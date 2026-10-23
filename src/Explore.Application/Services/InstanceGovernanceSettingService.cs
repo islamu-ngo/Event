@@ -7,14 +7,16 @@ using Explore.Application.DTOs.Instance;
 using Explore.Application.Notifications;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
+using Explore.Domain.Ai;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
+using Explore.Application.Features.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Services;
 
-public class InstanceGovernanceSettingService : IInstanceGovernanceSettingService
+public partial class InstanceGovernanceSettingService : IInstanceGovernanceSettingService
 {
     private readonly IHierarchicalSettingsResolver _resolver;
     private readonly SettingUpsertService _upsertService;
@@ -43,6 +45,11 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
 
         _logger.LogDebug("Resolved {Count} governance settings at instance scope", resolved.Count);
 
+        return MapOriginalSettings(resolved);
+    }
+
+    private static InstanceGovernanceSettings MapOriginalSettings(Dictionary<string, ResolvedSetting> resolved)
+    {
         var deployment = PopulateGroup<DeploymentSettingGroup>(resolved);
         var modules = PopulateGroup<ModuleSettingGroup>(resolved);
         var events = PopulateGroup<EventSettingGroup>(resolved);
@@ -308,62 +315,41 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         return SucceededEventPolicyResult(boundaryResult, [cardClickResult.Notification]);
     }
 
-    public async Task<PublicationPolicyMutationResult> ApplyEventPolicyPatchAsync(
-        PatchEventPolicyDto patch,
-        EventPolicyDto eventPolicy,
-        Guid? actorUserId,
+    public Task<PublicationPolicyMutationResult> ApplyEventPolicyPatchAsync(
+        TypedSettingsOriginal original,
+        ITypedSettingsOriginalStore store,
         CancellationToken cancellationToken = default)
     {
-        var valuesByKey = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (original.EventPolicy is not { } command || !command.Patch.HasChanges())
+            throw new UnauthorizedAccessException("The actual acquired event-policy patch is required.");
+        return store.ApplyEventPolicyAsync(original, cancellationToken);
+    }
+
+    public static ImmutableArray<TypedSettingsEffect> CompileEventPolicyOriginal(
+        TypedSettingsOriginal original, IReadOnlyDictionary<string, Explore.Domain.SystemSetting> system)
+    {
+        var patch = original.EventPolicy?.Patch
+            ?? throw new UnauthorizedAccessException("The original event-policy patch is required.");
+        var effects = ImmutableArray.CreateBuilder<TypedSettingsEffect>();
         if (patch.AllowUserSubmittedEvents.HasValue)
-            valuesByKey[GovernanceSettingKeys.Events.UserSubmissionEnabled] = eventPolicy.AllowUserSubmittedEvents;
+            effects.Add(new(GovernanceSettingKeys.Events.UserSubmissionEnabled,
+                SettingValueSerializer.Serialize(patch.AllowUserSubmittedEvents.Value), false));
         if (patch.AllowOrganizationSubmittedEvents.HasValue)
-            valuesByKey[GovernanceSettingKeys.Events.OrganizationSubmissionEnabled] = eventPolicy.AllowOrganizationSubmittedEvents;
+            effects.Add(new(GovernanceSettingKeys.Events.OrganizationSubmissionEnabled,
+                SettingValueSerializer.Serialize(patch.AllowOrganizationSubmittedEvents.Value), false));
         if (patch.AllowGroupSubmittedEvents.HasValue)
-            valuesByKey[GovernanceSettingKeys.Events.GroupSubmissionEnabled] = eventPolicy.AllowGroupSubmittedEvents;
-
-        PublicationPolicyMutationResult boundaryResult = new(true, null, string.Empty, []);
-        if (valuesByKey.Count > 0)
+            effects.Add(new(GovernanceSettingKeys.Events.GroupSubmissionEnabled,
+                SettingValueSerializer.Serialize(patch.AllowGroupSubmittedEvents.Value), false));
+        if (patch.EventCardClickOpensDetailPage.HasValue || patch.LockTenantEventCardClickBehavior.HasValue)
         {
-            DateTime occurredAtUtc = DateTime.UtcNow;
-            boundaryResult = await _upsertService.ApplyInstancePublicationPolicyAsync(
-                new PublicationPolicyInstanceMutationRequest(
-                    actorUserId ?? Guid.Empty,
-                    occurredAtUtc,
-                    [.. PublicationPolicySettingKeys.All
-                        .Where(valuesByKey.ContainsKey)
-                        .Select(key => new PublicationPolicySettingMutation(
-                            key,
-                            PublicationPolicyMutationKind.Set,
-                            SettingValueSerializer.Serialize(valuesByKey[key]),
-                            TenantId: null,
-                            IsLocked: false))]),
-                cancellationToken);
-            if (!boundaryResult.Success)
-                return boundaryResult;
+            string key = GovernanceSettingKeys.Events.CardClickOpensDetailPage;
+            var resolved = HierarchicalSettingMerge.Resolve(key, system)!;
+            var group = PopulateGroup<EventSettingGroup>(new Dictionary<string, ResolvedSetting> { [key] = resolved });
+            effects.Add(new(key, SettingValueSerializer.Serialize(patch.EventCardClickOpensDetailPage.HasValue
+                    ? patch.EventCardClickOpensDetailPage.Value : group.CardClickOpensDetailPage),
+                patch.LockTenantEventCardClickBehavior.HasValue ? patch.LockTenantEventCardClickBehavior.Value : resolved.IsLocked));
         }
-
-        var unguardedNotifications = new List<SettingChangedNotification>();
-        if (patch.EventCardClickOpensDetailPage.HasValue)
-        {
-            unguardedNotifications.Add((await _upsertService.UpsertValueWithDeferredInvalidationAsync(
-                GovernanceSettingKeys.Events.CardClickOpensDetailPage,
-                SettingValueSerializer.Serialize(eventPolicy.EventCardClickOpensDetailPage),
-                actorUserId,
-                isLocked: eventPolicy.LockTenantEventCardClickBehavior,
-                cancellationToken: cancellationToken)).Notification);
-        }
-        else if (patch.LockTenantEventCardClickBehavior.HasValue)
-        {
-            unguardedNotifications.Add(await _upsertService.UpsertLockAsync(
-                GovernanceSettingKeys.Events.CardClickOpensDetailPage,
-                SettingValueSerializer.Serialize(eventPolicy.EventCardClickOpensDetailPage),
-                eventPolicy.LockTenantEventCardClickBehavior,
-                actorUserId,
-                cancellationToken));
-        }
-
-        return SucceededEventPolicyResult(boundaryResult, unguardedNotifications);
+        return effects.ToImmutable();
     }
 
     private static ImmutableArray<PublicationPolicySettingMutation> CreateSubmissionMutations(
@@ -805,6 +791,7 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
 
     public async Task ApplyAiAssistantGovernanceSettingsAsync(AiAssistantGovernanceSettingsDto aiAssistant, Guid? actorUserId)
     {
+        ValidateAiAssistantCredentialScope(aiAssistant);
         var provider = NormalizeAiAssistantProvider(aiAssistant.Provider, aiAssistant.Enabled);
         var usesOfficialProvider = provider == AiProviderDefaults.ProviderOpenAi
             || provider == AiProviderDefaults.ProviderAnthropic;
@@ -814,7 +801,7 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         var endpointUrl = usesCompatibleProvider
             ? NormalizeOptionalUrl(aiAssistant.EndpointUrl)
             : string.Empty;
-        var apiKey = usesExternalProvider ? aiAssistant.ApiKey?.Trim() ?? string.Empty : string.Empty;
+        var credentialScope = usesExternalProvider ? aiAssistant.CredentialScope : "none";
         var modelId = usesExternalProvider ? aiAssistant.ModelId?.Trim() ?? string.Empty : string.Empty;
         var allowedModelIds = usesExternalProvider
             ? NormalizeAiModelIds([modelId], aiAssistant.AllowedModelIds)
@@ -836,8 +823,8 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
             isLocked: aiAssistant.LockTenantAiAssistant, actorUserId);
 
         await _upsertService.UpsertValueAsync(
-            GovernanceSettingKeys.AiAssistant.ApiKey,
-            SettingValueSerializer.Serialize(apiKey),
+            GovernanceSettingKeys.AiAssistant.CredentialScope,
+            SettingValueSerializer.Serialize(credentialScope),
             isLocked: aiAssistant.LockTenantAiAssistant, actorUserId);
 
         await _upsertService.UpsertValueAsync(
@@ -871,6 +858,8 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         Guid? actorUserId,
         CancellationToken cancellationToken = default)
     {
+        if (patch.ProviderConfiguration.HasValue || patch.Enabled is { HasValue: true, Value: true })
+            ValidateAiAssistantCredentialScope(aiAssistant);
         var notifications = new List<SettingChangedNotification>();
         var provider = NormalizeAiAssistantProvider(aiAssistant.Provider, aiAssistant.Enabled);
         var usesOfficialProvider = provider == AiProviderDefaults.ProviderOpenAi
@@ -881,7 +870,7 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         var endpointUrl = usesCompatibleProvider
             ? NormalizeOptionalUrl(aiAssistant.EndpointUrl)
             : string.Empty;
-        var apiKey = usesExternalProvider ? aiAssistant.ApiKey?.Trim() ?? string.Empty : string.Empty;
+        var credentialScope = usesExternalProvider ? aiAssistant.CredentialScope : "none";
         var modelId = usesExternalProvider ? aiAssistant.ModelId?.Trim() ?? string.Empty : string.Empty;
         var allowedModelIds = usesExternalProvider
             ? NormalizeAiModelIds([modelId], aiAssistant.AllowedModelIds)
@@ -921,8 +910,8 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
                 isLocked: aiAssistant.LockTenantAiAssistant,
                 cancellationToken: cancellationToken)).Notification);
             notifications.Add((await _upsertService.UpsertValueWithDeferredInvalidationAsync(
-                GovernanceSettingKeys.AiAssistant.ApiKey,
-                SettingValueSerializer.Serialize(apiKey),
+                GovernanceSettingKeys.AiAssistant.CredentialScope,
+                SettingValueSerializer.Serialize(credentialScope),
                 actorUserId,
                 isLocked: aiAssistant.LockTenantAiAssistant,
                 cancellationToken: cancellationToken)).Notification);
@@ -954,8 +943,8 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
                 actorUserId,
                 cancellationToken));
             notifications.Add(await _upsertService.UpsertLockAsync(
-                GovernanceSettingKeys.AiAssistant.ApiKey,
-                SettingValueSerializer.Serialize(apiKey),
+                GovernanceSettingKeys.AiAssistant.CredentialScope,
+                SettingValueSerializer.Serialize(aiAssistant.CredentialScope),
                 aiAssistant.LockTenantAiAssistant,
                 actorUserId,
                 cancellationToken));
@@ -1357,8 +1346,13 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
             Enabled = aiAssistant.Enabled,
             Provider = NormalizeAiAssistantProvider(aiAssistant.Provider, aiAssistant.Enabled),
             EndpointUrl = aiAssistant.EndpointUrl ?? string.Empty,
-            ApiKey = aiAssistant.ApiKey ?? string.Empty,
-            ApiKeyConfigured = !string.IsNullOrWhiteSpace(aiAssistant.ApiKey),
+            CredentialScope = aiAssistant.CredentialScope switch
+            {
+                AiCredentialScope.Instance => "instance",
+                AiCredentialScope.Tenant => "tenant",
+                AiCredentialScope.None => "none",
+                _ => throw new InvalidOperationException("AI credential scope is invalid.")
+            },
             ModelId = aiAssistant.ModelId ?? string.Empty,
             AllowedModelIds = NormalizeAiModelIds([aiAssistant.ModelId], aiAssistant.AllowedModelIds),
             AllowAnonymousAccess = aiAssistant.AllowAnonymousAccess,
@@ -1739,11 +1733,24 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         return raw.Trim().ToLowerInvariant() switch { "cerbos" => "cerbos", _ => "local" };
     }
 
+    private static void ValidateAiAssistantCredentialScope(AiAssistantGovernanceSettingsDto settings)
+    {
+        var failures = new List<FluentValidation.Results.ValidationFailure>();
+        if (settings.CredentialScope is not ("none" or "instance"))
+            failures.Add(new(nameof(settings.CredentialScope), "Instance AI credential scope must be none or instance."));
+
+        string provider = NormalizeAiAssistantProvider(settings.Provider, settings.Enabled);
+        if (provider is "openai" or "anthropic" && settings.CredentialScope != "instance")
+            failures.Add(new(nameof(settings.CredentialScope), "Official AI providers require an instance credential reference."));
+        if (provider == "fake" && settings.CredentialScope != "none")
+            failures.Add(new(nameof(settings.CredentialScope), "The fake AI provider does not accept a credential reference."));
+
+        if (failures.Count > 0)
+            throw new Exceptions.ValidationException(new FluentValidation.Results.ValidationResult(failures));
+    }
+
     private static string NormalizeAiAssistantProvider(string? provider, bool enabled)
     {
-        if (!enabled)
-            return AiProviderDefaults.ProviderNone;
-
         var normalized = provider?.Trim().ToLowerInvariant();
         return normalized is AiProviderDefaults.ProviderFake
             or AiProviderDefaults.ProviderOpenAi
@@ -1751,7 +1758,7 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
             or AiProviderDefaults.ProviderAnthropic
             or AiProviderDefaults.ProviderAnthropicCompatible
             ? normalized
-            : AiProviderDefaults.ProviderOpenAi;
+            : enabled ? AiProviderDefaults.ProviderOpenAi : AiProviderDefaults.ProviderNone;
     }
 
     private static IReadOnlyList<string> NormalizeAiModelIds(params IEnumerable<string?>[] modelIdGroups)

@@ -1,4 +1,3 @@
-using System.Linq;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -10,6 +9,8 @@ using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using Microsoft.Extensions.Configuration;
 using Explore.Application.Configuration;
+using Explore.Application.Features.InstanceOnboarding.Services;
+using Explore.Domain;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
@@ -19,7 +20,9 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
     ISetupSecretProvider setupSecretProvider,
     IInstanceBootstrapAuditLogger instanceBootstrapAuditLogger,
     IUnitOfWork unitOfWork,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    IEventDiscoveryEnrollmentGate enrollmentGate,
+    ITrustedSetupSettingsWriter? setupSettingsWriter = null)
     : ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -50,14 +53,41 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
                 "Invalid onboarding profile.");
         }
 
+        await using var enrollment = await enrollmentGate.AcquireAsync(cancellationToken);
         var response = await unitOfWork.ExecuteBootstrapConvergenceAsync(async transactionToken =>
         {
             var current = await instanceBootstrapStateRepository.GetCurrentForUpdate(transactionToken);
             if (current?.Status == InstanceBootstrapStatus.Completed
                 || !await setupSecretProvider.IsSetupModeActiveAsync(transactionToken))
                 return BaseCommandResponse.Validation<Guid>(["Setup mode is no longer active."], "Setup mode is no longer active.");
-            await InstanceOnboardingProfileSettingHelpers.PersistAsync(systemSettingRepository, profile, configuration, transactionToken);
-            return BaseCommandResponse.Success(current?.Id ?? Guid.Empty, "Instance onboarding profile saved successfully.");
+            var writes = new List<SystemSetting>();
+            InstanceOnboardingProfileSettingHelpers.AddSettings(writes, profile, configuration);
+            Guid? bootstrapId = current?.Id;
+            long? generation = current?.Generation;
+            InstanceBootstrapStatus? status = current?.Status;
+            InstanceBootstrapMode? mode = current?.Mode;
+            string? fingerprint = current?.ConfigurationFingerprint;
+            using var apply = new TrustedSetupSettingsApply<BaseCommandResponse<Guid>>(
+                unitOfWork, new TrustedSetupSettingsSource(null, null, null), writes,
+                (_, _) => Task.FromResult(BaseCommandResponse.Success(current?.Id ?? Guid.Empty,
+                    "Instance onboarding profile saved successfully.")),
+                async token =>
+                {
+                    var terminal = await instanceBootstrapStateRepository.GetCurrentForUpdate(token);
+                    if (terminal?.Id != bootstrapId || terminal?.Generation != generation
+                        || terminal?.Status != status || terminal?.Mode != mode
+                        || terminal?.ConfigurationFingerprint != fingerprint)
+                        throw new UnauthorizedAccessException("Setup profile lost its original pending generation.");
+                    foreach (var effect in writes)
+                    {
+                        var stored = await systemSettingRepository.GetByKey(effect.SettingKey, token);
+                        if (stored?.Value != effect.Value || stored.IsLocked != effect.IsLocked)
+                            throw new UnauthorizedAccessException("Setup profile did not retain its exact effects.");
+                    }
+                });
+            return await (setupSettingsWriter
+                ?? throw new InvalidOperationException("Setup profile requires its trusted settings writer."))
+                .ExecuteAsync(apply, transactionToken);
         }, cancellationToken);
         if (!response.IsSuccess) return response;
 

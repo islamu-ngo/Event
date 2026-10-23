@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Domain.CustomProperties;
 using Explore.Domain.References;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;
@@ -40,7 +41,7 @@ public class CustomPropertyDefinitionConfiguration : IEntityTypeConfiguration<Cu
             .HasMaxLength(1000);
 
         builder.Property(e => e.RegexPattern)
-            .HasMaxLength(1000);
+            .HasMaxLength(CustomPropertyPatternPolicy.MaximumPatternLength);
 
         builder.Property(e => e.AllowedUrlSchemes)
             .HasMaxLength(500);

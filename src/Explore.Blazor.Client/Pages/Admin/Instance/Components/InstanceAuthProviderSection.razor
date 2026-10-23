@@ -2,9 +2,11 @@
 @using Explore.Blazor.Client.Components.Onboarding
 @using Explore.Blazor.Client.Services
 @using MudBlazor
+@implements IDisposable
 
 @inject IDialogService DialogService
 @inject IBrowserActionInterop BrowserActionInterop
+@inject NavigationManager Navigation
 
 <div class="settings-section">
     <div class="settings-section-header">
@@ -212,7 +214,16 @@
                         @if (Model.GoogleSsoEnabled == true)
                         {
                             <MudTextField Variant="Variant.Outlined" T="string" Label="Client ID" @bind-Value="Model.GoogleClientId" />
-                            <MudTextField Variant="Variant.Outlined" T="string" Label="Client Secret" InputType="InputType.Password" @bind-Value="Model.GoogleClientSecret" />
+                            <MudAlert Severity="@(Model.GoogleClientSecretOwnership?.Configured == true ? Severity.Info : Severity.Warning)" Dense="true">
+                                <MudText Typo="Typo.body2">
+                                    @(Model.GoogleClientSecretOwnership?.Configured == true
+                                        ? "The Google client secret is configured by deployment."
+                                        : "The Google client secret is not confirmed configured by deployment.")
+                                </MudText>
+                                <MudText Typo="Typo.body2">
+                                    Configure or rotate it in Google and the selected secret authority, restart affected replicas, then reload this page and verify sign-in. This page cannot edit the client secret.
+                                </MudText>
+                            </MudAlert>
                         }
 
                         <section class="instance-auth-provider__visitor-onboarding"
@@ -297,8 +308,8 @@
 
                 <MudPaper Outlined="true" Class="pa-4" Style="@GetAuthorizationCardStyle(CerbosProvider)">
                     <MudStack Spacing="2">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2" Wrap="Wrap.Wrap">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Wrap="Wrap.Wrap">
                                 <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">Cerbos (External PDP)</MudText>
                                 <MudTooltip Text="Route protected authorization checks to Cerbos. When selected, authorized requests are denied if Cerbos is unavailable.">
                                     <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" />
@@ -368,7 +379,7 @@
                                         <div>
                                             <MudText Typo="Typo.subtitle2">Policy package sync</MudText>
                                             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                                Publish the latest embedded authorization policy bundle through the BFF using @((AuthorizationModel.CerbosAdminCredentialsOwnership?.Badge ?? "configured").ToLowerInvariant()) server-side credentials, or download the same package for manual cerbosctl put installation. The browser never owns the Admin API password.
+                                                Publish through the BFF with a fresh administrator pair for this request, or download the package for operator-owned cerbosctl installation. Both fields are cleared after every attempt.
                                             </MudText>
                                         </div>
                                         <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
@@ -384,11 +395,16 @@
                                                        StartIcon="@(_isSyncing ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Sync)"
                                                        Disabled="@(!CanSyncCerbosPolicies)"
                                                        OnClick="SyncCerbosPoliciesAsync">
-                                                @(_isSyncing ? "Syncing..." : IsDeploymentAuthorizationProvider ? "Retry Authorization Setup" : "Sync Policies")
+                                                 @(_isSyncing ? "Syncing..." : "Publish Policies")
                                             </MudButton>
                                         </MudStack>
                                     </MudStack>
 
+                                    <MudTextField T="string" Id="instance-cerbos-username" Label="One-time Cerbos administrator username"
+                                                  @bind-Value="_cerbosUsername" Immediate="true" autocomplete="off" />
+                                    <MudTextField T="string" Id="instance-cerbos-password" Label="One-time Cerbos administrator password"
+                                                  @bind-Value="_cerbosPassword" Immediate="true" autocomplete="off"
+                                                  InputType="InputType.Password" />
                                     @if (AuthorizationModel.CerbosEndpointVerified != true)
                                     {
                                         <MudAlert Severity="Severity.Info" Dense="true">
@@ -444,9 +460,30 @@
     public IInstanceOnboardingService? OnboardingService { get; set; }
 
     private bool _isSyncing;
+    private string? _cerbosUsername;
+    private string? _cerbosPassword;
     private bool _isDownloadingPackage;
     private BaseCommandResponseOfGuid? _syncResult;
     private BaseCommandResponseOfGuid? _downloadResult;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        _cerbosUsername = null;
+        _cerbosPassword = null;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        _cerbosUsername = null;
+        _cerbosPassword = null;
+    }
 
     private int CurrentPrimaryProviderId =>
         Model.PrimaryProviderId is KeycloakProviderId
@@ -523,13 +560,12 @@
         if (providerId == KeycloakProviderId
             && (string.IsNullOrWhiteSpace(Model.KeycloakAuthority)
                 || string.IsNullOrWhiteSpace(Model.KeycloakClientId)
-                || (string.IsNullOrWhiteSpace(Model.KeycloakClientSecret)
-                    && Model.KeycloakClientSecretOwnership?.Configured != true)))
+                || Model.KeycloakClientSecretOwnership?.Configured != true))
         {
             await DialogService.ShowMessageBoxAsync(new MessageBoxOptions
             {
                 Title = "Prepare Keycloak first",
-                Message = "Enter the Keycloak authority, client ID, and client secret, then verify the target realm before switching.",
+                Message = "Enter the Keycloak authority and client ID, configure the client secret through the selected deployment secret authority, restart affected replicas, then reload and verify the target realm before switching.",
                 YesText = "OK"
             }, DialogOptionsFactory.Confirmation());
             return;
@@ -605,7 +641,6 @@
         {
             Model.AtprotoLoginEnabled = true;
             Model.GoogleSsoEnabled = false;
-            Model.GoogleClientSecret = string.Empty;
         }
     }
 
@@ -639,10 +674,8 @@
         !_isSyncing
         && OnboardingService is not null
         && IsAuthorizationProviderSelected(CerbosProvider)
-        && (IsDeploymentAuthorizationProvider
-            || (AuthorizationModel.CerbosEndpointVerified == true
-                && AuthorizationModel.CerbosAdminUsernameConfigured == true
-                && AuthorizationModel.CerbosAdminPasswordConfigured == true));
+        && !string.IsNullOrWhiteSpace(_cerbosUsername)
+        && !string.IsNullOrWhiteSpace(_cerbosPassword);
 
     private bool IsCerbosEndpointReadOnly => AuthorizationModel.CerbosEndpointOwnership?.Editable != true;
 
@@ -745,6 +778,8 @@
     {
         if (!CanSyncCerbosPolicies || OnboardingService is null)
         {
+            _cerbosUsername = null;
+            _cerbosPassword = null;
             return;
         }
 
@@ -754,7 +789,12 @@
 
         try
         {
-            var response = await OnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync();
+            var response = await OnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync(
+                new AuthorizationPolicyPackageSyncRequestDto
+                {
+                    AdminUsername = _cerbosUsername,
+                    AdminPassword = _cerbosPassword
+                });
             if (response.Success == true && IsDeploymentAuthorizationProvider)
             {
                 AuthorizationModel = await OnboardingService.GetAuthorizationProviderConfigurationAsAdminAsync();
@@ -784,6 +824,8 @@
         }
         finally
         {
+            _cerbosUsername = null;
+            _cerbosPassword = null;
             _isSyncing = false;
         }
     }

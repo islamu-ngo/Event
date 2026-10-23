@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Persistence;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure;
@@ -18,9 +19,9 @@ public sealed class IdempotencyCleanupSettingsValidator : IValidateOptions<Idemp
             failures.Add("IdempotencyCleanup:PollingIntervalMinutes must be greater than zero.");
         }
 
-        if (options.BatchSize <= 0)
+        if (options.BatchSize is < 1 or > IdempotencyCleanupLimits.MaximumRows)
         {
-            failures.Add("IdempotencyCleanup:BatchSize must be greater than zero.");
+            failures.Add($"IdempotencyCleanup:BatchSize must be between 1 and {IdempotencyCleanupLimits.MaximumRows}.");
         }
 
         if (options.ExpirationGraceHours < 0)

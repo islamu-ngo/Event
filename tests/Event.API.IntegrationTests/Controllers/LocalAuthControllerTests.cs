@@ -63,7 +63,7 @@ public sealed class LocalAuthControllerTests
     [Test]
     [Arguments(LocalAuthFailure.InvalidRequest, StatusCodes.Status400BadRequest, "invalid_request")]
     [Arguments(LocalAuthFailure.InvalidCredentials, StatusCodes.Status401Unauthorized, "invalid_credentials")]
-    [Arguments(LocalAuthFailure.AccountLocked, StatusCodes.Status401Unauthorized, "account_locked")]
+    [Arguments(LocalAuthFailure.AccountLocked, StatusCodes.Status401Unauthorized, "invalid_credentials")]
     [Arguments(LocalAuthFailure.ProviderInactive, StatusCodes.Status409Conflict, "provider_inactive")]
     [Arguments(LocalAuthFailure.UserSynchronizationFailed, StatusCodes.Status503ServiceUnavailable, "user_sync_failed")]
     [Arguments(LocalAuthFailure.AuthenticationFailed, StatusCodes.Status503ServiceUnavailable, "authentication_failed")]

@@ -17,7 +17,7 @@ public sealed class LocalWebhookDeliveryHealthCheckTests
     [Test]
     public async Task CheckHealthAsync_WhenLocalProviderNotSelected_ReturnsHealthyWithoutQueueQuery()
     {
-        var targetRepository = Substitute.For<IWebhookLocalTargetRepository>();
+        var targetRepository = Substitute.For<IWebhookLocalDeliveryHealthObserver>();
         var healthCheck = CreateHealthCheck(
             targetRepository,
             new WebhookOptions { Enabled = true, Provider = WebhookOptions.ProviderSvix },
@@ -27,15 +27,14 @@ public sealed class LocalWebhookDeliveryHealthCheckTests
 
         await Assert.That(result.Status).IsEqualTo(HealthStatus.Healthy);
         await Assert.That(result.Data["localProviderSelected"]).IsEqualTo(false);
-        await targetRepository.DidNotReceiveWithAnyArgs().CountDueAsync(default, default);
-        await targetRepository.DidNotReceiveWithAnyArgs().CountStaleDeliveringAsync(default, default);
+        await targetRepository.DidNotReceiveWithAnyArgs().ObserveAsync(default, default);
     }
 
     [Test]
     public async Task CheckHealthAsync_WhenProcessorDisabled_ReturnsDegraded()
     {
         var healthCheck = CreateHealthCheck(
-            Substitute.For<IWebhookLocalTargetRepository>(),
+            Substitute.For<IWebhookLocalDeliveryHealthObserver>(),
             new WebhookOptions { Enabled = true, Provider = WebhookOptions.ProviderLocal },
             new WebhookDeliveryProcessorSettings { Enabled = false });
 
@@ -48,11 +47,9 @@ public sealed class LocalWebhookDeliveryHealthCheckTests
     [Test]
     public async Task CheckHealthAsync_WhenQueueBelowThreshold_ReturnsHealthyWithSafeCounts()
     {
-        var targetRepository = Substitute.For<IWebhookLocalTargetRepository>();
-        targetRepository.CountDueAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(5);
-        targetRepository.CountStaleDeliveringAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(0);
+        var targetRepository = Substitute.For<IWebhookLocalDeliveryHealthObserver>();
+        targetRepository.ObserveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(new WebhookLocalDeliveryHealth(5, 0));
         var healthCheck = CreateHealthCheck(
             targetRepository,
             new WebhookOptions { Enabled = true, Provider = WebhookOptions.ProviderLocal },
@@ -75,11 +72,9 @@ public sealed class LocalWebhookDeliveryHealthCheckTests
     [Test]
     public async Task CheckHealthAsync_WhenStaleSendingAtThreshold_ReturnsDegraded()
     {
-        var targetRepository = Substitute.For<IWebhookLocalTargetRepository>();
-        targetRepository.CountDueAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(0);
-        targetRepository.CountStaleDeliveringAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(1);
+        var targetRepository = Substitute.For<IWebhookLocalDeliveryHealthObserver>();
+        targetRepository.ObserveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(new WebhookLocalDeliveryHealth(0, 1));
         var healthCheck = CreateHealthCheck(
             targetRepository,
             new WebhookOptions { Enabled = true, Provider = WebhookOptions.ProviderLocal },
@@ -93,6 +88,42 @@ public sealed class LocalWebhookDeliveryHealthCheckTests
 
         await Assert.That(result.Status).IsEqualTo(HealthStatus.Degraded);
         await Assert.That(result.Data["staleDeliveringTargets"]).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task CheckHealthAsync_WhenAuthorityFails_ReturnsUnhealthyWithoutAggregateData()
+    {
+        var observer = Substitute.For<IWebhookLocalDeliveryHealthObserver>();
+        observer.ObserveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<WebhookLocalDeliveryHealth>(
+                new InvalidOperationException("webhook_health_authority_not_ready")));
+        var healthCheck = CreateHealthCheck(observer,
+            new WebhookOptions { Enabled = true, Provider = WebhookOptions.ProviderLocal },
+            new WebhookDeliveryProcessorSettings());
+
+        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
+
+        await Assert.That(result.Status).IsEqualTo(HealthStatus.Unhealthy);
+        await Assert.That(result.Exception).IsNull();
+        await Assert.That(result.Data.Keys).DoesNotContain("dueLocalTargets");
+        await Assert.That(result.Data.Keys).DoesNotContain("staleDeliveringTargets");
+        await Assert.That(result.Data.Keys).DoesNotContain("observedAtUtc");
+    }
+
+    [Test]
+    public async Task CheckHealthAsync_WhenObservationCancelled_PropagatesCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var observer = Substitute.For<IWebhookLocalDeliveryHealthObserver>();
+        observer.ObserveAsync(Arg.Any<DateTimeOffset>(), cancellation.Token)
+            .Returns(Task.FromCanceled<WebhookLocalDeliveryHealth>(cancellation.Token));
+        var healthCheck = CreateHealthCheck(observer,
+            new WebhookOptions { Enabled = true, Provider = WebhookOptions.ProviderLocal },
+            new WebhookDeliveryProcessorSettings());
+
+        await Assert.That(async () => await healthCheck.CheckHealthAsync(
+            new HealthCheckContext(), cancellation.Token)).Throws<OperationCanceledException>();
     }
 
     [Test]
@@ -134,7 +165,7 @@ public sealed class LocalWebhookDeliveryHealthCheckTests
     }
 
     private static LocalWebhookDeliveryHealthCheck CreateHealthCheck(
-        IWebhookLocalTargetRepository targetRepository,
+        IWebhookLocalDeliveryHealthObserver targetRepository,
         WebhookOptions webhookOptions,
         WebhookDeliveryProcessorSettings settings)
     {

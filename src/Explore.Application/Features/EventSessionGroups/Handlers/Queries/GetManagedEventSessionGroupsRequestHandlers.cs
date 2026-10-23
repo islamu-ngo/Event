@@ -7,14 +7,17 @@ using Explore.Application.Mappings;
 namespace Explore.Application.Features.EventSessionGroups.Handlers.Queries;
 
 public sealed class GetManagedEventSessionGroupsByEventRequestHandler(
-    IEventSessionGroupRepository repository)
+    IEventSessionGroupRepository repository,
+    IPrivateEventManagementReader? privateManagement = null)
     : IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>>
 {
     public async Task<List<EventSessionGroupListDto>> QueryAsync(
         GetManagedEventSessionGroupsByEventRequest request,
         CancellationToken cancellationToken = default)
     {
-        var groups = await repository.GetActiveByEventAsync(request.EventId, cancellationToken);
+        var groups = privateManagement is null ? await repository.GetActiveByEventAsync(request.EventId, cancellationToken)
+            : (await privateManagement.ReadAsync(new(PrivateEventManagementReadKind.Program, request.EventId), cancellationToken))
+                .SessionGroups.OrderBy(group => group.SortOrder).ThenBy(group => group.Name).ToList();
         var dtos = groups.Select(EventSessionMapper.ToListItem).ToList();
         for (var index = 0; index < dtos.Count; index++)
         {

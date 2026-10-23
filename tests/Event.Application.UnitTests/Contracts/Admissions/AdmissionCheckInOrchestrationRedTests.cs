@@ -16,6 +16,42 @@ public sealed class AdmissionCheckInOrchestrationRedTests
     private static readonly DateTime UtcNow = new(2026, 8, 26, 12, 0, 0, DateTimeKind.Utc);
 
     [Test]
+    public async Task ScannerIssuanceAndRevocationPersistThePersonalActorRatherThanTheAuthenticatedUserKey()
+    {
+        CheckInScenario scenario = new(UtcNow);
+        var service = ScannerCapabilityPorts.TypedService(scenario);
+        var issued = await service.IssueAsync(ScannerCapabilityPorts.IssueRequest(scenario) with
+        {
+            IssuedByUserId = scenario.StaffUserId
+        }, CancellationToken.None);
+        await Assert.That(issued.Outcome).IsEqualTo(AdmissionScannerCapabilityIssueOutcome.Issued);
+        AdmissionScannerCapability stored = scenario.ScannerCapabilities[issued.ScannerCapabilityId];
+        await Assert.That(stored.IssuedByActorId).IsEqualTo(scenario.StaffActorId);
+        await Assert.That(stored.IssuedByActorId).IsNotEqualTo(scenario.StaffUserId);
+        await service.RevokeAsync(ScannerCapabilityPorts.RevokeRequest(scenario, stored.Id) with
+        {
+            RevokedByUserId = scenario.StaffUserId
+        }, CancellationToken.None);
+        await Assert.That(stored.RevokedByActorId).IsEqualTo(scenario.StaffActorId);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ScannerIssuanceCannotUseAMissingOrAnotherUsersPersonalActor(bool otherUser)
+    {
+        CheckInScenario scenario = new(UtcNow);
+        scenario.ScannerActor = otherUser
+            ? new ActorOwnershipFacts(Guid.CreateVersion7(), Guid.CreateVersion7(), null, null) : null;
+        var result = await ScannerCapabilityPorts.TypedService(scenario).IssueAsync(
+            ScannerCapabilityPorts.IssueRequest(scenario) with { IssuedByUserId = scenario.StaffUserId },
+            CancellationToken.None);
+        await Assert.That(result.Outcome).IsEqualTo(AdmissionScannerCapabilityIssueOutcome.Rejected);
+        await Assert.That(result.PlaintextCapability).IsNull();
+        await Assert.That(scenario.ScannerCapabilities).IsEmpty();
+    }
+
+    [Test]
     [Arguments("Staff")]
     [Arguments("ScannerCapability")]
     public async Task CheckInUsesOneTenantDigestLookupAndRequiresStaffOrScopedScannerAuthority(string authorityKind)
@@ -408,7 +444,7 @@ internal static class CheckInPorts
         new CheckInPortFake(scenario),
         new CheckInPortFake(scenario),
         new CheckInPortFake(scenario),
-        scenario.UnitOfWork,
+        new CheckInPortFake(scenario),
         scenario.Clock);
 
     internal static AdmissionCheckInRequest TypedRequest(CheckInScenario scenario) => new(
@@ -464,6 +500,8 @@ internal static class ScannerCapabilityPorts
         new CheckInPortFake(scenario),
         new CheckInPortFake(scenario),
         scenario.UnitOfWork,
+        new CheckInPortFake(scenario),
+        new CheckInPortFake(scenario),
         scenario.Clock);
 
     internal static AdmissionScannerCapabilityIssueRequest IssueRequest(
@@ -477,7 +515,7 @@ internal static class ScannerCapabilityPorts
             [AdmissionCheckInAction.CheckIn, AdmissionCheckInAction.Undo],
             "North entrance scanner",
             scenario.Clock.GetUtcNow().AddHours(1),
-            scenario.StaffActorId);
+            scenario.StaffUserId);
 
     internal static AdmissionScannerCapabilityReadRequest ReadRequest(
         CheckInScenario scenario,
@@ -490,7 +528,7 @@ internal static class ScannerCapabilityPorts
             scenario.TenantId,
             eventId ?? scenario.EventId,
             capabilityId,
-            scenario.StaffActorId,
+            scenario.StaffUserId,
             "DeviceLost");
 }
 
@@ -501,6 +539,7 @@ internal sealed class CheckInScenario
         Clock = new CheckInTimeProvider(utcNow);
         UnitOfWork = new CheckInUnitOfWork();
         CredentialStates[Digest(Credential)] = "Active";
+        ScannerActor = new ActorOwnershipFacts(StaffActorId, StaffUserId, null, null);
     }
 
     internal Guid TenantId { get; } = Guid.CreateVersion7();
@@ -508,6 +547,8 @@ internal sealed class CheckInScenario
     internal Guid TargetId { get; } = Guid.CreateVersion7();
     internal Guid AdmissionTicketId { get; } = Guid.CreateVersion7();
     internal Guid StaffActorId { get; } = Guid.CreateVersion7();
+    internal Guid StaffUserId { get; } = Guid.CreateVersion7();
+    internal ActorOwnershipFacts? ScannerActor { get; set; }
     internal Guid ScannerCapabilityIssueRequestId { get; } = Guid.CreateVersion7();
     internal string Credential { get; } = RuntimeCapability.New();
     internal CheckInTimeProvider Clock { get; }
@@ -570,7 +611,7 @@ internal sealed class CheckInUnitOfWork : IUnitOfWork
     }
 
     public Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
-        operation(ct);
+        ExecuteInTransactionAsync(operation, ct);
 
     public Task<T> ExecuteReadCommittedAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
         ExecuteInTransactionAsync(operation, ct);
@@ -578,12 +619,22 @@ internal sealed class CheckInUnitOfWork : IUnitOfWork
 
 internal sealed class CheckInPortFake(CheckInScenario scenario) :
     IAdmissionCheckInTransaction,
+    IAdmissionTargetTransaction,
+    IActorOwnershipReader,
     IAdmissionCheckInCredentialDigestService,
     IAdmissionCheckInAuthority,
     IAdmissionCheckInTelemetry,
     IAdmissionScannerCapabilityMaterialService,
     IAdmissionScannerCapabilityRepository
 {
+    public Task<ActorOwnershipFacts?> ReadForUserAsync(Guid userId, Guid tenantId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(tenantId == scenario.TenantId ? scenario.ScannerActor : null);
+
+    public Task<T> ExecuteAsync<T>(Guid tenantId, Guid targetId,
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken) =>
+        scenario.UnitOfWork.ExecuteSerializableAsync(operation, cancellationToken);
+
     public Task<AdmissionCheckInCredentialDigest> DigestAsync(
         AdmissionCheckInCredentialDigestRequest request,
         CancellationToken cancellationToken)
@@ -766,10 +817,6 @@ internal sealed class CheckInPortFake(CheckInScenario scenario) :
     public Task<IReadOnlyList<AdmissionScannerCapability>> ListAsync(
         Guid tenantId,
         Guid eventId,
-        CancellationToken cancellationToken) => throw new NotSupportedException();
-
-    public Task<AdmissionScannerCapability?> FindByDigestCandidatesAsync(
-        IReadOnlyList<AdmissionScannerCapabilityDigestCandidate> candidates,
         CancellationToken cancellationToken) => throw new NotSupportedException();
 
     public Task<AdmissionScannerCapabilityDigestCandidates> DigestCandidatesAsync(

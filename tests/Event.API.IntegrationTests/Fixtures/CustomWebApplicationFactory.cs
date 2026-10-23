@@ -1,6 +1,8 @@
 using System.Threading.Channels;
+using Event.Testing.DataProtection;
 using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -15,6 +17,7 @@ namespace Event.Api.IntegrationTests.Fixtures;
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"InMemoryDbForTesting_{Guid.CreateVersion7():N}";
+    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -60,6 +63,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             TestHostServicePruner.RemoveNoisyHostedServices(services);
+            services.RemoveAll<IExternalDataProtectionSource>();
+            services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
         });
     }
 

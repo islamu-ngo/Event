@@ -2,6 +2,8 @@ namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Persistence.Database;
+using Explore.Persistence.Security;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 public sealed class ConfigurationImportSessionRepository(
@@ -13,6 +15,11 @@ public sealed class ConfigurationImportSessionRepository(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(session);
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+        {
+            await native.CreateSessionAsync(session, cancellationToken);
+            return;
+        }
         await dbContext.Set<ConfigurationImportSession>()
             .AddAsync(session, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -26,6 +33,12 @@ public sealed class ConfigurationImportSessionRepository(
         ArgumentOutOfRangeException.ThrowIfEqual(sessionId, Guid.Empty);
         ArgumentNullException.ThrowIfNull(target);
         string authorityKey = target.GetSessionStorageKey();
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+        {
+            if (target.Scope != ConfigurationImportScope.Instance)
+                throw new InvalidOperationException("An instance import owner cannot read a tenant session.");
+            return native.ReadSessionAsync(sessionId, cancellationToken);
+        }
         return AcquireAsync(sessionId, authorityKey, cancellationToken);
     }
 
@@ -82,6 +95,13 @@ public sealed class ConfigurationImportSessionRepository(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(session);
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+        {
+            long revision = dbContext.Entry(session).Property(row => row.Revision).OriginalValue;
+            await native.WriteSessionAsync(session, revision, cancellationToken);
+            dbContext.Entry(session).State = EntityState.Unchanged;
+            return;
+        }
         if (dbContext.Entry(session).State == EntityState.Detached)
             dbContext.Update(session);
         await dbContext.SaveChangesAsync(cancellationToken);

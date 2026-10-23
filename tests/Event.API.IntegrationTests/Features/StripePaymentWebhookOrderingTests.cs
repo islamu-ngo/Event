@@ -304,9 +304,12 @@ public sealed class StripePaymentWebhookOrderingTests
             return capture;
         }
 
-        public Task<RegistrationPaymentReconciliationResult> ReconcileAsync() =>
-            new RegistrationPaymentReconciliationService(paymentRepository, Checkout, Payment, timeProvider)
+        public Task<RegistrationPaymentReconciliationResult> ReconcileAsync()
+        {
+            var ports = Event.Api.IntegrationTests.Fixtures.PaymentReconciliationTestPorts.Create(paymentRepository);
+            return new RegistrationPaymentReconciliationService(ports.Admission, ports.Execution, Checkout, Payment, timeProvider)
                 .ReconcileDueAsync(new RegistrationPaymentReconciliationRequest("ordering-reconcile"), CancellationToken.None);
+        }
 
         public async ValueTask DisposeAsync()
         {

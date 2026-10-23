@@ -1,6 +1,9 @@
+using System.Runtime.ExceptionServices;
 using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -74,55 +77,120 @@ public partial class ExploreDbContext
             throw StorageReferenceConflict();
         var carriers = StorageReferenceCarriers();
         if (!Database.IsRelational())
+        {
+            await ValidateTrackedTenantAuthorityAsync(cancellationToken);
             return await persist(acceptAllChangesOnSuccess);
+        }
+        bool changesHumanSources = ChangeTracker.Entries()
+            .Any(HumanSecuritySourceMutationClassifier.RequiresGate);
+        bool changesEnrollment = ChangeTracker.Entries()
+            .Any(EventDiscoveryDisclosureMutationScope.RequiresEnrollmentGate);
+        void RequireCustody()
+        {
+            if (changesHumanSources)
+                HumanSecuritySourceGate.RequireCurrent(this);
+            if (changesEnrollment)
+                EventDiscoveryEnrollmentGate.RequireCurrent(this);
+        }
         if (Database.CurrentTransaction is not null)
         {
-            await DisclosureMutations.CaptureAsync(cancellationToken);
-            return await PersistStorageReferencesAsync(
-                carriers, () => persist(acceptAllChangesOnSuccess), cancellationToken);
+            RequireCustody();
+            try
+            {
+                var enrollment = PrepareDiscoveryEnrollmentSave();
+                await ValidateTrackedTenantAuthorityAsync(cancellationToken);
+                RequireCustody();
+                await DisclosureMutations.CaptureAsync(cancellationToken);
+                RequireCustody();
+                int saved = await PersistStorageReferencesAsync(
+                    carriers, () => persist(acceptAllChangesOnSuccess), cancellationToken);
+                RequireCustody();
+                CompleteDiscoveryEnrollmentSave(enrollment, saved);
+                return saved;
+            }
+            catch
+            {
+                FailDiscoveryEnrollmentSave();
+                if (changesHumanSources)
+                    PoisonStorageReferenceTransaction();
+                throw;
+            }
         }
 
         var stamps = CaptureTrackedStorageStamps();
         Dictionary<Guid, Guid> commitStamps = [];
+        IAsyncDisposable? humanGate = null;
+        IAsyncDisposable? enrollmentGate = null;
+        Exception? failure = null;
+        bool settled = false;
+        int result = 0;
         try
         {
-            int result = await Database.CreateExecutionStrategy().ExecuteInTransactionAsync(
+            if (changesHumanSources && !HumanSecuritySourceGate.TryRequireCurrent(this))
+            {
+                if (EventDiscoveryEnrollmentGate.TryRequireCurrent(this))
+                    throw new InvalidOperationException("discovery_source_gate_order_invalid");
+                humanGate = await new HumanSecuritySourceGate(this).AcquireAsync(cancellationToken);
+            }
+            if (changesEnrollment && !EventDiscoveryEnrollmentGate.TryRequireCurrent(this))
+                enrollmentGate = await new EventDiscoveryEnrollmentGate(this).AcquireAsync(cancellationToken);
+            RequireCustody();
+            result = await Database.CreateExecutionStrategy().ExecuteInTransactionAsync(
                 this,
                 async (_, token) =>
                 {
+                    RequireCustody();
                     commitStamps = [];
                     RestoreTrackedStorageStamps(stamps);
                     ResetDisclosureMutations();
+                    var enrollment = PrepareDiscoveryEnrollmentSave();
+                    await ValidateTrackedTenantAuthorityAsync(token);
+                    RequireCustody();
                     await DisclosureMutations.CaptureAsync(token);
+                    RequireCustody();
                     int saved = await PersistStorageReferencesAsync(carriers, () => persist(false), token);
+                    RequireCustody();
+                    CompleteDiscoveryEnrollmentSave(enrollment, saved);
                     await FlushDisclosureAsync(token);
+                    RequireCustody();
                     commitStamps = CaptureStorageCommitStamps();
                     return saved;
                 },
                 async (_, token) =>
                 {
+                    RequireCustody();
                     foreach (var stamp in commitStamps)
                         if (await StorageReferenceSources([stamp.Key])
                             .AnyAsync(source => source.ConcurrencyStamp == stamp.Value, token))
                             return true;
                     return false;
                 }, System.Data.IsolationLevel.Serializable, cancellationToken);
+            settled = true;
+            RequireCustody();
             if (acceptAllChangesOnSuccess)
                 ChangeTracker.AcceptAllChanges();
-            return result;
         }
-        catch
+        catch (Exception exception)
         {
-            ResetDisclosureMutations();
-            RestoreTrackedStorageStamps(stamps);
-            throw;
+            failure = exception;
+            if (!settled)
+            {
+                ResetDisclosureMutations();
+                RestoreTrackedStorageStamps(stamps);
+            }
         }
+        failure = await ReleaseOwnedDisclosureGatesAsync(enrollmentGate, humanGate, failure, settled);
+        if (failure is not null)
+            ExceptionDispatchInfo.Capture(failure).Throw();
+        return result;
     }
 
     private async Task<int> PersistStorageReferencesAsync(
         List<(EntityEntry Entry, IProperty Property)> carriers, Func<Task<int>> persist,
         CancellationToken cancellationToken)
     {
+        if (carriers.Count == 0)
+            return await persist();
         try
         {
             if (StorageReferenceTransactionFailed)
@@ -135,6 +203,8 @@ public partial class ExploreDbContext
                 foreach (var carrier in group)
                     CollectStorageReference(references, carrier.Entry, carrier.Property, persisted);
             }
+            if (references.Count == 0)
+                return await persist();
             var sources = await StorageReferenceSources(references.Keys).ToListAsync(cancellationToken);
             ValidateMissingStorageReferences(references, sources);
             await FenceStorageReferenceRowsAsync(sources, cancellationToken);

@@ -4,7 +4,7 @@ ABOUTME: Captures key runtime patterns and boundaries that are not obvious from 
 # Technical Architecture
 
 > **Audience:** Contributors | Architects | Operators | Integrators | AI agents
-> **Status:** Implemented
+> **Status:** Mixed
 > **Owner:** Contributor Experience
 > **Last Verified:** 2026-09-03
 > **Source Anchors:** `src/Explore.API/Program.cs`, `src/Explore.Application/`, `src/Explore.Domain/`, `src/Explore.Persistence/`, `src/Explore.Infrastructure/`, `src/Explore.Blazor/`, `src/Explore.AppHost/`
@@ -129,19 +129,26 @@ remain separately operator-pulled, not bundled into it.
 
 ### Persistent Key Ownership
 
-API composition registers Data Protection with application name `islamu-event`
-and `PersistKeysToDbContext<DataProtectionKeyContext>()` in the primary database.
-Combined Standalone keeps that store when Redis is absent. If cache is configured,
-the later BFF registration selects Redis for the combined process. Shipped Split
-uses the database for API keys and Redis
-`islamu-event:data-protection-keys` for its separate UI, backed by `redis_data`.
-The API's database registration does not propagate across processes.
+API, BFF and Combined use explicit `api`, `bff` and `combined` external ring
+partitions. The layer-neutral `Explore.ServiceDefaults.DataProtection` adapter
+serves a bounded read-only framework XML repository from the selected authority;
+no runtime DB, Redis or filesystem persistence/generation remains in these hosts.
+API/Combined retain `islamu-event` for their durable data contracts, while Split
+BFF uses `islamu-event:bff:v1`. Combined intentionally owns both API and BFF
+purposes; it does not implicitly borrow either Split ring.
 
-Neither topology creates the previously described filesystem keyring volume.
-Coordinate backups of actual database/Redis keys, Identity, media and selected
-secret authority, while preserving newer erasure facts independently of primary
-rollback. Persistence registration is not evidence of crash safety, successful
-restore or preservation of every session. See
+An independent complete key/revocation inventory must match the ring. Separately
+protected deployment hash and minimum generation prevent admission of a restored
+older record; they cannot be rolled back alongside it. Startup proves active
+protection and every required retained descriptor. Leases and readiness changes
+fence cached protectors until restart. See [SECRETS.md](SECRETS.md#external-data-protection-admission)
+for the exact trust assumptions, bounded schema and purpose/lifetime inventory.
+
+Old database/Redis rings and backups are preserved, not read as compatibility
+authority or automatically deleted. Coordinate external key custody with Identity,
+media and application backup; independently preserve erasure facts and the DP
+admission floor. A successful active round-trip does not prove historical inventory
+completeness, replica convergence or restore correctness. See
 [SELF_HOSTING.md](SELF_HOSTING.md#persistent-keys-and-backup-boundaries) and
 [OPERATIONS.md](OPERATIONS.md#health-and-metrics-endpoints) for precise storage and
 readiness limitations.
@@ -176,6 +183,24 @@ DDL rather than an EF Core migration.
 
 ## Persistence Capability Ladder
 
+### Authority belongs to the application
+
+The accepted direction is **a C# application with a database storage engine, not
+two applications with competing business authority**. Domain owns business
+invariants and state transitions; Application owns authorization requirements,
+workflows, concurrency coordination and completion. Persistence implements their
+ports with EF Core. Controllers remain transport adapters. The execution flow is
+HTTP/API → Application workflows → Domain rules → EF Core persistence → database;
+this is a runtime flow, not a reversal of inward project dependencies.
+
+The database supplies atomic transactions, foreign keys, uniqueness, declarative
+constraints and useful tenant isolation. RLS (row-level security) limits which
+rows a selected database session can access; it is defence in depth, not a second
+RBAC, business-rule engine or workflow coordinator. The approved application
+purpose must have the fixed permissions necessary to perform its legitimate work.
+See [the accepted decision](adr/ADR-application-owned-persistence.md) for the
+credential-compromise boundary and the current implementation transition.
+
 Persistence code follows one ordered capability ladder:
 
 1. **EF Core LINQ and set-based APIs** are the default for reads and mutations.
@@ -187,6 +212,15 @@ Persistence code follows one ordered capability ladder:
    SQL, provider-name checks, lock commands, and migration-generator coupling
    live only under `Explore.Persistence/Database/ProviderPrimitives` or
    `Explore.Persistence/Schema/ProviderPrimitives`.
+
+Use tracked changes, LINQ, transactions and appropriate EF set-based APIs before
+handwritten business SQL. EF-generated SQL is normal: EF is the abstraction, not
+a promise that the database executes no SQL. C# retains expected-state/concurrency
+checks, affected-row validation, retry/idempotency decisions and atomic outbox
+completion. A provider limitation may justify a small locking or storage primitive,
+not moving the entire use case into a stored procedure or privileged routine.
+Retire existing business routines through a verified C# cutover; do not preserve
+them for compatibility or drop their controls without the replacement.
 
 `EFCore.NamingConventions` owns ordinary snake-case identifiers.
 `RelationalModelNamespace` applies the configured PostgreSQL/SQL Server schema
@@ -207,6 +241,10 @@ requires a demonstrated EF capability gap, a parameterized implementation,
 real-engine tests for every affected provider, an architecture allowlist, and
 operator documentation. Ordinary repository branching or raw SQL is not an
 exception path.
+
+That inventory describes existing implementation, not a blanket requirement to
+retain its SQL. Reassess each primitive against the application-owned decision;
+queue eligibility, business ordering and workflow completion still belong in C#.
 
 `GuestRegistrationCapabilityRepository` owns exact guest-order recovery reads,
 order fencing, and monotonic status-promise CAS, returning Domain entities to
@@ -341,7 +379,9 @@ Native timing intentionally excludes authorization. Invocation-local timestamps 
 
 The API and standalone shared host composition validate final descriptors after all modules and test substitutions, rejecting missing, duplicate, open-generic or late raw native entries. Microsoft DI scope/build validation covers inspectable registrations; it does not prove open-generic or opaque factory graphs. A scoped native construction guard detects reentry through aliases and clears its state in `finally`, with bounded type-only errors. It does not analyze cycles wholly inside unrelated opaque factories.
 
-Normal and Testing startup perform cached constructor-parameter availability checks without constructing the operation graph before shared API setup, workers or traffic. Standalone-owned migrations and administrator bootstrap precede this shared runtime preflight; final descriptor validation still runs during Build, before standalone bootstrap. OpenAPI validates descriptors only because its runtime dependencies are intentionally absent. CI calls `ValidateNativeOperationsDeepAsync` against the actual final provider in a disposable scope, resolving every closed native handler without calling business operations. Constructors must remain free of network and business side effects.
+Normal and Testing startup perform cached constructor-parameter availability checks without constructing the operation graph before shared API setup, workers or traffic. Standalone-owned migrations and administrator bootstrap precede this shared runtime preflight; final descriptor validation still runs during Build, before standalone bootstrap. OpenAPI validates descriptors only because its runtime dependencies are intentionally absent.
+
+CI proves public pipeline construction on the dormant actual host separately from protected implementation construction. The API integration proof authenticates genuine Local requests, selects each operation's production owner and purpose, and resolves every concrete entry in the actual native catalog without invoking its business operation. The activated contract set must equal the discovered set. An anonymous universal Instance scope cannot satisfy these protected constructors, and `ValidateNativeOperationsDeepAsync` is not that exhaustive authenticated proof. Select the policy purpose before human preparation binds the physical owner; a prepared Standard owner cannot be changed into a MixedSettings owner. Constructors must remain free of network and business side effects.
 
 ## Settings Capability Dispatch
 

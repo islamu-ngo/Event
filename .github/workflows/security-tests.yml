@@ -42,6 +42,7 @@ jobs:
         run: |
           dotnet restore eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --locked-mode
           dotnet build eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release --no-restore --verbosity quiet --nologo
+          dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll verify-security-register eng/security/security-control-register.json
 
       - name: Detect Security-Relevant Changes
         id: changes
@@ -135,7 +136,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p artifacts/security-tests
-          dotnet test tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build --verbosity minimal -- --treenode-filter "/*/*/*/*[Category=Security]" --minimum-expected-tests 1 --no-progress --report-trx --report-trx-filename security-integration-tests.trx 2>&1 | tee artifacts/security-tests/security-integration-tests.log
+          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build --verbosity minimal -- --treenode-filter "/*/*/*/*[Category=Security]" --minimum-expected-tests 1 --maximum-parallel-tests 1 --no-progress --report-trx --report-trx-filename security-integration-tests.trx 2>&1 | tee artifacts/security-tests/security-integration-tests.log
 
       - name: Cerbos Policy Contract Tests
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
@@ -144,11 +145,19 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p artifacts/security-tests
-          dotnet test tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build --verbosity minimal -- --treenode-filter "/*/*/*/*[Category=PolicyContract]" --minimum-expected-tests 1 --no-progress --report-trx --report-trx-filename cerbos-policy-contract-tests.trx 2>&1 | tee artifacts/security-tests/cerbos-policy-contract-tests.log
+          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build --verbosity minimal -- --treenode-filter "/*/*/*/*[Category=PolicyContract]" --minimum-expected-tests 1 --no-progress --report-trx --report-trx-filename cerbos-policy-contract-tests.trx 2>&1 | tee artifacts/security-tests/cerbos-policy-contract-tests.log
+
+      - name: Produce Security Execution Evidence
+        if: ${{ success() && steps.changes.outputs.run-tests == 'true' && steps.security_integration_tests.outcome == 'success' && steps.cerbos_policy_contract_tests.outcome == 'success' }}
+        id: security_execution_evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0/ISLAMU.ReleaseEngineering.dll produce-security-execution artifacts/security-tests "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_EVENT_NAME"
 
       - name: Upload Security Test Evidence
         if: ${{ always() && steps.changes.outputs.run-tests == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: security-test-evidence
           path: |
@@ -165,6 +174,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           SECURITY_OUTCOME: ${{ steps.security_integration_tests.outcome }}
           CERBOS_OUTCOME: ${{ steps.cerbos_policy_contract_tests.outcome }}
+          PACKET_OUTCOME: ${{ steps.security_execution_evidence.outcome }}
         shell: bash
         run: |
           {
@@ -177,12 +187,17 @@ jobs:
             echo "| Trigger | ${EVENT_NAME} |"
             echo "| Ref | ${REF_NAME} |"
             echo "| Commit | ${COMMIT_SHA} |"
+            echo "| Execution packet production | ${PACKET_OUTCOME:-not-run} |"
+            echo "| Execution scope | Testing dedicated API test-host; database provider, database role, and authentication scheme are not-attested |"
+            echo "| Execution packet | \`artifacts/security-tests/security-execution.v1.json\` (only after both lanes and packet validation pass) |"
             echo "| Reliability inventory | docs/TEST_RELIABILITY.md |"
             echo
             echo "| Test lane | Step outcome | Evidence |"
             echo "|---|---|---|"
             echo "| Security integration tests | ${SECURITY_OUTCOME:-not-run} | Log plus \`security-integration-tests.trx\` |"
             echo "| Cerbos policy contract tests | ${CERBOS_OUTCOME:-not-run} | Log plus \`cerbos-policy-contract-tests.trx\` |"
+            echo
+            echo "The packet identifies the exact tested GITHUB_SHA, including the PR merge SHA when applicable; it does not relabel that object as a release candidate or attest live operational controls."
             echo
             echo "Repeated scheduled failures require an owner/date entry in docs/TEST_RELIABILITY.md before they are treated as accepted baseline noise."
           } >> "$GITHUB_STEP_SUMMARY"

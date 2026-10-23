@@ -21,7 +21,7 @@ namespace Explore.Persistence.Repositories;
 /// </summary>
 public sealed partial class ModerationAuthorityParticipant(
     ExploreDbContext context, IAdminContext admin, IMachinePrincipalAccessor machine,
-    IModerationMachineSubjectBindingRepository machineBindings, IExternalApiKeyRepository apiKeys,
+    IModerationMachineSubjectBindingRepository machineBindings, IExternalApiKeyAuthenticationRepository apiKeys,
     IModerationPolicyPublicationRepository publications, ModerationCapabilityRegistry inventory,
     ModerationNativeActivationQualification activation, TimeProvider clock,
     IEnumerable<IModerationConsumerRuntimeSource>? consumerSources = null,

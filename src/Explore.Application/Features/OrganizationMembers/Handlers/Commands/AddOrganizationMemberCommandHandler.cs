@@ -22,6 +22,7 @@ public class AddOrganizationMemberCommandHandler : ICommandHandler<AddOrganizati
     private readonly IUserRepository _userRepository;
     private readonly IUserContext _userContext;
     private readonly IOrganizationMemberMutationBoundary _mutation;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
 
     public AddOrganizationMemberCommandHandler(
         IOrganizationMemberRepository organizationMemberRepository,
@@ -29,7 +30,8 @@ public class AddOrganizationMemberCommandHandler : ICommandHandler<AddOrganizati
         IOrganizationTenantRepository organizationTenantRepository,
         IUserRepository userRepository,
         IUserContext userContext,
-        IOrganizationMemberMutationBoundary mutation)
+        IOrganizationMemberMutationBoundary mutation,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _organizationMemberRepository = organizationMemberRepository;
         _organizationRepository = organizationRepository;
@@ -37,6 +39,7 @@ public class AddOrganizationMemberCommandHandler : ICommandHandler<AddOrganizati
         _userRepository = userRepository;
         _userContext = userContext;
         _mutation = mutation;
+        _preparation = preparation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddOrganizationMemberCommand request, CancellationToken cancellationToken)
@@ -46,10 +49,17 @@ public class AddOrganizationMemberCommandHandler : ICommandHandler<AddOrganizati
             return BaseCommandResponse.Validation<Guid>(["Invalid requester User ID."], "Invalid requester User ID.");
         }
 
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
         var memberId = Guid.CreateVersion7();
         var dto = request.AddOrganizationMemberDto;
         return await _mutation.ExecuteAddAsync(request.TenantId, dto.OrganizationId, memberId, dto.Email, (int)dto.Role,
-            (actor, target, token) => AddAsync(request, actor, target, memberId, token), cancellationToken);
+            async (actor, target, token) =>
+            {
+                await prepared.AcquireAsync(request, token);
+                var result = await AddAsync(request, actor, target, memberId, token);
+                if (result.IsSuccess) prepared.Complete(result.Id);
+                return result;
+            }, cancellationToken);
     }
 
     private async Task<BaseCommandResponse<Guid>> AddAsync(AddOrganizationMemberCommand request, Guid requesterGuid,

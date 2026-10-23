@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Ai;
 
@@ -18,71 +13,68 @@ public sealed partial class AiContextHygieneService : IAiContextHygieneService
 {
     private readonly IAiConversationRepository _conversationRepository;
     private readonly IAiContextRedactor _redactor;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AiContextHygieneService(
         IAiConversationRepository conversationRepository,
-        IAiContextRedactor redactor)
+        IAiContextRedactor redactor,
+        IUnitOfWork unitOfWork)
     {
         _conversationRepository = conversationRepository;
         _redactor = redactor;
+        _unitOfWork = unitOfWork;
     }
 
     /// <inheritdoc/>
-    public async Task<int> RedactConversationTranscriptAsync(
+    public Task<int> RedactConversationTranscriptAsync(
         Guid conversationId,
         bool piiDisclosureEnabled,
-        CancellationToken cancellationToken)
-    {
-        var conversation = await _conversationRepository
-            .GetByIdForUpdateAsync(conversationId, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (conversation is null)
+        CancellationToken requestToken) =>
+        _unitOfWork.ExecuteSerializableAsync(async cancellationToken =>
         {
-            return 0;
-        }
-
-        var redactedCount = 0;
-
-        foreach (var reference in conversation.References)
-        {
-            if (string.IsNullOrEmpty(reference.Summary))
-            {
-                continue;
-            }
-
-            var redacted = _redactor.RedactEmbeddedPii(reference.Summary);
-            if (!string.Equals(redacted, reference.Summary, StringComparison.Ordinal))
-            {
-                reference.Summary = redacted;
-                redactedCount++;
-            }
-        }
-
-        foreach (var message in conversation.Messages)
-        {
-            if (string.IsNullOrEmpty(message.Content))
-            {
-                continue;
-            }
-
-            var redacted = _redactor.RedactEmbeddedPii(message.Content);
-            if (!string.Equals(redacted, message.Content, StringComparison.Ordinal))
-            {
-                message.Content = redacted;
-                redactedCount++;
-            }
-        }
-
-        if (redactedCount > 0)
-        {
-            await _conversationRepository
-                .Update(conversation)
+            var conversation = await _conversationRepository
+                .GetByIdForPrivacyUpdateAsync(conversationId, cancellationToken)
                 .ConfigureAwait(false);
-        }
+            if (conversation is null)
+            {
+                return 0;
+            }
 
-        return redactedCount;
-    }
+            var redactedCount = 0;
+            foreach (var reference in conversation.References)
+            {
+                if (string.IsNullOrEmpty(reference.Summary))
+                {
+                    continue;
+                }
+                var redacted = _redactor.RedactEmbeddedPii(reference.Summary);
+                if (!string.Equals(redacted, reference.Summary, StringComparison.Ordinal))
+                {
+                    reference.Summary = redacted;
+                    redactedCount++;
+                }
+            }
+
+            foreach (var message in conversation.Messages)
+            {
+                if (string.IsNullOrEmpty(message.Content))
+                {
+                    continue;
+                }
+                var redacted = _redactor.RedactEmbeddedPii(message.Content);
+                if (!string.Equals(redacted, message.Content, StringComparison.Ordinal))
+                {
+                    message.Content = redacted;
+                    redactedCount++;
+                }
+            }
+
+            if (redactedCount > 0)
+            {
+                await _conversationRepository.Update(conversation).ConfigureAwait(false);
+            }
+            return redactedCount;
+        }, requestToken);
 
     /// <inheritdoc/>
     public async Task<int> PropagateConsentRevocationAsync(

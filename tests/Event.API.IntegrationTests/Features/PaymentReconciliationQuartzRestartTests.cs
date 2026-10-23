@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services.Registration;
+using RegistrationPaymentCheckoutDispatchService = Explore.Infrastructure.Services.RegistrationPaymentCheckoutDispatchService;
 using Explore.Domain;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,11 +31,10 @@ public sealed class PaymentReconciliationQuartzRestartTests(QuartzPostgreSqlSche
         await using (ServiceProvider firstHost = BuildNode(schedulerName, new TaskCompletionSource()))
         {
             IScheduler first = await firstHost.GetRequiredService<ISchedulerFactory>().GetScheduler();
-            await first.Start();
             await first.ScheduleJob(
                 JobBuilder.Create<PaymentReconciliationDrainJob>().WithIdentity(jobKey).StoreDurably().Build(),
                 TriggerBuilder.Create().WithIdentity(jobKey.Name, jobKey.Group)
-                    .ForJob(jobKey).StartAt(DateTimeOffset.UtcNow.AddSeconds(10)).Build());
+                    .ForJob(jobKey).StartNow().Build());
             await first.Shutdown(waitForJobsToComplete: false);
         }
 
@@ -45,10 +45,14 @@ public sealed class PaymentReconciliationQuartzRestartTests(QuartzPostgreSqlSche
         await using ServiceProvider secondHost = BuildNode(schedulerName, claimObserved);
         IScheduler second = await secondHost.GetRequiredService<ISchedulerFactory>().GetScheduler();
         await second.Start();
-        Task completed = await Task.WhenAny(claimObserved.Task, Task.Delay(TimeSpan.FromSeconds(30)));
-        await second.Shutdown(waitForJobsToComplete: true);
-
-        await Assert.That(completed).IsSameReferenceAs(claimObserved.Task);
+        try
+        {
+            await claimObserved.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            await second.Shutdown(waitForJobsToComplete: true);
+        }
     }
 
     private ServiceProvider BuildNode(string schedulerName, TaskCompletionSource claimObserved)
@@ -58,7 +62,7 @@ public sealed class PaymentReconciliationQuartzRestartTests(QuartzPostgreSqlSche
                 Arg.Any<string>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
             .Returns([]);
         repository.ClaimDueReconciliationsAsync(
-                "payment-reconciliation-drain-job", 50, Arg.Any<DateTime>(), TimeSpan.FromMinutes(2), Arg.Any<CancellationToken>())
+                Arg.Any<PaymentReconciliationAcquisition>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 claimObserved.TrySetResult();
@@ -82,7 +86,8 @@ public sealed class PaymentReconciliationQuartzRestartTests(QuartzPostgreSqlSche
         freshness.IsCurrentAsync(Arg.Any<PaymentAttempt>(), Arg.Any<CancellationToken>()).Returns(true);
         services.AddSingleton<IPaidOrderAcceptanceFreshnessService>(freshness);
         services.AddSingleton<TimeProvider>(TimeProvider.System);
-        services.AddScoped(provider => new RegistrationPaymentCheckoutDispatchService(
+        services.AddSingleton(Substitute.For<IPaymentProviderDescriptor>());
+        services.AddScoped(provider => Fixtures.CheckoutDispatchTestPorts.CreateDispatcher(
             provider.GetRequiredService<IRegistrationPaymentAttemptRepository>(),
             provider.GetRequiredService<IHostedCheckoutSessionCreator>(),
             provider.GetRequiredService<IHostedCheckoutSessionRetriever>(),
@@ -90,9 +95,11 @@ public sealed class PaymentReconciliationQuartzRestartTests(QuartzPostgreSqlSche
             provider.GetRequiredService<IRegistrationOrderLifecycleService>(),
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<IPaidCheckoutActivationService>(),
-            provider.GetRequiredService<IPaidOrderAcceptanceFreshnessService>()));
+            provider.GetRequiredService<IPaidOrderAcceptanceFreshnessService>(),
+            provider.GetRequiredService<IPaymentProviderDescriptor>()));
         services.AddScoped(provider => new RegistrationPaymentReconciliationService(
-            provider.GetRequiredService<IRegistrationPaymentAttemptRepository>(),
+            Fixtures.PaymentReconciliationTestPorts.Create(provider.GetRequiredService<IRegistrationPaymentAttemptRepository>()).Admission,
+            Fixtures.PaymentReconciliationTestPorts.Create(provider.GetRequiredService<IRegistrationPaymentAttemptRepository>()).Execution,
             provider.GetRequiredService<IHostedCheckoutSessionRetriever>(),
             provider.GetRequiredService<IPaymentIntentRetriever>(),
             provider.GetRequiredService<TimeProvider>()));

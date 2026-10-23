@@ -186,13 +186,27 @@ public interface IRegistrationProviderCallbackUriBuilder
 
 public interface IRegistrationProviderManagedPublishPreflight
 {
-    Task<RegistrationProviderManagedPublishPreflightResult> RunAsync(
+    Task<RegistrationProviderManagedPublishObservation> ObserveAsync(
         Guid tenantId,
         Guid eventId,
         RegistrationProviderBinding binding,
         CancellationToken cancellationToken);
 }
 
+public sealed record RegistrationProviderManagedPublishObservation(
+    RegistrationProviderManagedPublishPreflightResult Result,
+    string? ProviderSurveyId,
+    string? ProviderSurveyRevisionId,
+    string? ProviderWebhookId,
+    Guid? WebhookSecretBindingId,
+    DateTime? SubscriptionExpiresAtUtc,
+    DateTime? SubscriptionObservedAtUtc);
+
+/// <summary>
+/// Records an actual transport observation at trusted current time. Human Event consumers must
+/// enclose remote work in the scoped deferred journal; only the separate non-human worker path
+/// persists immediately. An observation is business evidence, never authorization or settlement.
+/// </summary>
 public interface IRegistrationProviderConnectionCheckpoint
 {
     Task RecordCredentialRefreshAsync(Guid tenantId, Guid connectionId, CancellationToken cancellationToken);

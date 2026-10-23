@@ -1,3 +1,5 @@
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;
@@ -7,6 +9,7 @@ using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
@@ -15,27 +18,86 @@ public sealed class PurgeEventSessionCustomPropertyDefinitionCommandHandler : IC
     private readonly IEventSessionCustomPropertyRepository _repository;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISerializableAttemptOwner _owner;
+    private readonly IHumanAdministrativeActionPreparation _preparation;
     private readonly HybridCache _cache;
     private readonly BusinessMetrics? _metrics;
+    private readonly ITenantContext _tenantContext;
+    private readonly IAdminContext _adminContext;
+    private readonly ITenantAdministratorCommitAuthority _tenantAuthority;
+    private readonly IInstanceAdministratorCommitAuthority _instanceAuthority;
+    private readonly RequestAuthorization<PurgeEventSessionCustomPropertyDefinitionCommand> _authorization;
+    private readonly ILogger<PurgeEventSessionCustomPropertyDefinitionCommandHandler> _logger;
 
     public PurgeEventSessionCustomPropertyDefinitionCommandHandler(
         IEventSessionCustomPropertyRepository repository,
         IAuditLogRepository auditLogRepository,
         ICurrentUserService currentUserService,
-        IUnitOfWork unitOfWork,
+        ISerializableAttemptOwner owner,
         HybridCache cache,
+        ITenantContext tenantContext,
+        IAdminContext adminContext,
+        ITenantAdministratorCommitAuthority tenantAuthority,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        RequestAuthorization<PurgeEventSessionCustomPropertyDefinitionCommand> authorization,
+        ILogger<PurgeEventSessionCustomPropertyDefinitionCommandHandler> logger,
+        IHumanAdministrativeActionPreparation preparation,
         BusinessMetrics? metrics = null)
     {
         _repository = repository;
         _auditLogRepository = auditLogRepository;
         _currentUserService = currentUserService;
-        _unitOfWork = unitOfWork;
+        _owner = owner;
+        _preparation = preparation;
         _cache = cache;
         _metrics = metrics;
+        _tenantContext = tenantContext;
+        _adminContext = adminContext;
+        _tenantAuthority = tenantAuthority;
+        _instanceAuthority = instanceAuthority;
+        _authorization = authorization;
+        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> ExecuteAsync(PurgeEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    {
+        Guid tenantId = _tenantContext.TenantId;
+        if (!_currentUserService.IsAuthenticated || tenantId == Guid.Empty
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) is not { } userId)
+            return BaseCommandResponse.Authentication<CustomPropertyPurgeResultDto>();
+        await _authorization.AuthorizeAsync(request, _logger, cancellationToken);
+        Guid auditLogId = Guid.CreateVersion7();
+        DateTime occurredAt = DateTime.UtcNow;
+        CustomPropertyPurgeDependencySummary? completedSummary = null;
+        string? completedOutcome = null;
+        var prepared = await _preparation.PrepareAsync(request, userId, cancellationToken);
+        var response = await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, userId, token);
+            completedSummary = null;
+            completedOutcome = null;
+            if (!await _instanceAuthority.IsInstanceAdministratorForCommitAsync(userId, token)
+                && !await _tenantAuthority.IsTenantAdministratorForCommitAsync(userId, tenantId, token))
+                return BaseCommandResponse.Authorization<CustomPropertyPurgeResultDto>();
+            return await PurgeAuthorizedAsync(request, tenantId, userId, auditLogId, occurredAt, (summary, outcome) =>
+            {
+                completedSummary = summary;
+                completedOutcome = outcome;
+            }, token);
+        }, cancellationToken);
+        if (completedSummary is not null && completedOutcome is not null)
+        {
+            RecordPurgeDecision(completedSummary, completedOutcome);
+            if (response.IsSuccess)
+                await _cache.RemoveByTagAsync(
+                    SessionCustomPropertyCache.ListsByTenant(completedSummary.TenantId), CancellationToken.None);
+        }
+        return response;
+    }
+
+    private async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> PurgeAuthorizedAsync(
+        PurgeEventSessionCustomPropertyDefinitionCommand request, Guid tenantId, Guid userId, Guid auditLogId, DateTime occurredAt,
+        Action<CustomPropertyPurgeDependencySummary, string> completed, CancellationToken cancellationToken)
     {
         var reason = request.Reason.Trim();
         if (string.IsNullOrWhiteSpace(reason))
@@ -45,8 +107,9 @@ public sealed class PurgeEventSessionCustomPropertyDefinitionCommandHandler : IC
                 "Session custom-property definition purge failed.");
         }
 
-        var summary = await _repository.GetPurgeDependencies(request.Id, cancellationToken);
-        if (summary is null)
+        var summary = await _repository.FenceDefinitionForPurgeAsync(request.Id, cancellationToken)
+            ? await _repository.GetPurgeDependencies(request.Id, cancellationToken) : null;
+        if (summary is null || summary.TenantId != tenantId)
         {
             return BaseCommandResponse.NotFound<CustomPropertyPurgeResultDto>("Session custom-property definition not found.");
         }
@@ -57,27 +120,19 @@ public sealed class PurgeEventSessionCustomPropertyDefinitionCommandHandler : IC
                 summary,
                 reason,
                 "Session custom-property definition purge blocked.");
-            RecordPurgeDecision(summary, "blocked");
+            completed(summary, "blocked");
             return blockedResponse;
         }
 
-        var auditLogId = Guid.CreateVersion7();
         var result = CustomPropertyPurgeResponseFactory.ToResult(summary, true, auditLogId, reason);
-        var audit = CustomPropertyPurgeResponseFactory.CreateAudit(summary, result, _currentUserService.UserId);
-
-        var purged = await _unitOfWork.ExecuteInTransactionAsync(
-            async ct =>
-            {
-                var deleted = await _repository.PurgeDefinition(request.Id, ct);
-                if (!deleted)
-                {
-                    return false;
-                }
-
-                await _auditLogRepository.Create(audit);
-                return true;
-            },
-            cancellationToken);
+        bool purged = await _repository.PurgeDefinition(request.Id, cancellationToken);
+        if (purged)
+        {
+            var audit = CustomPropertyPurgeResponseFactory.CreateAudit(summary, result, userId);
+            audit.Timestamp = occurredAt;
+            await _auditLogRepository.Create(audit);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!purged)
         {
@@ -88,16 +143,15 @@ public sealed class PurgeEventSessionCustomPropertyDefinitionCommandHandler : IC
                     latestSummary,
                     reason,
                     "Session custom-property definition purge blocked.");
-                RecordPurgeDecision(latestSummary, "blocked_after_recheck");
+                completed(latestSummary, "blocked_after_recheck");
                 return blockedResponse;
             }
         }
 
-        RecordPurgeDecision(summary, purged ? "purged" : "failed");
+        completed(summary, purged ? "purged" : "failed");
 
         if (purged)
         {
-            await _cache.RemoveByTagAsync(SessionCustomPropertyCache.ListsByTenant(summary.TenantId), CancellationToken.None);
             return BaseCommandResponse.Success(result, "Session custom-property definition purged successfully.");
         }
 

@@ -81,7 +81,6 @@ public sealed class ExploreDatabaseMigratorTests(RecipientDeliveryMigrationConta
         {
             await using ExploreDbContext runtime = CreatePostgresApplicationContext(runtimeDatabase);
             await ExploreDatabaseMigrator.MigrateAndSeedAsync(
-                runtime,
                 ProductionHostEnvironment.Instance,
                 configuration,
                 migrationDatabase,
@@ -153,7 +152,6 @@ public sealed class ExploreDatabaseMigratorTests(RecipientDeliveryMigrationConta
 
             OptionsValidationException? exception = await Assert.That(async () =>
                     await ExploreDatabaseMigrator.MigrateAndSeedAsync(
-                        runtime,
                         ProductionHostEnvironment.Instance,
                         configuration,
                         migrationDatabase,
@@ -365,7 +363,6 @@ public sealed class ExploreDatabaseMigratorTopologyTests
             await using ExploreDbContext runtime = CreateApplicationContext(runtimeDatabase);
             await PrepareCurrentApplicationStoreAsync(runtime);
             await ExploreDatabaseMigrator.MigrateAndSeedAsync(
-                runtime,
                 ProductionHostEnvironment.Instance,
                 configuration,
                 migrationDatabase,

@@ -14,6 +14,10 @@ public interface IRegistrationProviderRepository
     Task<RegistrationProviderBinding?> GetBindingForPublicationAsync(Guid tenantId, Guid bindingId,
         Guid connectionId, Guid formId, Guid formVersionId, CancellationToken cancellationToken);
 
+    Task<RegistrationProviderBinding?> GetBindingObservationAsync(Guid tenantId, Guid bindingId, CancellationToken cancellationToken);
+
+    Task<RegistrationProviderConnection?> GetConnectionObservationAsync(Guid tenantId, Guid connectionId, CancellationToken cancellationToken);
+
     Task<bool> FormVersionBelongsToEventAsync(Guid tenantId, Guid eventId, Guid formId, Guid formVersionId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<RegistrationProviderBinding>> GetBindingsAsync(Guid tenantId, CancellationToken cancellationToken);

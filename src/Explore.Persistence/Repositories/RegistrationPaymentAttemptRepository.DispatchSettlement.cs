@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -217,13 +218,18 @@ public sealed partial class RegistrationPaymentAttemptRepository
             cancellationToken);
     }
 
-    private IQueryable<CheckoutDispatchEffect> ActiveClaim(CheckoutDispatchClaim claim, DateTime observedAt) => dbContext.CheckoutDispatchEffects
-        .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
-        .Where(value =>
+    private IQueryable<CheckoutDispatchEffect> ActiveClaim(CheckoutDispatchClaim claim, DateTime observedAt)
+    {
+        if (!PostgresCheckoutDispatchContract.HasCanonicalLease(dbContext, claim))
+            return dbContext.CheckoutDispatchEffects.Where(_ => false);
+
+        return dbContext.CheckoutDispatchEffects.Where(value =>
             value.TenantId == claim.TenantId && value.Id == claim.EffectId &&
             value.RegistrationOrderId == claim.RegistrationOrderId && value.PaymentAttemptId == claim.PaymentAttemptId &&
             value.Status == OutboxMessageStatus.Processing && value.ProcessingLeaseToken == claim.LeaseToken &&
-            value.ProcessingFence == claim.ProcessingFence && value.ProcessingLeaseExpiresAt > observedAt);
+            value.ProcessingFence == claim.ProcessingFence && value.AttemptCount == claim.AttemptCount &&
+            value.ProcessingLeaseExpiresAt == claim.LeaseExpiresAt && value.ProcessingLeaseExpiresAt > observedAt);
+    }
 
     private async Task<bool> SettleCheckoutDispatchAsync(
         CheckoutDispatchClaim claim,
@@ -249,9 +255,10 @@ public sealed partial class RegistrationPaymentAttemptRepository
                 ?? throw new InvalidOperationException("Claimed checkout dispatch attempt is missing.");
             _ = settleAttempt(attempt);
             await ClosePendingMaterialChangeChoicesAsync(attempt, observedAt, token);
+            PaymentReconciliationEffect? reconciliation = null;
             if (attempt.ProviderCheckoutSessionId is not null || attempt.PaymentAttemptStatusId == (int)PaymentAttemptStatusEnum.Unknown)
             {
-                PaymentReconciliationEffect? reconciliation = await dbContext.PaymentReconciliationEffects
+                reconciliation = await dbContext.PaymentReconciliationEffects
                     .SingleOrDefaultAsync(value => value.TenantId == attempt.TenantId && value.PaymentAttemptId == attempt.Id, token);
                 bool isUnknownDispatch = attempt.PaymentAttemptStatusId == (int)PaymentAttemptStatusEnum.Unknown;
                 Guid? dispatchEffectId = isUnknownDispatch ? claim.EffectId : null;
@@ -260,15 +267,14 @@ public sealed partial class RegistrationPaymentAttemptRepository
                 int? dispatchAttemptCount = isUnknownDispatch ? claim.AttemptCount : null;
                 if (reconciliation is null)
                 {
-                    await dbContext.PaymentReconciliationEffects.AddAsync(
-                        PaymentReconciliationEffect.Create(
-                            attempt,
-                            observedAt,
-                            checkoutDispatchEffectId: dispatchEffectId,
-                            checkoutDispatchUnknownAt: unknownAt,
-                            checkoutDispatchProcessingFence: dispatchFence,
-                            checkoutDispatchAttemptCount: dispatchAttemptCount),
-                        token);
+                    reconciliation = PaymentReconciliationEffect.Create(
+                        attempt,
+                        observedAt,
+                        checkoutDispatchEffectId: dispatchEffectId,
+                        checkoutDispatchUnknownAt: unknownAt,
+                        checkoutDispatchProcessingFence: dispatchFence,
+                        checkoutDispatchAttemptCount: dispatchAttemptCount);
+                    await dbContext.PaymentReconciliationEffects.AddAsync(reconciliation, token);
                 }
                 else
                 {
@@ -281,6 +287,7 @@ public sealed partial class RegistrationPaymentAttemptRepository
                         dispatchAttemptCount);
                 }
             }
+            dbContext.RetainNativeCheckoutDispatchOwner(claim, attempt, reconciliation);
             await dbContext.SaveChangesAsync(token);
             return true;
         }, cancellationToken);
@@ -288,7 +295,6 @@ public sealed partial class RegistrationPaymentAttemptRepository
 
     private Task<PaymentAttempt?> LoadClaimedAttemptAsync(CheckoutDispatchClaim claim, CancellationToken cancellationToken) =>
         dbContext.PaymentAttempts
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
             .SingleOrDefaultAsync(
                 value => value.TenantId == claim.TenantId && value.Id == claim.PaymentAttemptId && value.RegistrationOrderId == claim.RegistrationOrderId,
                 cancellationToken);

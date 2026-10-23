@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Services;
@@ -8,10 +9,12 @@ namespace Explore.Persistence.Services;
 public sealed class NotificationPreferenceResolver : INotificationPreferenceResolver
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly PostgresNativeQueueEnrollment? _nativeEnrollment;
 
-    public NotificationPreferenceResolver(ExploreDbContext dbContext)
+    public NotificationPreferenceResolver(ExploreDbContext dbContext, PostgresNativeQueueEnrollment? nativeEnrollment = null)
     {
         _dbContext = dbContext;
+        _nativeEnrollment = nativeEnrollment;
     }
 
     public async Task<NotificationPreferenceDecision> ResolveAsync(
@@ -30,6 +33,9 @@ public sealed class NotificationPreferenceResolver : INotificationPreferenceReso
         {
             return [];
         }
+
+        if (PostgresPublicationFanoutExecutionContract.Applies(_dbContext))
+            return await ResolvePublicationBatchAsync(requests, cancellationToken);
 
         var requestPairs = requests
             .Select(request => new
@@ -96,6 +102,32 @@ public sealed class NotificationPreferenceResolver : INotificationPreferenceReso
         return Enumerable.Range(0, requestPairs.Length)
             .Select(index => decisions[index])
             .ToArray();
+    }
+
+    private async Task<IReadOnlyList<NotificationPreferenceDecision>> ResolvePublicationBatchAsync(
+        IReadOnlyCollection<NotificationPreferenceResolveRequest> requests, CancellationToken cancellationToken)
+    {
+        var decisions = new List<NotificationPreferenceDecision>(requests.Count);
+        foreach (var original in requests)
+        {
+            var request = original with
+            {
+                CategoryCode = NormalizeCode(original.CategoryCode),
+                ChannelCode = NormalizeCode(original.ChannelCode)
+            };
+            if (request.OrganizationId is not null || request.GroupId is not null
+                || request.CategoryCode != NotificationPreferenceCategoryCodes.EventUpdates
+                || request.ChannelCode is not (NotificationPreferenceChannelCodes.InApp or NotificationPreferenceChannelCodes.Push))
+                throw new UnauthorizedAccessException("publication_fanout_preference_purpose_required");
+            var rows = await PostgresPublicationFanoutExecutionContract.ReadPreferencesAsync(
+                _dbContext, _nativeEnrollment, request.TenantId, request.UserId, cancellationToken);
+            var hierarchy = BuildHierarchy(new ResolverContext(request.TenantId, request.UserId, null, null));
+            decisions.Add(ResolveRequest(request,
+                rows.Categories.ToDictionary(category => category.MasterCode),
+                rows.Channels.ToDictionary(channel => channel.MasterCode),
+                rows.Preferences, hierarchy, ResolveMute(rows.Profiles, hierarchy)));
+        }
+        return decisions;
     }
 
     private async Task<List<NotificationChannelPreference>> LoadPreferencesAsync(

@@ -1,9 +1,10 @@
+using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
-using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Repositories;
 
@@ -12,9 +13,9 @@ namespace Explore.Persistence.Repositories;
 /// </summary>
 /// <remarks>
 /// The application caller owns serializable execution, authorization, commit and ambiguous-commit recovery.
-/// Reads are untracked and bypass only the named tenant filter, replacing it with an exact nullable
-/// tenant predicate; other filters remain in effect. Recovery returns entities for metadata mapping,
-/// not credential replay.
+/// Runtime reads retain the tenant filter and require an exact non-bypassed tenant lease.
+/// Null-tenant issuance and recovery belong exclusively to the dedicated instance capability.
+/// Recovery returns entities for metadata mapping, not credential replay.
 /// </remarks>
 /// <param name="dbContext">The context shared with the caller's issuance unit of work and authority fences.</param>
 public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbContext)
@@ -24,31 +25,53 @@ public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbC
     /// <remarks>
     /// Rejects both ambient System.Transactions ownership and an existing EF transaction, as well as
     /// any pending tracked change. It does not clear tracked state or open a transaction. For a
-    /// nonnull tenant it also requires the exact active filter with no tenant-filter bypass.
+    /// tenant operation it also requires the exact active filter with no tenant-filter bypass.
     /// </remarks>
     public void RequireCleanWriteScope(Guid? tenantId)
     {
         if (System.Transactions.Transaction.Current is not null
             || dbContext.Database.CurrentTransaction is not null || dbContext.ChangeTracker.HasChanges())
             throw new InvalidOperationException("API-key issuance requires its own clean transaction scope.");
-        if (tenantId is Guid tenant && (tenant == Guid.Empty
-            || dbContext.IsTenantFilterBypassed || dbContext.TenantFilterTenantId != tenant))
+        RequireTenantScope(tenantId);
+    }
+
+    private void RequireTenantScope(Guid? tenantId)
+    {
+        if (tenantId is not Guid tenant || tenant == Guid.Empty
+            || dbContext.IsTenantFilterBypassed || dbContext.TenantFilterTenantId != tenant)
             throw new InvalidOperationException("API-key issuance requires the exact active tenant scope.");
+    }
+
+    private void RequireTransaction(Guid? tenantId)
+    {
+        RequireTenantScope(tenantId);
+        if (dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("API-key issuance requires its caller-owned Serializable transaction.");
+    }
+
+    public Task<bool> ExistsByOwnerAndNameAsync(
+        ExternalApiKeyOwnerType ownerType, Guid ownerId, string name, CancellationToken cancellationToken)
+    {
+        RequireTransaction(dbContext.TenantFilterTenantId);
+        return dbContext.ExternalApiKeys.AsNoTracking().AnyAsync(
+            key => key.ExternalApiKeyOwnerTypeId == (int)ownerType && key.OwnerId == ownerId && key.Name == name,
+            cancellationToken);
     }
 
     /// <inheritdoc />
     /// <remarks>
-    /// Uses an untracked exact fingerprint-and-tenant lookup, including an explicit null tenant
-    /// for platform evidence. The named filter bypass does not grant authority; callers must
-    /// establish current authority before this read, including during commit-ambiguity recovery.
+    /// Uses an untracked exact fingerprint-and-tenant lookup after the caller establishes
+    /// current authority in its own transaction, including during commit-ambiguity recovery.
     /// </remarks>
     public Task<ExternalApiKeyIssuanceReceipt?> FindAsync(
-        string operationFingerprint, Guid? tenantId, CancellationToken cancellationToken) =>
-        dbContext.ExternalApiKeyIssuanceReceipts
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyPlatformManagement)
+        string operationFingerprint, Guid? tenantId, CancellationToken cancellationToken)
+    {
+        RequireTransaction(tenantId);
+        return dbContext.ExternalApiKeyIssuanceReceipts
             .AsNoTracking()
             .SingleOrDefaultAsync(receipt => receipt.TenantId == tenantId
                 && receipt.OperationFingerprint == operationFingerprint, cancellationToken);
+    }
 
     /// <inheritdoc />
     /// <remarks>
@@ -61,8 +84,8 @@ public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbC
         Guid keyId, Guid? tenantId, ExternalApiKeyOwnerType ownerType, Guid ownerId,
         CancellationToken cancellationToken)
     {
+        RequireTransaction(tenantId);
         var ownedKeys = dbContext.ExternalApiKeys
-            .IgnoreTenantFilter(TenantFilterBypassReasons.ExternalApiKeyPlatformManagement)
             .AsNoTracking()
             .Where(key => key.Id == keyId && key.TenantId == tenantId
                 && key.ExternalApiKeyOwnerTypeId == (int)ownerType && key.OwnerId == ownerId);
@@ -76,9 +99,9 @@ public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbC
         await RelationalEntityRowFence.AcquireLookupAsync<ExternalApiKeyStatus>(
             dbContext, [status], cancellationToken);
         DateTime now = DateTime.UtcNow;
-        return await ownedKeys.SingleOrDefaultAsync(key =>
-            key.ExternalApiKeyStatus.IsUsable && (key.ExpiresAt == null || key.ExpiresAt > now),
-            cancellationToken);
+        return await ExternalApiKeyMetadataProjection.Apply(ownedKeys.Where(key =>
+                key.ExternalApiKeyStatus.IsUsable && (key.ExpiresAt == null || key.ExpiresAt > now)))
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
     /// <inheritdoc />
@@ -91,6 +114,10 @@ public sealed class ExternalApiKeyIssuanceReceiptRepository(ExploreDbContext dbC
     public async Task CreateAsync(
         ExternalApiKeyIssuanceReceipt receipt, ExternalApiKey key, CancellationToken cancellationToken)
     {
+        RequireTransaction(key.TenantId);
+        if (receipt.TenantId != key.TenantId || receipt.ExternalApiKeyId != key.Id
+            || key.OwnerType == ExternalApiKeyOwnerType.InstanceAdmin)
+            throw new InvalidOperationException("API-key issuance evidence must match its tenant key.");
         dbContext.ExternalApiKeys.Add(key);
         dbContext.ExternalApiKeyIssuanceReceipts.Add(receipt);
         await dbContext.SaveChangesAsync(cancellationToken);

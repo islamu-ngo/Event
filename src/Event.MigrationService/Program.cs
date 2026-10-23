@@ -1,7 +1,5 @@
 using Event.MigrationService.Extensions;
 using Explore.Application.Configuration;
-using Explore.Application.Features.ConfigurationManifest.Application;
-using Explore.Infrastructure.ConfigurationManifest;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
@@ -9,7 +7,6 @@ using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Schema;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
 
 namespace Event.MigrationService;
 
@@ -22,7 +19,6 @@ public class Program
         var databaseOptions = builder.Configuration.AddPrimaryDatabaseBootstrap(
             builder.Environment.EnvironmentName);
         ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(builder.Configuration, builder.Environment);
-        var runtimeDatabaseOptions = databaseOptions with { Role = PrimaryDatabaseRole.Runtime };
 
         builder.AddServiceDefaults();
         builder.Services.AddSingleton(databaseOptions);
@@ -32,17 +28,12 @@ public class Program
         //  .WithTracing(tracing => tracing.AddSource(Worker.ActivitySourceName));
 
         builder.Services.AddPooledDbContextFactory<ExploreDbContext>(options =>
-            PrimaryDatabaseProviderComposition.ConfigureApplication(options, runtimeDatabaseOptions));
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options, databaseOptions));
         builder.Services.AddScoped(provider =>
             provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext());
         builder.Services.AddExternalIdentityMigrationContext(builder.Configuration);
-        builder.Services.AddConfigurationManifestPersistence();
-        builder.Services.AddConfigurationManifestStartup(
-            builder.Configuration,
-            ConfigurationManifestEffectDeliveryMode.DeferredToRuntime);
-
         builder.Services.AddDbContext<DataProtectionKeyContext>(options =>
-            PrimaryDatabaseProviderComposition.ConfigureDataProtection(options, runtimeDatabaseOptions));
+            PrimaryDatabaseProviderComposition.ConfigureDataProtection(options, databaseOptions));
 
         PrivacyErasureAuthorityTopology erasureTopology =
             PrivacyErasureDurabilityOptions.GetTopology(builder.Configuration);

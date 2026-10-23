@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Ai;
@@ -21,7 +22,8 @@ public sealed class GetUiShellContextRequestHandler(
     IAdminContext adminContext,
     IAiAssistantActorContextService actorContextService,
     IHierarchicalSettingsResolver settingsResolver,
-    IDeploymentModeProvider deploymentModeProvider)
+    IDeploymentModeProvider deploymentModeProvider,
+    IAiProviderCapabilityResolver capabilityResolver)
     : IQueryHandler<GetUiShellContextRequest, UiShellContextDto>
 {
     private static readonly string[] SettingKeys =
@@ -60,6 +62,8 @@ public sealed class GetUiShellContextRequestHandler(
         AiAssistantSettingGroup aiSettings =
             await settingsResolver.ResolveGroupAsync<AiAssistantSettingGroup>(settingContext, cancellationToken);
         DeploymentMode deploymentMode = await deploymentModeProvider.GetCurrentModeAsync(cancellationToken);
+        var aiDisabledReason = await AiAssistantAvailability.ResolveDisabledReasonAsync(
+            aiSettings, capabilityResolver, cancellationToken);
 
         List<ManagedActorDto> managedActors = actorContexts
             .Where(actor => actor.ScopeId.HasValue
@@ -95,7 +99,7 @@ public sealed class GetUiShellContextRequestHandler(
             Workspaces = new WorkspaceAvailabilityDto
             {
                 Studio = managedActors.Count > 0 || personalCreationAllowed,
-                Ai = AiAssistantAvailability.ResolveDisabledReason(aiSettings) is null
+                Ai = aiDisabledReason is null
             },
             ManagedActors = managedActors,
             SettingsScopes = settingsScopes,

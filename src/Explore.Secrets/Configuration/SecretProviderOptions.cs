@@ -25,6 +25,8 @@ public sealed class SecretProviderOptions
     /// </summary>
     public bool FailFast { get; set; } = true;
 
+    public SecretConsumer Consumer { get; set; } = SecretConsumer.Api;
+
     /// <summary>
     /// Infisical-specific settings.
     /// </summary>
@@ -63,7 +65,7 @@ public sealed class InfisicalOptions
     public string Environment { get; set; } = string.Empty;
 
     /// <summary>
-    /// Explicit secret paths to load (e.g., "/api", "/keycloak").
+    /// Explicit exact secret paths to load.
     /// Startup authority composition projects its actual paths here; no root path is implicit.
     /// </summary>
     public List<string> Paths { get; set; } = [];

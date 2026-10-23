@@ -42,12 +42,10 @@ public sealed class KeycloakOperationApplyContext
         PublicOrigin = publicOrigin;
         CredentialBindingRevision = credentialBindingRevision;
         RuntimeClientSecret = runtimeClientSecret;
-        AdministratorUsername = Required(
-            administratorUsername,
-            nameof(administratorUsername));
-        AdministratorPassword = Required(
-            administratorPassword,
-            nameof(administratorPassword));
+        ArgumentException.ThrowIfNullOrWhiteSpace(administratorUsername);
+        ArgumentException.ThrowIfNullOrWhiteSpace(administratorPassword);
+        AdministratorUsername = administratorUsername;
+        AdministratorPassword = administratorPassword;
         NowUtc = nowUtc;
     }
 

@@ -1,0 +1,30 @@
+Change-Id: CHG-01M535V4WY4EHHNRE5A2355S53
+Title: "Capture digest-pinned password policy and native normalized hashing"
+Type: feat
+Scope: access
+Summary: "Load bounded deployment-owned password snapshots fail closed and compose NFC normalization with native IdentityV3 hashing."
+Group: local-password-backend-module
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Invalid or unavailable captures deny new credentials and required readiness without exposing credential or path data.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: LocalIdentityOptions declares blocklist path, SHA256 and bounded hashing iteration options; startup attachment remains separate.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: No corpus is bundled; production startup, request validation and deployment wiring remain required.

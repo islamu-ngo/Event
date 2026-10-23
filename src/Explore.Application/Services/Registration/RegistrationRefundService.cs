@@ -37,23 +37,39 @@ public sealed class RegistrationRefundService(
             return Failure("refund_payment_not_captured", "Only a captured payment can be refunded.");
         }
 
-        long capacity = await refunds.GetRefundableCapacityAsync(order.TenantId, payment.Id, cancellationToken);
-        long amount = requestedAmountMinor ?? capacity;
-        if (amount <= 0 || amount > capacity)
+        string keyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(callerIdempotencyKey))).ToLowerInvariant();
+        string operationKey = $"refund:{payment.Id:N}:{keyHash}";
+        string inputDigest = RefundAttempt.ComputeInputDigest(
+            order.TenantId, payment.Id, order.Id, requestedAmountMinor, actorId, authorityCode, reasonCode);
+        // Every caller admits current account/organizer authority before entering this service.
+        // Recovery is native and never reinterprets an omitted amount using today's capacity.
+        RefundReservationResult? recovered = await refunds.RecoverOperationAsync(
+            order.TenantId, payment.Id, operationKey, inputDigest, cancellationToken);
+        if (recovered is not null)
+            return MapReservation(recovered);
+
+        // Resolve omitted/full against remaining capacity only inside the reservation lock.
+        // Otherwise a concurrent exact request can reserve between recovery and a stale
+        // capacity read, hiding its successful reservation from this invocation.
+        long amount = requestedAmountMinor ?? payment.TotalMinor;
+        if (amount <= 0 || amount > payment.TotalMinor)
         {
             return Failure("refund_capacity_exceeded", "Refund amount exceeds available captured capacity.");
         }
 
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
-        string keyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(callerIdempotencyKey))).ToLowerInvariant();
         RefundAttempt attempt = RefundAttempt.Create(
             Guid.CreateVersion7(), order.TenantId, payment.Id, payment.AcceptanceSnapshot,
             payment.RecipientSnapshot.ExternalAccountId, payment.ProviderPaymentId,
-            $"refund:{payment.Id:N}:{keyHash}", amount, now, null, authorityCode, reasonCode);
-        attempt.CreatedBy = actorId;
+            operationKey, amount, now, null, authorityCode, reasonCode);
+        attempt.BindNativeInput(requestedAmountMinor, actorId, authorityCode, reasonCode);
         RefundReservationResult reservation = await refunds.ReserveAndScheduleAsync(
             attempt, RefundOutboxMessageFactory.CreateDispatch(attempt, now), cancellationToken);
-        return reservation.Disposition switch
+        return MapReservation(reservation);
+    }
+
+    private static RegistrationRefundCommandResultDto MapReservation(RefundReservationResult reservation) =>
+        reservation.Disposition switch
         {
             RefundReservationDisposition.Reserved or RefundReservationDisposition.Duplicate when reservation.Attempt is not null =>
                 RegistrationRefundCommandResultDto.Success(
@@ -62,9 +78,10 @@ public sealed class RegistrationRefundService(
                 "refund_open_dispute", "Refund requires operator review while a dispute is open."),
             RefundReservationDisposition.CapacityExceeded => Failure(
                 "refund_capacity_exceeded", "Refund amount exceeds available captured capacity."),
+            RefundReservationDisposition.OperationConflict => Failure(
+                "refund_operation_conflict", "Refund operation key is already bound to different input."),
             _ => Failure("refund_authority_mismatch", "Refund authority could not be verified.")
         };
-    }
 
     private static RegistrationRefundCommandResultDto Failure(string code, string message) =>
         RegistrationRefundCommandResultDto.Failure(BaseCommandResponse.Failure<Guid>(code, message));

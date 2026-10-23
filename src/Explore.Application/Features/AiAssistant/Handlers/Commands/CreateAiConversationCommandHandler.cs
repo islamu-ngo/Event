@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai.Validators;
@@ -19,19 +20,25 @@ public sealed class CreateAiConversationCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAiAssistantActorContextService _actorContextService;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IAiProviderCapabilityResolver _capabilityResolver;
 
     public CreateAiConversationCommandHandler(
         IAiConversationRepository conversationRepository,
         IHierarchicalSettingsResolver settingsResolver,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IAiAssistantActorContextService actorContextService)
+        IAiAssistantActorContextService actorContextService,
+        IUnitOfWork unitOfWork,
+        IAiProviderCapabilityResolver capabilityResolver)
     {
         _conversationRepository = conversationRepository;
         _settingsResolver = settingsResolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
         _actorContextService = actorContextService;
+        _unitOfWork = unitOfWork;
+        _capabilityResolver = capabilityResolver;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -56,7 +63,8 @@ public sealed class CreateAiConversationCommandHandler
         var tenantId = _tenantContext.TenantId;
         var settings = await _settingsResolver.ResolveGroupAsync<AiAssistantSettingGroup>(
             new SettingContext(TenantId: tenantId), cancellationToken);
-        var disabledReason = AiAssistantAvailability.ResolveDisabledReason(settings);
+        var disabledReason = await AiAssistantAvailability.ResolveDisabledReasonAsync(
+            settings, _capabilityResolver, cancellationToken);
 
         if (disabledReason is not null)
         {
@@ -94,7 +102,8 @@ public sealed class CreateAiConversationCommandHandler
             ConcurrencyStamp = Guid.CreateVersion7()
         };
 
-        var created = await _conversationRepository.Create(conversation);
+        var created = await _unitOfWork.ExecuteSerializableAsync(
+            _ => _conversationRepository.Create(conversation), cancellationToken);
 
         return BaseCommandResponse.Success(created.Id, "AI conversation created.");
     }

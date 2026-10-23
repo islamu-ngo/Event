@@ -1,0 +1,28 @@
+Change-Id: CHG-01M52HCZQCHZ4V5S6TG65HV42K
+Title: "Exclude unbounded framework events from API diagnostic sinks"
+Type: fix
+Scope: privacy
+Summary: "Filter framework-authored URL, authentication, database and host events while retaining native bounded API diagnostics."
+Group: api-framework-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Final sink filtering excludes framework categories that can carry private URLs, SQL or exception details.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable

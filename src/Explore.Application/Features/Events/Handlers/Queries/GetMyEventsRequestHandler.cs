@@ -22,26 +22,39 @@ public class GetMyEventsRequestHandler : IQueryHandler<GetMyEventsRequest, Pagin
     private readonly ILogger<GetMyEventsRequestHandler> _logger;
     private readonly IPdsSyncOutboxRepository _outboxRepository;
     private readonly ITenantContext _tenantContext;
+    private readonly IPrivateEventManagementReader? _privateManagement;
 
     public GetMyEventsRequestHandler(
         IEventRepository eventRepository,
         IObjectStorageService objectStorageService,
         ILogger<GetMyEventsRequestHandler> logger,
         IPdsSyncOutboxRepository outboxRepository,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IPrivateEventManagementReader? privateManagement = null)
     {
         _eventRepository = eventRepository;
         _objectStorageService = objectStorageService;
         _logger = logger;
         _outboxRepository = outboxRepository;
         _tenantContext = tenantContext;
+        _privateManagement = privateManagement;
     }
 
     public async Task<PaginatedResult<EventListDto>> QueryAsync(GetMyEventsRequest request, CancellationToken cancellationToken)
     {
-        var (events, totalCount) = await _eventRepository.GetMyEventsWithDetailsPaged(request.UserId, request.PageNumber, request.PageSize);
+        PrivateEventManagementGraph? graph = null;
+        if (_privateManagement is not null)
+        {
+            if (!Guid.TryParse(request.UserId, out Guid userId) || userId == Guid.Empty)
+                throw new UnauthorizedAccessException("My-events requires the original human identifier.");
+            graph = await _privateManagement.ReadAsync(new(PrivateEventManagementReadKind.MyEvents,
+                PageNumber: request.PageNumber, PageSize: request.PageSize, ExpectedUserId: userId), cancellationToken);
+        }
+        var (events, totalCount) = graph is null
+            ? await _eventRepository.GetMyEventsWithDetailsPaged(request.UserId, request.PageNumber, request.PageSize)
+            : (graph.Events, graph.TotalCount);
         var eventDtos = events.Select(EventMapper.ToListItem).ToList();
-        IReadOnlyList<PdsSyncOutbox> deliveryRows = await _outboxRepository.GetCurrentEventDeliveryStatesAsync(
+        IReadOnlyList<PdsSyncOutbox> deliveryRows = graph is not null ? graph.DeliveryStates : await _outboxRepository.GetCurrentEventDeliveryStatesAsync(
             _tenantContext.TenantId,
             eventDtos.Select(dto => dto.Id).ToArray(),
             cancellationToken);

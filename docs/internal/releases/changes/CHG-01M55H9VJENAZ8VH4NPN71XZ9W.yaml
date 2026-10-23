@@ -1,0 +1,29 @@
+Change-Id: CHG-01M55H9VJENAZ8VH4NPN71XZ9W
+Title: "Bound legal Markdown rendering expansion"
+Type: fix
+Scope: onboarding
+Summary: "Reject repeated placeholder, nesting and encoded HTML expansion before legal document rendering exhausts its output budget."
+Group: legal-rendering-bounds
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Bound placeholder occurrences, inline depth and encoded rendered output before consuming legal document templates.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: Legal templates exceeding the renderer budgets are rejected rather than rendered.

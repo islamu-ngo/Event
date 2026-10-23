@@ -45,13 +45,21 @@ public sealed class TicketingRecoveryHealthCheck(
                 disabledData);
         }
 
-        await using AsyncServiceScope scope =
-            scopeFactory.CreateAsyncScope();
-        ITicketingRecoveryOperatorStore store =
-            scope.ServiceProvider.GetRequiredService<
-                ITicketingRecoveryOperatorStore>();
-        TicketingRecoveryAggregateHealth health =
-            await store.GetAggregateHealthAsync(cancellationToken);
+        TicketingRecoveryAggregateHealth health;
+        try
+        {
+            await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+            health = await scope.ServiceProvider.GetRequiredService<ITicketingRecoveryHealthObserver>()
+                .GetAggregateHealthAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return HealthCheckResult.Unhealthy("Ticketing recovery readiness query failed.");
+        }
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         double oldestDueAge = health.OldestDueAt.HasValue
             ? Math.Max(0, (now - health.OldestDueAt.Value).TotalSeconds)

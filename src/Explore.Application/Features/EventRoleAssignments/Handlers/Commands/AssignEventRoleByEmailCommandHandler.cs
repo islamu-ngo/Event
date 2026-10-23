@@ -10,11 +10,13 @@ namespace Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 
 public sealed class AssignEventRoleByEmailCommandHandler(
     IUserRepository userRepository,
-    AssignEventRoleCommandHandler assignRoleHandler,
+    IHumanEventTeamAssignmentOwner assignRoleHandler,
     IAdminContext identity,
     IMachinePrincipalAccessor machine,
     ITenantContext tenant,
-    IAuthorizationProvider authorization)
+    IAuthorizationProvider authorization,
+    IHumanEventTeamActionPreparation preparation,
+    ISerializableAttemptOwner owner)
     : EventRoleAssignmentCommandHandlerBase(identity, machine, tenant, authorization),
       ICommandHandler<AssignEventRoleByEmailCommand, BaseCommandResponse<Guid>>
 {
@@ -23,6 +25,17 @@ public sealed class AssignEventRoleByEmailCommandHandler(
         CancellationToken cancellationToken = default)
     {
         await RequireActorAsync(command.TenantId, command.EventId, AuthorizationActions.Events.ManageTeam, cancellationToken);
+        var prepared = await preparation.PrepareAsync(command, cancellationToken);
+        return await owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(command, token);
+            return await ExecuteBodyAsync(command, prepared, token);
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(AssignEventRoleByEmailCommand command,
+        IPreparedHumanEventTeamAction prepared, CancellationToken cancellationToken)
+    {
         var targetUserEmail = command.TargetUserEmail.Trim();
         if (string.IsNullOrWhiteSpace(targetUserEmail))
             return Failure("Target user email is required.", "target_user_email_required");
@@ -31,16 +44,8 @@ public sealed class AssignEventRoleByEmailCommandHandler(
         if (targetUser is null)
             return Failure("Target user not found.", "target_user_not_found");
 
-        return await assignRoleHandler.ExecuteQualifiedAsync(new AssignEventRoleCommand
-        {
-            TenantId = command.TenantId,
-            EventId = command.EventId,
-            TargetUserId = targetUser.Id,
-            RoleId = command.RoleId,
-            Status = command.Status,
-            StartsAtUtc = command.StartsAtUtc,
-            ExpiresAtUtc = command.ExpiresAtUtc
-        }, targetUserEmail, cancellationToken);
+        var inner = prepared.BindResolvedTarget(command, targetUser.Id);
+        return await assignRoleHandler.ExecuteHandoffAsync(inner, prepared, cancellationToken);
     }
 
 }

@@ -58,11 +58,12 @@ public sealed class SettingNotificationSecurityTests
         await consumers.HandleAsync(notification, CancellationToken.None);
 
         await Assert.That(capturedState?.ToString() ?? string.Empty).DoesNotContain(canary);
-        await Assert.That(capturedState?.ToString() ?? string.Empty).Contains(actorUserId.ToString());
+        await Assert.That(capturedState?.ToString() ?? string.Empty).DoesNotContain(actorUserId.ToString());
         var fields = ((IEnumerable<KeyValuePair<string, object?>>)capturedState!).ToDictionary(pair => pair.Key, pair => pair.Value);
-        await Assert.That(fields["OldValue"]).IsEqualTo(SettingChangedNotification.RedactedValue);
-        await Assert.That(fields["NewValue"]).IsEqualTo(SettingChangedNotification.RedactedValue);
-        await Assert.That(fields["TenantId"]).IsEqualTo(actorUserId);
-        await Assert.That(fields["ActorUserId"]).IsNull();
+        await Assert.That(fields["Scope"]).IsEqualTo(nameof(SettingSource.SystemDefault));
+        foreach (var field in new[] { "OldValue", "NewValue", "TenantId", "ActorUserId" })
+        {
+            await Assert.That(fields.ContainsKey(field)).IsFalse();
+        }
     }
 }

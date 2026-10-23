@@ -1,7 +1,7 @@
-using System.Text.RegularExpressions;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Domain;
+using Explore.Domain.CustomProperties;
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.CustomProperties;
@@ -290,7 +290,12 @@ internal static class CustomPropertyRuntimeValueValidator
             errors.Add($"{fieldName} must be {maxLength.Value} characters or fewer.");
         }
 
-        if (!string.IsNullOrWhiteSpace(regexPattern) && !Regex.IsMatch(trimmedValue, regexPattern))
+        if (errors.Count > 0)
+        {
+            return errors;
+        }
+
+        if (!CustomPropertyPatternPolicy.Matches(trimmedValue, regexPattern, minLength, maxLength))
         {
             errors.Add($"{fieldName} does not match the required pattern.");
         }
@@ -308,7 +313,7 @@ internal static class CustomPropertyRuntimeValueValidator
         var schemes = SplitAllowedUrlSchemes(allowedUrlSchemes);
         return schemes.Count == 0 || schemes.Contains(uri.Scheme)
             ? []
-            : [$"TextValue URL scheme '{uri.Scheme}' is not allowed."];
+            : ["TextValue URL scheme is not allowed."];
     }
 
     private static HashSet<string> SplitAllowedUrlSchemes(string? allowedUrlSchemes)

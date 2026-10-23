@@ -3,6 +3,7 @@ using System.Text;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.PrivacyErasure;
@@ -22,7 +23,8 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
     IOptions<PrivacyErasureOptions> options,
     TimeProvider timeProvider,
     IModerationRecognitionErasure recognition,
-    ModerationRecognitionRecoveryScheduler recoveryScheduler) : IPrivacyErasureService
+    ModerationRecognitionRecoveryScheduler recoveryScheduler,
+    ILocalIdentityEligibilityRevocation localEligibility) : IPrivacyErasureService
 {
     private const int ReplayBatchSize = 100;
     private const int ReceiptByteCount = 32;
@@ -207,13 +209,14 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
                     cancellationToken);
                 if (latest?.AuthoritySequence < intent.AuthoritySequence || latest is null || !covered)
                 {
+                    await using var eligibilityRevocation = await localEligibility.AcquireAsync(intent, cancellationToken);
                     await EnsureFenceForReplayAsync(intent, cancellationToken);
                     PrivacyErasureApplier.PreparedErasure prepared = await applier.PrepareAsync(
                         intent,
                         cancellationToken);
                     PrivacyErasureApplier.AppliedErasure applied = await recognition.ExecutePurgeAsync(
                         ct => unitOfWork.ExecuteSerializableAsync(
-                            inner => applier.ApplyInCurrentTransactionAsync(intent, prepared, inner), ct),
+                            inner => applier.ApplyInCurrentTransactionAsync(intent, prepared, authority, inner), ct),
                         cancellationToken);
                     await applier.InvalidateAfterCommitAsync(applied);
                     latest = await checkpointRepository.GetLatestAsync(cancellationToken);

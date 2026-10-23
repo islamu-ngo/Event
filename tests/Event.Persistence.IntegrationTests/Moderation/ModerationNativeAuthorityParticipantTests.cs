@@ -919,7 +919,7 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
             clock ??= new FixedClock();
             var (admin, machine) = Identity(context, actor);
             if (principal is not null) machine.SetPrincipal(principal);
-            var keys = new ExternalApiKeyRepository(context);
+            var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(
                 context, admin, machine, keys, new UnconfiguredKeys(), clock);
             var activation = new ModerationNativeActivationQualification(context, Inventory, NativeSources, NativeSources, clock);

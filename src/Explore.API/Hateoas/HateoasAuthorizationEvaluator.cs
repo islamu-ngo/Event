@@ -89,9 +89,9 @@ public sealed class HateoasAuthorizationEvaluator : IHateoasAuthorizationEvaluat
                 results,
                 httpContext.RequestAborted);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "HATEOAS trusted resource context resolution failed; denying permission-bound links.");
+            _logger.LogWarning("HATEOAS trusted resource context resolution failed; denying permission-bound links.");
             return results;
         }
 
@@ -141,9 +141,9 @@ public sealed class HateoasAuthorizationEvaluator : IHateoasAuthorizationEvaluat
             activity?.SetTag("outcome", "success");
             return results;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "HATEOAS batch authorization failed; denying all {Count} permission-bound links (fail-closed).", pendingChecks.Count);
+            _logger.LogWarning("HATEOAS batch authorization failed; denying all {Count} permission-bound links (fail-closed).", pendingChecks.Count);
             activity?.SetTag("outcome", "fail_closed");
 
             foreach (var pending in pendingChecks)

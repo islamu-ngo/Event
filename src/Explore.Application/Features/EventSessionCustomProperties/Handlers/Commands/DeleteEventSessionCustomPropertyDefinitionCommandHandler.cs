@@ -1,53 +1,61 @@
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventSessionCustomProperties.Requests.Commands;
 using Explore.Application.Contracts.Operations;
+using Explore.Domain;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
-public class DeleteEventSessionCustomPropertyDefinitionCommandHandler : ICommandHandler<DeleteEventSessionCustomPropertyDefinitionCommand, bool>
+public class DeleteEventSessionCustomPropertyDefinitionCommandHandler(
+    IEventSessionCustomPropertyRepository repository,
+    IEventSessionCustomPropertyProjectionUpdater projectionUpdater,
+    ISerializableAttemptOwner owner,
+    HybridCache cache,
+    ITenantContext tenantContext,
+    IUserContext userContext,
+    IAdminContext adminContext,
+    ITenantAdministratorCommitAuthority tenantAuthority,
+    IInstanceAdministratorCommitAuthority instanceAuthority,
+    RequestAuthorization<DeleteEventSessionCustomPropertyDefinitionCommand> authorization,
+    ILogger<DeleteEventSessionCustomPropertyDefinitionCommandHandler> logger,
+    IHumanAdministrativeActionPreparation preparation)
+    : ICommandHandler<DeleteEventSessionCustomPropertyDefinitionCommand, bool>
 {
-    private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
-    private readonly IEventSessionCustomPropertyProjectionUpdater _projectionUpdater;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly HybridCache _cache;
-
-    public DeleteEventSessionCustomPropertyDefinitionCommandHandler(
-        IEventSessionCustomPropertyRepository sessionCustomPropertyRepository,
-        IEventSessionCustomPropertyProjectionUpdater projectionUpdater,
-        IUnitOfWork unitOfWork,
-        HybridCache cache)
-    {
-        _sessionCustomPropertyRepository = sessionCustomPropertyRepository;
-        _projectionUpdater = projectionUpdater;
-        _unitOfWork = unitOfWork;
-        _cache = cache;
-    }
-
     public async Task<bool> ExecuteAsync(DeleteEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
-        var definition = await _sessionCustomPropertyRepository.GetDefinitionWithDetails(request.Id);
-        if (definition == null)
-        {
+        Guid tenantId = tenantContext.TenantId;
+        if (!userContext.IsAuthenticated || tenantId == Guid.Empty
+            || await adminContext.ResolveUserIdAsync(cancellationToken) is not { } userId)
             return false;
-        }
-
-        var deleted = await _unitOfWork.ExecuteInTransactionAsync(
-            async ct =>
-            {
-                await _projectionUpdater.RemoveForDefinitionAsync(request.Id, ct);
-                return await _sessionCustomPropertyRepository.DeleteDefinition(request.Id, ct);
-            },
-            cancellationToken);
-
-        if (!deleted)
+        await authorization.AuthorizeAsync(request, logger, cancellationToken);
+        EventSessionCustomPropertyDefinition? deletedDefinition = null;
+        var prepared = await preparation.PrepareAsync(request, userId, cancellationToken);
+        bool deleted = await owner.ExecuteAsync(async token =>
         {
+            await prepared.AcquireAsync(request, userId, token);
+            deletedDefinition = null;
+            if (!await instanceAuthority.IsInstanceAdministratorForCommitAsync(userId, token)
+                && !await tenantAuthority.IsTenantAdministratorForCommitAsync(userId, tenantId, token))
+                return false;
+            var definition = await repository.GetTrackedDefinitionWithOptions(request.Id, token);
+            if (definition is null || definition.TenantId != tenantId || definition.IsDeleted)
+                return false;
+            await projectionUpdater.RemoveForDefinitionAsync(definition.Id, token);
+            if (!await repository.DeleteDefinition(definition.Id, token))
+                return false;
+            deletedDefinition = definition;
+            return true;
+        }, cancellationToken);
+        if (!deleted || deletedDefinition is null)
             return false;
-        }
 
-        await _cache.RemoveByTagAsync(
-            SessionCustomPropertyCache.ListsBySession(definition.TenantId, definition.EventSessionId),
+        await cache.RemoveByTagAsync(
+            SessionCustomPropertyCache.ListsBySession(deletedDefinition.TenantId, deletedDefinition.EventSessionId),
             CancellationToken.None);
 
         return true;

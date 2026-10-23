@@ -21,8 +21,8 @@ public sealed class WebPushDispatchDrainServiceTests
         var dispatch = CreateDispatch(NotificationPreferenceCategoryCodes.EventUpdates);
         var subscription = CreateSubscription(dispatch);
         WebPushSendEnvelope? sentRequest = null;
-        fixture.DispatchRepository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([dispatch]);
-        fixture.DispatchRepository.TryMarkAsProcessing(dispatch.Id, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+        fixture.Admission.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id)]);
+        fixture.Admission.TryMarkAsProcessing(new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id), Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.ConfigureActiveClaim(dispatch);
         fixture.DispatchRepository.MarkAsDelivered(dispatch.Id, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.SubscriptionRepository.GetActiveByIdAsync(dispatch.TenantId, dispatch.SubscriptionId, Arg.Any<CancellationToken>()).Returns(subscription);
@@ -39,6 +39,7 @@ public sealed class WebPushDispatchDrainServiceTests
         await Assert.That(sentRequest.TimeToLiveSeconds).IsLessThanOrEqualTo(21600);
         await Assert.That(sentRequest.Topic).IsEqualTo("event-updates");
         await Assert.That(sentRequest.Urgency).IsEqualTo(WebPushUrgency.Normal);
+        await Assert.That(fixture.ExecutionFactory.AcquiredTenants).IsEquivalentTo([dispatch.TenantId, dispatch.TenantId, dispatch.TenantId]);
         await fixture.PreferenceResolver.Received(1).ResolveAsync(
             Arg.Is<NotificationPreferenceResolveRequest>(request =>
                 request.TenantId == dispatch.TenantId &&
@@ -58,8 +59,8 @@ public sealed class WebPushDispatchDrainServiceTests
     {
         var fixture = new Fixture(enabled: false);
         var dispatch = CreateDispatch(NotificationPreferenceCategoryCodes.Marketing);
-        fixture.DispatchRepository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([dispatch]);
-        fixture.DispatchRepository.TryMarkAsProcessing(dispatch.Id, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+        fixture.Admission.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id)]);
+        fixture.Admission.TryMarkAsProcessing(new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id), Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.ConfigureActiveClaim(dispatch);
         fixture.DispatchRepository.MarkAsSkipped(dispatch.Id, Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
 
@@ -81,8 +82,8 @@ public sealed class WebPushDispatchDrainServiceTests
     {
         var fixture = new Fixture();
         var dispatch = CreateDispatch(NotificationPreferenceCategoryCodes.EventUpdates);
-        fixture.DispatchRepository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([dispatch]);
-        fixture.DispatchRepository.TryMarkAsProcessing(dispatch.Id, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+        fixture.Admission.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id)]);
+        fixture.Admission.TryMarkAsProcessing(new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id), Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.ConfigureActiveClaim(dispatch);
         fixture.DispatchRepository.MarkPermanentFailureAndDeactivateSubscription(
             dispatch.TenantId,
@@ -117,8 +118,8 @@ public sealed class WebPushDispatchDrainServiceTests
     {
         var fixture = new Fixture();
         var dispatch = CreateDispatch(NotificationPreferenceCategoryCodes.EventUpdates);
-        fixture.DispatchRepository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([dispatch]);
-        fixture.DispatchRepository.TryMarkAsProcessing(dispatch.Id, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+        fixture.Admission.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id)]);
+        fixture.Admission.TryMarkAsProcessing(new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id), Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.ConfigureActiveClaim(dispatch);
         fixture.DispatchRepository.MarkAsFailed(dispatch.Id, Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), true, Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.SubscriptionRepository.GetActiveByIdAsync(dispatch.TenantId, dispatch.SubscriptionId, Arg.Any<CancellationToken>())
@@ -148,8 +149,8 @@ public sealed class WebPushDispatchDrainServiceTests
         var fixture = new Fixture();
         var dispatch = CreateDispatch(NotificationPreferenceCategoryCodes.EventUpdates);
         dispatch.CreatedAt = DateTime.UtcNow.AddHours(-7);
-        fixture.DispatchRepository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([dispatch]);
-        fixture.DispatchRepository.TryMarkAsProcessing(dispatch.Id, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+        fixture.Admission.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id)]);
+        fixture.Admission.TryMarkAsProcessing(new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id), Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.ConfigureActiveClaim(dispatch);
         fixture.DispatchRepository.MarkAsSkipped(dispatch.Id, Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
 
@@ -171,8 +172,8 @@ public sealed class WebPushDispatchDrainServiceTests
     {
         var fixture = new Fixture();
         var dispatch = CreateDispatch(NotificationPreferenceCategoryCodes.EventUpdates);
-        fixture.DispatchRepository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([dispatch]);
-        fixture.DispatchRepository.TryMarkAsProcessing(dispatch.Id, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+        fixture.Admission.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id)]);
+        fixture.Admission.TryMarkAsProcessing(new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id), Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.ConfigureActiveClaim(dispatch);
         fixture.DispatchRepository.MarkAsFailed(dispatch.Id, Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), false, Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.SubscriptionRepository.GetActiveByIdAsync(dispatch.TenantId, dispatch.SubscriptionId, Arg.Any<CancellationToken>())
@@ -201,8 +202,8 @@ public sealed class WebPushDispatchDrainServiceTests
     {
         var fixture = new Fixture();
         var dispatch = CreateDispatch(NotificationPreferenceCategoryCodes.EventUpdates);
-        fixture.DispatchRepository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([dispatch]);
-        fixture.DispatchRepository.TryMarkAsProcessing(dispatch.Id, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+        fixture.Admission.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id)]);
+        fixture.Admission.TryMarkAsProcessing(new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id), Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.ConfigureMissingActiveClaim(dispatch);
         fixture.SubscriptionRepository.GetActiveByIdAsync(dispatch.TenantId, dispatch.SubscriptionId, Arg.Any<CancellationToken>())
             .Returns(CreateSubscription(dispatch));
@@ -223,8 +224,8 @@ public sealed class WebPushDispatchDrainServiceTests
     {
         var fixture = new Fixture();
         var dispatch = CreateDispatch(NotificationPreferenceCategoryCodes.EventUpdates);
-        fixture.DispatchRepository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([dispatch]);
-        fixture.DispatchRepository.TryMarkAsProcessing(dispatch.Id, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
+        fixture.Admission.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id)]);
+        fixture.Admission.TryMarkAsProcessing(new WebPushDispatchOwner(dispatch.TenantId, dispatch.Id), Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
         fixture.ConfigureActiveClaim(dispatch);
         fixture.PrivacyErasureStateRepository.GetBySubjectAsync(dispatch.UserId, Arg.Any<CancellationToken>())
             .Returns(CreateFencedSaga(dispatch.UserId));
@@ -308,6 +309,7 @@ public sealed class WebPushDispatchDrainServiceTests
     {
         public Fixture(bool enabled = true)
         {
+            Admission = Substitute.For<IWebPushDispatchAdmission>();
             DispatchRepository = Substitute.For<IWebPushDispatchOutboxRepository>();
             SubscriptionRepository = Substitute.For<IWebPushSubscriptionRepository>();
             Sender = Substitute.For<IWebPushNotificationSender>();
@@ -329,6 +331,8 @@ public sealed class WebPushDispatchDrainServiceTests
                 });
             PrivacyErasureStateRepository.GetBySubjectAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                 .Returns((PrivacyErasureSaga?)null);
+            ExecutionFactory = new TestExecutionFactory(
+                DispatchRepository, SubscriptionRepository, PrivacyErasureStateRepository, PreferenceResolver);
 
             var services = new ServiceCollection();
             services.AddSingleton(DispatchRepository);
@@ -340,6 +344,8 @@ public sealed class WebPushDispatchDrainServiceTests
 
             Service = new WebPushDispatchDrainService(
                 ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+                Admission,
+                ExecutionFactory,
                 Options.Create(new WebPushSettings
                 {
                     Enabled = true,
@@ -351,9 +357,12 @@ public sealed class WebPushDispatchDrainServiceTests
                     InitialRetryDelaySeconds = 5,
                     MaxRetryDelaySeconds = 60
                 }),
+                TimeProvider.System,
                 NullLogger<WebPushDispatchDrainService>.Instance);
         }
 
+        public IWebPushDispatchAdmission Admission { get; }
+        public TestExecutionFactory ExecutionFactory { get; }
         public IWebPushDispatchOutboxRepository DispatchRepository { get; }
         public IWebPushSubscriptionRepository SubscriptionRepository { get; }
         public IWebPushNotificationSender Sender { get; }
@@ -364,10 +373,19 @@ public sealed class WebPushDispatchDrainServiceTests
 
         public void ConfigureActiveClaim(WebPushDispatchOutbox dispatch)
         {
+            dispatch.Subscription = CreateSubscription(dispatch);
             DispatchRepository.GetActiveClaimAsync(
                     dispatch.TenantId,
                     dispatch.Id,
                     Arg.Any<Guid>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(dispatch);
+            DispatchRepository.GetSenderEntryClaimAsync(
+                    dispatch.TenantId,
+                    dispatch.Id,
+                    Arg.Any<Guid>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<DateTime>(),
                     Arg.Any<CancellationToken>())
                 .Returns(dispatch);
         }
@@ -380,6 +398,36 @@ public sealed class WebPushDispatchDrainServiceTests
                     Arg.Any<Guid>(),
                     Arg.Any<CancellationToken>())
                 .Returns((WebPushDispatchOutbox?)null);
+        }
+    }
+
+    private sealed class TestExecutionFactory(
+        IWebPushDispatchOutboxRepository dispatchRepository,
+        IWebPushSubscriptionRepository subscriptionRepository,
+        IPrivacyErasureStateRepository privacyErasureStateRepository,
+        INotificationPreferenceResolver preferenceResolver) : IWebPushDispatchExecutionScopeFactory
+    {
+        public List<Guid> AcquiredTenants { get; } = [];
+
+        public Task<IWebPushDispatchExecutionScope> CreateAsync(Guid tenantId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            AcquiredTenants.Add(tenantId);
+            return Task.FromResult<IWebPushDispatchExecutionScope>(new Scope(
+                dispatchRepository, subscriptionRepository, privacyErasureStateRepository, preferenceResolver));
+        }
+
+        private sealed class Scope(
+            IWebPushDispatchOutboxRepository dispatchRepository,
+            IWebPushSubscriptionRepository subscriptionRepository,
+            IPrivacyErasureStateRepository privacyErasureStateRepository,
+            INotificationPreferenceResolver preferenceResolver) : IWebPushDispatchExecutionScope
+        {
+            public IWebPushDispatchOutboxRepository DispatchRepository => dispatchRepository;
+            public IWebPushSubscriptionRepository SubscriptionRepository => subscriptionRepository;
+            public IPrivacyErasureStateRepository PrivacyErasureStateRepository => privacyErasureStateRepository;
+            public INotificationPreferenceResolver PreferenceResolver => preferenceResolver;
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
     }
 }

@@ -31,7 +31,6 @@ public sealed class EventResourceFileResult(
             var content = prepared.TakeContent();
             await using var stream = content.Content;
             context.HttpContext.Response.Headers["X-Content-Type-Options"] = "nosniff";
-            context.HttpContext.Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
             await new FileStreamResult(stream, content.ContentType)
             {
                 FileDownloadName = content.SafeDisplayName,

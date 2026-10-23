@@ -21,21 +21,23 @@ public sealed class UpdateWebhookEndpointCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
     IMachinePrincipalAccessor machinePrincipalAccessor,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IHumanWebhookMutationPreparation preparation)
     : ICommandHandler<UpdateWebhookEndpointCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateWebhookEndpointCommand request,
         CancellationToken cancellationToken)
     {
-        if (!TryResolveActor(out _, out _))
+        if (!TryResolveActor(out _, out var actorUserId))
         {
             return Failure(
                 "webhook_endpoint_configuration_actor_required",
                 ["An authenticated operator identity is required."]);
         }
 
-        return await unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
+        var subscriptionIds = new Dictionary<Guid, Guid>();
+        async Task<BaseCommandResponse<Guid>> MutateAsync(CancellationToken transactionCancellationToken)
         {
             var endpoint = await endpointRepository.GetByIdForOwnerOperationAsync(
                 request.EndpointId,
@@ -139,10 +141,15 @@ public sealed class UpdateWebhookEndpointCommandHandler(
                 }
             }
 
+            foreach (var eventType in eventTypes)
+            {
+                if (!subscriptionIds.ContainsKey(eventType.Id))
+                    subscriptionIds.Add(eventType.Id, Guid.CreateVersion7());
+            }
             var subscriptions = eventTypes
                 .Select(eventType => new WebhookEndpointSubscription
                 {
-                    Id = Guid.CreateVersion7(),
+                    Id = subscriptionIds[eventType.Id],
                     TenantId = endpoint.TenantId,
                     InstanceId = endpoint.InstanceId,
                     EndpointId = endpoint.Id,
@@ -213,7 +220,11 @@ public sealed class UpdateWebhookEndpointCommandHandler(
                 ? $" {uncertainPublicationCount} uncertain provider publication(s) remain on their original snapshots."
                 : string.Empty;
             return BaseCommandResponse.Success(persisted.Id, $"Webhook endpoint updated; {migratedTargetCount} eligible pending target(s) migrated.{warning}");
-        }, cancellationToken);
+        }
+
+        return actorUserId.HasValue
+            ? await preparation.ExecuteAsync(request, MutateAsync, cancellationToken)
+            : await unitOfWork.ExecuteInTransactionAsync(MutateAsync, cancellationToken);
     }
 
     private static List<string> Validate(

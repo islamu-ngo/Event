@@ -1,16 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Recovery;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Contracts.SetupLive;
 using Explore.Application.Contracts.Waitlist;
 using Explore.Application.Features.ConfigurationManifest.Importing;
@@ -18,15 +17,14 @@ using Explore.Application.Features.ConfigurationManifest.Managed;
 using Explore.Domain;
 using Explore.Persistence.Caching;
 using Explore.Persistence.Database;
-using Explore.Persistence.Extensions;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Queries;
+using Explore.Persistence.Schema;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
-using Explore.Secrets.Bootstrap;
 using Explore.Secrets.Database;
 using ISLAMU.Moderation.Application;
 using Microsoft.EntityFrameworkCore;
@@ -41,6 +39,49 @@ namespace Explore.Persistence;
 
 public static class PersistenceServicesRegistration
 {
+    /// <summary>Registers the original scoped policy and manifest owners with their execution lease.</summary>
+    public static IServiceCollection AddPolicyMutationExecutionScopes(this IServiceCollection services)
+    {
+        services.AddScoped<ExploreDbContextExecutionLease>();
+        services.AddScoped<IPolicyMutationExecutionScopeFactory, PolicyMutationExecutionScopeFactory>();
+        services.AddScoped<IHumanOriginalCredentialCustody>(provider =>
+            (IHumanOriginalCredentialCustody)provider.GetRequiredService<IPolicyMutationExecutionScopeFactory>());
+        services.AddScoped<IHumanTenantPreferenceStore, HumanTenantPreferenceStore>();
+        services.AddScoped<IConfigurationManifestTenantReadScopeFactory, ConfigurationManifestTenantReadScopeFactory>();
+        services.AddScoped<IConfigurationInstanceImportExecutor, ConfigurationInstanceImportExecutor>();
+        return services;
+    }
+
+    /// <summary>Registers one Global pool and its existing closed discovery/admission aliases.</summary>
+    public static IServiceCollection AddGlobalExploreDbContextFactory(
+        this IServiceCollection services, PrimaryDatabaseConnectionOptions options)
+    {
+        services.AddSingleton(new GlobalExploreDbContextFactory(options));
+        services.AddSingleton<IGlobalExploreDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<IPdsSettlementDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<IPdsSyncQueueAdmissionDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<IEmailDispatchAdmissionDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<IAtprotoMaterializationDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<INotificationFanoutAdmissionDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<INotificationOutboxAdmissionDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<IGenericOutboxAdmissionDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<IWebPushDispatchAdmissionDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<IWebhookLocalDeliveryAdmissionDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        services.AddSingleton<IPaymentReconciliationAdmissionDbContextFactory>(provider =>
+            provider.GetRequiredService<GlobalExploreDbContextFactory>());
+        return services;
+    }
+
     // didn't implement aspire integration trough passing the builder cause it will require to install aspnetcore nuget package in persistence project and i want to keep it clean so let this dependency in API project only
     //public static IServiceCollection ConfigurePersistenceServices(this IServiceCollection services,
     //    WebApplicationBuilder builder) // Pass the builder instead of just configuration
@@ -59,6 +100,10 @@ public static class PersistenceServicesRegistration
     {
         PrivacyErasureDurabilityOptions erasureDurability =
             PrivacyErasureDurabilityOptions.FromConfiguration(configuration);
+        bool configureDatabaseComposition = !skipDbContextRegistration
+            || erasureDurability.Topology == PrivacyErasureAuthorityTopology.CoLocated
+            || string.Equals(environmentName, "Testing", StringComparison.OrdinalIgnoreCase)
+                && configuration.GetValue<bool>("Testing:UseRealDatabase");
 
         string? applicationConnectionString = null;
         PrimaryDatabaseProvider? applicationProvider = null;
@@ -68,14 +113,40 @@ public static class PersistenceServicesRegistration
             Provider = PrimaryDatabaseProvider.PostgreSql
         };
 
-        // Skip DbContext registration when running integration tests (they register their own)
-        if (!skipDbContextRegistration || erasureDurability.Topology == PrivacyErasureAuthorityTopology.CoLocated)
+        // Real-database test profiles need the purpose-owned factory graph even when
+        // the fixture replaces its request DbContext or selects an embedded privacy store.
+        if (configureDatabaseComposition)
         {
             var runtimeDatabaseOptions = PrimaryDatabaseConfiguration.BindRuntime(configuration);
             var runtimeDatabase = PrimaryDatabaseConfiguration.BuildConnectionString(runtimeDatabaseOptions);
             applicationConnectionString = runtimeDatabase.ConnectionString;
             applicationProvider = runtimeDatabase.Provider;
             applicationRuntimeOptions = runtimeDatabaseOptions;
+
+            var globalDatabaseOptions = PrimaryDatabaseConfiguration.BindGlobal(configuration);
+            if (runtimeDatabaseOptions.Provider == PrimaryDatabaseProvider.PostgreSql)
+                services.AddSingleton(PostgresNativeQueueEnrollment.Bind(configuration));
+            if (globalDatabaseOptions.Provider != PrimaryDatabaseProvider.Sqlite
+                && string.Equals(globalDatabaseOptions.Username, runtimeDatabaseOptions.Username, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Global and Runtime database logins must remain separate.");
+            }
+            services.AddGlobalExploreDbContextFactory(globalDatabaseOptions);
+            services.AddSingleton(new InstanceApiKeyDbContextFactories(
+                runtimeDatabaseOptions, globalDatabaseOptions,
+                [
+                    PrimaryDatabaseConfiguration.Bind(configuration, PrimaryDatabaseRole.InstanceKeyRead),
+                    PrimaryDatabaseConfiguration.Bind(configuration, PrimaryDatabaseRole.InstanceKeyWrite),
+                    PrimaryDatabaseConfiguration.Bind(configuration, PrimaryDatabaseRole.InstanceKeyIssuance),
+                    PrimaryDatabaseConfiguration.Bind(configuration, PrimaryDatabaseRole.PlatformKeyReport)
+                ],
+                runtimeDatabaseOptions.Provider == PrimaryDatabaseProvider.PostgreSql
+                    ? PlatformApiKeySourceEnrollment.Bind(configuration)
+                    : null));
+            if (!skipDbContextRegistration)
+                services.AddHostedService<InstanceApiKeyCapabilityAdmissionService>();
+            services.AddSingleton<ITenantExploreDbContextFactory>(
+                new TenantExploreDbContextFactory(runtimeDatabaseOptions));
 
             services.AddDbContext<DataProtectionKeyContext>(options =>
                 PrimaryDatabaseProviderComposition.ConfigureDataProtection(options, runtimeDatabaseOptions));
@@ -86,10 +157,9 @@ public static class PersistenceServicesRegistration
             {
                 PrimaryDatabaseProviderComposition.ConfigureApplication(options, runtimeDatabaseOptions);
 
-                if (runtimeDatabase.Provider == PrimaryDatabaseProvider.PostgreSql
-                    && IsEnabled(configuration["Persistence:EnableRlsTenantSession"]))
+                if (runtimeDatabase.Provider == PrimaryDatabaseProvider.PostgreSql)
                 {
-                    options.AddInterceptors(PostgresTenantSessionInterceptor.Instance);
+                    options.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
                 }
 
                 var runtimeEnvironmentName = environmentName
@@ -103,26 +173,16 @@ public static class PersistenceServicesRegistration
                 }
             });
 
-            // Register scoped DbContext that sets scoped dependencies from DI
-            // This follows EF Core's recommended pattern for pooled contexts with scoped dependencies
-            services.AddScoped(sp =>
-            {
-                var factory = sp.GetRequiredService<IDbContextFactory<ExploreDbContext>>();
-                var context = factory.CreateDbContext();
-
-                // Set scoped dependencies via property injection (null during migrations, populated during API requests)
-                context.ClearTenantFilterBypass();
-                context.TenantContext = sp.GetService<ITenantContext>();
-                context.CurrentUserService = sp.GetService<ICurrentUserService>();
-
-                return context;
-            });
+            services.AddPolicyMutationExecutionScopes();
+            services.AddCheckoutDispatchPersistence();
 
         }
 
         LocalIdentityOptions localIdentityOptions =
             configuration.GetSection(LocalIdentityOptions.SectionName).Get<LocalIdentityOptions>()
             ?? new LocalIdentityOptions();
+        string? primaryProvider = configuration.GetSection(AuthenticationProviderDeploymentOptions.SectionName)
+            .Get<AuthenticationProviderDeploymentOptions>()?.GetProvider();
         IdentityBuilder identityBuilder = services.AddIdentityCore<LocalIdentityUser>(options =>
             {
                 options.User.RequireUniqueEmail = false;
@@ -130,7 +190,7 @@ public static class PersistenceServicesRegistration
                 options.Lockout.MaxFailedAccessAttempts = localIdentityOptions.LockoutThreshold;
                 options.Lockout.DefaultLockoutTimeSpan =
                     TimeSpan.FromMinutes(localIdentityOptions.LockoutDurationMinutes);
-                options.Password.RequiredLength = LocalIdentityOptions.MinimumPasswordLength;
+                options.Password.RequiredLength = 1;
                 options.Password.RequiredUniqueChars = 1;
                 options.Password.RequireDigit = false;
                 options.Password.RequireLowercase = false;
@@ -139,8 +199,85 @@ public static class PersistenceServicesRegistration
             })
             .AddRoles<LocalIdentityRole>()
             .AddUserValidator<OptionalEmailLocalIdentityUserValidator>();
+        services.AddLocalPasswordPolicy(localIdentityOptions,
+            required: primaryProvider is null or AuthenticationProviderDeploymentOptions.LocalProvider);
 
         IdentityDatabaseTopology identityTopology = IdentityDatabaseConfiguration.GetTopology(configuration);
+        services.TryAddScoped<LocalIdentityExecutionLease>();
+        services.TryAddScoped<ILocalIdentityExecutionScopeFactory, LocalIdentityExecutionScopeFactory>();
+        services.AddSingleton(_ =>
+        {
+            var applicationWriter = PrimaryDatabaseConfiguration.Bind(configuration, PrimaryDatabaseRole.LocalIdentityWriter);
+            var externalWriter = identityTopology == IdentityDatabaseTopology.External
+                ? IdentityDatabaseConfiguration.BindExternal(configuration, PrimaryDatabaseRole.LocalIdentityWriter) : null;
+            PostgresLocalIdentityWriterEnrollment? applicationEnrollment = applicationWriter.Provider == PrimaryDatabaseProvider.PostgreSql
+                ? new(PrimaryDatabaseConfiguration.BindUsername(configuration, PrimaryDatabaseRole.Migrator),
+                    PrimaryDatabaseConfiguration.BindUsername(configuration, PrimaryDatabaseRole.Runtime), applicationWriter.Username!,
+                    PrimaryDatabaseConfiguration.BindUsername(configuration, PrimaryDatabaseRole.Global)) : null;
+            PostgresLocalIdentityWriterEnrollment? identityEnrollment = externalWriter?.Provider == PrimaryDatabaseProvider.PostgreSql
+                ? new(configuration["IdentityDatabase:Migrator:Username"] ?? configuration["IDENTITY_DATABASE_MIGRATOR_USERNAME"] ?? string.Empty,
+                    configuration["IdentityDatabase:Runtime:Username"] ?? configuration["IDENTITY_DATABASE_RUNTIME_USERNAME"] ?? string.Empty,
+                    new Npgsql.NpgsqlConnectionStringBuilder(externalWriter.ConnectionString).Username!) : null;
+            return new LocalIdentityWriterDbContextFactory(applicationWriter, externalWriter,
+                applicationEnrollment: applicationEnrollment, identityEnrollment: identityEnrollment);
+        });
+        services.AddScoped<ILocalBootstrapReceiptSource>(provider =>
+            new ConfiguredLocalBootstrapReceiptSource(provider.GetRequiredService<ExploreDbContext>(),
+                () => provider.GetRequiredService<LocalIdentityWriterDbContextFactory>()));
+        services.AddScoped<IHumanTenantCreationGraphWriter>(provider => new HumanTenantCreationGraphWriter(
+            provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<ExploreDbContextExecutionLease>(),
+            provider.GetRequiredService<IHumanTenantCreationPort>(),
+            identityTopology));
+        services.AddScoped<ManagedTenantWorkerCreationAdmission>();
+        services.AddScoped<IManagedTenantWorkerCreationAdmission>(provider =>
+            provider.GetRequiredService<ManagedTenantWorkerCreationAdmission>());
+        services.AddScoped<IManagedTenantWorkerCreationOwnerFactory, ManagedTenantWorkerCreationOwnerFactory>();
+        services.AddScoped<IManagedTenantLocalEligibilitySource>(provider =>
+            new ConfiguredManagedTenantLocalEligibilitySource(provider.GetRequiredService<ExploreDbContext>(),
+                identityTopology, identityTopology == IdentityDatabaseTopology.External
+                    ? provider.GetRequiredService<LocalIdentityWriterDbContextFactory>() : null,
+                provider.GetRequiredService<TimeProvider>()));
+        services.AddScoped(provider => new ManagedTenantWorkerCreationGraphWriter(
+            provider.GetRequiredService<ExploreDbContext>(), provider.GetRequiredService<ExploreDbContextExecutionLease>(),
+            provider.GetRequiredService<IManagedTenantLocalEligibilitySource>(),
+            provider.GetRequiredService<Explore.Application.Services.PrivacyIdentityFenceOperation>(),
+            provider.GetRequiredService<IPrivacyIdentityFenceAuthority>(), provider.GetRequiredService<IOriginalOwnerSettlementBoundary>(),
+            provider.GetRequiredService<IEventDiscoveryEnrollmentGate>(), provider.GetRequiredService<ISettingMutationLock>(),
+            provider.GetRequiredService<IOptions<Explore.Application.Management.ManagedControlPlaneOptions>>(),
+            provider.GetRequiredService<TimeProvider>(), provider.GetService<PostgresNativeQueueEnrollment>(), identityTopology));
+        services.AddScoped<Explore.Application.Features.Management.ManagedTenantProvisioningSchedulingOperation>();
+        services.AddScoped<IManagedTenantProvisioningSchedulingSource, ManagedTenantProvisioningSchedulingSource>();
+        services.AddScoped<IManagedTenantProvisioningSchedulingPort>(provider => new ManagedTenantProvisioningSchedulingPort(
+            provider.GetRequiredService<IServiceScopeFactory>(), provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+            provider.GetService<PostgresNativeQueueEnrollment>(), identityTopology));
+        services.AddHumanEventAssignmentSources(identityTopology);
+        services.AddEventTeamPolicySources();
+        services.AddHumanSupportAccessSources(identityTopology);
+        services.AddHumanSupportAdministrationSources();
+        services.AddHumanWebhookResourceSources(identityTopology);
+        services.AddHumanEventProviderSources(identityTopology);
+        services.AddHumanEmailSources(identityTopology);
+        services.AddHumanMixedSettingsSources(identityTopology);
+        services.AddPlatformApiKeySources(identityTopology);
+        Explore.Persistence.Security.StorageAccountingOriginalOwnerRegistration
+            .AddStorageAccountingOriginalOwner(services);
+        Explore.Persistence.Security.StorageProbeSourceOwnerRegistration
+            .AddStorageProbeSourceOwner(services);
+        services.AddFooterSettingsWriter();
+        services.AddScoped<Explore.Application.Features.InstanceOnboarding.Services.ITrustedSetupSettingsWriter,
+            TrustedSetupSettingsWriter>();
+        services.AddScoped<Explore.Application.Features.InstanceOnboarding.Services.IProviderConfigurationSettingsWriter,
+            ProviderConfigurationSettingsWriter>();
+        services.AddScoped<Explore.Application.Settings.IOperatorIdentitySettingsWriter,
+            OperatorIdentitySettingsWriter>();
+        services.AddScoped<Explore.Application.Settings.IResolverConfigurationSettingsWriter,
+            ResolverConfigurationSettingsWriter>();
+        services.AddStorageConfigurationWriter();
+        services.AddScoped<IRegistrationProviderDeferredCheckpointJournal>(provider =>
+            new RegistrationProviderDeferredCheckpointJournal(
+                () => provider.GetRequiredService<ExploreDbContext>(),
+                () => provider.GetRequiredService<IHumanEventProviderMutationPreparation>()));
         if (identityTopology == IdentityDatabaseTopology.External)
         {
             services.AddDbContext<ExternalIdentityDbContext>(options =>
@@ -154,6 +291,8 @@ public static class PersistenceServicesRegistration
         {
             identityBuilder.AddEntityFrameworkStores<ExploreDbContext>();
         }
+        if (configureDatabaseComposition)
+            services.AddLocalIdentityExecutionContextSelection(identityTopology);
         identityBuilder.AddDefaultTokenProviders().AddLocalLifecycleTokenProviders();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.AddScoped(serviceProvider =>
@@ -161,12 +300,14 @@ public static class PersistenceServicesRegistration
             DbContext identityDbContext = identityTopology == IdentityDatabaseTopology.External
                 ? serviceProvider.GetRequiredService<ExternalIdentityDbContext>()
                 : serviceProvider.GetRequiredService<ExploreDbContext>();
+            var application = serviceProvider.GetRequiredService<ExploreDbContext>();
             return new LocalIdentityCredentialStateStore(
                 identityDbContext: identityDbContext,
-                applicationDbContext: serviceProvider.GetRequiredService<ExploreDbContext>(),
+                applicationDbContext: application,
                 userManager: serviceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(),
                 timeProvider: serviceProvider.GetRequiredService<TimeProvider>(),
-                identityFence: serviceProvider.GetRequiredService<Explore.Application.Services.PrivacyIdentityFenceOperation>());
+                identityFence: serviceProvider.GetRequiredService<Explore.Application.Services.PrivacyIdentityFenceOperation>(),
+                executionLease: GetSelectedLocalIdentityExecution(serviceProvider, application));
         });
         services.AddScoped<ILocalIdentityLifecycleStore>(serviceProvider => new LocalIdentityLifecycleStore(
             identityDbContext: identityTopology == IdentityDatabaseTopology.External
@@ -188,8 +329,11 @@ public static class PersistenceServicesRegistration
         services.AddScoped<ILocalIdentityAuthService, LocalIdentityAuthService>();
         services.AddScoped<ILocalCredentialAdministration>(serviceProvider =>
             serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>());
+        Explore.Persistence.Identity.LocalAdministrationSourceRegistration
+            .AddLocalAdministrationSources(services);
 
         // Unit of Work (wraps EF Core transactions)
+        Security.HumanManagedProviderProvisioningDataRegistration.AddHumanManagedProviderProvisioningData(services);
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
         services.AddScoped<IModerationAuthoritySourceRepository, ModerationAuthoritySourceRepository>();
         services.AddScoped<IModerationMachineSubjectBindingRepository, ModerationMachineSubjectBindingRepository>();
@@ -348,13 +492,17 @@ public static class PersistenceServicesRegistration
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
             provider.GetRequiredService<IModerationNoticeCapture>()));
+        services.AddScoped<IOriginalOwnerSettlementBoundary>(provider =>
+            (IOriginalOwnerSettlementBoundary)provider.GetRequiredService<IUnitOfWork>());
+        services.AddScoped<ISerializableAttemptOwner, EfCoreUnitOfWork>();
         services.AddScoped<Explore.Application.Contracts.Services.Registration.IAnonymousRegistrationChallengeQuota,
             AnonymousRegistrationChallengeQuota>();
         services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
-        services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.AddScoped<IAtprotoSessionRefreshLock, RelationalAtprotoSessionRefreshLock>();
         services.AddScoped<ISetupLiveRepository, SetupLiveRepository>();
         services.AddScoped<IKeycloakOperationRepository, KeycloakOperationRepository>();
+        services.AddScoped<IAuthenticationCredentialCutoverRepository, AuthenticationCredentialCutoverRepository>();
+        services.AddScoped<IAuthenticationCredentialCutoverCoordinator, RelationalAuthenticationCredentialCutoverCoordinator>();
         services.AddScoped<IKeycloakOperationCoordinator, RelationalKeycloakOperationCoordinator>();
         services.AddScoped<ISetupSecretBindingOperationCoordinator,
             RelationalSetupSecretBindingOperationCoordinator>();
@@ -399,11 +547,22 @@ public static class PersistenceServicesRegistration
         services.AddScoped<INotificationEntityTypeRepository, NotificationEntityTypeRepository>();
 
         // Multi-tenancy Repositories
+        services.AddScoped<PublicEventDiscoveryReadBindingFactory>(provider => new(provider));
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<ITenantLookupSource, TenantLookupSource>();
         services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
+        services.AddScoped<IInstanceBootstrapStateReader, InstanceBootstrapStateReader>();
+        services.AddScoped<IIdentitySynchronizationBootstrapReader, IdentitySynchronizationBootstrapReader>();
         services.AddScoped<IPlatformUserRoleRepository, PlatformUserRoleRepository>();
         services.AddScoped<ITenantUserRepository, TenantUserRepository>();
+        services.AddScoped<IUserTenantMembershipRepository>(provider => new UserTenantMembershipRepository(
+            provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+            provider.GetRequiredService<ITenantExploreDbContextFactory>(),
+            provider.GetService<PostgresNativeQueueEnrollment>()));
+        services.AddScoped<IUserTenantNavigationRepository>(provider => new UserTenantNavigationRepository(
+            provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+            provider.GetService<PostgresNativeQueueEnrollment>()));
+        services.AddScoped<IAdministrativeAuthorityRepository, AdministrativeAuthorityRepository>();
         services.AddScoped<ITenantUserProfileRepository, TenantUserProfileRepository>();
         services.AddScoped<ITenantUserRoleGrantRepository, TenantUserRoleGrantRepository>();
         services.AddScoped<ITenantOnboardingStateRepository, TenantOnboardingStateRepository>();
@@ -417,22 +576,132 @@ public static class PersistenceServicesRegistration
         // User & Authentication Repositories
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
+        services.AddScoped<IInstanceApiKeyExecutionScopeFactory, InstanceApiKeyExecutionScopeFactory>();
+        services.AddScoped<Explore.Application.Features.ExternalApiKeys.InstanceApiKeyOperations>();
+        services.AddScoped<IExternalApiKeyAuthenticationRepository, ExternalApiKeyAuthenticationRepository>();
         services.AddScoped<IExternalApiKeyIssuanceReceiptRepository, ExternalApiKeyIssuanceReceiptRepository>();
-        services.AddScoped<IExternalApiKeyIssuanceAuthority, ExternalApiKeyIssuanceAuthority>();
+        services.AddScoped<IExternalApiKeyIssuanceAuthority>(provider => new ExternalApiKeyIssuanceAuthority(
+            provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>()));
+        services.AddScoped<Explore.Application.Contracts.Identity.IMachineMutationCommitAuthority, MachineMutationCommitAuthority>();
+        services.AddScoped<IInstanceAdministratorCommitAuthority>(HumanAdministratorAuthority);
+        services.AddScoped<ITenantAdministratorCommitAuthority>(HumanAdministratorAuthority);
+        services.AddScoped<IHumanSubjectCommitAuthority>(HumanAdministratorAuthority);
+        services.AddScoped<IPolicySourceSetFence>(provider =>
+        {
+            var context = provider.GetRequiredService<ExploreDbContext>();
+            var lease = provider.GetRequiredService<ExploreDbContextExecutionLease>();
+            lease.RequireOriginalOwner(context);
+            if (lease.PolicyPurpose is PolicyMutationPurpose.EmailDelivery or PolicyMutationPurpose.MixedSettings)
+                throw new InvalidOperationException("Email-only owners cannot acquire ordinary policy source sets.");
+            if (GetSelectedLocalIdentityExecution(provider, context) is { } selected)
+                return new PolicySourceSetFence(selected);
+            var purpose = context.IsConfigurationInstanceImportOwner
+                ? PolicySourceSetPurpose.ConfigurationImport
+                : lease.SelectedTenantId.HasValue ? PolicySourceSetPurpose.RuntimeTenant : PolicySourceSetPurpose.Global;
+            return new PolicySourceSetFence(context, purpose, context.Database.IsNpgsql()
+                ? PostgresNativeQueueEnrollment.Bind(provider.GetRequiredService<IConfiguration>()) : null);
+        });
+        services.AddScoped<IHumanPrincipalSourceFence>(provider =>
+        {
+            var context = provider.GetRequiredService<ExploreDbContext>();
+            var lease = provider.GetRequiredService<ExploreDbContextExecutionLease>();
+            lease.RequireOriginalOwner(context);
+            var subject = lease.HumanScope?.Subject
+                ?? throw new UnauthorizedAccessException("Principal sources require the original resolved human.");
+            var lifetime = lease.HumanLifetime
+                ?? throw new UnauthorizedAccessException("Principal sources require validated credential custody.");
+            if (lease.PolicyPurpose is PolicyMutationPurpose.EmailDelivery or PolicyMutationPurpose.MixedSettings)
+                throw new InvalidOperationException("Email-only owners cannot acquire ordinary principal sources.");
+            if (GetSelectedLocalIdentityExecution(provider, context) is { } selected)
+                return new HumanPrincipalSourceFence(selected, subject, lifetime.LocalSession);
+            var purpose = context.IsConfigurationInstanceImportOwner
+                ? PolicySourceSetPurpose.ConfigurationImport
+                : lease.SelectedTenantId.HasValue ? PolicySourceSetPurpose.RuntimeTenant : PolicySourceSetPurpose.Global;
+            DbContext? identityContext = lifetime.LocalSession is null ? null
+                : identityTopology == IdentityDatabaseTopology.External
+                    ? provider.GetRequiredService<ExternalIdentityDbContext>() : context;
+            return new HumanPrincipalSourceFence(context, subject, purpose, lifetime.LocalSession, identityContext,
+                context.Database.IsNpgsql()
+                    ? PostgresNativeQueueEnrollment.Bind(provider.GetRequiredService<IConfiguration>()) : null);
+        });
+        services.AddScoped<IHumanAuthorizationRouteSource>(provider =>
+        {
+            var context = provider.GetRequiredService<ExploreDbContext>();
+            var lease = provider.GetRequiredService<ExploreDbContextExecutionLease>();
+            lease.RequireOriginalOwner(context);
+            var subject = lease.HumanScope?.Subject
+                ?? throw new UnauthorizedAccessException("Route sources require the original resolved human.");
+            if (lease.HumanLifetime is null)
+                throw new UnauthorizedAccessException("Route sources require validated credential custody.");
+            if (lease.PolicyPurpose is PolicyMutationPurpose.EmailDelivery or PolicyMutationPurpose.MixedSettings)
+                throw new InvalidOperationException("Email-only owners cannot acquire ordinary route sources.");
+            if (GetSelectedLocalIdentityExecution(provider, context) is { } selected)
+                return new HumanAuthorizationRouteSource(selected, subject);
+            var purpose = context.IsConfigurationInstanceImportOwner
+                ? PolicySourceSetPurpose.ConfigurationImport
+                : lease.SelectedTenantId.HasValue ? PolicySourceSetPurpose.RuntimeTenant : PolicySourceSetPurpose.Global;
+            return new HumanAuthorizationRouteSource(context, subject, purpose,
+                context.Database.IsNpgsql()
+                    ? PostgresNativeQueueEnrollment.Bind(provider.GetRequiredService<IConfiguration>()) : null);
+        });
+        services.AddScoped<IHumanActionCommitFinalizer, HumanActionCommitFinalizer>();
+        services.TryAddScoped<Func<IHumanActionCommitFinalizer>>(provider =>
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>());
+        services.AddScoped<IAccountMembershipPolicySource>(provider =>
+        {
+            var context = provider.GetRequiredService<ExploreDbContext>();
+            var lease = provider.GetRequiredService<ExploreDbContextExecutionLease>();
+            lease.RequireOriginalOwner(context);
+            if (lease.PolicyPurpose is not null
+                || context.IsConfigurationInstanceImportOwner
+                || !lease.SelectedTenantId.HasValue)
+                throw new InvalidOperationException(
+                    "Account membership requires its ordinary Runtime owner.");
+            var subject = lease.HumanScope?.Subject
+                ?? throw new UnauthorizedAccessException(
+                    "Account sources require the original resolved human.");
+            var lifetime = lease.HumanLifetime
+                ?? throw new UnauthorizedAccessException(
+                    "Account sources require original authenticated lifetime.");
+            return new AccountMembershipPolicySource(context, subject, lifetime,
+                context.Database.IsNpgsql()
+                    ? PostgresNativeQueueEnrollment.Bind(provider.GetRequiredService<IConfiguration>())
+                    : null);
+        });
+        static ExternalApiKeyIssuanceAuthority HumanAdministratorAuthority(IServiceProvider provider)
+        {
+            var lease = provider.GetRequiredService<ExploreDbContextExecutionLease>();
+            var scope = lease.HumanScope
+                ?? throw new InvalidOperationException("Human authority requires an authenticated selected owner before construction.");
+            return new ExternalApiKeyIssuanceAuthority(provider.GetRequiredService<ExploreDbContext>(),
+                provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(), scope);
+        }
         services.AddScoped<IManagedControlPlaneRegistrationRepository, ManagedControlPlaneRegistrationRepository>();
         services.AddScoped<IManagedTenantProvisioningOperationRepository, ManagedTenantProvisioningOperationRepository>();
         services.AddScoped<IConfigurationManifestOperationRepository, ConfigurationManifestOperationRepository>();
         services.AddScoped<IConfigurationManifestFailureRecorder, ConfigurationManifestFailureRepository>();
         services.AddScoped<ILegalDocumentRepository, LegalDocumentRepository>();
+        services.AddScoped<IConfigurationImportLegalSourceReader, ConfigurationImportLegalSourceReader>();
         services.AddScoped<IExternalApiKeyQuotaRepository, ExternalApiKeyQuotaRepository>();
+        services.AddScoped<IExternalApiKeyTenantUsageReader, TenantApiKeyUsageReader>();
         services.AddScoped<IUserNotificationPreferenceRepository, UserNotificationPreferenceRepository>();
         services.AddScoped<IUserAuthenticationTokenRepository, UserAuthenticationTokenRepository>();
         services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
+        services.AddScoped<IExternalLoginAuthenticationRepository>(provider =>
+            GetSelectedLocalIdentityExecution(provider, provider.GetRequiredService<ExploreDbContext>()) is { } selected
+                ? new IdentityWriterExternalLoginAuthenticationRepository(selected)
+                : new ExternalLoginAuthenticationRepository(
+                provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IUserIdentityEmailRepository, UserIdentityEmailRepository>();
         services.AddScoped<IExternalBindingRepository, ExternalBindingRepository>();
 
         // Actor Repositories
         services.AddScoped<IActorRepository, ActorRepository>();
+        services.AddScoped<IActorOwnershipReader>(provider => new ActorOwnershipReader(
+            provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IAtprotoIdentityRepository, AtprotoIdentityRepository>();
         services.AddScoped<IActorReferenceConsolidationRepository, ActorReferenceConsolidationRepository>();
         services.AddScoped<IActorKeyStoreRepository, ActorKeyStoreRepository>();
@@ -460,12 +729,21 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IRegistrationFormTemplateRepository, RegistrationFormTemplateRepository>();
         services.AddScoped<IRegistrationProviderRepository, RegistrationProviderRepository>();
         services.AddScoped<IRegistrationProviderSubscriptionStateRepository, RegistrationProviderSubscriptionStateRepository>();
+        services.AddRegistrationProviderSubscriptionWorker();
         services.AddScoped<IParticipationRequirementAttachmentRepository, ParticipationRequirementAttachmentRepository>();
         services.AddScoped<IEventTicketCatalogRepository, EventTicketCatalogRepository>();
         services.AddScoped<IRegistrationInventoryRepository, RegistrationInventoryRepository>();
-        services.AddScoped<IGuestRegistrationCapabilityRepository, GuestRegistrationCapabilityRepository>();
+        services.AddInventoryHoldExpiryWorker();
+        services.AddScoped<IRegistrationOrderCreationReceiptRepository, RegistrationOrderCreationReceiptRepository>();
+        services.AddScoped<IGuestRegistrationCapabilityRepository>(provider =>
+            new GuestRegistrationCapabilityRepository(
+                provider.GetRequiredService<ExploreDbContext>(),
+                provider.GetRequiredService<IConfiguration>(),
+                () => provider.GetRequiredService<ISerializableAttemptOwner>(),
+                provider.GetRequiredService<TimeProvider>()));
         services.AddScoped<IEventAddOnRepository, EventAddOnRepository>();
         services.AddScoped<TicketingRecoveryRepository>();
+        services.AddTicketingRecoveryHealthPersistence();
         services.AddScoped<
             ITicketingRecoveryOperatorStore,
             TicketingRecoveryRepository>();
@@ -473,6 +751,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IPromotionRedemptionRepository, PromotionRedemptionRepository>();
         services.AddScoped<IRegistrationParticipantRepository, RegistrationParticipantRepository>();
         services.AddScoped<IRegistrationSubmissionRepository, RegistrationSubmissionRepository>();
+        services.AddScoped<IRegistrationProviderSubmissionEffectRepository, RegistrationProviderSubmissionEffectRepository>();
         services.AddScoped<IRegistrationAnswerAnalyticsRepository, RegistrationAnswerAnalyticsRepository>();
         services.AddScoped<IRegistrationRetentionCleanupRepository, RegistrationRetentionCleanupRepository>();
         services.AddScoped<IRegistrationAnswerFileRepository, RegistrationAnswerFileRepository>();
@@ -496,6 +775,7 @@ public static class PersistenceServicesRegistration
             IFairReturnOrchestrationRepository,
             FairReturnOrchestrationRepository>();
         services.AddScoped<IAdmissionCheckInTransaction, AdmissionCheckInRepository>();
+        services.AddScoped<IAdmissionTargetTransaction, AdmissionTargetTransaction>();
         services.AddScoped<AdmissionCheckInReportingRepository>();
         services.AddScoped<IAdmissionCheckInSummaryQuery>(provider =>
             provider.GetRequiredService<AdmissionCheckInReportingRepository>());
@@ -508,6 +788,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<AdmissionScannerCapabilityRepository>();
         services.AddScoped<IAdmissionScannerCapabilityRepository>(provider =>
             provider.GetRequiredService<AdmissionScannerCapabilityRepository>());
+        services.AddScoped<IAdmissionScannerAuthenticationRepository, AdmissionScannerAuthenticationRepository>();
         services.AddScoped<IAnonymousCancellationRepository, AnonymousCancellationRepository>();
         services.AddScoped<AdmissionRevocationRepository>();
         services.AddScoped<IAdmissionRevocationRepository>(provider =>
@@ -529,7 +810,10 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IAdmissionRecoveryDeliveryOutboxHandler, AdmissionRecoveryDeliveryOutboxHandler>();
         services.AddScoped<IAdmissionCredentialDeliveryOutboxHandler, AdmissionCredentialDeliveryOutboxHandler>();
         services.AddScoped<IAdmissionDeliveryDispatcher, AdmissionDeliveryIntentDispatcher>();
+        services.AddScoped<IRegistrationProviderSubmissionWriteQueueRepository, RegistrationProviderSubmissionWriteQueueRepository>();
         services.AddScoped<IRegistrationProviderSubmissionWriteEffectRepository, RegistrationProviderSubmissionWriteEffectRepository>();
+        services.AddScoped<IRegistrationProviderSubmissionWriteExecutionScopeFactory, RegistrationProviderSubmissionWriteExecutionScopeFactory>();
+        services.AddScoped<Explore.Application.Services.Registration.Commands.RegistrationProviderSubmissionWriteEffectDeliveryService>();
         services.AddScoped<
             ITicketPurchaseGovernanceRepository,
             TicketPurchaseGovernanceRepository>();
@@ -541,6 +825,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IOrganizerPaymentProviderConnectionRepository, OrganizerPaymentProviderConnectionRepository>();
         services.AddScoped<IRegistrationPaymentAttemptRepository, RegistrationPaymentAttemptRepository>();
         services.AddScoped<IRefundAttemptRepository, RefundAttemptRepository>();
+        services.AddRefundReconciliationHealthPersistence();
         services.AddScoped<IRefundCampaignRepository, RefundCampaignRepository>();
         services.AddScoped<IRegistrationMaterialChangeChoiceRepository, RegistrationMaterialChangeChoiceRepository>();
         services.AddScoped<IEventPublicActionRepository, EventPublicActionRepository>();
@@ -554,8 +839,23 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IEventHeavyRedactionRepository, EventHeavyRedactionRepository>();
         services.AddScoped<IEventModerationRecordRepository, EventModerationRecordRepository>();
         services.AddScoped<IEventReportRepository, EventReportRepository>();
+        services.AddScoped<IEventReportOperationsRepository, EventReportOperationsRepository>();
         services.AddScoped<IEventResourceRepository, EventResourceRepository>();
-        services.AddScoped<IEventResourceAuditRetentionRepository, EventResourceAuditRetentionRepository>();
+        services.AddScoped<IEventResourceAuditOwnerDiscoveryRepository>(provider =>
+            new EventResourceAuditOwnerDiscoveryRepository(
+                provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
+        services.AddScoped<IRegistrationRetentionTenantDiscoveryRepository>(provider =>
+            new RegistrationRetentionTenantDiscoveryRepository(
+                provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
+        services.AddScoped<IRegistrationRetentionExecutionScopeFactory, RegistrationRetentionExecutionScopeFactory>();
+        services.AddScoped<IEmailRetentionTenantDiscoveryRepository>(provider =>
+            new EmailRetentionTenantDiscoveryRepository(
+                provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
+        services.AddScoped<IEmailRetentionExecutionScopeFactory, EmailRetentionExecutionScopeFactory>();
+        services.AddScoped<IEventResourceAuditRetentionExecutionScopeFactory, EventResourceAuditRetentionExecutionScopeFactory>();
         services.AddScoped<IEventResourceProviderActivationRepository, EventResourceProviderActivationRepository>();
         services.AddScoped<IEventReportDecisionExecutionRepository, EventReportDecisionExecutionRepository>();
         services.AddScoped<IEventSessionRepository, EventSessionRepository>();
@@ -619,6 +919,9 @@ public static class PersistenceServicesRegistration
         services.AddScoped<ILocalAddressSuggestionQuery, LocalAddressSuggestionQuery>();
         services.AddScoped<ILocationRoomRepository, LocationRoomRepository>();
         services.AddScoped<IEventLocationRepository, EventLocationRepository>();
+        services.AddScoped<IEventLocationPrivacyReviewReader, EventLocationPrivacyReviewReader>();
+        services.AddScoped<ILocationPrivacyGovernanceStore, LocationPrivacyGovernanceStore>();
+        services.AddScoped<ILocationPrivacyCorrectionReceiptRepository, LocationPrivacyCorrectionReceiptRepository>();
         services.AddScoped<IEventLocationDisclosureAuditRepository, EventLocationDisclosureAuditRepository>();
         services.AddScoped<IEventLocationExactReadAuditRepository, EventLocationExactReadAuditRepository>();
         services.AddScoped<IPrivacyErasureReplayCheckpointRepository, PrivacyErasureReplayCheckpointRepository>();
@@ -714,6 +1017,11 @@ public static class PersistenceServicesRegistration
             (IPrivacyIdentityFenceAuthority)provider.GetRequiredService<IPrivacyErasureAuthority>());
         services.AddScoped<IPrivacyErasureRecoveryAuthority>(provider =>
             (IPrivacyErasureRecoveryAuthority)provider.GetRequiredService<IPrivacyErasureAuthority>());
+        services.AddScoped<ILocalIdentityEligibilityRevocation>(provider =>
+            new ConfiguredLocalIdentityEligibilityRevocation(provider.GetRequiredService<ExploreDbContext>(),
+                identityTopology, identityTopology == IdentityDatabaseTopology.External
+                    ? provider.GetRequiredService<LocalIdentityWriterDbContextFactory>() : null,
+                provider.GetRequiredService<IPrivacyErasureAuthority>(), provider.GetRequiredService<TimeProvider>()));
         services.AddScoped<IPrivacyIdentityBindingReader, UserExternalLoginRepository>();
 
         // Storage Repository
@@ -727,6 +1035,12 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IEventResourceStorageLifecycleRepository, EventResourceStorageLifecycleRepository>();
         services.AddScoped<IStorageUploadSessionRepository, StorageUploadSessionRepository>();
         services.AddScoped<IStorageUsageCounterRepository, StorageUsageCounterRepository>();
+        services.AddScoped<IInstanceStorageAdministration, InstanceStorageAdministration>();
+        services.AddScoped<StorageReconciliationOwner>();
+        services.AddScoped<IStorageReconciliationOwner>(provider =>
+            provider.GetRequiredService<StorageReconciliationOwner>());
+        services.AddScoped<ILocalStorageQuarantineOwner>(provider =>
+            provider.GetRequiredService<StorageReconciliationOwner>());
 
         // Tag & Category Repositories
         services.AddScoped<ITagRepository, TagRepository>();
@@ -747,7 +1061,31 @@ public static class PersistenceServicesRegistration
 
         // Settings Repositories
         services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
+        services.AddScoped<IAtprotoFederationSettingRepository>(provider =>
+            new AtprotoFederationSettingRepository(
+                provider.GetRequiredService<ExploreDbContext>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
+        services.AddScoped<IAtprotoFederationGlobalReadRepository>(provider =>
+            new AtprotoFederationGlobalReadRepository(
+                provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
+        services.AddScoped<IInstanceTenantSettingsReader, InstanceTenantSettingsReader>();
+        services.AddScoped<HumanSettingsDataBoundary>();
+        services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
+        services.AddScoped<IOrdinarySettingsMutationStore, OrdinarySettingsMutationStore>();
+        services.AddScoped<IHumanSecuritySourceGate>(provider =>
+            new HumanSecuritySourceGate(provider.GetRequiredService<ExploreDbContext>()));
+        services.AddScoped<Func<IHumanSecuritySourceGate>>(provider =>
+            () => provider.GetRequiredService<IHumanSecuritySourceGate>());
+        services.AddScoped<IEventDiscoveryEnrollmentGate, EventDiscoveryEnrollmentGate>();
+        services.AddScoped<Func<IEventDiscoveryEnrollmentGate>>(provider =>
+            () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>());
+        services.AddScoped<AtprotoFederationSettingsMutationStore>();
+        services.AddScoped<IAtprotoFederationSettingsMutationStore>(provider =>
+            provider.GetRequiredService<AtprotoFederationSettingsMutationStore>());
+        services.AddScoped<IAtprotoFederationSettingsWriter, AtprotoFederationSettingsWriter>();
         services.AddScoped<ITenantSettingRepository, TenantSettingRepository>();
+        services.AddScoped<IManagedTenantDomainRepository, ManagedTenantDomainRepository>();
         services.AddScoped<ITenantSettingsDocumentRepository, TenantSettingsDocumentRepository>();
         services.AddScoped<IOrganizationSettingRepository, OrganizationSettingRepository>();
         services.AddScoped<IGroupSettingRepository, GroupSettingRepository>();
@@ -757,6 +1095,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IWebPushSubscriptionRepository, WebPushSubscriptionRepository>();
         services.AddScoped<IAppSettingRepository, AppSettingRepository>();
         services.AddScoped<ISecretBindingRepository, SecretBindingRepository>();
+        services.AddScoped<ILocalizationSecretStatusReader, LocalizationSecretStatusReader>();
         services.AddScoped<IUiThemeRepository, UiThemeRepository>();
         services.AddScoped<IUiThemePresetRepository, UiThemePresetRepository>();
         services.AddScoped<IUserAppearanceProfileRepository, UserAppearanceProfileRepository>();
@@ -768,19 +1107,66 @@ public static class PersistenceServicesRegistration
 
         // PDS Synchronization Repositories
         services.AddScoped<IPdsSyncOutboxRepository, PdsSyncOutboxRepository>();
+        services.AddScoped<IPdsSyncQueueAdmission, PdsSyncQueueAdmission>();
+        services.AddScoped<IAtprotoModerationCompensationStore>(provider =>
+            new AtprotoModerationCompensationStore(
+                provider.GetRequiredService<ExploreDbContext>(),
+                provider.GetService<PostgresNativeQueueEnrollment>()));
+        services.AddScoped<IAtprotoSessionBindingReader, AtprotoSessionBindingReader>();
 
         // Generic Outbox Repositories
         services.AddScoped<IOutboxRepository, OutboxRepository>();
         services.AddScoped<IConfigurationManifestEffectOutboxRepository, OutboxRepository>();
         services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
+        services.AddScoped<IEmailDispatchAdmission, EmailDispatchAdmission>();
+        services.AddScoped<IEmailDispatchHealthSnapshotReader, EmailDispatchHealthSnapshotReader>();
+        services.AddScoped<INotificationFanoutAdmission, NotificationFanoutAdmission>();
+        services.AddScoped<INotificationOutboxAdmission, NotificationOutboxAdmission>();
+        services.AddScoped<INotificationOutboxExecutionAuthority, NotificationOutboxExecutionAuthority>();
+        services.AddScoped<IGenericOutboxAdmission, GenericOutboxAdmission>();
+        services.AddScoped<IGenericOutboxExecutionAuthority, GenericOutboxExecutionAuthority>();
+        services.AddScoped<IGenericOutboxExecutionScopeFactory, GenericOutboxExecutionScopeFactory>();
+        services.AddSingleton<IWebPushDispatchAdmission, WebPushDispatchAdmission>();
+        services.AddSingleton<IWebPushDispatchExecutionScopeFactory, WebPushDispatchExecutionScopeFactory>();
+        services.AddScoped<IIncomingWebhookQueueRepository, IncomingWebhookQueueRepository>();
+        services.AddScoped<IRegistrationFinalizationQueueRepository, RegistrationFinalizationQueueRepository>();
+        services.AddScoped<IPaymentReconciliationAdmission, PaymentReconciliationAdmission>();
+        services.AddScoped<IPaymentReconciliationExecutionScopeFactory, PaymentReconciliationExecutionScopeFactory>();
+        services.AddSingleton<IWebhookLocalDeliveryAdmission, WebhookLocalDeliveryAdmission>();
+        services.AddSingleton<IWebhookLocalDeliveryExecutionScopeFactory, WebhookLocalDeliveryExecutionScopeFactory>();
         services.AddScoped<IEmailDispatchEligibilityEvaluator, EmailDispatchEligibilityEvaluator>();
         services.AddScoped<IEmailDeliveryDisableImpactReader, EmailDeliveryDisableImpactReader>();
         services.AddScoped<IEmailDeliverySettingsWriter, EmailDeliverySettingsWriter>();
-        services.AddScoped<IVisitorAccessSettingsWriter, VisitorAccessSettingsWriter>();
-        services.AddScoped<IEventResourceSettingsWriter, EventResourceSettingsWriter>();
+        services.AddScoped<IInternalEmailDeliverySettingsWriter>(provider =>
+            new Explore.Application.Operations.InternalEmailPolicyMutationSettingsWriter(
+                provider.GetRequiredService<IPolicyMutationExecutionScopeFactory>(),
+                selected =>
+                {
+                    var context = selected.GetRequiredService<ExploreDbContext>();
+                    var lease = selected.GetRequiredService<ExploreDbContextExecutionLease>();
+                    lease.RequireOriginalOwner(context);
+                    if (lease.PolicyPurpose != PolicyMutationPurpose.EmailDelivery || lease.HumanScope is not null
+                        || selected.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>()
+                            ?.HttpContext?.User.Identities.Any(identity => identity.IsAuthenticated) == true)
+                        throw new InvalidOperationException("Internal email writes require a selected nonhuman email owner.");
+                    return new InternalEmailDeliverySettingsWriter(context,
+                        selected.GetRequiredService<ISettingMutationLock>(),
+                        selected.GetRequiredService<IUnitOfWork>());
+                }));
+        if (configureDatabaseComposition)
+            services.AddEmailPolicyMutationPersistence(
+                PrimaryDatabaseConfiguration.BindRuntime(configuration),
+                PrimaryDatabaseConfiguration.BindGlobal(configuration),
+                PrimaryDatabaseConfiguration.Bind(configuration, PrimaryDatabaseRole.EmailPolicyInstanceMutation),
+                PrimaryDatabaseConfiguration.Bind(configuration, PrimaryDatabaseRole.EmailPolicyTenantMutation));
+        services.AddResourceVisitorSettingsPersistence();
         services.AddScoped<IWebPushDispatchOutboxRepository, WebPushDispatchOutboxRepository>();
         services.AddScoped<IIntegrationSyncOutboxRepository, IntegrationSyncOutboxRepository>();
+        services.AddScoped<IIntegrationSyncQueueDiscovery>(provider => new IntegrationSyncQueueDiscovery(
+            provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+            provider.GetService<PostgresNativeQueueEnrollment>()));
         services.AddScoped<IQueueDrainHealthRepository, QueueDrainHealthRepository>();
+        services.AddScoped<IRegistrationProviderSubmissionWriteQueueRepository, RegistrationProviderSubmissionWriteQueueRepository>();
         services.AddScoped<IRegistrationProviderSubmissionWriteEffectRepository, RegistrationProviderSubmissionWriteEffectRepository>();
 
         // Webhook Repositories
@@ -791,6 +1177,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IWebhookMessageRepository, WebhookMessageRepository>();
         services.AddScoped<IWebhookDeliveryAttemptRepository, WebhookDeliveryAttemptRepository>();
         services.AddScoped<IWebhookLocalTargetRepository, WebhookLocalTargetRepository>();
+        services.AddScoped<IWebhookLocalDeliveryHealthObserver, WebhookLocalDeliveryHealthObserver>();
         services.AddScoped<IWebhookBulkReplayRepository, WebhookBulkReplayRepository>();
         services.AddScoped<IWebhookProviderPublicationRepository, WebhookProviderPublicationRepository>();
         services.AddScoped<IWebhookDeliveryPlanMaterializer, WebhookDeliveryPlanMaterializer>();
@@ -811,6 +1198,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IWebhookAuditEventRepository, WebhookAuditEventRepository>();
         services.AddScoped<ISupportAccessSessionRepository, SupportAccessSessionRepository>();
         services.AddScoped<ISupportAccessAuditEventRepository, SupportAccessAuditEventRepository>();
+        services.AddHumanSupportAdministrationDataAdapters();
 
         // Governance Policy Resolver (deterministic hierarchy walk: Instance → Tenant → Organization)
         services.AddScoped<IPolicyResolver, Services.PolicyResolver>();
@@ -825,15 +1213,62 @@ public static class PersistenceServicesRegistration
 
         // Idempotency Repository
         services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
+        services.AddScoped<IAiActorContextRepository, AiActorContextRepository>();
+        services.AddScoped<IPrivateEventManagementRepository, PrivateEventManagementRepository>();
+        services.AddScoped<IRegistrationPrivateReadRepository, RegistrationPrivateReadOperations>();
+        services.AddScoped<IEventCreationPublisherRepository, EventCreationPublisherRepository>();
+        services.AddScoped<IIdempotencyCleanupTenantDiscoveryRepository, IdempotencyCleanupTenantDiscoveryRepository>();
+        services.AddScoped<IIdempotencyCleanupExecutionScopeFactory, IdempotencyCleanupExecutionScopeFactory>();
         services.AddScoped<IAtprotoBootstrapReplayRepository, AtprotoBootstrapReplayRepository>();
         services.AddScoped<IAtprotoTransientStoreRepository, AtprotoTransientStoreRepository>();
         services.AddScoped<IAtprotoTransientAssertionReplayRepository, AtprotoTransientAssertionReplayRepository>();
 
         // AI Assistant Repositories
         services.AddScoped<IAiConversationRepository, AiConversationRepository>();
+        services.AddScoped<IAiEventDraftRecoveryRepository, AiEventDraftRecoveryRepository>();
         services.AddScoped<IAiConsentGrantRepository, AiConsentGrantRepository>();
 
+        services.AddConfigurationManifestPersistence();
+
         return services;
+    }
+
+    /// <summary>Resolves contexts from their selected workflow before considering the ordinary request pool.</summary>
+    internal static IServiceCollection AddLocalIdentityExecutionContextSelection(
+        this IServiceCollection services, IdentityDatabaseTopology topology)
+    {
+        services.TryAddScoped<LocalIdentityExecutionLease>();
+        services.TryAddScoped<ILocalIdentityExecutionScopeFactory, LocalIdentityExecutionScopeFactory>();
+        services.AddScoped(provider =>
+        {
+            if (InventoryHoldExpiryExecutionScopeFactory.GetSelectedRuntimeContext(provider) is { } holdExpiry)
+                return holdExpiry;
+            if (GenericOutboxExecutionScopeFactory.GetSelectedRuntimeContext(provider) is { } selected)
+                return selected;
+            var context = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
+            context.ClearTenantFilterBypass();
+            context.TenantContext = provider.GetService<ITenantContext>();
+            context.CurrentUserService = provider.GetService<ICurrentUserService>();
+            context.BindTenantLease();
+            return context;
+        });
+        if (topology == IdentityDatabaseTopology.External)
+            services.AddScoped(provider =>
+                provider.GetRequiredService<LocalIdentityExecutionLease>().Identity is ExternalIdentityDbContext selected
+                    ? selected
+                    : new ExternalIdentityDbContext(provider.GetRequiredService<DbContextOptions<ExternalIdentityDbContext>>()));
+        return services;
+    }
+
+    private static LocalIdentityExecutionLease? GetSelectedLocalIdentityExecution(
+        IServiceProvider provider, ExploreDbContext application)
+    {
+        var lease = provider.GetRequiredService<LocalIdentityExecutionLease>();
+        if (lease.Application is null && lease.Identity is null)
+            return null;
+        lease.RequireCurrent(application, lease.Identity
+            ?? throw new UnauthorizedAccessException("The selected Local identity context is missing."));
+        return lease;
     }
 
     private static void EnsureDedicatedEmbeddedAuthorityFile(
@@ -858,8 +1293,4 @@ public static class PersistenceServicesRegistration
         }
     }
 
-    private static bool IsEnabled(string? value)
-    {
-        return bool.TryParse(value, out var enabled) && enabled;
-    }
 }

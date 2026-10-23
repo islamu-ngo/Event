@@ -13,15 +13,16 @@ public sealed class StorageReconciliationService(
     IStorageObjectRepository storageObjectRepository,
     IStorageProviderBindingService providerResolver,
     IStorageProviderBindingRepository bindings,
-    IStorageProducerOperationRepository producers,
+    IStorageReconciliationOwner reconciliationOwner,
+    ILocalStorageQuarantineOwner quarantineOwner,
     IOptions<StorageReconciliationSettings> settings,
     BusinessMetrics metrics,
     ILogger<StorageReconciliationService> logger,
     IEventResourceStorageCleanupService resourceCleanup,
     IEventResourceStorageLifecycleRepository lifecycle,
-    IUnitOfWork unitOfWork) : IStorageReconciliationService
+    IUnitOfWork unitOfWork,
+    TimeProvider clock) : IStorageReconciliationService
 {
-    private const string MissingBackingObjectReason = "backing_object_missing";
     private const string MissingMetadataRecordReason = "metadata_record_missing";
 
     private readonly StorageReconciliationSettings _settings = settings.Value;
@@ -80,9 +81,9 @@ public sealed class StorageReconciliationService(
         CancellationToken cancellationToken)
     {
         var quarantineBeforeUtc = utcNow.AddHours(-_settings.MissingObjectQuarantineGraceHours);
-        var activeObjects = await storageObjectRepository.ListActiveForReconciliationAsync(
+        var activeObjects = await reconciliationOwner.ListMissingBackingCandidatesAsync(
             quarantineBeforeUtc,
-            _settings.BatchSize,
+            Math.Min(_settings.BatchSize, IStorageReconciliationOwner.MaximumCandidates),
             cancellationToken);
 
         counts.ScannedMetadataCount += activeObjects.Count;
@@ -117,9 +118,11 @@ public sealed class StorageReconciliationService(
                     continue;
                 }
 
-                storageObject.MarkQuarantined(null, MissingBackingObjectReason, utcNow);
-                await storageObjectRepository.Update(storageObject);
-                counts.QuarantinedMetadataCount++;
+                if (await reconciliationOwner.TryQuarantineMissingBackingAsync(
+                    storageObject, utcNow, cancellationToken))
+                    counts.QuarantinedMetadataCount++;
+                else
+                    counts.SkippedCount++;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -211,7 +214,7 @@ public sealed class StorageReconciliationService(
             var remaining = _settings.BatchSize - counts.ScannedBackingObjectCount;
             if (remaining <= 0)
             {
-                return;
+                break;
             }
 
             var inventory = new List<FileStorageInventoryObject>();
@@ -245,34 +248,11 @@ public sealed class StorageReconciliationService(
                 continue;
             }
 
-            var objectKeys = inventory
-                .Select(item => item.ObjectKey)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-            var knownKeys = await producers.ListKnownObjectKeysAsync(
-                target.Select(binding => binding.Id).ToArray(),
-                objectKeys,
-                cancellationToken);
-            var knownKeySet = new HashSet<string>(knownKeys, StringComparer.Ordinal);
-
             foreach (var item in inventory)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (knownKeySet.Contains(item.ObjectKey))
-                {
-                    continue;
-                }
-
-                if (item.LastModifiedUtc is { } lastModifiedUtc && lastModifiedUtc > orphanBeforeUtc)
-                {
-                    counts.SkippedCount++;
-                    continue;
-                }
-
-                counts.OrphanBackingObjectCount++;
-
-                if (_settings.DryRun || !_settings.QuarantineOrphanLocalFiles)
+                if (item.LastModifiedUtc is not { } lastModifiedUtc || lastModifiedUtc > orphanBeforeUtc)
                 {
                     counts.SkippedCount++;
                     continue;
@@ -280,17 +260,22 @@ public sealed class StorageReconciliationService(
 
                 try
                 {
-                    var quarantineResult = await provider.QuarantineAsync(
-                        new FileStorageQuarantineInput(item.ObjectKey, MissingMetadataRecordReason, utcNow),
-                        cancellationToken);
-
-                    if (quarantineResult.Quarantined)
+                    var bindingId = target.First().Id;
+                    if (_settings.DryRun || !_settings.QuarantineOrphanLocalFiles)
                     {
-                        counts.QuarantinedBackingObjectCount++;
+                        if (await quarantineOwner.IsLocalOrphanAsync(bindingId, item.ObjectKey, cancellationToken))
+                        {
+                            counts.OrphanBackingObjectCount++;
+                            counts.SkippedCount++;
+                        }
                     }
                     else
                     {
-                        counts.SkippedCount++;
+                        var admitted = await quarantineOwner.AdmitLocalQuarantineAsync(
+                            bindingId, item.ObjectKey, item.SizeBytes, lastModifiedUtc,
+                            orphanBeforeUtc, MissingMetadataRecordReason, cancellationToken);
+                        if (admitted is not null)
+                            counts.OrphanBackingObjectCount++;
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -305,6 +290,79 @@ public sealed class StorageReconciliationService(
                         "Storage reconciliation failed while quarantining orphan backing object for provider {Provider}.",
                         NormalizeProviderForLog(provider.Provider));
                 }
+            }
+        }
+        if (!_settings.DryRun && _settings.QuarantineOrphanLocalFiles)
+            await DrainLocalQuarantinesAsync(counts, cancellationToken);
+    }
+
+    private async Task DrainLocalQuarantinesAsync(
+        ReconciliationCounts counts, CancellationToken cancellationToken)
+    {
+        var claims = await quarantineOwner.ClaimLocalQuarantineAsync(
+            Math.Min(_settings.BatchSize, ILocalStorageQuarantineOwner.MaximumClaims),
+            TimeSpan.FromMinutes(5), cancellationToken);
+        foreach (var claim in claims)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (claim.LeaseExpiresAtUtc is not { } expires || expires <= clock.GetUtcNow().UtcDateTime)
+                {
+                    counts.SkippedCount++;
+                    continue;
+                }
+                var input = new FileStorageQuarantineInput(
+                    claim.ObjectKey, claim.Id, claim.ObservedSize, claim.ObservedLastModifiedUtc,
+                    claim.ProviderBindingId, claim.ConcurrencyStamp, expires,
+                    claim.CanonicalPhysicalPath, claim.PhysicalPathHash);
+                var provider = (IFileStorageInventoryProvider)await providerResolver.ResolveTargetAsync(
+                    claim.ProviderBindingId, StorageProviders.Local, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (input.LeaseExpiresAtUtc <= clock.GetUtcNow().UtcDateTime
+                    || !await quarantineOwner.IsLocalQuarantineClaimCurrentAsync(input, cancellationToken)
+                    || input.LeaseExpiresAtUtc <= clock.GetUtcNow().UtcDateTime)
+                {
+                    counts.SkippedCount++;
+                    continue;
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                var effect = await provider.QuarantineAsync(input, quarantineOwner, clock, cancellationToken);
+                if (effect.Outcome == FileStorageQuarantineOutcome.Blocked)
+                {
+                    await quarantineOwner.BlockLocalQuarantineAsync(
+                        claim.Id, claim.ConcurrencyStamp, cancellationToken);
+                    counts.FailedCount++;
+                    continue;
+                }
+                var outcome = effect.Outcome switch
+                {
+                    FileStorageQuarantineOutcome.Moved => LocalStorageQuarantineOutcome.Moved,
+                    FileStorageQuarantineOutcome.AlreadyQuarantined => LocalStorageQuarantineOutcome.AlreadyQuarantined,
+                    FileStorageQuarantineOutcome.AlreadyAbsent => LocalStorageQuarantineOutcome.AlreadyAbsent,
+                    _ => throw new InvalidOperationException("Unknown local quarantine outcome.")
+                };
+                bool settled = await quarantineOwner.CompleteLocalQuarantineAsync(
+                    claim.Id, claim.ConcurrencyStamp, outcome, cancellationToken);
+                if (settled && effect.Quarantined)
+                    counts.QuarantinedBackingObjectCount++;
+                else
+                    counts.SkippedCount++;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // An uncertain effect retains this exact claim for expiry recovery.
+                throw;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException
+                or IOException or UnauthorizedAccessException or SystemException)
+            {
+                await quarantineOwner.RetryLocalQuarantineAsync(
+                    claim.Id, claim.ConcurrencyStamp, DateTime.UtcNow.AddMinutes(5), cancellationToken);
+                counts.FailedCount++;
+                metrics.RecordStorageReconciliationObjects(1, StorageProviders.Local,
+                    "backing_object", "quarantine", "failed", "quarantine_failed");
+                logger.LogWarning("Storage reconciliation could not settle local quarantine work.");
             }
         }
     }

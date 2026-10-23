@@ -63,6 +63,18 @@ public sealed partial class RegistrationPaymentAttemptRepository
                 int rows = await ClaimCandidate(candidate, owner, leaseToken, claimedAt, leaseDuration, nextFence, cancellationToken);
                 if (rows == 1)
                 {
+                    DateTime? persistedExpiry = await dbContext.CheckoutDispatchEffects
+                        .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
+                        .AsNoTracking()
+                        .Where(value => value.Id == candidate.EffectId && value.TenantId == candidate.TenantId &&
+                            value.RegistrationOrderId == candidate.RegistrationOrderId &&
+                            value.PaymentAttemptId == candidate.PaymentAttemptId &&
+                            value.Status == OutboxMessageStatus.Processing && value.ProcessingLeaseToken == leaseToken &&
+                            value.ProcessingFence == nextFence && value.AttemptCount == candidate.AttemptCount + 1)
+                        .Select(value => value.ProcessingLeaseExpiresAt)
+                        .SingleOrDefaultAsync(cancellationToken);
+                    if (persistedExpiry is null)
+                        continue;
                     CheckoutDispatchReplayKind replayKind = candidate.Status == OutboxMessageStatus.Failed && candidate.UnknownAt.HasValue
                         ? CheckoutDispatchReplayKind.UnknownRedrive
                         : candidate.Status == OutboxMessageStatus.Failed && candidate.LastFailureCode is not null
@@ -75,6 +87,7 @@ public sealed partial class RegistrationPaymentAttemptRepository
                         candidate.PaymentAttemptId,
                         leaseToken,
                         nextFence,
+                        DateTime.SpecifyKind(persistedExpiry.Value, DateTimeKind.Utc),
                         replayKind,
                         checked(candidate.AttemptCount + 1)));
                 }
@@ -96,10 +109,10 @@ public sealed partial class RegistrationPaymentAttemptRepository
 
         return await (from effect in ActiveClaim(claim, observedAt).AsNoTracking()
                       join attempt in dbContext.PaymentAttempts
-                              .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
                               .Include(value => value.AcceptanceSnapshot)
                               .AsNoTracking()
-                          on new { effect.TenantId, Id = effect.PaymentAttemptId } equals new { attempt.TenantId, attempt.Id }
+                          on new { effect.TenantId, effect.RegistrationOrderId, Id = effect.PaymentAttemptId }
+                          equals new { attempt.TenantId, attempt.RegistrationOrderId, attempt.Id }
                       select attempt).SingleOrDefaultAsync(cancellationToken);
     }
 
@@ -126,7 +139,6 @@ public sealed partial class RegistrationPaymentAttemptRepository
             PaymentAttempt attempt = await LoadClaimedAttemptAsync(claim, token)
                 ?? throw new InvalidOperationException("Claimed checkout dispatch attempt is missing.");
             RegistrationOrder? order = await dbContext.RegistrationOrders
-                .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
                 .AsNoTracking()
                 .SingleOrDefaultAsync(value => value.TenantId == claim.TenantId && value.Id == claim.RegistrationOrderId, token);
             if (!attempt.PaidOrderAcceptanceSnapshotId.HasValue ||
@@ -195,7 +207,6 @@ public sealed partial class RegistrationPaymentAttemptRepository
             }
 
             RegistrationOrder? order = await dbContext.RegistrationOrders
-                .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
                 .SingleOrDefaultAsync(value => value.TenantId == claim.TenantId && value.Id == claim.RegistrationOrderId, token);
             if (attempt is null || order is null || attempt.ProviderCheckoutSessionId is not null || attempt.ProviderPaymentId is not null ||
                 (RegistrationOrderStatusEnum)order.RegistrationOrderStatusId != RegistrationOrderStatusEnum.AwaitingPayment ||
@@ -206,7 +217,6 @@ public sealed partial class RegistrationPaymentAttemptRepository
             }
 
             bool saleStopped = await dbContext.PaidCheckoutSaleControls
-                .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
                 .AnyAsync(value =>
                     value.TenantId == claim.TenantId &&
                     value.IsStopped &&
@@ -218,7 +228,6 @@ public sealed partial class RegistrationPaymentAttemptRepository
             }
 
             List<RegistrationInventoryHold> activeHolds = await dbContext.RegistrationInventoryHolds
-                .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
                 .Where(value => value.TenantId == claim.TenantId && value.RegistrationOrderId == claim.RegistrationOrderId &&
                                 value.RegistrationInventoryHoldStatusId == (int)RegistrationInventoryHoldStatusEnum.Active)
                 .ToListAsync(token);
@@ -293,7 +302,6 @@ public sealed partial class RegistrationPaymentAttemptRepository
         }
 
         CheckoutDispatchEffect? effect = await dbContext.CheckoutDispatchEffects
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
             .AsNoTracking()
             .SingleOrDefaultAsync(value => value.TenantId == claim.TenantId && value.Id == claim.EffectId &&
                                            value.RegistrationOrderId == claim.RegistrationOrderId &&

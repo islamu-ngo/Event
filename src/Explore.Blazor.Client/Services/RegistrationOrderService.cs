@@ -171,8 +171,41 @@ public sealed class RegistrationOrderService(
         public StartRegistrationOrderRequest Request() => JsonSerializer.Deserialize<StartRegistrationOrderRequest>(Body, IntentJson)!;
     }
 
-    public Task<BaseCommandResponseOfGuid?> StartAuthenticatedAsync(Guid eventId, StartRegistrationOrderRequest request, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(() => authenticatedClient.StartAuthenticatedRegistrationOrderAsync(eventId, body: request, cancellationToken: cancellationToken));
+    private AuthenticatedIntent? _authenticatedIntent;
+    private int _authenticatedBusy;
+
+    public async Task<BaseCommandResponseOfGuid?> StartAuthenticatedAsync(
+        Guid eventId, StartRegistrationOrderRequest request, CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.CompareExchange(ref _authenticatedBusy, 1, 0) != 0) return null;
+        try
+        {
+            string body = JsonSerializer.Serialize(request, IntentJson);
+            if (_authenticatedIntent is { } pending &&
+                (pending.EventId != eventId || pending.Origin != navigation.BaseUri || pending.Body != body))
+                return null;
+            var intent = _authenticatedIntent ??= new(eventId, navigation.BaseUri, body, NewIdempotencyKey());
+            var response = await authenticatedClient.StartAuthenticatedRegistrationOrderWithOperationKeyAsync(
+                intent.EventId,
+                JsonSerializer.Deserialize<StartRegistrationOrderRequest>(intent.Body, IntentJson)!,
+                intent.Key, cancellationToken);
+            if (response.Success)
+                _authenticatedIntent = null;
+            return response;
+        }
+        catch (ApiException exception)
+        {
+            // A validation rejection is definite. Uncertain transport, authentication and
+            // unavailable-parent outcomes retain the original key and immutable payload.
+            if (exception.StatusCode == 400)
+                _authenticatedIntent = null;
+            logger.LogWarning("Registration order request was unavailable. Status: {StatusCode}.", exception.StatusCode);
+            return null;
+        }
+        finally { Volatile.Write(ref _authenticatedBusy, 0); }
+    }
+
+    private sealed record AuthenticatedIntent(Guid EventId, string Origin, string Body, string Key);
 
     public async Task<IReadOnlyList<HalResourceOfRegistrationOrderDto>> GetActorOrdersAsync(CancellationToken cancellationToken = default)
     {

@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4TXNQ6W8KCKQ73YYVNK818W
+Title: "Protect unsaved event selector changes during navigation"
+Type: fix
+Scope: events
+Summary: "Visibility, audience, registration policy, event type and madhab selections explicitly mark details dirty so native Stay navigation retains selector-only edits."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

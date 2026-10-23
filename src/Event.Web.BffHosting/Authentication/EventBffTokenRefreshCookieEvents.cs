@@ -1,10 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -65,21 +63,21 @@ public class EventBffTokenRefreshCookieEvents(
     internal const string TokenRefreshHttpClientName = "Event.Web.BffHosting.TokenRefresh";
 
     private static readonly TimeSpan RefreshBuffer = TimeSpan.FromSeconds(60);
-    private static readonly Action<ILogger, string?, Exception?> LogTokensRefreshed =
-        LoggerMessage.Define<string?>(
+    private static readonly Action<ILogger, Exception?> LogTokensRefreshed =
+        LoggerMessage.Define(
             LogLevel.Information,
             new EventId(1000, "TokensRefreshed"),
-            "[TokenRefresh] Tokens refreshed successfully for scheme {Scheme}");
-    private static readonly Action<ILogger, DateTime, DateTime, DateTime, bool, Exception?> LogTokenExpiryCheck =
-        LoggerMessage.Define<DateTime, DateTime, DateTime, bool>(
+            "[TokenRefresh] Tokens refreshed successfully.");
+    private static readonly Action<ILogger, bool, Exception?> LogTokenExpiryCheck =
+        LoggerMessage.Define<bool>(
             LogLevel.Debug,
             new EventId(1001, "TokenExpiryCheck"),
-            "[TokenRefresh] Token expiry check: ValidTo={ValidTo:o}, Now={Now:o}, Threshold={Threshold:o}, IsExpired={IsExpired}");
-    private static readonly Action<ILogger, string, string?, Exception?> LogCallingTokenEndpoint =
-        LoggerMessage.Define<string, string?>(
+            "[TokenRefresh] Token expiry check: IsExpired={IsExpired}");
+    private static readonly Action<ILogger, Exception?> LogCallingTokenEndpoint =
+        LoggerMessage.Define(
             LogLevel.Debug,
             new EventId(1002, "CallingTokenEndpoint"),
-            "[TokenRefresh] Calling token endpoint {Endpoint} for scheme {Scheme}");
+            "[TokenRefresh] Calling token endpoint.");
 
     public override async Task SigningIn(CookieSigningInContext context)
     {
@@ -129,8 +127,7 @@ public class EventBffTokenRefreshCookieEvents(
             if (result.Tokens is null)
             {
                 logger.LogWarning(
-                    "[TokenRefresh] Refresh failed for scheme {Scheme} (reason={Reason}) — signing out",
-                    schemeName,
+                    "[TokenRefresh] Refresh failed (reason={Reason}) — signing out",
                     result.FailureReason);
                 await RejectAndSignOutAsync(
                     context: context,
@@ -143,11 +140,11 @@ public class EventBffTokenRefreshCookieEvents(
             await sessionHandler.OnTokenRefreshSucceededAsync(context, result.Tokens);
             context.ShouldRenew = true;
 
-            LogTokensRefreshed(logger, schemeName, null);
+            LogTokensRefreshed(logger, null);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogError(ex, "[TokenRefresh] Exception during refresh for scheme {Scheme} — signing out", schemeName);
+            logger.LogError("[TokenRefresh] Refresh failed. FailureCategory={FailureCategory} — signing out", "refresh_exception");
             await RejectAndSignOutAsync(
                 context: context,
                 category: EventBffSessionRejectionCategory.TokenRefresh,
@@ -168,9 +165,9 @@ public class EventBffTokenRefreshCookieEvents(
         {
             await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogWarning(ex, "[TokenRefresh] SignOutAsync failed while rejecting principal");
+            logger.LogWarning("[TokenRefresh] SignOutAsync failed. FailureCategory={FailureCategory}", "signout_failed");
         }
 
         if (context.HttpContext.Response.HasStarted || !IsHtmlNavigation(context.HttpContext.Request))
@@ -216,13 +213,13 @@ public class EventBffTokenRefreshCookieEvents(
             var threshold = now.Add(RefreshBuffer);
             var isExpired = validTo <= threshold;
 
-            LogTokenExpiryCheck(logger, validTo, now, threshold, isExpired, null);
+            LogTokenExpiryCheck(logger, isExpired, null);
 
             return isExpired;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogWarning(ex, "[TokenRefresh] Failed to parse access token JWT — treating as expired");
+            logger.LogWarning("[TokenRefresh] Failed to parse access token JWT. FailureCategory={FailureCategory}", "invalid_access_token");
             return true;
         }
     }
@@ -243,15 +240,15 @@ public class EventBffTokenRefreshCookieEvents(
         {
             oidcOptions = oidcOptionsMonitor.Get(schemeName);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogWarning(ex, "[TokenRefresh] Failed to resolve OIDC options for scheme {Scheme}", schemeName);
+            logger.LogWarning("[TokenRefresh] Failed to resolve OIDC options. FailureCategory={FailureCategory}", "oidc_options_error");
             return RefreshResult.Failure("oidc_options_error");
         }
 
         if (oidcOptions.ConfigurationManager is null)
         {
-            logger.LogWarning("[TokenRefresh] ConfigurationManager is null for scheme {Scheme}", schemeName);
+            logger.LogWarning("[TokenRefresh] ConfigurationManager is unavailable.");
             return RefreshResult.Failure("no_configuration_manager");
         }
 
@@ -260,13 +257,13 @@ public class EventBffTokenRefreshCookieEvents(
 
         if (string.IsNullOrEmpty(tokenEndpoint))
         {
-            logger.LogWarning("[TokenRefresh] Token endpoint not found in OIDC config for scheme {Scheme}", schemeName);
+            logger.LogWarning("[TokenRefresh] Token endpoint not found in OIDC config.");
             return RefreshResult.Failure("no_token_endpoint");
         }
 
         if (string.IsNullOrWhiteSpace(oidcOptions.ClientId))
         {
-            logger.LogWarning("[TokenRefresh] ClientId missing for scheme {Scheme}", schemeName);
+            logger.LogWarning("[TokenRefresh] ClientId missing.");
             return RefreshResult.Failure("missing_client_id");
         }
 
@@ -283,30 +280,46 @@ public class EventBffTokenRefreshCookieEvents(
         }
 
         var httpClient = httpClientFactory.CreateClient(TokenRefreshHttpClientName);
-        LogCallingTokenEndpoint(logger, tokenEndpoint, schemeName, null);
+        LogCallingTokenEndpoint(logger, null);
 
         using var content = new FormUrlEncodedContent(parameters);
-        using var response = await httpClient.PostAsync(tokenEndpoint, content, context.HttpContext.RequestAborted);
+        using var request = new HttpRequestMessage(HttpMethod.Post, tokenEndpoint) { Content = content };
+        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
+        const int maximumResponseBytes = 64 * 1024;
+        if (response.Content.Headers.ContentLength > maximumResponseBytes)
+            throw new InvalidDataException("Token response exceeds its limit.");
+        await using var stream = await response.Content.ReadAsStreamAsync(context.HttpContext.RequestAborted);
+        byte[] bytes = new byte[maximumResponseBytes + 1];
+        int length = 0;
+        while (length < bytes.Length)
+        {
+            int read = await stream.ReadAsync(bytes.AsMemory(length), context.HttpContext.RequestAborted);
+            if (read == 0)
+                break;
+            length += read;
+        }
+        if (length > maximumResponseBytes)
+            throw new InvalidDataException("Token response exceeds its limit.");
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted);
-            var reason = ParseOidcErrorCode(body) ?? $"status_{(int)response.StatusCode}";
+            var reason = ParseOidcErrorCode(bytes.AsMemory(0, length)) ?? "token_endpoint_rejected";
             logger.LogWarning(
-                "[TokenRefresh] Token endpoint returned {StatusCode} for scheme {Scheme} (error={Error}, hasBody={HasBody})",
+                "[TokenRefresh] Token endpoint returned {StatusCode} (error={Error}, hasBody={HasBody})",
                 response.StatusCode,
-                schemeName,
                 reason,
-                !string.IsNullOrWhiteSpace(body));
+                length > 0);
             return RefreshResult.Failure(reason);
         }
 
-        var json = await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted);
-        using var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(bytes.AsMemory(0, length), new JsonDocumentOptions { MaxDepth = 16 });
         var root = doc.RootElement;
 
-        if (!root.TryGetProperty("access_token", out var newAccessTokenElement))
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("access_token", out var newAccessTokenElement)
+            || newAccessTokenElement.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(newAccessTokenElement.GetString()))
         {
-            logger.LogWarning("[TokenRefresh] Response missing access_token for scheme {Scheme}", schemeName);
+            logger.LogWarning("[TokenRefresh] Response missing access_token.");
             return RefreshResult.Failure("missing_access_token");
         }
 
@@ -348,17 +361,19 @@ public class EventBffTokenRefreshCookieEvents(
         return RefreshResult.Success(tokens);
     }
 
-    private static string? ParseOidcErrorCode(string body)
+    private static string? ParseOidcErrorCode(ReadOnlyMemory<byte> body)
     {
-        if (string.IsNullOrWhiteSpace(body))
+        if (body.IsEmpty)
         {
             return null;
         }
 
         try
         {
-            using var doc = JsonDocument.Parse(body);
-            if (doc.RootElement.TryGetProperty("error", out var errorElement))
+            using var doc = JsonDocument.Parse(body, new JsonDocumentOptions { MaxDepth = 16 });
+            if (doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("error", out var errorElement)
+                && errorElement.ValueKind == JsonValueKind.String)
             {
                 return NormalizeOidcErrorCode(errorElement.GetString());
             }
@@ -372,17 +387,13 @@ public class EventBffTokenRefreshCookieEvents(
 
     private static string? NormalizeOidcErrorCode(string? errorCode)
     {
-        if (string.IsNullOrWhiteSpace(errorCode))
+        return errorCode switch
         {
-            return null;
-        }
-
-        var normalized = new string(errorCode.Trim()
-            .Select(character => char.IsLetterOrDigit(character) || character is '_' or '-' ? character : '_')
-            .Take(64)
-            .ToArray());
-
-        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+            "invalid_request" or "invalid_client" or "invalid_grant" or "unauthorized_client"
+                or "unsupported_grant_type" or "invalid_scope" or "server_error"
+                or "temporarily_unavailable" => errorCode,
+            _ => null
+        };
     }
 
     private readonly record struct RefreshResult(List<AuthenticationToken>? Tokens, string? FailureReason)

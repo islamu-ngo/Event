@@ -56,6 +56,8 @@ public sealed class RegistrationPaymentAttemptClaimService(
         // The order-scoped database lock is the serialization boundary. A
         // waiting transaction must take a fresh read after acquiring it so it
         // can reuse the winner instead of acting on a pre-lock snapshot.
+        Guid attemptId = Guid.CreateVersion7();
+        Guid dispatchEffectId = Guid.CreateVersion7();
         return await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
             RegistrationOrder? order = await orders.GetOrderForUpdateWithLinesAsync(request.RegistrationOrderId, request.TenantId, token);
@@ -142,6 +144,7 @@ public sealed class RegistrationPaymentAttemptClaimService(
                     "Payment disclosures changed. Review and acknowledge the current facts.");
             }
 
+            PaymentAttempt? terminalToRelease = null;
             if (request.TerminalAttemptId is { } terminalAttemptId)
             {
                 (PaymentAttempt Attempt, CheckoutDispatchEffect DispatchEffect)? latest = await attempts.GetLatestByOrderAsync(
@@ -155,12 +158,14 @@ public sealed class RegistrationPaymentAttemptClaimService(
                 {
                     PaymentAttemptStatusEnum replacementStatus = (PaymentAttemptStatusEnum)latest.Value.Attempt.PaymentAttemptStatusId;
                     bool safelyQueuedReplacement = latest.Value.Attempt.ActiveUniquenessSlot == PaymentAttempt.ActiveUniquenessSlotValue &&
+                        latest.Value.Attempt.CompositionRevision == lockedCompositionRevision &&
+                        latest.Value.Attempt.HasImmutableAcceptance &&
                         ((replacementStatus == PaymentAttemptStatusEnum.Created && latest.Value.DispatchEffect.Status == OutboxMessageStatus.Pending) ||
                          (replacementStatus == PaymentAttemptStatusEnum.DispatchPending && latest.Value.DispatchEffect.Status == OutboxMessageStatus.Failed)) &&
                         latest.Value.Attempt.ProviderCheckoutSessionId is null &&
                         latest.Value.DispatchEffect.ParkedAt is null &&
                         latest.Value.DispatchEffect.LastFailureCode is null;
-                    return safelyQueuedReplacement
+                    return safelyQueuedReplacement && await acceptanceFreshness.IsCurrentAsync(latest.Value.Attempt, token)
                         ? new(true, latest.Value.Attempt, latest.Value.DispatchEffect, false, "Registration order already has an active replacement payment attempt.")
                         : RegistrationPaymentAttemptClaimResult.Failure("payment_retry_not_available", "Payment retry is not available.");
                 }
@@ -183,14 +188,8 @@ public sealed class RegistrationPaymentAttemptClaimService(
                     acceptance = latest.Value.Attempt.AcceptanceSnapshot!;
                 }
 
-                if (latest.Value.Attempt.ActiveUniquenessSlot == PaymentAttempt.ActiveUniquenessSlotValue &&
-                    !await attempts.ReleaseActiveSlotAsync(
-                        latest.Value.Attempt,
-                        request.RequestedAt,
-                        token))
-                {
-                    return RegistrationPaymentAttemptClaimResult.Failure("payment_retry_not_available", "Payment retry is not available.");
-                }
+                if (latest.Value.Attempt.ActiveUniquenessSlot == PaymentAttempt.ActiveUniquenessSlotValue)
+                    terminalToRelease = latest.Value.Attempt;
             }
 
             DateTime maximumCutoff = request.RequestedAt.Add(MaximumProviderCutoff);
@@ -202,16 +201,6 @@ public sealed class RegistrationPaymentAttemptClaimService(
             DateTime paymentCutoff = expiresAt < request.RequestedAt.Add(MinimumProviderCutoff)
                 ? request.RequestedAt.Add(MinimumProviderCutoff)
                 : expiresAt;
-            if (paymentCutoff > expiresAt)
-            {
-                _ = order.ExtendPaymentCutoff(paymentCutoff, request.RequestedAt);
-                IReadOnlyList<RegistrationInventoryHold> activeHolds = await orders.GetActiveHoldsForUpdateAsync(order.Id, order.TenantId, token);
-                foreach (RegistrationInventoryHold hold in activeHolds)
-                {
-                    _ = hold.ExtendPaymentCutoff(paymentCutoff, request.RequestedAt);
-                }
-            }
-
             (PaymentAttempt Attempt, CheckoutDispatchEffect DispatchEffect)? active = await attempts.GetActiveByOrderAsync(
                 request.TenantId, request.RegistrationOrderId, token);
             if (active is not null)
@@ -260,7 +249,6 @@ public sealed class RegistrationPaymentAttemptClaimService(
 
             }
 
-            Guid attemptId = Guid.CreateVersion7();
             PaymentAttempt attempt = PaymentAttempt.Create(
                 attemptId,
                 order.TenantId,
@@ -284,7 +272,19 @@ public sealed class RegistrationPaymentAttemptClaimService(
                     "payment_acceptance_stale",
                     "Payment disclosures changed. Review and acknowledge the current facts.");
             }
-            CheckoutDispatchEffect effect = CheckoutDispatchEffect.Create(attempt, request.RequestedAt);
+            CheckoutDispatchEffect effect = CheckoutDispatchEffect.Create(dispatchEffectId, attempt, request.RequestedAt);
+            if (terminalToRelease is not null &&
+                !await attempts.ReleaseActiveSlotAsync(terminalToRelease, request.RequestedAt, token))
+                return RegistrationPaymentAttemptClaimResult.Failure("payment_retry_not_available", "Payment retry is not available.");
+
+            if (paymentCutoff > expiresAt)
+            {
+                _ = order.ExtendPaymentCutoff(paymentCutoff, request.RequestedAt);
+                IReadOnlyList<RegistrationInventoryHold> activeHolds = await orders.GetActiveHoldsForUpdateAsync(order.Id, order.TenantId, token);
+                foreach (RegistrationInventoryHold hold in activeHolds)
+                    _ = hold.ExtendPaymentCutoff(paymentCutoff, request.RequestedAt);
+            }
+
             RegistrationPaymentAttemptClaimOutcome outcome = await attempts.ClaimAsync(new(attempt, effect), token);
             return new(true, outcome.Attempt, outcome.DispatchEffect, outcome.Created, outcome.Created ? "Payment attempt claimed." : "Registration order already has an active payment attempt.");
         }, cancellationToken);

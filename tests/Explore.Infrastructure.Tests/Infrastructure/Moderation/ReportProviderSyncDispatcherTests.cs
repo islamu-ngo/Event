@@ -1,9 +1,7 @@
 using System.Diagnostics.Metrics;
-using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventReporting.Models;
-using Explore.Application.Models.InternalEvents;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;
 using Explore.Domain;
@@ -311,7 +309,7 @@ public sealed class ReportProviderSyncDispatcherTests
     private static IEventReportRepository CreateRepository(EventReport report)
     {
         var repository = Substitute.For<IEventReportRepository>();
-        repository.GetByIdForUpdateAsync(report.TenantId, report.Id, Arg.Any<CancellationToken>())
+        repository.GetByIdForProviderSyncAsync(report.TenantId, report.Id, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<EventReport?>(report));
         repository.Update(Arg.Any<EventReport>()).Returns(Task.CompletedTask);
         return repository;
@@ -354,30 +352,7 @@ public sealed class ReportProviderSyncDispatcherTests
         DateTime createdAt,
         string correlationId)
     {
-        var payload = new EventReportProviderSyncRequested
-        {
-            TenantId = report.TenantId,
-            ReportId = report.Id,
-            EventId = report.EventId,
-            CaseId = reportCase.Id,
-            CaseConcurrencyStamp = reportCase.ConcurrencyStamp,
-            ReasonCode = report.ReasonCode,
-            QueueCode = reportCase.QueueCode,
-            SubmittedAtUtc = createdAt,
-            CorrelationId = correlationId
-        };
-
-        return new OutboxMessage
-        {
-            Id = Guid.CreateVersion7(),
-            AggregateType = "EventReport",
-            AggregateId = report.Id,
-            EventType = EventReportOutboxMessageFactory.EventReportProviderSyncRequestedEventType,
-            Payload = JsonSerializer.Serialize(payload),
-            Status = OutboxMessageStatus.Pending,
-            CreatedAt = createdAt,
-            MaxRetries = 5
-        };
+        return EventReportOutboxMessageFactory.CreateProviderSyncRequestedMessage(report, reportCase, correlationId);
     }
 
     private static string BuildIdempotencyKey(OutboxMessage message) =>

@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Net;
 using System.Net.Http.Json;
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
@@ -17,6 +16,7 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
 {
     private readonly ILogger<InfisicalSecretProvider> _logger;
     private readonly InfisicalOptions _options;
+    private readonly SecretConsumer _consumer;
     private readonly ConcurrentDictionary<string, SecretValue> _secretCache = new(StringComparer.OrdinalIgnoreCase);
 
     private string? _accessToken;
@@ -32,6 +32,7 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
     {
         _logger = logger;
         _options = options.Value.Infisical;
+        _consumer = options.Value.Consumer;
     }
 
     /// <inheritdoc />
@@ -53,6 +54,7 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
             }
 
             ValidateConfiguration();
+            SecretAcquisitionPolicy.AdmitPaths(_consumer, _options.Paths);
 
             _logger.LogInformation("secret_provider_initializing");
 
@@ -245,6 +247,7 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
     /// </summary>
     private async Task LoadSecretsAsync(CancellationToken cancellationToken)
     {
+        SecretAcquisitionPolicy.AdmitPaths(_consumer, _options.Paths);
         if (string.IsNullOrEmpty(_accessToken))
         {
             await AuthenticateAsync(cancellationToken).ConfigureAwait(false);
@@ -273,7 +276,7 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
                     + $"?workspaceId={Uri.EscapeDataString(_options.ProjectId!)}"
                     + $"&environment={Uri.EscapeDataString(_options.Environment)}"
                     + $"&secretPath={Uri.EscapeDataString(path)}"
-                    + "&expandSecretReferences=true&recursive=true";
+                    + "&expandSecretReferences=false&recursive=false&include_imports=false";
 
                 var listResp = await http.GetAsync(listUrl, cancellationToken).ConfigureAwait(false);
 
@@ -290,22 +293,25 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
                     .ReadFromJsonAsync<InfisicalConfigurationProvider.InfisicalListSecretsResponse>(cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
 
-                if (listJson?.Secrets is null || listJson.Secrets.Count == 0)
-                {
-                    _logger.LogWarning("secret_provider_path_empty");
-                    continue;
-                }
+                if (listJson?.Secrets is null)
+                    throw new InvalidOperationException("secret_authority_invalid");
 
                 foreach (var secret in listJson.Secrets)
                 {
-                    if (string.IsNullOrEmpty(secret.SecretKey)) continue;
+                    if (string.IsNullOrEmpty(secret.SecretKey)
+                        || !string.Equals(secret.SecretPath, path, StringComparison.Ordinal)
+                        || secret.SecretValue is null
+                        || secret.SecretValue.Contains("${", StringComparison.Ordinal))
+                        throw new InvalidOperationException("secret_authority_invalid");
+                    SecretAcquisitionPolicy.AdmitEntry(path, secret.SecretKey);
 
                     var settingKey = ConvertToSettingKey(secret.SecretKey, path);
                     var secretValue = new SecretValue(
                         secret.SecretValue ?? string.Empty,
                         Version: secret.Version?.ToString());
 
-                    newSecrets[settingKey] = secretValue;
+                    if (!newSecrets.TryAdd(settingKey, secretValue))
+                        throw new InvalidOperationException("secret_authority_invalid");
 
                     _logger.LogTrace("secret_provider_item_loaded");
                 }
@@ -316,7 +322,7 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
             }
             catch (Exception ex) when (ex is not SecretProviderException)
             {
-                _logger.LogError(ex, "secret_provider_path_unavailable");
+                _logger.LogError("secret_provider_path_unavailable");
                 throw SecretProviderException.Transient(
                     "secret_provider_path_unavailable",
                     SecretProviderType.Infisical,
@@ -381,6 +387,7 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
     /// </summary>
     private void ValidateConfiguration()
     {
+        SecretAcquisitionPolicy.AdmitPaths(_consumer, _options.Paths);
         var errors = new List<string>();
 
         if (string.IsNullOrWhiteSpace(_options.Url))

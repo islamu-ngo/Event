@@ -1,6 +1,7 @@
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Threading.Channels;
+using Event.Testing.DataProtection;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
@@ -9,6 +10,7 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
 using Explore.Secrets.Database;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -33,6 +35,7 @@ public class SecurityWebApplicationFactory : WebApplicationFactory<Program>
     private readonly string _keycloakAuthority;
     private readonly string _keycloakMetadataAddress;
     private readonly string _cerbosGrpcEndpoint;
+    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
     private readonly string _databasePath = Path.Combine(
         Path.GetTempPath(), $"security-api-{Guid.CreateVersion7():N}.db");
 
@@ -97,14 +100,7 @@ public class SecurityWebApplicationFactory : WebApplicationFactory<Program>
                 LookupTableSeeder.SeedAsync(database).GetAwaiter().GetResult();
             }
             services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
-            services.AddScoped(provider =>
-            {
-                var database = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
-                database.ClearTenantFilterBypass();
-                database.TenantContext = provider.GetRequiredService<ITenantContext>();
-                database.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
-                return database;
-            });
+            services.AddTestContextOwners();
 
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
@@ -112,6 +108,8 @@ public class SecurityWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<IExternalDataProtectionSource>();
+            services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
             services.RemoveAll<IDeploymentModeProvider>();
             services.AddSingleton<IDeploymentModeProvider>(new FixedDeploymentModeProvider(DeploymentMode));
 

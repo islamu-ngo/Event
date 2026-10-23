@@ -231,6 +231,8 @@ public sealed class EmailDispatchRepositoriesSqliteTests
             services.AddScoped<ITenantContextAccessor>(_ => new TenantContextAccessor(new HttpContextAccessor()));
             services.AddScoped(_ => CreateContext(databasePath));
             services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
+            services.AddScoped<IEmailDispatchAdmission>(provider =>
+                provider.GetRequiredService<IEmailDispatchOutboxRepository>());
             services.AddScoped<INotificationPreferenceResolver, NotificationPreferenceResolver>();
             services.AddSingleton<NotificationDeliveryPolicyResolver>();
             services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();

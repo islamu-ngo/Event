@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
@@ -14,7 +15,9 @@ public sealed class CreateWebhookEndpointCommandHandler(
     IWebhookEventTypeRepository eventTypeRepository,
     IWebhookProviderCapabilityResolver capabilityResolver,
     IWebhookAuditEventWriter auditWriter,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IMachinePrincipalAccessor machinePrincipalAccessor,
+    IHumanWebhookMutationPreparation preparation)
     : ICommandHandler<CreateWebhookEndpointCommand, BaseCommandResponse<Guid>>
 {
     private const int DefaultMaxAttempts = 8;
@@ -30,77 +33,90 @@ public sealed class CreateWebhookEndpointCommandHandler(
             return Failure("webhook_endpoint_validation_failed", validationErrors);
         }
 
-        var consumer = await consumerRepository.GetByIdForOwnerOperationAsync(
-            request.ConsumerId,
-            forUpdate: false,
-            cancellationToken);
-        if (consumer is null || consumer.Status != WebhookConsumerStatus.Active)
-        {
-            return Failure("webhook_consumer_not_found", ["Webhook consumer was not found."]);
-        }
+        // Retry the original command with stable products, but reload all authority and
+        // business state inside each newly prepared owner. Never reuse tracked entities.
+        var endpointId = Guid.CreateVersion7();
+        var subscriptionIds = eventTypeIds.ToDictionary(id => id, _ => Guid.CreateVersion7());
+        var secretRef = request.SecretRef.Trim();
 
-        if (!WebhookEndpointCapabilityPolicy.CanManageLocalEndpoint(
-                capabilityResolver,
-                consumer.ProviderMode,
-                out var capabilityFailure))
+        async Task<BaseCommandResponse<Guid>> MutateAsync(CancellationToken token)
         {
-            return Failure("webhook_endpoint_management_unavailable", [capabilityFailure]);
-        }
-
-        var existingEndpoint = await endpointRepository.GetByConsumerAndUrlForOwnerOperationAsync(
-            request.ConsumerId,
-            normalizedUrl,
-            cancellationToken);
-        if (existingEndpoint is not null)
-        {
-            return Failure("webhook_endpoint_url_conflict", ["Webhook endpoint URL is already configured for this consumer."]);
-        }
-
-        var eventTypes = await eventTypeRepository.GetByIdsAsync(eventTypeIds, cancellationToken);
-        if (eventTypes.Count != eventTypeIds.Length || eventTypes.Any(eventType => !eventType.IsEnabled))
-        {
-            return Failure("webhook_endpoint_event_types_invalid", ["One or more webhook event types are invalid or disabled."]);
-        }
-
-        var now = DateTime.UtcNow;
-        var endpoint = new WebhookEndpoint
-        {
-            Id = Guid.CreateVersion7(),
-            TenantId = consumer.TenantId,
-            InstanceId = consumer.InstanceId,
-            ConsumerId = request.ConsumerId,
-            Url = normalizedUrl,
-            Description = NormalizeOptional(request.Description),
-            Status = WebhookEndpointStatus.Active,
-            SecretRef = request.SecretRef.Trim(),
-            SecretVersion = 1,
-            SecretActivatedAt = now,
-            ConfigurationVersion = 1,
-            MaxAttempts = request.MaxAttempts ?? DefaultMaxAttempts,
-            TimeoutSeconds = request.TimeoutSeconds ?? DefaultTimeoutSeconds,
-            RateLimitPerMinute = request.RateLimitPerMinute,
-            CreatedAt = now
-        };
-
-        var subscriptions = eventTypes
-            .Select(eventType => new WebhookEndpointSubscription
+            var consumer = await consumerRepository.GetByIdForOwnerOperationAsync(
+                request.ConsumerId,
+                forUpdate: false,
+                token);
+            if (consumer is null || consumer.Status != WebhookConsumerStatus.Active)
             {
-                Id = Guid.CreateVersion7(),
+                return Failure("webhook_consumer_not_found", ["Webhook consumer was not found."]);
+            }
+
+            if (!WebhookEndpointCapabilityPolicy.CanManageLocalEndpoint(
+                    capabilityResolver,
+                    consumer.ProviderMode,
+                    out var capabilityFailure))
+            {
+                return Failure("webhook_endpoint_management_unavailable", [capabilityFailure]);
+            }
+
+            var existingEndpoint = await endpointRepository.GetByConsumerAndUrlForOwnerOperationAsync(
+                request.ConsumerId,
+                normalizedUrl,
+                token);
+            if (existingEndpoint is not null)
+            {
+                return Failure("webhook_endpoint_url_conflict", ["Webhook endpoint URL is already configured for this consumer."]);
+            }
+
+            var eventTypes = await eventTypeRepository.GetByIdsAsync(eventTypeIds, token);
+            if (eventTypes.Count != eventTypeIds.Length || eventTypes.Any(eventType => !eventType.IsEnabled))
+            {
+                return Failure("webhook_endpoint_event_types_invalid", ["One or more webhook event types are invalid or disabled."]);
+            }
+
+            var now = DateTime.UtcNow;
+            var endpoint = new WebhookEndpoint
+            {
+                Id = endpointId,
                 TenantId = consumer.TenantId,
                 InstanceId = consumer.InstanceId,
-                EndpointId = endpoint.Id,
-                EventTypeId = eventType.Id,
-                IsEnabled = true,
+                ConsumerId = consumer.Id,
+                Url = normalizedUrl,
+                Description = NormalizeOptional(request.Description),
+                Status = WebhookEndpointStatus.Active,
+                SecretRef = secretRef,
+                SecretVersion = 1,
+                SecretActivatedAt = now,
+                ConfigurationVersion = 1,
+                MaxAttempts = request.MaxAttempts ?? DefaultMaxAttempts,
+                TimeoutSeconds = request.TimeoutSeconds ?? DefaultTimeoutSeconds,
+                RateLimitPerMinute = request.RateLimitPerMinute,
                 CreatedAt = now
-            })
-            .ToArray();
+            };
 
-        return await unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
+            var subscriptions = eventTypes
+                .Select(eventType => new WebhookEndpointSubscription
+                {
+                    Id = subscriptionIds[eventType.Id],
+                    TenantId = consumer.TenantId,
+                    InstanceId = consumer.InstanceId,
+                    EndpointId = endpoint.Id,
+                    EventTypeId = eventType.Id,
+                    IsEnabled = true,
+                    CreatedAt = now
+                })
+                .ToArray();
+
             var persisted = await endpointRepository.CreateWithSubscriptionsAsync(
                 endpoint,
                 subscriptions,
                 token);
+            // CreateEndpoint's W selector retains the consumer, not the new products.
+            if (persisted.Id != endpointId || persisted.ConsumerId != request.ConsumerId
+                || persisted.TenantId != consumer.TenantId || persisted.InstanceId != consumer.InstanceId
+                || persisted.ConfigurationScopeId != consumer.ConfigurationScopeId
+                || subscriptions.Any(subscription => subscription.EndpointId != endpointId
+                    || subscription.TenantId != consumer.TenantId || subscription.InstanceId != consumer.InstanceId))
+                throw new UnauthorizedAccessException("The created webhook endpoint must retain its original consumer lineage.");
             await auditWriter.AppendAsync(
                 new WebhookAuditWriteRequest(
                     persisted.TenantId,
@@ -127,7 +143,11 @@ public sealed class CreateWebhookEndpointCommandHandler(
                 token);
 
             return BaseCommandResponse.Success(persisted.Id, "Webhook endpoint created.");
-        }, cancellationToken);
+        }
+
+        return machinePrincipalAccessor.Current is null
+            ? await preparation.ExecuteAsync(request, MutateAsync, cancellationToken)
+            : await unitOfWork.ExecuteInTransactionAsync(MutateAsync, cancellationToken);
     }
 
     private static List<string> Validate(

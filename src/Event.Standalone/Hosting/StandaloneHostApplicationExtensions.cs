@@ -29,7 +29,7 @@ public static class StandaloneHostApplicationExtensions
             mcpPath,
             schedulerPath);
 
-        app.UseForwardedHeaders();
+        app.UseEffectiveHostAuthority();
         var schemeInitializer = app.Services.GetRequiredService<DynamicAuthSchemeInitializer>();
         app.Use(async (context, next) =>
         {

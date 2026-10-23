@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5358PKPZ48ZK0TYGHVA7WKX
+Title: "Fence refund handoff phases with original invocation evidence"
+Type: feat
+Scope: access
+Summary: "Retain original refund input identity and fence buyer and application-fee provider handoffs with current invocation evidence."
+Group: refund-handoff-domain-state
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: A committed provider handoff never becomes retry permission from process or lease expiry alone.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Original mutation windows and buyer success remain retained; persistence and native dispatch integration are required before deployment.

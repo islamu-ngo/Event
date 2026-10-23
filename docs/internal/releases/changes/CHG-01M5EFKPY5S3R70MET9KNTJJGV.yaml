@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5EFKPY5S3R70MET9KNTJJGV
+Title: "Restore platform key usage reports"
+Type: fix
+Scope: access
+Summary: "Map PostgreSQL usage-report columns into the existing EF result shape so authorized administrators receive the complete report instead of a materialization error."
+Group: platform-key-usage-report
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: The eight-column result projection changes only names used by EF materialization. Administrator authorization, selected report purpose, source enrollment, transaction custody, private-ledger denial and native routine identity remain unchanged. This does not retire the remaining native reporting routine.
+  Migration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: No credential, schema, configuration or data transition is required. Existing platform-wide reports retain inactive-tenant and instance-wide aggregates with the same response fields and numeric values.

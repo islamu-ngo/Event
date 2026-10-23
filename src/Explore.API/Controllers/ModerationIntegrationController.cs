@@ -176,9 +176,8 @@ public sealed class ModerationIntegrationController(
             outcome,
             failureCategory);
         logger.LogInformation(
-            "Moderation provider callback {Provider} completed for report {ReportId} outcome {Outcome} failure {FailureCategory}",
+            "Moderation provider callback {Provider} completed outcome {Outcome} failure {FailureCategory}",
             provider,
-            response.Id,
             outcome,
             failureCategory);
     }

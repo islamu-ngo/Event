@@ -98,12 +98,26 @@ public class RudderStackAnalyticsProvider : IAnalyticsProvider
             var response = await api.SendAsync(path.TrimStart('/'), $"Basic {authToken}", payload, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogDebug("RudderStack call {Path} returned status {StatusCode}", path, response.StatusCode);
+                _logger.LogWarning("rudderstack_call_failed operation={Operation}", path switch
+                {
+                    "/identify" => "identify",
+                    "/track" => "track",
+                    "/page" => "page",
+                    "/group" => "group",
+                    _ => "unknown"
+                });
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "RudderStack analytics call failed for {Path}", path);
+            _logger.LogWarning("rudderstack_call_failed operation={Operation}", path switch
+            {
+                "/identify" => "identify",
+                "/track" => "track",
+                "/page" => "page",
+                "/group" => "group",
+                _ => "unknown"
+            });
         }
     }
 

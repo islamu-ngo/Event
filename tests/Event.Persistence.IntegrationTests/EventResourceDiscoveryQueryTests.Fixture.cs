@@ -151,7 +151,8 @@ public sealed partial class EventResourceDiscoveryQueryTests
             }
         }
         return new(repository, unit, new(unit, new EventResourceAuthoritySnapshotReader(repository,
-            new EventAuthoritySnapshotService(context), governance, new ExternalApiKeyRepository(context),
+            new EventAuthoritySnapshotService(context), governance,
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
             Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
             new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                 Substitute.For<IModerationMachineSubjectBindingRepository>(),

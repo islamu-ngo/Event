@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5369C5APRZ2D48TJY8WB1G2
+Title: "Attach fail-closed local password policy to production Identity"
+Type: feat
+Scope: access
+Summary: "Attach the verified password backend to production persistence composition with provider-specific readiness."
+Group: local-password-startup-composition
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Local or unselected primary authentication is not ready without a usable digest-pinned password snapshot.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Invalid or unavailable captures deny new credentials and required readiness without exposing credential or path data.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Startup binds hierarchical Authentication:Local blocklist and hash settings; flat environment-key normalization remains separate.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Local or unselected primary authentication requires usable policy readiness; lifecycle-store and flat environment-key wiring remain separate.

@@ -1,0 +1,33 @@
+Change-Id: CHG-01M4CBNGDF7M5EXPMVJJ5DPSFY
+Title: "resolve provider runtime credentials only through selected authority"
+Type: fix
+Scope: onboarding
+Summary: "Replace secret-bearing authentication settings and internal readback with metadata-only configuration, exact runtime authority acquisition and operator-authorized retained cutover receipts before legacy cleanup."
+Group: security-phase-02
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Authentication configuration no longer accepts or returns credential values or exposes internal secret readback; provision canonical selected-authority runtime credentials.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Exact runtime acquisition, current administrator authority and retained cutover receipts gate approved legacy cleanup; raw SQL and obsolete writers require independent operational fencing.
+  Migration:
+    Reference: schemas/islamu-event.md
+    Disposition: documented
+    Detail: Generated receipt and head tables retain value-free readiness and atomic cleanup counts; migrations do not rotate credentials or automatically delete legacy rows.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/infisical.md
+    Disposition: documented
+    Detail: Provision dedicated OIDC roots and separate ATProto OAuth signing custody; coordinate the nonsecret credential-profile revision and owning process replacements.
+  OpenAPI:
+    Reference: docs/internal/API_CONTRACT_INVENTORY.md
+    Disposition: documented
+    Detail: Metadata-only authentication configuration and administrator cutover inspection, evidence and cleanup operations replace secret-bearing readback.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Verify frozen replica acquisition, activation, old-process drain and writer fencing before approving exact legacy IDs; a lost response recovers retained counts without repeating deletion.

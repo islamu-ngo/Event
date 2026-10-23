@@ -18,7 +18,7 @@ namespace Explore.Persistence.Repositories;
 /// </summary>
 public sealed partial class ModerationNoticeCleanupRepository(
     ExploreDbContext context, IMachinePrincipalAccessor machine,
-    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyRepository keys,
+    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyAuthenticationRepository keys,
     TimeProvider clock, IModerationNoticeNotificationCleanup? notifications = null)
     : IModerationNoticeCleanupRepository
 {

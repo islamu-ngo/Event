@@ -71,7 +71,7 @@ public class OfflineTranslationProvider : ITranslationManagementProvider, IStati
         var normalised = languageCode.Trim().ToLowerInvariant();
         if (_bundles.TryRemove(normalised, out _))
         {
-            _logger.LogDebug("[LOCALIZATION] Offline bundle cache invalidated for {Language}", normalised);
+            _logger.LogDebug("localization_offline_cache_invalidated");
         }
     }
 
@@ -102,8 +102,8 @@ public class OfflineTranslationProvider : ITranslationManagementProvider, IStati
         }
 
         _logger.LogInformation(
-            "[LOCALIZATION] Merged offline bundle for {Language}: {EmbeddedCount} embedded keys, {WritableCount} writable overrides, {MergedCount} total keys",
-            languageCode, embedded.Count, writable.Count, merged.Count);
+            "localization_offline_bundle_merged embedded_count={EmbeddedCount} writable_count={WritableCount} merged_count={MergedCount}",
+            embedded.Count, writable.Count, merged.Count);
 
         return merged;
     }
@@ -132,15 +132,13 @@ public class OfflineTranslationProvider : ITranslationManagementProvider, IStati
             using var fileStream = File.OpenRead(writablePath);
             var dict = BundleSchema.Read(fileStream);
             _logger.LogInformation(
-                "[LOCALIZATION] Loaded writable bundle for {Language}: {Count} keys ({Path})",
-                languageCode, dict.Count, writablePath);
+                "localization_writable_bundle_loaded count={Count}",
+                dict.Count);
             return dict;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex,
-                "[LOCALIZATION] Failed to read writable bundle at {Path}; embedded defaults remain active",
-                writablePath);
+            _logger.LogWarning("localization_writable_bundle_read_failed fallback=embedded");
             return null;
         }
     }
@@ -152,19 +150,19 @@ public class OfflineTranslationProvider : ITranslationManagementProvider, IStati
 
         if (stream is null)
         {
-            _logger.LogDebug("No offline bundle found for language {Language} (resource: {Resource})", languageCode, resourceName);
+            _logger.LogDebug("localization_embedded_bundle_unavailable");
             return new SortedDictionary<string, string>(StringComparer.Ordinal);
         }
 
         try
         {
             var dict = BundleSchema.Read(stream);
-            _logger.LogInformation("Loaded embedded translation bundle for {Language}: {Count} keys", languageCode, dict.Count);
+            _logger.LogInformation("localization_embedded_bundle_loaded count={Count}", dict.Count);
             return dict;
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            _logger.LogError(ex, "Failed to parse embedded translation bundle for {Language}", languageCode);
+            _logger.LogError("localization_embedded_bundle_invalid");
             return new Dictionary<string, string>();
         }
     }
@@ -188,8 +186,8 @@ public class OfflineTranslationProvider : ITranslationManagementProvider, IStati
             }
 
             _languagesScanned = true;
-            _logger.LogInformation("Offline translation bundles scanned: {Count} languages found ({Languages})",
-                _availableLanguages.Count, string.Join(", ", _availableLanguages));
+            _logger.LogInformation("localization_offline_bundles_scanned count={Count}",
+                _availableLanguages.Count);
         }
     }
 }

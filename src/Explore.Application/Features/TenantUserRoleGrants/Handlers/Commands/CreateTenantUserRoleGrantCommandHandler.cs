@@ -17,32 +17,44 @@ public class CreateTenantUserRoleGrantCommandHandler : ICommandHandler<CreateTen
     private readonly IRoleRepository _roleRepository;
     private readonly ITenantContext _tenantContext;
     private readonly ITenantUserRoleGrantMutationBoundary _boundary;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
 
     public CreateTenantUserRoleGrantCommandHandler(
         ITenantUserRoleGrantRepository tenantUserRoleGrantRepository,
         ITenantUserRepository tenantUserRepository,
         IRoleRepository roleRepository,
         ITenantContext tenantContext,
-        ITenantUserRoleGrantMutationBoundary boundary)
+        ITenantUserRoleGrantMutationBoundary boundary,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _tenantUserRoleGrantRepository = tenantUserRoleGrantRepository;
         _tenantUserRepository = tenantUserRepository;
         _roleRepository = roleRepository;
         _tenantContext = tenantContext;
         _boundary = boundary;
+        _preparation = preparation;
     }
 
-    public Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateTenantUserRoleGrantCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateTenantUserRoleGrantCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
         var grantId = Guid.CreateVersion7();
-        return _boundary.ExecuteCreateAsync(request.TenantId, request.TenantUserRoleGrantDto.TenantUserId,
+        return await _boundary.ExecuteCreateAsync(request.TenantId, request.TenantUserRoleGrantDto.TenantUserId,
             request.TenantUserRoleGrantDto.RoleId,
-            (actor, token) => CreateAsync(request, grantId, actor, token), cancellationToken);
+            async (actor, token) =>
+        {
+            if (actor != prepared.PrincipalId)
+                return BaseCommandResponse.Authorization<Guid>();
+            await prepared.AcquireAsync(request, token);
+            var result = await ExecuteBodyAsync(request, grantId, prepared, token);
+            if (result.IsSuccess) prepared.Complete(result.Id);
+            return result;
+        }, cancellationToken);
     }
 
-    private async Task<BaseCommandResponse<Guid>> CreateAsync(CreateTenantUserRoleGrantCommand request,
-        Guid grantId, Guid actor, CancellationToken cancellationToken)
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(CreateTenantUserRoleGrantCommand request,
+        Guid grantId, IPreparedHumanAccountAdministrativeAction prepared, CancellationToken cancellationToken)
     {
         var dto = request.TenantUserRoleGrantDto;
 
@@ -93,8 +105,8 @@ public class CreateTenantUserRoleGrantCommandHandler : ICommandHandler<CreateTen
             RoleId = dto.RoleId,
             Role = null!,
             RoleScopeId = (int)RoleScopeEnum.Tenant,
-            GrantedAt = DateTime.UtcNow,
-            GrantedBy = actor
+            GrantedAt = prepared.ChangedAt,
+            GrantedBy = prepared.PrincipalId
         };
 
         tenantUserRoleGrant = await _tenantUserRoleGrantRepository.Create(tenantUserRoleGrant);

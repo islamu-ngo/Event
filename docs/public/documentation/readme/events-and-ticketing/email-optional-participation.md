@@ -113,6 +113,21 @@ mapped answers. Running cleanup before the delivery worker does not turn that
 known expiry into an ambiguous empty submission. Previously attempted or
 uncertain deliveries retain their existing reconciliation process.
 
+### Operating The Deletion Sweep
+
+The registration deletion sweep uses separate discovery and tenant-scoped
+execution authorities. Discovery returns only tenant identities; each tenant's
+cleanup runs with its own database authority. On PostgreSQL, install the current
+native database capability before enabling the worker. Other relational providers
+retain bounded tenant discovery; model-only providers are rejected. Monitor
+failed scheduled jobs rather than treating missing deletions as success.
+
+The sweep retains its existing active-tenant eligibility rule. Suspended tenants
+are not included by the seeded policy. This does not extend a stored privacy
+deadline: read-time expiry still denies expired data even when physical deletion
+is delayed. Restoring cleanup must not broaden database privileges, override
+legal holds, or change existing provider-delivery reconciliation.
+
 ## Public Calendar Export
 
 When the server offers a calendar action, it uses the existing public event

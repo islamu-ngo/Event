@@ -2,10 +2,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Explore.Domain;
+using Explore.Domain.Federation;
 using Explore.Domain.Secrets;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Explore.Persistence.Schema;
 
@@ -17,6 +19,9 @@ internal static partial class PortableRelationalModelPolicy
     private const string MySqlProvider = "Microting.EntityFrameworkCore.MySql";
     private const string InMemoryProvider = "Microsoft.EntityFrameworkCore.InMemory";
     private const int MySqlLookupIndexPrefixLength = 512;
+    private static readonly ValueConverter<DateTimeOffset, DateTime> WebhookUtcTimestampConverter = new(
+        value => value.UtcDateTime,
+        value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
 
     private static readonly HashSet<string> PostgreSqlColumnTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -74,6 +79,14 @@ internal static partial class PortableRelationalModelPolicy
             else if (providerName == MySqlProvider && entityType.ClrType == typeof(EventReportSignal))
             {
                 ConfigureMySqlEventReportSignalUniqueness(entityType);
+            }
+            else if (providerName == MySqlProvider && entityType.ClrType == typeof(PdsSyncOutbox))
+            {
+                ConfigureMySqlPdsActiveUniqueness(entityType);
+            }
+            else if (providerName == MySqlProvider && entityType.ClrType == typeof(ConfigurationImportOperation))
+            {
+                ConfigureMySqlImportSuccessUniqueness(entityType);
             }
 
             NormalizeProperties(entityType, providerName);
@@ -167,6 +180,15 @@ internal static partial class PortableRelationalModelPolicy
     {
         foreach (var property in entityType.GetProperties())
         {
+            // SQLite must order queue instants in SQL; its provider cannot compare DateTimeOffset.
+            if (providerName == SqliteProvider
+                && (entityType.ClrType == typeof(WebhookLocalTargetSnapshot)
+                    || entityType.ClrType == typeof(WebhookDeliveryPlanSnapshot))
+                && (Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType) == typeof(DateTimeOffset))
+            {
+                property.SetValueConverter(WebhookUtcTimestampConverter);
+            }
+
             if (providerName == SqlServerProvider &&
                 property.ClrType == typeof(int) &&
                 property.IsPrimaryKey())
@@ -364,8 +386,17 @@ internal static partial class PortableRelationalModelPolicy
 
             if (providerName == SqlServerProvider)
             {
+                // These finite ASCII values require exact lengths. LEN ignores
+                // trailing spaces on SQL Server; DATALENGTH preserves that proof.
+                bool finiteFederation =
+                    (entityType.ClrType == typeof(AtprotoFederationInstanceSetting)
+                        && constraintName is "ck_atproto_federation_instance_settings_key"
+                            or "ck_atproto_federation_instance_settings_value")
+                    || (entityType.ClrType == typeof(AtprotoFederationTenantSetting)
+                        && constraintName is "ck_atproto_federation_tenant_settings_key"
+                            or "ck_atproto_federation_tenant_settings_value");
                 sql = NonnegativeCursor().Replace(
-                    sql.Replace("length(", "len(", StringComparison.OrdinalIgnoreCase),
+                    sql.Replace("length(", finiteFederation ? "DATALENGTH(" : "len(", StringComparison.OrdinalIgnoreCase),
                     "[cursor] >= 0");
                 sql = NormalizeSqlServerBooleanPredicates(entityType, sql);
 
@@ -410,6 +441,34 @@ internal static partial class PortableRelationalModelPolicy
                 index.SetFilter(NormalizeBooleanLiterals(filter, providerName));
             }
         }
+    }
+
+    private static void ConfigureMySqlImportSuccessUniqueness(IMutableEntityType entityType)
+    {
+        var successIndex = entityType.GetIndexes().Single(index => index.IsUnique && index.GetFilter() is not null);
+        entityType.RemoveIndex(successIndex);
+        var slot = entityType.AddProperty("SuccessSlot", typeof(int?));
+        slot.IsNullable = true;
+        slot.SetColumnName("success_slot");
+        slot.SetComputedColumnSql("CASE WHEN status <> 3 THEN 1 ELSE NULL END");
+        slot.SetIsStored(true);
+        slot.ValueGenerated = ValueGenerated.OnAddOrUpdate;
+        entityType.AddIndex([.. successIndex.Properties, slot]).IsUnique = true;
+    }
+
+    private static void ConfigureMySqlPdsActiveUniqueness(IMutableEntityType entityType)
+    {
+        var activeIndex = entityType.GetIndexes().Single(index => index.IsUnique && index.GetFilter() is not null);
+        entityType.RemoveIndex(activeIndex);
+        // MySQL/MariaDB have no filtered indexes. Null slots keep inactive evidence
+        // unconstrained while the full exact lineage has one active operation.
+        var slot = entityType.AddProperty("ActiveSlot", typeof(int?));
+        slot.IsNullable = true;
+        slot.SetColumnName("active_slot");
+        slot.SetComputedColumnSql("CASE WHEN status IN (1, 2) AND superseded_at IS NULL THEN 1 ELSE NULL END");
+        slot.SetIsStored(true);
+        slot.ValueGenerated = ValueGenerated.OnAddOrUpdate;
+        entityType.AddIndex([.. activeIndex.Properties, slot]).IsUnique = true;
     }
 
     private static void ConfigureMySqlSecretBindingUniqueness(IMutableEntityType entityType)
@@ -690,7 +749,10 @@ internal static partial class PortableRelationalModelPolicy
 
     private static string NormalizeBooleanLiterals(string sql, string providerName) =>
         providerName == SqlServerProvider
-            ? TrueLiteral().Replace(FalseLiteral().Replace(sql, "0"), "1")
+            ? SqlServerBooleanTokens().Replace(sql, static match =>
+                match.Groups["boolean"].Success
+                    ? (match.Value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "1" : "0")
+                    : match.Value)
             : sql;
 
     private static string NormalizeSqlServerBooleanPredicates(
@@ -731,11 +793,11 @@ internal static partial class PortableRelationalModelPolicy
     [GeneratedRegex(@"\bcursor\s*>=\s*0\b", RegexOptions.IgnoreCase)]
     private static partial Regex NonnegativeCursor();
 
-    [GeneratedRegex(@"\bfalse\b", RegexOptions.IgnoreCase)]
-    private static partial Regex FalseLiteral();
-
-    [GeneratedRegex(@"\btrue\b", RegexOptions.IgnoreCase)]
-    private static partial Regex TrueLiteral();
+    // Model predicates use SQL string literals and quoted identifiers. Match those
+    // complete tokens first so their contents never become SQL Server bit values.
+    [GeneratedRegex("""'(?:''|[^'])*'|"(?:""|[^"])*"|\[(?:\]\]|[^\]])*\]|(?<boolean>\b(?:false|true)\b)""",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SqlServerBooleanTokens();
 
     [GeneratedRegex(@"^\((?<left>.+)\)\s*=\s*\((?<right>.+)\)$", RegexOptions.Singleline)]
     private static partial Regex PredicateEquivalence();

@@ -3,91 +3,287 @@ using Explore.Application.Services.Federation;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using NSubstitute;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Application.UnitTests.Settings;
 
 public sealed class AtprotoJetstreamTenantPresentationResolverTests
 {
+    private const string EventsEnabled = GovernanceSettingKeys.Federation.AtprotoEventsEnabled;
+
     [Test]
     public async Task ResolveEnabledTenantIds_UsesInstanceLockAndActiveTenantBoundary()
     {
-        Guid enabledOverrideTenantId = Guid.CreateVersion7();
-        Guid disabledOverrideTenantId = Guid.CreateVersion7();
-        ITenantRepository tenants = Substitute.For<ITenantRepository>();
-        ISystemSettingRepository systemSettings = Substitute.For<ISystemSettingRepository>();
-        ITenantSettingRepository tenantSettings = Substitute.For<ITenantSettingRepository>();
-        tenants.GetActiveAsNoTrackingAsync(Arg.Any<CancellationToken>()).Returns([
-            Tenant(enabledOverrideTenantId),
-            Tenant(disabledOverrideTenantId)
-        ]);
-        systemSettings.GetByKey(GovernanceSettingKeys.Deployment.Mode, Arg.Any<CancellationToken>())
-            .Returns(SystemSetting(GovernanceSettingKeys.Deployment.Mode, "\"MultiTenant\"", locked: false));
-        systemSettings.GetByKey(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, Arg.Any<CancellationToken>())
-            .Returns(SystemSetting(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "false", locked: false));
-        tenantSettings.GetByKeyAcrossTenants(
-                GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-                Arg.Any<CancellationToken>())
-            .Returns([
-                TenantSetting(enabledOverrideTenantId, "true"),
-                TenantSetting(disabledOverrideTenantId, "false")
-            ]);
-        var sut = new AtprotoJetstreamTenantPresentationResolver(tenants, systemSettings, tenantSettings);
+        using var fixture = new FederationReaderFixture();
+        Guid enabledOverrideTenantId = fixture.AddTenant();
+        Guid disabledOverrideTenantId = fixture.AddTenant();
+        Guid inactiveTenantId = fixture.AddTenant(active: false);
+        fixture.Instance(EventsEnabled, "false");
+        fixture.Override(enabledOverrideTenantId, EventsEnabled, "true");
+        fixture.Override(disabledOverrideTenantId, EventsEnabled, "false");
+        fixture.Override(inactiveTenantId, EventsEnabled, "true");
+        AtprotoJetstreamTenantPresentationResolver sut = fixture.Resolve<AtprotoJetstreamTenantPresentationResolver>();
 
         IReadOnlyList<Guid> enabled = await sut.ResolveEnabledTenantIdsAsync(CancellationToken.None);
 
         await Assert.That(enabled).IsEquivalentTo([enabledOverrideTenantId]);
 
-        systemSettings.GetByKey(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, Arg.Any<CancellationToken>())
-            .Returns(SystemSetting(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "true", locked: true));
+        fixture.Instance(EventsEnabled, "true", locked: true);
 
         enabled = await sut.ResolveEnabledTenantIdsAsync(CancellationToken.None);
 
         await Assert.That(enabled).IsEquivalentTo([enabledOverrideTenantId, disabledOverrideTenantId]);
 
-        systemSettings.GetByKey(GovernanceSettingKeys.Deployment.Mode, Arg.Any<CancellationToken>())
-            .Returns(SystemSetting(GovernanceSettingKeys.Deployment.Mode, "\"SingleTenant\"", locked: false));
-        systemSettings.GetByKey(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, Arg.Any<CancellationToken>())
-            .Returns(SystemSetting(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "false", locked: true));
+        fixture.DeploymentMode("SingleTenant");
+        fixture.Instance(EventsEnabled, "false", locked: true);
 
         enabled = await sut.ResolveEnabledTenantIdsAsync(CancellationToken.None);
 
         await Assert.That(enabled).IsEquivalentTo([enabledOverrideTenantId]);
 
-        systemSettings.GetByKey(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, Arg.Any<CancellationToken>())
-            .Returns((SystemSetting?)null);
+        fixture.RemoveInstance(EventsEnabled);
 
         enabled = await sut.ResolveEnabledTenantIdsAsync(CancellationToken.None);
 
         await Assert.That(enabled).IsEmpty();
     }
 
-    private static Tenant Tenant(Guid id) => new()
+    [Test]
+    public async Task DedicatedInstancePolicyOverridesContradictoryGenericSettings()
     {
-        Id = id,
-        FullName = $"Tenant {id}",
-        Slug = id.ToString("N"),
-        TenantStatusId = (int)TenantStatusEnum.Active,
-        TenantStatus = new TenantStatus { Id = (int)TenantStatusEnum.Active, MasterCode = "ACTIVE", FullName = "Active", IsActiveState = true },
-        CreatedAt = DateTime.UtcNow
-    };
+        using var fixture = new FederationReaderFixture();
+        Guid tenantId = fixture.AddTenant();
+        fixture.LegacyInstance(EventsEnabled, "false", locked: true);
+        fixture.DedicatedInstance(EventsEnabled, "true", locked: true);
 
-    private static SystemSetting SystemSetting(string key, string value, bool locked) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        SettingKey = key,
-        Value = value,
-        IsLocked = locked,
-        CreatedAt = DateTime.UtcNow
-    };
+        IReadOnlyList<Guid> enabled = await fixture.Resolve<AtprotoJetstreamTenantPresentationResolver>()
+            .ResolveEnabledTenantIdsAsync(CancellationToken.None);
 
-    private static TenantSetting TenantSetting(Guid tenantId, string value) => new()
+        await Assert.That(enabled).IsEquivalentTo([tenantId]);
+    }
+
+    [Test]
+    public async Task DedicatedTenantOverrideWinsWithoutLeakingUnrelatedFederationKeys()
     {
-        Id = Guid.CreateVersion7(),
-        TenantId = tenantId,
-        Tenant = null!,
-        SettingKey = GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-        Value = value,
-        CreatedAt = DateTime.UtcNow
-    };
+        using var fixture = new FederationReaderFixture();
+        Guid enabledTenantId = fixture.AddTenant();
+        Guid disabledTenantId = fixture.AddTenant();
+        fixture.Instance(EventsEnabled, "false");
+        fixture.DedicatedOverride(enabledTenantId, EventsEnabled, "true");
+        fixture.DedicatedOverride(disabledTenantId, EventsEnabled, "false");
+        fixture.DedicatedOverride(disabledTenantId, GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled, "true");
+
+        IReadOnlyList<Guid> enabled = await fixture.Resolve<AtprotoJetstreamTenantPresentationResolver>()
+            .ResolveEnabledTenantIdsAsync(CancellationToken.None);
+
+        await Assert.That(enabled).IsEquivalentTo([enabledTenantId]);
+    }
+
+    [Test]
+    public async Task MissingDedicatedInstanceRemainsDisabledDespiteStaleGenericRowsAndTenantOptIn()
+    {
+        using var fixture = new FederationReaderFixture();
+        Guid tenantId = fixture.AddTenant();
+        fixture.LegacyInstance(EventsEnabled, "true");
+        fixture.DedicatedOverride(tenantId, EventsEnabled, "true");
+
+        IReadOnlyList<Guid> enabled = await fixture.Resolve<AtprotoJetstreamTenantPresentationResolver>()
+            .ResolveEnabledTenantIdsAsync(CancellationToken.None);
+
+        await Assert.That(enabled).IsEmpty();
+    }
+
+    [Test]
+    public async Task InheritedEnablementIncludesOnlyActiveTenantsInStableOrder()
+    {
+        using var fixture = new FederationReaderFixture();
+        fixture.AddTenant(FederationReaderFixture.TenantB);
+        fixture.AddTenant(FederationReaderFixture.TenantA);
+        Guid inactive = fixture.AddTenant(active: false);
+        Guid optedOut = fixture.AddTenant();
+        fixture.Instance(EventsEnabled, "true");
+        fixture.Override(optedOut, EventsEnabled, "false");
+        fixture.Override(inactive, EventsEnabled, "true");
+
+        IReadOnlyList<Guid> enabled = await fixture.Resolve<AtprotoJetstreamTenantPresentationResolver>()
+            .ResolveEnabledTenantIdsAsync(CancellationToken.None);
+
+        await Assert.That(enabled.SequenceEqual([FederationReaderFixture.TenantA, FederationReaderFixture.TenantB])).IsTrue();
+    }
+}
+
+internal sealed class FederationReaderFixture : IDisposable
+{
+    internal static readonly Guid TenantA = Guid.Parse("11111111-1111-7111-8111-111111111111");
+    internal static readonly Guid TenantB = Guid.Parse("22222222-2222-7222-8222-222222222222");
+    internal static readonly Guid TenantC = Guid.Parse("33333333-3333-7333-8333-333333333333");
+    private static readonly DateTime ObservedAt = new(2026, 10, 18, 12, 0, 0, DateTimeKind.Utc);
+    private readonly List<Tenant> _tenants = [];
+    private readonly LegacySettingsStore _legacy = new();
+    private readonly DedicatedSettingsStore _dedicated = new();
+    private readonly ServiceProvider _services;
+
+    internal FederationReaderFixture()
+    {
+        DeploymentMode("MultiTenant");
+        var services = new ServiceCollection();
+        services.AddSingleton<ITenantRepository>(new TenantDirectory(_tenants));
+        services.AddSingleton<ISystemSettingRepository>(_legacy);
+        services.AddSingleton<IAtprotoFederationGlobalReadRepository>(_dedicated);
+        services.AddTransient<AtprotoJetstreamTenantPresentationResolver>();
+        services.AddTransient<AtprotoPdsRecoveryPolicyResolver>();
+        _services = services.BuildServiceProvider();
+    }
+
+    internal T Resolve<T>() where T : notnull => _services.GetRequiredService<T>();
+
+    internal Guid AddTenant(Guid? id = null, bool active = true)
+    {
+        Guid tenantId = id ?? Guid.CreateVersion7();
+        int statusId = (int)(active ? TenantStatusEnum.Active : TenantStatusEnum.Suspended);
+        _tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            FullName = "Federation test tenant",
+            Slug = tenantId.ToString("N"),
+            TenantStatusId = statusId,
+            TenantStatus = new TenantStatus
+            {
+                Id = statusId,
+                MasterCode = active ? "ACTIVE" : "SUSPENDED",
+                FullName = active ? "Active" : "Suspended",
+                IsActiveState = active
+            },
+            CreatedAt = ObservedAt
+        });
+        return tenantId;
+    }
+
+    internal void DeploymentMode(string mode) =>
+        LegacyInstance(GovernanceSettingKeys.Deployment.Mode, $"\"{mode}\"");
+
+    internal void Instance(string key, string value, bool locked = false)
+    {
+        LegacyInstance(key, value, locked);
+        DedicatedInstance(key, value, locked);
+    }
+
+    internal void LegacyInstance(string key, string value, bool locked = false)
+    {
+        _legacy.Instance.RemoveAll(row => row.SettingKey == key);
+        _legacy.Instance.Add(new SystemSetting
+        {
+            Id = Guid.CreateVersion7(),
+            SettingKey = key,
+            Value = value,
+            IsLocked = locked,
+            CreatedAt = ObservedAt
+        });
+    }
+
+    internal void DedicatedInstance(string key, string value, bool locked = false)
+    {
+        _dedicated.Instance.RemoveAll(row => row.SettingKey == key);
+        _dedicated.Instance.Add(AtprotoFederationInstanceSetting.Create(key, value, locked, ObservedAt, null));
+    }
+
+    internal void RemoveInstance(string key)
+    {
+        _legacy.Instance.RemoveAll(row => row.SettingKey == key);
+        _dedicated.Instance.RemoveAll(row => row.SettingKey == key);
+    }
+
+    internal void Override(Guid tenantId, string key, string value) => DedicatedOverride(tenantId, key, value);
+
+    internal void DedicatedOverride(Guid tenantId, string key, string value)
+    {
+        _dedicated.Overrides.RemoveAll(row => row.TenantId == tenantId && row.SettingKey == key);
+        _dedicated.Overrides.Add(AtprotoFederationTenantSetting.Create(tenantId, key, value, false, ObservedAt, null));
+    }
+
+    internal void ChangeRecoveryOverrideAfterNextObservation(Guid tenantId, string enabled, string mode)
+    {
+        (string Key, string Value)[] next =
+        [
+            (GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled, enabled),
+            (GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode, mode)
+        ];
+        _dedicated.AfterObservation = next.Select(row => AtprotoFederationTenantSetting.Create(
+            tenantId, row.Key, row.Value, false, ObservedAt, null)).ToList();
+    }
+
+    public void Dispose() => _services.Dispose();
+
+    private sealed class DedicatedSettingsStore : IAtprotoFederationGlobalReadRepository
+    {
+        internal List<AtprotoFederationInstanceSetting> Instance { get; } = [];
+        internal List<AtprotoFederationTenantSetting> Overrides { get; } = [];
+        internal List<AtprotoFederationTenantSetting>? AfterObservation { get; set; }
+
+        public Task<IReadOnlyList<AtprotoFederationInstanceSetting>> GetInstanceAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<AtprotoFederationInstanceSetting>>(
+                Instance.Where(row => keys.Contains(row.SettingKey, StringComparer.Ordinal)).ToArray());
+        }
+
+        public Task<IReadOnlyList<AtprotoFederationTenantSetting>> GetOverridesAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            AtprotoFederationTenantSetting[] observed = Overrides
+                .Where(row => keys.Contains(row.SettingKey, StringComparer.Ordinal)).ToArray();
+            if (AfterObservation is not null)
+            {
+                Overrides.Clear();
+                Overrides.AddRange(AfterObservation);
+                AfterObservation = null;
+            }
+            return Task.FromResult<IReadOnlyList<AtprotoFederationTenantSetting>>(observed);
+        }
+    }
+
+    private sealed class LegacySettingsStore : ISystemSettingRepository
+    {
+        internal List<SystemSetting> Instance { get; } = [];
+
+        public Task<SystemSetting?> GetByKey(string key, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(Instance.SingleOrDefault(row => row.SettingKey == key));
+        }
+
+        public Task<List<SystemSetting>> GetAllSettings(string? category = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<bool> IsLocked(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string?> UpsertAsync(SystemSetting setting, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string?> UpsertInCurrentTransactionAsync(SystemSetting setting, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string?> UpsertLockAsync(SystemSetting setting, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    private sealed class TenantDirectory(List<Tenant> tenants) : ITenantRepository
+    {
+        public Task<IReadOnlyList<Tenant>> GetActiveAsNoTrackingAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<Tenant>>(tenants.Where(tenant => tenant.TenantStatus.IsActiveState).ToArray());
+        }
+
+        public Task<Tenant?> GetById(Guid id) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Tenant>> GetAll() => throw new NotSupportedException();
+        public Task<(IReadOnlyList<Tenant> Items, int TotalCount)> GetAllPaged(int pageNumber, int pageSize) => throw new NotSupportedException();
+        public Task<bool> Exists(Guid id) => throw new NotSupportedException();
+        public Task<Tenant> Create(Tenant entity) => throw new NotSupportedException();
+        public Task Update(Tenant entity) => throw new NotSupportedException();
+        public Task Delete(Tenant entity) => throw new NotSupportedException();
+        public Task AcquireHumanDeletionReservationAsync(Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<bool> DeleteHumanAsync(Guid tenantId, IPreparedHumanTenantMutation prepared, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Tenant?> GetTenantBySlug(string slug) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Tenant>> GetBySlugsAsNoTrackingAsync(IReadOnlyCollection<string> slugs, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<int> GetActiveTenantCountAsync() => throw new NotSupportedException();
+        public Task<IReadOnlyList<Tenant>> GetAllActiveForConfigurationManifestExportAsync(int maximumCount, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Tenant?> GetByIdAsNoTrackingAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<bool> ApplyConfigurationImportIdentityAsync(Guid tenantId, string displayName, Guid actorUserId, DateTime occurredAt, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<bool> TryTransitionStatusAsync(Guid id, int expectedStatusId, int newStatusId, DateTime updatedAt, Guid updatedBy, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
 }

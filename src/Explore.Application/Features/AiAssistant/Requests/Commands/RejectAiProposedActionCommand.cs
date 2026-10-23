@@ -7,7 +7,8 @@ namespace Explore.Application.Features.AiAssistant.Requests.Commands;
 [AuthorizeResource(ResourceKinds.AiConversation, AuthorizationActions.AiConversations.RejectAction)]
 public sealed record RejectAiProposedActionCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
+    public Guid ConversationId { get; init; }
     public Guid ProposedActionId { get; init; }
 
-    string? ISecureRequest.ResourceId => ProposedActionId == Guid.Empty ? null : ProposedActionId.ToString();
+    string? ISecureRequest.ResourceId => ConversationId == Guid.Empty ? null : ConversationId.ToString();
 }

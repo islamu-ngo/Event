@@ -95,6 +95,21 @@ echo it.
 
 ## Aspire Split Or Standalone Topology
 
+Authority errors are not repaired by changing the selected source implicitly:
+
+| Bounded failure | Repair |
+| --- | --- |
+| `secret_consumer_scope_invalid` | Remove broad, sibling, provisioning or infrastructure paths; use the compiled exact consumer roots. |
+| `secret_consumer_identity_missing` | Inject the enabled consumer's `INFISICAL_<CONSUMER>_CLIENT_ID/CLIENT_SECRET`, not a shared pair. |
+| `secret_consumer_identity_reused` | Provision independent machine identities and independently restricted ACLs. |
+| `secret_authority_invalid` | Check exact returned provenance, duplicate configuration keys and reference expressions without logging values. |
+| `secret_local_database_port_required` | Set the local database's stable operator-injected port and match it in the selected vault. |
+
+AppHost preserves Infisical in `local-full`. Supply provider-resource inputs
+separately; repairing a provider does not authorize the runtime to read that
+provider's admin or database credentials. A blank permitted-client item is
+invalid: omit it completely when no optional restriction is intended.
+
 Symptoms:
 
 - Aspire starts the unexpected API/BFF pair or omits the combined host.
@@ -406,18 +421,21 @@ Checks:
 
 ### Terminal Assistant Does Not Start Or Write
 
-- `interactive-terminal-required`: run `Event.SetupAssistant.Terminal` directly
-  in a TTY. Pipes, redirects, captured standard streams, and secret arguments are
-  rejected deliberately.
-- `protected-output-unavailable`: use Linux, macOS, or FreeBSD and a writable
-  current directory. The target requires owner-only `0600` create-new semantics
-  and has no plaintext fallback.
-- Existing output file: choose a new safe filename or remove the old file only
-  after preserving it deliberately; the assistant never overwrites.
-- Resize-only screen: enlarge the terminal to at least 40 columns by 17 rows.
+For new installs, use separately packaged
+[Configurator](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/terminal.md)
+with the local Event definition. Its release evidence owns supported output
+hosts; protected output currently requires Linux and a supported filesystem.
+`islamu-configurator` has no bundled `event-setup` aliases. An offline result
+cannot establish Event bootstrap, secret binding or backend readiness.
+- Launch `islamu-configurator-terminal --definition PATH` in an interactive TTY,
+  with an admitted local Event definition. Never pass private answers as arguments.
+- Protected-save refusal: use a supported Linux host/filesystem. The writer has
+  no plaintext fallback and does not infer native protection from a packaged RID.
+- Existing output file: choose a new safe filename; publication never overwrites.
+- Resize-only screen: use at least 80 columns by 26 rows.
 - Arabic text displays but shaping/order is poor: select a terminal/font with
   Unicode and RTL support. Terminal.Gui screen-reader, braille, RTL shaping, and
-  scrollback erasure remain unverified and are stated in the UI.
+  scrollback erasure remain unverified guarantees in the external UI.
 
 ## Secret Provider Unavailable
 
@@ -862,7 +880,9 @@ enable bootstrap on API replicas.
 
 The diagnostic intentionally reports a digest prefix and stable code rather
 than the full path or values. Use `docker compose config` to confirm that only
-`event-migrationservice` has the manifest environment and read-only mount.
+`islamu-event-api` has the manifest environment and read-only mount in split
+deployment, and that it waits for successful `event-migrationservice`
+completion. The migration service has no manifest or Global credential.
 After correcting a pre-commit failure, run `ValidateOnly`, then rerun the same
 topology owner. Existing tenants remain wholesale skips. A same-section rerun
 uses fresh Day 2 instance authority and never replays historical instance

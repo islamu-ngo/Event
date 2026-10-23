@@ -26,6 +26,7 @@ public sealed class ForwardedHeadersTrustOptions
 
         options.ForwardedHeaders = hasTrustedProxyBoundary ? forwardedHeaders : ForwardedHeaders.None;
         options.ForwardLimit = ForwardLimit;
+        options.RequireHeaderSymmetry = true;
         options.KnownProxies.Clear();
         options.KnownIPNetworks.Clear();
 

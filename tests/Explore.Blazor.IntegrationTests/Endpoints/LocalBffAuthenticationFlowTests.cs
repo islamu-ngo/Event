@@ -320,7 +320,7 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
     {
         public Task InitializeAsync() => Task.CompletedTask;
 
-        public Task RefreshSchemesAsync(string? setupSecret = null) =>
+        public Task RefreshSchemesAsync() =>
             Task.CompletedTask;
 
         public Task<IReadOnlyList<string>>

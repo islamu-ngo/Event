@@ -11,11 +11,15 @@ using Explore.Infrastructure.Authentication;
 using Explore.Infrastructure.Mail;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Services;
+using Explore.Secrets.Database;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,11 +35,17 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
     internal ControlledSmtp Smtp { get; } = new();
     internal bool UseRealSmtp { get; set; }
     internal CancellationToken CancellationToken => Native.CancellationToken;
-    private LocalLifecycleDeliveryFixture(LocalCredentialFirstUseTests.Fixture native) => Native = native;
-
-    internal static async Task<LocalLifecycleDeliveryFixture> CreateAsync(IdentityDatabaseTopology topology, bool verified = true)
+    private readonly ServiceProvider executionProvider;
+    private LocalLifecycleDeliveryFixture(LocalCredentialFirstUseTests.Fixture native, ServiceProvider executionProvider)
     {
-        var native = await LocalCredentialFirstUseTests.Fixture.CreateAsync(topology);
+        Native = native;
+        this.executionProvider = executionProvider;
+    }
+
+    internal static async Task<LocalLifecycleDeliveryFixture> CreateAsync(IdentityDatabaseTopology topology, bool verified = true,
+        IInterceptor? interceptor = null)
+    {
+        var native = await LocalCredentialFirstUseTests.Fixture.CreateAsync(topology, interceptor);
         try
         {
             await native.IssueReadySessionAsync(verified);
@@ -47,16 +57,70 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
                      new(null, GovernanceSettingKeys.Email.FromAddress, Explore.Application.Contracts.Persistence.EmailDeliverySettingMutationKind.SetValue, "\"events@instance.test\"")],
                     cancellationToken: native.CancellationToken);
             }
+            return new LocalLifecycleDeliveryFixture(native,
+                await CreateExecutionProviderAsync(native, topology, interceptor));
         }
         catch { await native.DisposeAsync(); throw; }
-        return new LocalLifecycleDeliveryFixture(native);
     }
 
     internal Scope Open(Func<string, CancellationToken, Task>? beforeLock = null) => new(this, beforeLock);
 
+    private static async Task<ServiceProvider> CreateExecutionProviderAsync(LocalCredentialFirstUseTests.Fixture native,
+        IdentityDatabaseTopology topology, IInterceptor? interceptor)
+    {
+        await using var original = native.Provider.CreateAsyncScope();
+        var application = original.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        string applicationConnection = application.Database.GetConnectionString()!;
+        string identityConnection = native.Identity(original).Database.GetConnectionString()!;
+        var writer = new LocalIdentityWriterDbContextFactory(new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.LocalIdentityWriter,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = new SqliteConnectionStringBuilder(applicationConnection).DataSource
+        }, topology == IdentityDatabaseTopology.External
+            ? new ExternalIdentityDatabaseDescriptor(PrimaryDatabaseProvider.Sqlite, identityConnection,
+                IdentityDatabaseConfiguration.DefaultSchema, null, null)
+            : null, poolSize: 1, interceptors: interceptor is null ? null : [interceptor]);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(writer);
+        services.AddSingleton<TimeProvider>(native.Clock);
+        services.AddSingleton(native.Provider.GetRequiredService<IDataProtectionProvider>());
+        services.AddPooledDbContextFactory<ExploreDbContext>(options => options
+            .UseSqlite(applicationConnection).UseSnakeCaseNamingConvention());
+        services.AddScoped<ExploreDbContextExecutionLease>();
+        var identity = services.AddIdentityCore<LocalIdentityUser>().AddRoles<LocalIdentityRole>()
+            .AddUserValidator<OptionalEmailLocalIdentityUserValidator>().AddLocalLifecycleTokenProviders();
+        if (topology == IdentityDatabaseTopology.External)
+        {
+            services.AddDbContext<ExternalIdentityDbContext>(options => options
+                .UseSqlite(identityConnection).UseSnakeCaseNamingConvention());
+            identity.AddEntityFrameworkStores<ExternalIdentityDbContext>();
+        }
+        else identity.AddEntityFrameworkStores<ExploreDbContext>();
+        services.AddLocalIdentityExecutionContextSelection(topology);
+        services.AddScoped(provider => new LocalIdentityCredentialStateStore(
+            Identity(provider), provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<UserManager<LocalIdentityUser>>(), native.Clock,
+            executionLease: provider.GetRequiredService<LocalIdentityExecutionLease>()));
+        services.AddScoped<ILocalIdentityLifecycleStore>(provider => new LocalIdentityLifecycleStore(
+            Identity(provider), provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<UserManager<LocalIdentityUser>>(), native.Clock,
+            provider.GetRequiredService<LocalIdentityCredentialStateStore>()));
+        services.AddScoped<ILocalIdentityLifecycleDeliveryStore>(provider => new LocalIdentityLifecycleDeliveryStore(
+            Identity(provider), provider.GetRequiredService<ExploreDbContext>(),
+            provider.GetRequiredService<LocalIdentityCredentialStateStore>(), native.Clock));
+        return services.BuildIsolatedServiceProvider(validateScopes: true);
+
+        DbContext Identity(IServiceProvider provider) => topology == IdentityDatabaseTopology.External
+            ? provider.GetRequiredService<ExternalIdentityDbContext>()
+            : provider.GetRequiredService<ExploreDbContext>();
+    }
+
     internal sealed class Scope : IAsyncDisposable, ITenantContext
     {
         private readonly AsyncServiceScope _scope;
+        private readonly AsyncServiceScope executionScope;
         private readonly MemoryCache _cache = new(new MemoryCacheOptions());
         internal ExploreDbContext Application { get; }
         internal DbContext Identity { get; }
@@ -71,7 +135,6 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
         {
             _scope = fixture.Native.Provider.CreateAsyncScope();
             Application = _scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-            Application.TenantContext = this;
             Identity = fixture.Native.Identity(_scope);
             var states = fixture.Native.StateStore(_scope);
             Lifecycle = new(Identity, Application, _scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Native.Clock, states,
@@ -79,12 +142,10 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
             Deliveries = new(Identity, Application, states, fixture.Native.Clock,
                 NativeIdentityRecognitionBoundary.For(Application, fixture.Native.Clock));
             MutationLock = new(Application, new EfCoreUnitOfWork(Application), beforeLock);
-            var writer = EmailDispatchSqliteFixture.CreateEmailSettingsWriter(Application, MutationLock);
-            var settings = new HierarchicalSettingsResolver(new SystemSettingRepository(Application, MutationLock),
-                new TenantSettingRepository(Application, MutationLock), new OrganizationSettingRepository(Application),
-                new GroupSettingRepository(Application), new GroupTenantRepository(Application), new UserPreferenceRepository(Application),
-                this, MutationLock, _cache, NullLogger<HierarchicalSettingsResolver>.Instance, writer,
-                new EventResourceSettingsWriter(Application, MutationLock, new EfCoreUnitOfWork(Application)));
+            var settings = new HierarchicalSettingsReader(SystemSettingRepository.CreateReadOnly(Application, MutationLock),
+                TenantSettingRepository.CreateReadOnly(Application, MutationLock), new OrganizationSettingRepository(Application),
+                new GroupSettingRepository(Application), UserPreferenceRepository.CreateReadOnly(Application), _cache,
+                new AtprotoFederationSettingRepository(Application, null));
             var secrets = Substitute.For<ISecretResolver>();
             secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(call =>
             {
@@ -98,12 +159,20 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
             Processor = new(Lifecycle, Deliveries, MutationLock, settings, capabilities, transport,
                 new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(
                     new Dictionary<string, string?> { ["PublicBaseUrl"] = "https://instance.test" }).Build(),
-                new SystemSettingRepository(Application, MutationLock),
+                SystemSettingRepository.CreateReadOnly(Application, MutationLock),
                 Options.Create(new EmailDispatchProcessorSettings()));
-            Router = new(new UserExternalLoginRepository(Application), [new LocalIdentityLifecycleEmailService(Lifecycle, Deliveries)]);
+            executionScope = fixture.executionProvider.CreateAsyncScope();
+            Router = new(new UserExternalLoginRepository(Application),
+                [new LocalIdentityLifecycleEmailService(
+                    executionScope.ServiceProvider.GetRequiredService<ILocalIdentityExecutionScopeFactory>())]);
         }
 
-        public async ValueTask DisposeAsync() { _cache.Dispose(); await _scope.DisposeAsync(); }
+        public async ValueTask DisposeAsync()
+        {
+            _cache.Dispose();
+            try { await executionScope.DisposeAsync(); }
+            finally { await _scope.DisposeAsync(); }
+        }
     }
 
     internal sealed class ControlledSmtp : ILocalIdentityLifecycleSmtpTransport
@@ -121,5 +190,9 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
         }
     }
 
-    public ValueTask DisposeAsync() => Native.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        try { await executionProvider.DisposeAsync(); }
+        finally { await Native.DisposeAsync(); }
+    }
 }

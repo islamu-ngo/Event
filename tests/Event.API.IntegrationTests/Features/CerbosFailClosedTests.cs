@@ -1,11 +1,15 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Net.Security;
 using System.Text;
+using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
+using Event.Testing.DataProtection;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -20,7 +24,7 @@ namespace Event.Api.IntegrationTests.Features;
 /// <summary>
 /// Most critical safety test in the security test suite.
 /// Proves the core invariant: when an operator explicitly chooses Cerbos as the authorization
-/// provider, and Cerbos becomes unavailable, the system denies ALL authorization checks.
+/// provider, and Cerbos becomes unavailable, provider-authorized operations fail closed.
 /// It never silently falls back to the potentially more permissive local RBAC provider.
 ///
 /// This test exercises the real RuntimeAuthorizationProvider routing:
@@ -28,7 +32,8 @@ namespace Event.Api.IntegrationTests.Features;
 ///   → CerbosAuthorizationService (gRPC to unreachable endpoint)
 ///   → gRPC failure → catch block → deny all
 ///
-/// Not even instance admin is allowed — fail-closed is absolute.
+/// Instance administrator roles cannot bypass provider checks. Handler-owned governance
+/// reads and anonymous endpoints retain their independent, explicit authority.
 /// </summary>
 [Category(TestCategories.Security)]
 [ClassDataSource<KeycloakOnlyFixture>(Shared = SharedType.PerAssembly)]
@@ -44,7 +49,7 @@ public class CerbosFailClosedTests : IAsyncDisposable
         _keycloak = keycloak;
         _factory = new CerbosFailClosedWebApplicationFactory(
             keycloak.Authority,
-            keycloak.MetadataAddress);
+            keycloak.MetadataAddress, keycloak.TokenClient);
         _client = _factory.CreateClient();
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
@@ -65,15 +70,15 @@ public class CerbosFailClosedTests : IAsyncDisposable
     #region All Users Denied When Cerbos Unavailable
 
     [Test]
-    public async Task InstanceAdmin_DeniedWhenCerbosDown()
+    public async Task GovernanceRead_RetainsHandlerOwnedInstanceAuthority_WhenCerbosDown()
     {
         var token = await _keycloak.TokenClient.GetAdminTokenAsync();
         using var request = CreateAuthorizedRequest(HttpMethod.Get, "/api/instance/settings/modules", token);
 
         var response = await _client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden).Because("when Cerbos is down and configured as the authz provider, " +
-        "even instance admin must be denied — fail-closed is absolute");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(
+            "module governance reads explicitly check current instance administrator authority, not the policy provider");
     }
 
     [Test]
@@ -84,7 +89,7 @@ public class CerbosFailClosedTests : IAsyncDisposable
 
         var response = await _client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden).Because("all resource access must be denied when the chosen provider is unavailable");
+        await AssertProviderUnavailableAsync(response);
     }
 
     [Test]
@@ -95,7 +100,7 @@ public class CerbosFailClosedTests : IAsyncDisposable
 
         var response = await _client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden).Because("even read-only operations must be denied when Cerbos is down");
+        await AssertProviderUnavailableAsync(response);
     }
 
     [Test]
@@ -106,7 +111,7 @@ public class CerbosFailClosedTests : IAsyncDisposable
 
         var response = await _client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden).Because("tenant admin access to own tenant resources must be denied");
+        await AssertProviderUnavailableAsync(response);
     }
 
     #endregion
@@ -149,11 +154,18 @@ public class CerbosFailClosedTests : IAsyncDisposable
         var response1 = await _client.SendAsync(request1);
         var response2 = await _client.SendAsync(request2);
 
-        await Assert.That(response1.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
-        await Assert.That(response2.StatusCode).IsEqualTo(HttpStatusCode.Forbidden).Because("deny-all must be consistent — no intermittent allow during Cerbos outage");
+        await AssertProviderUnavailableAsync(response1);
+        await AssertProviderUnavailableAsync(response2);
     }
 
     #endregion
+
+    private static async Task AssertProviderUnavailableAsync(HttpResponseMessage response)
+    {
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        await Assert.That(problem.GetProperty("code").GetString()).IsEqualTo("authorization_provider_unavailable");
+    }
 
     private static string CreateTenantJson()
     {
@@ -180,13 +192,17 @@ public class CerbosFailClosedTests : IAsyncDisposable
     /// </summary>
     private sealed class CerbosFailClosedWebApplicationFactory : WebApplicationFactory<Program>
     {
+        private readonly KeycloakTokenClient _keycloakTokens;
+        private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
         private readonly string _keycloakAuthority;
         private readonly string _keycloakMetadataAddress;
         private readonly string _unreachableCerbosEndpoint = "http://localhost:19999";
         private string _dbName = $"CerbosFailClosedDb_{Guid.NewGuid():N}";
 
-        public CerbosFailClosedWebApplicationFactory(string keycloakAuthority, string keycloakMetadataAddress)
+        public CerbosFailClosedWebApplicationFactory(
+            string keycloakAuthority, string keycloakMetadataAddress, KeycloakTokenClient keycloakTokens)
         {
+            _keycloakTokens = keycloakTokens;
             _keycloakAuthority = keycloakAuthority;
             _keycloakMetadataAddress = keycloakMetadataAddress;
         }
@@ -216,6 +232,7 @@ public class CerbosFailClosedTests : IAsyncDisposable
                     ["Deployment:Mode"] = "SingleTenant",
                     ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
                     ["Testing:HostProfile"] = TestHostProfile.Security,
+                    ["Authorization:Provider"] = "cerbos",
                     ["Cerbos:GrpcEndpoint"] = _unreachableCerbosEndpoint,
                     ["Cerbos:PlaintextMode"] = "true",
                 };
@@ -227,7 +244,7 @@ public class CerbosFailClosedTests : IAsyncDisposable
             {
                 services.RemoveExploreDbContextRegistrations();
 
-                services.AddInMemoryExploreDbContext(_dbName);
+                services.AddKeycloakSecurityDbContext(_dbName, _keycloakTokens, PlatformDefaults.DefaultTenantId);
 
                 services.RemoveAll<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
                 services.AddDistributedMemoryCache();
@@ -235,6 +252,8 @@ public class CerbosFailClosedTests : IAsyncDisposable
 
             builder.ConfigureTestServices(services =>
             {
+                services.RemoveAll<IExternalDataProtectionSource>();
+                services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
                 services.PostConfigure<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(
                     Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme, options =>
                     {

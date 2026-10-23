@@ -8,12 +8,10 @@ using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.ConfigurationImport;
 using Explore.Application.Authorization;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Domain;
-using Explore.Persistence;
+using Explore.Domain.Settings.Definitions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using TUnit.Core;
 
@@ -24,14 +22,16 @@ public sealed class SetupLiveConfigurationImportTests(SetupLiveAuthorityRedFixtu
     private const string CapabilityHeader = "X-Setup-Enrollment-Capability";
 
     [Test]
-    public async Task UploadPreviewAndConcurrentApplyUseTheExistingImportStateMachine()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task UploadPreviewAndConcurrentApplyUseTheExistingImportStateMachine(bool includeResourceSetting)
     {
         await fixture.ResetAsync();
         string originalName = await TenantName();
         var enrollment = await Enroll(["target.read", "configuration.import"]);
         await Assert.That(enrollment.Links.GetProperty("create-configuration-import-session")
             .GetProperty("method").GetString()).IsEqualTo("POST");
-        var session = await Stage(enrollment);
+        var session = await Stage(enrollment, includeResourceSetting);
         await Assert.That(await TenantName()).IsEqualTo(originalName);
 
         using var previewRequest = SessionRequest(enrollment, session, "preview");
@@ -49,24 +49,18 @@ public sealed class SetupLiveConfigurationImportTests(SetupLiveAuthorityRedFixtu
             .IsEqualTo("POST");
         await Assert.That(await TenantName()).IsEqualTo(originalName);
 
-        using var barrier = fixture.Coordinator.ArmBeforeAcquireBarrier();
         using var first = SessionRequest(enrollment, session, "apply");
-        Task<HttpResponseMessage> pending = fixture.Client.SendAsync(first);
-        await barrier.Started.WaitAsync(TimeSpan.FromSeconds(10));
-        try
-        {
-            using var second = SessionRequest(enrollment, session, "apply");
-            using var applied = await fixture.Client.SendAsync(second);
-            await Assert.That(applied.StatusCode).IsEqualTo(HttpStatusCode.OK);
-            using var receipt = JsonDocument.Parse(await applied.Content.ReadAsStringAsync());
-            await Assert.That(receipt.RootElement.GetProperty("fidelityVerified").GetBoolean())
-                .IsTrue();
-        }
-        finally
-        {
-            barrier.Release();
-        }
-        using var conflict = await pending;
+        using var second = SessionRequest(enrollment, session, "apply");
+        // Human/Discovery now precede the generation lock; neither contender may
+        // wait for the other's completion while retaining those outer gates.
+        var responses = await Task.WhenAll(fixture.Client.SendAsync(first), fixture.Client.SendAsync(second))
+            .WaitAsync(TimeSpan.FromSeconds(30));
+        using var firstResponse = responses[0];
+        using var secondResponse = responses[1];
+        var applied = responses.Single(response => response.StatusCode == HttpStatusCode.OK);
+        var conflict = responses.Single(response => response.StatusCode == HttpStatusCode.Conflict);
+        using var receipt = JsonDocument.Parse(await applied.Content.ReadAsStringAsync());
+        await Assert.That(receipt.RootElement.GetProperty("fidelityVerified").GetBoolean()).IsTrue();
         await Assert.That(conflict.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         await Assert.That(conflict.Content.Headers.ContentType?.MediaType)
             .IsEqualTo("application/problem+json");
@@ -75,6 +69,14 @@ public sealed class SetupLiveConfigurationImportTests(SetupLiveAuthorityRedFixtu
         await Assert.That(problem.RootElement.GetProperty("code").GetString())
             .IsEqualTo(ConfigurationImportFailureCodes.Replayed);
         await Assert.That(await TenantName()).IsEqualTo("Setup Imported Community");
+        if (includeResourceSetting)
+        {
+            await using var observer = fixture.Factory.CreateMigratorContext();
+            await Assert.That(await observer.Set<TenantSetting>().AsNoTracking()
+                .Where(setting => setting.TenantId == fixture.Primary.TenantId
+                    && setting.SettingKey == EventResourceSettingDefinitions.MaxActiveResources.Key)
+                .Select(setting => setting.Value).SingleAsync()).IsEqualTo("100");
+        }
     }
 
     [Test]
@@ -321,7 +323,8 @@ public sealed class SetupLiveConfigurationImportTests(SetupLiveAuthorityRedFixtu
         Authenticate(request);
         request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("D"));
         using var response = await fixture.Client.SendAsync(request);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Created);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Created)
+            .Because(fixture.Capture.FailureMetadata);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return new Enrollment(
             body.RootElement.GetProperty("enrollmentId").GetGuid(),
@@ -345,11 +348,10 @@ public sealed class SetupLiveConfigurationImportTests(SetupLiveAuthorityRedFixtu
     private string Route(Guid enrollmentId) =>
         $"/api/tenants/{fixture.Primary.TenantId:D}/setup/enrollments/{enrollmentId:D}/configuration-import/sessions";
 
-    private async Task<Session> Stage(Enrollment enrollment)
+    private async Task<Session> Stage(Enrollment enrollment, bool includeResourceSetting = false)
     {
-        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        await using (var db = fixture.Factory.CreateMigratorContext())
         {
-            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             if (!await db.PaidEventPolicyVersions.AnyAsync(policy =>
                     policy.TenantId == null && policy.IsActive))
             {
@@ -358,7 +360,7 @@ public sealed class SetupLiveConfigurationImportTests(SetupLiveAuthorityRedFixtu
             }
         }
         using var upload = Request(enrollment, "");
-        upload.Content = Artifact();
+        upload.Content = Artifact(includeResourceSetting);
         using var response = await fixture.Client.SendAsync(upload);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Created);
         await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
@@ -389,13 +391,13 @@ public sealed class SetupLiveConfigurationImportTests(SetupLiveAuthorityRedFixtu
 
     private async Task<string> TenantName()
     {
-        await using var scope = fixture.Factory.Services.CreateAsyncScope();
-        var tenants = scope.ServiceProvider.GetRequiredService<ITenantRepository>();
-        var tenant = await tenants.GetByIdAsNoTrackingAsync(fixture.Primary.TenantId);
-        return tenant!.FullName;
+        await using var observer = fixture.Factory.CreateMigratorContext();
+        return await observer.Tenants.AsNoTracking()
+            .Where(tenant => tenant.Id == fixture.Primary.TenantId)
+            .Select(tenant => tenant.FullName).SingleAsync();
     }
 
-    private static HttpContent Artifact()
+    private static HttpContent Artifact(bool includeResourceSetting = false)
     {
         var package = new TenantConfigurationPackageV1Alpha2
         {
@@ -413,7 +415,12 @@ public sealed class SetupLiveConfigurationImportTests(SetupLiveAuthorityRedFixtu
             Spec = new TenantConfigurationPackageSpecV1Alpha2
             {
                 DisplayName = "Setup Imported Community",
-                Settings = new Dictionary<string, JsonElement>(),
+                Settings = includeResourceSetting
+                    ? new Dictionary<string, JsonElement>
+                    {
+                        [EventResourceSettingDefinitions.MaxActiveResources.Key] = JsonSerializer.SerializeToElement(100)
+                    }
+                    : new Dictionary<string, JsonElement>(),
                 Documents = new Dictionary<string, ConfigurationManifestDocumentV1Alpha2>()
             }
         };

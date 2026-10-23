@@ -86,13 +86,7 @@ public sealed class UpdateEventRoleAssignmentWindowCommandHandler
         {
             _metrics.RecordEventRoleAssignmentChanged("update-window", "denied", RoleCodeFor(assignment.RoleId));
             _logger.LogWarning(
-                "Event role assignment window update denied TenantId={TenantId} EventId={EventId} AssignmentId={AssignmentId} TargetUserId={TargetUserId} RoleId={RoleId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
-                request.TenantId,
-                request.EventId,
-                assignment.Id,
-                assignment.UserId,
-                assignment.RoleId,
-                actorUserId,
+                "Event role assignment window update denied: {DenyReason}",
                 authority.FailureCode ?? EventRoleAuthorityFailureCodes.AuthorityMissing);
             await WriteAuditAsync(
                 _auditLogRepository,

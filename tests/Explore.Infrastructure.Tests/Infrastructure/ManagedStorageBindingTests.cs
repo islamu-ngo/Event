@@ -33,6 +33,34 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 [NotInParallel("StorageTargetSqlite")]
 public sealed class ManagedStorageBindingTests
 {
+    [Test]
+    public async Task HistoricalLocalBindingCannotBypassHostedPublicRootExclusion()
+    {
+        await using var env = await StorageTestEnvironment.CreateAsync();
+        string publicRoot = Directory.CreateDirectory(Path.Combine(env.Root, "wwwroot")).FullName;
+        var host = Substitute.For<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+        host.ContentRootPath.Returns(env.Root);
+        host.WebRootPath.Returns(publicRoot);
+        var historical = StorageProviderBinding.Local(publicRoot);
+        env.Context.Set<StorageProviderBinding>().Add(historical);
+        await env.Context.SaveChangesAsync();
+        var service = new StorageProviderBindingService(new StorageProviderBindingRepository(env.Context),
+            env.Database.Settings, Substitute.For<IRetainedSecretResolver>(),
+            Microsoft.Extensions.Options.Options.Create(new LocalFileStorageOptions
+            {
+                RootPath = env.OtherRoot,
+                CreateRootIfMissing = false
+            }), Substitute.For<IS3ClientFactory>(), NullLoggerFactory.Instance, host);
+        var persisted = await env.Context.Set<StorageProviderBinding>().AsNoTracking()
+            .SingleAsync(row => row.Id == historical.Id);
+        await Assert.ThrowsAsync<OptionsValidationException>(() => service.ResolveAsync(persisted.Id, default));
+        await Assert.That(Directory.GetFileSystemEntries(publicRoot).Length).IsEqualTo(0);
+        var approved = StorageProviderBinding.Local(env.OtherRoot);
+        env.Context.Set<StorageProviderBinding>().Add(approved);
+        await env.Context.SaveChangesAsync();
+        await Assert.That(await service.ResolveAsync(approved.Id, default) is LocalFileStorageProvider).IsTrue();
+    }
+
     internal static readonly byte[] Png = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAABAAAAAQBPJcTWAAAAEElEQVR4nGP8ywACLGCSAQANEQED1LYyQAAAAABJRU5ErkJggg==");
 
@@ -269,6 +297,51 @@ public sealed class ManagedStorageBindingTests
         using var text = new StreamReader(stream);
         await Assert.That(await text.ReadToEndAsync()).IsEqualTo("\"name\"\n\"Amina\"\n");
         await Assert.That(File.Exists(Path.Combine(env.OtherRoot, stored.ObjectKey!))).IsFalse();
+    }
+
+    [Test]
+    [Arguments("ascii")]
+    [Arguments("utf8")]
+    [Arguments("quotes")]
+    public async Task OversizedRegistrationCsvCannotAcquireProviderCustody(string content)
+    {
+        await using var env = await StorageTestEnvironment.CreateAsync();
+        string value = content switch
+        {
+            "ascii" => new string('a', 65_530),
+            "utf8" => new string('\u00e9', 32_765),
+            "quotes" => new string('"', 32_765),
+            _ => throw new ArgumentOutOfRangeException(nameof(content))
+        };
+        var request = CsvRequest(env.Database.TenantId) with
+        {
+            Answers = new Dictionary<string, string> { ["k"] = value }
+        };
+        var sink = new CsvRegistrationProviderSubmissionSink(env.Producer, env.Objects, env.Unit);
+        await Assert.ThrowsAsync<RegistrationProviderSubmissionDeliveryException>(() => sink.AcceptAsync(request, default));
+        await Assert.That(await env.Context.Set<StorageProducerOperation>().CountAsync()).IsEqualTo(0);
+        await Assert.That(await env.Context.StorageProviderBindings.CountAsync()).IsEqualTo(0);
+        await Assert.That(await env.Context.StorageObjects.CountAsync()).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ExactRegistrationCsvBudgetProducesExactPrivateBytes()
+    {
+        await using var env = await StorageTestEnvironment.CreateAsync();
+        string value = new('a', 65_529);
+        var request = CsvRequest(env.Database.TenantId) with
+        {
+            Answers = new Dictionary<string, string> { ["k"] = value }
+        };
+        var sink = new CsvRegistrationProviderSubmissionSink(env.Producer, env.Objects, env.Unit);
+        await sink.AcceptAsync(request, default);
+        var stored = await env.Context.StorageObjects.AsNoTracking().SingleAsync();
+        await Assert.That(stored.Size).IsEqualTo(65_536L);
+        var provider = await env.Bindings.ResolveTargetAsync(stored.StorageProviderBindingId, stored.Provider, default);
+        var opened = await provider.OpenReadAsync(new(stored.ObjectKey!, stored.ContentType), default);
+        await using var stream = opened.Content;
+        using var reader = new StreamReader(stream);
+        await Assert.That(await reader.ReadToEndAsync()).IsEqualTo($"\"k\"\n\"{value}\"\n");
     }
 
     [Test]
@@ -514,10 +587,6 @@ internal sealed class StorageTestEnvironment : IAsyncDisposable
     public static async Task<StorageTestEnvironment> CreateAsync()
     {
         var database = await SmtpSettingsDatabase.CreateAsync();
-        database.Context.FileTypes.AddRange(
-            new FileType { Id = (int)FileTypeEnum.Image, MasterCode = "Image", FullName = "Image" },
-            new FileType { Id = (int)FileTypeEnum.Document, MasterCode = "Document", FullName = "Document" });
-        await database.Context.SaveChangesAsync();
         return new(database);
     }
 

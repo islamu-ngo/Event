@@ -1,4 +1,5 @@
 using System.Data;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain;
 using Explore.Persistence.Privacy.ErasureAuthority.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
@@ -6,10 +7,13 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 
-public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
+public sealed partial class EmbeddedPrivacyErasureAuthorityRepository : IOriginalPrivacyIdentityFenceAuthority
 {
     private readonly AsyncLocal<EmbeddedPrivacyErasureAuthorityDbContext?> _identityGate = new();
     private readonly AsyncLocal<PrivacyErasureRecoveryGate?> _recoveryGate = new();
+
+    internal bool UsesOriginalApplicationContext(ExploreDbContext originalOwner) =>
+        ReferenceEquals(applicationContext, originalOwner) && originalOwner.Database.IsSqlite();
 
     public Task<T> ExecuteSerializedAsync<T>(
         Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken) =>
@@ -17,9 +21,68 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
             ? operation(cancellationToken)
             : ExecuteEnrollmentSerializedAsync(operation, _ => Task.CompletedTask, cancellationToken);
 
-    public async Task<T> ExecuteEnrollmentSerializedAsync<T>(
+    public Task<T> ExecuteOriginalEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    {
+        if (_identityGate.Value is not null)
+            throw new InvalidOperationException("Original enrollment cannot borrow another identity gate.");
+        return ExecuteSerializedAsync(operation, cancellationToken);
+    }
+
+    public Task<T> ExecuteOriginalEnrollmentAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         Func<CancellationToken, Task> beforePrimaryCommit,
+        Action<DateTimeOffset> requireCurrent,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(requireCurrent);
+        return ExecuteEnrollmentSerializedCoreAsync(operation, beforePrimaryCommit, requireCurrent, cancellationToken);
+    }
+
+    internal async Task<T> ExecuteJoinedOriginalEnrollmentAsync<T>(ExploreDbContext originalOwner,
+        Func<CancellationToken, Task<T>> settleOriginalOwner, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(settleOriginalOwner);
+        if (!ReferenceEquals(applicationContext, originalOwner) || _identityGate.Value is not null
+            || originalOwner.IdentityFenceOwnsTransaction || !originalOwner.HumanCommitAttemptOwnsTransaction
+            || !originalOwner.HasHumanCommitContextLease || originalOwner.IsTenantFilterBypassed
+            || originalOwner.Database.CurrentTransaction is not { } transaction
+            || transaction.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Joined identity authority requires the original human Serializable owner.");
+
+        await EnsureStorageReadyAsync(cancellationToken);
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        if (!EmbeddedIdentityFenceConnection.TryShareApplicationConnection(originalOwner, db, joinOriginalTransaction: true))
+            throw new InvalidOperationException("Joined identity authority requires the original co-located SQLite store.");
+        await using var enlistment = await db.Database.UseTransactionAsync(transaction.GetDbTransaction(), cancellationToken);
+        PrivacyErasureCounter counter = await ReadOrInitializeIdentityCounterAsync(db, cancellationToken);
+        using var recoveryGate = new PrivacyErasureRecoveryGate(db,
+            db.Entry(counter).State == EntityState.Added ? null : counter.GetRecoveryState());
+        await db.SaveChangesAsync(cancellationToken);
+        _identityGate.Value = db;
+        _recoveryGate.Value = recoveryGate;
+        try
+        {
+            // Only the original owner commits or rolls back this shared physical transaction.
+            return await settleOriginalOwner(cancellationToken);
+        }
+        finally
+        {
+            _identityGate.Value = null;
+            _recoveryGate.Value = null;
+        }
+    }
+
+    public Task<T> ExecuteEnrollmentSerializedAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforePrimaryCommit,
+        CancellationToken cancellationToken) =>
+        ExecuteEnrollmentSerializedCoreAsync(operation, beforePrimaryCommit, null, cancellationToken);
+
+    private async Task<T> ExecuteEnrollmentSerializedCoreAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforePrimaryCommit,
+        Action<DateTimeOffset>? requireCurrent,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(beforePrimaryCommit);
@@ -58,8 +121,17 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
                 if (applicationContext!.StorageReferenceTransactionFailed)
                     throw new InvalidOperationException("The storage reference transaction has failed.");
                 await applicationContext.FlushDisclosureAsync(cancellationToken);
+                await applicationContext.ValidateTrustedSetupSettingsSourcesAsync(cancellationToken);
+                await applicationContext.ValidateHumanCommitAdmissionsAsync(cancellationToken);
+                await beforePrimaryCommit(cancellationToken);
+                applicationContext.ValidateHumanCommitAdmissionTimes();
+                applicationContext.ValidateTrustedSetupSettingsTimes();
+            }
+            else if (requireCurrent is not null)
+            {
                 await beforePrimaryCommit(cancellationToken);
             }
+            requireCurrent?.Invoke(timeProvider.GetUtcNow());
             await transaction.CommitAsync(cancellationToken);
             storage?.HardenCompanionFiles();
             return result;
@@ -81,6 +153,8 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
             {
                 applicationContext!.IdentityFenceOwnsTransaction = false;
                 applicationContext.IdentityFenceTransactionFailed = false;
+                applicationContext.ResetHumanCommitAdmissions();
+                applicationContext.ResetTrustedSetupSettingsAdmissions();
                 await applicationEnlistment.DisposeAsync();
             }
         }

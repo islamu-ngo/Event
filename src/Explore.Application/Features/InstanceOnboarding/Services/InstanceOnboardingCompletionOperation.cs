@@ -5,7 +5,6 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
-using Explore.Application.DTOs.TenantSettings;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.InstanceOnboarding.Common;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
@@ -29,8 +28,6 @@ namespace Explore.Application.Features.InstanceOnboarding.Services;
 public sealed class InstanceOnboardingCompletionOperation(
     IInstanceBootstrapStateRepository bootstrapRepository,
     IPlatformUserRoleRepository platformRoleRepository,
-    ITenantUserRoleGrantRepository tenantRoleRepository,
-    ITenantUserRepository tenantUserRepository,
     IRoleRepository roleRepository,
     IUserRepository userRepository,
     IActorRepository actorRepository,
@@ -39,8 +36,6 @@ public sealed class InstanceOnboardingCompletionOperation(
     IPrivacyErasureStateRepository privacyErasure,
     Explore.Application.Contracts.Identity.IIdentityAccountResolver identityResolver,
     Explore.Application.Services.IdentityEmailSynchronizationOperation identityEmailSynchronization,
-    ITenantRepository tenantRepository,
-    ITenantCreationService tenantCreationService,
     ISystemSettingRepository systemSettingRepository,
     IEnumerable<IConfiguredAdministratorBootstrapProvider> configuredProviders,
     ISetupSecretProvider setupSecretProvider,
@@ -52,7 +47,10 @@ public sealed class InstanceOnboardingCompletionOperation(
     IInstanceOnboardingGenerationReader generationReader,
     IConfiguration configuration,
     Explore.Application.Services.PrivacyIdentityFenceOperation identityFence,
-    IOptions<InstanceOperatorIdentityOptions>? operatorIdentityOptions = null)
+    IEventDiscoveryEnrollmentGate enrollmentGate,
+    ILocalBootstrapReceiptSource receiptSource,
+    IOptions<InstanceOperatorIdentityOptions>? operatorIdentityOptions = null,
+    ITrustedSetupSettingsWriter? setupSettingsWriter = null)
 {
     private static readonly JsonSerializerOptions IdentitySerializerOptions = new(JsonSerializerDefaults.Web);
 
@@ -67,6 +65,11 @@ public sealed class InstanceOnboardingCompletionOperation(
         ClaimConfiguredInstanceAdministratorCommand command,
         CancellationToken cancellationToken) =>
         CompleteAsync(CompletionInput.Configured(command), cancellationToken);
+
+    internal Task<BaseCommandResponse<Guid>> ClaimConfiguredWithinEnrollmentAsync(
+        ClaimConfiguredInstanceAdministratorCommand command,
+        CancellationToken cancellationToken) =>
+        CompleteWithinEnrollmentAsync(CompletionInput.Configured(command), cancellationToken);
 
     internal Task<BaseCommandResponse<Guid>> CompleteLocalBootstrapAsync(
         ConfiguredAdministratorBootstrapBinding? binding,
@@ -89,6 +92,17 @@ public sealed class InstanceOnboardingCompletionOperation(
                 "Configured administrator identity is not ready.");
         }
 
+        await using ILocalBootstrapReceiptLease? receipt = input.LocalCredential is { } local
+            ? await receiptSource.AcquireAsync(local, cancellationToken) : null;
+        input = input with { LocalReceiptLease = receipt };
+        await using var enrollment = await enrollmentGate.AcquireAsync(cancellationToken);
+        return await CompleteWithinEnrollmentAsync(input, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> CompleteWithinEnrollmentAsync(
+        CompletionInput input, CancellationToken cancellationToken)
+    {
+        enrollmentGate.RequireCurrent();
         PersistenceOutcome outcome;
         try
         {
@@ -102,6 +116,7 @@ public sealed class InstanceOnboardingCompletionOperation(
                         return result;
                     }, identityFence.EnsureCurrentAsync, token),
                 cancellationToken);
+            enrollmentGate.RequireCurrent();
         }
         catch (EnrollmentRejected rejected)
         {
@@ -194,6 +209,7 @@ public sealed class InstanceOnboardingCompletionOperation(
                     false, admission.DeploymentMode, admission.AuditOperation);
         }
 
+        var writes = new List<SystemSetting>();
         if (input.IsConfigured && operatorIdentityOptions?.Value is { } options)
         {
             var (configuredIdentity, _) = InstanceOperatorIdentity.TryCreate(options, InstanceOperatorIdentityCapability.PaidCommerce);
@@ -229,50 +245,76 @@ public sealed class InstanceOnboardingCompletionOperation(
                         ValueType = SettingValueType.Json,
                         CreatedAt = DateTime.UtcNow
                     };
-                    await systemSettingRepository.UpsertInCurrentTransactionAsync(setting, cancellationToken);
+                    writes.Add(setting);
                 }
             }
         }
 
-        if (await systemSettingRepository.GetByKey(InstanceOperatorIdentitySettingKeys.OperatorIdentity, cancellationToken) is null)
+        if (writes.Count == 0
+            && await systemSettingRepository.GetByKey(InstanceOperatorIdentitySettingKeys.OperatorIdentity, cancellationToken) is null)
         {
             var draft = new InstanceOperatorIdentitySettings
             {
                 OperatorId = Guid.CreateVersion7(),
                 Revision = Guid.CreateVersion7()
             };
-            await systemSettingRepository.UpsertInCurrentTransactionAsync(new SystemSetting
+            writes.Add(new SystemSetting
             {
                 Id = Guid.CreateVersion7(),
                 SettingKey = InstanceOperatorIdentitySettingKeys.OperatorIdentity,
                 Value = JsonSerializer.Serialize(draft, IdentitySerializerOptions),
                 ValueType = SettingValueType.Json,
                 CreatedAt = input.CompletedAt
-            }, cancellationToken);
+            });
         }
 
-        CompleteInstanceOnboardingRequest settings = admission.Settings!;
+        bool singleTenant = admission.DeploymentMode == DeploymentMode.SingleTenant;
+        AddDeploymentMode(writes, admission.DeploymentMode);
+        AddSiteProfile(writes, admission.SiteProfile!, singleTenant);
+        AddAdministrationAccess(writes, admission.Settings!, singleTenant);
+        var source = new TrustedSetupSettingsSource(input.AccountKey, admission.Binding, input.LocalCredential, input.LocalReceiptLease);
+        Guid expectedBootstrapId = bootstrap?.Id ?? input.BootstrapId;
+        long expectedGeneration = bootstrap?.Generation ?? 1;
+        using var apply = new TrustedSetupSettingsApply<PersistenceOutcome>(unitOfWork, source, writes,
+                (effects, token) => PersistAdmittedAsync(input, admission, bootstrap, user, effects, token),
+                async token =>
+                {
+                    InstanceBootstrapState? completed = await bootstrapRepository.GetCurrentForUpdate(token);
+                    if (completed?.Id != expectedBootstrapId
+                        || completed.Status != InstanceBootstrapStatus.Completed
+                        || completed.CompletedByUserId != input.UserId
+                        || completed.CompletedAt != input.CompletedAt
+                        || completed.Generation != expectedGeneration
+                        || completed.DeploymentMode != admission.DeploymentMode
+                        || completed.Mode != (input.IsConfigured
+                            ? InstanceBootstrapMode.ConfiguredAdministrator : InstanceBootstrapMode.Interactive)
+                        || input.IsConfigured && (completed.ProviderKind != admission.Binding!.AccountKey.ProviderKind
+                            || completed.CompletedIdentityFingerprint != admission.Binding.IdentityFingerprint))
+                        throw new UnauthorizedAccessException("Setup completion lost its original terminal receipt.");
+                }, singleTenant ? PrepareDefaultTenant(admission.SiteProfile!.SiteName, input.UserId, input.CompletedAt) : null);
+        return await (setupSettingsWriter
+            ?? throw new InvalidOperationException("Setup completion requires its trusted settings writer."))
+            .ExecuteAsync(apply, cancellationToken);
+    }
+
+    private async Task<PersistenceOutcome> PersistAdmittedAsync(
+        CompletionInput input, Admission admission, InstanceBootstrapState? bootstrap,
+        User? user, ITrustedSetupCompletionEffects effects, CancellationToken cancellationToken)
+    {
         bool singleTenant = admission.DeploymentMode == DeploymentMode.SingleTenant;
         Guid? defaultTenantId = null;
         if (singleTenant)
         {
-            Tenant tenant = await EnsureDefaultTenantAsync(
-                admission.SiteProfile!.SiteName,
-                input.UserId,
-                cancellationToken);
-            defaultTenantId = tenant.Id;
+            defaultTenantId = await effects.EnsureDefaultTenantAsync(cancellationToken);
         }
 
-        user ??= await CreateUserAsync(input, administratorProfile, defaultTenantId, cancellationToken);
-        await PersistDeploymentModeAsync(admission.DeploymentMode);
-        await PersistSiteProfileAsync(admission.SiteProfile!, singleTenant, cancellationToken);
-        await PersistAdministrationAccessAsync(settings, singleTenant);
+        user ??= await CreateUserAsync(input, admission.Binding?.AdministratorProfile, defaultTenantId, cancellationToken);
         await EnsurePlatformAdministratorAsync(input.UserId);
         logger.LogInformation("Onboarding: Assigned Platform Admin role");
 
         if (singleTenant && defaultTenantId.HasValue)
         {
-            await EnsureDefaultTenantAdministratorAsync(defaultTenantId.Value, user);
+            await effects.EnsureDefaultTenantAdministratorAsync(cancellationToken);
             logger.LogInformation("Onboarding: Assigned Tenant Admin role for default tenant");
         }
 
@@ -596,25 +638,15 @@ public sealed class InstanceOnboardingCompletionOperation(
         return user;
     }
 
-    private async Task<Tenant> EnsureDefaultTenantAsync(
-        string displayName,
-        Guid actorUserId,
-        CancellationToken cancellationToken)
+    private static TenantCreationRequest PrepareDefaultTenant(
+        string displayName, Guid actorUserId, DateTime occurredAt)
     {
-        Tenant? tenant = await tenantRepository.GetById(PlatformDefaults.DefaultTenantId);
-        if (tenant is not null)
-        {
-            return tenant;
-        }
-
-        DateTime occurredAt = DateTime.UtcNow;
         TenantSettingsDocument branding = TenantBrandingSettingsDocumentDefaults.Create(
             PlatformDefaults.DefaultTenantId,
             displayName);
         TenantSettingsDocument identity = TenantDirectoryOperatorIdentityDocumentDefaults.Create(
             PlatformDefaults.DefaultTenantId);
-        TenantCreationOutcome outcome = await tenantCreationService.CreateInCurrentTransactionAsync(
-            new TenantCreationRequest(
+        return new TenantCreationRequest(
                 PlatformDefaults.DefaultTenantId,
                 PlatformDefaults.DefaultTenantName,
                 PlatformDefaults.DefaultTenantSlug,
@@ -630,9 +662,8 @@ public sealed class InstanceOnboardingCompletionOperation(
                     Guid.CreateVersion7(),
                     identity.SchemaVersion,
                     identity.DefaultsVersion,
-                    identity.PayloadJson)),
-            cancellationToken);
-        return outcome.Tenant;
+                    identity.PayloadJson));
+
     }
 
     private async Task EnsurePlatformAdministratorAsync(Guid userId)
@@ -665,8 +696,8 @@ public sealed class InstanceOnboardingCompletionOperation(
         });
     }
 
-    private Task PersistDeploymentModeAsync(DeploymentMode mode) =>
-        systemSettingRepository.UpsertAsync(new SystemSetting
+    private static void AddDeploymentMode(List<SystemSetting> writes, DeploymentMode mode) =>
+        writes.Add(new SystemSetting
         {
             SettingKey = GovernanceSettingKeys.Deployment.Mode,
             Value = JsonSerializer.Serialize(mode.ToString()),
@@ -680,23 +711,20 @@ public sealed class InstanceOnboardingCompletionOperation(
             UpdatedAt = DateTime.UtcNow
         });
 
-    private async Task PersistSiteProfileAsync(
+    private void AddSiteProfile(
+        List<SystemSetting> writes,
         SelfHostOnboardingProfileDto siteProfile,
-        bool singleTenant,
-        CancellationToken cancellationToken)
+        bool singleTenant)
     {
-        await InstanceOnboardingProfileSettingHelpers.PersistAsync(
-            systemSettingRepository,
-            siteProfile,
-            configuration,
-            cancellationToken);
+        InstanceOnboardingProfileSettingHelpers.AddSettings(writes, siteProfile, configuration);
         if (singleTenant)
         {
-            await PersistSingleTenantPublicExperienceDefaultsAsync(siteProfile.SiteName);
+            AddSingleTenantPublicExperienceDefaults(writes, siteProfile.SiteName);
         }
     }
 
-    private async Task PersistAdministrationAccessAsync(
+    private static void AddAdministrationAccess(
+        List<SystemSetting> writes,
         CompleteInstanceOnboardingRequest settings,
         bool singleTenant)
     {
@@ -711,7 +739,8 @@ public sealed class InstanceOnboardingCompletionOperation(
         string? adminHost = NormalizeOptionalHost(settings.AdminHost);
         if (!string.IsNullOrWhiteSpace(adminHost))
         {
-            await PersistSettingAsync(
+            AddSetting(
+                writes,
                 GovernanceSettingKeys.Domains.AdminHost,
                 JsonSerializer.Serialize(adminHost),
                 SettingValueType.String,
@@ -721,23 +750,26 @@ public sealed class InstanceOnboardingCompletionOperation(
         }
     }
 
-    private async Task PersistSingleTenantPublicExperienceDefaultsAsync(string siteName)
+    private static void AddSingleTenantPublicExperienceDefaults(List<SystemSetting> writes, string siteName)
     {
-        await PersistSettingAsync(
+        AddSetting(
+            writes,
             GovernanceSettingKeys.PublicExperience.Mode,
             JsonSerializer.Serialize(PublicExperienceMode.DiscoveryCentric.ToString()),
             SettingValueType.String,
             "PublicExperience",
             1,
             "Anonymous public experience posture");
-        await PersistSettingAsync(
+        AddSetting(
+            writes,
             GovernanceSettingKeys.PublicExperience.EventCatalogLabel,
             JsonSerializer.Serialize("Events"),
             SettingValueType.String,
             "PublicExperience",
             2,
             "Display label for the public event catalog entry point");
-        await PersistSettingAsync(
+        AddSetting(
+            writes,
             GovernanceSettingKeys.Routing.DefaultPublicHomePage,
             JsonSerializer.Serialize("EventList"),
             SettingValueType.String,
@@ -754,7 +786,8 @@ public sealed class InstanceOnboardingCompletionOperation(
                 LinkText: "Browse events",
                 LinkUrl: "/events",
                 SortOrder: 0)]);
-        await PersistSettingAsync(
+        AddSetting(
+            writes,
             GovernanceSettingKeys.PublicExperience.HomeBlocks,
             JsonSerializer.Serialize(blocks),
             SettingValueType.Json,
@@ -770,7 +803,8 @@ public sealed class InstanceOnboardingCompletionOperation(
                 Placement: PublicExperienceCtaPlacement.Hero,
                 Style: PublicExperienceCtaStyle.Primary,
                 SortOrder: 0)]);
-        await PersistSettingAsync(
+        AddSetting(
+            writes,
             GovernanceSettingKeys.PublicExperience.Ctas,
             JsonSerializer.Serialize(ctas),
             SettingValueType.Json,
@@ -779,14 +813,15 @@ public sealed class InstanceOnboardingCompletionOperation(
             "Versioned public call-to-action configuration document");
     }
 
-    private Task PersistSettingAsync(
+    private static void AddSetting(
+        List<SystemSetting> writes,
         string key,
         string value,
         SettingValueType valueType,
         string category,
         int displayOrder,
         string description) =>
-        systemSettingRepository.UpsertAsync(new SystemSetting
+        writes.Add(new SystemSetting
         {
             SettingKey = key,
             Value = value,
@@ -817,76 +852,6 @@ public sealed class InstanceOnboardingCompletionOperation(
             .ToLowerInvariant();
     }
 
-    private async Task EnsureDefaultTenantAdministratorAsync(Guid tenantId, User user)
-    {
-        TenantUser tenantUser = await EnsureActiveTenantUserAsync(tenantId, user);
-        TenantUserRoleGrant? grant =
-            await tenantRoleRepository.GetByTenantAndUser(tenantId, user.Id);
-        Role? role = await roleRepository.GetByMasterCodeAsync("tenant.admin")
-            ?? await roleRepository.GetByIdAsync((int)RoleEnum.TenantAdmin);
-        if (role is null)
-        {
-            throw new InvalidOperationException(
-                "Critical system error: Tenant Admin role not found in database.");
-        }
-
-        if (grant is null)
-        {
-            await tenantRoleRepository.Create(new TenantUserRoleGrant
-            {
-                TenantId = tenantId,
-                Tenant = null!,
-                TenantUserId = tenantUser.Id,
-                TenantUser = null!,
-                RoleId = role.Id,
-                Role = null!,
-                RoleScopeId = (int)RoleScopeEnum.Tenant,
-                GrantedAt = DateTime.UtcNow,
-                GrantedBy = user.Id
-            });
-        }
-        else if (grant.RoleId != role.Id)
-        {
-            grant.RoleId = role.Id;
-            await tenantRoleRepository.Update(grant);
-        }
-    }
-
-    private async Task<TenantUser> EnsureActiveTenantUserAsync(Guid tenantId, User user)
-    {
-        TenantUser? tenantUser = await tenantUserRepository.GetByTenantAndUserAsync(tenantId, user.Id);
-        if (tenantUser is null)
-        {
-            Actor? actor = user.Actor ?? await actorRepository.GetActorByUserId(user.Id);
-            return await tenantUserRepository.Create(new TenantUser
-            {
-                TenantId = tenantId,
-                Tenant = null!,
-                UserId = user.Id,
-                User = null!,
-                ActorId = actor?.Id,
-                Actor = null,
-                StatusId = (int)TenantUserStatusEnum.Active,
-                JoinedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = user.Id
-            });
-        }
-        if (tenantUser.StatusId == (int)TenantUserStatusEnum.Active && !tenantUser.IsDeleted)
-        {
-            return tenantUser;
-        }
-
-        tenantUser.StatusId = (int)TenantUserStatusEnum.Active;
-        tenantUser.IsDeleted = false;
-        tenantUser.DeletedAt = null;
-        tenantUser.DeletedBy = null;
-        tenantUser.UpdatedAt = DateTime.UtcNow;
-        tenantUser.UpdatedBy = user.Id;
-        await tenantUserRepository.Update(tenantUser);
-        return tenantUser;
-    }
-
     private sealed record CompletionInput(
         CompleteInstanceOnboardingCommand? InteractiveCommand,
         ClaimConfiguredInstanceAdministratorCommand? ConfiguredCommand,
@@ -899,6 +864,7 @@ public sealed class InstanceOnboardingCompletionOperation(
         LocalCredentialProvisioningSnapshot? LocalCredential = null,
         ConfiguredAdministratorBootstrapBinding? LocalBinding = null)
     {
+        public ILocalBootstrapReceiptLease? LocalReceiptLease { get; init; }
         public Guid PersonalActorId { get; } = Guid.CreateVersion7();
         public Guid IdentityClaimId { get; } = Guid.CreateVersion7();
         public Guid IdentityEvidenceId { get; } = Guid.CreateVersion7();

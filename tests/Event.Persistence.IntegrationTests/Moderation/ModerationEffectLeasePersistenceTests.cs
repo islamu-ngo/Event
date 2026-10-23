@@ -858,13 +858,15 @@ public sealed class ModerationEffectLeasePersistenceTests
             switch (change)
             {
                 case "key-revoked":
-                    var revokedKey = await new ExternalApiKeyRepository(writer).GetByKeyIdForAuthentication(database.KeyId);
+                    var revokedKey = await new ExternalApiKeyAuthenticationRepository(
+                        new SecurityTestSupport.AdministrativeAuthorityTestFactory(writer)).GetByKeyIdForAuthentication(database.KeyId);
                     writer.Attach(revokedKey!);
                     revokedKey!.ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Revoked;
                     await writer.SaveChangesAsync();
                     break;
                 case "key-expired":
-                    var expiredKey = await new ExternalApiKeyRepository(writer).GetByKeyIdForAuthentication(database.KeyId);
+                    var expiredKey = await new ExternalApiKeyAuthenticationRepository(
+                        new SecurityTestSupport.AdministrativeAuthorityTestFactory(writer)).GetByKeyIdForAuthentication(database.KeyId);
                     writer.Attach(expiredKey!);
                     expiredKey!.ExpiresAt = database.Clock.UtcNow.UtcDateTime;
                     await writer.SaveChangesAsync();
@@ -1307,7 +1309,9 @@ public sealed class ModerationEffectLeasePersistenceTests
             var selected = tenantId ?? TenantId;
             var settings = new ModerationReconciliationOptions { Enabled = true, TenantId = selected };
             var credential = await new ModerationReconciliationCredentialProvider(
-                new SettingsMonitor(settings), new ExternalApiKeyRepository(context), new SelectedSecret(this), Clock)
+                new SettingsMonitor(settings),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new SelectedSecret(this), Clock)
                 .AuthenticateAsync(selected, CancellationToken.None);
             var machine = new MachinePrincipalAccessor(new HttpContextAccessor());
             machine.SetPrincipal(credential ?? throw new InvalidOperationException("Native fixture authentication failed."));
@@ -1315,10 +1319,12 @@ public sealed class ModerationEffectLeasePersistenceTests
         }
 
         public ModerationEffectLeaseRepository Repository(ExploreDbContext context, MachinePrincipalAccessor machine)
-            => new(context, machine, Bindings(context, machine), new ExternalApiKeyRepository(context), Clock);
+            => new(context, machine, Bindings(context, machine),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), Clock);
 
         public ModerationMaintenanceAuthority MaintenanceAuthority(ExploreDbContext context, MachinePrincipalAccessor machine)
-            => new(context, machine, Bindings(context, machine), new ExternalApiKeyRepository(context), Clock);
+            => new(context, machine, Bindings(context, machine),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), Clock);
 
         private ModerationMachineSubjectBindingRepository Bindings(
             ExploreDbContext context, MachinePrincipalAccessor machine)
@@ -1326,7 +1332,7 @@ public sealed class ModerationEffectLeasePersistenceTests
             var admin = new AdminContext(new HttpContextAccessor(), new PlatformUserRoleRepository(context),
                 new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
                 new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
-            var keys = new ExternalApiKeyRepository(context);
+            var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             return new(context, admin, machine, keys, new UnconfiguredKeys(), Clock);
         }
 
@@ -1353,11 +1359,11 @@ public sealed class ModerationEffectLeasePersistenceTests
                 provider.GetRequiredService<MachinePrincipalAccessor>());
             services.AddScoped<ExploreDbContext>(provider =>
                 Context(provider.GetRequiredService<ITenantContextAccessor>().TenantId, interceptors));
-            services.AddScoped<IExternalApiKeyRepository>(provider =>
-                new ExternalApiKeyRepository(provider.GetRequiredService<ExploreDbContext>()));
+            services.AddScoped<IExternalApiKeyAuthenticationRepository>(provider => new ExternalApiKeyAuthenticationRepository(
+                new SecurityTestSupport.AdministrativeAuthorityTestFactory(provider.GetRequiredService<ExploreDbContext>())));
             services.AddScoped(provider => new ModerationReconciliationCredentialProvider(
                 provider.GetRequiredService<IOptionsMonitor<ModerationReconciliationOptions>>(),
-                provider.GetRequiredService<IExternalApiKeyRepository>(), new SelectedSecret(this), Clock));
+                provider.GetRequiredService<IExternalApiKeyAuthenticationRepository>(), new SelectedSecret(this), Clock));
             services.AddScoped<IModerationEffectLeaseRepository>(provider =>
                 Repository(provider.GetRequiredService<ExploreDbContext>(), provider.GetRequiredService<MachinePrincipalAccessor>()));
             services.AddScoped<IModerationReconciliationQuery>(provider =>

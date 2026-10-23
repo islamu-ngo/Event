@@ -28,17 +28,23 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         await using (var context = fixture.CreateDbContext())
         {
+            context.BindTenantLease();
             await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
         }
 
         CatalogLocationAuthoritySnapshot firstSeed;
+        EventDiscoveryRevision firstRevision;
         await using (var context = fixture.CreateDbContext())
         {
             firstSeed = await GetCatalogLocationAuthoritySnapshotAsync(context);
+            firstRevision = await context.Set<EventDiscoveryRevision>().AsNoTracking()
+                .SingleAsync(row => row.TenantId == SeedIds.DefaultTenantId);
+            await Assert.That(firstRevision.Id.Version).IsEqualTo(7);
         }
 
         await using (var context = fixture.CreateDbContext())
         {
+            context.BindTenantLease();
             await DatabaseSeeder.SeedAsync(context, DevelopmentEnvironment);
         }
 
@@ -60,6 +66,11 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
         await Assert.That(softDeletedCatalogCount).IsEqualTo(0);
 
         CatalogLocationAuthoritySnapshot secondSeed = await GetCatalogLocationAuthoritySnapshotAsync(verifyContext);
+        var secondRevision = await verifyContext.Set<EventDiscoveryRevision>().AsNoTracking()
+            .SingleAsync(row => row.TenantId == SeedIds.DefaultTenantId);
+        await Assert.That(secondRevision.Id).IsEqualTo(firstRevision.Id);
+        await Assert.That(secondRevision.IdentityEpoch).IsEqualTo(firstRevision.IdentityEpoch);
+        await Assert.That(secondRevision.DisclosureEpoch).IsEqualTo(firstRevision.DisclosureEpoch);
         await Assert.That(firstSeed.SessionCount).IsEqualTo(9);
         await Assert.That(firstSeed.GroupCount).IsEqualTo(9);
         await Assert.That(firstSeed.EventAgendaItemCount).IsEqualTo(9);

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M534SBGW7J09E3HQ5VJ8MD6Y
+Title: "Restore stored identities for paid-event policy evaluation"
+Type: feat
+Scope: access
+Summary: "Restore active paid-event policy evaluation aggregates with stored scope, identity and version using existing normalization."
+Group: paid-event-policy-restoration
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Evaluation retains stored policy identity rather than generating an unrelated new identity.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Domain restoration does not activate or update policies; native persistence reader integration remains separate.

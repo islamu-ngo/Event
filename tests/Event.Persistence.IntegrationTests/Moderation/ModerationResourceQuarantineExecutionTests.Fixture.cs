@@ -295,14 +295,16 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         {
             var settings = new ModerationReconciliationOptions { Enabled = true, TenantId = Database.TenantId };
             var credential = await new ModerationReconciliationCredentialProvider(new Settings(settings),
-                new ExternalApiKeyRepository(context), new Secret(this), Clock).AuthenticateAsync(Database.TenantId, default);
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new Secret(this), Clock).AuthenticateAsync(Database.TenantId, default);
             var http = new HttpContextAccessor();
             var machine = new MachinePrincipalAccessor(http);
             machine.SetPrincipal(credential ?? throw new InvalidOperationException("Installed maintenance authentication failed."));
             var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
                 new OrganizationMemberRepository(context), new GroupMemberRepository(context),
                 new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
-            return (machine, new(context, admin, machine, new ExternalApiKeyRepository(context),
+            return (machine, new(context, admin, machine,
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), Clock));
         }
 
@@ -311,7 +313,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             await using var context = Context();
             var identity = await AuthenticateAsync(context);
             var result = await new ModerationEffectLeaseRepository(context, identity.Machine, identity.Bindings,
-                new ExternalApiKeyRepository(context), Clock).ClaimAsync(EffectId, LeaseRevision == 0 ? 1 : LeaseRevision);
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Clock).ClaimAsync(EffectId, LeaseRevision == 0 ? 1 : LeaseRevision);
             await Assert.That(result.Outcome).IsEqualTo(ModerationEffectLeaseOutcome.Known);
             LeaseId = result.Effect!.LeaseId!.Value;
             LeaseRevision = result.Effect.Revision;
@@ -332,7 +335,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             }
             if (tenantId is { } foreign) context.TenantContext = new SelectedTenant(foreign);
             return await new ModerationResourceQuarantineRepository(context, identity.Machine, identity.Bindings,
-                new ExternalApiKeyRepository(context), Clock, Database.Privacy.Authority(context, Clock))
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Clock, Database.Privacy.Authority(context, Clock))
                 .ExecuteAsync(EffectId, leaseId ?? LeaseId,
                     revision ?? LeaseRevision, ordinal, resourceId ?? ResourceId, materialId ?? MaterialId);
         }

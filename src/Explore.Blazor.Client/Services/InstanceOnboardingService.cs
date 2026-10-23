@@ -811,7 +811,6 @@ public sealed class InstanceOnboardingService(
                 AtprotoPublicUrl = config.AtprotoPublicUrl,
                 GoogleSsoEnabled = config.GoogleSsoEnabled,
                 GoogleClientId = config.GoogleClientId,
-                GoogleClientSecret = config.GoogleClientSecret,
                 LockAtprotoLoginEnabled = config.LockAtprotoLoginEnabled,
                 LockGoogleSsoEnabled = config.LockGoogleSsoEnabled,
                 KeycloakPublicOnboardingPolicy = config.KeycloakPublicOnboardingPolicy,

@@ -1,0 +1,30 @@
+Change-Id: CHG-01M52ZPTHX7V1X4J6TTFP0R6XD
+Title: "Add native storage probe source generation and exclusion"
+Type: feat
+Scope: storage
+Summary: "Exclude whole-relation settings, secret-binding and bootstrap changes through an original-session generation sentinel."
+Group: native-storage-probe-source
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Compulsory statement writers share a private acquisition sentinel without granting original source reads or writes.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Explicit migrator installation provides the native prerequisite without production wiring.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Managed storage-probe sessions and verified production installation remain required before the actual probe is protected.

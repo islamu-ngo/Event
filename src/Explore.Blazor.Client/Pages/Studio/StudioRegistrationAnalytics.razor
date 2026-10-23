@@ -1,5 +1,7 @@
 @using System.Globalization
 @inject IRegistrationFormAuthoringService Authoring
+@inject StudioEventContextState EventContext
+@implements IDisposable
 
 <section class="studio-registration-analytics" data-testid="registration-analytics">
     @if (_isLoading)
@@ -84,18 +86,34 @@
     private HalResourceOfRegistrationAnswerAnalyticsDto? _analytics;
     private bool _isLoading;
     private string? _error;
+    private Guid? _loadedEventId;
+    private long _contextGeneration;
+    private long _requestGeneration;
+    private bool _disposed;
+    private readonly CancellationTokenSource _lifetime = new();
 
     protected override async Task OnParametersSetAsync()
     {
-        if (_forms.Count > 0 || EventId == Guid.Empty || AnalyticsLink is null)
+        if (_loadedEventId == EventId && _contextGeneration == EventContext.Generation)
         {
             return;
         }
 
+        _loadedEventId = EventId;
+        _contextGeneration = EventContext.Generation;
+        var request = ++_requestGeneration;
+        var eventId = EventId;
+        _forms.Clear();
+        _analytics = null;
+        _formId = Guid.Empty;
+        _versionId = Guid.Empty;
+        _error = null;
+        if (EventId == Guid.Empty || AnalyticsLink is null) return;
         _isLoading = true;
         try
         {
-            var workflow = await Authoring.GetWorkflowAsync(EventId);
+            var workflow = await Authoring.GetWorkflowAsync(eventId, _lifetime.Token);
+            if (!IsCurrent(eventId, request)) return;
             _forms.AddRange(workflow.Forms.Select(form => new RegistrationFormAnalyticsChoice(
                 form.Id,
                 form.Name,
@@ -111,11 +129,12 @@
         }
         catch (Exception)
         {
-            _error = "Registration analytics could not be loaded.";
+            if (IsCurrent(eventId, request)) _error = "Answer analytics could not be loaded.";
         }
         finally
         {
-            _isLoading = false;
+            if (!_disposed && EventId == eventId && _contextGeneration == EventContext.Generation)
+                _isLoading = false;
         }
     }
 
@@ -137,13 +156,44 @@
 
     private async Task LoadAnalyticsAsync()
     {
+        var request = ++_requestGeneration;
+        var eventId = EventId;
+        var formId = _formId;
+        var versionId = _versionId;
         _analytics = null;
         if (AnalyticsLink is null || _formId == Guid.Empty || _versionId == Guid.Empty)
         {
             return;
         }
 
-        _analytics = await Authoring.GetAnalyticsAsync(EventId, _formId, _versionId, AnalyticsLink);
+        try
+        {
+            var analytics = await Authoring.GetAnalyticsAsync(eventId, formId, versionId, AnalyticsLink, _lifetime.Token);
+            if (IsCurrent(eventId, request) && _formId == formId && _versionId == versionId)
+                _analytics = analytics;
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            // Disposal cancels this request; obsolete aggregates must not become a visible error.
+        }
+        catch
+        {
+            if (IsCurrent(eventId, request)) _error = "Answer analytics could not be loaded.";
+        }
+    }
+
+    private bool IsCurrent(Guid eventId, long request) => !_disposed && EventId == eventId
+        && request == _requestGeneration && EventContext.EventId == eventId
+        && _contextGeneration == EventContext.Generation;
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_requestGeneration;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        _forms.Clear();
+        _analytics = null;
     }
 
     private sealed record RegistrationFormAnalyticsChoice(Guid Id, string Name, IReadOnlyList<RegistrationFormVersionAnalyticsChoice> Versions);

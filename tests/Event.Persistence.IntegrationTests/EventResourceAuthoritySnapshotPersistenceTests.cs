@@ -672,7 +672,8 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
         governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(EventResourceGovernancePolicy.Default(long.MaxValue));
-        return new(resources, authority, governance, new ExternalApiKeyRepository(context),
+        return new(resources, authority, governance,
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
             Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
             new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                 Substitute.For<IModerationMachineSubjectBindingRepository>(),

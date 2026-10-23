@@ -5,6 +5,7 @@ using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
 using System.Data;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -184,16 +185,21 @@ public sealed class LegalDocumentRepository(ExploreDbContext dbContext)
         && transaction.GetDbTransaction().Connection == dbContext.Database.GetDbConnection()
         && !dbContext.IsTenantFilterBypassed;
 
-    public Task<LegalDocument?> GetForUpdateAsync(
+    public async Task<LegalDocument?> GetForUpdateAsync(
         LegalDocumentScope scope,
         Guid? tenantId,
         LegalDocumentKind kind,
-        CancellationToken cancellationToken) =>
-        AggregateQuery(tracking: true)
+        CancellationToken cancellationToken)
+    {
+        if (dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.ReadLegalForUpdateAsync(scope, tenantId, kind, cancellationToken);
+        return await AggregateQuery(tracking: true)
             .SingleOrDefaultAsync(
                 document => document.AuthorityKey == AuthorityKey(scope, tenantId)
                     && document.Kind == kind,
                 cancellationToken);
+    }
 
     public Task<LegalDocument?> GetByIdForUpdateAsync(
         Guid legalDocumentId,
@@ -230,6 +236,20 @@ public sealed class LegalDocumentRepository(ExploreDbContext dbContext)
     {
         ArgumentNullException.ThrowIfNull(legalDocument);
         await dbContext.LegalDocuments.AddAsync(legalDocument, cancellationToken);
+    }
+
+    public async Task SaveImportedAsync(
+        LegalDocument legalDocument,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(legalDocument);
+        if (dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Imported legal source requires an active transaction.");
+        if (dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(dbContext) is { } native)
+            await native.WriteLegalAsync(legalDocument, cancellationToken);
+        else
+            await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private IQueryable<LegalDocument> AggregateQuery(bool tracking)

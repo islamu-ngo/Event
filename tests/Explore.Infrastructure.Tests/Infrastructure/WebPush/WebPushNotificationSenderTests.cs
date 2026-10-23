@@ -1,4 +1,6 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Explore.Application.Models;
 using Explore.Infrastructure.WebPush;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -9,6 +11,50 @@ namespace Explore.Infrastructure.Tests.Infrastructure.WebPush;
 
 public sealed class WebPushNotificationSenderTests
 {
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    public async Task FailedEncryptedSendPreservesClassificationWithoutPrivateDiagnosticExports(
+        bool malformed, bool timeout)
+    {
+        var keys = VapidHelper.GenerateVapidKeys();
+        string canary = Guid.NewGuid().ToString("N") + "\r\nprivate-push-provider";
+        Exception failure = malformed ? new ArgumentException(canary)
+            : timeout ? new TaskCanceledException(canary)
+            : new HttpRequestException(canary, new IOException(keys.PrivateKey), HttpStatusCode.BadGateway);
+        var handler = new RecordingMessageHandler(_ => throw failure);
+        using var client = new HttpClient(handler);
+        var logger = new TestListLogger<WebPushNotificationSender>();
+        var sender = new WebPushNotificationSender(
+            Options.Create(new WebPushSettings
+            {
+                VapidSubject = "mailto:ops@example.test",
+                VapidPublicKey = keys.PublicKey,
+                VapidPrivateKey = keys.PrivateKey
+            }), client, new WebPushEndpointSafetyPolicy((_, _) =>
+                Task.FromResult(new[] { IPAddress.Parse("203.0.113.10") })), logger);
+        string auth = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var envelope = new WebPushSendEnvelope("https://push.example.test/" + Guid.NewGuid().ToString("N"),
+            VapidHelper.GenerateVapidKeys().PublicKey, auth, JsonSerializer.Serialize(new { content = canary }),
+            canary, 21600, "event-updates", WebPushUrgency.Normal);
+
+        var result = await sender.SendAsync(envelope);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.FailureKind).IsEqualTo(malformed
+            ? WebPushSendFailureKind.PermanentNonRetryable : WebPushSendFailureKind.Retryable);
+        await Assert.That(result.StatusCode).IsEqualTo(!malformed && !timeout ? (int?)502 : null);
+        await Assert.That(handler.Requests.Count).IsEqualTo(1);
+        await Assert.That(logger.Entries.Count).IsEqualTo(1);
+        await Assert.That(logger.Entries[0].Exception).IsNull();
+        string exported = logger.Entries[0].Message + JsonSerializer.Serialize(logger.Entries[0].State)
+            + JsonSerializer.Serialize(result);
+        foreach (string privateValue in new[] { canary[..32], auth, keys.PrivateKey, envelope.Endpoint })
+            await Assert.That(exported.Contains(privateValue, StringComparison.Ordinal)).IsFalse();
+    }
+
     [Test]
     public async Task SendAsync_WhenProviderAcceptsRequest_ReturnsSuccessAndSendsEncryptedPayload()
     {
@@ -135,7 +181,8 @@ public sealed class WebPushNotificationSenderTests
             return new TestSubscription(new WebPushSendEnvelope(
                 endpoint,
                 keys.PublicKey,
-                "auth-secret",
+                Convert.ToBase64String(RandomNumberGenerator.GetBytes(16))
+                    .TrimEnd('=').Replace('+', '-').Replace('/', '_'),
                 "{\"malicious\":\"<script>alert(1)</script>\"}",
                 "correlation-1",
                 21600,

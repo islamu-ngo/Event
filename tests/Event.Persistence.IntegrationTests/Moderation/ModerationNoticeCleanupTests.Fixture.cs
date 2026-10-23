@@ -78,7 +78,8 @@ public sealed partial class ModerationNoticeCleanupTests
         {
             var credential = await new ModerationReconciliationCredentialProvider(
                 new CleanupOptions(new() { Enabled = true, TenantId = Database.TenantId }),
-                new ExternalApiKeyRepository(context), new CleanupSecret(Credential), Clock)
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new CleanupSecret(Credential), Clock)
                 .AuthenticateAsync(Database.TenantId, CancellationToken.None);
             var machine = new MachinePrincipalAccessor(new HttpContextAccessor());
             machine.SetPrincipal(credential ?? throw new InvalidOperationException("Native cleanup authentication failed."));
@@ -91,7 +92,7 @@ public sealed partial class ModerationNoticeCleanupTests
             var admin = new AdminContext(new HttpContextAccessor(), new PlatformUserRoleRepository(context),
                 new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
                 new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
-            var keys = new ExternalApiKeyRepository(context);
+            var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), Clock);
             return new(context, machine, bindings, keys, Clock, nativeNotificationOwner

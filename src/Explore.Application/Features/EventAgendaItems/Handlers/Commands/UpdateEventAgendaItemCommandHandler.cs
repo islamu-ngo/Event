@@ -13,6 +13,7 @@ using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
 using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventAgendaItems.Handlers.Commands;
 
@@ -30,6 +31,10 @@ public class UpdateEventAgendaItemCommandHandler : ICommandHandler<UpdateEventAg
     private readonly HybridCache _cache;
     private readonly IAuthorizationProvider _authorizationProvider;
     private readonly AuthorizationResourceContextResolver _authorizationResourceContextResolver;
+    private readonly ITenantContext _tenantContext;
+    private readonly ICurrentUserService _currentUser;
+    private readonly RequestAuthorization<UpdateEventAgendaItemCommand> _authorization;
+    private readonly ILogger<UpdateEventAgendaItemCommandHandler> _logger;
 
     public UpdateEventAgendaItemCommandHandler(
         IEventAgendaItemRepository eventAgendaItemRepository,
@@ -43,7 +48,11 @@ public class UpdateEventAgendaItemCommandHandler : ICommandHandler<UpdateEventAg
         EventLocationAttachmentService eventLocationAttachmentService,
         HybridCache cache,
         IAuthorizationProvider authorizationProvider,
-        AuthorizationResourceContextResolver authorizationResourceContextResolver)
+        AuthorizationResourceContextResolver authorizationResourceContextResolver,
+        ITenantContext tenantContext,
+        ICurrentUserService currentUser,
+        RequestAuthorization<UpdateEventAgendaItemCommand> authorization,
+        ILogger<UpdateEventAgendaItemCommandHandler> logger)
     {
         _eventAgendaItemRepository = eventAgendaItemRepository;
         _eventRepository = eventRepository;
@@ -57,10 +66,16 @@ public class UpdateEventAgendaItemCommandHandler : ICommandHandler<UpdateEventAg
         _cache = cache;
         _authorizationProvider = authorizationProvider;
         _authorizationResourceContextResolver = authorizationResourceContextResolver;
+        _tenantContext = tenantContext;
+        _currentUser = currentUser;
+        _authorization = authorization;
+        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventAgendaItemCommand request, CancellationToken cancellationToken)
     {
+        if (!_currentUser.IsAuthenticated || _currentUser.UserId is not { } userId)
+            return BaseCommandResponse.Authentication<Guid>();
         var validator = new UpdateEventAgendaItemDtoValidator(
             _eventRepository,
             _locationRepository,
@@ -75,48 +90,46 @@ public class UpdateEventAgendaItemCommandHandler : ICommandHandler<UpdateEventAg
                 "Event agenda item update failed.");
         }
 
-        var agendaItem = await _eventAgendaItemRepository.GetById(request.EventAgendaItemId);
-        if (agendaItem == null)
+        Guid previousEventId = Guid.Empty;
+        Guid parentEventId = Guid.Empty;
+        var response = await _unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            return BaseCommandResponse.NotFound<Guid>("Event agenda item not found.");
-        }
+            var candidate = await _eventAgendaItemRepository.GetById(request.EventAgendaItemId);
+            if (candidate is null)
+                return BaseCommandResponse.NotFound<Guid>("Event agenda item not found.");
+            previousEventId = candidate.EventId;
+            parentEventId = request.EventAgendaItemDto.Event?.EventId ?? candidate.EventId;
+            bool eventChanged = previousEventId != parentEventId;
+            await _authorization.AuthorizeAsync(request, _logger, token);
+            if (eventChanged)
+                await AuthorizeDestinationAsync(request, parentEventId, token);
 
-        if (agendaItem.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
-        {
-            throw new ConcurrencyConflictException(
-                ConcurrencyConflictException.ConcurrentUpdate,
-                "The event agenda item was modified by another request. Reload and retry.",
-                nameof(EventAgendaItem),
-                agendaItem.Id.ToString());
-        }
-
-        var previousEventId = agendaItem.EventId;
-        var parentEventId = request.EventAgendaItemDto.Event?.EventId ?? agendaItem.EventId;
-        var parentEvent = await _eventRepository.GetById(parentEventId);
-        if (parentEvent == null || parentEvent.TenantId != agendaItem.TenantId)
-        {
-            return BaseCommandResponse.Validation<Guid>(
-                ["Event does not belong to the same tenant as the agenda item."],
-                "Event does not belong to the same tenant as the agenda item.");
-        }
-
-        var relationshipValidation = await ValidateLocationRoomRelationshipAsync(agendaItem, request.EventAgendaItemDto, cancellationToken);
-        if (!relationshipValidation.Success)
-        {
-            return BaseCommandResponse.Validation<Guid>(
-                [relationshipValidation.Message],
-                "Event agenda item update failed.");
-        }
-
-        Guid? previousEventLocationId = agendaItem.EventLocationId;
-        var eventChanged = previousEventId != parentEvent.Id;
-        if (eventChanged)
-        {
-            await AuthorizeDestinationAsync(request, parentEvent.Id, cancellationToken);
-        }
-
-        await _unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
+            Event? parentEvent = null;
+            foreach (Guid eventId in new[] { previousEventId, parentEventId }.Distinct().Order())
+            {
+                Event? authorized = eventId == previousEventId
+                    ? await _eventAgendaItemRepository.GetAuthorizedParentForMutationAsync(
+                        _tenantContext.TenantId, userId, eventId, AuthorizationActions.Update, token)
+                    : await _eventRepository.GetAuthorizedForUpdateAsync(
+                        _tenantContext.TenantId, userId, eventId, token);
+                if (authorized is null)
+                    throw new AuthorizationException(ResourceKinds.EventAgendaItem, AuthorizationActions.Update);
+                if (eventId == parentEventId)
+                    parentEvent = authorized;
+            }
+            var agendaItem = await _eventAgendaItemRepository.GetForMutationAsync(request.EventAgendaItemId, token);
+            if (agendaItem is null || agendaItem.EventId != previousEventId || parentEvent is null
+                || agendaItem.TenantId != _tenantContext.TenantId)
+                throw new AuthorizationException(ResourceKinds.EventAgendaItem, AuthorizationActions.Update);
+            if (agendaItem.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
+                throw new ConcurrencyConflictException(
+                    ConcurrencyConflictException.ConcurrentUpdate,
+                    "The event agenda item was modified by another request. Reload and retry.",
+                    nameof(EventAgendaItem), agendaItem.Id.ToString());
+            var relationshipValidation = await ValidateLocationRoomRelationshipAsync(agendaItem, request.EventAgendaItemDto, token);
+            if (!relationshipValidation.Success)
+                return BaseCommandResponse.Validation<Guid>([relationshipValidation.Message], "Event agenda item update failed.");
+            Guid? previousEventLocationId = agendaItem.EventLocationId;
             EventLocation eventLocation = await _eventLocationAttachmentService.ResolveAsync(
                 parentEvent.Id,
                 relationshipValidation.LocationId,
@@ -147,17 +160,21 @@ public class UpdateEventAgendaItemCommandHandler : ICommandHandler<UpdateEventAg
             await ApplyScheduleAsync(agendaItem, parentEvent, eventChanged, request.EventAgendaItemDto.Schedule, token);
             await _eventAgendaItemRepository.Update(agendaItem);
             await _eventLocationAttachmentService.DetachIfUnreferencedAsync(previousEventLocationId, token);
+            token.ThrowIfCancellationRequested();
+            return BaseCommandResponse.Success(agendaItem.Id, "Event agenda item updated successfully.");
         }, cancellationToken);
 
-        if (eventChanged)
+        if (!response.IsSuccess)
+            return response;
+        if (previousEventId != parentEventId)
         {
             await _cache.RemoveByTagAsync(CacheTags.Event(previousEventId), cancellationToken);
         }
 
-        await _cache.RemoveByTagAsync(CacheTags.Event(parentEvent.Id), cancellationToken);
-        await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentEvent.TenantId), cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(parentEventId), cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(_tenantContext.TenantId), cancellationToken);
 
-        return BaseCommandResponse.Success(agendaItem.Id, "Event agenda item updated successfully.");
+        return response;
     }
 
     private async Task AuthorizeDestinationAsync(

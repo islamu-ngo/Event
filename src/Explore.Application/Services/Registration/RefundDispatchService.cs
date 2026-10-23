@@ -17,38 +17,45 @@ public sealed class RefundDispatchService(
         CancellationToken cancellationToken)
     {
         RefundAttempt? attempt = await repository.GetByIdAsync(tenantId, refundAttemptId, cancellationToken);
-        if (attempt is null || attempt.Status is not (RefundAttemptStatusEnum.Requested or RefundAttemptStatusEnum.DispatchPending))
+        if (attempt is null || !attempt.CanDispatchBuyer)
         {
             return attempt;
         }
 
         DateTime dispatchingAt = NextObservation(attempt);
-        attempt.MarkDispatchPending(dispatchingAt, null);
-        await repository.SaveChangesAsync(cancellationToken);
+        // Refund mutation retention is independent of the checkout/session cutoff.
+        // Unsupported providers have no certified mutation window.
+        if (attempt.ProviderCode != "stripe" || attempt.ProviderMutationExpiresAt <= dispatchingAt)
+            return await BlockExpiredAsync(attempt, dispatchingAt, cancellationToken);
 
+        Guid token = Guid.CreateVersion7();
+        attempt = await repository.TryBeginDispatchAsync(
+            attempt, token, applicationFee: false, dispatchingAt, dispatchingAt.AddHours(23),
+            RefundOutboxMessageFactory.CreateReconciliation(attempt, dispatchingAt, dispatchingAt.AddMinutes(1)),
+            cancellationToken);
+        if (attempt is null)
+            return await repository.GetByIdAsync(tenantId, refundAttemptId, cancellationToken);
+
+        // Exceptions carry no positive pre-handoff proof. The committed recovery trigger
+        // survives even when cancellation prevents this request from writing again.
         RefundProviderResult result = await creator.CreateAsync(CreateRequest(attempt), cancellationToken);
         DateTime observedAt = NextObservation(attempt);
-        if (result.Outcome == RefundProviderOutcome.Observed && result.Observation is not null)
-        {
-            RefundAttemptEvidence.Apply(attempt, result.Observation, observedAt, result.ProviderRequestId);
-        }
-        else if (result.Outcome == RefundProviderOutcome.Unknown && result.Failure?.ProviderHandoffStarted == true)
-        {
-            attempt.MarkUnknown(observedAt, result.ProviderRequestId);
-        }
-        else if (result.Outcome == RefundProviderOutcome.Failed && result.Failure is not null)
-        {
-            attempt.MarkProviderBlocked(observedAt, result.ProviderRequestId, result.Failure.Code);
-        }
-        else
-        {
-            attempt.MarkDispatchPending(observedAt, result.ProviderRequestId);
-        }
-
-        await repository.SaveChangesAsync(cancellationToken);
-        await ResolveAddOnAllocationAsync(attempt, cancellationToken);
+        attempt = await repository.SettleAndScheduleAsync(
+            attempt, token, result, observedAt,
+            RefundOutboxMessageFactory.CreateReconciliation(attempt, observedAt, observedAt.AddMinutes(1)),
+            cancellationToken);
+        if (attempt is not null)
+            await ResolveAddOnAllocationAsync(attempt, cancellationToken);
         return attempt;
     }
+
+    private Task<RefundAttempt?> BlockExpiredAsync(
+        RefundAttempt attempt, DateTime observedAt, CancellationToken cancellationToken) =>
+        repository.SettleAndScheduleAsync(
+            attempt, null,
+            RefundProviderResult.Failed(new("refund_provider_retention_expired", RefundProviderFailureKind.Configuration)),
+            observedAt, RefundOutboxMessageFactory.CreateReconciliation(attempt, observedAt, observedAt),
+            cancellationToken);
 
     internal static RefundCreateRequest CreateRequest(RefundAttempt attempt) => RefundCreateRequest.Create(
         attempt.Id,
@@ -58,7 +65,10 @@ public sealed class RefundDispatchService(
         attempt.ProviderIdempotencyKey,
         attempt.Allocation.TotalMinor,
         attempt.CurrencyCode,
-        checked(attempt.Allocation.PlatformFeeMinor + attempt.Allocation.PlatformContributionMinor));
+        checked(attempt.Allocation.PlatformFeeMinor + attempt.Allocation.PlatformContributionMinor)) with
+    {
+        MutationExpiresAt = attempt.ProviderMutationExpiresAt
+    };
 
     private DateTime NextObservation(RefundAttempt attempt)
     {

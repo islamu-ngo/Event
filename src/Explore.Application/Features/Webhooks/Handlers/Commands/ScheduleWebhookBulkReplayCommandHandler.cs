@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Handlers.Queries;
@@ -16,7 +17,9 @@ public sealed class ScheduleWebhookBulkReplayCommandHandler(
     IWebhookBulkReplayPolicyResolver policyResolver,
     IWebhookAuditEventWriter auditWriter,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IMachinePrincipalAccessor machinePrincipalAccessor,
+    IHumanWebhookMutationPreparation preparation)
     : ICommandHandler<ScheduleWebhookBulkReplayCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -46,7 +49,9 @@ public sealed class ScheduleWebhookBulkReplayCommandHandler(
 
         var requestHash = WebhookBulkReplayRequestIdentity.Compute(request);
         var queuedAt = timeProvider.GetUtcNow().UtcDateTime;
-        return await unitOfWork.ExecuteInTransactionAsync(async token =>
+        WebhookBulkReplayOperation? operation = null;
+        WebhookBulkReplayPreviewSnapshot? originalPreview = null;
+        async Task<BaseCommandResponse<Guid>> MutateAsync(CancellationToken token)
         {
             await repository.AcquireTenantScheduleLockAsync(request.TenantId, token);
             var existing = await repository.GetByOperationKeyAsync(
@@ -80,7 +85,7 @@ public sealed class ScheduleWebhookBulkReplayCommandHandler(
             var preview = await repository.PreviewAsync(
                 request.TenantId,
                 filter,
-                queuedAt,
+                timeProvider.GetUtcNow().UtcDateTime,
                 token);
             if (preview.EligibleCount == 0)
             {
@@ -93,7 +98,14 @@ public sealed class ScheduleWebhookBulkReplayCommandHandler(
                     preview);
             }
 
-            var operation = WebhookBulkReplayOperation.Create(
+            // The domain factory owns the private ID. Keep the original queued product across
+            // acknowledged rollback, but never reuse its estimates against a changed preview.
+            if (originalPreview is not null && originalPreview != preview)
+                return await RejectAsync(request, "webhook_bulk_replay_preview_changed",
+                    "Webhook replay eligibility changed while scheduling; submit a fresh request.",
+                    limits.PolicyVersion, token, preview);
+            originalPreview = preview;
+            operation ??= WebhookBulkReplayOperation.Create(
                 request.TenantId,
                 request.OperationKey,
                 requestHash,
@@ -131,8 +143,20 @@ public sealed class ScheduleWebhookBulkReplayCommandHandler(
                     PrincipalReference: $"user:{request.ActorUserId:D}"),
                 token);
             return Success(operation.Id, "Webhook bulk replay operation queued.");
-        }, cancellationToken);
+        }
+
+        if (machinePrincipalAccessor.Current is not null)
+            return await unitOfWork.ExecuteInTransactionAsync(MutateAsync, cancellationToken);
+
+        // Rejection audits are intentional writes. Keep the business result inside an
+        // explicit outcome until the original owner has admitted and acknowledged its commit.
+        // Admission exceptions and borrowed rollback receipts still escape to preparation.
+        var outcome = await preparation.ExecuteAsync(request,
+            async token => new SchedulingOutcome(await MutateAsync(token)), cancellationToken);
+        return outcome.Response;
     }
+
+    private sealed record SchedulingOutcome(BaseCommandResponse<Guid> Response);
 
     private async Task<BaseCommandResponse<Guid>> RejectAsync(
         ScheduleWebhookBulkReplayCommand request,

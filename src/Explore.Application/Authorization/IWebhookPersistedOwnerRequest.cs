@@ -11,5 +11,6 @@ public enum WebhookOwnedResourceKind
     Consumer = 1,
     Endpoint = 2,
     Message = 3,
-    DeliveryAttempt = 4
+    DeliveryAttempt = 4,
+    ProviderPublication = 5
 }

@@ -1,4 +1,5 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Locations.Requests.Commands;
@@ -22,7 +23,8 @@ public sealed class AddressGovernanceTelemetryTests
                 AuthorizationProviderMetadata.Runtime,
                 AuthorizationDecisionReasonCodes.Denied));
         var logger = new CaptureLogger<RequestAuthorization<UpdateLocationCommand>>();
-        var evaluator = new RequestAuthorization<UpdateLocationCommand>(authorization);
+        var evaluator = new RequestAuthorization<UpdateLocationCommand>(
+            authorization, Substitute.For<IMachinePrincipalAccessor>());
         var command = new UpdateLocationCommand
         {
             LocationId = locationId,

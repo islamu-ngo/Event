@@ -14,7 +14,8 @@ public sealed class StripeConnectAccountAdapter(
     IOptions<StripePaymentOptions> options) : IOrganizerPaymentOnboardingProvider
 {
     public const string HttpClientName = "Payments.StripeConnect";
-    private const int MaxNetworkRetries = 2;
+    // Mutation retry authority belongs to the durable business operation, not SDK transport.
+    private const int MaxNetworkRetries = 0;
 
     public async Task<OrganizerPaymentProviderAccountCreationResult> CreateAccountAsync(
         OrganizerPaymentProviderAccountCreationRequest request,

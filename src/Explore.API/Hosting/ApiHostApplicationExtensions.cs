@@ -5,6 +5,7 @@ using Explore.API.Filters;
 using Explore.API.Mcp;
 using Explore.API.Middleware;
 using Explore.ServiceDefaults.HealthChecks;
+using Explore.ServiceDefaults;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -25,6 +26,9 @@ public static class ApiHostApplicationExtensions
         ArgumentNullException.ThrowIfNull(app);
         ArgumentNullException.ThrowIfNull(state);
 
+        if (includeForwardedHeaders)
+            app.UseEffectiveHostAuthority();
+
         if (app.Services.GetService<AgentBrowserResetCoordinator>() is { } agentDatabase)
             app.Use((HttpContext context, RequestDelegate next) => agentDatabase.HandleHttpAsync(context, next));
 
@@ -33,14 +37,13 @@ public static class ApiHostApplicationExtensions
             app.UseWhen(predicate, branch => UseApiHostMiddlewareBeforeScheduler(
                 branch,
                 app,
-                state,
-                includeForwardedHeaders));
+                state));
             UseApiHostScheduler(app, state);
             app.UseWhen(predicate, UseApiHostMiddlewareAfterScheduler);
             return app;
         }
 
-        UseApiHostMiddlewareBeforeScheduler(app, app, state, includeForwardedHeaders);
+        UseApiHostMiddlewareBeforeScheduler(app, app, state);
         UseApiHostScheduler(app, state);
         UseApiHostMiddlewareAfterScheduler(app);
         return app;
@@ -49,8 +52,7 @@ public static class ApiHostApplicationExtensions
     private static void UseApiHostMiddlewareBeforeScheduler(
         IApplicationBuilder pipeline,
         WebApplication app,
-        ApiHostCompositionState state,
-        bool includeForwardedHeaders)
+        ApiHostCompositionState state)
     {
         if (app.Environment.IsDevelopment() ||
             app.Environment.IsEnvironment("Testing") ||
@@ -63,7 +65,6 @@ public static class ApiHostApplicationExtensions
 
         if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
         {
-            Microsoft.IdentityModel.Logging.IdentityModelEventSource.ShowPII = true;
             pipeline.UseCors("DevPolicy");
         }
         else
@@ -72,14 +73,12 @@ public static class ApiHostApplicationExtensions
             pipeline.UseHsts();
         }
 
-        pipeline.UseApiExceptionHandling();
-        if (includeForwardedHeaders)
-        {
-            pipeline.UseForwardedHeaders();
-        }
-        pipeline.UseSecurityHeaders();
+        Microsoft.IdentityModel.Logging.IdentityModelEventSource.ShowPII = false;
+        Microsoft.IdentityModel.Logging.IdentityModelEventSource.LogCompleteSecurityArtifact = false;
         pipeline.UseCorrelationId();
         pipeline.UseRequestLogging();
+        pipeline.UseApiExceptionHandling();
+        pipeline.UseSecurityHeaders();
         pipeline.UseResponseCompression();
         if (state.HttpsRedirectionEnabled)
         {
@@ -164,13 +163,13 @@ public static class ApiHostApplicationExtensions
         app.MapDefaultEndpoints();
         app.MapHealthChecks(
             "/health/webhooks/local",
-            CreateWebhookReadinessOptions("webhook-local-readiness"));
+            CreateWebhookReadinessOptions("webhook-local-readiness")).RequirePrivateOperationalListener();
         app.MapHealthChecks(
             "/health/webhooks/svix",
-            CreateWebhookReadinessOptions("webhook-svix-readiness"));
+            CreateWebhookReadinessOptions("webhook-svix-readiness")).RequirePrivateOperationalListener();
         app.MapHealthChecks(
             "/health/webhooks/coop-effects",
-            CreateWebhookReadinessOptions("webhook-coop-effect-readiness"));
+            CreateWebhookReadinessOptions("webhook-coop-effect-readiness")).RequirePrivateOperationalListener();
         return app;
     }
 

@@ -214,8 +214,9 @@ public sealed partial class RegistrationOrderLifecycleService
         RegistrationOrder initialOrder,
         DateTime now,
         string code,
-        CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteSerializableAsync(async token =>
+        CancellationToken cancellationToken,
+        RegistrationFinalizationClaim? claim = null) =>
+        ExecuteFinalizationTransactionAsync(claim, async token =>
         {
             RegistrationOrder? order = await inventory.GetOrderForUpdateWithLinesAsync(
                 initialOrder.Id, initialOrder.TenantId, token);

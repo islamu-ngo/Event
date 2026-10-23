@@ -33,6 +33,35 @@ Use these runbooks when a CI/CD gate fails. The default response is to preserve 
 | Container build | `container-build-*`, digest JSON, promotion evidence, Trivy text/SARIF, attestation verification JSON, checksum manifest | Fix Dockerfile/dependency/scan issue and rebuild the same component | Do not deploy if scan, attestation verification, immutable promotion verification, or checksum generation fails. |
 | Coolify deploy | `deployment-production-evidence` / `deployment-staging-evidence` | Fix webhook/secrets/smoke URL/configuration, rerun environment-gated deploy | Do not bypass production environment approval, deployment freeze, required smoke checks, or expected digest evidence. |
 
+## Reviewed exact secret-scan false positives
+
+`.gitleaksignore` contains individual reviewed finding fingerprints, not rules,
+paths or credential values. Every entry requires retained evidence and explicit
+maintainer approval. Never use it to accept an actual secret or hide a new finding.
+
+### PR75 tenant-setting row identifier
+
+- Owner and approval: Project Steward, explicitly approved on 2026-10-19.
+- Scope: the single `generic-api-key` finding at
+  `tests/Event.Persistence.IntegrationTests/Repositories/PersistedResourceAuthorityTests.cs:344`
+  in commit `e2937d6ef122d7441e1165b1113a549c3602ef6c`.
+- Classification: the literal names a seeded `TenantSetting.SettingKey` row in
+  tenant-isolation tests. It is not a credential, token, setting value or connection
+  secret. No matched content is reproduced here and no source is obfuscated.
+- Evidence: [Secret Scanning run 39287193181](https://github.com/islamu-ngo/Event/actions/runs/39287193181),
+  artifact `secret-scanning-evidence` (ID `12202619443`), gitleaks 8.30.1, one result;
+  retained SARIF SHA-256
+  `6fc768f19e3807b8775a3c018ee078c48c67d670a0b6333ce7c3ed93ca8ec646`.
+- Compensating control: all rules and files remain scanned; the ignore matches
+  only that historical commit/path/rule/line fingerprint. A changed location or
+  future occurrence is not accepted by this entry. Validate the original merge
+  range with the pinned scanner and redacted output before recording a pass.
+- Removal condition: the CI owner removes the entry after demonstrating that no
+  supported scanned range can include that historical finding, or that the pinned
+  rule no longer flags it. Do not rewrite shared history merely to remove it.
+
+This is a reviewed nonsecret classification, not an emergency gate override.
+
 ## Emergency Override Requirements
 
 Emergency overrides are reserved for urgent security or operator-impact incidents. An override must include:

@@ -1,6 +1,8 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSessions.Requests.Commands;
@@ -38,11 +40,34 @@ public class CreateEventSessionCommandSecurityTests
         var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000101");
         var eventId = Guid.Parse("00000000-0000-0000-0000-000000000102");
         var command = CreateCommand(tenantId, eventId);
+        var tenant = Substitute.For<ITenantContext>();
+        tenant.TenantId.Returns(tenantId);
+        var events = Substitute.For<IEventRepository>();
+        events.GetAuthorizationTargetByIdAsync(eventId, Arg.Any<CancellationToken>())
+            .Returns(new Explore.Domain.Event
+            {
+                Id = eventId,
+                TenantId = tenantId,
+                Title = "Original event",
+                Actor = null!,
+                Tenant = null!,
+                VisibilityType = null!,
+                EventStatus = null!,
+                EventFormat = null!
+            });
+        var executedTargets = new List<Guid>();
         var innerHandler = Substitute.For<ICommandHandler<CreateEventSessionCommand, BaseCommandResponse<Guid>>>();
         innerHandler.ExecuteAsync(Arg.Any<CreateEventSessionCommand>(), Arg.Any<CancellationToken>())
-            .Returns(call => Task.FromResult(BaseCommandResponse.Success(call.Arg<CreateEventSessionCommand>().EventSessionDto.EventId)));
+            .Returns(call =>
+            {
+                var target = call.Arg<CreateEventSessionCommand>().EventSessionDto.EventId;
+                executedTargets.Add(target);
+                return Task.FromResult(BaseCommandResponse.Success(target));
+            });
         var authorization = new RequestAuthorization<CreateEventSessionCommand>(
-            new ExactPreCreateAuthorizationProvider(tenantId, eventId));
+            new ExactPreCreateAuthorizationProvider(tenantId, eventId),
+            Substitute.For<IMachinePrincipalAccessor>(),
+            new AuthorizationResourceContextResolver(eventRepository: events, tenantContext: tenant));
         var decorator = new AuthorizationCommandHandlerDecorator<CreateEventSessionCommand, BaseCommandResponse<Guid>>(
             innerHandler,
             authorization,
@@ -78,7 +103,7 @@ public class CreateEventSessionCommandSecurityTests
                 CancellationToken.None));
         }
 
-        await innerHandler.Received(1).ExecuteAsync(Arg.Any<CreateEventSessionCommand>(), Arg.Any<CancellationToken>());
+        await Assert.That(executedTargets).IsEquivalentTo(new[] { eventId });
     }
 
     private static CreateEventSessionCommand CreateCommand(Guid tenantId, Guid eventId) => new()

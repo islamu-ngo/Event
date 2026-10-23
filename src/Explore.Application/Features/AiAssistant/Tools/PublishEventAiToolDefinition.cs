@@ -15,7 +15,7 @@ public static class PublishEventAiToolDefinition
             AllowedPayloadFields,
             ForbiddenPayloadFields,
             typeof(PublishEventAiActionMapper),
-            new AiToolAuthorizationRequirement(ResourceKinds.Event, AuthorizationActions.Update),
+            new AiToolAuthorizationRequirement(ResourceKinds.Event, AuthorizationActions.Events.Publish),
             ExposeToProvider: false,
             ExposeToMcp: true,
             AgentMetadata: new AiToolAgentMetadata(

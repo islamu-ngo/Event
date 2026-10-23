@@ -42,6 +42,7 @@ public sealed class StorageContentSignaturePolicySecurityTests
             mimeType,
             extension,
             bytes.Length,
+            bytes.Length,
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
@@ -65,6 +66,7 @@ public sealed class StorageContentSignaturePolicySecurityTests
             declaredMimeType,
             declaredExtension,
             bytes.Length,
+            bytes.Length,
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
@@ -80,6 +82,7 @@ public sealed class StorageContentSignaturePolicySecurityTests
             "image/png",
             "png",
             bytes.Length,
+            bytes.Length,
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
@@ -92,6 +95,7 @@ public sealed class StorageContentSignaturePolicySecurityTests
             new MemoryStream(ValidPng),
             "image/png; charset=binary",
             "png",
+            ValidPng.Length,
             ValidPng.Length,
             CancellationToken.None);
 
@@ -202,12 +206,53 @@ public sealed class StorageContentSignaturePolicySecurityTests
             "application/pdf",
             "pdf",
             bytes.Length,
+            bytes.Length,
             CancellationToken.None);
         using var captured = new MemoryStream();
         await result.Content.CopyToAsync(captured);
 
         await Assert.That(result.Success).IsTrue();
         await Assert.That(captured.ToArray()).IsEquivalentTo(bytes);
+    }
+
+    [Test]
+    [Arguments("image/png", "png")]
+    [Arguments("application/pdf", "pdf")]
+    [Arguments("text/plain", "txt")]
+    public async Task ReservationAbovePolicyCeilingIsRejectedBeforeReading(string mime, string extension)
+    {
+        using var content = new MemoryStream(ValidPng);
+        StorageContentInspectionResult result = await StorageContentSignaturePolicy.InspectAsync(
+            content, mime, extension, long.MaxValue, 1024, CancellationToken.None);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(content.Position).IsEqualTo(0L);
+        await Assert.That(ReferenceEquals(result.Content, content)).IsTrue();
+    }
+
+    [Test]
+    [Arguments(0L)]
+    [Arguments(-1L)]
+    public async Task MissingPolicyCeilingCannotAdmitRasterAllocation(long maximumBytes)
+    {
+        using var content = new MemoryStream(ValidPng);
+        var result = await StorageContentSignaturePolicy.InspectAsync(
+            content, "image/png", "png", ValidPng.Length, maximumBytes, default);
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(content.Position).IsEqualTo(0L);
+    }
+
+    [Test]
+    public async Task GenericPdfSignatureDoesNotClaimSpecializedDocumentInspection()
+    {
+        byte[] bytes = "%PDF-1.7\n<script>untrusted document data</script>"u8.ToArray();
+        using var content = new MemoryStream(bytes);
+        var result = await StorageContentSignaturePolicy.InspectAsync(
+            content, "application/pdf", "pdf", bytes.Length, bytes.Length, default);
+        await Assert.That(result.Success).IsTrue();
+        using var replay = new MemoryStream();
+        await result.Content.CopyToAsync(replay);
+        await Assert.That(replay.ToArray()).IsEquivalentTo(bytes);
     }
 
     private static byte[] RasterBytes(string mimeType) =>

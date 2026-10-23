@@ -29,11 +29,10 @@ public interface IEventLocationRepository
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Counts live EventLocations still flagged for privacy remediation across every tenant.
-    /// Aggregate-only by design: readiness probes run without an ambient tenant and must never
-    /// project venue rows.
+    /// Saves paired disclosure audits and projection-correction messages and retains their
+    /// exact correction receipts in the caller's transaction. Message-bearing saves require
+    /// an existing transaction so disclosure, audit, outbox, and receipt commit together.
     /// </summary>
-    Task<int> CountNeedingPrivacyReviewAsync(CancellationToken cancellationToken);
     Task SaveGovernanceChangesAsync(
         IReadOnlyCollection<EventLocationDisclosureAudit> audits,
         IReadOnlyCollection<OutboxMessage> outboxMessages,

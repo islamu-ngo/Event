@@ -3,6 +3,7 @@ using System.IO;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
@@ -18,7 +19,8 @@ namespace Explore.Persistence.Services;
 /// <summary>Serializes organization membership with native reviewer-independence qualification.</summary>
 public sealed partial class OrganizationMemberMutationBoundary(
     ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy, IUserContext user,
-    IAdminContext admin, IMachinePrincipalAccessor machine, IAuthorizationProvider authorization)
+    IAdminContext admin, IMachinePrincipalAccessor machine, IAuthorizationProvider authorization,
+    IHumanActionCommitFinalizer finalizer)
     : IOrganizationMemberMutationBoundary, IOrganizationCreationMutationBoundary
 {
     public Task<BaseCommandResponse<Guid>> ExecuteAddAsync(Guid tenantId, Guid organizationId, Guid memberId, string email, int roleId,
@@ -50,6 +52,7 @@ public sealed partial class OrganizationMemberMutationBoundary(
             Deny();
         }
         Attempt? attempted = null;
+        var admission = new NativeHumanMutationAdmission(context, finalizer);
         try
         {
             return await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() =>
@@ -106,6 +109,7 @@ public sealed partial class OrganizationMemberMutationBoundary(
                     return await privacy.ExecuteEnrollmentSerializedAsync(async privacyToken =>
                         await new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAsync(async inner =>
                         {
+                            admission.RegisterOwning(RecheckAsync);
                             await using var installation = await RelationalNamedLock.AcquireTransactionAsync(
                                 context, "moderation.authority-source.installation", inner);
                             var human = target!.HumanId;

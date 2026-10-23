@@ -9,9 +9,11 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Configuration;
 using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.Features.ExternalApiKeys.Handlers.Commands;
+using Explore.Application.Features.ExternalApiKeys;
 using Explore.Application.Features.ExternalApiKeys.Handlers.Queries;
 using Explore.Application.Features.ExternalApiKeys.Requests.Commands;
 using Explore.Application.Features.ExternalApiKeys.Requests.Queries;
@@ -20,11 +22,16 @@ using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Identity;
+using Explore.Infrastructure;
+using Explore.Infrastructure.Mail;
+using Explore.Infrastructure.Services;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -233,11 +240,12 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         await Assert.That(body.Contains(issued!.ApiKey!, StringComparison.Ordinal)).IsFalse();
     }
 
-    /// <summary>Owns the TestServer, in-memory credential connection and task-private retained-authority files.</summary>
+    /// <summary>Owns the TestServer and private application/retained-authority files.</summary>
     private sealed class IssuanceHost(
         WebApplication app,
         HttpClient client,
         SqliteConnection connection,
+        string applicationPath,
         string authorityPath,
         Guid userId) : IAsyncDisposable
     {
@@ -271,9 +279,12 @@ public sealed class ExternalApiKeyIssuanceHttpTests
         {
             Guid userId = Guid.CreateVersion7();
             Guid tenantId = Guid.CreateVersion7();
+            string applicationPath = Path.Combine(
+                Environment.GetEnvironmentVariable("TMPDIR") ?? Path.GetTempPath(),
+                $"issuance-http-application-{Guid.CreateVersion7():N}.db");
             var connection = new SqliteConnection(new SqliteConnectionStringBuilder
             {
-                DataSource = ":memory:"
+                DataSource = applicationPath
             }.ToString());
             string authorityPath = Path.Combine(
                 Environment.GetEnvironmentVariable("TMPDIR") ?? Path.GetTempPath(),
@@ -293,12 +304,56 @@ public sealed class ExternalApiKeyIssuanceHttpTests
                 builder.Services.AddApiRateLimiting(builder.Configuration, builder.Environment);
                 builder.Services.AddDataProtection();
                 builder.Services.AddMetrics();
+                builder.Services.AddMemoryCache();
+                builder.Services.AddSingleton(TimeProvider.System);
                 builder.Services.AddSingleton<BusinessMetrics>();
                 builder.Services.AddSingleton<RecyclableMemoryStreamManager>();
-                builder.Services.AddSingleton<ITenantContext>(
-                    new FixedTenantContext(unresolvedTenant ? Guid.Empty : tenantId));
+                builder.Services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
+                builder.Services.AddScoped<ITenantContext>(services =>
+                    new FixedTenantContext(unresolvedTenant ? Guid.Empty : tenantId,
+                        services.GetRequiredService<ITenantContextAccessor>()));
                 builder.Services.AddDbContext<ExploreDbContext>(options =>
                     options.UseSqlite(connection).UseSnakeCaseNamingConvention());
+                builder.Services.AddSingleton<IGlobalExploreDbContextFactory>(_ => new GlobalExploreDbContextFactory(
+                    new PrimaryDatabaseConnectionOptions
+                    {
+                        Role = PrimaryDatabaseRole.Global,
+                        Provider = PrimaryDatabaseProvider.Sqlite,
+                        Database = applicationPath
+                    }, poolSize: 1));
+                var runtime = new PrimaryDatabaseConnectionOptions
+                {
+                    Role = PrimaryDatabaseRole.Runtime,
+                    Provider = PrimaryDatabaseProvider.Sqlite,
+                    Database = applicationPath
+                };
+                builder.Services.AddSingleton(new InstanceApiKeyDbContextFactories(
+                    runtime, runtime with { Role = PrimaryDatabaseRole.Global },
+                    [
+                        runtime with { Role = PrimaryDatabaseRole.InstanceKeyRead },
+                        runtime with { Role = PrimaryDatabaseRole.InstanceKeyWrite },
+                        runtime with { Role = PrimaryDatabaseRole.InstanceKeyIssuance },
+                        runtime with { Role = PrimaryDatabaseRole.PlatformKeyReport }
+                    ]));
+                builder.Services.AddScoped<IInstanceApiKeyExecutionScopeFactory, InstanceApiKeyExecutionScopeFactory>();
+                builder.Services.AddScoped<InstanceApiKeyOperations>();
+                builder.Services.AddScoped<IAuthorizationProvider, FallbackAuthorizationService>();
+                builder.Services.AddScoped<IMachinePrincipalAccessor, MachinePrincipalAccessor>();
+                builder.Services.AddScoped<IEventAuthoritySnapshotService, EventAuthoritySnapshotService>();
+                builder.Services.AddScoped<IHierarchicalSettingsResolver, HierarchicalSettingsResolver>();
+                builder.Services.AddHierarchicalSettingsReader();
+                builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
+                builder.Services.AddScoped<ITenantSettingRepository, TenantSettingRepository>();
+                builder.Services.AddScoped<IOrganizationSettingRepository, OrganizationSettingRepository>();
+                builder.Services.AddScoped<IGroupSettingRepository, GroupSettingRepository>();
+                builder.Services.AddScoped<IGroupTenantRepository, GroupTenantRepository>();
+                builder.Services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
+                builder.Services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
+                builder.Services.AddScoped<IEmailDeliveryDisableImpactReader, EmailDeliveryDisableImpactReader>();
+                builder.Services.AddScoped<IEmailDeliveryDisableTokenService, EmailDeliveryDisableTokenService>();
+                builder.Services.AddScoped<IEmailDeliverySettingsWriter, EmailDeliverySettingsWriter>();
+                builder.Services.AddScoped<IEventResourceSettingsWriter, EventResourceSettingsWriter>();
+                builder.Services.AddScoped<IAdministrativeAuthorityRepository, AdministrativeAuthorityRepository>();
                 builder.Services.AddDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>(options =>
                     options.UseSqlite(authorityConnection).UseSnakeCaseNamingConvention());
                 builder.Services.AddScoped<IPrivacyIdentityFenceAuthority>(services =>
@@ -308,6 +363,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
                 builder.Services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
                 builder.Services.AddScoped<IExternalApiKeyIssuanceReceiptRepository, ExternalApiKeyIssuanceReceiptRepository>();
                 builder.Services.AddScoped<IExternalApiKeyIssuanceAuthority, ExternalApiKeyIssuanceAuthority>();
+                builder.Services.AddScoped<IInstanceAdministratorCommitAuthority, ExternalApiKeyIssuanceAuthority>();
                 builder.Services.AddScoped<IUserContext, UserContext>();
                 builder.Services.AddScoped<IAdminContext, AdminContext>();
                 builder.Services.AddScoped<IPlatformUserRoleRepository, PlatformUserRoleRepository>();
@@ -315,6 +371,9 @@ public sealed class ExternalApiKeyIssuanceHttpTests
                 builder.Services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
                 builder.Services.AddScoped<IExternalApiKeyRepository, ExternalApiKeyRepository>();
                 builder.Services.AddScoped<IExternalApiKeyQuotaRepository, ExternalApiKeyQuotaRepository>();
+                builder.Services.AddScoped<IExternalApiKeyTenantUsageReader, TenantApiKeyUsageReader>();
+                builder.Services.AddSingleton<ITenantExploreDbContextFactory>(new TenantExploreDbContextFactory(runtime));
+                builder.Services.AddScoped<ITenantAdministratorCommitAuthority, ExternalApiKeyIssuanceAuthority>();
                 builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
                 builder.Services.AddScoped<IOrganizationMemberRepository, OrganizationMemberRepository>();
                 builder.Services.AddScoped<IGroupRepository, GroupRepository>();
@@ -406,7 +465,7 @@ public sealed class ExternalApiKeyIssuanceHttpTests
                 app.UseMiddleware<IdempotencyMiddleware>();
                 app.MapControllers();
                 await app.StartAsync();
-                var host = new IssuanceHost(app, app.GetTestClient(), connection, authorityPath, userId);
+                var host = new IssuanceHost(app, app.GetTestClient(), connection, applicationPath, authorityPath, userId);
                 ownershipTransferred = true;
                 return host;
             }
@@ -422,6 +481,9 @@ public sealed class ExternalApiKeyIssuanceHttpTests
                     finally
                     {
                         await connection.DisposeAsync();
+                        File.Delete(applicationPath);
+                        File.Delete(applicationPath + "-wal");
+                        File.Delete(applicationPath + "-shm");
                         File.Delete(authorityPath);
                         File.Delete(authorityPath + "-wal");
                         File.Delete(authorityPath + "-shm");
@@ -436,15 +498,18 @@ public sealed class ExternalApiKeyIssuanceHttpTests
             client.Dispose();
             await App.DisposeAsync();
             await connection.DisposeAsync();
+            File.Delete(applicationPath);
+            File.Delete(applicationPath + "-wal");
+            File.Delete(applicationPath + "-shm");
             File.Delete(authorityPath);
             File.Delete(authorityPath + "-wal");
             File.Delete(authorityPath + "-shm");
         }
     }
 
-    private sealed class FixedTenantContext(Guid tenantId) : ITenantContext
+    private sealed class FixedTenantContext(Guid tenantId, ITenantContextAccessor? execution = null) : ITenantContext
     {
-        public Guid TenantId { get; } = tenantId;
+        public Guid TenantId => execution?.TenantId ?? tenantId;
     }
 
     private sealed class IssuanceControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>

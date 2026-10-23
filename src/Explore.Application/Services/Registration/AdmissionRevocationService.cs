@@ -13,6 +13,34 @@ public sealed class AdmissionRevocationService(
     public const string RefundReconciledReason = "RefundReconciled";
     public const string OrderCancellationReason = "OrderCancellation";
 
+    public Task<AdmissionRevocationResult> ReconcileCommittedCancellationAsync(
+        AdmissionCommittedCancellationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null || request.TenantId == Guid.Empty ||
+            request.RegistrationOrderId == Guid.Empty || request.EventId == Guid.Empty ||
+            !Enum.IsDefined(request.Source))
+        {
+            return Task.FromResult(Result(AdmissionRevocationOutcome.InvalidRequest));
+        }
+
+        repository.RequireCommittedCancellationScope(request.TenantId);
+        return unitOfWork.ExecuteReadCommittedAsync(async token =>
+        {
+            AdmissionRevocationContext? context = await repository.LoadCommittedCancellationAsync(request, token);
+            if (context is null || context.TenantId != request.TenantId ||
+                context.RegistrationOrderId != request.RegistrationOrderId ||
+                context.Tickets.Any(ticket => ticket.TenantId != request.TenantId ||
+                    ticket.RegistrationOrderId != request.RegistrationOrderId || ticket.EventId != request.EventId))
+            {
+                return Result(AdmissionRevocationOutcome.NotFound);
+            }
+
+            return await ApplyLoadedAsync(
+                new(request.TenantId, request.RegistrationOrderId, OrderCancellationReason, []), context, token);
+        }, cancellationToken);
+    }
+
     public Task<AdmissionRevocationResult> ReconcileAsync(
         AdmissionRevocationRequest request,
         CancellationToken cancellationToken)
@@ -44,6 +72,14 @@ public sealed class AdmissionRevocationService(
             return Result(AdmissionRevocationOutcome.NotFound);
         }
 
+        return await ApplyLoadedAsync(request, context, token);
+    }
+
+    private async Task<AdmissionRevocationResult> ApplyLoadedAsync(
+        AdmissionRevocationRequest request,
+        AdmissionRevocationContext context,
+        CancellationToken token)
+    {
         if (!IsValidAllocationSet(request))
         {
             return new AdmissionRevocationResult(

@@ -3,13 +3,15 @@ namespace Explore.Application.Settings.Groups;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Domain.Constants;
+using Explore.Domain.Ai;
 
 public class AiAssistantSettingGroup : ISettingGroup
 {
     public bool Enabled { get; private set; }
     public string Provider { get; private set; } = "none";
     public string? EndpointUrl { get; private set; }
-    public string? ApiKey { get; private set; }
+    public AiCredentialScope CredentialScope { get; private set; }
+    public bool TenantOwnedTransport { get; private set; }
     public string? ModelId { get; private set; }
     public IReadOnlyList<string> AllowedModelIds { get; private set; } = [];
     public int MaxInputTokens { get; private set; } = 8000;
@@ -30,7 +32,6 @@ public class AiAssistantSettingGroup : ISettingGroup
     public bool PiiDisclosureEnabled { get; private set; }
 
     public bool HasEndpointUrl => !string.IsNullOrWhiteSpace(EndpointUrl);
-    public bool HasApiKey => !string.IsNullOrWhiteSpace(ApiKey);
     public bool HasModel => !string.IsNullOrWhiteSpace(ModelId);
     public bool IsFakeProvider => Provider.Equals(AiProviderDefaults.ProviderFake, StringComparison.OrdinalIgnoreCase);
     public bool IsOpenAiProvider => Provider.Equals(AiProviderDefaults.ProviderOpenAi, StringComparison.OrdinalIgnoreCase);
@@ -38,8 +39,9 @@ public class AiAssistantSettingGroup : ISettingGroup
     public bool IsAnthropicProvider => Provider.Equals(AiProviderDefaults.ProviderAnthropic, StringComparison.OrdinalIgnoreCase);
     public bool IsAnthropicCompatibleProvider => Provider.Equals(AiProviderDefaults.ProviderAnthropicCompatible, StringComparison.OrdinalIgnoreCase);
     public bool IsConfigured =>
-        ((IsOpenAiProvider || IsAnthropicProvider) && HasApiKey && HasModel)
-        || ((IsOpenAiCompatibleProvider || IsAnthropicCompatibleProvider) && HasEndpointUrl && HasModel);
+        Enum.IsDefined(CredentialScope)
+        && (((IsOpenAiProvider || IsAnthropicProvider) && CredentialScope is AiCredentialScope.Instance or AiCredentialScope.Tenant && HasModel)
+            || ((IsOpenAiCompatibleProvider || IsAnthropicCompatibleProvider) && HasEndpointUrl && HasModel));
     public bool IsAvailable => Enabled && IsConfigured;
 
     public static IEnumerable<string> SettingKeys =>
@@ -47,7 +49,7 @@ public class AiAssistantSettingGroup : ISettingGroup
         GovernanceSettingKeys.AiAssistant.Enabled,
         GovernanceSettingKeys.AiAssistant.Provider,
         GovernanceSettingKeys.AiAssistant.EndpointUrl,
-        GovernanceSettingKeys.AiAssistant.ApiKey,
+        GovernanceSettingKeys.AiAssistant.CredentialScope,
         GovernanceSettingKeys.AiAssistant.ModelId,
         GovernanceSettingKeys.AiAssistant.AllowedModelIds,
         GovernanceSettingKeys.AiAssistant.MaxInputTokens,
@@ -71,11 +73,23 @@ public class AiAssistantSettingGroup : ISettingGroup
         if (settings.TryGetValue(GovernanceSettingKeys.AiAssistant.Enabled, out var enabled))
             Enabled = SettingValueSerializer.Deserialize(enabled.Value, false);
         if (settings.TryGetValue(GovernanceSettingKeys.AiAssistant.Provider, out var provider))
+        {
             Provider = SettingValueSerializer.DeserializeString(provider.Value, "none");
+            TenantOwnedTransport = IsTenantSource(provider.Source);
+        }
         if (settings.TryGetValue(GovernanceSettingKeys.AiAssistant.EndpointUrl, out var endpoint))
+        {
             EndpointUrl = SettingValueSerializer.DeserializeString(endpoint.Value);
-        if (settings.TryGetValue(GovernanceSettingKeys.AiAssistant.ApiKey, out var apiKey))
-            ApiKey = SettingValueSerializer.DeserializeString(apiKey.Value);
+            TenantOwnedTransport |= IsTenantSource(endpoint.Source);
+        }
+        if (settings.TryGetValue(GovernanceSettingKeys.AiAssistant.CredentialScope, out var credentialScope))
+            CredentialScope = SettingValueSerializer.DeserializeString(credentialScope.Value) switch
+            {
+                "none" => AiCredentialScope.None,
+                "instance" => AiCredentialScope.Instance,
+                "tenant" => AiCredentialScope.Tenant,
+                _ => (AiCredentialScope)(-1)
+            };
         if (settings.TryGetValue(GovernanceSettingKeys.AiAssistant.ModelId, out var modelId))
             ModelId = SettingValueSerializer.DeserializeString(modelId.Value);
         if (settings.TryGetValue(GovernanceSettingKeys.AiAssistant.AllowedModelIds, out var allowedModelIds))
@@ -109,6 +123,10 @@ public class AiAssistantSettingGroup : ISettingGroup
         if (settings.TryGetValue(GovernanceSettingKeys.AiAssistant.PiiDisclosureEnabled, out var piiDisclosureEnabled))
             PiiDisclosureEnabled = SettingValueSerializer.Deserialize(piiDisclosureEnabled.Value, false);
     }
+
+    private static bool IsTenantSource(SettingSource source) =>
+        source is SettingSource.TenantOverride or SettingSource.TenantLocked
+            or SettingSource.OrganizationOverride or SettingSource.GroupOverride or SettingSource.UserPreference;
 
     private static IReadOnlyList<string> NormalizeModelIds(IEnumerable<string?> modelIds)
     {

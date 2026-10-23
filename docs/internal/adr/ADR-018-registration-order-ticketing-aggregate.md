@@ -52,6 +52,84 @@ Hi.Events validates the product need for reservation-first checkout, commercial 
 5. Order, attempt, submission, approval, payment, and future refund states are independent. Domain rule classes own exhaustive transitions; `ApprovalStatus` remains only the organizer verdict.
 6. Duplicate finalization returns the original result and creates no additional participants, registrations, answers, holds, or outbox records.
 
+### Authenticated creation recovery
+
+Authenticated order creation requires an operation key at the native
+`StartAuthenticatedRegistrationOrderCommand` boundary and at the underlying
+`CreateRegistrationOrderWithHoldCommand` entry. HTTP supplies `Idempotency-Key`;
+the grammar is 1-128 ASCII letters, digits, `.`, `_`, `:` or `-`. The
+authenticated start route suppresses generic HTTP response storage and returns
+private, no-store responses. Suppression is not permission to omit the native
+key check.
+
+Submission validates and computes any replacement platform contribution before
+attempting the state transition, without mutating the tracked order. Only a
+successful transition to `AwaitingRequirements` permits applying and saving
+the contribution and totals, inside the same native transaction. A rejected
+transition leaves existing contribution evidence and pricing unchanged.
+Exceptions still roll back both state and pricing; generic unit-of-work
+normal-result commit semantics remain intact for intentional expiry writes.
+
+`IRegistrationCreationPrincipal` is an Application-owned trusted principal
+port, implemented by `HttpRegistrationCreationPrincipal` in API. It reuses
+`GetPlatformUserId()` and the existing idempotency principal/capability
+fingerprint. Tenant context, current account, accepted authentication purpose,
+capability scope and operation key identify one creation operation. The body
+cannot supply principal scope, account authority, actor authority or verified
+contact evidence. Existing account admission continues to reject API keys and
+other purpose-bound identities; a machine credential's subject is not a buyer.
+
+`RegistrationOrderCreationReceipt` stores a separate SHA-256 input digest over
+the event, pinned catalogue request, booking party, normalized selections
+ordered by ticket ID, quantities, nullable chosen prices and nullable
+contribution selection. Null contribution and explicit zero are different
+inputs. The internal actor/contact fields are also digest-bound and are
+rejected for this account-only creation path. Request JSON property order and
+selection order do not change the native operation.
+
+`CreateOrderWithHoldCommandHandler` captures the receipt, order, line and hold
+identities before execution-strategy replay. It stages the receipt with the
+order and inventory graph in its existing serializable transaction. The
+unique tenant/operation fingerprint converges contending callers. There is no
+generic outer business transaction and no change to normal-result UoW commit
+semantics. Deadline scheduling remains a post-commit optimization covered by
+the existing inventory reconciliation sweep.
+
+Before exact recovery, the handler rechecks the current principal and retained
+subject-erasure authority. Creation additionally fences current account and
+tenant rows. A matching committed receipt is resolved before new publication,
+catalogue publication, visitor allocation or capacity checks; a retry does not
+reserve more capacity or renew a hold deadline. An input mismatch returns
+`registration_order_creation_conflict`. Missing, soft-deleted, expired or
+inaccessible order/account/event/catalogue data denies disclosure. Recovery
+selects only the receipt's order, never an arbitrary order for that account.
+An exception after a potentially committed effect, including cancellation or
+lost acknowledgement, permits a bounded independent recovery read through
+`ITenantExploreDbContextFactory`. This is a fresh ordinary exact-tenant lease,
+not a Global worker. Absence of committed evidence never authorizes an HTTP
+claim deletion.
+
+The minimal receipt has no user identifier, raw operation key, request body,
+credential, contact data, parent foreign key or TTL. It survives order deletion
+as a non-reopening tombstone. `PrivacyErasureApplier` and
+`UserLocationPrivacyErasureRepository.EraseRegistrationAndLocalNotificationsAsync`
+continue to own subject disposal; their HTTP-record cleanup does not delete
+this family-owned receipt. `RegistrationRetentionCleanupRepository` continues
+to dispose retained answers and PII without reopening creation. The existing
+retained-subject gate rejects the erased old User UUID even before primary
+disposal finishes; ordinary re-registration under a new UUID does not restore
+the old order.
+
+The handwritten authenticated client sends an explicit operation key. Its
+registration service retains the exact serialized intent and key after an
+uncertain response or cancellation, rejects replacing that pending intent,
+and releases it after acknowledged success or a definite validation rejection.
+Generated provider migrations, OpenAPI and client contracts must be produced
+at the programme's authorized generation gate. Source-authored native SQLite
+transaction, erasure, contention and independent-context tests, principal
+purpose tests and real client-transport tests remain unexecuted until final
+programme assurance; this source change is not runtime certification.
+
 ### Payment boundary
 
 1. An all-zero order follows free confirmation after requirements, approval, and capacity checks.

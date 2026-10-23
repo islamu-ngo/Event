@@ -325,7 +325,7 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         {
             await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
             var authority = await new ModerationMaintenanceAuthority(context, identity.Machine, identity.Bindings,
-                new ExternalApiKeyRepository(context), fixture.Clock)
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), fixture.Clock)
                 .AcquireForEffectAsync(fixture.EffectId, fixture.LeaseId, fixture.LeaseRevision, privacy, token);
             if (authority is null) return null;
             var source = await context.ModerationNoticeSources.AsNoTracking()

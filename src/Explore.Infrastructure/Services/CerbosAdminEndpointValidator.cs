@@ -1,12 +1,9 @@
 using System.Net;
-using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Services;
 
-public sealed class CerbosAdminEndpointValidator(IOptions<CerbosPolicyPackageOptions> options)
+public sealed class CerbosAdminEndpointValidator
 {
-    private readonly CerbosPolicyPackageOptions _options = options.Value;
-
     public bool TryNormalize(
         string? endpoint,
         bool isByo,
@@ -33,19 +30,20 @@ public sealed class CerbosAdminEndpointValidator(IOptions<CerbosPolicyPackageOpt
             return false;
         }
 
-        if (isByo && uri.Scheme != Uri.UriSchemeHttps && !_options.AllowInsecureByoAdminEndpoints)
+        if (isByo && uri.Scheme != Uri.UriSchemeHttps)
         {
             warning = "BYO Cerbos Admin API endpoint must use https.";
             return false;
         }
 
-        if (!string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+        if (!string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment) || uri.AbsolutePath != "/")
         {
             warning = "Cerbos Admin API endpoint must not include credentials, query, or fragment components.";
             return false;
         }
 
-        if (isByo && !_options.AllowPrivateByoAdminEndpoints && IsPrivateOrLocalEndpoint(uri))
+        if (isByo && IsPrivateOrLocalEndpoint(uri))
         {
             warning = "BYO Cerbos Admin API endpoint must not target local or private network addresses.";
             return false;

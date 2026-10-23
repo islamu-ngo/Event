@@ -28,15 +28,15 @@ public sealed class CerbosPolicyPackageOptions
     /// </summary>
     public int MaxPoliciesPerRequest { get; set; } = 100;
 
-    /// <summary>
-    /// Allows tenant-supplied Admin API endpoints to use http rather than https.
-    /// Intended for local development only; production BYO endpoints should remain HTTPS-only.
-    /// </summary>
-    public bool AllowInsecureByoAdminEndpoints { get; set; }
+    public CerbosPublicationOptions Publication { get; set; } = new();
+}
 
-    /// <summary>
-    /// Allows tenant-supplied Admin API endpoints to target loopback, private, or link-local addresses.
-    /// Intended for controlled tests or local development only.
-    /// </summary>
-    public bool AllowPrivateByoAdminEndpoints { get; set; }
+/// <summary>Deployment-owned public verification material. Never contains the operator signing key.</summary>
+public sealed class CerbosPublicationOptions
+{
+    public string ReceiptBase64 { get; set; } = string.Empty;
+    public string SignatureBase64 { get; set; } = string.Empty;
+    public string PublicKeyPem { get; set; } = string.Empty;
+    public string Revision { get; set; } = string.Empty;
+    public string Environment { get; set; } = string.Empty;
 }

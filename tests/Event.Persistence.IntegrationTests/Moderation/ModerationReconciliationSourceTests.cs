@@ -602,7 +602,9 @@ public sealed class ModerationReconciliationSourceTests
         }
 
         public ModerationReconciliationCredentialProvider Credentials(ExploreDbContext context) =>
-            new(new SettingsMonitor(Settings), new ExternalApiKeyRepository(context), new SelectedSecret(this), new FixedClock());
+            new(new SettingsMonitor(Settings),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new SelectedSecret(this), new FixedClock());
 
         private static AdminContext Admin(ExploreDbContext context) =>
             new(new HttpContextAccessor(), new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
@@ -610,7 +612,9 @@ public sealed class ModerationReconciliationSourceTests
                 new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
 
         public ModerationMachineSubjectBindingRepository Bindings(ExploreDbContext context, MachinePrincipalAccessor machine) =>
-            new(context, Admin(context), machine, new ExternalApiKeyRepository(context), new UnconfiguredKeys(), new FixedClock());
+            new(context, Admin(context), machine,
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new UnconfiguredKeys(), new FixedClock());
 
         public async Task PublishAsync(AuthorityScope jurisdiction, bool retire = false)
         {
@@ -728,7 +732,7 @@ public sealed class ModerationReconciliationSourceTests
             await using var privacyFixture = await ModerationNoticePrivacyFixture.CreateAsync();
             var privacyAuthority = privacyFixture.Authority(context, clock);
             var participant = new ModerationAuthorityParticipant(context, Admin(context), machine, Bindings(context, machine),
-                new ExternalApiKeyRepository(context),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 new ModerationPolicyPublicationRepository(context, Admin(context), machine, Inventory, null, clock),
                 Inventory, new ModerationNativeActivationQualification(context, Inventory, null, null, clock), clock);
             var result = await new ModerationOperationService(new ModerationStore(context, participant, clock, privacyAuthority,

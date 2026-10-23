@@ -32,7 +32,7 @@ public class OrganizationMemberRepository : GenericRepository<OrganizationMember
             .ToListAsync();
     }
 
-    public async Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id)
+    public async Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.OrganizationMembers
             .AsNoTracking()
@@ -47,7 +47,7 @@ public class OrganizationMemberRepository : GenericRepository<OrganizationMember
                     .ThenInclude(o => o.Actor)
             .Include(m => m.Role)
             .Include(m => m.OrganizationPosition)
-            .FirstOrDefaultAsync(m => m.Id == id);
+            .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
     public async Task<List<OrganizationMember>> GetMembersByOrganizationId(Guid organizationId)

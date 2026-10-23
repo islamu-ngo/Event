@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53VHF74PAKK9SJNHXTXSMWH
+Title: "Bind self-owned tenant preferences to original human admission"
+Type: fix
+Scope: access
+Summary: "Set a user's tenant preference through one original credential-bound attempt and a closed native data capability instead of direct Runtime user-table access."
+Group: tenant-preference-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Retain original subject and credential custody, current membership sources, exact native privileges and terminal data-image checks through settlement.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Database preparation installs the closed preference writer and image contract with exact deployment enrollment.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose source, credential and native readiness failures without widening Runtime data privileges.

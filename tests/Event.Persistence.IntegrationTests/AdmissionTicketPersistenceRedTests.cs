@@ -9,6 +9,7 @@ using Explore.Application.Contracts.Secrets;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Services.Registration;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
@@ -386,6 +387,352 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
     }
 
     [Test]
+    [Arguments(AdmissionCancellationSource.Order)]
+    [Arguments(AdmissionCancellationSource.Event)]
+    public async Task CommittedCancellationRejectsActiveNativeSourceWithoutRevokingCredentials(
+        AdmissionCancellationSource source)
+    {
+        SeededAssignment seed = await SeedAssignmentAsync("active-cancellation-source");
+        await IssueSeedAsync(seed);
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        var service = CancellationRevocationService(context);
+
+        AdmissionRevocationResult result = await service.ReconcileCommittedCancellationAsync(
+            new(seed.TenantId, seed.OrderId, seed.EventId, source), CancellationToken.None);
+
+        await Assert.That(result.Outcome).IsEqualTo(AdmissionRevocationOutcome.NotFound);
+        await Assert.That(result.RevokedTicketIds).IsEmpty();
+        await AssertActiveCredentialAsync(seed);
+    }
+
+    [Test]
+    [Arguments(AdmissionCancellationSource.Order)]
+    [Arguments(AdmissionCancellationSource.Event)]
+    public async Task CommittedCancellationRejectsWrongEventMissingAndForeignOrder(
+        AdmissionCancellationSource source)
+    {
+        SeededAssignment seed = await SeedCancelledAdmissionAsync(source);
+        SeededAssignment foreign = await SeedCancelledAdmissionAsync(source);
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        var service = CancellationRevocationService(context);
+        AdmissionCommittedCancellationRequest[] requests =
+        [
+            new(seed.TenantId, seed.OrderId, foreign.EventId, source),
+            new(seed.TenantId, Guid.CreateVersion7(), seed.EventId, source),
+            new(seed.TenantId, foreign.OrderId, seed.EventId, source)
+        ];
+
+        foreach (AdmissionCommittedCancellationRequest request in requests)
+        {
+            AdmissionRevocationResult result = await service.ReconcileCommittedCancellationAsync(
+                request, CancellationToken.None);
+            await Assert.That(result.Outcome).IsEqualTo(AdmissionRevocationOutcome.NotFound);
+        }
+        await AssertActiveCredentialAsync(seed);
+        await AssertActiveCredentialAsync(foreign);
+    }
+
+    [Test]
+    [Arguments(AdmissionCancellationSource.Order)]
+    [Arguments(AdmissionCancellationSource.Event)]
+    public async Task CommittedCancellationRejectsDeletedSourceAndWrongTenantScope(
+        AdmissionCancellationSource source)
+    {
+        SeededAssignment seed = await SeedCancelledAdmissionAsync(source);
+        await using (ExploreDbContext foreignScope = TenantContext(Guid.CreateVersion7()))
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                CancellationRevocationService(foreignScope).ReconcileCommittedCancellationAsync(
+                    new(seed.TenantId, seed.OrderId, seed.EventId, source), CancellationToken.None));
+        }
+        await using (ExploreDbContext mutation = TenantContext(seed.TenantId))
+        {
+            if (source == AdmissionCancellationSource.Order)
+            {
+                RegistrationOrder order = await mutation.RegistrationOrders.SingleAsync(value => value.Id == seed.OrderId);
+                order.IsDeleted = true;
+            }
+            else
+            {
+                DomainEvent eventEntity = await mutation.Events.SingleAsync(value => value.Id == seed.EventId);
+                eventEntity.IsDeleted = true;
+            }
+            await mutation.SaveChangesAsync();
+        }
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        AdmissionRevocationResult result = await CancellationRevocationService(context)
+            .ReconcileCommittedCancellationAsync(
+                new(seed.TenantId, seed.OrderId, seed.EventId, source), CancellationToken.None);
+
+        await Assert.That(result.Outcome).IsEqualTo(AdmissionRevocationOutcome.NotFound);
+        await AssertActiveCredentialAsync(seed);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task EventCancellationRejectsUncommittedSourceAndLeavesItsTransactionUntouched(bool saved)
+    {
+        SeededAssignment seed = await SeedAssignmentAsync("uncommitted-cancellation");
+        await IssueSeedAsync(seed);
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        async Task CancelAndReconcileAsync(CancellationToken token)
+        {
+            DomainEvent eventEntity = await context.Events.SingleAsync(value => value.Id == seed.EventId, token);
+            eventEntity.Cancel(UtcNow.AddMinutes(1));
+            if (saved)
+                await context.SaveChangesAsync(token);
+            await CancellationRevocationService(context).ReconcileCommittedCancellationAsync(
+                new(seed.TenantId, seed.OrderId, seed.EventId, AdmissionCancellationSource.Event), token);
+        }
+        if (saved)
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(CancelAndReconcileAsync));
+        }
+        else
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => CancelAndReconcileAsync(CancellationToken.None));
+            await Assert.That(context.ChangeTracker.HasChanges()).IsTrue();
+        }
+        await AssertActiveCredentialAsync(seed);
+        await using ExploreDbContext verification = TenantContext(seed.TenantId);
+        DomainEvent persisted = await verification.Events.SingleAsync(value => value.Id == seed.EventId);
+        await Assert.That(persisted.EventStatusId).IsEqualTo((int)EventStatusEnum.Draft);
+    }
+
+    [Test]
+    [Arguments(AdmissionCancellationSource.Order)]
+    [Arguments(AdmissionCancellationSource.Event)]
+    public async Task CommittedCancellationDoesNotTrustUnchangedTrackedCancelledState(
+        AdmissionCancellationSource source)
+    {
+        SeededAssignment seed = await SeedAssignmentAsync("tracked-cancellation-source");
+        await IssueSeedAsync(seed);
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        if (source == AdmissionCancellationSource.Order)
+        {
+            RegistrationOrder order = await context.RegistrationOrders.SingleAsync(value => value.Id == seed.OrderId);
+            var status = context.Entry(order).Property(value => value.RegistrationOrderStatusId);
+            status.CurrentValue = (int)RegistrationOrderStatusEnum.Cancelled;
+            status.OriginalValue = status.CurrentValue;
+        }
+        else
+        {
+            DomainEvent eventEntity = await context.Events.SingleAsync(value => value.Id == seed.EventId);
+            var status = context.Entry(eventEntity).Property(value => value.EventStatusId);
+            status.CurrentValue = (int)EventStatusEnum.Cancelled;
+            status.OriginalValue = status.CurrentValue;
+        }
+
+        AdmissionRevocationResult result = await CancellationRevocationService(context)
+            .ReconcileCommittedCancellationAsync(
+                new(seed.TenantId, seed.OrderId, seed.EventId, source), CancellationToken.None);
+
+        await Assert.That(result.Outcome).IsEqualTo(AdmissionRevocationOutcome.NotFound);
+        await AssertActiveCredentialAsync(seed);
+    }
+
+    [Test]
+    [Arguments(AdmissionCancellationSource.Order)]
+    [Arguments(AdmissionCancellationSource.Event)]
+    public async Task CommittedCancellationRetainsNativeSourceLocksThroughCredentialSaveAndReplay(
+        AdmissionCancellationSource source)
+    {
+        SeededAssignment seed = await SeedCancelledAdmissionAsync(source);
+        var gate = new CancellationCredentialSaveGate();
+        await using ExploreDbContext context = TenantContext(seed.TenantId, gate);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        Task<AdmissionRevocationResult> pending = CancellationRevocationService(context)
+            .ReconcileCommittedCancellationAsync(
+                new(seed.TenantId, seed.OrderId, seed.EventId, source), timeout.Token);
+        try
+        {
+            await gate.Entered.WaitAsync(timeout.Token);
+            await AssertFenceHeldAsync(eventFence: false);
+            if (source == AdmissionCancellationSource.Event)
+                await AssertFenceHeldAsync(eventFence: true);
+
+            async Task AssertFenceHeldAsync(bool eventFence)
+            {
+                await using ExploreDbContext probe = TenantContext(seed.TenantId);
+                PostgresException? conflict = await probe.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+                {
+                    await using var transaction = await probe.Database.BeginTransactionAsync(timeout.Token);
+                    try
+                    {
+                        if (eventFence)
+                            await probe.Events.FromSqlInterpolated(
+                                $"SELECT * FROM events WHERE tenant_id = {seed.TenantId} AND id = {seed.EventId} FOR UPDATE NOWAIT")
+                                .SingleAsync(timeout.Token);
+                        else
+                            await probe.RegistrationOrders.FromSqlInterpolated(
+                                $"SELECT * FROM registration_orders WHERE tenant_id = {seed.TenantId} AND id = {seed.OrderId} FOR UPDATE NOWAIT")
+                                .SingleAsync(timeout.Token);
+                        return null;
+                    }
+                    catch (PostgresException exception)
+                    {
+                        return exception;
+                    }
+                });
+                await Assert.That(conflict?.SqlState).IsEqualTo(PostgresErrorCodes.LockNotAvailable);
+            }
+        }
+        finally
+        {
+            gate.Release();
+            await pending.WaitAsync(timeout.Token);
+        }
+
+        await Assert.That((await pending).Outcome).IsEqualTo(AdmissionRevocationOutcome.Applied);
+        await using ExploreDbContext replayContext = TenantContext(seed.TenantId);
+        AdmissionTicket beforeReplay = await replayContext.AdmissionTickets.AsNoTracking()
+            .Include(value => value.Credentials).SingleAsync(value => value.RegistrationOrderId == seed.OrderId);
+        DateTime? revokedAt = beforeReplay.Credentials.Single().RevokedAt;
+        AdmissionRevocationResult replay = await CancellationRevocationService(replayContext)
+            .ReconcileCommittedCancellationAsync(
+                new(seed.TenantId, seed.OrderId, seed.EventId, source), timeout.Token);
+        await Assert.That(replay.Outcome).IsEqualTo(AdmissionRevocationOutcome.Applied);
+        await using ExploreDbContext verification = TenantContext(seed.TenantId);
+        AdmissionTicket ticket = await verification.AdmissionTickets.Include(value => value.Credentials)
+            .SingleAsync(value => value.RegistrationOrderId == seed.OrderId);
+        await Assert.That(ticket.AdmissionTicketStatusId).IsEqualTo((int)AdmissionTicketStatusEnum.Cancelled);
+        await Assert.That(revokedAt).IsNotNull();
+        await Assert.That(ticket.Credentials.Single().RevokedAt).IsEqualTo(revokedAt);
+    }
+
+    [Test]
+    public async Task EventCancellationRejectsActiveEventBeforeListingOrContinuation()
+    {
+        SeededAssignment seed = await SeedAssignmentAsync("active-event-cancellation");
+        await IssueSeedAsync(seed);
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        var repository = new AdmissionRevocationRepository(context);
+        var unitOfWork = new EfCoreUnitOfWork(context);
+        var service = new AdmissionEventCancellationService(
+            repository, CancellationRevocationService(context), unitOfWork,
+            new FixedAdmissionTimeProvider(UtcNow.AddMinutes(2)));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ReconcileAsync(Guid.CreateVersion7(), seed.TenantId, seed.EventId, CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            unitOfWork.ExecuteReadCommittedAsync(async token =>
+            {
+                await repository.ScheduleContinuationAsync(
+                    Guid.CreateVersion7(), seed.TenantId, seed.EventId, UtcNow.AddMinutes(2), token);
+                return true;
+            }));
+        await AssertActiveCredentialAsync(seed);
+        await using ExploreDbContext verification = TenantContext(seed.TenantId);
+        await Assert.That(await verification.OutboxMessages.AnyAsync(value =>
+            value.AggregateId == seed.EventId &&
+            value.EventType == AdmissionRevocationOutboxMessageFactory.EventCancellationRequested)).IsFalse();
+    }
+
+    [Test]
+    [Arguments("active")]
+    [Arguments("missing")]
+    [Arguments("foreign")]
+    [Arguments("deleted")]
+    public async Task EventCancellationRejectsInvalidSourceEvenWithNoRevocableTickets(string invalidSource)
+    {
+        SeededAssignment seed = await SeedAssignmentAsync("empty-invalid-event-cancellation");
+        Guid eventId = seed.EventId;
+        if (invalidSource == "missing")
+            eventId = Guid.CreateVersion7();
+        else if (invalidSource == "foreign")
+            eventId = (await SeedCancelledAdmissionAsync(AdmissionCancellationSource.Event)).EventId;
+        else if (invalidSource == "deleted")
+        {
+            await using ExploreDbContext mutation = TenantContext(seed.TenantId);
+            DomainEvent eventEntity = await mutation.Events.SingleAsync(value => value.Id == seed.EventId);
+            eventEntity.Cancel(UtcNow.AddMinutes(1));
+            eventEntity.IsDeleted = true;
+            await mutation.SaveChangesAsync();
+        }
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        var repository = new AdmissionRevocationRepository(context);
+        var service = new AdmissionEventCancellationService(
+            repository, CancellationRevocationService(context), new EfCoreUnitOfWork(context),
+            new FixedAdmissionTimeProvider(UtcNow.AddMinutes(2)));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ReconcileAsync(Guid.CreateVersion7(), seed.TenantId, eventId, CancellationToken.None));
+        await using ExploreDbContext verification = TenantContext(seed.TenantId);
+        await Assert.That(await verification.OutboxMessages.AnyAsync(value =>
+            value.AggregateId == seed.EventId &&
+            value.EventType == AdmissionRevocationOutboxMessageFactory.EventCancellationRequested)).IsFalse();
+    }
+
+    [Test]
+    public async Task EventCancellationContinuationPreservesSourceExclusionAndDeduplicatesPendingWork()
+    {
+        SeededAssignment seed = await SeedCancelledAdmissionAsync(AdmissionCancellationSource.Event);
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        OutboxMessage source = AdmissionRevocationOutboxMessageFactory.CreateEventCancellation(
+            seed.TenantId, seed.EventId, UtcNow.AddMinutes(1));
+        context.OutboxMessages.Add(source);
+        await context.SaveChangesAsync();
+        var repository = new AdmissionRevocationRepository(context);
+        var unitOfWork = new EfCoreUnitOfWork(context);
+        for (int replay = 0; replay < 2; replay++)
+        {
+            repository.RequireCommittedCancellationScope(seed.TenantId);
+            await unitOfWork.ExecuteReadCommittedAsync(async token =>
+            {
+                await repository.ScheduleContinuationAsync(
+                    source.Id, seed.TenantId, seed.EventId, UtcNow.AddMinutes(2), token);
+                return true;
+            });
+        }
+        await using ExploreDbContext verification = TenantContext(seed.TenantId);
+        OutboxMessage[] messages = await verification.OutboxMessages
+            .Where(value => value.AggregateId == seed.EventId &&
+                value.EventType == AdmissionRevocationOutboxMessageFactory.EventCancellationRequested)
+            .ToArrayAsync();
+        await Assert.That(messages.Length).IsEqualTo(2);
+        OutboxMessage continuation = messages.Single(value => value.Id != source.Id);
+        AdmissionEventCancellationPayload payload = AdmissionRevocationOutboxMessageFactory.ReadEventCancellation(continuation);
+        await Assert.That(payload.TenantId).IsEqualTo(seed.TenantId);
+        await Assert.That(payload.EventId).IsEqualTo(seed.EventId);
+        await Assert.That(continuation.Status).IsEqualTo(OutboxMessageStatus.Pending);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task DirectCancellationBeforeOrderTransitionRetainsCallerTransactionAtomicity(bool rollback)
+    {
+        SeededAssignment seed = await SeedAssignmentAsync("direct-cancellation");
+        await IssueSeedAsync(seed);
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        var unitOfWork = new EfCoreUnitOfWork(context);
+        async Task RevokeAsync() => await unitOfWork.ExecuteInTransactionAsync(async token =>
+        {
+            AdmissionRevocationResult result = await CancellationRevocationService(context)
+                .ReconcileInCurrentTransactionAsync(
+                    new(seed.TenantId, seed.OrderId, AdmissionRevocationService.OrderCancellationReason, []), token);
+            await Assert.That(result.Outcome).IsEqualTo(AdmissionRevocationOutcome.Applied);
+            if (rollback)
+                throw new InvalidOperationException("Abort the caller-owned transition.");
+        });
+        if (rollback)
+            await Assert.ThrowsAsync<InvalidOperationException>(RevokeAsync);
+        else
+            await RevokeAsync();
+
+        await using ExploreDbContext verification = TenantContext(seed.TenantId);
+        RegistrationOrder order = await verification.RegistrationOrders.SingleAsync(value => value.Id == seed.OrderId);
+        AdmissionTicket ticket = await verification.AdmissionTickets.Include(value => value.Credentials)
+            .SingleAsync(value => value.RegistrationOrderId == seed.OrderId);
+        await Assert.That(order.RegistrationOrderStatusId).IsEqualTo((int)RegistrationOrderStatusEnum.Confirmed);
+        await Assert.That(ticket.AdmissionTicketStatusId).IsEqualTo(
+            (int)(rollback ? AdmissionTicketStatusEnum.Active : AdmissionTicketStatusEnum.Cancelled));
+        await Assert.That(ticket.Credentials.Single().RevokedAt.HasValue).IsEqualTo(!rollback);
+    }
+
+    [Test]
     public async Task ExactRefundAndCancellationFactsPersistCredentialRevocationWhilePartialFactsPreserve()
     {
         SeededAssignment refundSeed = await SeedAssignmentAsync("refund-revocation");
@@ -434,6 +781,12 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
 
         SeededAssignment cancellationSeed = await SeedAssignmentAsync("cancellation-revocation");
         await IssueSeedAsync(cancellationSeed);
+        await using (ExploreDbContext sourceContext = TenantContext(cancellationSeed.TenantId))
+        {
+            DomainEvent source = await sourceContext.Events.SingleAsync(value => value.Id == cancellationSeed.EventId);
+            source.Cancel(UtcNow.AddMinutes(1));
+            await sourceContext.SaveChangesAsync();
+        }
         await using (ExploreDbContext context = TenantContext(cancellationSeed.TenantId))
         {
             var repository = new AdmissionRevocationRepository(context);
@@ -444,6 +797,7 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
             var eventCancellation = new AdmissionEventCancellationService(
                 repository,
                 revocation,
+                new EfCoreUnitOfWork(context),
                 new FixedAdmissionTimeProvider(UtcNow.AddMinutes(2)));
             int cancelled = await eventCancellation.ReconcileAsync(
                 Guid.CreateVersion7(),
@@ -458,6 +812,9 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
             await Assert.That((AdmissionTicketStatusEnum)ticket.AdmissionTicketStatusId)
                 .IsEqualTo(AdmissionTicketStatusEnum.Cancelled);
             await Assert.That(ticket.Credentials.Single().RevokedAt).IsNotNull();
+            int replay = await eventCancellation.ReconcileAsync(
+                Guid.CreateVersion7(), cancellationSeed.TenantId, cancellationSeed.EventId, CancellationToken.None);
+            await Assert.That(replay).IsEqualTo(0);
         }
     }
 
@@ -667,6 +1024,7 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
         var eventCancellation = new AdmissionEventCancellationService(
             repository,
             revocation,
+            new EfCoreUnitOfWork(revocationContext),
             new FixedAdmissionTimeProvider(UtcNow.AddMinutes(3)));
         int reconciled = await eventCancellation.ReconcileAsync(
             Guid.CreateVersion7(),
@@ -1476,6 +1834,63 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
     private static string Digest(byte fill) =>
         Convert.ToBase64String(Enumerable.Repeat(fill, 32).ToArray());
 
+    private static AdmissionRevocationService CancellationRevocationService(ExploreDbContext context) =>
+        new(new AdmissionRevocationRepository(context), new EfCoreUnitOfWork(context),
+            new FixedAdmissionTimeProvider(UtcNow.AddMinutes(3)));
+
+    private async Task AssertActiveCredentialAsync(SeededAssignment seed)
+    {
+        await using ExploreDbContext verification = TenantContext(seed.TenantId);
+        AdmissionTicket ticket = await verification.AdmissionTickets.Include(value => value.Credentials)
+            .SingleAsync(value => value.RegistrationOrderId == seed.OrderId);
+        await Assert.That(ticket.AdmissionTicketStatusId).IsEqualTo((int)AdmissionTicketStatusEnum.Active);
+        await Assert.That(ticket.Credentials.Single().RevokedAt).IsNull();
+    }
+
+    private async Task<SeededAssignment> SeedCancelledAdmissionAsync(AdmissionCancellationSource source)
+    {
+        SeededAssignment seed = (await SeedAssignmentsAsync(
+            "committed-cancellation", assignmentCount: 1, anonymous: true)).Single();
+        TicketGraph graph = AdmissionPersistenceSurface.RequirePublicSurface().IssueTicketGraph(
+            seed, Guid.CreateVersion7(), Guid.CreateVersion7(), 1, 1, Digest(0x31));
+        await PersistTicketAsync(seed.TenantId, graph, CancellationToken.None);
+        await using ExploreDbContext context = TenantContext(seed.TenantId);
+        if (source == AdmissionCancellationSource.Order)
+        {
+            RegistrationOrder order = await context.RegistrationOrders.Include(value => value.Lines)
+                .SingleAsync(value => value.Id == seed.OrderId);
+            await Assert.That(order.TryCancelConfirmedAnonymous(
+                new AnonymousCancellationEvidence(false, false, false, false), UtcNow.AddMinutes(1))).IsTrue();
+        }
+        else
+        {
+            DomainEvent eventEntity = await context.Events.SingleAsync(value => value.Id == seed.EventId);
+            eventEntity.Cancel(UtcNow.AddMinutes(1));
+        }
+        await context.SaveChangesAsync();
+        return seed;
+    }
+
+    private sealed class CancellationCredentialSaveGate : SaveChangesInterceptor
+    {
+        private readonly TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal Task Entered => entered.Task;
+        internal void Release() => release.TrySetResult();
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context!.ChangeTracker.Entries<AdmissionTicket>()
+                .Any(entry => entry.State == EntityState.Modified))
+            {
+                entered.TrySetResult();
+                await release.Task.WaitAsync(cancellationToken);
+            }
+            return result;
+        }
+    }
+
     private async Task<(Guid TenantId, AdmissionRecoveryCapability State)>
         SeedRecoveryCapabilityAsync(string suffix)
     {
@@ -1589,7 +2004,8 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
     private async Task<SeededAssignment[]> SeedAssignmentsAsync(
         string suffix,
         int assignmentCount,
-        bool paid = false)
+        bool paid = false,
+        bool anonymous = false)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(assignmentCount);
 
@@ -1680,9 +2096,12 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
         }
         catalog.Publish();
         RegistrationOrder order = RegistrationOrder.Create(
-            tenant.Id, eventEntity.Id, user.Id, actor.Id, BookingPartyTypeEnum.Individual, catalog.Id,
-            RegistrationParticipationSnapshot.Create(Guid.CreateVersion7(), 1, 1, 1, null),
-            null, null, "EUR", UtcNow, null);
+            tenant.Id, eventEntity.Id, anonymous ? null : user.Id, anonymous ? null : actor.Id,
+            BookingPartyTypeEnum.Individual, catalog.Id,
+            RegistrationParticipationSnapshot.Create(Guid.CreateVersion7(),
+                anonymous ? (int)ParticipationHandlingModeEnum.PlatformManaged : 1,
+                anonymous ? (int)IdentityAccessModeEnum.GuestAllowed : 1, 1, null),
+            null, anonymous ? CapabilityTokenHash.Create(Digest(0x30)) : null, "EUR", UtcNow, null);
         RegistrationOrderLine line = RegistrationOrderLine.Create(
             catalog, ticketType, order.Id, assignmentCount, null, null);
         order.AddLine(line);

@@ -80,7 +80,14 @@ public sealed record PaymentProviderDescriptor(
     string ProfileCode,
     string ApiRevision,
     string Environment,
-    string CredentialOwner);
+    string CredentialOwner)
+{
+    /// <summary>
+    /// Provider guarantee for an unchanged checkout mutation key and scope.
+    /// Null means unknown mutations cannot be safely redriven.
+    /// </summary>
+    public TimeSpan? CheckoutMutationIdempotencyRetentionFloor { get; init; }
+}
 
 public sealed class HostedCheckoutCreateRequest
 {

@@ -79,12 +79,17 @@ public sealed class NativeInstanceOnboardingOperationTests
 
     private static readonly Type[] Requests =
     [
-        // Commands (30)
+        // Commands (35)
+        typeof(CleanupAuthenticationCredentialsCommand),
+        typeof(PrepareAuthenticationCredentialCutoverCommand),
+        typeof(ReportAuthenticationCredentialActivationCommand),
+        typeof(AttestAuthenticationCredentialFenceCommand),
         typeof(SaveInstanceOperatorIdentityCommand),
         typeof(ClaimConfiguredInstanceAdministratorCommand),
         typeof(CompleteInstanceOnboardingCommand),
         typeof(CompleteLocalInstanceOnboardingCommand),
         typeof(RecalculateInstanceStorageUsageCommand),
+        typeof(RecalculateInstanceStorageUsageDuringSetupCommand),
         typeof(SaveInstanceOnboardingProfileCommand),
         typeof(SyncAuthorizationPolicyPackageCommand),
         typeof(UpdateAnalyticsGovernanceSettingsCommand),
@@ -111,7 +116,10 @@ public sealed class NativeInstanceOnboardingOperationTests
         typeof(ReconcileKeycloakOperationCommand),
         typeof(CancelKeycloakOperationCommand),
 
-        // Queries (21)
+        // Queries (25)
+        typeof(InspectAuthenticationCredentialCleanupQuery),
+        typeof(GetCurrentAuthenticationCredentialCutoverQuery),
+        typeof(GetAuthenticationCredentialCutoverQuery),
         typeof(GetInstanceOnboardingJourneyQuery),
         typeof(GetInstanceOperatorIdentityQuery),
         typeof(DownloadAuthorizationPolicyPackageQuery),
@@ -129,6 +137,7 @@ public sealed class NativeInstanceOnboardingOperationTests
         typeof(GetSystemOnboardingStatusQuery),
         typeof(TestInstanceSmtpConnectionQuery),
         typeof(TestInstanceStorageProviderQuery),
+        typeof(TestInstanceStorageProviderDuringSetupQuery),
         typeof(GetOperatorIdentityFormOptionsQuery),
         typeof(GetKeycloakConnectionQuery),
         typeof(InspectKeycloakOperationQuery),
@@ -142,6 +151,11 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Arguments(typeof(CompleteInstanceOnboardingCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(CompleteLocalInstanceOnboardingCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(RecalculateInstanceStorageUsageCommand), typeof(ICommand<InstanceStorageUsageDto>))]
+    [Arguments(typeof(RecalculateInstanceStorageUsageDuringSetupCommand), typeof(ICommand<InstanceStorageUsageDto>))]
+    [Arguments(typeof(CleanupAuthenticationCredentialsCommand), typeof(ICommand<AuthenticationCredentialCutoverDto>))]
+    [Arguments(typeof(PrepareAuthenticationCredentialCutoverCommand), typeof(ICommand<AuthenticationCredentialCutoverDto>))]
+    [Arguments(typeof(ReportAuthenticationCredentialActivationCommand), typeof(ICommand<AuthenticationCredentialCutoverDto>))]
+    [Arguments(typeof(AttestAuthenticationCredentialFenceCommand), typeof(ICommand<AuthenticationCredentialCutoverDto>))]
     [Arguments(typeof(SaveInstanceOnboardingProfileCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(SyncAuthorizationPolicyPackageCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(UpdateAnalyticsGovernanceSettingsCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
@@ -183,6 +197,10 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Arguments(typeof(GetSystemOnboardingStatusQuery), typeof(IQuery<SystemOnboardingStatusDto>))]
     [Arguments(typeof(TestInstanceSmtpConnectionQuery), typeof(IQuery<EmailResult>))]
     [Arguments(typeof(TestInstanceStorageProviderQuery), typeof(IQuery<InstanceStorageProviderStatusDto>))]
+    [Arguments(typeof(TestInstanceStorageProviderDuringSetupQuery), typeof(IQuery<InstanceStorageProviderStatusDto>))]
+    [Arguments(typeof(InspectAuthenticationCredentialCleanupQuery), typeof(IQuery<AuthenticationCredentialCleanupInventoryDto>))]
+    [Arguments(typeof(GetCurrentAuthenticationCredentialCutoverQuery), typeof(IQuery<AuthenticationCredentialCutoverDto>))]
+    [Arguments(typeof(GetAuthenticationCredentialCutoverQuery), typeof(IQuery<AuthenticationCredentialCutoverDto>))]
     [Arguments(typeof(GetOperatorIdentityFormOptionsQuery), typeof(IQuery<OperatorIdentityFormOptionsDto>))]
     [Arguments(typeof(GetKeycloakConnectionQuery), typeof(IQuery<KeycloakConnectionDto>))]
     [Arguments(typeof(InspectKeycloakOperationQuery), typeof(IQuery<KeycloakInspectionDto>))]
@@ -207,7 +225,7 @@ public sealed class NativeInstanceOnboardingOperationTests
                      contract.GetGenericTypeDefinition() == typeof(IQuery<>))))
             .ToArray();
         await Assert.That(Requests).IsEquivalentTo(discovered);
-        await Assert.That(Requests.Length).IsEqualTo(51);
+        await Assert.That(Requests.Length).IsEqualTo(60);
 
         foreach (var request in Requests)
         {

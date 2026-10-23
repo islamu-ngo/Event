@@ -6,11 +6,8 @@ using System.Text;
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
-using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,9 +15,203 @@ using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
+[NotInParallel]
 public class CerbosPolicyPackageServiceTests : IDisposable
 {
+    private sealed class ManifestReplacementLogger(Action replace) : ILogger<CerbosPolicyPackageService>
+    {
+        public bool Replaced { get; private set; }
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (!Replaced && state is IEnumerable<KeyValuePair<string, object?>> properties
+                && properties.Any(property => property.Key == "ArtifactCount"))
+            {
+                replace();
+                Replaced = true;
+            }
+        }
+    }
+
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), $"cerbos-package-{Guid.NewGuid():N}");
+
+    [Test]
+    [Arguments("resourcePolicy: &policy\n  resource: islamuevent_event\ncopy: *policy\n")]
+    [Arguments("resourcePolicy: !!map\n  resource: islamuevent_event\n")]
+    [Arguments("resourcePolicy:\n  resource: islamuevent_event\n  resource: replaced\n")]
+    [Arguments("resourcePolicy:\n  <<: {resource: islamuevent_event}\n")]
+    [Arguments("resourcePolicy:\n  resource: islamuevent_event\n---\nresourcePolicy:\n  resource: replaced\n")]
+    public async Task BuildManifestRejectsYamlExpansionAndAmbiguousAuthority(string yaml)
+    {
+        var root = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(root, "islamuevent_event.yaml"), yaml);
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+        var service = CreateService(root);
+
+        await Assert.That(async () => await service.BuildManifestAsync()).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments(".json")]
+    [Arguments(".yaml")]
+    public async Task BuildManifestRejectsInvalidUtf8InsteadOfReplacingAuthorityText(string extension)
+    {
+        var root = CreatePackageRoot();
+        await File.WriteAllBytesAsync(Path.Combine(root, "islamuevent_event" + extension), [0xC3, 0x28]);
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+
+        await Assert.That(async () => await CreateService(root).BuildManifestAsync())
+            .Throws<DecoderFallbackException>();
+    }
+
+    [Test]
+    [Arguments("alias")]
+    [Arguments("tag")]
+    [Arguments("depth")]
+    [Arguments("scalar")]
+    [Arguments("events")]
+    [Arguments("syntax")]
+    public async Task PublishRejectsYamlExpansionBudgetsBeforeAdminHandoffWithBoundedDiagnostics(string invalidity)
+    {
+        string canary = Guid.NewGuid().ToString("N");
+        string yaml = invalidity switch
+        {
+            "alias" => $"resourcePolicy: &private_{canary}\n  rules: [*private_{canary}]\n",
+            "tag" => $"resourcePolicy: !!map\n  resource: {canary}\n",
+            "depth" => "resourcePolicy: " + new string('[', 33) + canary + new string(']', 33),
+            "scalar" => "resourcePolicy: " + canary + new string('a', 65_537),
+            "events" => "resourcePolicy:\n" + string.Concat(Enumerable.Repeat("  - 0\n", 65_537)) + $"private: {canary}\n",
+            "syntax" => $"resourcePolicy: [{{private: {canary}\n",
+            _ => throw new ArgumentOutOfRangeException(nameof(invalidity))
+        };
+        var root = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(root, "islamuevent_event.yaml"), yaml);
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+        var logger = new TestListLogger<CerbosPolicyPackageService>();
+        var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+
+        var result = await CreateService(root, handler: handler, logger: logger)
+            .PublishAsync(oneTimeCredentials: FreshCredentials());
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageUnavailable);
+        await Assert.That(handler.Requests).IsEmpty();
+        await Assert.That(logger.Entries.All(entry => entry.Exception is null)).IsTrue();
+        string exported = result.Message + string.Join(' ', result.Warnings) +
+            string.Join(' ', logger.Entries.Select(entry => entry.Message +
+                string.Join(' ', entry.State.Select(property => property.Value))));
+        await Assert.That(exported).DoesNotContain(canary);
+        await Assert.That(exported).DoesNotContain(root);
+    }
+
+    [Test]
+    [Arguments(HttpStatusCode.Unauthorized)]
+    [Arguments(HttpStatusCode.ServiceUnavailable)]
+    public async Task PublishFailureDiagnosticsRetainStatusWithoutCredentialsProviderBodyOrDeploymentIdentity(
+        HttpStatusCode statusCode)
+    {
+        var root = await CreatePopulatedPackageRootAsync();
+        var canary = Guid.NewGuid().ToString("N") + "\r\nprivate-provider-body";
+        var credentials = FreshCredentials();
+        var logger = new TestListLogger<CerbosPolicyPackageService>();
+        var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(statusCode)
+        {
+            Content = new StringContent(canary)
+        });
+        var service = CreateService(root, handler: handler, logger: logger);
+
+        var result = await service.PublishAsync(oneTimeCredentials: credentials);
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.IssueCode).IsEqualTo(statusCode == HttpStatusCode.Unauthorized
+            ? PolicyPackageIssueCode.AdminApiAuthenticationFailed
+            : PolicyPackageIssueCode.AdminApiUnavailable);
+        await Assert.That(logger.Entries.Any(entry => entry.State.Any(property =>
+            property.Key == "StatusCode" && Equals(property.Value, statusCode)))).IsTrue();
+        await Assert.That(logger.Entries.All(entry => entry.Exception is null)).IsTrue();
+        await Assert.That(logger.Entries.SelectMany(entry => entry.State).Any(property =>
+            property.Key is "Endpoint" or "PackageId" or "ContentHash")).IsFalse();
+        var exported = string.Join(' ', logger.Entries.Select(entry =>
+            entry.Message + " " + string.Join(' ', entry.State.Select(property => property.Value))))
+            + " " + string.Join(' ', result.Warnings);
+        await Assert.That(exported).DoesNotContain(canary);
+        await Assert.That(exported).DoesNotContain(root);
+        await Assert.That(exported).DoesNotContain("cerbos.example");
+        await Assert.That(exported).DoesNotContain(credentials.Username);
+        await Assert.That(exported).DoesNotContain(credentials.Password);
+    }
+
+    [Test]
+    public async Task UnavailablePackageDiagnosticsEmitNoExceptionOrPrivatePath()
+    {
+        var root = Path.Combine(_tempRoot, Guid.NewGuid().ToString("N"));
+        var logger = new TestListLogger<CerbosPolicyPackageService>();
+        var service = CreateService(root, logger: logger);
+
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
+
+        await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageUnavailable);
+        await Assert.That(logger.Entries.Any(entry => entry.Level == LogLevel.Warning)).IsTrue();
+        await Assert.That(logger.Entries.All(entry => entry.Exception is null)).IsTrue();
+        await Assert.That(string.Join(' ', logger.Entries.Select(entry => entry.Message)))
+            .DoesNotContain(root);
+    }
+
+    [Test]
+    public async Task BuildManifestRejectsExcessiveArtifactBeforeHashingOrPublication()
+    {
+        var root = CreatePackageRoot();
+        var path = Path.Combine(root, "islamuevent_event.yaml");
+        await using (var file = File.Create(path))
+            file.SetLength(2 * 1024 * 1024 + 1);
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+        using var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var service = CreateService(root, handler: handler);
+
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(handler.Requests).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PublishRejectsPackageCountOrAggregateBudgetBeforeSending(bool excessiveAggregateBytes)
+    {
+        var root = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(root, "islamuevent_event.yaml"),
+            CreatePolicyYaml("islamuevent_event"));
+        int count = excessiveAggregateBytes ? 9 : 256;
+        string schema = excessiveAggregateBytes
+            ? "{\"description\":\"" + new string('a', 1_900_000) + "\"}"
+            : "{\"type\":\"object\"}";
+        for (int index = 0; index < count; index++)
+            await File.WriteAllTextAsync(Path.Combine(root, "_schemas", $"islamuevent_{index}.json"), schema);
+        using var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+
+        var result = await CreateService(root, handler: handler)
+            .PublishAsync(oneTimeCredentials: FreshCredentials());
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageUnavailable);
+        await Assert.That(handler.Requests).IsEmpty();
+    }
+
+    [Test]
+    public async Task BuildManifestRejectsDeepJsonAndDuplicateMembers()
+    {
+        var root = CreatePackageRoot();
+        var path = Path.Combine(root, "islamuevent_event.json");
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+        var service = CreateService(root);
+        await File.WriteAllTextAsync(path, "{\"resourcePolicy\":{},\"resourcePolicy\":{}}");
+        await Assert.That(async () => await service.BuildManifestAsync()).Throws<InvalidOperationException>();
+        await File.WriteAllTextAsync(path, new string('[', 33) + "0" + new string(']', 33));
+        await Assert.That(async () => await service.BuildManifestAsync()).Throws<JsonException>();
+    }
 
     [Test]
     public async Task BuildManifestAsync_WithNamespacedArtifacts_ReturnsStableManifest()
@@ -117,10 +308,26 @@ public class CerbosPolicyPackageServiceTests : IDisposable
 
         var instructions = await ReadEntryAsync(zipArchive, "INSTRUCTIONS.md");
         await Assert.That(await ReadEntryAsync(zipArchive, "islamuevent_event.yaml")).IsEqualTo(policy);
-        await Assert.That(instructions).Contains("docker compose --profile authz run --rm cerbos-policy-sync");
-        await Assert.That(instructions).Contains("cerbosctl put policy --recursive .");
-        await Assert.That(instructions).Contains("cerbosctl put schema --recursive _schemas");
+        await Assert.That(string.IsNullOrWhiteSpace(instructions)).IsFalse();
         await Assert.That(await ReadEntryAsync(zipArchive, "manifest.json")).Contains("test-policy-package");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExportArchiveRejectsArtifactReplacementAfterManifest(bool sameLength)
+    {
+        var root = CreatePackageRoot();
+        var path = Path.Combine(root, "islamuevent_event.json");
+        const string original = "{\"resourcePolicy\":{\"resource\":\"islamuevent_event\",\"version\":\"1\"}}";
+        await File.WriteAllTextAsync(path, original);
+        await File.WriteAllTextAsync(Path.Combine(root, "_schemas", "islamuevent_event.json"), "{}");
+        var logger = new ManifestReplacementLogger(() =>
+            File.WriteAllText(path, original.Replace("\"1\"", sameLength ? "\"2\"" : "\"changed\"", StringComparison.Ordinal)));
+        var service = CreateService(root, logger: logger);
+
+        await Assert.ThrowsAsync<PolicyPackageUnavailableException>(() => service.ExportArchiveAsync());
+        await Assert.That(logger.Replaced).IsTrue();
     }
 
     [Test]
@@ -168,7 +375,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         });
         var service = CreateService(policiesRoot, handler: handler);
 
-        var result = await service.PublishAsync();
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.Requests.Count).IsEqualTo(3);
@@ -190,7 +397,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
     }
 
     [Test]
-    public async Task PublishAsync_WithByoAdminConfiguration_UsesResolvedEndpointAndCredentialsOnly()
+    public async Task PublishAsync_WithByoAdminConfiguration_UsesResolvedEndpointAndFreshCredentials()
     {
         var policiesRoot = CreatePackageRoot();
         await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
@@ -204,22 +411,21 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             {
                 Endpoint = "tenant-grpc.example:3593",
                 Mode = CerbosMode.CustomEndpoint,
-                AdminEndpoint = "https://tenant-cerbos.example/base",
-                AdminUsername = "tenant-user",
-                AdminPassword = "tenant-secret",
+                AdminEndpoint = "https://tenant-cerbos.example",
                 IsInstanceDefault = false
             });
 
-        var result = await service.PublishAsync();
+        var supplied = FreshCredentials();
+        var result = await service.PublishAsync(oneTimeCredentials: supplied);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.Requests.All(r => r.RequestUri?.Host == "tenant-cerbos.example")).IsTrue();
-        await Assert.That(handler.Requests.All(r => r.RequestUri?.AbsolutePath.StartsWith("/base/admin", StringComparison.Ordinal) == true)).IsTrue();
+        await Assert.That(handler.Requests.All(r => r.RequestUri?.AbsolutePath.StartsWith("/admin", StringComparison.Ordinal) == true)).IsTrue();
 
         var authorization = handler.Requests[0].Authorization;
         await Assert.That(authorization?.Scheme).IsEqualTo("Basic");
         var decodedCredentials = Encoding.UTF8.GetString(Convert.FromBase64String(authorization?.Parameter ?? string.Empty));
-        await Assert.That(decodedCredentials).IsEqualTo("tenant-user:tenant-secret");
+        await Assert.That(decodedCredentials).IsEqualTo($"{supplied.Username}:{supplied.Password}");
     }
 
     [Test]
@@ -235,90 +441,75 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         {
             Endpoint = "tenant-grpc.example:3593",
             Mode = CerbosMode.CustomEndpoint,
-            AdminEndpoint = "https://tenant-cerbos.example/base",
-            AdminUsername = "tenant-user",
-            AdminPassword = "tenant-secret",
+            AdminEndpoint = "https://tenant-cerbos.example",
             IsInstanceDefault = false
         });
         var service = CreateService(policiesRoot, handler: handler, configResolver: configResolver);
 
-        var result = await service.PublishInstanceAsync();
+        var supplied = FreshCredentials();
+        var result = await service.PublishInstanceAsync(oneTimeCredentials: supplied);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.Requests.All(request => request.RequestUri?.Host == "cerbos.example")).IsTrue();
         var credentials = Encoding.UTF8.GetString(
             Convert.FromBase64String(handler.Requests[0].Authorization?.Parameter ?? string.Empty));
-        await Assert.That(credentials).IsEqualTo("admin:secret");
+        await Assert.That(credentials).IsEqualTo($"{supplied.Username}:{supplied.Password}");
         await configResolver.DidNotReceive().ResolveAsync(Arg.Any<CancellationToken>());
     }
 
     [Test]
-    public async Task PublishInstanceAsync_WithOneTimeCredentials_OverridesMissingDeploymentCredentialsForOneRequest()
+    public async Task PublishInstanceAsync_WithFreshCredentials_UsesOnlyTheSubmittedPair()
     {
         var policiesRoot = CreatePackageRoot();
         await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
         await File.WriteAllTextAsync(Path.Combine(policiesRoot, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
 
         var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
-        var service = CreateService(
-            policiesRoot,
-            handler: handler,
-            adminUsername: string.Empty,
-            adminPassword: string.Empty);
+        var service = CreateService(policiesRoot, handler: handler);
+        var supplied = FreshCredentials();
 
         var result = await service.PublishInstanceAsync(
             CancellationToken.None,
-            new PolicyPackageAdminCredentials("one-time-admin", "one-time-password"));
+            supplied);
 
         await Assert.That(result.Succeeded).IsTrue();
         var credentials = Encoding.UTF8.GetString(
             Convert.FromBase64String(handler.Requests[0].Authorization?.Parameter ?? string.Empty));
-        await Assert.That(credentials).IsEqualTo("one-time-admin:one-time-password");
+        await Assert.That(credentials).IsEqualTo($"{supplied.Username}:{supplied.Password}");
     }
 
     [Test]
-    public async Task PublishInstanceAsync_WithDeploymentSecretBindings_UsesResolvedCredentials()
+    public async Task PublishInstanceAsync_WithoutFreshCredentials_DoesNotContactProvider()
     {
         var policiesRoot = CreatePackageRoot();
         await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
         await File.WriteAllTextAsync(Path.Combine(policiesRoot, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
 
-        var secretResolver = Substitute.For<ISecretResolver>();
-        ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername, "bound-admin");
-        ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword, "bound-password");
         var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
-        var service = CreateService(
-            policiesRoot,
-            handler: handler,
-            secretResolver: secretResolver,
-            adminUsername: string.Empty,
-            adminPassword: string.Empty);
-
-        var result = await service.PublishInstanceAsync();
-
-        await Assert.That(result.Succeeded).IsTrue();
-        var credentials = Encoding.UTF8.GetString(
-            Convert.FromBase64String(handler.Requests[0].Authorization?.Parameter ?? string.Empty));
-        await Assert.That(credentials).IsEqualTo("bound-admin:bound-password");
-    }
-
-    [Test]
-    public async Task PublishInstanceAsync_WhenDeploymentSecretAuthorityIsUnavailable_FailsClosed()
-    {
-        var policiesRoot = CreatePackageRoot();
-        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
-        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
-
-        var secretResolver = Substitute.For<ISecretResolver>();
-        secretResolver.ResolveAsync(Arg.Any<string>(), null, Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Unavailable);
-        var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
-        var service = CreateService(policiesRoot, handler: handler, secretResolver: secretResolver);
+        var service = CreateService(policiesRoot, handler: handler);
 
         var result = await service.PublishInstanceAsync();
 
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiUnavailable);
+        await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiNotConfigured);
+        await Assert.That(handler.Requests).IsEmpty();
+    }
+
+    [Test]
+    public async Task PublishInstanceAsync_WithPartialCredentials_FailsClosed()
+    {
+        var policiesRoot = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+
+        var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var service = CreateService(policiesRoot, handler: handler);
+
+        var result = await service.PublishInstanceAsync(
+            oneTimeCredentials: new PolicyPackageAdminCredentials(Guid.NewGuid().ToString("N"), string.Empty));
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiNotConfigured);
         await Assert.That(handler.Requests).IsEmpty();
     }
 
@@ -333,30 +524,25 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         var service = CreateService(
             policiesRoot,
             handler: handler,
-            adminUsername: Guid.NewGuid().ToString("N"),
-            adminPassword: Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
             logger: logger);
 
-        var result = await service.GetStatusAsync();
+        var result = await service.GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageStatusUnknown);
         object? failureType = logger.Entries.SelectMany(entry => entry.State)
             .Single(property => property.Key == "FailureType").Value;
-        await Assert.That(failureType).IsEqualTo("CerbosAdminApiException");
+        await Assert.That(failureType).IsEqualTo("unavailable");
     }
 
     [Test]
-    public async Task GetStatusAsync_WhenDeploymentSecretAuthorityRecovers_RetriesWithoutReconfiguration()
+    public async Task GetStatusAsync_AfterMissingCredentials_OnlyFreshInputEnablesLiveInspection()
     {
         var policiesRoot = CreatePackageRoot();
         await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
         await File.WriteAllTextAsync(Path.Combine(policiesRoot, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
 
-        var secretResolver = Substitute.For<ISecretResolver>();
-        secretResolver.ResolveAsync(Arg.Any<string>(), null, Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Unavailable);
         var handler = StoreHandler("{\"policyIds\":[\"resource.islamuevent_event.vdefault\"]}");
-        var service = CreateService(policiesRoot, handler: handler, secretResolver: secretResolver);
+        var service = CreateService(policiesRoot, handler: handler);
 
         var unavailable = await service.GetStatusAsync();
 
@@ -364,10 +550,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         await Assert.That(string.Join(' ', unavailable.Warnings)).DoesNotContain("Configure Cerbos Admin API credentials");
         await Assert.That(handler.Requests).IsEmpty();
 
-        ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername, "bound-admin");
-        ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword, "bound-password");
-
-        _ = await service.GetStatusAsync();
+        _ = await service.GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(handler.Requests).IsNotEmpty();
     }
@@ -388,8 +571,6 @@ public class CerbosPolicyPackageServiceTests : IDisposable
                 Endpoint = "tenant-grpc.example:3593",
                 Mode = CerbosMode.CustomEndpoint,
                 AdminEndpoint = "https://tenant-cerbos.example",
-                AdminUsername = "tenant-user",
-                AdminPassword = null,
                 IsInstanceDefault = false
             });
 
@@ -398,7 +579,6 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiNotConfigured);
         await Assert.That(handler.Requests).IsEmpty();
-        await Assert.That(string.Join(' ', result.Warnings)).Contains("requires both admin username and admin password");
         await Assert.That(string.Join(' ', result.Warnings)).DoesNotContain("tenant-user");
     }
 
@@ -422,12 +602,10 @@ public class CerbosPolicyPackageServiceTests : IDisposable
                 Endpoint = "tenant-grpc.example:3593",
                 Mode = CerbosMode.CustomEndpoint,
                 AdminEndpoint = adminEndpoint,
-                AdminUsername = "tenant-user",
-                AdminPassword = "tenant-secret",
                 IsInstanceDefault = false
             });
 
-        var result = await service.PublishAsync();
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(handler.Requests).IsEmpty();
@@ -447,7 +625,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
         var service = CreateService(policiesRoot, maxPoliciesPerRequest: 2, handler: handler);
 
-        var result = await service.PublishAsync();
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.Succeeded).IsTrue();
         var policyRequests = handler.Requests.Where(r => r.RequestUri?.AbsolutePath == "/admin/policy").ToArray();
@@ -470,7 +648,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             : new HttpResponseMessage(HttpStatusCode.OK));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var result = await service.PublishAsync();
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiAuthenticationFailed);
@@ -493,7 +671,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             : new HttpResponseMessage(HttpStatusCode.OK));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var result = await service.PublishAsync();
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiUnavailable);
@@ -515,7 +693,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             : new HttpResponseMessage(HttpStatusCode.OK));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var result = await service.PublishAsync();
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiUnavailable);
@@ -537,7 +715,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             : new HttpResponseMessage(HttpStatusCode.OK));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var result = await service.PublishAsync();
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.ReloadFailed);
@@ -561,7 +739,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             : new HttpResponseMessage(HttpStatusCode.OK));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var result = await service.PublishAsync();
+        var result = await service.PublishAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.ReloadFailed);
@@ -590,7 +768,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             StoredPolicies(("resource.islamuevent_event.vdefault", "13466950985171780168")));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var result = await service.GetStatusAsync();
+        var result = await service.GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.None);
         await Assert.That(result.IsHealthy).IsTrue();
@@ -619,12 +797,10 @@ public class CerbosPolicyPackageServiceTests : IDisposable
                 Endpoint = "tenant-grpc.example:3593",
                 Mode = CerbosMode.CustomEndpoint,
                 AdminEndpoint = "https://tenant-cerbos.example",
-                AdminUsername = "tenant-user",
-                AdminPassword = null,
                 IsInstanceDefault = false
             });
 
-        var result = await service.GetStatusAsync();
+        var result = await service.GetStatusAsync(oneTimeCredentials: new PolicyPackageAdminCredentials(Guid.NewGuid().ToString("N"), string.Empty));
 
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiNotConfigured);
         await Assert.That(result.IsHealthy).IsFalse();
@@ -660,7 +836,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         var handler = new RecordingMessageHandler(_ => JsonResponse("{\"policyIds\":[]}"));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var status = await service.GetStatusAsync();
+        var status = await service.GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(status.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageMismatch);
         await Assert.That(status.IsHealthy).IsFalse();
@@ -675,7 +851,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             JsonResponse("{\"policyIds\":[\"resource.islamuevent_event.vdefault\"]}"));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var status = await service.GetStatusAsync();
+        var status = await service.GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(status.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageMismatch);
         await Assert.That(status.Message).Contains("partial").Or.Contains("but this package declares");
@@ -692,7 +868,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
                 ("resource.islamuevent_event.vdefault", "13466950985171780168")));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var status = await service.GetStatusAsync();
+        var status = await service.GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(status.IssueCode).IsEqualTo(PolicyPackageIssueCode.None);
         await Assert.That(status.IsHealthy).IsTrue();
@@ -720,7 +896,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
                 ListJson,
                 StoredPolicies(
                     ("derived_roles.islamuevent_explore_admin_roles", "17613918467673392044"),
-                    ("resource.islamuevent_event.vdefault", "13466950985171780168")))).GetStatusAsync();
+                    ("resource.islamuevent_event.vdefault", "13466950985171780168")))).GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         var after = await CreateService(
             policiesRoot,
@@ -728,7 +904,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
                 ListJson,
                 StoredPolicies(
                     ("derived_roles.islamuevent_explore_admin_roles", "17613918467673392044"),
-                    ("resource.islamuevent_event.vdefault", "6065751633899809269")))).GetStatusAsync();
+                    ("resource.islamuevent_event.vdefault", "6065751633899809269")))).GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(before.IssueCode).IsEqualTo(PolicyPackageIssueCode.None);
         await Assert.That(after.IssueCode).IsEqualTo(PolicyPackageIssueCode.None);
@@ -748,7 +924,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             "{\"policyIds\":[\"derived_roles.islamuevent_explore_admin_roles\",\"resource.islamuevent_event.vdefault\"]}");
         var service = CreateService(policiesRoot, handler: handler);
 
-        var status = await service.GetStatusAsync();
+        var status = await service.GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(status.IssueCode).IsEqualTo(PolicyPackageIssueCode.None);
         await Assert.That(status.ObservedRevision).IsNull();
@@ -766,7 +942,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
         var service = CreateService(policiesRoot, handler: handler);
 
-        var status = await service.GetStatusAsync();
+        var status = await service.GetStatusAsync(oneTimeCredentials: FreshCredentials());
 
         await Assert.That(status.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageStatusUnknown);
         await Assert.That(string.Join(" ", status.Warnings)).Contains("explicit status operation");
@@ -786,6 +962,9 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             "{\"type\":\"object\"}");
         return policiesRoot;
     }
+
+    private static PolicyPackageAdminCredentials FreshCredentials() =>
+        new(Guid.NewGuid().ToString("N"), Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
 
     private static HttpResponseMessage JsonResponse(string json) =>
         new(HttpStatusCode.OK)
@@ -815,15 +994,12 @@ public class CerbosPolicyPackageServiceTests : IDisposable
                 $"{{\"metadata\":{{\"hash\":\"{policy.Hash}\",\"storeIdentifier\":\"{policy.Id}\"}}}}"))
         + "]}";
 
-    private static CerbosPolicyPackageService CreateService(
+    private static AuthenticatedPolicyPackageTestService CreateService(
         string policiesRoot,
         int maxPoliciesPerRequest = 100,
         RecordingMessageHandler? handler = null,
         CerbosConfiguration? resolvedConfiguration = null,
         ICerbosConfigResolver? configResolver = null,
-        ISecretResolver? secretResolver = null,
-        string adminUsername = "admin",
-        string adminPassword = "secret",
         ILogger<CerbosPolicyPackageService>? logger = null)
     {
         var options = Options.Create(new CerbosPolicyPackageOptions
@@ -846,36 +1022,15 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             Mode = CerbosMode.Instance,
             IsInstanceDefault = true
         });
-        if (secretResolver is null)
-        {
-            secretResolver = Substitute.For<ISecretResolver>();
-            if (!string.IsNullOrEmpty(adminUsername))
-                ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername, adminUsername);
-            if (!string.IsNullOrEmpty(adminPassword))
-                ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword, adminPassword);
-        }
-
-        return new CerbosPolicyPackageService(
+        return new AuthenticatedPolicyPackageTestService(
             options,
             adminOptions,
             configResolver,
-            secretResolver,
-            new CerbosAdminEndpointValidator(options),
+            new CerbosAdminEndpointValidator(),
             new StaticHttpClientFactory(new HttpClient(handler)),
             logger ?? Substitute.For<ILogger<CerbosPolicyPackageService>>(),
-            Substitute.For<IEventResourcePolicyPublicationFence>(),
             Options.Create(new CerbosSettings { GrpcEndpoint = "https://instance-cerbos.example:3593" }));
     }
-
-    private static void ConfigureResolvedSecret(ISecretResolver resolver, string key, string value) =>
-        resolver.ResolveAsync(key, null, Arg.Any<CancellationToken>()).Returns(
-            SecretResolutionResult.Resolved(new ResolvedSecret(
-                key,
-                value,
-                SecretSourceType.Infisical,
-                SecretScope.Instance,
-                null,
-                DateTimeOffset.UtcNow)));
 
     private static string CreatePolicyYaml(string resourceKind)
     {

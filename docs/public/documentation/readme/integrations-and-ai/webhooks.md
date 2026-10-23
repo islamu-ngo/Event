@@ -47,6 +47,18 @@ Every incoming callback verifies HMAC signatures, evaluates idempotency keys, an
 
 ## Related Guides & Next Steps
 
+Svix readiness exposes whether environment and version coordinates are configured,
+not their raw values. Health consumers must use `environmentConfigured`,
+`providerVersionConfigured`, and `capabilityPolicyVersionConfigured`; the former
+`environment`, `providerVersion`, and `capabilityPolicyVersion` fields are removed.
+Provider selection is normalized to a supported mode or `unknown`. Readiness still
+validates the exact configured conformance profile before admitting the provider.
+
+Publication-worker diagnostics identify dispatch and reconciliation failures by
+fixed categories rather than provider exception types or details. Inspect governed
+publication state for recovery decisions; raw provider failures are not exported
+through technical logs. Canceling a worker operation does not emit a failure log.
+
 * **[Docker Compose Runbook](../self-hosting/docker-compose.md#optional-service-profiles)** — Launch the Svix webhook container profile.
 * **[Paid Events & Payouts](../events-and-ticketing/paid-events-and-payouts.md)** — Learn how Stripe webhooks settle ticket sales.
 * **[Environment Variables Reference](../configuration-and-operations/environment-variables.md#11-advanced-outgoing-webhooks-svix-infrastructure)** — Configure Svix Redis, DSN, and JWT signing keys.

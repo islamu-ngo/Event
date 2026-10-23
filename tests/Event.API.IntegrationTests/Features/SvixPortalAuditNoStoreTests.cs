@@ -1,17 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;
+using Event.Api.IntegrationTests.Authentication;
 using Explore.API.Controllers;
-using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Webhooks;
-using Explore.Application.Features.Webhooks.Handlers.Commands;
-using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Domain;
 using Microsoft.AspNetCore.Mvc;
-using NSubstitute;
+using Svix;
 
 namespace Event.API.IntegrationTests.Features;
 
+[NotInParallel]
 public sealed class SvixPortalAuditNoStoreTests
 {
     [Test]
@@ -44,116 +42,43 @@ public sealed class SvixPortalAuditNoStoreTests
     [Test]
     public async Task AuditFailure_ProducesNoPortalResponse()
     {
-        var portalService = Substitute.For<IWebhookProviderPortalService>();
-        var auditWriter = Substitute.For<IWebhookAuditEventWriter>();
-        portalService.CreateAccessAsync(Arg.Any<WebhookProviderPortalAccessInput>(), Arg.Any<CancellationToken>())
-            .Returns(WebhookProviderPortalAccessResult.Success(
-                "https://svix.example/sensitive-portal",
-                "sensitive-token",
-                DateTimeOffset.UtcNow.AddMinutes(15),
-                Guid.CreateVersion7(),
-                "policy-v1"));
-        auditWriter.AppendAsync(
-                Arg.Any<WebhookAuditWriteRequest>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<WebhookAuditEvent>(new InvalidOperationException("audit unavailable")));
-        var command = CreateCommand();
-        var handler = CreateHandler(portalService, auditWriter, command.ConsumerId);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ExecuteAsync(
-            command,
-            CancellationToken.None));
+        await using var portal = await HumanWebhookPreparationTests.PortalFixture.CreateAsync();
+        portal.Boundaries.FailAudit = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => portal.ExecuteAsync());
+        await Assert.That(portal.CreateCalls).IsEqualTo(1);
+        await Assert.That(await portal.ReadAuditsAsync()).IsEmpty();
     }
 
     [Test]
     public async Task SuccessfulAudit_ContainsSafeMetadataOnly()
     {
-        const string portalUrl = "https://svix.example/sensitive-portal";
-        const string portalToken = "sensitive-token";
-        var bindingId = Guid.CreateVersion7();
-        var portalService = Substitute.For<IWebhookProviderPortalService>();
-        var auditWriter = Substitute.For<IWebhookAuditEventWriter>();
-        portalService.CreateAccessAsync(Arg.Any<WebhookProviderPortalAccessInput>(), Arg.Any<CancellationToken>())
-            .Returns(WebhookProviderPortalAccessResult.Success(
-                portalUrl,
-                portalToken,
-                DateTimeOffset.UtcNow.AddMinutes(15),
-                bindingId,
-                "policy-v1"));
-        WebhookAuditWriteRequest? auditRequest = null;
-        auditWriter.AppendAsync(
-                Arg.Do<WebhookAuditWriteRequest>(request => auditRequest = request),
-                Arg.Any<CancellationToken>())
-            .Returns((WebhookAuditEvent)null!);
-        var command = CreateCommand();
-        var handler = CreateHandler(portalService, auditWriter, command.ConsumerId);
-
-        var result = await handler.ExecuteAsync(command, CancellationToken.None);
+        await using var portal = await HumanWebhookPreparationTests.PortalFixture.CreateAsync();
+        var result = await portal.ExecuteAsync();
+        var audit = (await portal.ReadAuditsAsync()).Single();
 
         await Assert.That(result.IsSuccess).IsTrue();
-        await Assert.That(auditRequest).IsNotNull();
-        await Assert.That(auditRequest!.Action).IsEqualTo(WebhookAuditAction.PortalAccessIssued);
-        await Assert.That(auditRequest.SafeAfterJson).Contains(bindingId.ToString("D"), StringComparison.OrdinalIgnoreCase);
-        await Assert.That(auditRequest.ConfigurationVersion).IsEqualTo("policy-v1");
-        await Assert.That(auditRequest.SafeAfterJson).DoesNotContain(portalUrl, StringComparison.Ordinal);
-        await Assert.That(auditRequest.SafeAfterJson).DoesNotContain(portalToken, StringComparison.Ordinal);
+        await Assert.That(result.Id!.Token).IsEqualTo(portal.Token);
+        await Assert.That(audit.Action).IsEqualTo(WebhookAuditAction.PortalAccessIssued);
+        await Assert.That(audit.SafeAfterJson).Contains(portal.Binding.Id.ToString("D"), StringComparison.OrdinalIgnoreCase);
+        await Assert.That(audit.ConfigurationVersion).IsEqualTo("svix-1.96.1-v1");
+        await Assert.That(audit.SafeAfterJson).DoesNotContain(portal.Url, StringComparison.Ordinal);
+        await Assert.That(audit.SafeAfterJson).DoesNotContain(portal.Token, StringComparison.Ordinal);
     }
 
     [Test]
     public async Task ProviderFailure_IsAuditedWithSafeCategoryBeforeResponse()
     {
-        var portalService = Substitute.For<IWebhookProviderPortalService>();
-        var auditWriter = Substitute.For<IWebhookAuditEventWriter>();
-        portalService.CreateAccessAsync(Arg.Any<WebhookProviderPortalAccessInput>(), Arg.Any<CancellationToken>())
-            .Returns(WebhookProviderPortalAccessResult.Failure(
-                "svix_provider_unavailable",
-                isRetryable: true,
-                "SvixApi:503"));
-        WebhookAuditWriteRequest? auditRequest = null;
-        auditWriter.AppendAsync(
-                Arg.Do<WebhookAuditWriteRequest>(request => auditRequest = request),
-                Arg.Any<CancellationToken>())
-            .Returns((WebhookAuditEvent)null!);
-        var command = CreateCommand();
-        var handler = CreateHandler(portalService, auditWriter, command.ConsumerId);
-
-        var result = await handler.ExecuteAsync(command, CancellationToken.None);
+        await using var portal = await HumanWebhookPreparationTests.PortalFixture.CreateAsync();
+        portal.ProviderFailure = new ApiException(503, portal.Token);
+        var result = await portal.ExecuteAsync();
+        var audit = (await portal.ReadAuditsAsync()).Single();
 
         await Assert.That(result.IsSuccess).IsFalse();
-        await Assert.That(auditRequest).IsNotNull();
-        await Assert.That(auditRequest!.SafeAfterJson).Contains("provider_failure", StringComparison.Ordinal);
-        await Assert.That(auditRequest.SafeAfterJson).Contains("svix_provider_unavailable", StringComparison.Ordinal);
-        await Assert.That(auditRequest.SafeAfterJson).DoesNotContain("SvixApi:503", StringComparison.Ordinal);
-    }
-
-    private static OpenSvixAppPortalCommand CreateCommand() => new()
-    {
-        ConsumerId = Guid.CreateVersion7(),
-        SessionId = "session-1"
-    };
-
-    private static OpenSvixAppPortalCommandHandler CreateHandler(
-        IWebhookProviderPortalService portalService,
-        IWebhookAuditEventWriter auditWriter,
-        Guid consumerId)
-    {
-        var tenantId = Guid.CreateVersion7();
-        var consumerRepository = Substitute.For<IWebhookConsumerRepository>();
-        consumerRepository.GetByIdForOwnerOperationAsync(
-                consumerId,
-                false,
-                Arg.Any<CancellationToken>())
-            .Returns(new WebhookConsumer
-            {
-                Id = consumerId,
-                TenantId = tenantId,
-                ConsumerKind = WebhookConsumerKind.Tenant,
-                Name = "Portal audit consumer",
-                Status = WebhookConsumerStatus.Active,
-                ProviderMode = WebhookProviderMode.Svix,
-                CreatedAt = DateTime.UtcNow
-            });
-
-        return new OpenSvixAppPortalCommandHandler(portalService, auditWriter, consumerRepository);
+        await Assert.That(result.IsRetryable).IsTrue();
+        await Assert.That(result.Id).IsNull();
+        await Assert.That(audit.SafeAfterJson).Contains("provider_failure", StringComparison.Ordinal);
+        await Assert.That(audit.SafeAfterJson).Contains("svix_provider_unavailable", StringComparison.Ordinal);
+        await Assert.That(audit.SafeAfterJson).DoesNotContain("SvixApi:503", StringComparison.Ordinal);
+        await Assert.That(audit.SafeAfterJson).DoesNotContain(portal.Token, StringComparison.Ordinal);
     }
 }

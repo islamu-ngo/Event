@@ -103,6 +103,8 @@ public sealed class GetRegistrationProviderQueueQueryHandler(IRegistrationProvid
 public sealed class PollRegistrationProviderReconciliationCommandHandler(
     IRegistrationProviderRepository providerRepository,
     IRegistrationProviderRegistry providerRegistry,
+    IHumanEventProviderMutationPreparation preparation,
+    IRegistrationProviderDeferredCheckpointJournal checkpoints,
     BusinessMetrics? metrics = null)
     : ICommandHandler<PollRegistrationProviderReconciliationCommand, BaseCommandResponse<Guid>>
 {
@@ -115,7 +117,8 @@ public sealed class PollRegistrationProviderReconciliationCommandHandler(
             return Failure(request.BindingId, "registration_provider_reconciliation_validation_failed", "Reconciliation checkpoint is invalid.");
         }
 
-        RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        RegistrationProviderBinding? binding = await providerRepository.GetBindingObservationAsync(request.TenantId, request.BindingId, cancellationToken);
         if (binding is null || !await BindingBelongsToEventAsync(providerRepository, request, cancellationToken))
         {
             metrics?.RecordRegistrationProviderManagementAction("poll_reconciliation", "not_found");
@@ -137,7 +140,13 @@ public sealed class PollRegistrationProviderReconciliationCommandHandler(
             return Failure(request.BindingId, "registration_provider_reconciliation_unknown", "Registration provider reconciliation capability is not available.");
         }
 
-        RegistrationProviderReconciliationResult result = await reconciler.ReconcileAsync(new RegistrationProviderReconciliationRequest(request.TenantId, binding, binding.Connection!, tuple, request.SinceUtc), cancellationToken);
+        var observation = await checkpoints.ObserveAsync(
+            HumanEventProviderSourceTarget.From(request, request.EventId), prepared,
+            token => reconciler.ReconcileAsync(new RegistrationProviderReconciliationRequest(
+                request.TenantId, binding, binding.Connection!, tuple, request.SinceUtc), token),
+            cancellationToken);
+        RegistrationProviderReconciliationResult result = await checkpoints.ExecuteAsync(
+            request, prepared, observation, (observed, _) => Task.FromResult(observed), cancellationToken);
         metrics?.RecordRegistrationProviderManagementAction("poll_reconciliation", "accepted");
         return Success(request.BindingId, $"Reconciliation observed {result.ObservedSubmissionCount} bounded provider submissions.");
     }
@@ -149,7 +158,7 @@ public sealed class QueueManualRegistrationProviderImportCommandHandler(
     IIncomingWebhookEffectOutboxRepository effectRepository,
     IRegistrationProviderCallbackReceiptProtector receiptProtector,
     IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?> storageContent,
-    IUnitOfWork unitOfWork,
+    IHumanEventProviderMutationPreparation preparation,
     TimeProvider timeProvider,
     BusinessMetrics? metrics = null)
     : ICommandHandler<QueueManualRegistrationProviderImportCommand, BaseCommandResponse<Guid>>
@@ -166,6 +175,7 @@ public sealed class QueueManualRegistrationProviderImportCommandHandler(
             return Failure(request.BindingId, "registration_provider_manual_import_validation_failed", "Manual import requires bounded storage/reference metadata.");
         }
 
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
         RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
         if (binding is null || !await BindingBelongsToEventAsync(providerRepository, request.TenantId, request.EventId, request.BindingId, cancellationToken))
         {
@@ -181,6 +191,7 @@ public sealed class QueueManualRegistrationProviderImportCommandHandler(
             return Failure(request.BindingId, "registration_provider_manual_import_unsupported", "Manual import is not supported by this provider binding.");
         }
 
+        await prepared.ValidateAsync(request, cancellationToken);
         StorageObjectContentResult? content = await storageContent.QueryAsync(new GetStorageObjectContentRequest
         {
             StorageObjectId = storageObjectId,
@@ -197,6 +208,7 @@ public sealed class QueueManualRegistrationProviderImportCommandHandler(
         {
             csv = await reader.ReadToEndAsync(cancellationToken);
         }
+        await prepared.ValidateAsync(request, cancellationToken);
 
         IReadOnlyList<IReadOnlyList<string>> rows;
         try
@@ -280,7 +292,7 @@ public sealed class QueueManualRegistrationProviderImportCommandHandler(
             imports.Add((message, providerDecisionId, hash));
         }
 
-        (int accepted, int skipped) = await unitOfWork.ExecuteInTransactionAsync(async transactionToken =>
+        (int accepted, int skipped) = await preparation.ExecutePreparedAsync(request, prepared, async transactionToken =>
         {
             int acceptedRows = 0;
             int skippedRows = 0;
@@ -359,41 +371,45 @@ public sealed class RetryRegistrationProviderParkedItemCommandHandler(
     IIncomingWebhookEffectOutboxRepository effectRepository,
     IIncomingWebhookEffectReceiptRepository receiptRepository,
     TimeProvider timeProvider,
+    IHumanEventProviderMutationPreparation preparation,
     BusinessMetrics? metrics = null)
     : ICommandHandler<RetryRegistrationProviderParkedItemCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RetryRegistrationProviderParkedItemCommand request, CancellationToken cancellationToken = default)
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(RetryRegistrationProviderParkedItemCommand request, CancellationToken token = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        if (request.EffectOutboxId is not { } effectId || request.ExpectedProcessingGeneration is not { } generation)
+        return preparation.ExecuteAsync(request, async cancellationToken =>
         {
-            metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "no_effect");
-            return Failure(request.SubmissionId ?? Guid.Empty, "registration_provider_retry_no_effect", "Only retained effect retries are currently replayable.");
-        }
+            if (request.EffectOutboxId is not { } effectId || request.ExpectedProcessingGeneration is not { } generation)
+            {
+                metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "no_effect");
+                return Failure(request.SubmissionId ?? Guid.Empty, "registration_provider_retry_no_effect", "Only retained effect retries are currently replayable.");
+            }
 
-        IncomingWebhookEffectOutbox? pointer = await effectRepository.GetByTenantAndIdForUpdateAsync(request.TenantId, effectId, cancellationToken);
-        if (pointer is null || !await ValidateRetainedEffectAsync(providerRepository, receiptRepository, pointer, request.TenantId, request.EventId, cancellationToken))
-        {
-            metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "not_found");
-            return Failure(effectId, "registration_provider_effect_not_found", "Registration provider effect was not found.");
-        }
+            IncomingWebhookEffectOutbox? pointer = await effectRepository.GetByTenantAndIdForUpdateAsync(request.TenantId, effectId, cancellationToken);
+            if (pointer is null || !await ValidateRetainedEffectAsync(providerRepository, receiptRepository, pointer, request.TenantId, request.EventId, cancellationToken))
+            {
+                metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "not_found");
+                return Failure(effectId, "registration_provider_effect_not_found", "Registration provider effect was not found.");
+            }
 
-        if (pointer.Status == OutboxMessageStatus.Pending)
-        {
-            metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "already_pending");
-            return Success(pointer.Id, "Registration provider effect retry was already pending.");
-        }
+            if (pointer.Status == OutboxMessageStatus.Pending)
+            {
+                metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "already_pending");
+                return Success(pointer.Id, "Registration provider effect retry was already pending.");
+            }
 
-        if (pointer.Status != OutboxMessageStatus.DeadLettered || pointer.ProcessingGeneration != generation)
-        {
-            metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "not_eligible");
-            return Failure(pointer.Id, "registration_provider_effect_retry_not_eligible", "Registration provider effect retry is not eligible.");
-        }
+            if (pointer.Status != OutboxMessageStatus.DeadLettered || pointer.ProcessingGeneration != generation)
+            {
+                metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "not_eligible");
+                return Failure(pointer.Id, "registration_provider_effect_retry_not_eligible", "Registration provider effect retry is not eligible.");
+            }
 
-        pointer.Redrive(generation, timeProvider.GetUtcNow().UtcDateTime);
-        await effectRepository.SaveChangesAsync(cancellationToken);
-        metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "scheduled");
-        return Success(pointer.Id, "Registration provider effect retry scheduled.");
+            pointer.Redrive(generation, timeProvider.GetUtcNow().UtcDateTime);
+            await effectRepository.SaveChangesAsync(cancellationToken);
+            metrics?.RecordRegistrationProviderManagementAction("retry_parked_item", "scheduled");
+            return Success(pointer.Id, "Registration provider effect retry scheduled.");
+        }, token);
     }
 }
 
@@ -402,49 +418,53 @@ public sealed class ResolveRegistrationProviderQueueItemCommandHandler(
     IIncomingWebhookEffectOutboxRepository effectRepository,
     IIncomingWebhookEffectReceiptRepository receiptRepository,
     TimeProvider timeProvider,
+    IHumanEventProviderMutationPreparation preparation,
     BusinessMetrics? metrics = null)
     : ICommandHandler<ResolveRegistrationProviderQueueItemCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ResolveRegistrationProviderQueueItemCommand request, CancellationToken cancellationToken = default)
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(ResolveRegistrationProviderQueueItemCommand request, CancellationToken token = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        bool hasSubmission = request.SubmissionId is { } submissionId && submissionId != Guid.Empty;
-        bool hasEffect = request.EffectOutboxId is { } requestedEffectId && requestedEffectId != Guid.Empty;
-        bool valid = hasSubmission != hasEffect && BoundedReference(request.DecisionCode, 100) &&
-            (string.IsNullOrWhiteSpace(request.NoteReference) || BoundedReference(request.NoteReference, 300));
-        if (!valid)
+        return preparation.ExecuteAsync(request, async cancellationToken =>
         {
-            metrics?.RecordRegistrationProviderManagementAction("resolve_queue_item", "validation_failed");
-            return Failure(request.SubmissionId ?? request.EffectOutboxId ?? Guid.Empty, "registration_provider_resolution_validation_failed", "Resolution decision is invalid.");
-        }
-
-        if (hasEffect)
-        {
-            Guid effectId = request.EffectOutboxId!.Value;
-            IncomingWebhookEffectOutbox? effect = await effectRepository.GetByTenantAndIdForUpdateAsync(request.TenantId, effectId, cancellationToken);
-            if (effect is null || !await ValidateRetainedEffectAsync(providerRepository, receiptRepository, effect, request.TenantId, request.EventId, cancellationToken))
+            bool hasSubmission = request.SubmissionId is { } submissionId && submissionId != Guid.Empty;
+            bool hasEffect = request.EffectOutboxId is { } requestedEffectId && requestedEffectId != Guid.Empty;
+            bool valid = hasSubmission != hasEffect && BoundedReference(request.DecisionCode, 100) &&
+                (string.IsNullOrWhiteSpace(request.NoteReference) || BoundedReference(request.NoteReference, 300));
+            if (!valid)
             {
-                metrics?.RecordRegistrationProviderManagementAction("resolve_queue_item", "not_found");
-                return Failure(effectId, "registration_provider_queue_item_not_found", "Registration provider queue item was not found.");
+                metrics?.RecordRegistrationProviderManagementAction("resolve_queue_item", "validation_failed");
+                return Failure(request.SubmissionId ?? request.EffectOutboxId ?? Guid.Empty, "registration_provider_resolution_validation_failed", "Resolution decision is invalid.");
             }
 
-            effect.AcknowledgeResolution("organizer_" + SafeCategory(request.DecisionCode), timeProvider.GetUtcNow().UtcDateTime);
-            await effectRepository.SaveChangesAsync(cancellationToken);
+            if (hasEffect)
+            {
+                Guid effectId = request.EffectOutboxId!.Value;
+                IncomingWebhookEffectOutbox? effect = await effectRepository.GetByTenantAndIdForUpdateAsync(request.TenantId, effectId, cancellationToken);
+                if (effect is null || !await ValidateRetainedEffectAsync(providerRepository, receiptRepository, effect, request.TenantId, request.EventId, cancellationToken))
+                {
+                    metrics?.RecordRegistrationProviderManagementAction("resolve_queue_item", "not_found");
+                    return Failure(effectId, "registration_provider_queue_item_not_found", "Registration provider queue item was not found.");
+                }
+
+                effect.AcknowledgeResolution("organizer_" + SafeCategory(request.DecisionCode), timeProvider.GetUtcNow().UtcDateTime);
+                await effectRepository.SaveChangesAsync(cancellationToken);
+                metrics?.RecordRegistrationProviderManagementAction("resolve_queue_item", "acknowledged");
+                return Success(effect.Id, "Registration provider reconciliation decision acknowledged.");
+            }
+
+            RegistrationSubmission? submission = await providerRepository.GetParkedSubmissionAsync(request.TenantId, request.EventId, request.SubmissionId!.Value, cancellationToken);
+            if (submission is null)
+            {
+                metrics?.RecordRegistrationProviderManagementAction("resolve_queue_item", "not_found");
+                return Failure(request.SubmissionId.Value, "registration_provider_queue_item_not_found", "Registration provider queue item was not found.");
+            }
+
+            await providerRepository.AddSubmissionIssueAsync(RegistrationSubmissionIssue.Create(submission, "RESOLVED_" + SafeCategory(request.DecisionCode), timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
+            await providerRepository.SaveChangesAsync(cancellationToken);
             metrics?.RecordRegistrationProviderManagementAction("resolve_queue_item", "acknowledged");
-            return Success(effect.Id, "Registration provider reconciliation decision acknowledged.");
-        }
-
-        RegistrationSubmission? submission = await providerRepository.GetParkedSubmissionAsync(request.TenantId, request.EventId, request.SubmissionId!.Value, cancellationToken);
-        if (submission is null)
-        {
-            metrics?.RecordRegistrationProviderManagementAction("resolve_queue_item", "not_found");
-            return Failure(request.SubmissionId.Value, "registration_provider_queue_item_not_found", "Registration provider queue item was not found.");
-        }
-
-        await providerRepository.AddSubmissionIssueAsync(RegistrationSubmissionIssue.Create(submission, "RESOLVED_" + SafeCategory(request.DecisionCode), timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
-        await providerRepository.SaveChangesAsync(cancellationToken);
-        metrics?.RecordRegistrationProviderManagementAction("resolve_queue_item", "acknowledged");
-        return Success(submission.Id, "Registration provider reconciliation decision acknowledged.");
+            return Success(submission.Id, "Registration provider reconciliation decision acknowledged.");
+        }, token);
     }
 }
 
@@ -472,7 +492,8 @@ public sealed class GetRegistrationProviderConnectionQueryHandler(IRegistrationP
 public sealed class UpsertRegistrationProviderConnectionCommandHandler(
     IRegistrationProviderRepository providerRepository,
     IRegistrationProviderRegistry providerRegistry,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IHumanTenantMutationPreparation preparation)
     : ICommandHandler<UpsertRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpsertRegistrationProviderConnectionCommand request, CancellationToken cancellationToken = default)
@@ -485,66 +506,84 @@ public sealed class UpsertRegistrationProviderConnectionCommandHandler(
             ? request.Request.WebhookSecretBindingId
             : null;
 
-        if (request.ConnectionId is { } id)
+        return await preparation.ExecuteAsync(HumanTenantMutationKind.RegistrationProviderConnections, request.TenantId,
+            async (prepared, innerToken) =>
         {
-            RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, id, cancellationToken);
-            if (connection is null) return Failure(id, "registration_provider_connection_not_found", "Registration provider connection was not found.");
-            connection.Update(request.Request.Name, kind, deployment, request.Request.ProviderCode, request.Request.ProviderDeploymentCode,
-                request.Request.ApiVersion, request.Request.AdapterPolicyVersion, request.Request.ConformanceEvidenceRevision,
-                request.Request.ManagementApiBaseUrl, request.Request.PublicBaseUrl, request.Request.ProviderWorkspaceId,
-                request.Request.ApiTokenSecretBindingId, webhookSecretBindingId);
-            connection.UpdateOAuthMetadata(request.Request.GrantedOAuthScopes, request.Request.ProviderIdentity, request.Request.PubSubConfigurationReference);
-            await providerRepository.SaveChangesAsync(cancellationToken);
-            return Success(connection.Id, "Registration provider connection updated.");
-        }
+            await preparation.RequireOwnedAsync(prepared, request.TenantId, HumanTenantMutationKind.RegistrationProviderConnections, innerToken);
+            if (request.ConnectionId is { } id)
+            {
+                RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, id, innerToken);
+                if (connection is null) return Failure(id, "registration_provider_connection_not_found", "Registration provider connection was not found.");
+                connection.Update(request.Request.Name, kind, deployment, request.Request.ProviderCode, request.Request.ProviderDeploymentCode,
+                    request.Request.ApiVersion, request.Request.AdapterPolicyVersion, request.Request.ConformanceEvidenceRevision,
+                    request.Request.ManagementApiBaseUrl, request.Request.PublicBaseUrl, request.Request.ProviderWorkspaceId,
+                    request.Request.ApiTokenSecretBindingId, webhookSecretBindingId);
+                connection.UpdateOAuthMetadata(request.Request.GrantedOAuthScopes, request.Request.ProviderIdentity, request.Request.PubSubConfigurationReference);
+                await providerRepository.SaveChangesAsync(innerToken);
+                return Success(connection.Id, "Registration provider connection updated.");
+            }
 
-        RegistrationProviderConnection created = RegistrationProviderConnection.Create(request.TenantId, request.Request.Name, kind, deployment,
-            request.Request.ProviderCode, request.Request.ProviderDeploymentCode, request.Request.ApiVersion,
-            request.Request.AdapterPolicyVersion, request.Request.ConformanceEvidenceRevision, request.Request.ManagementApiBaseUrl,
-            request.Request.PublicBaseUrl, request.Request.ProviderWorkspaceId, request.Request.ApiTokenSecretBindingId,
-            webhookSecretBindingId, timeProvider.GetUtcNow().UtcDateTime);
-        created.UpdateOAuthMetadata(request.Request.GrantedOAuthScopes, request.Request.ProviderIdentity, request.Request.PubSubConfigurationReference);
-        await providerRepository.AddConnectionAsync(created, cancellationToken);
-        await providerRepository.SaveChangesAsync(cancellationToken);
-        return Success(created.Id, "Registration provider connection created.");
+            RegistrationProviderConnection created = RegistrationProviderConnection.Create(request.TenantId, request.Request.Name, kind, deployment,
+                request.Request.ProviderCode, request.Request.ProviderDeploymentCode, request.Request.ApiVersion,
+                request.Request.AdapterPolicyVersion, request.Request.ConformanceEvidenceRevision, request.Request.ManagementApiBaseUrl,
+                request.Request.PublicBaseUrl, request.Request.ProviderWorkspaceId, request.Request.ApiTokenSecretBindingId,
+                webhookSecretBindingId, timeProvider.GetUtcNow().UtcDateTime);
+            created.UpdateOAuthMetadata(request.Request.GrantedOAuthScopes, request.Request.ProviderIdentity, request.Request.PubSubConfigurationReference);
+            await providerRepository.AddConnectionAsync(created, innerToken);
+            await providerRepository.SaveChangesAsync(innerToken);
+            return Success(created.Id, "Registration provider connection created.");
+        }, cancellationToken);
     }
 }
 
-public sealed class ReplaceRegistrationProviderApprovedOriginsCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
+public sealed class ReplaceRegistrationProviderApprovedOriginsCommandHandler(
+    IRegistrationProviderRepository providerRepository, TimeProvider timeProvider,
+    IHumanTenantMutationPreparation preparation)
     : ICommandHandler<ReplaceRegistrationProviderApprovedOriginsCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReplaceRegistrationProviderApprovedOriginsCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.ConnectionId, cancellationToken);
-        if (connection is null) return Failure(request.ConnectionId, "registration_provider_connection_not_found", "Registration provider connection was not found.");
-        try
+        return await preparation.ExecuteAsync(HumanTenantMutationKind.RegistrationProviderConnections, request.TenantId,
+            async (prepared, innerToken) =>
         {
-            connection.ReplaceApprovedOrigins(request.Origins, timeProvider.GetUtcNow().UtcDateTime);
-        }
-        catch (ArgumentException ex)
-        {
-            return Failure(request.ConnectionId, "registration_provider_origin_validation_failed", ex.Message);
-        }
-
-        await providerRepository.SaveChangesAsync(cancellationToken);
-        return Success(connection.Id, "Registration provider approved origins replaced.");
+            await preparation.RequireOwnedAsync(prepared, request.TenantId, HumanTenantMutationKind.RegistrationProviderConnections, innerToken);
+            RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.ConnectionId, innerToken);
+            if (connection is null) return Failure(request.ConnectionId, "registration_provider_connection_not_found", "Registration provider connection was not found.");
+            try
+            {
+                connection.ReplaceApprovedOrigins(request.Origins, timeProvider.GetUtcNow().UtcDateTime);
+            }
+            catch (ArgumentException ex)
+            {
+                return Failure(request.ConnectionId, "registration_provider_origin_validation_failed", ex.Message);
+            }
+            await providerRepository.SaveChangesAsync(innerToken);
+            return Success(connection.Id, "Registration provider approved origins replaced.");
+        }, cancellationToken);
     }
 }
 
-public sealed class DeleteRegistrationProviderConnectionCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
+public sealed class DeleteRegistrationProviderConnectionCommandHandler(
+    IRegistrationProviderRepository providerRepository, TimeProvider timeProvider,
+    IHumanTenantMutationPreparation preparation)
     : ICommandHandler<DeleteRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationProviderConnectionCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.ConnectionId, cancellationToken);
-        if (connection is null) return Failure(request.ConnectionId, "registration_provider_connection_not_found", "Registration provider connection was not found.");
-        if ((await providerRepository.GetBindingsAsync(request.TenantId, cancellationToken)).Any(binding => binding.RegistrationProviderConnectionId == request.ConnectionId))
-            return Failure(request.ConnectionId, "registration_provider_connection_in_use", "Registration provider connection still has bindings.");
-        connection.Remove(timeProvider.GetUtcNow().UtcDateTime);
-        await providerRepository.SaveChangesAsync(cancellationToken);
-        return Success(connection.Id, "Registration provider connection deleted.");
+        return await preparation.ExecuteAsync(HumanTenantMutationKind.RegistrationProviderConnections, request.TenantId,
+            async (prepared, innerToken) =>
+        {
+            await preparation.RequireOwnedAsync(prepared, request.TenantId, HumanTenantMutationKind.RegistrationProviderConnections, innerToken);
+            RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.ConnectionId, innerToken);
+            if (connection is null) return Failure(request.ConnectionId, "registration_provider_connection_not_found", "Registration provider connection was not found.");
+            if ((await providerRepository.GetBindingsAsync(request.TenantId, innerToken)).Any(binding => binding.RegistrationProviderConnectionId == request.ConnectionId))
+                return Failure(request.ConnectionId, "registration_provider_connection_in_use", "Registration provider connection still has bindings.");
+            connection.Remove(timeProvider.GetUtcNow().UtcDateTime);
+            await providerRepository.SaveChangesAsync(innerToken);
+            return Success(connection.Id, "Registration provider connection deleted.");
+        }, cancellationToken);
     }
 }
 
@@ -575,112 +614,195 @@ public sealed class CreateRegistrationProviderBindingCommandHandler(
     IRegistrationProviderRepository providerRepository,
     ISecretBindingRepository secretBindingRepository,
     IRegistrationProviderRegistry providerRegistry,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IHumanEventProviderMutationPreparation preparation)
     : ICommandHandler<CreateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateRegistrationProviderBindingCommand request, CancellationToken token = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.Request.ConnectionId, cancellationToken);
-        if (connection is null ||
-            !await providerRepository.FormVersionBelongsToEventAsync(request.TenantId, request.EventId, request.Request.FormId, request.Request.FormVersionId, cancellationToken) ||
-            !TryBindingRequest(request.Request, out RegistrationProviderPresentationModeEnum presentation, out RegistrationProviderCollectionModeEnum collection, out RegistrationProviderCompletionModeEnum completion, out RegistrationProviderTrustLevelEnum trust))
+        return preparation.ExecuteAsync(request, async cancellationToken =>
         {
-            return Failure(Guid.Empty, "registration_provider_binding_validation_failed", "Registration provider binding is invalid.");
-        }
+            RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.Request.ConnectionId, cancellationToken);
+            if (connection is null ||
+                !await providerRepository.FormVersionBelongsToEventAsync(request.TenantId, request.EventId, request.Request.FormId, request.Request.FormVersionId, cancellationToken) ||
+                !TryBindingRequest(request.Request, out RegistrationProviderPresentationModeEnum presentation, out RegistrationProviderCollectionModeEnum collection, out RegistrationProviderCompletionModeEnum completion, out RegistrationProviderTrustLevelEnum trust))
+            {
+                return Failure(Guid.Empty, "registration_provider_binding_validation_failed", "Registration provider binding is invalid.");
+            }
 
-        RegistrationProviderBinding binding = RegistrationProviderBinding.Create(request.TenantId, request.Request.ConnectionId, request.Request.FormId,
-            request.Request.FormVersionId, presentation, collection, completion, trust, request.Request.WebhookSecretBindingId, timeProvider.GetUtcNow().UtcDateTime);
-        if (!await BindingWebhookSecretIsValidAsync(secretBindingRepository, request.TenantId, binding.Id, binding.WebhookSecretBindingId, cancellationToken))
-        {
-            return Failure(Guid.Empty, "registration_provider_binding_validation_failed", "Registration provider binding is invalid.");
-        }
+            RegistrationProviderBinding binding = RegistrationProviderBinding.Create(request.TenantId, request.Request.ConnectionId, request.Request.FormId,
+                request.Request.FormVersionId, presentation, collection, completion, trust, request.Request.WebhookSecretBindingId, timeProvider.GetUtcNow().UtcDateTime);
+            if (!await BindingWebhookSecretIsValidAsync(secretBindingRepository, request.TenantId, binding.Id, binding.WebhookSecretBindingId, cancellationToken))
+            {
+                return Failure(Guid.Empty, "registration_provider_binding_validation_failed", "Registration provider binding is invalid.");
+            }
 
-        ApplyProviderProvisioning(binding, request.Request);
-        ReplaceCapabilitiesFromDescriptor(binding, connection, providerRegistry);
-        await providerRepository.AddBindingAsync(binding, cancellationToken);
-        await providerRepository.SaveChangesAsync(cancellationToken);
-        return Success(binding.Id, "Registration provider binding created.");
+            ApplyProviderProvisioning(binding, request.Request);
+            ReplaceCapabilitiesFromDescriptor(binding, connection, providerRegistry);
+            await providerRepository.AddBindingAsync(binding, cancellationToken);
+            await providerRepository.SaveChangesAsync(cancellationToken);
+            return Success(binding.Id, "Registration provider binding created.");
+        }, token);
     }
 }
 
 public sealed class UpdateRegistrationProviderBindingCommandHandler(
     IRegistrationProviderRepository providerRepository,
     ISecretBindingRepository secretBindingRepository,
-    IRegistrationProviderRegistry providerRegistry)
+    IRegistrationProviderRegistry providerRegistry,
+    IHumanEventProviderMutationPreparation preparation)
     : ICommandHandler<UpdateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRegistrationProviderBindingCommand request, CancellationToken token = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
-        if (binding is null || !await BindingBelongsToEventAsync(providerRepository, request.TenantId, request.EventId, request.BindingId, cancellationToken))
-            return Failure(request.BindingId, "registration_provider_binding_not_found", "Registration provider binding was not found.");
-        RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.Request.ConnectionId, cancellationToken);
-        if (connection is null ||
-            !await providerRepository.FormVersionBelongsToEventAsync(request.TenantId, request.EventId, request.Request.FormId, request.Request.FormVersionId, cancellationToken) ||
-            !TryBindingRequest(request.Request, out RegistrationProviderPresentationModeEnum presentation, out RegistrationProviderCollectionModeEnum collection, out RegistrationProviderCompletionModeEnum completion, out RegistrationProviderTrustLevelEnum trust))
-            return Failure(request.BindingId, "registration_provider_binding_validation_failed", "Registration provider binding is invalid.");
-        try
+        return preparation.ExecuteAsync(request, async cancellationToken =>
         {
-            if (!await BindingWebhookSecretIsValidAsync(secretBindingRepository, request.TenantId, binding.Id, request.Request.WebhookSecretBindingId, cancellationToken))
-            {
+            RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
+            if (binding is null || !await BindingBelongsToEventAsync(providerRepository, request.TenantId, request.EventId, request.BindingId, cancellationToken))
+                return Failure(request.BindingId, "registration_provider_binding_not_found", "Registration provider binding was not found.");
+            RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.Request.ConnectionId, cancellationToken);
+            if (connection is null ||
+                !await providerRepository.FormVersionBelongsToEventAsync(request.TenantId, request.EventId, request.Request.FormId, request.Request.FormVersionId, cancellationToken) ||
+                !TryBindingRequest(request.Request, out RegistrationProviderPresentationModeEnum presentation, out RegistrationProviderCollectionModeEnum collection, out RegistrationProviderCompletionModeEnum completion, out RegistrationProviderTrustLevelEnum trust))
                 return Failure(request.BindingId, "registration_provider_binding_validation_failed", "Registration provider binding is invalid.");
+            try
+            {
+                if (!await BindingWebhookSecretIsValidAsync(secretBindingRepository, request.TenantId, binding.Id, request.Request.WebhookSecretBindingId, cancellationToken))
+                {
+                    return Failure(request.BindingId, "registration_provider_binding_validation_failed", "Registration provider binding is invalid.");
+                }
+
+                binding.UpdateDraft(request.Request.ConnectionId, request.Request.FormId, request.Request.FormVersionId, presentation, collection, completion, trust, request.Request.WebhookSecretBindingId);
+                ApplyProviderProvisioning(binding, request.Request);
+                ReplaceCapabilitiesFromDescriptor(binding, connection, providerRegistry);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return Failure(request.BindingId, "registration_provider_binding_update_failed", ex.Message);
             }
 
-            binding.UpdateDraft(request.Request.ConnectionId, request.Request.FormId, request.Request.FormVersionId, presentation, collection, completion, trust, request.Request.WebhookSecretBindingId);
-            ApplyProviderProvisioning(binding, request.Request);
-            ReplaceCapabilitiesFromDescriptor(binding, connection, providerRegistry);
-        }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-        {
-            return Failure(request.BindingId, "registration_provider_binding_update_failed", ex.Message);
-        }
-
-        await providerRepository.SaveChangesAsync(cancellationToken);
-        return Success(binding.Id, "Registration provider binding updated.");
+            await providerRepository.SaveChangesAsync(cancellationToken);
+            return Success(binding.Id, "Registration provider binding updated.");
+        }, token);
     }
 }
 
-public sealed class DeleteRegistrationProviderBindingCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
+public sealed class DeleteRegistrationProviderBindingCommandHandler(
+    IRegistrationProviderRepository providerRepository, TimeProvider timeProvider,
+    IHumanEventProviderMutationPreparation preparation)
     : ICommandHandler<DeleteRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationProviderBindingCommand request, CancellationToken token = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
+        return preparation.ExecuteAsync(request, async cancellationToken =>
+        {
+            RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
+            if (binding is null || !await BindingBelongsToEventAsync(providerRepository, request.TenantId, request.EventId, request.BindingId, cancellationToken))
+                return Failure(request.BindingId, "registration_provider_binding_not_found", "Registration provider binding was not found.");
+            try
+            {
+                binding.Remove(timeProvider.GetUtcNow().UtcDateTime);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Failure(request.BindingId, "registration_provider_binding_delete_failed", ex.Message);
+            }
+
+            await providerRepository.SaveChangesAsync(cancellationToken);
+            return Success(binding.Id, "Registration provider binding deleted.");
+        }, token);
+    }
+}
+
+public sealed class PublishEventRegistrationProviderBindingCommandHandler(
+    IRegistrationProviderRepository providerRepository,
+    IRegistrationProviderRegistry providerRegistry,
+    IEventPublicationMutationBoundary publicationBoundary,
+    IRegistrationProviderManagedPublishPreflight managedPublishPreflight,
+    IRegistrationProviderSubscriptionStateRepository subscriptionStates,
+    IHumanEventProviderMutationPreparation preparation,
+    IRegistrationProviderDeferredCheckpointJournal checkpoints,
+    TimeProvider timeProvider)
+    : ICommandHandler<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
+{
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishEventRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
+    {
+        RequireEventScope(request.TenantId, request.EventId);
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        RegistrationProviderBinding? binding = await providerRepository.GetBindingObservationAsync(request.TenantId, request.BindingId, cancellationToken);
         if (binding is null || !await BindingBelongsToEventAsync(providerRepository, request.TenantId, request.EventId, request.BindingId, cancellationToken))
             return Failure(request.BindingId, "registration_provider_binding_not_found", "Registration provider binding was not found.");
-        try
+        var observation = await checkpoints.ObserveAsync(
+            HumanEventProviderSourceTarget.From(request, request.EventId), prepared,
+            token => managedPublishPreflight.ObserveAsync(request.TenantId, request.EventId, binding, token),
+            cancellationToken);
+        DateTime publishedAt = timeProvider.GetUtcNow().UtcDateTime;
+        var outcome = await checkpoints.ExecuteAsync(request, prepared, observation, async (proposal, token) =>
         {
-            binding.Remove(timeProvider.GetUtcNow().UtcDateTime);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Failure(request.BindingId, "registration_provider_binding_delete_failed", ex.Message);
-        }
-
-        await providerRepository.SaveChangesAsync(cancellationToken);
-        return Success(binding.Id, "Registration provider binding deleted.");
+            var current = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, token)
+                ?? throw new InvalidOperationException("registration_provider_binding_source_changed");
+            if (proposal.ProviderSurveyId is { } surveyId &&
+                (current.ProviderSurveyId != surveyId || current.ProviderSurveyRevisionId != proposal.ProviderSurveyRevisionId))
+                current.SetDraftProvisionedSurvey(surveyId, proposal.ProviderSurveyRevisionId);
+            if (proposal.ProviderWebhookId is { } webhookId && current.ProviderWebhookId != webhookId)
+            {
+                if (proposal.WebhookSecretBindingId is { } secretId)
+                    current.SetDraftProvisionedSubscription(webhookId, secretId);
+                else
+                    current.SetDraftProvisionedSubscription(webhookId);
+            }
+            if (proposal.SubscriptionExpiresAtUtc is { } expiresAt &&
+                proposal.SubscriptionObservedAtUtc is { } observedAt &&
+                await subscriptionStates.GetAsync(request.TenantId, request.BindingId, "RESPONSES", token) is null)
+            {
+                var state = RegistrationProviderSubscriptionState.Create(request.TenantId, request.BindingId,
+                    "RESPONSES", proposal.ProviderWebhookId!, expiresAt,
+                    observedAt.ToString("O", CultureInfo.InvariantCulture), observedAt);
+                state.ReceiveNotification(observedAt);
+                await subscriptionStates.AddAsync(state, token);
+            }
+            await providerRepository.SaveChangesAsync(token);
+            if (!proposal.Result.Succeeded)
+            {
+                string code = proposal.Result.FailureCode ?? "registration_provider_preflight_failed";
+                return new PublishOutcome(BaseCommandResponse.Failure<Guid>(
+                    code, code, proposal.Result.Errors, request.BindingId));
+            }
+            return new PublishOutcome(await new PublishRegistrationProviderBindingCommandHandler(
+                providerRepository, providerRegistry, publicationBoundary).ExecuteAsync(
+                new PublishRegistrationProviderBindingCommand(request.TenantId, request.EventId, request.BindingId,
+                    ToSchemaDriftClass((RegistrationProviderDriftClassEnum)current.DriftClassId), publishedAt), token));
+        }, cancellationToken);
+        return outcome.Response;
     }
+
+    // An admitted draft may retain acknowledged provisioning even when publication is refused.
+    private sealed record PublishOutcome(BaseCommandResponse<Guid> Response);
 }
 
 public sealed class ReplaceEventDraftRegistrationProviderMappingsCommandHandler(
     IRegistrationProviderRepository providerRepository,
-    ICommandHandler<ReplaceDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>> replaceMappingsHandler)
+    IHumanEventProviderMutationPreparation preparation)
     : ICommandHandler<ReplaceEventDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReplaceEventDraftRegistrationProviderMappingsCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        if (!await BindingBelongsToEventAsync(providerRepository, request.TenantId, request.EventId, request.BindingId, cancellationToken))
-            return Failure(request.BindingId, "registration_provider_binding_not_found", "Registration provider binding was not found.");
-
-        return await replaceMappingsHandler.ExecuteAsync(new ReplaceDraftRegistrationProviderMappingsCommand(
-            request.TenantId,
-            request.BindingId,
-            [.. request.Request.FieldMappings.Select(mapping => new RegistrationProviderFieldMappingInput(mapping.PlatformFieldKey, mapping.ProviderFieldKey, mapping.IsRequired))],
-            [.. request.Request.OptionMappings.Select(mapping => new RegistrationProviderOptionMappingInput(mapping.PlatformFieldKey, mapping.PlatformOptionKey, mapping.ProviderOptionKey))]), cancellationToken);
+        return await preparation.ExecuteAsync(request, async token =>
+        {
+            if (!await BindingBelongsToEventAsync(providerRepository, request.TenantId, request.EventId,
+                    request.BindingId, token))
+                return Failure(request.BindingId, "registration_provider_binding_not_found",
+                    "Registration provider binding was not found.");
+            return await new ReplaceDraftRegistrationProviderMappingsCommandHandler(providerRepository).ExecuteAsync(new ReplaceDraftRegistrationProviderMappingsCommand(
+                request.TenantId,
+                request.BindingId,
+                [.. request.Request.FieldMappings.Select(mapping => new RegistrationProviderFieldMappingInput(mapping.PlatformFieldKey, mapping.ProviderFieldKey, mapping.IsRequired))],
+                [.. request.Request.OptionMappings.Select(mapping => new RegistrationProviderOptionMappingInput(mapping.PlatformFieldKey, mapping.PlatformOptionKey, mapping.ProviderOptionKey))]), token);
+        }, cancellationToken);
     }
 }
 
@@ -689,9 +811,10 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
     IRegistrationProviderRegistry providerRegistry,
     SchemaDriftClassifier driftClassifier,
     FormSchemaArtifactPublicationService publicationService,
-    TimeProvider timeProvider,
     IEventPublicationMutationBoundary publicationBoundary,
-    IMachinePrincipalAccessor machine)
+    IHumanEventProviderMutationPreparation preparation,
+    IRegistrationProviderDeferredCheckpointJournal checkpoints,
+    TimeProvider timeProvider)
     : ICommandHandler<ImportExternalRegistrationProviderFormVersionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ImportExternalRegistrationProviderFormVersionCommand request, CancellationToken cancellationToken = default)
@@ -702,24 +825,8 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
             return Failure(Guid.Empty, "registration_provider_external_import_validation_failed", "External schema import request is invalid.");
         }
 
-        BaseCommandResponse<Guid> result = machine.Current is not null
-            ? await ImportAsync(request, cancellationToken)
-            : await publicationBoundary.ExecuteAsync(request.EventId,
-                token => ImportAsync(request, token), cancellationToken);
-        return result.FailureCode switch
-        {
-            "event_publish_restricted" => BaseCommandResponse.Failure<Guid>(
-                "registration_provider_external_import_publish_restricted", result.Message, result.Errors, request.EventId),
-            "event_publish_authority_unavailable" => BaseCommandResponse.Failure<Guid>(
-                "registration_provider_external_import_publish_authority_unavailable", result.Message, result.Errors, request.EventId),
-            _ => result
-        };
-    }
-
-    private async Task<BaseCommandResponse<Guid>> ImportAsync(
-        ImportExternalRegistrationProviderFormVersionCommand request, CancellationToken cancellationToken)
-    {
-        RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.ConnectionId, cancellationToken);
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        RegistrationProviderConnection? connection = await providerRepository.GetConnectionObservationAsync(request.TenantId, request.ConnectionId, cancellationToken);
         if (connection is null)
         {
             return Failure(request.ConnectionId, "registration_provider_connection_not_found", "Registration provider connection was not found.");
@@ -734,108 +841,132 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
 
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         RegistrationProviderBinding transientBinding = TransientBinding(request, connection.Id, now);
-        RegistrationProviderSchemaReadResult remoteSchema;
+        IRegistrationProviderCheckpointObservation<RegistrationProviderSchemaReadResult> observation;
         try
         {
-            remoteSchema = await schemaReader.ReadSchemaAsync(new(request.TenantId, transientBinding, connection, tuple), cancellationToken);
+            observation = await checkpoints.ObserveAsync(
+                HumanEventProviderSourceTarget.From(request, request.EventId), prepared,
+                token => schemaReader.ReadSchemaAsync(new(request.TenantId, transientBinding, connection, tuple), token),
+                cancellationToken);
         }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException or FormatException)
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or FormatException)
         {
             return Failure(request.ConnectionId, "registration_provider_schema_read_failed", "Registration provider schema could not be read.");
         }
 
-        if (!remoteSchema.IsActive)
+        if (!observation.Result.IsActive)
         {
             return Failure(request.ConnectionId, "registration_provider_survey_inactive", "Registration provider schema is not active.");
         }
 
-        NormalizedProviderSchemaSnapshot normalized = NormalizedProviderSchemaSnapshot.From(remoteSchema.Snapshot);
-        RegistrationEvidenceHash revisionHash = RegistrationEvidenceHash.Create(normalized.Base64Hash);
-        string providerSurveyId = request.Request.ProviderSurveyId.Trim();
-        string providerSurveyRevisionId = request.Request.ProviderSurveyRevisionId ?? remoteSchema.Fingerprint;
-        RegistrationForm? form = request.Request.FormId is { } formId
-            ? await providerRepository.GetFormForExternalImportAsync(request.TenantId, request.EventId, formId, cancellationToken)
-            : await providerRepository.GetExternalImportFormAsync(request.TenantId, request.EventId, connection.Id, providerSurveyId, cancellationToken);
-        if (request.Request.FormId is not null && form is null)
+        ImportOutcome outcome = await checkpoints.ExecuteAsync(request, prepared, observation,
+            async (remoteSchema, token) => new ImportOutcome(await publicationBoundary.ExecuteInCurrentTransactionAsync(
+                request.EventId, inner => ImportAsync(remoteSchema, inner), token)), cancellationToken);
+        var result = outcome.Response;
+        return result.FailureCode switch
         {
-            return Failure(request.Request.FormId.Value, "registration_form_not_found", "Registration form was not found.");
-        }
+            "event_publish_restricted" => BaseCommandResponse.Failure<Guid>(
+                "registration_provider_external_import_publish_restricted", result.Message, result.Errors, request.EventId),
+            "event_publish_authority_unavailable" => BaseCommandResponse.Failure<Guid>(
+                "registration_provider_external_import_publish_authority_unavailable", result.Message, result.Errors, request.EventId),
+            _ => result
+        };
 
-        RegistrationProviderSchemaDriftClass driftClass = RegistrationProviderSchemaDriftClass.NoDrift;
-        RegistrationProviderSchemaRevision? existingRevision = null;
-        if (form is not null)
+        async Task<BaseCommandResponse<Guid>> ImportAsync(RegistrationProviderSchemaReadResult remoteSchema,
+            CancellationToken cancellationToken)
         {
-            existingRevision = await providerRepository.GetSchemaRevisionByHashAsync(request.TenantId, connection.Id, providerSurveyId, revisionHash, cancellationToken);
-            if (existingRevision is not null)
+            NormalizedProviderSchemaSnapshot normalized = NormalizedProviderSchemaSnapshot.From(remoteSchema.Snapshot);
+            RegistrationEvidenceHash revisionHash = RegistrationEvidenceHash.Create(normalized.Base64Hash);
+            string providerSurveyId = request.Request.ProviderSurveyId.Trim();
+            string providerSurveyRevisionId = request.Request.ProviderSurveyRevisionId ?? remoteSchema.Fingerprint;
+            RegistrationForm? form = request.Request.FormId is { } formId
+                ? await providerRepository.GetFormForExternalImportAsync(request.TenantId, request.EventId, formId, cancellationToken)
+                : await providerRepository.GetExternalImportFormAsync(request.TenantId, request.EventId, connection.Id, providerSurveyId, cancellationToken);
+            if (request.Request.FormId is not null && form is null)
             {
-                RegistrationFormVersion? existingVersion = form.Versions.SingleOrDefault(version =>
-                    version.SourceKindId == (int)RegistrationFormVersionSourceKindEnum.ExternalImported &&
-                    version.StatusId == (int)RegistrationFormStatusEnum.Published &&
-                    version.ExternalRegistrationProviderConnectionId == connection.Id &&
-                    version.ExternalProviderSurveyId == providerSurveyId &&
-                    version.ExternalRegistrationProviderSchemaRevisionId == existingRevision.Id);
-                if (existingVersion is not null)
+                return Failure(request.Request.FormId.Value, "registration_form_not_found", "Registration form was not found.");
+            }
+
+            RegistrationProviderSchemaDriftClass driftClass = RegistrationProviderSchemaDriftClass.NoDrift;
+            RegistrationProviderSchemaRevision? existingRevision = null;
+            if (form is not null)
+            {
+                existingRevision = await providerRepository.GetSchemaRevisionByHashAsync(request.TenantId, connection.Id, providerSurveyId, revisionHash, cancellationToken);
+                if (existingRevision is not null)
                 {
-                    return Success(existingVersion.Id, "External registration provider schema import already exists.");
+                    RegistrationFormVersion? existingVersion = form.Versions.SingleOrDefault(version =>
+                        version.SourceKindId == (int)RegistrationFormVersionSourceKindEnum.ExternalImported &&
+                        version.StatusId == (int)RegistrationFormStatusEnum.Published &&
+                        version.ExternalRegistrationProviderConnectionId == connection.Id &&
+                        version.ExternalProviderSurveyId == providerSurveyId &&
+                        version.ExternalRegistrationProviderSchemaRevisionId == existingRevision.Id);
+                    if (existingVersion is not null)
+                    {
+                        return Success(existingVersion.Id, "External registration provider schema import already exists.");
+                    }
+
+                    if (SchemaDriftClassifier.BlocksPublication(RegistrationProviderManagementHandlerHelpers.ToSchemaDriftClass((RegistrationProviderDriftClassEnum)existingRevision.DriftClassId)))
+                    {
+                        return Failure(existingRevision.Id, "registration_provider_schema_drift_blocked", "Registration provider schema drift requires mapping review.");
+                    }
                 }
 
-                if (SchemaDriftClassifier.BlocksPublication(RegistrationProviderManagementHandlerHelpers.ToSchemaDriftClass((RegistrationProviderDriftClassEnum)existingRevision.DriftClassId)))
+                RegistrationProviderSchemaRevision? previous = await providerRepository.GetLatestExternalImportSchemaRevisionAsync(
+                    request.TenantId, request.EventId, form.Id, connection.Id, providerSurveyId, cancellationToken);
+                if (previous is not null)
                 {
-                    return Failure(existingRevision.Id, "registration_provider_schema_drift_blocked", "Registration provider schema drift requires mapping review.");
+                    driftClass = driftClassifier.Classify(NormalizedProviderSchemaSnapshot.Parse(previous.ProviderSnapshotJson), normalized.Snapshot);
                 }
             }
 
-            RegistrationProviderSchemaRevision? previous = await providerRepository.GetLatestExternalImportSchemaRevisionAsync(
-                request.TenantId, request.EventId, form.Id, connection.Id, providerSurveyId, cancellationToken);
-            if (previous is not null)
+            RegistrationProviderSchemaRevision revision = RegistrationProviderSchemaRevision.Create(
+                request.TenantId,
+                connection.Id,
+                RegistrationProviderSchemaAuthorityEnum.ProviderDiscovered,
+                revisionHash,
+                providerSurveyId,
+                providerSurveyRevisionId,
+                normalized.Json,
+                normalized.HexHash,
+                ToDomain(driftClass),
+                now);
+            await providerRepository.AddSchemaRevisionAsync(revision, cancellationToken);
+
+            if (SchemaDriftClassifier.BlocksPublication(driftClass))
             {
-                driftClass = driftClassifier.Classify(NormalizedProviderSchemaSnapshot.Parse(previous.ProviderSnapshotJson), normalized.Snapshot);
+                await providerRepository.SaveChangesAsync(cancellationToken);
+                return Failure(revision.Id, "registration_provider_schema_drift_blocked", "Registration provider schema drift requires mapping review.");
             }
-        }
 
-        RegistrationProviderSchemaRevision revision = RegistrationProviderSchemaRevision.Create(
-            request.TenantId,
-            connection.Id,
-            RegistrationProviderSchemaAuthorityEnum.ProviderDiscovered,
-            revisionHash,
-            providerSurveyId,
-            providerSurveyRevisionId,
-            normalized.Json,
-            normalized.HexHash,
-            ToDomain(driftClass),
-            now);
-        await providerRepository.AddSchemaRevisionAsync(revision, cancellationToken);
+            bool createForm = form is null;
+            form ??= RegistrationForm.Create(request.TenantId, request.EventId, request.Request.Namespace, request.Request.Key, request.Request.Name, now);
+            int nextVersion = form.Versions.Select(version => version.Version).DefaultIfEmpty().Max() + 1;
+            RegistrationFormVersion version = RegistrationFormVersion.CreateExternalImported(
+                form,
+                nextVersion,
+                request.Request.LanguageTag,
+                connection.Id,
+                revision.Id,
+                providerSurveyId,
+                providerSurveyRevisionId,
+                ExternalImportMappingRevision.Hash(tuple, providerSurveyId, providerSurveyRevisionId, normalized.Snapshot),
+                now);
+            AddSnapshotFields(version, normalized.Snapshot, now);
+            publicationService.Publish(version, now);
+            form.AddVersion(version);
+            if (createForm)
+            {
+                await providerRepository.AddFormAsync(form, cancellationToken);
+            }
 
-        if (SchemaDriftClassifier.BlocksPublication(driftClass))
-        {
             await providerRepository.SaveChangesAsync(cancellationToken);
-            return Failure(revision.Id, "registration_provider_schema_drift_blocked", "Registration provider schema drift requires mapping review.");
+            return Success(version.Id, "External registration provider schema imported as a frozen published form version.");
         }
-
-        bool createForm = form is null;
-        form ??= RegistrationForm.Create(request.TenantId, request.EventId, request.Request.Namespace, request.Request.Key, request.Request.Name, now);
-        int nextVersion = form.Versions.Select(version => version.Version).DefaultIfEmpty().Max() + 1;
-        RegistrationFormVersion version = RegistrationFormVersion.CreateExternalImported(
-            form,
-            nextVersion,
-            request.Request.LanguageTag,
-            connection.Id,
-            revision.Id,
-            providerSurveyId,
-            providerSurveyRevisionId,
-            ExternalImportMappingRevision.Hash(tuple, providerSurveyId, providerSurveyRevisionId, normalized.Snapshot),
-            now);
-        AddSnapshotFields(version, normalized.Snapshot, now);
-        publicationService.Publish(version, now);
-        form.AddVersion(version);
-        if (createForm)
-        {
-            await providerRepository.AddFormAsync(form, cancellationToken);
-        }
-
-        await providerRepository.SaveChangesAsync(cancellationToken);
-        return Success(version.Id, "External registration provider schema imported as a frozen published form version.");
     }
+
+    // A schema-only blocked import intentionally commits admitted evidence. This result
+    // unwraps only after physical acknowledgment; it is neither authority nor rollback proof.
+    private sealed record ImportOutcome(BaseCommandResponse<Guid> Response);
 
     private static bool ValidImportRequest(ImportExternalRegistrationProviderFormVersionRequestDto request) =>
         (request.FormId is null || request.FormId != Guid.Empty) &&
@@ -940,60 +1071,70 @@ public sealed class GetRegistrationChannelsQueryHandler(IRegistrationProviderRep
     }
 }
 
-public sealed class UpsertRegistrationChannelCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
+public sealed class UpsertRegistrationChannelCommandHandler(
+    IRegistrationProviderRepository providerRepository, TimeProvider timeProvider,
+    IHumanEventProviderMutationPreparation preparation)
     : ICommandHandler<UpsertRegistrationChannelCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpsertRegistrationChannelCommand request, CancellationToken cancellationToken = default)
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(UpsertRegistrationChannelCommand request, CancellationToken token = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        RegistrationRequirement? requirement = await providerRepository.GetRequirementAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, cancellationToken);
-        if (requirement is null) return Failure(request.RequirementId, "registration_requirement_not_found", "Registration requirement was not found.");
-        if (!await ProviderBindingUsableAsync(providerRepository, request.TenantId, request.EventId, request.Request, cancellationToken))
-            return Failure(request.Request.RegistrationProviderBindingId ?? Guid.Empty, "registration_channel_provider_binding_invalid", "Provider channel requires a published same-event binding.");
-
-        try
+        return preparation.ExecuteAsync(request, async cancellationToken =>
         {
-            if (request.ChannelId is { } id)
-            {
-                RegistrationChannel? channel = await providerRepository.GetChannelAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, id, cancellationToken);
-                if (channel is null) return Failure(id, "registration_channel_not_found", "Registration channel was not found.");
-                channel.Update(request.Request.Ordinal, request.Request.IsNative, request.Request.RegistrationProviderBindingId);
-                await providerRepository.SaveChangesAsync(cancellationToken);
-                return Success(channel.Id, "Registration channel updated.");
-            }
+            RegistrationRequirement? requirement = await providerRepository.GetRequirementAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, cancellationToken);
+            if (requirement is null) return Failure(request.RequirementId, "registration_requirement_not_found", "Registration requirement was not found.");
+            if (!await ProviderBindingUsableAsync(providerRepository, request.TenantId, request.EventId, request.Request, cancellationToken))
+                return Failure(request.Request.RegistrationProviderBindingId ?? Guid.Empty, "registration_channel_provider_binding_invalid", "Provider channel requires a published same-event binding.");
 
-            RegistrationChannel? deleted = requirement.Channels.FirstOrDefault(channel => channel.IsDeleted && channel.Ordinal == request.Request.Ordinal);
-            if (deleted is not null)
+            try
             {
-                deleted.Revive(request.Request.Ordinal, request.Request.IsNative, request.Request.RegistrationProviderBindingId);
-                await providerRepository.SaveChangesAsync(cancellationToken);
-                return Success(deleted.Id, "Registration channel created.");
-            }
+                if (request.ChannelId is { } id)
+                {
+                    RegistrationChannel? channel = await providerRepository.GetChannelAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, id, cancellationToken);
+                    if (channel is null) return Failure(id, "registration_channel_not_found", "Registration channel was not found.");
+                    channel.Update(request.Request.Ordinal, request.Request.IsNative, request.Request.RegistrationProviderBindingId);
+                    await providerRepository.SaveChangesAsync(cancellationToken);
+                    return Success(channel.Id, "Registration channel updated.");
+                }
 
-            RegistrationChannel created = RegistrationChannel.Create(requirement, request.Request.Ordinal, request.Request.IsNative,
-                request.Request.RegistrationProviderBindingId, timeProvider.GetUtcNow().UtcDateTime);
-            requirement.AddChannel(created);
-            await providerRepository.SaveChangesAsync(cancellationToken);
-            return Success(created.Id, "Registration channel created.");
-        }
-        catch (Exception ex) when (ex is ArgumentException or ArgumentOutOfRangeException)
-        {
-            return Failure(request.ChannelId ?? Guid.Empty, "registration_channel_validation_failed", ex.Message);
-        }
+                RegistrationChannel? deleted = requirement.Channels.FirstOrDefault(channel => channel.IsDeleted && channel.Ordinal == request.Request.Ordinal);
+                if (deleted is not null)
+                {
+                    deleted.Revive(request.Request.Ordinal, request.Request.IsNative, request.Request.RegistrationProviderBindingId);
+                    await providerRepository.SaveChangesAsync(cancellationToken);
+                    return Success(deleted.Id, "Registration channel created.");
+                }
+
+                RegistrationChannel created = RegistrationChannel.Create(requirement, request.Request.Ordinal, request.Request.IsNative,
+                    request.Request.RegistrationProviderBindingId, timeProvider.GetUtcNow().UtcDateTime);
+                requirement.AddChannel(created);
+                await providerRepository.SaveChangesAsync(cancellationToken);
+                return Success(created.Id, "Registration channel created.");
+            }
+            catch (Exception ex) when (ex is ArgumentException or ArgumentOutOfRangeException)
+            {
+                return Failure(request.ChannelId ?? Guid.Empty, "registration_channel_validation_failed", ex.Message);
+            }
+        }, token);
     }
 }
 
-public sealed class DeleteRegistrationChannelCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
+public sealed class DeleteRegistrationChannelCommandHandler(
+    IRegistrationProviderRepository providerRepository, TimeProvider timeProvider,
+    IHumanEventProviderMutationPreparation preparation)
     : ICommandHandler<DeleteRegistrationChannelCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationChannelCommand request, CancellationToken cancellationToken = default)
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationChannelCommand request, CancellationToken token = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
-        RegistrationChannel? channel = await providerRepository.GetChannelAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, request.ChannelId, cancellationToken);
-        if (channel is null) return Failure(request.ChannelId, "registration_channel_not_found", "Registration channel was not found.");
-        channel.Remove(timeProvider.GetUtcNow().UtcDateTime);
-        await providerRepository.SaveChangesAsync(cancellationToken);
-        return Success(channel.Id, "Registration channel deleted.");
+        return preparation.ExecuteAsync(request, async cancellationToken =>
+        {
+            RegistrationChannel? channel = await providerRepository.GetChannelAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, request.ChannelId, cancellationToken);
+            if (channel is null) return Failure(request.ChannelId, "registration_channel_not_found", "Registration channel was not found.");
+            channel.Remove(timeProvider.GetUtcNow().UtcDateTime);
+            await providerRepository.SaveChangesAsync(cancellationToken);
+            return Success(channel.Id, "Registration channel deleted.");
+        }, token);
     }
 }
 

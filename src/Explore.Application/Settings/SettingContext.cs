@@ -9,8 +9,10 @@ namespace Explore.Application.Settings;
 /// <param name="OrganizationId">Organization within the tenant. Null = skip org scope.</param>
 /// <param name="GroupId">Group within the organization. Null = skip group scope.</param>
 /// <param name="UserId">User preferences. Null = skip user scope.</param>
+/// <param name="RequireAuthoritativeReads">Reads the owning transaction instead of shared caches.</param>
 public sealed record SettingContext(
     Guid? TenantId = null,
     Guid? OrganizationId = null,
     Guid? GroupId = null,
-    Guid? UserId = null);
+    Guid? UserId = null,
+    bool RequireAuthoritativeReads = false);

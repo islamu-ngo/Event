@@ -1,0 +1,29 @@
+Change-Id: CHG-01M54JW5400DMGY8NGZEH7WRPV
+Title: "Keep analytics diagnostics free of caller values"
+Type: fix
+Scope: privacy
+Summary: "Preserve fixed operation diagnostics and safe feature-flag fallback without exporting analytics payloads or exceptions."
+Group: analytics-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Keep analytics identifiers, event and feature keys, endpoint credentials and exception objects out of server diagnostic exports.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose fixed provider and operation categories while disabled analytics and feature-flag failure defaults remain available.

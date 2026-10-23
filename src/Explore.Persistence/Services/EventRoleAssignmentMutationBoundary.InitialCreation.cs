@@ -34,6 +34,7 @@ public sealed partial class EventRoleAssignmentMutationBoundary
             || creation.RequestedStatus is not (EventStatusEnum.Draft or EventStatusEnum.Published)) DenyInitialCreation();
         creation = creation with { ImageIds = creation.ImageIds.Distinct().Order().ToArray() };
         InitialCreationAttempt? attempted = null;
+        var admission = new NativeHumanMutationAdmission(context, finalizer);
         EventInitialCreationWriteReceipt? writes = null;
         var settings = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
         string publisherSetting = creation.OrganizationId.HasValue ? GovernanceSettingKeys.Events.OrganizationSubmissionEnabled
@@ -139,6 +140,12 @@ public sealed partial class EventRoleAssignmentMutationBoundary
             return await privacy.ExecuteEnrollmentSerializedAsync(async privacyToken =>
                 await new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAttemptAsync(async inner =>
                 {
+                    admission.RegisterOwning(RecheckAsync, () =>
+                    {
+                        if (acquiredAt is { } start && clock.GetUtcNow().UtcDateTime < start
+                            || result?.IsSuccess == true && creation.RequestedStatus == EventStatusEnum.Published
+                                && (publication is null || !publication.PermitsAt(clock.GetUtcNow()))) DenyInitialCreation();
+                    });
                     await using var hierarchy = creation.OrganizationId is null && creation.GroupId.HasValue
                         ? await RelationalNamedLock.AcquireTransactionAsync(context, $"group-hierarchy:{creation.TenantId}", inner) : null;
                     await using var installation = await RelationalNamedLock.AcquireTransactionAsync(context,

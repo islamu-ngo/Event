@@ -103,9 +103,9 @@ public static class AuthenticationExtensions
         if (!string.IsNullOrEmpty(authority) && !string.IsNullOrEmpty(clientId))
         {
             logger.Information(
-                "Keycloak environment config detected — Authority: {Authority}, ClientId: {ClientId}, HasSecret: {HasSecret}. " +
+                "Keycloak environment config detected — HasSecret: {HasSecret}. " +
                 "Will be registered as auth scheme during initialization.",
-                authority, clientId, !string.IsNullOrEmpty(clientSecret) ? "YES" : "NO");
+                !string.IsNullOrEmpty(clientSecret));
         }
         else
         {

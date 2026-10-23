@@ -25,9 +25,34 @@ public sealed class TenantActivationCapacityPolicy(
             return TenantActivationCapacityAssessment.Unmanaged;
         }
 
-        DeploymentMode mode = knownPersistedMode
+        DeploymentMode? mode = knownPersistedMode
             ?? ResolvePersistedMode(await bootstrapStateRepository.GetCurrent(cancellationToken));
-        int maximum = mode == DeploymentMode.SingleTenant ? 1 : options.Value.MaximumTenantCount;
+        int maximumTenantCount = options.Value.MaximumTenantCount;
+        var configuration = Assess(true, requireMultiTenant, mode, maximumTenantCount, 0, 0);
+        if (configuration.FailureCode is "tenant_provisioning_requires_multi_tenant"
+            or "tenant_provisioning_capacity_not_configured")
+            return configuration;
+
+        int active = await tenantRepository.GetActiveTenantCountAsync();
+        int reserved = await operationRepository.CountActiveReservationsAsync(
+            cancellationToken,
+            excludedReservationOperationId);
+
+        return Assess(true, requireMultiTenant, mode, maximumTenantCount, active, reserved);
+    }
+
+    /// <summary>
+    /// Assesses capacity from the caller's retained source image. A missing completed
+    /// deployment mode uses the single-tenant limit; reservations consume capacity.
+    /// </summary>
+    public static TenantActivationCapacityAssessment Assess(bool isEnforced, bool requireMultiTenant,
+        DeploymentMode? persistedMode, int maximumTenantCount, int active, int reserved)
+    {
+        if (!isEnforced)
+            return TenantActivationCapacityAssessment.Unmanaged;
+
+        DeploymentMode mode = persistedMode ?? DeploymentMode.SingleTenant;
+        int maximum = mode == DeploymentMode.SingleTenant ? 1 : maximumTenantCount;
 
         if (requireMultiTenant && mode != DeploymentMode.MultiTenant)
         {
@@ -55,10 +80,6 @@ public sealed class TenantActivationCapacityPolicy(
                 "Managed tenant provisioning capacity is not configured.");
         }
 
-        int active = await tenantRepository.GetActiveTenantCountAsync();
-        int reserved = await operationRepository.CountActiveReservationsAsync(
-            cancellationToken,
-            excludedReservationOperationId);
         int available = Math.Max(0, maximum - active - reserved);
 
         return available > 0
@@ -74,10 +95,10 @@ public sealed class TenantActivationCapacityPolicy(
                 "This Event instance has no available tenant capacity.");
     }
 
-    private static DeploymentMode ResolvePersistedMode(InstanceBootstrapState? bootstrap) =>
+    private static DeploymentMode? ResolvePersistedMode(InstanceBootstrapState? bootstrap) =>
         bootstrap?.Status == InstanceBootstrapStatus.Completed
             ? bootstrap.DeploymentMode
-            : DeploymentMode.SingleTenant;
+            : null;
 }
 
 public sealed record TenantActivationCapacityAssessment(

@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Admissions;
 using Explore.Application.Features.Admissions.Handlers.Commands;
@@ -11,9 +12,7 @@ using Explore.Domain.ValueObjects;
 namespace Explore.Application.Features.Admissions.Handlers.Queries;
 
 public sealed class GetTicketTransferQueryHandler(
-    IAdmissionTicketTransferRepository repository,
-    ITenantContext tenantContext,
-    ICurrentUserService currentUser,
+    IRegistrationPrivateReader reader,
     IGuestCapabilityTokenService capabilityTokens,
     TimeProvider timeProvider) :
     IQueryHandler<GetTicketTransferQuery, TicketTransferDto?>
@@ -22,13 +21,10 @@ public sealed class GetTicketTransferQueryHandler(
         GetTicketTransferQuery query,
         CancellationToken cancellationToken = default)
     {
-        AdmissionTicketTransferAccessContext? access =
-            await repository.GetAccessAsync(
-                tenantContext.TenantId,
-                query.EventId,
-                query.AdmissionTicketId,
-                query.AdmissionTicketTransferId,
-                cancellationToken);
+        var graph = await reader.ReadAsync(new(RegistrationPrivateReadKind.Transfer,
+            query.EventId, TicketId: query.AdmissionTicketId, TransferId: query.AdmissionTicketTransferId),
+            query.CapabilityToken, cancellationToken);
+        AdmissionTicketTransferAccessContext? access = graph?.Transfer;
         if (access is null)
         {
             return null;
@@ -40,7 +36,7 @@ public sealed class GetTicketTransferQueryHandler(
             && capabilityTokens.Matches(
                 query.CapabilityToken,
                 CapabilityTokenHash.Create(access.Transfer.CapabilityDigest));
-        Guid? userId = currentUser.UserId;
+        Guid? userId = graph!.PrincipalId;
         bool sourceAuthority = userId.HasValue
             && (access.SourceParticipant.LinkedUserId == userId
                 || access.Order.AccountUserId == userId);
@@ -63,7 +59,7 @@ public sealed class GetTicketTransferQueryHandler(
                 && access.Transfer.StatusId ==
                 (int)AdmissionTicketTransferStatus.Accepted,
             canAccept: capabilityValid
-                && currentUser.IsAuthenticated
+                && userId.HasValue
                 && access.Transfer.IsOpen,
             canCancel: sourceAuthority && access.Transfer.IsOpen,
             canCorrect: holderAuthority

@@ -47,10 +47,21 @@ public sealed class CompositeOutboxMessageDispatcher(
     ILogger<CompositeOutboxMessageDispatcher> logger,
     IConfigurationManifestEffectDispatcher configurationManifestEffectDispatcher,
     IConfigurationImportEffectDelivery configurationImportEffectDelivery,
-    IModerationEffectDispatcher moderationEffectDispatcher) : IOutboxMessageDispatcher
+    IModerationEffectDispatcher moderationEffectDispatcher,
+    INotificationOutboxExecutionAuthority notificationOutboxExecutionAuthority,
+    IGenericOutboxExecutionAuthority genericOutboxExecutionAuthority) : IOutboxMessageDispatcher
 {
     public async Task DispatchAsync(OutboxMessage message, CancellationToken ct = default)
     {
+        if (NotificationOutboxRoutes.Contains(message.EventType))
+            await notificationOutboxExecutionAuthority.RequireAsync(message, ct);
+        if (GenericOutboxRoutes.Contains(message.EventType))
+        {
+            if (message.Status == OutboxMessageStatus.DeadLettered)
+                await genericOutboxExecutionAuthority.RequireDeadLetterAsync(message, ct);
+            else
+                await genericOutboxExecutionAuthority.RequireAsync(message, ct);
+        }
         switch (message.EventType)
         {
             case ModerationEffectOutboxMessageFactory.EventType:
@@ -93,7 +104,7 @@ public sealed class CompositeOutboxMessageDispatcher(
 
             case ConfigurationManifestEffectOutbox.EventType:
                 await configurationManifestEffectDispatcher.DispatchAsync(
-                    message.AggregateId,
+                    message,
                     ct);
                 return;
 
@@ -108,29 +119,27 @@ public sealed class CompositeOutboxMessageDispatcher(
                     message.Payload ?? throw new InvalidOperationException("Operator import audit is missing."))
                     ?? throw new InvalidOperationException("Operator import audit is invalid.");
                 logger.LogInformation(
-                    "Operator identity audit delivered: EventType={EventType} MessageId={MessageId} Status={Status}",
-                    OperatorIdentityImportAudit.EventType, message.Id, "recorded");
+                    "Operator identity audit delivered: EventType={EventType} Status={Status}",
+                    OperatorIdentityImportAudit.EventType, "recorded");
                 return;
 
             case RegistrationOrderOutboxMessageFactory.RejectedEventType:
             case RegistrationOrderOutboxMessageFactory.ConfirmedEventType:
-                logger.LogInformation("Recorded registration-order lifecycle outbox message {MessageId} after commit.", message.Id);
+                logger.LogInformation("Recorded registration-order lifecycle outbox message after commit.");
                 return;
 
             case RegistrationOrderOutboxMessageFactory.CancelledEventType:
                 RegistrationOrderLifecycleOutboxPayload cancelled =
                     RegistrationOrderOutboxMessageFactory.ReadLifecycle(message);
                 AdmissionRevocationResult cancellationResult =
-                    await admissionRevocationService.ReconcileAsync(
-                        new AdmissionRevocationRequest(
+                    await admissionRevocationService.ReconcileCommittedCancellationAsync(
+                        new AdmissionCommittedCancellationRequest(
                             cancelled.TenantId,
                             cancelled.RegistrationOrderId,
-                            AdmissionRevocationService.OrderCancellationReason,
-                            []),
+                            cancelled.EventId,
+                            AdmissionCancellationSource.Order),
                         ct);
-                if (cancellationResult.Outcome is
-                    AdmissionRevocationOutcome.InvalidRequest or
-                    AdmissionRevocationOutcome.InvalidAllocation)
+                if (cancellationResult.Outcome != AdmissionRevocationOutcome.Applied)
                 {
                     throw new InvalidOperationException("Durable order cancellation admission facts are invalid.");
                 }
@@ -203,17 +212,16 @@ public sealed class CompositeOutboxMessageDispatcher(
             payload.TenantId, payload.RefundAttemptId, cancellationToken);
         if (attempt is null)
         {
-            return;
+            throw new InvalidOperationException("Refund dispatch source is unavailable.");
         }
 
-        if (attempt.Status == RefundAttemptStatusEnum.DispatchPending)
+        if (attempt.CanDispatchBuyer && attempt.NoProviderHandoffProvenAt.HasValue)
         {
             businessMetrics.RecordRefundOperation("dispatch", attempt.Status.ToString(), "retry");
             throw new InvalidOperationException("Refund dispatch remains safely retryable before provider handoff.");
         }
         businessMetrics.RecordRefundOperation("dispatch", attempt.Status.ToString(), "completed");
         await ReconcileAdmissionRefundAsync(attempt, cancellationToken);
-        await ScheduleReconciliationAsync(attempt, cancellationToken);
         if (attempt.Status == RefundAttemptStatusEnum.RequiresAction && attempt.SourceCampaignId.HasValue)
         {
             await refundCampaignRepository.RequireOperatorAsync(
@@ -232,26 +240,12 @@ public sealed class CompositeOutboxMessageDispatcher(
             payload.TenantId, payload.RefundAttemptId, cancellationToken);
         if (attempt is null)
         {
-            return;
+            throw new InvalidOperationException("Refund reconciliation source is unavailable.");
         }
 
         businessMetrics.RecordRefundOperation("reconcile", attempt.Status.ToString(), "completed");
         await ReconcileAdmissionRefundAsync(attempt, cancellationToken);
-        await ScheduleReconciliationAsync(attempt, cancellationToken);
         await RefreshCampaignAsync(attempt, cancellationToken);
-    }
-
-    private Task ScheduleReconciliationAsync(RefundAttempt attempt, CancellationToken cancellationToken)
-    {
-        if (attempt.Status is not (RefundAttemptStatusEnum.Pending or RefundAttemptStatusEnum.RequiresAction or RefundAttemptStatusEnum.Unknown) ||
-            attempt.Status == RefundAttemptStatusEnum.RequiresAction && attempt.FailureCode is not null)
-        {
-            return Task.CompletedTask;
-        }
-
-        DateTime now = timeProvider.GetUtcNow().UtcDateTime;
-        return outboxRepository.Create(
-            RefundOutboxMessageFactory.CreateReconciliation(attempt, now, now.AddMinutes(1)));
     }
 
     private Task RefreshCampaignAsync(RefundAttempt attempt, CancellationToken cancellationToken) =>
@@ -287,6 +281,8 @@ public sealed class CompositeOutboxMessageDispatcher(
         OutboxMessage message,
         CancellationToken ct = default)
     {
+        if (GenericOutboxRoutes.SupportsDeadLetter(message.EventType))
+            await genericOutboxExecutionAuthority.RequireDeadLetterAsync(message, ct);
         switch (message.EventType)
         {
             case ModerationEffectOutboxMessageFactory.EventType:
@@ -299,7 +295,7 @@ public sealed class CompositeOutboxMessageDispatcher(
 
             case ConfigurationManifestEffectOutbox.EventType:
                 await configurationManifestEffectDispatcher.DispatchAsync(
-                    message.AggregateId,
+                    message,
                     ct);
                 return;
 
@@ -366,11 +362,12 @@ public sealed class CompositeOutboxMessageDispatcher(
 
         var request = JsonSerializer.Deserialize<EventPublishedNotificationFanoutRequested>(message.Payload)
             ?? throw new JsonException($"Failed to deserialize notification fanout payload for message {message.Id}.");
+        if (message.AggregateType != "Event" || message.AggregateId == Guid.Empty
+            || message.AggregateId != request.EventId)
+            throw new InvalidOperationException("The publication fanout Event envelope is invalid.");
 
         logger.LogInformation(
-            "Dispatching internal notification fanout for event {EventId} from outbox message {MessageId}",
-            request.EventId,
-            message.Id);
+            "Dispatching internal notification fanout");
 
         await notificationFanoutService.FanoutAsync(request, cancellationToken);
     }
@@ -384,17 +381,20 @@ public sealed class CompositeOutboxMessageDispatcher(
 
         var request = JsonSerializer.Deserialize<EventLightModeratedNotificationFanoutRequested>(message.Payload)
             ?? throw new JsonException($"Failed to deserialize light moderation notification fanout payload for message {message.Id}.");
+        if (message.AggregateType != "Event" || message.AggregateId == Guid.Empty
+            || message.AggregateId != request.EventId)
+            throw new InvalidOperationException("The light moderation fanout Event envelope is invalid.");
 
         logger.LogInformation(
-            "Dispatching internal light moderation notification fanout for event {EventId} from outbox message {MessageId}",
-            request.EventId,
-            message.Id);
+            "Dispatching internal light moderation notification fanout");
 
         await moderationNotificationFanoutService.FanoutLightModerationAsync(request, cancellationToken);
     }
 
     private async Task DispatchHeavyRedactionNotificationFanoutAsync(OutboxMessage message, CancellationToken cancellationToken)
     {
+        if (message.AggregateType != "Event" || message.AggregateId == Guid.Empty)
+            throw new InvalidOperationException("The retained heavy moderation Event envelope is invalid.");
         if (string.IsNullOrWhiteSpace(message.Payload))
         {
             throw new InvalidOperationException($"Outbox message {message.Id} has no payload for heavy redaction notification fanout.");
@@ -409,6 +409,7 @@ public sealed class CompositeOutboxMessageDispatcher(
         {
             await outboxRepository.TryReplaceProcessingPayloadAsync(
                 message.Id,
+                message.NextRetryAt ?? throw new InvalidOperationException("The original processing claim is required."),
                 message.Payload,
                 EventHeavyRedactedNotificationFanoutPayloadParser.SafeInvalidPayload,
                 cancellationToken);
@@ -419,6 +420,7 @@ public sealed class CompositeOutboxMessageDispatcher(
         {
             bool scrubbed = await outboxRepository.TryReplaceProcessingPayloadAsync(
                 message.Id,
+                message.NextRetryAt ?? throw new InvalidOperationException("The original processing claim is required."),
                 message.Payload,
                 parsed.NormalizedPayload,
                 cancellationToken);
@@ -431,10 +433,9 @@ public sealed class CompositeOutboxMessageDispatcher(
         }
 
         logger.LogInformation(
-            "Dispatching internal heavy redaction notification fanout for moderation record {ModerationRecordId} from outbox message {MessageId}",
-            parsed.Request.ModerationRecordId,
-            message.Id);
+            "Dispatching internal heavy redaction notification fanout");
 
-        await moderationNotificationFanoutService.FanoutHeavyRedactionAsync(parsed.Request, cancellationToken);
+        await moderationNotificationFanoutService.FanoutHeavyRedactionAsync(
+            parsed.Request, message.AggregateId, cancellationToken);
     }
 }

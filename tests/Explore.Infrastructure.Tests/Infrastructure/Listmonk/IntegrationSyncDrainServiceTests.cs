@@ -25,8 +25,7 @@ public sealed class IntegrationSyncDrainServiceTests
     {
         var outbox = CreateOutbox();
         var fixture = new Fixture(_ => JsonResponse(HttpStatusCode.OK, "{\"data\":{\"id\":123}}"));
-        fixture.Repository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns([outbox]);
+        fixture.ConfigureCandidate(outbox);
         fixture.Repository.TryClaimAsync(Arg.Any<IntegrationSyncClaimRequest>(), Arg.Any<CancellationToken>())
             .Returns(true);
         fixture.ConfigureActiveClaim(outbox);
@@ -44,8 +43,7 @@ public sealed class IntegrationSyncDrainServiceTests
     {
         var outbox = CreateOutbox();
         var fixture = new Fixture(_ => throw new InvalidOperationException("HTTP should not be called."));
-        fixture.Repository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns([outbox]);
+        fixture.ConfigureCandidate(outbox);
         fixture.Repository.TryClaimAsync(Arg.Any<IntegrationSyncClaimRequest>(), Arg.Any<CancellationToken>())
             .Returns(false);
 
@@ -62,8 +60,7 @@ public sealed class IntegrationSyncDrainServiceTests
     {
         var outbox = CreateOutbox();
         var fixture = new Fixture(_ => throw new InvalidOperationException("HTTP should not be called."));
-        fixture.Repository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns([outbox]);
+        fixture.ConfigureCandidate(outbox);
         fixture.Repository.TryClaimAsync(Arg.Any<IntegrationSyncClaimRequest>(), Arg.Any<CancellationToken>())
             .Returns(true);
         fixture.ConfigureMissingActiveClaim(outbox);
@@ -82,8 +79,7 @@ public sealed class IntegrationSyncDrainServiceTests
     {
         var outbox = CreateOutbox();
         var fixture = new Fixture(_ => throw new InvalidOperationException("HTTP should not be called."));
-        fixture.Repository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns([outbox]);
+        fixture.ConfigureCandidate(outbox);
         fixture.Repository.TryClaimAsync(Arg.Any<IntegrationSyncClaimRequest>(), Arg.Any<CancellationToken>())
             .Returns(true);
         fixture.ConfigureActiveClaim(outbox);
@@ -111,8 +107,7 @@ public sealed class IntegrationSyncDrainServiceTests
         var outbox = CreateOutbox();
         outbox.UserId = null;
         var fixture = new Fixture(_ => throw new InvalidOperationException("HTTP should not be called."));
-        fixture.Repository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns([outbox]);
+        fixture.ConfigureCandidate(outbox);
         fixture.Repository.TryClaimAsync(Arg.Any<IntegrationSyncClaimRequest>(), Arg.Any<CancellationToken>())
             .Returns(true);
         fixture.ConfigureActiveClaim(outbox);
@@ -138,8 +133,7 @@ public sealed class IntegrationSyncDrainServiceTests
         var fixture = new Fixture(_ => throw new InvalidOperationException("HTTP should not be called."));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        fixture.Repository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns([outbox]);
+        fixture.ConfigureCandidate(outbox);
         fixture.Repository.TryClaimAsync(Arg.Any<IntegrationSyncClaimRequest>(), Arg.Any<CancellationToken>())
             .Returns(true);
         fixture.ConfigureActiveClaim(outbox);
@@ -159,8 +153,7 @@ public sealed class IntegrationSyncDrainServiceTests
     {
         var outbox = CreateOutbox();
         var fixture = new Fixture(_ => JsonResponse(HttpStatusCode.InternalServerError, "{\"error\":\"down\"}"));
-        fixture.Repository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns([outbox]);
+        fixture.ConfigureCandidate(outbox);
         fixture.Repository.TryClaimAsync(Arg.Any<IntegrationSyncClaimRequest>(), Arg.Any<CancellationToken>())
             .Returns(true);
         fixture.ConfigureActiveClaim(outbox);
@@ -181,10 +174,9 @@ public sealed class IntegrationSyncDrainServiceTests
         outbox.Status = IntegrationSyncStatus.Processing;
         outbox.ProcessingLeaseToken = Guid.CreateVersion7();
         outbox.ProcessingStartedAt = DateTime.UtcNow.AddMinutes(-10);
-        outbox.LastError = IntegrationSyncFailureCodes.ProviderHandoffInDoubt;
+        outbox.EvidenceKind = IntegrationSyncEvidenceKind.ProviderHandoffInDoubt;
         var fixture = new Fixture(_ => throw new InvalidOperationException("HTTP should not be called."));
-        fixture.Repository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns([outbox]);
+        fixture.ConfigureCandidate(outbox);
 
         IntegrationSyncDrainResult result = await fixture.Service.ProcessBatchAsync(CancellationToken.None);
 
@@ -206,8 +198,7 @@ public sealed class IntegrationSyncDrainServiceTests
     {
         var outbox = CreateOutbox("{");
         var fixture = new Fixture(_ => throw new InvalidOperationException("HTTP should not be called."));
-        fixture.Repository.GetPendingBatch(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns([outbox]);
+        fixture.ConfigureCandidate(outbox);
         fixture.Repository.TryClaimAsync(Arg.Any<IntegrationSyncClaimRequest>(), Arg.Any<CancellationToken>())
             .Returns(true);
         fixture.ConfigureActiveClaim(outbox);
@@ -275,6 +266,7 @@ public sealed class IntegrationSyncDrainServiceTests
         {
             Handler = new RecordingMessageHandler(responseFactory);
             Repository = Substitute.For<IIntegrationSyncOutboxRepository>();
+            Discovery = Substitute.For<IIntegrationSyncQueueDiscovery>();
             PrivacyErasureStateRepository = Substitute.For<IPrivacyErasureStateRepository>();
             PrivacyErasureStateRepository.GetBySubjectAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                 .Returns((PrivacyErasureSaga?)null);
@@ -339,6 +331,7 @@ public sealed class IntegrationSyncDrainServiceTests
 
             var services = new ServiceCollection();
             services.AddSingleton(Repository);
+            services.AddSingleton(Discovery);
             services.AddSingleton(PrivacyErasureStateRepository);
             services.AddSingleton(settingsResolver);
             services.AddSingleton(secretResolver);
@@ -362,9 +355,18 @@ public sealed class IntegrationSyncDrainServiceTests
 
         public RecordingMessageHandler Handler { get; }
         public IIntegrationSyncOutboxRepository Repository { get; }
+        private IIntegrationSyncQueueDiscovery Discovery { get; }
         public IPrivacyErasureStateRepository PrivacyErasureStateRepository { get; }
         public IntegrationSyncDrainService Service { get; }
         private ServiceProvider ServiceProvider { get; }
+
+        public void ConfigureCandidate(IntegrationSyncOutbox outbox)
+        {
+            Discovery.GetPendingAsync(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+                .Returns([new IntegrationSyncQueueCandidate(outbox.TenantId, outbox.Id)]);
+            Repository.GetPendingAsync(outbox.Id, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+                .Returns(outbox);
+        }
 
         public void ConfigureActiveClaim(IntegrationSyncOutbox outbox)
         {

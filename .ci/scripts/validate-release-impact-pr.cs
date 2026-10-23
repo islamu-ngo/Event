@@ -43,7 +43,8 @@ try
 {
     changedFiles = await GetChangedFilesAsync(filesUri);
 }
-catch (Exception exception) when (exception is HttpRequestException or OperationCanceledException or JsonException)
+catch (Exception exception) when (exception is HttpRequestException or OperationCanceledException or JsonException
+    or IOException or UnauthorizedAccessException)
 {
     Console.WriteLine("Release impact validation failed: changed-file metadata is unavailable.");
     return 1;
@@ -131,10 +132,12 @@ return 0;
 
 static async Task<List<GitHubChangedFile>?> GetChangedFilesAsync(Uri? filesUri)
 {
-    var metadata = Environment.GetEnvironmentVariable("RELEASE_IMPACT_FILE_METADATA");
-    if (!string.IsNullOrWhiteSpace(metadata))
+    var metadataPath = Environment.GetEnvironmentVariable("RELEASE_IMPACT_FILE_METADATA_PATH");
+    if (!string.IsNullOrWhiteSpace(metadataPath))
     {
-        using var document = JsonDocument.Parse(metadata);
+        if (new FileInfo(metadataPath).Length > 16 * 1024 * 1024) return null;
+        await using var stream = File.OpenRead(metadataPath);
+        using var document = await JsonDocument.ParseAsync(stream);
         return ReadChangedFiles(document.RootElement);
     }
 

@@ -4,6 +4,7 @@ using System.Net.Security;
 using System.Text;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
+using Event.Testing.DataProtection;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -12,6 +13,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -390,7 +392,7 @@ public class CrossTenantIsolationTests : IAsyncDisposable
         cerbosConfigResolver.ResolveAsync(Arg.Any<CancellationToken>()).Returns((CerbosConfiguration?)null);
 
         return new IsolationWebApplicationFactory(
-            _keycloak.Authority, _keycloak.MetadataAddress,
+            _keycloak.Authority, _keycloak.MetadataAddress, _keycloak.TokenClient,
             adminContext, tenantContext, cerbosConfigResolver);
     }
 
@@ -400,6 +402,8 @@ public class CrossTenantIsolationTests : IAsyncDisposable
 
     private sealed class IsolationWebApplicationFactory : WebApplicationFactory<Program>
     {
+        private readonly KeycloakTokenClient _keycloakTokens;
+        private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
         private readonly string _keycloakAuthority;
         private readonly string _keycloakMetadataAddress;
         private readonly IAdminContext _adminContext;
@@ -409,10 +413,12 @@ public class CrossTenantIsolationTests : IAsyncDisposable
         public IsolationWebApplicationFactory(
             string keycloakAuthority,
             string keycloakMetadataAddress,
+            KeycloakTokenClient keycloakTokens,
             IAdminContext adminContext,
             ITenantContext tenantContext,
             ICerbosConfigResolver cerbosConfigResolver)
         {
+            _keycloakTokens = keycloakTokens;
             _keycloakAuthority = keycloakAuthority;
             _keycloakMetadataAddress = keycloakMetadataAddress;
             _adminContext = adminContext;
@@ -457,7 +463,7 @@ public class CrossTenantIsolationTests : IAsyncDisposable
             {
                 services.RemoveExploreDbContextRegistrations();
 
-                services.AddInMemoryExploreDbContext($"IsolationDb_{Guid.NewGuid():N}");
+                services.AddKeycloakSecurityDbContext($"IsolationDb_{Guid.NewGuid():N}", _keycloakTokens, _tenantContext.TenantId);
 
                 services.RemoveAll<IDistributedCache>();
                 services.AddDistributedMemoryCache();
@@ -476,6 +482,8 @@ public class CrossTenantIsolationTests : IAsyncDisposable
 
             builder.ConfigureTestServices(services =>
             {
+                services.RemoveAll<IExternalDataProtectionSource>();
+                services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
                 {
                     options.RequireHttpsMetadata = false;
@@ -541,9 +549,11 @@ public class CrossTenantIsolationTests : IAsyncDisposable
             }
 
             var bootstrappedAt = DateTime.UtcNow;
+            var administratorId = Guid.CreateVersion7();
+            dbContext.Users.Add(new UserBuilder().WithId(administratorId).Build());
             var bootstrap = InstanceBootstrapState.CreateInteractivePending(
                 Guid.CreateVersion7(), DeploymentMode.MultiTenant, bootstrappedAt);
-            bootstrap.CompleteInteractive(Guid.CreateVersion7(), bootstrappedAt);
+            bootstrap.CompleteInteractive(administratorId, bootstrappedAt);
             dbContext.InstanceBootstrapStates.Add(bootstrap);
 
             dbContext.SystemSettings.Add(new Explore.Domain.SystemSetting

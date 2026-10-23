@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
@@ -6,13 +7,11 @@ using Event.Api.IntegrationTests.Seeds;
 using Explore.API.Controllers;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.InstanceAdmin;
 using Explore.Application.Features.InstanceAdmin.Plans;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Features.InstanceAdmin.Requests.Queries;
-using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -112,9 +111,9 @@ public sealed class NativeInstanceAdminHttpTests
     [Test]
     public async Task PlanAuthoring_PreservesPublishedVersionImmutabilityAndHalState()
     {
-        await using var factory = await InstanceAdminFactory.CreateAsync();
-        var seed = await SeedAsync(factory);
-        using var admin = Client(factory, seed.AdminId);
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
+        await SeedPlanAdministratorAsync(fixture);
+        using var admin = await PlanClientAsync(fixture);
         await PostAsync(admin, "/plans", Draft());
         var draft = await PlanAsync(admin, "native-plan");
         Guid versionId = draft.GetProperty("versions")[0].GetProperty("id").GetGuid();
@@ -144,9 +143,9 @@ public sealed class NativeInstanceAdminHttpTests
     [Test]
     public async Task AssignmentAndSettingTransitions_KeepPinnedVersionsAndExplicitApplicationSeparate()
     {
-        await using var factory = await InstanceAdminFactory.CreateAsync();
-        var seed = await SeedAsync(factory);
-        using var admin = Client(factory, seed.AdminId);
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
+        var seed = await SeedPlanAdministratorAsync(fixture);
+        using var admin = await PlanClientAsync(fixture);
         await PostAsync(admin, "/plans", Draft());
         Guid firstVersion = (await PlanAsync(admin, "native-plan")).GetProperty("versions")[0].GetProperty("id").GetGuid();
         await PostAsync(admin, $"/plans/versions/{firstVersion}/publish", new PublishTenantPlanVersionRequest(TenantPlanExistingAssignmentPolicy.LeaveExistingTenantsPinned));
@@ -207,9 +206,9 @@ public sealed class NativeInstanceAdminHttpTests
     [Test]
     public async Task PublishingWithMovePolicy_UpdatesBothTenantAssignmentsWithoutRewritingPublishedContent()
     {
-        await using var factory = await InstanceAdminFactory.CreateAsync();
-        var seed = await SeedAsync(factory);
-        using var admin = Client(factory, seed.AdminId);
+        await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync();
+        var seed = await SeedPlanAdministratorAsync(fixture);
+        using var admin = await PlanClientAsync(fixture);
         await PostAsync(admin, "/plans", Draft());
         Guid originalVersionId = (await PlanAsync(admin, "native-plan")).GetProperty("versions")[0].GetProperty("id").GetGuid();
         await PostAsync(admin, $"/plans/versions/{originalVersionId}/publish",
@@ -320,6 +319,73 @@ public sealed class NativeInstanceAdminHttpTests
                 ? TestAuthHandler.CreateInstanceAdminHeaderValue(userId.Value)
                 : TestAuthHandler.CreateAuthHeaderValue(userId.Value));
         return client;
+    }
+
+    private static async Task<HttpClient> PlanClientAsync(LocalIdentityLifecycleHttpFixture fixture)
+    {
+        fixture.Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await fixture.SignInAsync());
+        fixture.Client.DefaultRequestHeaders.Add("X-Tenant-Slug", "local-admission");
+        return fixture.Client;
+    }
+
+    private static async Task<SeedData> SeedPlanAdministratorAsync(LocalIdentityLifecycleHttpFixture fixture)
+    {
+        await using var db = fixture.Native.CreateDatabase();
+        var member = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(db);
+        var other = await TenantScenarioSeed.SeedSecondaryTenantWithUserAsync(db);
+        DateTime now = fixture.Clock.GetUtcNow().UtcDateTime;
+        Guid actorId = await db.Actors.Where(row => row.UserId == fixture.Binding.LocalSubjectId)
+            .Select(row => row.Id).SingleAsync();
+        var administrator = new TenantUser
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            UserId = fixture.Binding.LocalSubjectId,
+            User = null!,
+            ActorId = actorId,
+            Actor = null!,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = now,
+            CreatedAt = now
+        };
+        db.TenantUsers.Add(administrator);
+        db.PlatformUserRoles.Add(new PlatformUserRole
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = fixture.Binding.LocalSubjectId,
+            User = null!,
+            RoleId = (int)RoleEnum.Admin,
+            Role = null!,
+            GrantedAt = now
+        });
+        db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = administrator.TenantId,
+            Tenant = null!,
+            TenantUserId = administrator.Id,
+            TenantUser = administrator,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant,
+            GrantedAt = now
+        });
+        foreach (var (key, value) in new[]
+        {
+            (GovernanceSettingKeys.Deployment.Mode, "\"MultiTenant\""),
+            (GovernanceSettingKeys.Security.AuthorizationProvider, "\"local\"")
+        })
+        {
+            var setting = await db.SystemSettings.SingleOrDefaultAsync(row => row.SettingKey == key);
+            if (setting is null) db.SystemSettings.Add(new SystemSetting { SettingKey = key, Value = value });
+            else setting.Value = value;
+        }
+        (await db.InstanceBootstrapStates.SingleAsync()).TransitionDeploymentMode(DeploymentMode.MultiTenant);
+        await db.SaveChangesAsync();
+        await fixture.Host.Services.GetRequiredService<IDeploymentModeProvider>().InvalidateCacheAsync();
+        return new(fixture.Binding.LocalSubjectId, member.UserId, PlatformDefaults.DefaultTenantId,
+            other.TenantId, (await db.Tenants.SingleAsync(row => row.Id == other.TenantId)).Slug);
     }
 
     private static async Task<SeedData> SeedAsync(InstanceAdminFactory factory)

@@ -135,6 +135,7 @@ public class FinalizeStorageUploadSessionCommandHandler
                 session.ContentType,
                 session.Extension,
                 session.ExpectedSizeBytes,
+                session.PolicyMaxUploadBytes,
                 cancellationToken);
 
             contentForProvider = contentInspection.Content;

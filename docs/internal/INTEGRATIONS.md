@@ -21,6 +21,8 @@ Provider callback
 
 Outgoing product webhooks use `Local`, `Svix`, `Composite`, `DryRun`, or `Disabled`; see [WEBHOOKS.md](WEBHOOKS.md).
 
+The separate outbound subscriber bridge uses application-owned Listmonk delivery and recovery decisions; see [Listmonk outbox recovery evidence](integrations/listmonk-outbox.md). Its diagnostic text is not lifecycle authority.
+
 ## Incoming Routes
 
 | Route | Provider | Authentication | Behavior |

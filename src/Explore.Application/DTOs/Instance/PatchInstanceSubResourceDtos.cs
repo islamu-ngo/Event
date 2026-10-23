@@ -94,7 +94,7 @@ public sealed record AiAssistantProviderConfigurationWriteDto
 {
     public string Provider { get; init; } = string.Empty;
     public string EndpointUrl { get; init; } = string.Empty;
-    public string ApiKey { get; init; } = string.Empty;
+    public string CredentialScope { get; init; } = "none";
     public string ModelId { get; init; } = string.Empty;
     public IReadOnlyList<string> AllowedModelIds { get; init; } = [];
 }

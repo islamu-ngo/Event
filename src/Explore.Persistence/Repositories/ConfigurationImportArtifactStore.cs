@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Persistence.Entities;
+using Explore.Persistence.Security;
+using Explore.Persistence.Database.ProviderPrimitives;
 
 public sealed class ConfigurationImportArtifactRepository(
     ExploreDbContext dbContext,
@@ -43,7 +45,9 @@ public sealed class ConfigurationImportArtifactRepository(
             throw new ArgumentOutOfRangeException(nameof(expiresAt));
         string digest = ConfigurationImportDigest.ComputeBytes(artifact.Span);
         ConfigurationImportStoredArtifact? existing =
-            await dbContext.Set<ConfigurationImportStoredArtifact>()
+            ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } nativeReader
+                ? await nativeReader.ReadArtifactAsync(handle.Id, cancellationToken)
+                : await dbContext.Set<ConfigurationImportStoredArtifact>()
                 .SingleOrDefaultAsync(
                     candidate => candidate.Id == handle.Id,
                     cancellationToken);
@@ -80,9 +84,13 @@ public sealed class ConfigurationImportArtifactRepository(
             artifact.Length,
             createdAt,
             expiresAt);
-        await dbContext.Set<ConfigurationImportStoredArtifact>()
-            .AddAsync(stored, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } nativeWriter)
+            await nativeWriter.StoreArtifactAsync(stored, cancellationToken);
+        else
+        {
+            await dbContext.Set<ConfigurationImportStoredArtifact>().AddAsync(stored, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
         return Reference(stored);
     }
 
@@ -92,7 +100,9 @@ public sealed class ConfigurationImportArtifactRepository(
     {
         ArgumentNullException.ThrowIfNull(handle);
         ConfigurationImportStoredArtifact? stored =
-            await dbContext.Set<ConfigurationImportStoredArtifact>()
+            ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } nativeReader
+                ? await nativeReader.ReadArtifactAsync(handle.Id, cancellationToken)
+                : await dbContext.Set<ConfigurationImportStoredArtifact>()
                 .AsNoTracking()
                 .SingleOrDefaultAsync(
                     candidate => candidate.Id == handle.Id,
@@ -130,6 +140,11 @@ public sealed class ConfigurationImportArtifactRepository(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(handle);
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } nativeWriter)
+        {
+            await nativeWriter.DeleteArtifactAsync(handle.Id, cancellationToken);
+            return;
+        }
         ConfigurationImportStoredArtifact? stored =
             await dbContext.Set<ConfigurationImportStoredArtifact>()
                 .SingleOrDefaultAsync(

@@ -1,5 +1,6 @@
 using Explore.API.ExceptionHandling;
 using Microsoft.AspNetCore.Diagnostics;
+using Explore.API.Middleware;
 
 namespace Explore.API.Extensions;
 
@@ -11,6 +12,8 @@ public static class ExceptionHandlingExtensions
         {
             options.CustomizeProblemDetails = context =>
             {
+                context.ProblemDetails.Instance =
+                    SafeRouteMetadata.GetRouteIdentityOrClassification(context.HttpContext);
                 context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
                 context.ProblemDetails.Extensions["timestamp"] = DateTimeOffset.UtcNow;
                 context.ProblemDetails.Extensions["correlationId"] =
@@ -32,7 +35,12 @@ public static class ExceptionHandlingExtensions
 
     public static IApplicationBuilder UseApiExceptionHandling(this IApplicationBuilder app)
     {
-        app.UseExceptionHandler();
+        // Native handlers own bounded logs and status. Framework exception
+        // diagnostics may include raw provider messages even when handled.
+        app.UseExceptionHandler(new ExceptionHandlerOptions
+        {
+            SuppressDiagnosticsCallback = _ => true
+        });
         app.UseStatusCodePages(async statusCodeContext =>
         {
             var httpContext = statusCodeContext.HttpContext;

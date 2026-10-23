@@ -75,6 +75,7 @@ public sealed class EventResourceContentController(
     }
 
     [HttpGet("{id:guid}/content", Name = RouteNames.GetEventResourceContent)]
+    [SandboxedFileResponse]
     [AllowAnonymous]
     [RequestTimeout(RequestTimeoutExtensions.DefaultPolicy)]
     [ProducesResponseType(typeof(byte[]), StatusCodes.Status200OK)]

@@ -10,6 +10,39 @@ namespace Explore.Persistence.Database.ProviderPrimitives;
 
 internal static class AtprotoJetstreamCommitFence
 {
+    /// <summary>Classifies a rolled-back serialization failure using a fresh, read-only statement.</summary>
+    internal static async Task<bool> ReadCurrentAsync(
+        ExploreDbContext dbContext, AtprotoJetstreamClaim claim, CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.CurrentTransaction is not null)
+            throw new InvalidOperationException("The post-rollback claim probe requires a fresh transaction boundary.");
+        if (!dbContext.Database.IsNpgsql())
+        {
+            DateTime now = DateTime.UtcNow;
+            return await dbContext.AtprotoJetstreamConsumerStates.AsNoTracking().AnyAsync(value =>
+                value.Id == claim.ConsumerStateId && value.Service == claim.Service
+                && value.LeaseToken == claim.LeaseToken && value.LeaseFence == claim.LeaseFence
+                && value.LeaseExpiresAt > now, cancellationToken);
+        }
+        var entity = dbContext.Model.FindEntityType(typeof(AtprotoJetstreamConsumerState))!;
+        var store = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+        var sql = dbContext.GetService<ISqlGenerationHelper>();
+        string table = sql.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+        string id = ResolveColumn(dbContext, store, value => value.Id);
+        string service = ResolveColumn(dbContext, store, value => value.Service);
+        string token = ResolveColumn(dbContext, store, value => value.LeaseToken);
+        string fence = ResolveColumn(dbContext, store, value => value.LeaseFence);
+        string expires = ResolveColumn(dbContext, store, value => value.LeaseExpiresAt);
+        string query = $$"""
+            SELECT CASE WHEN EXISTS (SELECT 1 FROM {{table}}
+                WHERE {{id}} = {0} AND {{service}} = {1} AND {{token}} = {2} AND {{fence}} = {3}
+                  AND {{expires}} > clock_timestamp()) THEN 1 ELSE 0 END AS "Value"
+            """;
+        return await dbContext.Database.SqlQueryRaw<int>(
+            query, claim.ConsumerStateId, claim.Service, claim.LeaseToken, claim.LeaseFence)
+            .SingleAsync(cancellationToken) == 1;
+    }
+
     public static async Task<bool> IsCurrentAsync(
         ExploreDbContext dbContext,
         AtprotoJetstreamClaim claim,
@@ -52,7 +85,7 @@ internal static class AtprotoJetstreamCommitFence
     private static string ResolveColumn(
         ExploreDbContext dbContext,
         StoreObjectIdentifier storeObject,
-        Expression<Func<AtprotoJetstreamConsumerState, object>> expression)
+        Expression<Func<AtprotoJetstreamConsumerState, object?>> expression)
     {
         Expression body = expression.Body is UnaryExpression unary
             ? unary.Operand

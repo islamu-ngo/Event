@@ -1,0 +1,29 @@
+Change-Id: CHG-01M55HQQS0PET27FKBB7BA6G8D
+Title: "Align programme project references and dependency locks"
+Type: fix
+Scope: self-hosting
+Summary: "Record project-reference and restore metadata required by the existing native authority and isolated hosting changes without adding implementation during packaging."
+Group: staged-programme-dependencies
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Record project-reference and restore metadata required by the existing native authority and isolated hosting changes without adding implementation during packaging.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Review the paired public operator guidance and complete final composed assurance before release. Packaging does not establish deployment readiness.

@@ -3,6 +3,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using Explore.Persistence.Extensions;
+using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -10,7 +11,8 @@ using Explore.Domain.Services.Discovery;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext)
+public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext,
+    PublicEventDiscoveryReadBindingFactory? publicDiscoveryBindings = null)
     : IAtprotoEventProjectionRepository
 {
     public async Task<(IReadOnlyList<AtprotoEventProjection> Items, int TotalCount)> GetPublicWindowAsync(
@@ -29,6 +31,8 @@ public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext)
         AtprotoEventProjectionQuery query, EventDiscoverySourceCursor? after, CancellationToken cancellationToken)
     {
         RequireDiscoveryTransaction();
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.SeekRemoteAsync(PublicDiscoveryBinding(), query, after, cancellationToken);
         ArgumentOutOfRangeException.ThrowIfLessThan(query.Take, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(query.Take, 1000);
         var filtered = FilteredQuery(query);
@@ -62,6 +66,8 @@ public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext)
         AtprotoEventProjectionQuery query, IReadOnlyCollection<Guid> recordIds, CancellationToken cancellationToken)
     {
         RequireDiscoveryTransaction();
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.MembersRemoteAsync(PublicDiscoveryBinding(), query, recordIds, cancellationToken);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(recordIds.Count, 100);
         return await PortableInstants(FilteredQuery(query))
             .Where(value => recordIds.Contains(value.AtprotoRecordId))
@@ -117,6 +123,8 @@ public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext)
         IReadOnlyCollection<Guid> atprotoRecordIds,
         CancellationToken cancellationToken)
     {
+        if (DiscoveryRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.VisibleRemoteRecordsAsync(PublicDiscoveryBinding(), atprotoRecordIds, cancellationToken);
         if (atprotoRecordIds.Count == 0)
         {
             return [];
@@ -187,6 +195,13 @@ public sealed class AtprotoEventProjectionRepository(ExploreDbContext dbContext)
         AtprotoEventDiscoverySort sort,
         bool descending) =>
         AtprotoEventProjectionTemporalQuery.Order(dbContext, query, sort, descending);
+
+    private PublicEventDiscoveryReadBinding? _publicDiscoveryReadBinding;
+
+    private PublicEventDiscoveryReadBinding PublicDiscoveryBinding() =>
+        _publicDiscoveryReadBinding ??= (publicDiscoveryBindings
+            ?? throw new UnauthorizedAccessException("Native public discovery requires its selected binding factory."))
+            .Create(dbContext);
 
     private void RequireDiscoveryTransaction()
     {

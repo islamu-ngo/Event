@@ -98,7 +98,7 @@ public sealed class AiPromptContextBuilder
         return new AiChatProviderConfiguration(
             AiProviderDefaults.ProviderNameToId(provider),
             settings.EndpointUrl?.Trim() ?? string.Empty,
-            settings.ApiKey?.Trim() ?? string.Empty,
+            settings.CredentialScope,
             modelId.Trim());
     }
 

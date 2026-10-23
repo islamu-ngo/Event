@@ -196,6 +196,29 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
         var unrelatedEndpointSeed = CreateWebhookEndpoint(tenantA, unrelatedConsumer, webhookEndpointStatus, "https://hooks.example.invalid/unrelated", "svix-endpoint-unrelated");
         seedContext.WebhookEndpoints.AddRange(ownerEndpointA, ownerEndpointB, unrelatedEndpointSeed);
 
+        var receipts = new[]
+        {
+            (TenantId: tenantA.Id, UserId: owner.Id.ToString("D")),
+            (TenantId: tenantB.Id, UserId: owner.Id.ToString("N")),
+            (TenantId: tenantA.Id, UserId: unrelated.Id.ToString("D"))
+        }.Select(identity => new IdempotencyRecord
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = identity.TenantId,
+            Key = Guid.CreateVersion7().ToString("N"),
+            UserId = identity.UserId,
+            RequestMethod = "POST",
+            RequestTarget = $"/api/users/{identity.UserId}",
+            RequestContentType = "application/json",
+            RequestBodyHash = new string('a', 64),
+            PrincipalFingerprint = new string('b', 64),
+            StatusCode = 201,
+            ResponseBody = "private receipt",
+            ContentType = "text/plain",
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddHours(1)
+        }).ToArray();
+        seedContext.IdempotencyRecords.AddRange(receipts);
         await seedContext.SaveChangesAsync();
         string unrelatedIntegrationPayloadBefore = await seedContext.IntegrationSyncOutbox
             .AsNoTracking()
@@ -221,6 +244,20 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
         await repository.AnonymizeRetainedAuditEvidenceAsync(owner.Id, CancellationToken.None);
         await repository.EraseRegistrationAndLocalNotificationsAsync(owner.Id, CancellationToken.None);
         await repository.EraseMembershipsAndPreferencesAsync(owner.Id, CancellationToken.None);
+        var retainedReceipts = await runtimeContext.IdempotencyRecords.AsNoTracking()
+            .Where(row => receipts.Select(receipt => receipt.Id).Contains(row.Id)).ToArrayAsync();
+        await Assert.That(retainedReceipts.Length).IsEqualTo(3);
+        foreach (var original in receipts)
+        {
+            var row = retainedReceipts.Single(value => value.Id == original.Id);
+            bool erased = original.UserId != unrelated.Id.ToString("D");
+            await Assert.That(row.Key).IsEqualTo(original.Key);
+            await Assert.That(row.StatusCode).IsEqualTo(erased ? -1 : 201);
+            await Assert.That(row.UserId).IsEqualTo(erased ? null : original.UserId);
+            await Assert.That(row.ResponseBody).IsEqualTo(erased ? null : "private receipt");
+            await Assert.That(row.RequestTarget).IsEqualTo(erased ? "" : original.RequestTarget);
+            await Assert.That(row.PrincipalFingerprint).IsEqualTo(erased ? "" : original.PrincipalFingerprint);
+        }
         await Assert.That(await runtimeContext.UserExternalLogins
             .IgnoreAllFilters(TenantFilterBypassReasons.UserPrivacyErasure)
             .CountAsync(login => login.UserId == owner.Id)).IsEqualTo(0);

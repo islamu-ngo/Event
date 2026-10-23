@@ -8,12 +8,14 @@ namespace Explore.Application.Features.Footer.Handlers.Commands;
 
 public sealed class CreateFooterLinkGroupCommandHandler(
     IFooterLinkGroupRepository footerLinkGroupRepository,
-    FooterLinkMutationGuard mutationGuard)
+    FooterLinkMutationGuard mutationGuard,
+    IFooterOperationExecution footerExecution)
     : ICommandHandler<CreateFooterLinkGroupCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateFooterLinkGroupCommand request, CancellationToken cancellationToken)
     {
+        await footerExecution.RequireOwnedAsync(request, cancellationToken);
         await mutationGuard.EnsureAllowedAsync(request.TenantId, cancellationToken);
 
         var maxOrder = await footerLinkGroupRepository.GetMaxOrderAsync(request.TenantId, cancellationToken);

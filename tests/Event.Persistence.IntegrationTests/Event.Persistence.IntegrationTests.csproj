@@ -3,11 +3,15 @@
   <!-- The privacy meter factory is declared once and linked into every suite that builds
        privacy-instrumented services, so no lane invents its own meter root. -->
   <ItemGroup>
+    <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
+    <Compile Include="..\Shared\TransactionCleanupFault.cs" Link="Fixtures\TransactionCleanupFault.cs" />
     <Compile Include="..\Shared\Telemetry\EventLocationPrivacyMetricsFactory.cs" Link="Telemetry\EventLocationPrivacyMetricsFactory.cs" />
     <Compile Include="..\Shared\Moderation\ModerationMeasurementJournalAttribute.cs" Link="Moderation\ModerationMeasurementJournalAttribute.cs" />
+    <Compile Include="..\Explore.Infrastructure.Tests\Fixtures\CurrentHumanPrincipalFixture.cs" Link="Fixtures\CurrentHumanPrincipalFixture.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Explore.API\Explore.API.csproj" />
     <ProjectReference Include="..\..\src\Explore.Infrastructure\Explore.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Explore.Persistence\Explore.Persistence.csproj" />
     <ProjectReference Include="..\..\src\Explore.Persistence.Migrations.MySql\Explore.Persistence.Migrations.MySql.csproj" />
@@ -21,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="NSubstitute" />

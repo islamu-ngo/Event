@@ -271,7 +271,7 @@ public sealed class EventTicketingRowLockScenarioRunner(PostgreSqlContainerFixtu
         return new CreateEventTicketTypeCommandHandler(
             new EventRepository(context),
             catalogs,
-            new TicketTypeEntitlementResolver(new EventDayRepository(context), new EventSessionRepository(context), tenant),
+            new TicketTypeEntitlementResolver(new EventDayRepository(context), new EventSessionRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor()), tenant),
             tenant,
             new EfCoreUnitOfWork(context),
             services.GetRequiredService<HybridCache>());

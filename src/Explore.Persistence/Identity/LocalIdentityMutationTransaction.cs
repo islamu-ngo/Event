@@ -12,6 +12,7 @@ namespace Explore.Persistence.Identity;
 /// </summary>
 internal sealed class LocalIdentityMutationTransaction : IAsyncDisposable
 {
+    private readonly DbContext identity;
     private readonly ExploreDbContext application;
     private readonly IDbContextTransaction identityTransaction;
     private readonly IDbContextTransaction? applicationTransaction;
@@ -21,10 +22,11 @@ internal sealed class LocalIdentityMutationTransaction : IAsyncDisposable
     private bool completed;
     private bool nativeCommitDeferred;
 
-    private LocalIdentityMutationTransaction(ExploreDbContext application,
+    private LocalIdentityMutationTransaction(DbContext identity, ExploreDbContext application,
         IDbContextTransaction identityTransaction, IDbContextTransaction? applicationTransaction,
         bool ownsIdentityTransaction, string? savepoint, PrivacyIdentityFenceOperation identityFence)
     {
+        this.identity = identity;
         this.application = application;
         this.identityTransaction = identityTransaction;
         this.applicationTransaction = applicationTransaction;
@@ -54,7 +56,7 @@ internal sealed class LocalIdentityMutationTransaction : IAsyncDisposable
                 primary = await application.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
             if (savepoint is not null)
                 await application.Database.CurrentTransaction!.CreateSavepointAsync(savepoint, token);
-            return new(application, native, primary, !(shared && adopted), savepoint, identityFence);
+            return new(identity, application, native, primary, !(shared && adopted), savepoint, identityFence);
         }
         catch
         {
@@ -64,12 +66,25 @@ internal sealed class LocalIdentityMutationTransaction : IAsyncDisposable
         }
     }
 
-    public async Task CommitAsync(CancellationToken token)
+    internal void RequireOwner(DbContext originalIdentity, ExploreDbContext originalApplication)
     {
+        if (completed || !ReferenceEquals(identity, originalIdentity) || !ReferenceEquals(application, originalApplication)
+            || !ReferenceEquals(identity.Database.CurrentTransaction, identityTransaction))
+            throw new UnauthorizedAccessException("Local mutation settlement requires its original selected context pair.");
+    }
+
+    public async Task CommitAsync(CancellationToken token, Action? requireCurrent = null)
+    {
+        requireCurrent?.Invoke();
         if (savepoint is null)
         {
             await application.FlushDisclosureAsync(token);
+            await application.ValidateTrustedSetupSettingsSourcesAsync(token);
+            await application.ValidateHumanCommitAdmissionsAsync(token);
             await identityFence.EnsureCurrentAsync(token);
+            application.ValidateHumanCommitAdmissionTimes();
+            application.ValidateTrustedSetupSettingsTimes();
+            requireCurrent?.Invoke();
             if (applicationTransaction is not null)
                 await applicationTransaction.CommitAsync(token);
         }
@@ -81,12 +96,21 @@ internal sealed class LocalIdentityMutationTransaction : IAsyncDisposable
             {
                 // The external Local acknowledgement must not get ahead of the primary
                 // mirror commit owned by the co-located retained authority.
-                identityFence.DeferNativeIdentityCommit(identityTransaction, () => identityTransaction.CommitAsync(token));
+                identityFence.DeferNativeIdentityCommit(identityTransaction, async () =>
+                {
+                    requireCurrent?.Invoke();
+                    await identityTransaction.CommitAsync(token);
+                    requireCurrent?.Invoke();
+                });
                 nativeCommitDeferred = true;
             }
             else
+            {
+                requireCurrent?.Invoke();
                 await identityTransaction.CommitAsync(token);
+            }
         }
+        requireCurrent?.Invoke();
         completed = true;
     }
 

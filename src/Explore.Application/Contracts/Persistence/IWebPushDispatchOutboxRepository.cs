@@ -8,29 +8,22 @@ public interface IWebPushDispatchOutboxRepository
 
     Task<bool> CreateIfNotExistsAsync(WebPushDispatchOutbox entity, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<WebPushDispatchOutbox>> GetPendingBatch(
-        int batchSize,
-        DateTime now,
-        CancellationToken cancellationToken = default);
-
-    Task<int> CountDueDispatchAsync(DateTime now, CancellationToken cancellationToken = default);
-
-    Task<int> CountRetryScheduledAsync(CancellationToken cancellationToken = default);
-
-    Task<int> CountStaleProcessingAsync(DateTime processingStartedBefore, CancellationToken cancellationToken = default);
-
-    Task<int> CountTerminalFailureAsync(CancellationToken cancellationToken = default);
-
-    Task<bool> TryMarkAsProcessing(
-        Guid id,
-        Guid leaseToken,
-        DateTime startedAt,
-        CancellationToken cancellationToken = default);
-
     Task<WebPushDispatchOutbox?> GetActiveClaimAsync(
         Guid tenantId,
         Guid dispatchId,
         Guid leaseToken,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reacquires the original live claim and its same-tenant, same-recipient subscription
+    /// with user, privacy fence, soft-delete and subscription expiry eligibility in one read.
+    /// </summary>
+    Task<WebPushDispatchOutbox?> GetSenderEntryClaimAsync(
+        Guid tenantId,
+        Guid dispatchId,
+        Guid leaseToken,
+        DateTime processingStartedAfter,
+        DateTime now,
         CancellationToken cancellationToken = default);
 
     Task<bool> MarkAsDelivered(Guid id, Guid leaseToken, DateTime deliveredAt, CancellationToken cancellationToken = default);
@@ -52,14 +45,6 @@ public interface IWebPushDispatchOutboxRepository
         string reasonCategory,
         string reasonMessage,
         DateTime skippedAt,
-        CancellationToken cancellationToken = default);
-
-    Task<int> RecoverStaleProcessing(
-        DateTime processingStartedBefore,
-        DateTime recoveredAt,
-        string failureCategory,
-        string errorMessage,
-        int batchSize,
         CancellationToken cancellationToken = default);
 
     Task<bool> MarkPermanentFailureAndDeactivateSubscription(

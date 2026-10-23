@@ -22,7 +22,7 @@ namespace Explore.Persistence.Repositories;
 /// </summary>
 public sealed partial class ModerationResourceQuarantineDutyRepository(
     ExploreDbContext context, IMachinePrincipalAccessor machine,
-    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyRepository keys,
+    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyAuthenticationRepository keys,
     IPrivacyIdentityFenceAuthority privacy, ModerationResourceReviewEscalationMaterializer notifications,
     ISettingMutationLock settings, TimeProvider clock) : IModerationResourceQuarantineDutyRepository,
     IModerationScheduleRiskReviewReconciliationRepository

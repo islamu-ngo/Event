@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Footer;
 using Explore.Application.Features.Footer.Handlers.Queries;
 using Explore.Application.Features.Footer.Requests.Queries;
@@ -33,7 +34,9 @@ public sealed class GetTenantFooterSettingsQueryHandlerTests
         var handler = new GetTenantFooterSettingsQueryHandler(
             settingsResolver,
             tenantContext,
-            deploymentModeProvider);
+            deploymentModeProvider,
+            Substitute.For<IHumanCommitScopePreparation>(),
+            Substitute.For<IFooterOperationExecution>());
 
         var result = await handler.QueryAsync(new GetTenantFooterSettingsQuery(), CancellationToken.None);
 
@@ -70,7 +73,9 @@ public sealed class GetTenantFooterSettingsQueryHandlerTests
         var handler = new GetTenantFooterSettingsQueryHandler(
             settingsResolver,
             tenantContext,
-            deploymentModeProvider);
+            deploymentModeProvider,
+            Substitute.For<IHumanCommitScopePreparation>(),
+            Substitute.For<IFooterOperationExecution>());
 
         var result = await handler.QueryAsync(new GetTenantFooterSettingsQuery(), CancellationToken.None);
 

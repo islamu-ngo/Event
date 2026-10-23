@@ -53,6 +53,64 @@ If the product needs user-defined entities, relationships, formulas, or schema m
 4. Governance reports become the path for surfacing promotion candidates.
 5. Some tenant requests for arbitrary data modeling will be rejected or deferred to a separate product initiative.
 
+## Bounded Pattern and Candidate Contract
+
+`Explore.Domain.CustomProperties.CustomPropertyPatternPolicy` owns definition
+syntax admission and value matching. Patterns have a maximum length of 2,048
+UTF-16 code units and use .NET `RegexOptions.NonBacktracking` with a 100 ms
+match timeout, without a compiled per-definition cache. Malformed syntax,
+unsupported constructs (including backreferences and lookarounds), excessive
+pattern length and match timeout fail closed. Null or empty patterns remove the
+pattern constraint; whitespace is a literal pattern, not an absent constraint.
+The non-backtracking engine's own supported syntax/complexity limits also apply.
+
+The general, event and session create DTO validators invoke this policy. They
+reject required `Options = null` and null option items before any count,
+default-option selection or entity construction can dereference those items.
+Create omission retains the DTO's empty collection: it is legal for non-option
+definitions, while option definitions require at least one valid option.
+Length bounds must be nonnegative and ordered; text defaults must meet length
+and pattern constraints, and number/date defaults must meet their bounds.
+
+All three update command handlers reconstruct a detached complete create DTO
+from stored state and the presence-aware patch, then run the same create
+validator before mutating the tracked definition. This preserves tenant
+authorization, `ExpectedConcurrencyStamp`, governance, quotas and
+repository-owned option identity/reference lifecycle. Invalid candidates leave
+description, bounds, pattern, option relationships and concurrency stamp intact.
+An invalid historical pattern must be corrected or deliberately cleared in that
+candidate, even when another metadata field is the intended edit.
+
+The wire representation of nullable patch fields is `OptionalUpdate<T>`, not
+a scalar replacement. Omission, a bare JSON null, or `hasValue: false` preserves
+the saved field. `{"hasValue":true,"value":null}` clears a nullable field,
+`{"hasValue":true,"value":""}` saves an empty string, and the same envelope with
+a nonempty value replaces it. Description clearing remains legal. Supplied
+`options` requires non-null `items`; an empty array is validated against the
+merged property type, and null entries are rejected rather than coerced.
+The existing PATCH route requires `If-Match` with the current definition stamp.
+
+`CustomPropertyRuntimeValueValidator` is shared by both event/session single
+and multi-value command handlers. It checks trimmed input length before matching
+through the Domain policy; an invalid historical pattern returns validation
+instead of throwing or using the backtracking engine. Typed shape, active-option
+membership, ordinal, duplicate-value and parent-scope checks remain in place.
+Pattern/value content and parsed URL schemes are not reflected in validation
+messages. HTTP mapping retains `validation_failed` (400) and the owning
+definition/value error key; there is no new pattern-specific HTTP code.
+
+Source regressions live in `CustomPropertyCandidateValidationTests` and the
+`PatternCandidates` partials of `CustomPropertyDefinitionPrerequisiteTests`,
+`EventCustomPropertyNativeTests` and `SessionCustomPropertyNativeTests`.
+They exercise real JSON, actual authorized native operations, unchanged tracked
+state after rejection, and fresh repository reloads from each existing SQLite
+HTTP fixture for legal clears and rejected mutations. Event/session tests also
+cover all four value commands with supported and historical unsafe patterns.
+These sources are authored but execution is deferred until the entire security
+programme implementation is complete; they are not passing-test evidence.
+Generated client PATCH/If-Match companions must be regenerated and exercised in
+that final assurance gate, never hand-edited.
+
 ## Related
 
 - [CUSTOM_PROPERTIES.md](../CUSTOM_PROPERTIES.md) — Layer 3 governance and lifecycle rules.

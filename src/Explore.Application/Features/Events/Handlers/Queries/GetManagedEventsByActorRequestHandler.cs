@@ -89,9 +89,9 @@ public class GetManagedEventsByActorRequestHandler : IQueryHandler<GetManagedEve
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Failed to authorize managed event list for actor profile; denying all management-only events.");
+            _logger.LogWarning("Failed to authorize managed event list for actor profile; denying all management-only events.");
             return [];
         }
 

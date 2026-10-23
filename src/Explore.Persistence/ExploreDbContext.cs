@@ -9,6 +9,18 @@ public partial class ExploreDbContext : DbContext
 {
     private ITenantContext? _tenantContext;
     private string? _tenantFilterBypassReason;
+    private bool _tenantLeaseBound;
+    private Guid? _tenantLeaseId;
+    private ITenantContext? _tenantLeaseIdentity;
+    internal bool IsPostgresRuntimeReady { get; set; }
+    internal bool IsConfigurationInstanceImportOwner { get; private set; }
+
+    internal void BindConfigurationInstanceImportOwner()
+    {
+        if (BindTenantLease() is not null || IsConfigurationInstanceImportOwner)
+            throw new InvalidOperationException("An instance import requires a fresh sealed global owner.");
+        IsConfigurationInstanceImportOwner = true;
+    }
 
     /// <summary>
     /// Tenant context for multi-tenant data isolation.
@@ -17,9 +29,16 @@ public partial class ExploreDbContext : DbContext
     /// </summary>
     public ITenantContext? TenantContext
     {
-        get => _tenantContext;
+        get
+        {
+            ValidateTenantLease();
+            return _tenantLeaseBound ? _tenantLeaseIdentity : _tenantContext;
+        }
         set
         {
+            ValidateTenantLease();
+            if (_tenantLeaseBound && !ReferenceEquals(_tenantContext, value))
+                throw new InvalidOperationException("tenant_lease_identity_changed");
             _tenantContext = value;
             ModerationTrustDomainId = null;
             if (value is not null)
@@ -32,7 +51,80 @@ public partial class ExploreDbContext : DbContext
     /// <summary>
     /// Tenant id consumed by global query filters. Null means no ambient tenant is bound.
     /// </summary>
-    public Guid? TenantFilterTenantId => TenantContext?.TenantId;
+    public Guid? TenantFilterTenantId
+    {
+        get
+        {
+            ValidateTenantLease();
+            return _tenantLeaseBound ? _tenantLeaseId : _tenantContext?.TenantId;
+        }
+    }
+
+    internal Guid? BindTenantLease()
+    {
+        ValidateTenantLease();
+        if (!_tenantLeaseBound)
+        {
+            _tenantLeaseId = NormalizeTenantId(_tenantContext?.TenantId);
+            _tenantLeaseIdentity = _tenantLeaseId is { } id ? new TenantLeaseIdentity(id) : null;
+            _tenantLeaseBound = true;
+        }
+        return _tenantLeaseId;
+    }
+
+    internal void ValidateTenantLease()
+    {
+        if (_tenantLeaseBound && NormalizeTenantId(_tenantContext?.TenantId) != _tenantLeaseId)
+            throw new InvalidOperationException("tenant_lease_identity_changed");
+    }
+
+    /// <summary>Requires an existing immutable owner; read admission must never mint a missing lease.</summary>
+    internal void RequireBoundTenantLease()
+    {
+        ValidateTenantLease();
+        if (!_tenantLeaseBound)
+            throw new InvalidOperationException("tenant_lease_not_bound");
+    }
+
+    public override void Dispose()
+    {
+        ClearTenantLease();
+        base.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        ClearTenantLease();
+        GC.SuppressFinalize(this);
+        return base.DisposeAsync();
+    }
+
+    private void ClearTenantLease()
+    {
+        _nativePaymentReconciliationOwner = null;
+        _nativeHumanTenantOwner = null;
+        ResetHumanCommitAdmissions();
+        ResetManagedWorkerCreationContextLease();
+        _outboxExecutionClaim = null;
+        ResetTrustedSetupSettingsAdmissions();
+        ResetNativeWebhookClaims();
+        IsPostgresRuntimeReady = false;
+        IsConfigurationInstanceImportOwner = false;
+        _tenantLeaseBound = false;
+        _tenantLeaseId = null;
+        _tenantLeaseIdentity = null;
+        _tenantContext = null;
+        _tenantFilterBypassReason = null;
+        HumanCommitContextLease = null;
+        HumanCommitAuditSubject = null;
+        CurrentUserService = null;
+    }
+
+    private static Guid? NormalizeTenantId(Guid? tenantId) =>
+        tenantId == Guid.Empty ? null : tenantId;
+
+    private sealed record TenantLeaseIdentity(Guid TenantId) : ITenantContext;
 
     /// <summary>
     /// True only for explicit system/admin flows that intentionally query across tenants.

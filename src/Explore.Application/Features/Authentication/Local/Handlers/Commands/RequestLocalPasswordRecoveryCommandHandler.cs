@@ -18,15 +18,25 @@ public sealed class RequestLocalPasswordRecoveryCommandHandler(
         if (!validation.IsValid)
             return BaseCommandResponse.Validation<Guid>(errors: ["A bounded Local account identifier is required."]);
 
-        LocalIdentityLifecycleRequest? target = await lifecycle.FindRequestByIdentifierAsync(
-            request.Request.Identifier, LocalIdentityLifecyclePurpose.PasswordRecovery, cancellationToken);
+        LocalIdentityLifecycleRequest? target;
+        try
+        {
+            target = await lifecycle.FindRequestByIdentifierAsync(
+                request.Request.Identifier, LocalIdentityLifecyclePurpose.PasswordRecovery, cancellationToken);
+        }
+        catch (Exception exception) when (LocalIdentityIntakeFailureClassifier.IsTransientStoreFailure(exception))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return BaseCommandResponse.Success(id: Guid.Empty);
+        }
         if (target is not null)
         {
-            // Even provider/configuration failures are hidden here: a target-specific call cannot establish
-            // that an outage is global. Delivery remains durable and independent of this public response.
+            // Classified pre-commit failures and ineligibility share the empty public intake response.
+            // Only recorded operations belong to durable delivery; uncommitted work has no retry promise.
             await email.RequestPasswordResetAsync(new AccountAuthorityLifecycleEmailRequest(
                 UserId: target.LocalSubjectId, ExternalLoginId: target.ExternalLoginId), cancellationToken);
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return BaseCommandResponse.Success(id: Guid.Empty);
     }
 }

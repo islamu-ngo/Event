@@ -16,6 +16,11 @@ public interface IEventReportRepository : IGenericRepository<EventReport, Guid>
         IReadOnlyList<EventReportSignal> signals,
         CancellationToken cancellationToken);
 
+    Task<EventReport?> GetByIdForProviderSyncAsync(
+        Guid tenantId,
+        Guid reportId,
+        CancellationToken cancellationToken);
+
     Task<EventReport?> GetByIdAsync(
         Guid tenantId,
         Guid reportId,
@@ -114,12 +119,4 @@ public interface IEventReportRepository : IGenericRepository<EventReport, Guid>
         DateTime olderThanUtc,
         CancellationToken cancellationToken);
 
-    Task<int> CountExternalLinksBySyncStateAsync(
-        EventReportSyncState syncState,
-        CancellationToken cancellationToken);
-
-    Task<int> CountExternalLinksBySyncStateBeforeAsync(
-        EventReportSyncState syncState,
-        DateTime olderThanUtc,
-        CancellationToken cancellationToken);
 }

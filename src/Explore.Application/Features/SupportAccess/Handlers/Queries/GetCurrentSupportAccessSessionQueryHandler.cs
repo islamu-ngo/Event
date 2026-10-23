@@ -2,9 +2,7 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.SupportAccess;
-using Explore.Application.Features.SupportAccess;
 using Explore.Application.Features.SupportAccess.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
@@ -16,13 +14,16 @@ public sealed class GetCurrentSupportAccessSessionQueryHandler(
     ISupportAccessSessionService supportAccessSessionService,
     IAdminContext adminContext,
     IHierarchicalSettingsResolver settingsResolver,
-    ISupportAccessSessionRepository sessionRepository)
+    ISupportAccessSessionRepository sessionRepository,
+    IHumanCommitScopePreparation humanScope)
     : IQueryHandler<GetCurrentSupportAccessSessionQuery, CurrentSupportAccessSessionDto>
 {
     public async Task<CurrentSupportAccessSessionDto> QueryAsync(
         GetCurrentSupportAccessSessionQuery request,
         CancellationToken cancellationToken)
     {
+        if (await adminContext.ResolveUserIdAsync(cancellationToken) is { })
+            await humanScope.PrepareAsync(cancellationToken);
         var context = await supportAccessSessionService.GetCurrentAsync(cancellationToken);
         if (!context.IsActive || !context.SessionId.HasValue)
         {

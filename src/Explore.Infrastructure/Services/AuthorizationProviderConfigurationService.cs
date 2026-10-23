@@ -2,15 +2,16 @@ using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Secrets;
 using Explore.Application.Utilities;
-using Explore.Domain;
 using Explore.Domain.Constants;
-using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
+using Explore.Domain;
+using Microsoft.Extensions.DependencyInjection;
 using Grpc.Core;
 using Grpc.Health.V1;
 using Grpc.Net.Client;
@@ -24,7 +25,6 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
 {
     private readonly ISystemSettingRepository _systemSettingRepository;
     private readonly IConfiguration _configuration;
-    private readonly ISecretResolver _secretResolver;
     private readonly CerbosAdminEndpointValidator _adminEndpointValidator;
     private readonly IAuthorizationProviderModeCacheInvalidator _providerModeCacheInvalidator;
     private readonly ICerbosConfigResolver _cerbosConfigResolver;
@@ -32,22 +32,22 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
     private readonly AuthorizationProviderDeploymentOptions _deploymentOptions;
     private readonly AuthorizationProviderBootstrapState _bootstrapState;
     private readonly ILogger<AuthorizationProviderConfigurationService> _logger;
+    private readonly IPolicyMutationExecutionScopeFactory _scopeFactory;
 
     public AuthorizationProviderConfigurationService(
         ISystemSettingRepository systemSettingRepository,
         IConfiguration configuration,
-        ISecretResolver secretResolver,
         CerbosAdminEndpointValidator adminEndpointValidator,
         IAuthorizationProviderModeCacheInvalidator providerModeCacheInvalidator,
         ICerbosConfigResolver cerbosConfigResolver,
         IPolicyPackageService policyPackageService,
         IOptions<AuthorizationProviderDeploymentOptions> deploymentOptions,
         AuthorizationProviderBootstrapState bootstrapState,
-        ILogger<AuthorizationProviderConfigurationService> logger)
+        ILogger<AuthorizationProviderConfigurationService> logger,
+        IPolicyMutationExecutionScopeFactory scopeFactory)
     {
         _systemSettingRepository = systemSettingRepository;
         _configuration = configuration;
-        _secretResolver = secretResolver;
         _adminEndpointValidator = adminEndpointValidator;
         _providerModeCacheInvalidator = providerModeCacheInvalidator;
         _cerbosConfigResolver = cerbosConfigResolver;
@@ -55,18 +55,26 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
         _deploymentOptions = deploymentOptions.Value;
         _bootstrapState = bootstrapState;
         _logger = logger;
+        _scopeFactory = scopeFactory;
     }
 
-    public async Task<AuthorizationProviderConfigurationDto> ReadConfigurationAsync()
+    public Task<AuthorizationProviderConfigurationDto> ReadConfigurationAsync() =>
+        ReadConfigurationCoreAsync(null, null);
+
+    private async Task<AuthorizationProviderConfigurationDto> ReadConfigurationCoreAsync(
+        ProviderConfigurationState? original, IConfiguration? deployment, bool? originalPublication = null)
     {
-        var providerSetting = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Security.AuthorizationProvider);
-        var grpcEndpointSetting = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Cerbos.GrpcEndpoint);
-        var adminEndpointSetting = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Cerbos.CustomAdminEndpoint);
+        Task<SystemSetting?> Read(string key) => original is null
+            ? _systemSettingRepository.GetByKey(key) : Task.FromResult(original.System[key]?.ToEntity());
+        var configuration = deployment ?? _configuration;
+        var providerSetting = await Read(GovernanceSettingKeys.Security.AuthorizationProvider);
+        var grpcEndpointSetting = await Read(GovernanceSettingKeys.Cerbos.GrpcEndpoint);
+        var adminEndpointSetting = await Read(GovernanceSettingKeys.Cerbos.CustomAdminEndpoint);
 
         // Preserve operator's raw bootstrap value end-to-end. Deployment values prefill setup/admin
         // screens, but application-managed saved settings take precedence after an explicit save.
         var deploymentProvider = _deploymentOptions.GetProvider();
-        var rawEnvEndpoint = _configuration["Cerbos:GrpcEndpoint"]?.Trim() ?? string.Empty;
+        var rawEnvEndpoint = configuration["Cerbos:GrpcEndpoint"]?.Trim() ?? string.Empty;
         var detectedFromEnv = !string.IsNullOrWhiteSpace(rawEnvEndpoint);
         var storedProviderConfigured = providerSetting is not null && !string.IsNullOrWhiteSpace(providerSetting.Value);
         var provider = deploymentProvider ?? DeserializeString(providerSetting?.Value, "local");
@@ -74,13 +82,14 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
         var providerConfigured = deploymentProvider switch
         {
             AuthorizationProviderDeploymentOptions.LocalProvider => true,
-            AuthorizationProviderDeploymentOptions.CerbosProvider => bootstrap.Status == AuthorizationProviderBootstrapState.Ready,
+            AuthorizationProviderDeploymentOptions.CerbosProvider => bootstrap.Status == AuthorizationProviderBootstrapState.Ready
+                && (originalPublication ?? await _policyPackageService.IsPublicationReadyAsync()),
             _ => storedProviderConfigured
         };
         var storedGrpcEndpoint = DeserializeString(grpcEndpointSetting?.Value, string.Empty);
         var endpointDeploymentManaged = deploymentProvider == AuthorizationProviderDeploymentOptions.CerbosProvider
-                                        || IsDeploymentManaged(GovernanceSettingKeys.Cerbos.GrpcEndpoint)
-                                        || IsDeploymentManaged(Explore.Domain.Secrets.SecretDefinitionRegistry.Keys.Cerbos.GrpcEndpoint);
+                                        || IsDeploymentManaged(GovernanceSettingKeys.Cerbos.GrpcEndpoint, configuration)
+                                        || IsDeploymentManaged(Explore.Domain.Secrets.SecretDefinitionRegistry.Keys.Cerbos.GrpcEndpoint, configuration);
 
         var grpcEndpoint = endpointDeploymentManaged
             ? rawEnvEndpoint
@@ -91,21 +100,11 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
             grpcEndpoint = rawEnvEndpoint;
         }
 
-        var configuredAdminUsernameConfigured = (await _secretResolver.ResolveAsync(
-            SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername,
-            null)).IsResolved;
-        var configuredAdminPasswordConfigured = (await _secretResolver.ResolveAsync(
-            SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword,
-            null)).IsResolved;
-        var adminCredentialsConfigured = configuredAdminUsernameConfigured && configuredAdminPasswordConfigured;
-
         return new AuthorizationProviderConfigurationDto
         {
             Provider = provider,
             CerbosGrpcEndpoint = grpcEndpoint,
             CerbosAdminEndpoint = DeserializeString(adminEndpointSetting?.Value, string.Empty),
-            CerbosAdminUsernameConfigured = configuredAdminUsernameConfigured,
-            CerbosAdminPasswordConfigured = configuredAdminPasswordConfigured,
             CerbosDetectedFromEnvironment = detectedFromEnv,
             CerbosEndpointVerified = bootstrap.EndpointVerified,
             CerbosPoliciesSynchronized = bootstrap.PoliciesSynchronized,
@@ -119,88 +118,88 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
                 bootstrapAvailable: detectedFromEnv && !endpointDeploymentManaged && string.IsNullOrWhiteSpace(storedGrpcEndpoint),
                 applicationManagedDescription: "Saved Cerbos PDP endpoint settings take precedence after onboarding/admin save. Environment values are only bootstrap prefills unless deployment-managed mode is configured.",
                 deploymentManagedDescription: "Cerbos PDP endpoint is managed by deployment configuration. Change it in the environment, secret provider, or appsettings and restart."),
-            CerbosAdminCredentialsOwnership = CreateOwnershipMetadata(
-                deploymentManaged: adminCredentialsConfigured,
-                configured: adminCredentialsConfigured,
-                bootstrapAvailable: false,
-                applicationManagedDescription: "No deployment credentials are configured. One-time credentials can be supplied for an explicit policy sync and are not saved.",
-                deploymentManagedDescription: "Cerbos Admin API credentials are provided by deployment configuration. One-time credentials can override them for a single explicit policy sync."),
         };
     }
 
-    public async Task ApplyConfigurationAsync(AuthorizationProviderConfigurationDto configuration)
+    public async Task ApplyConfigurationAsync(UpdateAuthorizationProviderConfigurationCommand command,
+        CancellationToken cancellationToken = default)
     {
-        var deploymentProvider = _deploymentOptions.GetProvider();
-        if (deploymentProvider is not null)
-        {
-            if (!configuration.Provider.Equals(deploymentProvider, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    "The authorization provider is managed by deployment configuration and cannot be changed in the application.");
-            }
+        await using var observation = await ObserveConfigurationAsync(command, cancellationToken);
+        await ApplyConfigurationAsync(observation, cancellationToken);
+    }
 
-            _cerbosConfigResolver.InvalidateCache();
-            _providerModeCacheInvalidator.InvalidateInstanceMode();
-            return;
-        }
+    public async Task ApplySetupConfigurationAsync(UpdateAuthorizationProviderConfigurationDuringSetupCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        await using var observation = await ObserveConfigurationAsync(command, cancellationToken);
+        await ApplyConfigurationAsync(observation, cancellationToken);
+    }
 
-        var isCerbosProvider = configuration.Provider.Equals("cerbos", StringComparison.OrdinalIgnoreCase);
-        var normalizedGrpcEndpoint = isCerbosProvider
-            ? GrpcEndpointNormalizer.Normalize(configuration.CerbosGrpcEndpoint)
-            : string.Empty;
-        var rawAdminEndpoint = configuration.CerbosAdminEndpoint?.Trim() ?? string.Empty;
-        var endpointDeploymentManaged = IsDeploymentManaged(GovernanceSettingKeys.Cerbos.GrpcEndpoint)
-                                        || IsDeploymentManaged(Explore.Domain.Secrets.SecretDefinitionRegistry.Keys.Cerbos.GrpcEndpoint);
-        Uri? normalizedAdminEndpoint = null;
+    public Task<ProviderConfigurationMutation> ObserveConfigurationAsync(UpdateAuthorizationProviderConfigurationCommand command,
+        CancellationToken token) => ObserveConfigurationCoreAsync(command, token);
 
-        if (isCerbosProvider && !string.IsNullOrWhiteSpace(rawAdminEndpoint))
-        {
-            if (!_adminEndpointValidator.TryNormalize(rawAdminEndpoint, isByo: true, out normalizedAdminEndpoint, out var warning))
-                throw new InvalidOperationException(warning);
-        }
+    public Task<ProviderConfigurationMutation> ObserveConfigurationAsync(UpdateAuthorizationProviderConfigurationDuringSetupCommand command,
+        CancellationToken token) => ObserveConfigurationCoreAsync(command, token);
 
-        await UpsertSettingAsync(
-            GovernanceSettingKeys.Security.AuthorizationProvider,
-            JsonSerializer.Serialize(configuration.Provider.ToLowerInvariant()),
-            SettingValueType.String,
-            true,
-            "Security",
-            1,
-            "Authorization provider: 'cerbos' for external PDP, 'local' for built-in RBAC");
-
-        if (!endpointDeploymentManaged)
-        {
-            await UpsertSettingAsync(
-                GovernanceSettingKeys.Cerbos.GrpcEndpoint,
-                JsonSerializer.Serialize(normalizedGrpcEndpoint),
-                SettingValueType.String,
-                true,
-                "Security",
-                2,
-                "Cerbos PDP gRPC endpoint for authorization requests");
-        }
-
-        if (!isCerbosProvider)
-        {
-            _cerbosConfigResolver.InvalidateCache();
-            _providerModeCacheInvalidator.InvalidateInstanceMode();
-            return;
-        }
-
-        if (normalizedAdminEndpoint is not null)
-        {
-            await UpsertSettingAsync(
-                GovernanceSettingKeys.Cerbos.CustomAdminEndpoint,
-                JsonSerializer.Serialize(normalizedAdminEndpoint.GetLeftPart(UriPartial.Path).TrimEnd('/')),
-                SettingValueType.String,
-                true,
-                "Security",
-                3,
-                "Cerbos Admin API endpoint for policy package publishing");
-        }
-
+    public async Task ApplyConfigurationAsync(ProviderConfigurationMutation observation, CancellationToken token)
+    {
+        await observation.ExecuteAsync(this, token);
         _cerbosConfigResolver.InvalidateCache();
         _providerModeCacheInvalidator.InvalidateInstanceMode();
+    }
+
+    private async Task<ProviderConfigurationMutation> ObserveConfigurationCoreAsync(object command, CancellationToken token)
+    {
+        var observation = await ProviderConfigurationMutation.ObserveAsync(command, this, _scopeFactory, token);
+        try
+        {
+            var core = observation.Services.GetRequiredService<IAuthorizationProviderConfigurationService>()
+                as AuthorizationProviderConfigurationService
+                ?? throw new UnauthorizedAccessException("The original provider compiler is unavailable.");
+            var materials = await observation.Source.ObserveMaterialsAsync(observation.Before, token);
+            var original = await core.ReadConfigurationCoreAsync(observation.Before, observation.Source.Deployment, materials.PublicationReady);
+            var configuration = observation.AuthorizationPatch ?? throw new ArgumentException("A complete provider group is required.");
+            string? deploymentProvider = core._deploymentOptions.GetProvider();
+            bool cerbos = configuration.Provider.Equals("cerbos", StringComparison.OrdinalIgnoreCase);
+            var rows = new List<SystemSetting>();
+            void Add(string key, string value, int order, string description) => rows.Add(new()
+            {
+                SettingKey = key,
+                Value = JsonSerializer.Serialize(value),
+                ValueType = SettingValueType.String,
+                IsLocked = true,
+                Category = "Security",
+                DisplayOrder = order,
+                Description = description,
+                CreatedAt = observation.OccurredAt,
+                UpdatedAt = observation.OccurredAt
+            });
+            if (deploymentProvider is null)
+            {
+                Add(GovernanceSettingKeys.Security.AuthorizationProvider, configuration.Provider.ToLowerInvariant(), 1,
+                    "Authorization provider: 'cerbos' for external PDP, 'local' for built-in RBAC");
+                if (!core.IsDeploymentManaged(GovernanceSettingKeys.Cerbos.GrpcEndpoint, observation.Source.Deployment)
+                    && !core.IsDeploymentManaged(Explore.Domain.Secrets.SecretDefinitionRegistry.Keys.Cerbos.GrpcEndpoint, observation.Source.Deployment))
+                    Add(GovernanceSettingKeys.Cerbos.GrpcEndpoint,
+                        cerbos ? GrpcEndpointNormalizer.Normalize(configuration.CerbosGrpcEndpoint) : string.Empty, 2,
+                        "Cerbos PDP gRPC endpoint for authorization requests");
+                string rawAdmin = configuration.CerbosAdminEndpoint?.Trim() ?? "";
+                if (cerbos && rawAdmin.Length != 0
+                    && core._adminEndpointValidator.TryNormalize(rawAdmin, isByo: true, out _, out _))
+                {
+                    string endpoint = rawAdmin.TrimEnd('/');
+                    if (!endpoint.Contains("://", StringComparison.Ordinal)) endpoint = $"https://{endpoint}";
+                    Add(GovernanceSettingKeys.Cerbos.CustomAdminEndpoint,
+                        new Uri(endpoint).GetLeftPart(UriPartial.Path).TrimEnd('/'), 3,
+                        "Cerbos Admin API endpoint for policy package publishing");
+                }
+            }
+            await observation.CompileAuthorizationAsync(original, rows, core, token);
+            await observation.Services.GetRequiredService<IProviderConfigurationSettingsWriter>()
+                .RequireUnchangedAsync(observation.Before, token);
+            return observation;
+        }
+        catch { await observation.DisposeAsync(); throw; }
     }
 
     public async Task<bool> IsConfiguredAsync()
@@ -213,7 +212,8 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
 
         if (deploymentProvider == AuthorizationProviderDeploymentOptions.CerbosProvider)
         {
-            return ResolveBootstrapSnapshot(deploymentProvider).Status == AuthorizationProviderBootstrapState.Ready;
+            return ResolveBootstrapSnapshot(deploymentProvider).Status == AuthorizationProviderBootstrapState.Ready
+                && await _policyPackageService.IsPublicationReadyAsync();
         }
 
         var providerSetting = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Security.AuthorizationProvider);
@@ -221,8 +221,7 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
     }
 
     public async Task<AuthorizationProviderReconciliationResult> ReconcileDeploymentProviderAsync(
-        CancellationToken cancellationToken = default,
-        PolicyPackageAdminCredentials? oneTimeCredentials = null)
+        CancellationToken cancellationToken = default)
     {
         var provider = _deploymentOptions.GetProvider();
         if (provider is null)
@@ -239,29 +238,17 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
         }
 
         return await _bootstrapState.RunSingleFlightAsync(
-            token => ReconcileCerbosDeploymentProviderAsync(provider, oneTimeCredentials, token),
+            token => ReconcileCerbosDeploymentProviderAsync(provider, token),
             cancellationToken);
     }
 
     private async Task<AuthorizationProviderReconciliationResult> ReconcileCerbosDeploymentProviderAsync(
         string provider,
-        PolicyPackageAdminCredentials? oneTimeCredentials,
         CancellationToken cancellationToken)
     {
         var endpointVerified = false;
         try
         {
-            var current = _bootstrapState.Read();
-            if (current.Provider == provider && current.Status == AuthorizationProviderBootstrapState.Ready)
-            {
-                return new(
-                    Attempted: true,
-                    Succeeded: true,
-                    EndpointVerified: current.EndpointVerified,
-                    PoliciesSynchronized: current.PoliciesSynchronized,
-                    Message: current.Message ?? "Cerbos authorization is ready.");
-            }
-
             _bootstrapState.MarkPending(provider);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -285,26 +272,19 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
 
             try
             {
-                var publishResult = await _policyPackageService.PublishInstanceAsync(
-                    cancellationToken,
-                    oneTimeCredentials);
-                if (!publishResult.Succeeded)
+                if (!await _policyPackageService.IsPublicationReadyAsync(cancellationToken))
                 {
                     return MarkReconciliationFailed(
                         provider,
                         endpointVerified: true,
-                        string.IsNullOrWhiteSpace(publishResult.Message)
-                            ? "The Cerbos policy package could not be synchronized."
-                            : publishResult.Message);
+                        "A current authenticated operator publication receipt for this revision, package and environment is required.");
                 }
 
-                // PublishInstanceAsync fences bound resource deployments before writing. Bootstrap
-                // readiness preserves non-resource behavior; it never grants resource activation.
-                const string message = "Cerbos endpoint verification and policy synchronization completed. Bound resource deployments require separate coordinated activation.";
-                _bootstrapState.MarkReady(provider, endpointVerified: true, policiesSynchronized: true, message);
+                const string message = "Cerbos PDP health and the operator publication declaration were verified. Live-store equality is unverified; resource activation remains separate.";
+                _bootstrapState.MarkReady(provider, endpointVerified: true, policiesSynchronized: false, message);
                 _cerbosConfigResolver.InvalidateCache();
                 _providerModeCacheInvalidator.InvalidateInstanceMode();
-                return new(true, true, true, true, message);
+                return new(true, true, true, false, message);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -314,7 +294,7 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
                 return MarkReconciliationFailed(
                     provider,
                     endpointVerified: true,
-                    "The Cerbos policy package could not be synchronized.");
+                    "The Cerbos publication declaration could not be verified.");
             }
         }
         catch (OperationCanceledException)
@@ -323,7 +303,7 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
                 provider,
                 endpointVerified,
                 endpointVerified
-                    ? "Automatic Cerbos setup was canceled before policy synchronization completed."
+                    ? "Cerbos readiness was canceled before publication verification completed."
                     : "Automatic Cerbos setup was canceled before completion.");
             throw;
         }
@@ -388,9 +368,9 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
         return Task.FromResult(isSafe);
     }
 
-    private bool IsDeploymentManaged(string key)
+    private bool IsDeploymentManaged(string key, IConfiguration? deployment = null)
     {
-        var configuredKeys = _configuration.GetSection("Secrets:Ownership:DeploymentManagedKeys").Get<string[]>()
+        var configuredKeys = (deployment ?? _configuration).GetSection("Secrets:Ownership:DeploymentManagedKeys").Get<string[]>()
                              ?? Array.Empty<string>();
         return configuredKeys.Any(candidate =>
             candidate.Equals("*", StringComparison.OrdinalIgnoreCase)
@@ -463,29 +443,6 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
             Configured = configured,
             BootstrapAvailable = bootstrapAvailable
         };
-    }
-
-    private async Task UpsertSettingAsync(
-        string settingKey,
-        string value,
-        SettingValueType valueType,
-        bool isLocked,
-        string category,
-        int displayOrder,
-        string description)
-    {
-        await _systemSettingRepository.UpsertAsync(new SystemSetting
-        {
-            SettingKey = settingKey,
-            Value = value,
-            ValueType = valueType,
-            IsLocked = isLocked,
-            Description = description,
-            Category = category,
-            DisplayOrder = displayOrder,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        });
     }
 
     private static string DeserializeString(string? rawValue, string defaultValue)

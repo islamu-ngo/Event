@@ -607,6 +607,27 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
     }
 
     [Test]
+    public async Task CerbosNavigation_ClearsUnsubmittedCredentials()
+    {
+        _instanceOnboardingService.GetAuthorizationProviderConfigurationAsAdminAsync()
+            .Returns(new AuthorizationProviderConfigurationDto
+            {
+                Provider = "cerbos",
+                CerbosGrpcEndpoint = "cerbosgrpc.local:3593",
+                CerbosEndpointVerified = true
+            });
+        var cut = RenderAuthProvidersSection();
+        await cut.Find("#instance-cerbos-username").InputAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = Guid.NewGuid().ToString("N") });
+        await cut.Find("#instance-cerbos-password").InputAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = Guid.NewGuid().ToString("N") });
+
+        var navigation = _ctx.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        await cut.InvokeAsync(() => navigation.NavigateTo("/"));
+
+        await Assert.That(cut.Find("#instance-cerbos-username").GetAttribute("value")).IsNullOrEmpty();
+        await Assert.That(cut.Find("#instance-cerbos-password").GetAttribute("value")).IsNullOrEmpty();
+    }
+
+    [Test]
     public async Task UnifiedAdminSettingsLayout_CerbosPolicySync_InvokesAdminBffSync()
     {
         // Arrange
@@ -615,11 +636,9 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
             {
                 Provider = "cerbos",
                 CerbosGrpcEndpoint = "cerbosgrpc.local:3593",
-                CerbosEndpointVerified = true,
-                CerbosAdminUsernameConfigured = true,
-                CerbosAdminPasswordConfigured = true
+                CerbosEndpointVerified = true
             });
-        _instanceOnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync()
+        _instanceOnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync(Arg.Any<AuthorizationPolicyPackageSyncRequestDto>())
             .Returns(new BaseCommandResponseOfGuid
             {
                 Success = true,
@@ -627,10 +646,12 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
             });
 
         IRenderedComponent<UnifiedAdminSettingsLayout> cut = RenderAuthProvidersSection();
+        cut.Find("#instance-cerbos-username").Input(Guid.NewGuid().ToString("N"));
+        cut.Find("#instance-cerbos-password").Input(Guid.NewGuid().ToString("N"));
 
         // Act
         cut.FindAll("button")
-            .First(button => button.TextContent.Contains("Sync Policies", StringComparison.OrdinalIgnoreCase))
+            .First(button => button.TextContent.Contains("Publish Policies", StringComparison.OrdinalIgnoreCase))
             .Click();
 
         // Assert
@@ -641,7 +662,7 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
                 throw new InvalidOperationException("Policy sync success message was not rendered.");
             }
         });
-        await _instanceOnboardingService.Received(1).SyncAuthorizationPolicyPackageAsAdminAsync();
+        await Assert.That(cut.Find("#instance-cerbos-password").GetAttribute("value")).IsNullOrEmpty();
     }
 
     [Test]
@@ -653,11 +674,9 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
             {
                 Provider = "cerbos",
                 CerbosGrpcEndpoint = "cerbosgrpc.local:3593",
-                CerbosEndpointVerified = true,
-                CerbosAdminUsernameConfigured = true,
-                CerbosAdminPasswordConfigured = true
+                CerbosEndpointVerified = true
             });
-        _instanceOnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync()
+        _instanceOnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync(Arg.Any<AuthorizationPolicyPackageSyncRequestDto>())
             .Returns(new BaseCommandResponseOfGuid
             {
                 Success = false,
@@ -666,10 +685,12 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
             });
 
         IRenderedComponent<UnifiedAdminSettingsLayout> cut = RenderAuthProvidersSection();
+        cut.Find("#instance-cerbos-username").Input(Guid.NewGuid().ToString("N"));
+        cut.Find("#instance-cerbos-password").Input(Guid.NewGuid().ToString("N"));
 
         // Act
         cut.FindAll("button")
-            .First(button => button.TextContent.Contains("Sync Policies", StringComparison.OrdinalIgnoreCase))
+            .First(button => button.TextContent.Contains("Publish Policies", StringComparison.OrdinalIgnoreCase))
             .Click();
 
         // Assert
@@ -682,7 +703,7 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
         });
         await Assert.That(cut.Markup).DoesNotContain("secret-token", StringComparison.OrdinalIgnoreCase);
         await Assert.That(cut.Markup).DoesNotContain("stack trace", StringComparison.OrdinalIgnoreCase);
-        await _instanceOnboardingService.Received(1).SyncAuthorizationPolicyPackageAsAdminAsync();
+        await Assert.That(cut.Find("#instance-cerbos-password").GetAttribute("value")).IsNullOrEmpty();
     }
 
     [Test]
@@ -701,7 +722,7 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
 
         // Act
         var syncButton = cut.FindAll("button")
-            .First(button => button.TextContent.Contains("Sync Policies", StringComparison.OrdinalIgnoreCase));
+            .First(button => button.TextContent.Contains("Publish Policies", StringComparison.OrdinalIgnoreCase));
 
         // Assert
         await Assert.That(syncButton.HasAttribute("disabled")).IsTrue();
@@ -712,6 +733,8 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
     [Test]
     public async Task UnifiedAdminSettingsLayout_DeploymentManagedCerbosFailure_EnablesServerRetry()
     {
+        var password = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        AuthorizationPolicyPackageSyncRequestDto? submitted = null;
         _instanceOnboardingService.GetAuthorizationProviderConfigurationAsAdminAsync()
             .Returns(new AuthorizationProviderConfigurationDto
             {
@@ -728,17 +751,26 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
                     Editable = false
                 }
             });
-        _instanceOnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync()
-            .Returns(new BaseCommandResponseOfGuid
+        _instanceOnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync(Arg.Any<AuthorizationPolicyPackageSyncRequestDto>())
+            .Returns(call =>
             {
-                Success = false,
-                Message = "Automatic Cerbos setup did not complete."
+                submitted = call.Arg<AuthorizationPolicyPackageSyncRequestDto>();
+                return new BaseCommandResponseOfGuid
+                {
+                    Success = false,
+                    Message = "Automatic Cerbos setup did not complete."
+                };
             });
 
         IRenderedComponent<UnifiedAdminSettingsLayout> cut = RenderAuthProvidersSection();
         var retryButton = cut.FindAll("button")
-            .First(button => button.TextContent.Contains("Retry Authorization Setup", StringComparison.OrdinalIgnoreCase));
+            .First(button => button.TextContent.Contains("Publish Policies", StringComparison.OrdinalIgnoreCase));
 
+        await Assert.That(retryButton.HasAttribute("disabled")).IsTrue();
+        cut.Find("input#instance-cerbos-username").Input("policy-publisher");
+        cut.Find("input#instance-cerbos-password").Input(password);
+        retryButton = cut.FindAll("button")
+            .First(button => button.TextContent.Contains("Publish Policies", StringComparison.OrdinalIgnoreCase));
         await Assert.That(retryButton.HasAttribute("disabled")).IsFalse();
         retryButton.Click();
 
@@ -749,12 +781,18 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
                 throw new InvalidOperationException("Expected safe retry failure feedback.");
             }
         });
-        await _instanceOnboardingService.Received(1).SyncAuthorizationPolicyPackageAsAdminAsync();
+        await Assert.That(submitted).IsNotNull();
+        await Assert.That(submitted!.AdminUsername).IsEqualTo("policy-publisher");
+        await Assert.That(submitted.AdminPassword).IsEqualTo(password);
+        await Assert.That(cut.Find("input#instance-cerbos-username").GetAttribute("value") ?? "").IsEmpty();
+        await Assert.That(cut.Find("input#instance-cerbos-password").GetAttribute("value") ?? "").IsEmpty();
     }
 
     [Test]
     public async Task UnifiedAdminSettingsLayout_DeploymentManagedCerbosRetry_RefreshesReadiness()
     {
+        var password = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        AuthorizationPolicyPackageSyncRequestDto? submitted = null;
         var failed = new AuthorizationProviderConfigurationDto
         {
             Provider = "cerbos",
@@ -782,16 +820,22 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
         };
         _instanceOnboardingService.GetAuthorizationProviderConfigurationAsAdminAsync()
             .Returns(failed, ready);
-        _instanceOnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync()
-            .Returns(new BaseCommandResponseOfGuid
+        _instanceOnboardingService.SyncAuthorizationPolicyPackageAsAdminAsync(Arg.Any<AuthorizationPolicyPackageSyncRequestDto>())
+            .Returns(call =>
             {
-                Success = true,
-                Message = "Cerbos endpoint verification and policy synchronization completed."
+                submitted = call.Arg<AuthorizationPolicyPackageSyncRequestDto>();
+                return new BaseCommandResponseOfGuid
+                {
+                    Success = true,
+                    Message = "Cerbos endpoint verification and policy synchronization completed."
+                };
             });
 
         IRenderedComponent<UnifiedAdminSettingsLayout> cut = RenderAuthProvidersSection();
+        cut.Find("input#instance-cerbos-username").Input("policy-publisher");
+        cut.Find("input#instance-cerbos-password").Input(password);
         cut.FindAll("button")
-            .First(button => button.TextContent.Contains("Retry Authorization Setup", StringComparison.OrdinalIgnoreCase))
+            .First(button => button.TextContent.Contains("Publish Policies", StringComparison.OrdinalIgnoreCase))
             .Click();
 
         cut.WaitForAssertion(() =>
@@ -802,8 +846,11 @@ public sealed class UnifiedAdminSettingsLayoutTests : IDisposable
                 throw new InvalidOperationException("Expected refreshed deployment readiness after a successful retry.");
             }
         });
-        await _instanceOnboardingService.Received(2)
-            .GetAuthorizationProviderConfigurationAsAdminAsync();
+        await Assert.That(submitted).IsNotNull();
+        await Assert.That(submitted!.AdminUsername).IsEqualTo("policy-publisher");
+        await Assert.That(submitted.AdminPassword).IsEqualTo(password);
+        await Assert.That(cut.Find("input#instance-cerbos-username").GetAttribute("value") ?? "").IsEmpty();
+        await Assert.That(cut.Find("input#instance-cerbos-password").GetAttribute("value") ?? "").IsEmpty();
     }
 
     private void ConfigureSingleTenantInstanceDefaults()

@@ -10,18 +10,18 @@ namespace Explore.Application.DTOs.ExternalApiKey.Validators;
 
 internal class CreateExternalApiKeyDtoValidator : AbstractValidator<CreateExternalApiKeyDto>
 {
-    private readonly IExternalApiKeyRepository _externalApiKeyRepository;
+    private readonly Func<ExternalApiKeyOwnerType, Guid, string, CancellationToken, Task<bool>> _nameExists;
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IGroupRepository _groupRepository;
 
     public CreateExternalApiKeyDtoValidator(
-        IExternalApiKeyRepository externalApiKeyRepository,
+        Func<ExternalApiKeyOwnerType, Guid, string, CancellationToken, Task<bool>> nameExists,
         IOrganizationRepository organizationRepository,
         IGroupRepository groupRepository,
         Guid currentUserId,
         Guid? tenantId)
     {
-        _externalApiKeyRepository = externalApiKeyRepository;
+        _nameExists = nameExists;
         _organizationRepository = organizationRepository;
         _groupRepository = groupRepository;
 
@@ -82,16 +82,8 @@ internal class CreateExternalApiKeyDtoValidator : AbstractValidator<CreateExtern
             return false;
         }
 
-        // InstanceAdmin keys have TenantId=null, so the standard tenant query filter
-        // would never match them. Use the tenant-filter-bypass variant.
         var ownerType = ToOwnerType(dto.ExternalApiKeyOwnerTypeId);
-
-        if (ownerType == ExternalApiKeyOwnerType.InstanceAdmin)
-        {
-            return !await _externalApiKeyRepository.ExistsByOwnerAndNameIgnoringTenantFilter(ownerType, ownerId.Value, name, cancellationToken);
-        }
-
-        return !await _externalApiKeyRepository.ExistsByOwnerAndName(ownerType, ownerId.Value, name, cancellationToken);
+        return !await _nameExists(ownerType, ownerId.Value, name, cancellationToken);
     }
 
     private static Guid? ResolveOwnerId(CreateExternalApiKeyDto dto, Guid currentUserId, Guid? tenantId)

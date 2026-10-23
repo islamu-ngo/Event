@@ -258,7 +258,7 @@ public sealed class OrganizationMappingHandlerTests
     {
         public List<OrganizationMember> Items { get; } = items;
         public override Task<OrganizationMember> Create(OrganizationMember entity) { Items.Add(entity); return Task.FromResult(entity); }
-        public Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
+        public Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
         public Task<List<OrganizationMember>> GetMembersByOrganizationId(Guid organizationId) => Task.FromResult(Items.Where(item => item.OrganizationTenant.OrganizationId == organizationId).ToList());
         public Task<List<OrganizationMember>> GetMembershipsByUser(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(Items.Where(item => item.UserId == userId).ToList());
         public Task<List<OrganizationMember>> GetInvitesByUserId(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(Items.Where(item => item.UserId == userId).ToList());
@@ -336,6 +336,7 @@ public sealed class OrganizationMappingHandlerTests
     internal sealed class ActorStore : Store<Actor, Guid>, IActorRepository
     {
         public List<Actor> Items { get; } = [];
+        public Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public override Task<Actor> Create(Actor entity) { Items.Add(entity); return Task.FromResult(entity); }
         public Task<Actor?> GetActorWithDetails(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Actor?> GetPublicActorProfileAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -349,7 +350,6 @@ public sealed class OrganizationMappingHandlerTests
         public Task<IReadOnlyList<Actor>> SearchAiReferenceActorsAsync(string searchTerm, int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Actor?> GetActorByUserId(Guid userId) => throw new NotSupportedException();
         public Task<Actor?> GetTrackedActorByUserId(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<Actor?> GetActorByUserIdAndTenantId(Guid userId, Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Actor?> GetActorByOrganizationId(Guid organizationId) => throw new NotSupportedException();
         public Task<Actor?> GetActorByGroupId(Guid groupId) => throw new NotSupportedException();
         public Task<int> ForgetPiiAsync(Guid actorId) => throw new NotSupportedException();

@@ -11,7 +11,7 @@ public sealed class AdmissionCheckInService(
     IAdmissionCheckInCredentialDigestService credentialDigestService,
     IAdmissionCheckInAuthority authority,
     IAdmissionCheckInTelemetry telemetry,
-    IUnitOfWork unitOfWork,
+    IAdmissionTargetTransaction targetTransaction,
     TimeProvider timeProvider)
 {
     public const int MaximumBatchSize = 100;
@@ -58,7 +58,8 @@ public sealed class AdmissionCheckInService(
                 return Complete(Rejected(request.TargetId), request, decision.TargetType, startedAt);
             }
 
-            AdmissionCheckInDecision? persisted = await unitOfWork.ExecuteInTransactionAsync(
+            AdmissionCheckInDecision? persisted = await targetTransaction.ExecuteAsync(
+                request.TenantId, request.TargetId,
                 token => transaction.ExecuteAsync(
                     new AdmissionCheckInTransactionRequest(
                         request.TenantId,

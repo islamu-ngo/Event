@@ -4,6 +4,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Moderation;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
@@ -23,7 +24,8 @@ namespace Explore.Persistence.Services;
 public sealed partial class EventRoleAssignmentMutationBoundary(
     ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy, IUserContext user, IAdminContext identity,
     IMachinePrincipalAccessor machine, IAuthorizationProvider authorization, TimeProvider clock,
-    IModerationRecognitionContinuityReader continuity)
+    IModerationRecognitionContinuityReader continuity,
+    IHumanActionCommitFinalizer finalizer)
     : IEventOwnershipTransferMutationBoundary, IEventRoleAssignmentWindowMutationBoundary,
       IEventRoleAssignmentRevocationMutationBoundary, IEventRoleAssignmentCreationMutationBoundary,
       IEventInitialCreationMutationBoundary
@@ -48,9 +50,17 @@ public sealed partial class EventRoleAssignmentMutationBoundary(
         ExecuteMutationAsync(MutationKind.Create, tenantId, eventId, assignmentId, targetUserId, startsAtUtc, expiresAtUtc,
             auditId, new Creation(roleId, status, expectedEmail), operation, cancellationToken);
 
+    public Task<BaseCommandResponse<Guid>> ExecuteInCurrentTransactionAsync(Guid tenantId, Guid eventId, Guid assignmentId,
+        Guid targetUserId, int roleId, EventRoleAssignmentStatus status, DateTime startsAtUtc, DateTime? expiresAtUtc,
+        Guid auditId, string? expectedEmail, Func<Guid, CancellationToken, Task<BaseCommandResponse<Guid>>> operation,
+        CancellationToken cancellationToken) =>
+        ExecuteMutationAsync(MutationKind.Create, tenantId, eventId, assignmentId, targetUserId, startsAtUtc,
+            expiresAtUtc, auditId, new Creation(roleId, status, expectedEmail), operation, cancellationToken, joined: true);
+
     private async Task<BaseCommandResponse<Guid>> ExecuteMutationAsync(MutationKind kind, Guid tenantId, Guid eventId, Guid currentOwnerAssignmentId,
         Guid? newOwnerUserId, DateTime? windowStartsAtUtc, DateTime? windowExpiresAtUtc, Guid auditId, Creation? creation,
-        Func<Guid, CancellationToken, Task<BaseCommandResponse<Guid>>> operation, CancellationToken cancellationToken)
+        Func<Guid, CancellationToken, Task<BaseCommandResponse<Guid>>> operation, CancellationToken cancellationToken,
+        bool joined = false)
     {
         ArgumentNullException.ThrowIfNull(operation);
         bool transfer = kind == MutationKind.Transfer;
@@ -59,13 +69,21 @@ public sealed partial class EventRoleAssignmentMutationBoundary(
         string action = transfer ? AuthorizationActions.Events.TransferOwnership : AuthorizationActions.Events.ManageTeam;
         Guid targetUserId = newOwnerUserId ?? Guid.Empty;
         RequireContext();
-        if (eventId == Guid.Empty || currentOwnerAssignmentId == Guid.Empty || (transfer || creating) && targetUserId == Guid.Empty || auditId == Guid.Empty
-            || context.Database.CurrentTransaction is not null || context.ChangeTracker.HasChanges()) Deny();
+        if (eventId == Guid.Empty || currentOwnerAssignmentId == Guid.Empty || (transfer || creating) && targetUserId == Guid.Empty || auditId == Guid.Empty) Deny();
+        if (joined) context.RequireHumanCommitAdmission();
+        else if (context.Database.CurrentTransaction is not null || context.ChangeTracker.HasChanges()) Deny();
         Attempt? attempted = null;
+        var admission = new NativeHumanMutationAdmission(context, finalizer);
         try
         {
-            return await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() =>
-                context.Database.CreateExecutionStrategy().ExecuteAsync<object?, BaseCommandResponse<Guid>>(null, async (_, _, token) =>
+            return joined ? await ExecuteAttemptAsync(cancellationToken)
+                : await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() =>
+                    context.Database.CreateExecutionStrategy().ExecuteAsync<object?, BaseCommandResponse<Guid>>(null,
+                        (_, _, token) => ExecuteAttemptAsync(token),
+                        async (_, _, token) => new ExecutionResult<BaseCommandResponse<Guid>>(
+                            await VerifyAsync(token), attempted is null ? default! : attempted.Result), cancellationToken), cancellationToken);
+
+            async Task<BaseCommandResponse<Guid>> ExecuteAttemptAsync(CancellationToken token)
                 {
                     RequireContext();
                     if (await VerifyAsync(token)) return attempted!.Result;
@@ -81,7 +99,7 @@ public sealed partial class EventRoleAssignmentMutationBoundary(
                             throw new AuthorizationProviderUnavailableException(ResourceKinds.Event, action);
                         Deny();
                     }
-                    context.ChangeTracker.Clear();
+                    if (!joined) context.ChangeTracker.Clear();
                     int targetRoleId = creation?.RoleId ?? (int)RoleEnum.EventOwner;
                     if (!transfer && !creating)
                     {
@@ -134,9 +152,19 @@ public sealed partial class EventRoleAssignmentMutationBoundary(
                         if (!transfer && attempted is { Result.IsSuccess: true } && now >= ceilingEnd) Deny();
                         if (transfer && attempted is { Result.IsSuccess: true } && (replacement is null || !Effective(replacement, now))) Deny();
                     }
-                    return await privacy.ExecuteEnrollmentSerializedAsync(async privacyToken =>
-                        await new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAttemptAsync(async inner =>
+                    void RequireCurrent()
+                    {
+                        var now = clock.GetUtcNow().UtcDateTime;
+                        if (acquiredAt is { } start && (now < start || now >= authorityEnd)) Deny();
+                        if (!transfer && attempted is { Result.IsSuccess: true } && now >= ceilingEnd) Deny();
+                        if (transfer && attempted is { Result.IsSuccess: true } owned
+                            && (owned.After.SingleOrDefault(row => row.Id == owned.Result.Id) is not { } replacement
+                                || !Effective(replacement, now))) Deny();
+                    }
+                    async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(CancellationToken inner)
                         {
+                            if (joined) admission.RegisterJoined(RecheckAsync, RequireCurrent);
+                            else admission.RegisterOwning(RecheckAsync, RequireCurrent);
                             await using var installation = await RelationalNamedLock.AcquireTransactionAsync(
                                 context, "moderation.authority-source.installation", inner);
                             var selectedHumans = new[] { actor.Value, targetUserId }.Distinct().Order().ToArray();
@@ -286,13 +314,16 @@ public sealed partial class EventRoleAssignmentMutationBoundary(
                                 var current = await EventAuthorityProviderOperations.ReadAssignmentsAsync(context, tenantId, selectedHumans, [eventId], inner, includeOwners: transfer);
                                 if (!plan.Assignments.OrderBy(row => row.Id).SequenceEqual(current.OrderBy(row => row.Id))) throw Changed();
                             }
-                        }, RecheckAsync, privacyToken), RecheckAsync, token);
-                }, async (_, _, token) => new ExecutionResult<BaseCommandResponse<Guid>>(
-                    await VerifyAsync(token), attempted is null ? default! : attempted.Result), cancellationToken), cancellationToken);
+                        }
+                    return joined ? await ExecuteBodyAsync(token)
+                        : await privacy.ExecuteEnrollmentSerializedAsync(privacyToken =>
+                            new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAttemptAsync(
+                                ExecuteBodyAsync, RecheckAsync, privacyToken), RecheckAsync, token);
+                }
         }
         catch (Exception exception) when (attempted is not null && TransportFailure(exception))
         {
-            if (await VerifyAsync(cancellationToken)) return attempted!.Result;
+            if (!joined && await VerifyAsync(cancellationToken)) return attempted!.Result;
             throw;
         }
 
@@ -360,4 +391,29 @@ public sealed partial class EventRoleAssignmentMutationBoundary(
     private sealed record Attempt(Guid Actor, Guid TargetUser, BaseCommandResponse<Guid> Result, List<AssignmentState> Before,
         List<AssignmentState> After, AuditState Audit, Guid? EpochId, long BeforeRevision, long AfterRevision)
     { public override string ToString() => nameof(Attempt); }
+}
+
+/// <summary>Connects native owner checks to the retained human's transaction-bound finalizer.</summary>
+internal sealed class NativeHumanMutationAdmission(ExploreDbContext context, IHumanActionCommitFinalizer finalizer)
+{
+    private int entered;
+
+    internal void RegisterOwning(Func<CancellationToken, Task> validate, Action? requireCurrent = null)
+    {
+        if (!context.HasHumanCommitContextLease) return;
+        if (Interlocked.Exchange(ref entered, 1) != 0)
+            throw new InvalidOperationException("A retained human mutation cannot replay its original preparation.");
+        // This entry is called only by the boundary's own native UoW callback. Registration
+        // independently verifies the selected lease, physical transaction and credential custody.
+        context.HumanCommitAttemptOwnsTransaction = true;
+        finalizer.Register(validate, _ => requireCurrent?.Invoke());
+    }
+
+    internal void RegisterJoined(Func<CancellationToken, Task> validate, Action? requireCurrent = null)
+    {
+        context.RequireHumanCommitAdmission();
+        if (Interlocked.Exchange(ref entered, 1) != 0)
+            throw new InvalidOperationException("A joined native mutation may enter its original owner only once.");
+        finalizer.Register(validate, _ => requireCurrent?.Invoke());
+    }
 }

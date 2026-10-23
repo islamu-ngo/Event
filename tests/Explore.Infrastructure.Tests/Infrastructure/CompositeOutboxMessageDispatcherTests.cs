@@ -24,6 +24,9 @@ using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Messaging;
 using Explore.Infrastructure.Services.Moderation;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Repositories;
+using Explore.Secrets.Database;
 using Explore.Persistence.Services;
 using Explore.Tests.Shared.Telemetry;
 using Microsoft.Data.Sqlite;
@@ -57,6 +60,29 @@ public sealed class CompositeOutboxMessageDispatcherTests
             moderationEffectDispatcher: handler);
         await Assert.That(() => deadLetter ? dispatcher.ReconcileDeadLetterAsync(message) : dispatcher.DispatchAsync(message))
             .Throws<ApplicationException>();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task MissingNativeRefundCannotBeAcknowledgedAsCompleted(bool reconciliation)
+    {
+        Guid refundId = Guid.CreateVersion7();
+        var dispatcher = CreateDispatcher(
+            Substitute.For<IEventPublishedNotificationFanoutService>(),
+            Substitute.For<IEventModerationNotificationFanoutService>(),
+            refundRepository: Substitute.For<IRefundAttemptRepository>());
+        var message = new OutboxMessage
+        {
+            Id = Guid.CreateVersion7(),
+            AggregateType = nameof(RefundAttempt),
+            AggregateId = refundId,
+            EventType = reconciliation ? RefundOutboxMessageFactory.ReconciliationRequested
+                : RefundOutboxMessageFactory.DispatchRequested,
+            Payload = JsonSerializer.Serialize(new RefundAttemptProcessPayload(Guid.CreateVersion7(), refundId)),
+            CreatedAt = DateTime.UtcNow
+        };
+        await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.DispatchAsync(message));
     }
 
     [Test]
@@ -99,11 +125,11 @@ public sealed class CompositeOutboxMessageDispatcherTests
             foreach (string sensitive in new[]
             {
                 audit.ContentDigest, audit.ExpectedRevisionHash, audit.CommittedRevision.ToString(),
-                audit.ActorUserId.ToString(), "private-legal-name", "private-contact@example.test"
+                audit.ActorUserId.ToString(), message.Id.ToString(), "private-legal-name", "private-contact@example.test"
             })
                 await Assert.That(projection.Contains(sensitive, StringComparison.Ordinal)).IsFalse();
             await Assert.That(entry.State.Where(property => property.Key != "{OriginalFormat}")
-                .Select(property => property.Key)).IsEquivalentTo(["EventType", "MessageId", "Status"]);
+                .Select(property => property.Key)).IsEquivalentTo(["EventType", "Status"]);
         }
     }
 
@@ -171,7 +197,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
                 && payload.SourceActorId == request.SourceActorId),
             Arg.Any<CancellationToken>());
         await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutLightModerationAsync(default!, default);
-        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default);
+        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default, default);
     }
 
     [Test]
@@ -200,7 +226,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
             Arg.Any<CancellationToken>());
         await fanoutService.DidNotReceiveWithAnyArgs().FanoutAsync(default!, default);
         await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutLightModerationAsync(default!, default);
-        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default);
+        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default, default);
     }
 
     [Test]
@@ -235,7 +261,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
                 && payload.ModerationRecordId == request.ModerationRecordId),
             Arg.Any<CancellationToken>());
         await fanoutService.DidNotReceiveWithAnyArgs().FanoutAsync(default!, default);
-        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default);
+        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default, default);
     }
 
     [Test]
@@ -265,6 +291,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
                 payload.TenantId == request.TenantId
                 && payload.ModerationRecordId == request.ModerationRecordId
                 && payload.Version == request.Version),
+            Arg.Any<Guid>(),
             Arg.Any<CancellationToken>());
         await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutLightModerationAsync(default!, default);
         await fanoutService.DidNotReceiveWithAnyArgs().FanoutAsync(default!, default);
@@ -277,6 +304,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
         var outboxRepository = Substitute.For<IOutboxRepository>();
         outboxRepository.TryReplaceProcessingPayloadAsync(
                 Arg.Any<Guid>(),
+                Arg.Any<DateTime>(),
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
@@ -299,13 +327,17 @@ public sealed class CompositeOutboxMessageDispatcherTests
             Id = Guid.CreateVersion7(),
             AggregateType = "Event",
             EventType = EventModerationOutboxMessageFactory.EventHeavyRedactedNotificationFanoutRequestedEventType,
-            Payload = historicalPayload
+            Payload = historicalPayload,
+            AggregateId = Guid.CreateVersion7(),
+            Status = OutboxMessageStatus.Processing,
+            NextRetryAt = new DateTime(2026, 10, 10, 12, 5, 0, DateTimeKind.Utc)
         };
 
         await dispatcher.DispatchAsync(message);
 
         await outboxRepository.Received(1).TryReplaceProcessingPayloadAsync(
             message.Id,
+            message.NextRetryAt!.Value,
             historicalPayload,
             Arg.Is<string>(payload => payload.Contains("Version", StringComparison.Ordinal)
                 && !payload.Contains("SourceActorId", StringComparison.Ordinal)
@@ -315,6 +347,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
             Arg.Is<EventHeavyRedactedNotificationFanoutRequested>(payload => payload.TenantId == tenantId
                 && payload.ModerationRecordId == moderationRecordId
                 && payload.Version == EventHeavyRedactedNotificationFanoutRequested.CurrentVersion),
+            message.AggregateId,
             Arg.Any<CancellationToken>());
     }
 
@@ -325,6 +358,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
         var outboxRepository = Substitute.For<IOutboxRepository>();
         outboxRepository.TryReplaceProcessingPayloadAsync(
                 Arg.Any<Guid>(),
+                Arg.Any<DateTime>(),
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
@@ -359,17 +393,21 @@ public sealed class CompositeOutboxMessageDispatcherTests
             Id = Guid.CreateVersion7(),
             AggregateType = "Event",
             EventType = EventModerationOutboxMessageFactory.EventHeavyRedactedNotificationFanoutRequestedEventType,
-            Payload = unsafePayload
+            Payload = unsafePayload,
+            AggregateId = Guid.CreateVersion7(),
+            Status = OutboxMessageStatus.Processing,
+            NextRetryAt = new DateTime(2026, 10, 10, 12, 5, 0, DateTimeKind.Utc)
         };
 
         await Assert.That(async () => await dispatcher.DispatchAsync(message)).Throws<JsonException>();
 
         await outboxRepository.Received(1).TryReplaceProcessingPayloadAsync(
             message.Id,
+            message.NextRetryAt!.Value,
             unsafePayload,
             EventHeavyRedactedNotificationFanoutPayloadParser.SafeInvalidPayload,
             Arg.Any<CancellationToken>());
-        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default);
+        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default, default);
     }
 
     [Test]
@@ -389,7 +427,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
         })).Throws<InvalidOperationException>();
         await fanoutService.DidNotReceiveWithAnyArgs().FanoutAsync(default!, default);
         await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutLightModerationAsync(default!, default);
-        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default);
+        await moderationFanoutService.DidNotReceiveWithAnyArgs().FanoutHeavyRedactionAsync(default!, default, default);
     }
 
     [Test]
@@ -438,7 +476,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
     [Arguments(LocationPrivacyOutboxMessageFactory.LocationPiiErasedEventType)]
     [Arguments(LocationPrivacyOutboxMessageFactory.LocationPrivacyCorrectionRequestedEventType)]
     [Arguments(LocationPrivacyCorrectionDispatcher.GovernanceCorrectionEventType)]
-    public async Task DispatchAsync_WithLocationPrivacyEvent_RoutesToCorrectionDispatcher(string eventType)
+    public async Task DispatchAsync_WithLocationPrivacyEvent_RequiresReceiptBeforeExternalCorrection(string eventType)
     {
         var cache = new RecordingHybridCache();
         CompositeOutboxMessageDispatcher dispatcher = CreateDispatcher(
@@ -446,14 +484,22 @@ public sealed class CompositeOutboxMessageDispatcherTests
             Substitute.For<IEventModerationNotificationFanoutService>(),
             cache: cache);
 
-        await dispatcher.DispatchAsync(CreateLocationPrivacyMessage(eventType));
-
-        await Assert.That(cache.RemovedTags).Contains(CacheTags.EventLocations);
+        if (eventType == LocationPrivacyOutboxMessageFactory.LocationPiiErasedEventType)
+        {
+            await dispatcher.DispatchAsync(CreateLocationPrivacyMessage(eventType));
+            await Assert.That(cache.RemovedTags).Contains(CacheTags.EventLocations);
+        }
+        else
+        {
+            await Assert.That(async () => await dispatcher.DispatchAsync(CreateLocationPrivacyMessage(eventType)))
+                .Throws<InvalidOperationException>();
+            await Assert.That(cache.RemovedTags).IsEmpty();
+        }
     }
 
     [Test]
     [Category("EventLocationPrivacy")]
-    public async Task ReconcileDeadLetterAsync_WithLocationPrivacyEvent_ReplaysCorrectionDispatcher()
+    public async Task ReconcileDeadLetterAsync_WithUnboundLocationCorrection_RejectsBeforeEffects()
     {
         var cache = new RecordingHybridCache();
         CompositeOutboxMessageDispatcher dispatcher = CreateDispatcher(
@@ -461,10 +507,10 @@ public sealed class CompositeOutboxMessageDispatcherTests
             Substitute.For<IEventModerationNotificationFanoutService>(),
             cache: cache);
 
-        await dispatcher.ReconcileDeadLetterAsync(CreateLocationPrivacyMessage(
-            LocationPrivacyOutboxMessageFactory.LocationPrivacyCorrectionRequestedEventType));
-
-        await Assert.That(cache.RemovedTags).Contains(CacheTags.EventLocations);
+        await Assert.That(async () => await dispatcher.ReconcileDeadLetterAsync(CreateLocationPrivacyMessage(
+            LocationPrivacyOutboxMessageFactory.LocationPrivacyCorrectionRequestedEventType)))
+            .Throws<InvalidOperationException>();
+        await Assert.That(cache.RemovedTags).IsEmpty();
     }
 
     [Test]
@@ -570,16 +616,19 @@ public sealed class CompositeOutboxMessageDispatcherTests
             Substitute.For<IEventPublishedNotificationFanoutService>(),
             Substitute.For<IEventModerationNotificationFanoutService>(),
             manifestEffectDispatcher: manifestDispatcher);
-        Guid operationId = Guid.CreateVersion7();
-        OutboxMessage message = ConfigurationManifestEffectOutbox.Create(
-            Guid.CreateVersion7(),
-            operationId,
-            DateTime.UtcNow);
+        DateTime now = DateTime.UtcNow;
+        var operation = ConfigurationManifestOperation.Create(ConfigurationManifestAuditMode.Bootstrap,
+            "configuration.islamu.org/v1alpha2", "ConfigurationManifest", "routing",
+            new string('a', 64), ConfigurationManifestOperationStatus.Applied,
+            0, 0, 0, 0, null, null, now, now,
+            instanceSectionDigest: new string('b', 64), bootstrapGeneration: 1);
+        operation.BindEffectOutbox(Guid.CreateVersion7());
+        OutboxMessage message = ConfigurationManifestEffectOutbox.Create(operation, []);
 
         await dispatcher.DispatchAsync(message);
 
         await manifestDispatcher.Received(1).DispatchAsync(
-            operationId,
+            message,
             Arg.Any<CancellationToken>());
     }
 
@@ -650,8 +699,8 @@ public sealed class CompositeOutboxMessageDispatcherTests
         Guid eventId = Guid.CreateVersion7();
         IAdmissionRevocationService admissionRevocation =
             Substitute.For<IAdmissionRevocationService>();
-        admissionRevocation.ReconcileAsync(
-                Arg.Any<AdmissionRevocationRequest>(),
+        admissionRevocation.ReconcileCommittedCancellationAsync(
+                Arg.Any<AdmissionCommittedCancellationRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(new AdmissionRevocationResult(
                 AdmissionRevocationOutcome.Applied, [], []));
@@ -676,12 +725,12 @@ public sealed class CompositeOutboxMessageDispatcherTests
 
         await dispatcher.DispatchAsync(message);
 
-        await admissionRevocation.Received(1).ReconcileAsync(
-            Arg.Is<AdmissionRevocationRequest>(request =>
+        await admissionRevocation.Received(1).ReconcileCommittedCancellationAsync(
+            Arg.Is<AdmissionCommittedCancellationRequest>(request =>
                 request.TenantId == tenantId &&
                 request.RegistrationOrderId == orderId &&
-                request.Reason == AdmissionRevocationService.OrderCancellationReason &&
-                request.RefundAllocations.Count == 0),
+                request.EventId == eventId &&
+                request.Source == AdmissionCancellationSource.Order),
             Arg.Any<CancellationToken>());
     }
 
@@ -712,55 +761,90 @@ public sealed class CompositeOutboxMessageDispatcherTests
     [Test]
     public async Task SuccessfulRefundDispatchInvokesAdmissionReconciliationBeforeOutboxCompletion()
     {
-        Guid tenantId = Guid.CreateVersion7();
-        Guid paymentAttemptId = Guid.CreateVersion7();
-        PaidOrderAcceptanceSnapshot acceptance = RefundAcceptance(tenantId);
-        RefundAttempt attempt = RefundAttempt.Create(
-            Guid.CreateVersion7(),
-            tenantId,
-            paymentAttemptId,
-            acceptance,
-            "acct_example",
-            "pi_example",
-            $"refund:{Guid.CreateVersion7():N}",
-            500,
-            DateTime.UtcNow.AddMinutes(-2));
-        IRefundAttemptRepository refunds = Substitute.For<IRefundAttemptRepository>();
-        refunds.GetByIdAsync(tenantId, attempt.Id, Arg.Any<CancellationToken>())
-            .Returns(attempt);
-        IRefundCreator creator = Substitute.For<IRefundCreator>();
-        creator.CreateAsync(Arg.Any<RefundCreateRequest>(), Arg.Any<CancellationToken>())
-            .Returns(RefundProviderResult.Observed(
-                new RefundProviderObservation(
-                    "re_example",
-                    "pi_example",
-                    RefundProviderStatus.Succeeded,
-                    500,
-                    "EUR",
-                    0),
-                "req_example"));
-        IAdmissionRefundRevocationService admissionRefund =
-            Substitute.For<IAdmissionRefundRevocationService>();
-        admissionRefund.ReconcileSucceededAsync(
+        string databasePath = Path.Combine(Path.GetTempPath(), $"refund-dispatch-{Guid.CreateVersion7():N}.db");
+        try
+        {
+            await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = databasePath,
+                Pooling = false
+            }.ToString());
+            await connection.OpenAsync();
+            var options = new DbContextOptionsBuilder<ExploreDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+            {
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = databasePath
+            });
+            options.UseSqlite(connection).UseSnakeCaseNamingConvention();
+            await using var context = new ExploreDbContext(options.Options);
+            context.EnableTenantFilterBypass("Native refund dispatcher regression.");
+            await context.Database.EnsureCreatedAsync();
+            await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF;");
+            Guid tenantId = Guid.CreateVersion7();
+            Guid paymentAttemptId = Guid.CreateVersion7();
+            PaidOrderAcceptanceSnapshot acceptance = RefundAcceptance(tenantId);
+            RefundAttempt attempt = RefundAttempt.Create(
+                Guid.CreateVersion7(),
+                tenantId,
+                paymentAttemptId,
+                acceptance,
+                "acct_example",
+                "pi_example",
+                $"refund:{Guid.CreateVersion7():N}",
+                500,
+                DateTime.UtcNow.AddMinutes(-2));
+            context.RefundAttempts.Add(attempt);
+            await context.SaveChangesAsync();
+            IRefundAttemptRepository refunds = new RefundAttemptRepository(context);
+            IRefundCreator creator = Substitute.For<IRefundCreator>();
+            creator.CreateAsync(Arg.Any<RefundCreateRequest>(), Arg.Any<CancellationToken>())
+                .Returns(RefundProviderResult.Observed(
+                    new RefundProviderObservation(
+                        "re_example",
+                        "pi_example",
+                        RefundProviderStatus.Succeeded,
+                        500,
+                        "EUR",
+                        0),
+                    "req_example"));
+            IAdmissionRefundRevocationService admissionRefund =
+                Substitute.For<IAdmissionRefundRevocationService>();
+            admissionRefund.ReconcileSucceededAsync(
+                    tenantId,
+                    attempt.Id,
+                    Arg.Any<CancellationToken>())
+                .Returns(new AdmissionRevocationResult(
+                    AdmissionRevocationOutcome.Applied, [], []));
+            CompositeOutboxMessageDispatcher dispatcher = CreateDispatcher(
+                Substitute.For<IEventPublishedNotificationFanoutService>(),
+                Substitute.For<IEventModerationNotificationFanoutService>(),
+                refundRepository: refunds,
+                refundCreator: creator,
+                admissionRefundRevocationService: admissionRefund);
+
+            await dispatcher.DispatchAsync(
+                RefundOutboxMessageFactory.CreateDispatch(attempt, DateTime.UtcNow));
+
+            await admissionRefund.Received(1).ReconcileSucceededAsync(
                 tenantId,
                 attempt.Id,
-                Arg.Any<CancellationToken>())
-            .Returns(new AdmissionRevocationResult(
-                AdmissionRevocationOutcome.Applied, [], []));
-        CompositeOutboxMessageDispatcher dispatcher = CreateDispatcher(
-            Substitute.For<IEventPublishedNotificationFanoutService>(),
-            Substitute.For<IEventModerationNotificationFanoutService>(),
-            refundRepository: refunds,
-            refundCreator: creator,
-            admissionRefundRevocationService: admissionRefund);
-
-        await dispatcher.DispatchAsync(
-            RefundOutboxMessageFactory.CreateDispatch(attempt, DateTime.UtcNow));
-
-        await admissionRefund.Received(1).ReconcileSucceededAsync(
-            tenantId,
-            attempt.Id,
-            Arg.Any<CancellationToken>());
+                Arg.Any<CancellationToken>());
+            context.ChangeTracker.Clear();
+            RefundAttempt persisted = (await refunds.GetByIdAsync(tenantId, attempt.Id, CancellationToken.None))!;
+            await Assert.That(persisted.Status).IsEqualTo(RefundAttemptStatusEnum.Succeeded);
+            await Assert.That(persisted.DispatchToken).IsNotNull();
+            await Assert.That(await context.OutboxMessages.CountAsync(message =>
+                message.AggregateId == attempt.Id &&
+                message.EventType == RefundOutboxMessageFactory.ReconciliationRequested)).IsEqualTo(2);
+        }
+        finally
+        {
+            File.Delete(databasePath);
+            File.Delete(databasePath + "-shm");
+            File.Delete(databasePath + "-wal");
+        }
     }
 
     private static CompositeOutboxMessageDispatcher CreateDispatcher(
@@ -806,11 +890,12 @@ public sealed class CompositeOutboxMessageDispatcherTests
             new EventDiscoveryIdentityCorrectionDispatcher(
                 correctionNotificationService
                     ?? Substitute.For<IEventDiscoveryIdentityCorrectionNotificationService>(),
-                Substitute.For<ITenantContextAccessor>()),
+                Substitute.For<INotificationOutboxExecutionAuthority>()),
             new LocationPrivacyCorrectionDispatcher(
                 selectedCache,
                 correctionPlanner,
-                EventLocationPrivacyMetricsFactory.Create()),
+                EventLocationPrivacyMetricsFactory.Create(),
+                Substitute.For<ILocationPrivacyCorrectionReceiptRepository>()),
             new PrivacyErasureCacheInvalidationDispatcher(selectedCache),
             admissionDeliveryHandler ?? Substitute.For<IAdmissionCredentialDeliveryOutboxHandler>(),
             Substitute.For<IAdmissionRecoveryRequestOutboxHandler>(),
@@ -825,7 +910,8 @@ public sealed class CompositeOutboxMessageDispatcherTests
             new RefundReconciliationService(refundRepository, refundCreator, refundRetriever, TimeProvider.System),
             new RegistrationPaymentCancellationService(
                 Substitute.For<IRegistrationPaymentAttemptRepository>(), refundRepository,
-                refundCampaignRepository, Substitute.For<IPaymentCancellationProvider>(), TimeProvider.System),
+                refundCampaignRepository, Substitute.For<IPaymentCancellationProvider>(), TimeProvider.System,
+                Substitute.For<IRegistrationInventoryRepository>()),
             admissionRevocationService ?? Substitute.For<IAdmissionRevocationService>(),
             admissionRefundRevocationService ?? Substitute.For<IAdmissionRefundRevocationService>(),
             admissionEventCancellationService ?? Substitute.For<IAdmissionEventCancellationService>(),
@@ -838,7 +924,9 @@ public sealed class CompositeOutboxMessageDispatcherTests
                 ?? Substitute.For<IConfigurationManifestEffectDispatcher>(),
             importEffectDelivery
                 ?? Substitute.For<IConfigurationImportEffectDelivery>(),
-            moderationEffectDispatcher ?? Substitute.For<IModerationEffectDispatcher>());
+            moderationEffectDispatcher: moderationEffectDispatcher ?? Substitute.For<IModerationEffectDispatcher>(),
+            notificationOutboxExecutionAuthority: Substitute.For<INotificationOutboxExecutionAuthority>(),
+            genericOutboxExecutionAuthority: Substitute.For<IGenericOutboxExecutionAuthority>());
     }
 
     private static PaidOrderAcceptanceSnapshot RefundAcceptance(Guid tenantId) =>

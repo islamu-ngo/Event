@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4V59KC8JG4WX8MS6G7W6Q0A
+Title: "Preserve session duration when moving its start date"
+Type: fix
+Scope: events
+Summary: "Moving a saved program item to an earlier or later day shifts its end date by the same interval, retaining same-day and overnight schedules."
+Group: studio-event-workspace
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

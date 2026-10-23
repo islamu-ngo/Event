@@ -9,7 +9,9 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Infrastructure.Identity;
+using Explore.Infrastructure.Tests.Infrastructure;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -17,15 +19,15 @@ namespace Explore.Infrastructure.Tests.Behaviors;
 
 public class AdminClaimsTransformationTests
 {
-    private readonly IAdminContext _adminContext;
-    private readonly IUserExternalLoginRepository _userExternalLoginRepository;
+    private readonly IAdministrativeAuthorityRepository _adminContext;
+    private readonly IExternalLoginAuthenticationRepository _userExternalLoginRepository;
     private readonly ILogger<AdminClaimsTransformation> _logger;
     private readonly AdminClaimsTransformation _sut;
 
     public AdminClaimsTransformationTests()
     {
-        _adminContext = Substitute.For<IAdminContext>();
-        _userExternalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
+        _adminContext = Substitute.For<IAdministrativeAuthorityRepository>();
+        _userExternalLoginRepository = Substitute.For<IExternalLoginAuthenticationRepository>();
         _logger = Substitute.For<ILogger<AdminClaimsTransformation>>();
         _sut = new AdminClaimsTransformation(_adminContext, _userExternalLoginRepository, _logger);
     }
@@ -129,18 +131,28 @@ public class AdminClaimsTransformationTests
     }
 
     [Test]
-    public async Task TransformAsync_PurposeBoundPrincipalDoesNotGainInternalOrAdminClaims()
+    [Arguments(ApiAuthenticationSchemeNames.ApiKey)]
+    [Arguments(ApiAuthenticationSchemeNames.AdmissionScanner)]
+    public async Task TransformAsync_PurposeBoundPrincipalDoesNotGainInternalOrAdminClaims(string scheme)
     {
         var principal = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim("sub", Guid.NewGuid().ToString("D"))],
-            ApiAuthenticationSchemeNames.ApiKey));
+            scheme));
+        bool acquiredAdminContext = false;
+        var authority = Substitute.For<IAdministrativeAuthorityRepository>();
+        authority.IsInstanceAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            acquiredAdminContext = true;
+            return Task.FromException<bool>(
+                new InvalidOperationException("Purpose-bound authentication cannot acquire administrator persistence."));
+        });
+        var guarded = new AdminClaimsTransformation(authority, _userExternalLoginRepository, _logger);
 
-        var result = await _sut.TransformAsync(principal);
+        var result = await guarded.TransformAsync(principal);
 
         await Assert.That(result.HasClaim(c => c.Type == "internal_user_id")).IsFalse();
         await Assert.That(result.HasClaim(c => c.Type == AdminClaimTypes.InstanceAdmin)).IsFalse();
-        await _adminContext.DidNotReceive()
-            .IsInstanceAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await Assert.That(acquiredAdminContext).IsFalse();
     }
 
     [Test]
@@ -221,12 +233,14 @@ public class AdminClaimsTransformationTests
         var userId = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
         var orgId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
         var identity = new ClaimsIdentity(new[] { new Claim("sub", userId.ToString()) }, "TestAuth");
         var principal = new ClaimsPrincipal(identity);
 
         _adminContext.IsInstanceAdminAsync(userId, Arg.Any<CancellationToken>()).Returns(true);
         _adminContext.GetAdminTenantIdsAsync(userId, Arg.Any<CancellationToken>()).Returns(new List<Guid> { tenantId }.AsReadOnly() as IReadOnlyList<Guid>);
         _adminContext.GetAdminOrganizationIdsAsync(userId, Arg.Any<CancellationToken>()).Returns(new List<Guid> { orgId }.AsReadOnly() as IReadOnlyList<Guid>);
+        _adminContext.GetAdminGroupIdsAsync(userId, Arg.Any<CancellationToken>()).Returns([groupId]);
 
         // Act
         var result = await _sut.TransformAsync(principal);
@@ -235,6 +249,37 @@ public class AdminClaimsTransformationTests
         await Assert.That(result.HasClaim(AdminClaimTypes.InstanceAdmin, "true")).IsTrue();
         await Assert.That(result.HasClaim(AdminClaimTypes.TenantAdmin, tenantId.ToString())).IsTrue();
         await Assert.That(result.HasClaim(AdminClaimTypes.OrganizationAdmin, orgId.ToString())).IsTrue();
+        await Assert.That(result.HasClaim(AdminClaimTypes.GroupAdmin, groupId.ToString())).IsTrue();
+    }
+
+    [Test]
+    public async Task TransformAsync_ExplicitUserDoesNotConstructOrdinaryAdministrativeContext()
+    {
+        var userId = Guid.CreateVersion7();
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("sub", userId.ToString())], "TestAuth"));
+        _adminContext.IsInstanceAdminAsync(userId).Returns(true);
+        _adminContext.GetAdminTenantIdsAsync(userId).Returns([]);
+        _adminContext.GetAdminOrganizationIdsAsync(userId).Returns([]);
+        _adminContext.GetAdminGroupIdsAsync(userId).Returns([]);
+        bool acquiredAdminContext = false;
+        var services = new ServiceCollection();
+        services.AddSingleton(_adminContext);
+        services.AddSingleton(_userExternalLoginRepository);
+        services.AddSingleton(_logger);
+        services.AddTransient<IAdminContext>(_ =>
+        {
+            acquiredAdminContext = true;
+            throw new InvalidOperationException("Pre-tenant claims enrichment must not acquire an ordinary request lease.");
+        });
+        services.AddTransient<AdminClaimsTransformation>();
+        using var provider = services.BuildServiceProvider();
+
+        var result = await provider.GetRequiredService<AdminClaimsTransformation>().TransformAsync(principal);
+
+        await Assert.That(result.HasClaim(AdminClaimTypes.InstanceAdmin, "true")).IsTrue();
+        await Assert.That(result.HasClaim(PlatformIdentityClaimTypes.InternalUserId, userId.ToString())).IsTrue();
+        await Assert.That(acquiredAdminContext).IsFalse();
     }
 
     [Test]
@@ -302,30 +347,32 @@ public class AdminClaimsTransformationTests
     }
 
     [Test]
-    public async Task TransformAsync_AdminContextThrowsException_FailsOpenAndLogWarning()
+    public async Task TransformAsync_AdminContextThrowsException_PreservesAuthenticationWithoutDisclosingFailure()
     {
         // Arrange
         var userId = Guid.NewGuid();
         var identity = new ClaimsIdentity(new[] { new Claim("sub", userId.ToString()) }, "TestAuth");
         var principal = new ClaimsPrincipal(identity);
 
-        _adminContext.IsInstanceAdminAsync(userId, Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException("DB connection failed"));
+        string privateFailure = $"private-database-{Guid.CreateVersion7():N}";
+        _adminContext.IsInstanceAdminAsync(userId, Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException(privateFailure));
+        var logger = new TestListLogger<AdminClaimsTransformation>();
+        var sut = new AdminClaimsTransformation(_adminContext, _userExternalLoginRepository, logger);
 
         // Act
-        var result = await _sut.TransformAsync(principal);
+        var result = await sut.TransformAsync(principal);
 
         // Assert — should return principal without admin claims (fail-open)
         await Assert.That(result.HasClaim(c => c.Type == AdminClaimTypes.InstanceAdmin)).IsFalse();
         await Assert.That(result.HasClaim(c => c.Type == AdminClaimTypes.TenantAdmin)).IsFalse();
         await Assert.That(result.HasClaim(c => c.Type == AdminClaimTypes.OrganizationAdmin)).IsFalse();
 
-        // Verify warning was logged
-        _logger.Received(1).Log(
-            LogLevel.Warning,
-            Arg.Any<EventId>(),
-            Arg.Any<object>(),
-            Arg.Is<InvalidOperationException>(ex => ex.Message == "DB connection failed"),
-            Arg.Any<Func<object, Exception?, string>>());
+        await Assert.That(result.Identity!.IsAuthenticated).IsTrue();
+        await Assert.That(logger.Entries.Any(entry => entry.Level == LogLevel.Warning)).IsTrue();
+        await Assert.That(logger.Entries.All(entry => entry.Exception is null
+            && !entry.Message.Contains(privateFailure, StringComparison.Ordinal)
+            && entry.Arguments.All(argument => !(argument?.ToString()?.Contains(
+                privateFailure, StringComparison.Ordinal) ?? false)))).IsTrue();
     }
 
     [Test]

@@ -1,0 +1,32 @@
+Change-Id: CHG-01M57ZK3SQYGXXCMHQFQ56EWC2
+Title: "Load reference catalogues through EF Core"
+Type: feat
+Scope: database
+Summary: "Replace PostgreSQL catalogue routines with fixed Runtime column reads and publish complete EF-loaded cache snapshots without swallowing failures."
+Group: lookup-catalogue-ef
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: The removed catalogue function, roles or policies cause fail-closed admission. Provision a fresh isolated development PostgreSQL instance or cluster without obsolete roles; no automatic cleanup or compatibility migration is supplied.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: All consumers sharing Runtime can read the fixed reference columns. Private membership and permission sources remain denied, tenant RLS is retained, and actor guards permit only the six direct non-grantable Runtime Role columns.
+  Migration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: The schema installer grants fixed EF-mapped columns instead of creating catalogue business routines. Obsolete catalogue objects or catalogue permission drift are refused without data deletion, permission normalization or altered generated migrations.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Existing Runtime and Migrator credentials remain authoritative. No new secret or environment variable is introduced; direct grants must not be replaced with inherited or grantable permissions.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Initial cache load fails visibly on any failed read. A failed or cancelled refresh preserves the previous complete cache and reports failure; repair the database or permission problem before retrying, without broadening access.

@@ -1,17 +1,13 @@
-using System.Diagnostics.Metrics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure.Ai;
-using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
 using Explore.Infrastructure.Ai;
-using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
-public sealed class AnthropicChatProviderTests
+public sealed class AnthropicChatProviderTests : AiProviderTestBase
 {
     [Test]
     public async Task SendAsync_WhenUserMessageHasImage_PostsOfficialAnthropicMessagesRequest()
@@ -29,7 +25,7 @@ public sealed class AnthropicChatProviderTests
               "usage": { "input_tokens": 20, "output_tokens": 8 }
             }
             """, response => response.Headers.Add("x-request-id", "req_test")));
-        var provider = CreateProvider(handler, CreateSettings(apiKey: "secret-key"));
+        var provider = CreateProvider(handler, CreateSettings());
         const string imageData = "aW1hZ2UtYnl0ZXM=";
 
         var result = await provider.SendAsync(CreateRequest(
@@ -45,7 +41,7 @@ public sealed class AnthropicChatProviderTests
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.RequestUri).IsEqualTo(new Uri("https://api.anthropic.com/v1/messages"));
-        await Assert.That(handler.RequestHeaders!.GetValues("x-api-key").Single()).IsEqualTo("secret-key");
+        await Assert.That(handler.RequestHeaders!.GetValues("x-api-key").Single()).IsEqualTo(Fixture.Credential);
         await Assert.That(handler.RequestHeaders.GetValues("anthropic-version").Single()).IsEqualTo("2023-06-01");
         await Assert.That(result.Response!.ProviderRequestId).IsEqualTo("req_test");
         await Assert.That(result.Response.AssistantMessage).IsEqualTo("This is an event flyer.");
@@ -67,27 +63,25 @@ public sealed class AnthropicChatProviderTests
         await Assert.That(source.GetProperty("data").GetString()).IsEqualTo(imageData);
     }
 
-    private static AnthropicChatProvider CreateProvider(
+    private AnthropicChatProvider CreateProvider(
         HttpMessageHandler handler,
         AiProviderSettings settings)
     {
-        var client = new HttpClient(handler);
+        var client = Fixture.CreateClient(handler);
         var factory = new StaticHttpClientFactory(client);
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
 
         return new AnthropicChatProvider(
             factory,
-            Options.Create(settings),
-            new AiProviderSettingsValidator(),
-            new BusinessMetrics(meterFactory));
+            Fixture.Configuration(settings),
+            Fixture.Validator,
+            Fixture.Metrics);
     }
 
-    private static AiProviderSettings CreateSettings(string apiKey = "test-key") => new()
+    private static AiProviderSettings CreateSettings() => new()
     {
         Enabled = true,
         Provider = AiProviderSettings.ProviderAnthropic,
-        ApiKey = apiKey,
+        CredentialScope = AiCredentialScope.Instance,
         ModelId = "claude-test",
         MaxInputTokens = 8000,
         MaxOutputTokens = 1024,

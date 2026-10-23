@@ -239,6 +239,565 @@ The actual logic of "is this user allowed to do this?" is delegated to a runtime
     -   `CerbosAuthorizationService`: Offloads decision-making to an external Cerbos Policy Decision Point (PDP).
     -   `FallbackAuthorizationService`: Uses a local, database-backed RBAC implementation when local authorization is selected.
 
+### Persisted targets and public-action mutations
+
+`AuthorizationResourceContextResolver` does not substitute request facts when an
+Event, Session, OrganizationMember, persisted StorageObject or projection parent
+cannot be loaded. Persisted targets must match the nonempty server tenant.
+Session and projection decisions also resolve their current event parent;
+member decisions require the persisted organization participation and parent.
+Pre-create facts apply only to creation, and an event parent is still resolved.
+Organization creation remains a global resource operation. Tenant-wide
+projection/status and storage-list scopes remain collection operations, not
+evidence about an individual object.
+
+The decorator's decision is not a transaction receipt. Event public-action
+create, update and delete handlers call the selected provider themselves and
+then acquire current native authority in their own Serializable transaction.
+`EventPublicActionRepository.GetAuthorizedEventForMutationAsync` holds the
+persisted User, tenant membership, Actor/Event ownership, relevant assignments,
+roles and permissions through commit. Tenant administration, the publishing
+user's ownership, organization administration, and explicit
+`event:manage-public-actions` permission retain their distinct predicates.
+Platform administration alone is not authority for this action.
+An expired or revoked event grant cannot be replaced by an authentication claim
+or an earlier allow. Actual action id, parent id, tenant and concurrency stamp
+are checked again, including when an object is already tracked.
+
+Provider evaluation precedes native locks deliberately: administrative discovery
+uses an independent Global connection, which must not wait on a row locked by
+the same logical operation. Native authority is reacquired after the provider
+response and on each Serializable retry. Cancellation and failures retain the
+existing unit-of-work rollback and tracking cleanup; selected-provider
+unavailability remains a denial rather than a local grant.
+
+These mechanisms are not a blanket authorization exemption for other handlers,
+workers or raw SQL owners. Their action-specific persisted predicates and
+transaction contracts remain required. The Phase 21 task ledger distinguishes
+authored source from the unrun programme-final native assurance gates.
+
+### API-key management authority
+
+Key detail, policy-update and revocation handlers resolve the canonical subject
+and own a Serializable transaction. `ExternalApiKeyManagementAuthority` reuses
+`IExternalApiKeyIssuanceAuthority` for tenant-bound ownership and
+`IInstanceAdministratorCommitAuthority` for instance ownership. The latter does
+not require the acting administrator to be the key's original owner. These
+ports fence actual identity, membership, role and permission rows; a role claim
+or an earlier administrative lookup does not substitute for them.
+
+`ExternalApiKeyRepository` loads no-tracking candidates from the current tenant.
+Null-tenant instance keys use separate purpose-bound execution scopes. After owner authorization,
+`GetForManagementAsync` fences and rereads the exact key in the same transaction.
+The handlers compare persisted tenant, owner type and owner id before returning
+details or applying changes. Revocation remains idempotent, and mutation metrics
+are recorded only after commit.
+
+The approved D03 capability amendment adds four independent read/write/issuance/
+report pools. Fixed execute-only PostgreSQL functions enforce current user,
+provider binding, platform-admin grants and exact null-tenant instance-key
+ownership. List-mine stays self-owned; exact administration preserves cross-owner
+instance-admin access. The selected instance PDP evaluates fixed
+`instance.api-keys.*` resources through the existing InstanceSetting policy
+inside the transaction before native fences. Fixed writes cannot change owner,
+tenant, key identity or credential hash.
+
+Issuance keeps first-only disclosure and digest-only nonreopening receipts.
+PostgreSQL derives the receipt selector from actor plus bounded operation key;
+recovery returns redacted metadata only. The existing privacy authority remains
+the outer fence, with co-located SQLite sharing the dedicated connection's
+actual transaction. Historical reporting returns existing aggregates across
+inactive tenants and instance keys; a requested tenant report binds a fresh
+Runtime lease and its own provider/admin/read transaction.
+
+The credential, native-function and admission source is authored but unrun.
+Profile admission rejects missing grants/functions instead of inventing a
+Runtime bypass. Existing Global/authentication/scanner capabilities are unchanged;
+source authorship is not a completed provider assurance receipt.
+
+Admission also rejects purpose contamination: actual inherited membership may
+reach only the selected executor, and other-purpose fixed-function execution
+is forbidden even when granted directly to the login. Exact other-key,
+authentication and scanner signatures are checked alongside a catalogue-based
+allow-list of executable application-schema SECURITY DEFINER functions.
+No existing Global, authentication or scanner grants are changed by admission.
+
+### Event agenda mutation authority
+
+The three agenda mutation handlers evaluate the selected provider inside their
+Serializable transaction before native row fences. They then bind the current
+principal/provider identity, actual agenda permission and persisted event parent.
+Agenda administration retains its existing instance/tenant/org/owner/manager
+semantics; this does not expand ordinary event-update or public-action rights.
+Child rows are reread and fenced before changes, and relocation also checks
+the destination's separate event-update policy and current authority.
+
+`EventAgendaItemRepository.MoveToEventAsync` checks the stored source
+tenant/parent/stamp, both current parents, and the stored destination placement
+and room before its parameterized update. Tracked parent substitution cannot
+authorize that operation. Creation reserves its aggregate identity and audit
+time before retries; entities and schedule projections are rebuilt per attempt.
+The native source cases are authored but unrun under the programme override.
+
+### Event deletion authority
+
+`DeleteEventCommandHandler` owns selected-provider evaluation, current
+`EventDelete` authority, paid-evidence lookup, session enumeration/fences,
+cascading deletion and federation outbox planning in one Serializable
+transaction. It no longer treats a tenant grant with the legacy `Admin` code as
+system administration. Actor ownership, organization administration and current
+event-delete grants remain subject to the selected Event policy; platform or
+tenant administration alone does not grant deletion.
+
+Missing, authority-denied and paid-evidence response categories remain stable.
+Provider unavailability stays distinct from ordinary denial, and cache work
+remains after commit. Diagnostics retain fixed outcomes and session count
+without actor/tenant/resource identifiers or titles. Native regression source
+is authored; executable assurance remains pending.
+
+### Event session mutation authority
+
+Session create/update/delete use their own selected-provider decisions and
+current session-specific native authority inside Serializable transactions.
+The event-child resolver preserves the existing administrator and event-role
+rules; moving a session additionally requires the existing Session/create
+pre-create admission for its persisted destination event, not Event/update.
+The selected decision uses stored destination tenant/parent facts inside the
+Serializable transaction; the ordered native destination fence independently
+requires current session-create authority before effects. Persisted tenant,
+parent, stamp, placement and room are checked
+before the raw move. Published-session relocation and ticket-entitlement
+deletion restrictions remain enforced.
+
+Creation now keeps Islamic metadata, template definitions/options/default
+values and projection creation in the session transaction rather than writing
+them after the session commit. Root identity/time survive rollback-known
+retries, and template audit fields use the canonical actor. Existing update
+fanout, refund and reminder effects retain their original transaction owner.
+Native scheduling, permission, tracked-state, provider-outage and shared-commit
+cases are authored but unrun.
+
+### Persisted machine mutation commit authority
+
+Session mutations and footer **link/group PATCH** combine the selected provider
+decision with `IMachineMutationCommitAuthority` on the actual Runtime
+Serializable business connection. This does not widen Local's InstanceAdmin
+session allow-list or introduce Organization/Group session authority. Configured
+keys and internal machine execution have no persisted authentication proof and
+fail closed for these mutations, even if their KeyId matches a stored key.
+
+Successful persisted API-key authentication attaches
+`PersistedApiKeyAuthenticationProof` as a server feature. Its row identity,
+KeyId, owner, tenant, status, deadline and copied scopes are immutable;
+the bound `ClaimsIdentity` is not. The accessor therefore requires exactly one
+authenticated identity, the original reference, unchanged key/owner/tenant/
+scope fields, and purpose-specific User metadata. User-owned keys have exactly
+one matching `internal_user_id`; other keys have none. Subject, provider,
+nameidentifier or session-identity contamination invalidates that proof.
+An internal execution override cannot borrow it; clearing the override can
+restore only the original still-valid HTTP proof.
+
+User-key delegation uses the validated proof owner and current owner/role
+fences. API-key identity remains excluded from ambient human identity:
+new placement creation, final-carrier placement detachment, template actor
+attribution, published material-change/refund paths, and the six human-only
+footer actions retain their real-human requirements. In particular, footer
+settings PATCH is not a machine operation.
+
+Tenant-key fences use exact Runtime tenant access. Native checks retain
+Active/PendingRotation only, intersect required scopes in both the
+authentication snapshot and current row, verify exact identity/owner/tenant,
+and evaluate live expiry after target waits. Session guarded writes invoke the
+caller's final check after placement/room/overlap acquisition; a final check
+before commit also rolls back expiry during later transactional work.
+Footer PATCH holds the current link-group governance lease, then
+principal/key/tenant/group/optional-link fences, and rechecks immediately
+before mutation and before commit. Fresh repository reads reject tracked
+ownership substitution or parent drift.
+
+Null-tenant InstanceAdmin footer PATCH alone uses
+`PostgresMachineMutationAuthorityContract`: its fixed boolean function accepts
+the exact group and optional link, never an operation name or arbitrary setting
+key. It rejects foreign and instance-default groups, holds actual owner, key,
+tenant, group and link locks, and reads `clock_timestamp()` after contention.
+The function cannot enumerate keys, read credentials/usage, change settings,
+or borrow Global/authentication/scanner/management credentials. The dedicated
+Runtime executor has only function execution; installer/admission verify
+ownership, membership, function identity/body, fixed search path, PUBLIC
+denial and cross-purpose isolation. Source and native cases are authored;
+execution and provisioning remain deferred to programme assurance.
+
+### Room-update transaction authority
+
+`UpdateLocationRoomCommandHandler` owns a Serializable transaction for both
+ordinary edits and relocation. It repeats the selected room/update provider
+decision, fences current human administration or authentication-owned
+persisted-key authority, then holds the actual room and ordered source/
+destination locations. Current tenant lifecycle, deleted rooms, erased
+locations, tracked parent substitution and the supplied concurrency stamp
+are checked before effects. Schedule references still prevent relocation.
+Machine expiry is checked after target acquisition and again before commit.
+
+Cerbos's existing null-tenant InstanceAdmin room-update cell uses the distinct
+`PostgresMachineRoomMutationAuthorityContract` and
+`machine_room_update_authority` function. Local's machine allow-list is
+unchanged. The function derives the current source from the locked room,
+accepts only an exact optional destination, and holds key/owner/tenant/room/
+location locks through the caller's commit. It has separate owner, migrator
+and Runtime executor roles, no credential pool, no enumeration and no
+secret/hash/usage access. It neither calls nor broadens the footer function.
+Native handler/provider and ordinary-Runtime cases are authored but unrun.
+
+### Native Local session validation
+
+After native signature and audience validation, co-located PostgreSQL session
+validation uses `human_principal_source_session(uuid,text,uuid)` on the original
+Runtime context, connection, transaction and selected tenant, including a
+legitimate null-tenant instance request. It returns bounded revocation facts,
+not an Identity user or a human admission. Runtime receives execution only.
+Exact source, ownership, role and ACL attestation use the existing principal
+source contract and migrator installation.
+
+`LocalIdentityCredentialStateStore.ValidateReadySessionAsync` requires the
+ordinal stamp match, email state, password presence, Ready metadata, replaced
+Create/Reset operation and exact live user/login/personal-actor binding. Instance
+email policy still distinguishes invalid sessions from unavailable validation.
+Login keeps its complete entity and response path; this projection does not
+fabricate a `LocalIdentityUser`. All fourteen native Runtime controls pass with
+both null and selected tenants, including invalid-session outcomes and denied
+direct access to private identity tokens. The selected-tenant fixture uses the
+production `PostgresTenantSessionInterceptor`; caller guards remain unchanged.
+
+### Original resource and visitor Settings ownership
+
+Standalone selected human resource and visitor writes acquire their complete
+ordered policy key group before executing the prepared producer's Serializable
+attempt. Joined writes retain the acquired original producer and existing locks;
+an arbitrary caller-owned transaction is not sufficient. Values and lock changes
+remain separate storage effects: resource value upsert does not implicitly
+unlock a row. Fixture migrations exercise actual producers and rollback rather
+than authorizing a write by naming an import operation.
+
+### Current human Cerbos principal inputs
+
+`CerbosPrincipalBuilder` obtains human policy inputs through
+`IHumanCerbosPrincipalReader`, rather than ordinary administrative or membership
+repository queries. `HumanCerbosPrincipalReader` prepares the original selected
+owner, retains the resolved subject, authentic credential lifetime, HTTP context,
+principal reference and ambient tenant, then observes `IHumanPrincipalSourceFence`
+while idle. It validates current account/session sources and caller continuity
+before projecting the existing Cerbos attributes, including ordered permission
+lists. It opens no new owner or transaction and grants no private-table access.
+
+This is a current read, not commit admission. A mutation must prepare its decision
+while idle, then acquire and finalize its real sources under one original attempt.
+The reader deliberately cannot supply a cached observation to authorization inside
+an already-open transaction. Source diagnostics are clean; executable assurance
+for this integration remains pending.
+
+### Ordinary AI tool proposal custody
+
+`ProposeAiToolActionCommandHandler` prepares ordinary proposals through
+`IHumanAiToolProposalPreparation` before entering one `ISerializableAttemptOwner`.
+It no longer calls the generic provider inside a replaying unit of work.
+`HumanAiToolProposalPreparation` retains the exact registry kind, required
+resource/action, strictly validated payload, command object and conversation
+owner, tenant, actor, active status and initial concurrency stamp. Its
+cancellable `GetAiProposalAuthorizationTargetByIdAsync` read loads only the
+tenant-filtered Event entity, without navigation joins into private identity
+tables. Missing foreign heavy-moderation targets still use their dedicated
+preparation below.
+
+Preparation captures principal, route, support and policy source exclusion
+while the original human execution owner is idle. Actual Event targets use
+`IHumanEventAssignmentSourceFactory` in the selected tenant. Targetless draft
+and template questions do not invent assignment snapshots. Resource IDs and
+`PreCreateAuthorizationFacts`, `EventScopedAuthorizationFacts` or
+`TenantScopedAuthorizationFacts` retain the original proposal policy meaning;
+model-supplied organization, group and management-context flags grant nothing.
+Cerbos receives `BuildPrincipalFromSources` with actual assignment enrichment,
+at the selected instance or tenant endpoint and original tenant policy scope.
+Local evaluation uses the canonical fallback permission mapping and Event
+authority projector, including authenticated draft creation, tenant template
+administration and actual Event assignment permissions. Instance administration
+never replaces a selected Cerbos denial.
+
+The provider finishes before locks are acquired. Acquisition borrows the same
+owner's exclusion, principal, route, optional assignments and support leases;
+no external call occurs under those leases. Full source comparisons and
+principal reprojection run at acquisition and terminal commit, including
+assignment windows and the original credential expiry after blocking work.
+The retained graph must still contain the exact proposed-only action and
+original owner/tenant/actor/payload. The repository advances the conversation
+stamp when saving; the original stamp is checked before that authorized save.
+A rejected attempt rolls back without replaying the prepared decision.
+Ordinary authorization rejections retain `tool_authorization_denied`; a changed
+conversation retains `conversation_authority_changed`. Provider outages keep
+their dedicated exception path.
+
+`HumanAiToolProposalPreparationTests` contains credential-backed Local/Cerbos
+proposal, denial, source-revocation, request-replacement, reuse, expiry and
+retained-graph controls. These tests are authored but unrun in this source-only
+unit; the unchanged MCP assertions and serial programme assurance remain the
+execution gates. No additional action kind can be confirmed or executed, and
+no target Event is mutated or dispatched. See the
+[operator guide](../public/documentation/readme/security-and-identity/authorization.md#ordinary-ai-tool-proposals).
+
+### Cross-tenant AI heavy-moderation proposals
+
+`ProposeAiToolActionCommandHandler` retains ordinary filtered event reads. Only
+the registry's `HeavyModerateEvent` / `Event` / `ModerateHeavy` question with a
+missing ordinary target enters `IHumanAiModerationProposalPreparation`. The
+conversation's selected tenant S, owner H, actor, stamp, active status and exact
+command are retained. A current persisted platform-administrator grant and the
+original authenticated credential are required before discovering the exact
+event's tenant T. Tenant-admin roles, machine principals and model-provided
+management-context flags do not provide this authority.
+
+`HumanAiModerationProposalTargetSource` never accepts T as an argument. Its
+PostgreSQL observe/acquire routines resolve one event identifier and read its
+actual assignment contributors under S's unchanged Runtime connection. The
+dedicated NOLOGIN owner has column-limited source access; Runtime receives only
+routine execution. Migrator installation is composed after the existing human
+assignment source, whose writer epoch also excludes negative-set changes.
+Existing selected-tenant assignment routines keep their equality guard.
+Exact routine bodies, ACLs, enrollment, source metadata and policies are
+attested. Separate current-catalog checks prevent an older Serializable snapshot
+from hiding native drift; no private data is read on that metadata connection.
+
+Provider selection and policy scope remain S's, including S's BYO route. T does
+not select a different endpoint. The resource remains the existing
+`EventScopedAuthorizationFacts(T, eventId)`, and Cerbos receives truthful T/event
+assignments. A selected provider denial or outage rejects the proposal.
+The prepared branch uses one `ISerializableAttemptOwner`, not replaying
+`IUnitOfWork.ExecuteSerializableAsync`. It acquires the existing policy exclusion,
+principal, route, target assignments and support sources before graph mutation.
+The terminal finalizer checks those original inputs, credential lifetime,
+authentic request references and the retained proposed-only graph before commit.
+The target event is neither mutated nor dispatched, and confirmation remains
+create-event-draft-only.
+
+`HumanAiModerationProposalTargetNativeTests` and
+`HumanAiModerationProposalPreparationTests` contain focused native and
+credential-backed controls. They are authored but unrun pending serial programme
+assurance. See the [operator guide](../public/documentation/readme/security-and-identity/authorization.md#cross-tenant-ai-heavy-moderation-proposals).
+
+### AI retention transaction authority
+
+Actor selection now uses `IHumanActorContextReader` before graph mutation.
+`HumanActorContextReader` explicitly prepares the canonical human and authentic
+credential lifetime, observes current principal contributors, then holds the
+policy source-set fence followed by the principal fence in one non-replaying
+Serializable attempt. Terminal admission checks the original request, account,
+tenant, credential lifetime and source contributors before releasing results.
+This is a self-read, not an administrator policy question.
+`IAiActorContextRepository` requires that held admission and returns detached
+`Actor` entities containing only display and owner names. PostgreSQL uses the
+execute-only `ai_actor_context_read` capability with column-limited NOLOGIN
+ownership; Runtime and Global receive no direct source-table access. Both native
+and portable predicates require live personal ownership or live approved
+organization/group placement, membership and an actual active `event.create`
+mapping in the correct role scope. A result exceeding 1,000 actors fails closed.
+Five authentic request controls pass: repeated detached reads, foreign-subject/
+tenant rejection, committed membership revocation and both credential-expiry
+boundaries. Native display projection also passes. Full eligibility, drift and
+graph mutation assurance remains underway; these results do not establish
+successful conversation creation.
+
+Ordinary AI graph writes require their exact nonbypassed Runtime tenant and a
+caller-owned Serializable transaction. `AiConversationRepository` fences the
+current actor anchors, owner user, tenant/status and root, then loads a fresh
+tracked graph. Admitted organization/group actors also fence the actual tenant
+link, membership, role, permission and composite `RolePermission` rows and
+recheck `EventCreate`, matching `AiAssistantActorContextService`; owner-only
+cancellation/rejection does not acquire a new universal membership requirement.
+The tracked root must retain its persisted ownership, and every child must
+retain its exact tenant/parent. EF persists both existing-child edits and new
+children, advances root concurrency even for child-only changes, and keeps
+unrelated tracking rather than replaying historical states or clearing the
+whole context.
+
+Worker privacy checks use `IAiConversationRepository.IsPrivacyFencedAsync` on the
+freshly acquired tracked conversation, before provider handoff and again before
+settlement. The repository retains its original subject, actor, tenant, connection
+and Serializable transaction across the read. PostgreSQL reuses the native AI
+owner contract with `ai_conversation_owner_privacy_fence(uuid,uuid)`, returning
+only whether a local saga exists. Its definer receives only `SELECT(subject_id)`
+on that source; Runtime gets execution, not saga or receipt access. Missing owner
+or drifted native authority rejects processing rather than treating the fence as
+absent. Installer body/role/ACL/source attestation covers both routines and rejects
+stale installations. The twelve native fence controls are now covered by the
+eleven passing original-owner/drift controls in
+`AiPrivacy-CurrentInstallationAndOriginalOwner.trx` and the corrected two-case
+present/absent check in `AiPrivacy-InstalledSchemaOriginalSubject.trx` (one
+overlapping absent case). The first run's present-case setup failure was a
+canonical migration model used against a custom execution schema, not a fence
+result; the corrected setup appends the genuine authority fact without granting
+Runtime access. Broader graph-owner assurance remains pending.
+
+Installation metadata is checked before and after the Boolean read through a
+fresh non-enlisted Runtime connector. A graph owner's Serializable catalog
+snapshot can otherwise retain pre-DDL function bodies, ACLs and role flags.
+These checks read catalog metadata only; private fence data remains on the
+original graph transaction and connector, whose identity is checked again before
+the result is released. Late function-body, ACL and role drift are rejected in
+the verified native controls; signed HTTP and real worker checks also pass in
+`AiApi-CurrentCatalogAndOriginalWorker.trx`.
+
+PostgreSQL owner fencing uses `PostgresAiConversationOwnerFenceContract`: a
+column-limited NOLOGIN owner holds those sources and returns only eligibility.
+This data fence serves human graph mutations and worker settlement; it does not
+issue human action admission. `ExploreDbContext.TrackedAuthority` consumes the
+repository's retained native owner keys only for the exact conversation graph's
+User, Actor and Tenant foreign keys on the original tenant, connection and
+physical transaction. Other foreign keys and persisted tenant checks still use
+their existing validation. Changed keys or transaction replacement cannot reuse
+that evidence. Runtime receives no private source-table grants.
+`AiEventDraftRecoveryRepository` passes deployment enrollment when constructing
+the graph repository and adds the native organizer-eligible placement predicate
+for event creation. That predicate only narrows owner eligibility; it is not an
+authorization claim. Portable recovery retains its existing placement checks.
+
+Create, send, cancel, proposal and rejection handlers own their local mutation
+transactions. Model-catalog and primary tool admission precede Runtime user
+fences. Sending serializes user/tenant quota checks, reloads after stale recovery
+and commits the message/run and database idempotency receipt together. The
+controller's later in-memory queue enqueue remains a separate delivery boundary.
+Processing claims the queued run in one transaction, calls reference/model
+providers without a business transaction, then freshly settles the same eligible
+in-progress run in another. A late failure cannot replace a cancelled outcome.
+
+Transcript hygiene owns a separate privacy-purpose transaction that remains
+available after ordinary owner authority is revoked, but permits only existing
+message-content/reference-summary redaction. Confirmation commits one local
+claim before independent storage/native command dispatch and commits the action
+outcome plus execution record together afterward. Already claimed actions cannot
+redispatch. These local boundaries do not make independent external/native
+commits atomic: Phase24/Phase27 still own exact payload/version/actor/expiry
+binding for every family, primary admission before image effects and unknown
+cross-commit recovery. Twenty native graph/action cases are authored and unrun;
+no end-to-end confirmation or runtime certification is claimed.
+
+`AiRetentionCleanupJob` reaches `AiRetentionCleanupService`, which creates a
+fresh Runtime tenant scope and invokes the native cleanup handler. That
+handler holds the retention-policy setting lease, reads current system/tenant
+rows with the instance lock taking precedence, and owns one Serializable
+transaction for the six graph-redaction updates. The repository requires that
+exact nonbypassed tenant transaction, fences selected conversation roots, and
+rechecks their current age before redaction. Dry-run remains read-only.
+Partial child redaction cannot survive a later failure. Seven native cases
+are authored and unrun; aggregate graph updates and proposed-action execution
+remain separate caller-owner work.
+
+### Custom-property projection maintenance authority
+
+Tenant-wide rebuild, dirty-scope drain and single-event/session rebuild handlers
+own their Serializable transaction. They require the exact current tenant and
+canonical authenticated user, evaluate the selected provider, then fence current
+instance or tenant administration before calling an updater. Posted tenant IDs
+cannot redirect maintenance into another tenant. The single-resource requests
+continue to resolve their tenant from the stored event/session through the
+authorization resolver.
+
+The two updaters no longer create or commit a separate rebuild/drain transaction.
+Their maintenance entrypoints require the caller's exact nonbypassed tenant
+lease and Serializable transaction; dirty-row marking repeats that boundary and
+an explicit tenant predicate. Projection rows, dirty markers and status changes
+therefore roll back with the caller's authority transaction. Existing native
+tests now create fresh exact-tenant maintenance contexts rather than relying on
+their privileged seed context. New native handler and rollback tests are
+authored, not executed.
+
+### Template mutation authority
+
+Event-template creation uses the server-selected execution tenant. Session-template
+creation resolves its persisted event-template parent; update/deletion resolve
+the selected template to its persisted execution tenant before evaluating the
+declared tenant-update policy. A session template must retain a visible same-tenant parent.
+The handlers invoke the selected provider themselves, then use a Serializable
+transaction for the target reread and all child/root writes.
+
+`ITenantAdministratorCommitAuthority` exposes the existing tenant-administrator
+identity, active membership and grant fences; its implementation reuses the
+native owner checks in `ExternalApiKeyIssuanceAuthority`. Instance administrators
+use the existing instance-administrator port instead. Neither port grants new
+database privileges. Current authority is reacquired on transaction retry, and
+cache invalidation follows commit.
+
+Update repositories require that exact-tenant Serializable transaction, fence
+the template row and, for a session template, its visible same-tenant parent.
+A fresh persisted snapshot is compared with tracked scalar values before the
+patch is constructed. Audit timestamps are taken from storage, avoiding false
+mismatches caused by database timestamp precision; caller-supplied tracked
+business fields cannot become an unsubmitted patch. The owning handlers retain
+the expected concurrency stamp and existing validation/quota rules. Quota reads
+use the same scoped context and now propagate cancellation to their existing
+setting readers.
+
+Creation snapshots the mutable outer DTO, validates its input shape, and
+allocates root/definition/option UUIDv7 ids plus creation time before transaction
+replay. Each attempt builds fresh entity graphs using that identity plan and
+the captured execution tenant. It reacquires current administrator authority;
+session-template creation also fences its parent before insertion. Quota,
+uniqueness and governance checks and every write stay in the transaction;
+cache invalidation follows commit.
+
+Definition replacement also preallocates its new child identities and creation
+time outside replay. Both repositories bind definitions to the actual root and
+its tenant, then options to their persisted definition, before inserting them.
+
+Six authored SQLite cases inject one pre-commit busy failure into the real
+transaction pipeline. They check stable root/child/default-option identities and
+creation timestamps for creation and replacement, and reject creation replay
+after a real administrator-grant removal.
+They do not substitute authority services or claim engine-contention coverage.
+These and the other native cases are unrun; source completion does not close
+the wider Phase 21 caller inventory.
+
+### Custom-property definition mutation authority
+
+All sixteen shared/event/session definition and value write handlers invoke their
+declared tenant-update provider policy, then reacquire native current
+administration inside Serializable execution. Creation holds the actual parent;
+update/delete/value readers hold the definition, parent and runtime option rows.
+Tracked scalar comparisons reject unsubmitted tenant, parent or option changes.
+Database-owned audit timestamps are normalized from storage.
+
+Updates retain concurrency-stamp, quota and governance checks. Definition,
+option and value ids/time are reserved before retries, with fresh graphs per
+attempt. Value validation rereads options and existing values under the fences,
+preserving duplicate-value rejection. Existing value writes compare persisted
+ownership, and replacements bind every row to the command's exact parent/scope.
+Purge explicitly fences its target before dependency reads, then commits deletion
+and a freshly constructed audit together. Its audit id/time remains stable on
+retry. Projection writes and cleanup remain atomic; metrics/cache follow commit.
+
+Fifty-eight actual-handler SQLite authority cases are authored, plus seventeen
+conversion/quota/value-validation regressions migrated from fake-store fixtures
+to native storage. None has run. This family source packet does not close the
+remaining Phase 21 caller inventory or provider assurance.
+
+### Subscription state reads
+
+`ActorSubscriptionRepository` self-service state/detail/list reads require the
+current nonbypassed tenant lease. They retain soft-delete filtering and use
+no-tracking rows, with persisted equality between the subscription recipient and
+its tenant membership's user. Deleted members/users and inconsistent recipient
+links cannot supply state or become fanout recipients.
+
+The state lookup returns scalar entities for explicit mutation, not an
+identity-map instance or a graph containing mutable actor PII. Unsubscribe
+rejects a live administrative Blocked state, preventing unsubscribe/resubscribe
+from clearing the block. A retired row remains retired; the existing filtered
+unique index still permits a new subscription after retirement. Missing state
+retains the existing idempotent unsubscribe result; `BaseCommandResponse`
+permits its empty id and no mutation occurs.
+
+This source packet does not close the subscription family's transaction owner.
+Commit-bound membership/target checks and the legacy publication fanout's
+persisted outbox-to-tenant binding remain open in Phase 21. Authored native cases
+have not been executed.
+
 ### Event resource authority
 
 `RuntimeAuthorizationProvider` partitions `islamuevent_event_resource` checks
@@ -300,8 +859,28 @@ changes and announced policy writers start a new operation and close authority
 before Admin mutation. Generic settings writes and portable manifests cannot
 replace this coordinated document.
 
-`EventResourceProviderControlPlane` uses the native setting mutation lock and
-ReadCommitted unit of work to commit document revision and activation together.
+`EventResourceProviderControlPlane` retains the actual Bind, Begin and Activate
+commands through `EventResourceProviderOriginal`. The binding-key ordered lock
+is acquired before the existing single, non-replaying Serializable attempt.
+This is ordinary Global Instance authority, never MixedSettings authority.
+`HumanSettingsMutationPreparation.EventResourceProvider` acquires the original
+subject/principal, authorization route, support and credential horizon before
+`EventResourceProviderOriginalStore` privately compiles the complete binding and
+activation row effects. Row metadata, explicit absence, the full binding document
+and publication resolver inputs are retained on the same physical connection.
+
+The store writes only that pair, with the original actor and one represented
+timestamp, operation ID, document revision and concurrency stamp. It does not
+flush unrelated tracked entities through `SaveChanges`. A stale activation is a
+real no-op and must still pass private action completion; omitted effects cannot
+borrow that result. Final source checks precede the owner's final horizon sample,
+and every exit expires the original. `PostgresEventResourceProviderContract`
+provides the enrolled Global execute-only backend, independent native effect
+comparison, compulsory source revisions and exclusion (including absence and stale
+Serializable snapshots), row-effect witnesses, deferred completion and strict
+role/routine/privilege/trigger attestation. The production database migrator
+installs it; Runtime never repairs it. Generic ordinary-setting definitions and
+the current-transaction upsert both reject the binding key.
 Only current instance administrators may bind, begin or activate. Activation
 requires the matching operation and epoch, matching scope/version, all previous
 writers stopped, a positive reachable-replica count equal to the count with
@@ -313,6 +892,20 @@ Upload success, elapsed time, failure or cancellation cannot
 activate a deployment. Recovery starts a new operation and attests convergence.
 All three write actions suppress generic idempotency response storage and replay;
 a cached receipt must not bypass a revoked administrator or a newer operation.
+
+Publication retains the actual `SyncAuthorizationPolicyPackageCommand` through
+`IPolicyPackageService` and the same original producer. The package service issues
+and rechecks its own selected target from captured system/tenant resolver rows,
+including absences, deployment provider options, gRPC endpoint and validated Admin
+origins. It does not use a cached runtime resolver as write authority. The closure
+owner must acknowledge commit and release the ordered lock before schemas,
+policies or reload requests can be sent. Rejection and unknown settlement produce
+no remote permission; later remote failure never reactivates the deployment.
+Inspect-only remains observation. Setup-secret publication uses its genuine
+setup-ticket and pending-generation authority, rejects a bound deployment before
+remote writes, and preserves validated unbound publication without manufacturing
+a human activation proof. The submitted one-time Admin credential pair is never
+serialized into the original source or native authority payload.
 
 This protocol depends on truthful endpoint associations and participation by
 every remote writer. It cannot detect unannounced external policy edits or infer
@@ -399,6 +992,22 @@ infer it from roles.
 
 ## 4. Authorization Providers
 
+### Signed Publication Receipt Verification Primitive
+
+`CerbosPublicationReceiptVerifier` verifies an operator statement over exact JSON
+bytes using RSA-PSS with SHA-256 and an independently configured public key of at
+least 3072 bits. The private signing key is not an Event input. Callers supply the
+expected revision, content hash, environment, PDP endpoint, and observation time;
+receipt fields never define their own expected deployment authority.
+
+Verification rejects unsuccessful publication, future publication, expiry, a
+lifetime exceeding 24 hours, duplicate or unknown JSON properties, missing required
+constructor fields, and malformed signatures or keys. Documents are limited to
+8192 bytes, signatures to 1024 bytes, and PEM public keys to 16384 characters.
+The result is a boolean without raw provider diagnostics. A valid signature proves
+the signed statement, not the live PDP state. This primitive does not itself wire
+startup readiness or replace the existing provider-administration callers.
+
 ### 4.1. Cerbos
 
 -   **Description**: A powerful, open-source, stateless authorization service that allows policies to be defined in human-readable YAML files.
@@ -461,19 +1070,129 @@ User profile updates use the `islamuevent_user` resource with the target domain 
 
 ### 4.1.1 Cerbos Package Upload
 
+Admin HTTP calls carry the server-selected target classification into separate
+`CerbosByoAdminClient` and `CerbosInstanceAdminClient` transports. BYO targets
+require HTTPS, a root-only origin, and exclusively public DNS answers; a mixed
+public/private answer is rejected before connection. Instance targets may use a
+private operator service, but only at an exactly configured scheme/host/port.
+Both use the vetted-address connector, reject cloud metadata destinations, and
+disable redirects so administrator credentials cannot follow a redirected request.
+Endpoint paths, user information, query strings, and fragments are not admitted.
+The former `AllowInsecureByoAdminEndpoints` and `AllowPrivateByoAdminEndpoints`
+options are removed; neither can bypass the BYO boundary.
+
+ZIP export reopens each artifact through the bounded reader and compares both
+its byte length and SHA-256 with the completed manifest before creating its ZIP
+entry. It writes the verified byte array rather than reopening the path again.
+Replacement after manifest construction fails with `PolicyPackageUnavailableException`,
+including replacement by different bytes of the same length. No inconsistent
+archive is returned; export does not perform a provider publication.
+
+Publication and status diagnostics retain artifact counts, typed HTTP status, and
+closed failure categories rather than exception objects/types, package identity,
+content hashes, provider endpoints, or private transport details. Refit failures
+that arrive as failed response objects follow the same diagnostic boundary as
+thrown failures. Business issue codes and unknown status remain authoritative;
+ordinary logs are not a substitute for publication-state evidence. Unexpected
+failure warnings do not imply that external side effects were rolled back.
+
+The Event package compiler admits at most 256 policy/schema artifacts, 2 MiB per
+artifact, and 16 MiB of aggregate artifact bytes before provider handoff. Reads
+reject file growth beyond the observed length. Every artifact is parsed before
+manifest hashing using strict UTF-8 and JSON depth 32. Duplicate JSON members,
+`$type`, and merge keys are rejected. YAML is preflighted before deserialization:
+one document, depth 32, at most 65,536 parser events, scalar length at most 65,536
+characters, and aggregate scalar text at most 2 MiB. Anchors, aliases, explicit
+tags, duplicate mapping keys, and merge keys are not admitted. Converted JSON
+must also fit the per-artifact byte budget. Existing packages using these YAML
+features must be rewritten as explicit bounded mappings before Event publication.
+
 #### In-App Onboarding & Admin Sync (`POST /api/instance/settings/authz-provider/sync`)
 
 Operators can synchronize the bundled policy package directly through the instance administration UI or API:
 
-- **Deployment credentials mode**: The instance-scoped `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD` secret bindings are resolved through `ISecretResolver`; onboarding/admin sync uses them automatically and keeps the one-time override form collapsed without projecting plaintext into `IConfiguration`.
-- **One-time credential override**: If deployment credentials are missing or the operator explicitly wishes to supply temporary credentials, the UI provides a one-time username/password form. A complete username/password pair overrides deployment credentials for that single request and is held only in memory during the request. Partial pairs fail validation immediately.
+- **Foreground credentials only**: Every publication requires a fresh complete administrator pair. Missing and partial input are rejected; there is no configuration, cache, tenant binding or selected-secret-authority fallback. Setup/admin UI fields are cleared after each attempt, on navigation and on component disposal. Complete credential strings are passed unchanged.
+- **Read-only inspection**: The same authorized POST accepts `inspectOnly: true` with a fresh pair. It reads current store identifiers and revision metadata without uploading or reloading. Ordinary package status reads do not acquire administrator credentials and report live-store status as unknown. A store's revision is not the package content hash.
 - **Credential security boundary**: One-time values are never written to `SystemSetting`, database rows, response bodies, logs, traces, or background jobs.
 - **Timeout and additive upload**: Admin HTTP API calls enforce a strict 10-second timeout. Policy and schema uploads are additive; they do not perform destructive deletions of existing policies.
 - **Runtime isolation**: Sync and revision status depend on the Cerbos Admin HTTP API, but runtime authorization evaluation depends solely on the gRPC PDP, ensuring PDP decision checks remain isolated from Admin API availability and latency.
 
 #### Hosted CI/CD Publishing
 
-For the hosted production path, `.github/workflows/cerbos-policy-check.yml` publishes schemas and policies to the Cerbos Admin API only after `Cerbos Policy Validation` succeeds on a `push` to `main`. The publish job uses the protected `production` GitHub Environment approval gate and the repository secrets documented in [CONFIGURATION.md](CONFIGURATION.md#deployment-cicd-secrets).
+`Cerbos Policy Validation` retains its required check identity and package compilation/tests.
+The PDP's Admin API supports one Basic-auth administrator, not a scoped non-administrator
+publisher. Consequently CI does not receive a reusable Cerbos administrator pair.
+Unattended publication is unavailable; renaming an administrator account does not
+make its permissions least-privileged.
+
+`deploy-coolify.yml` calls `_cerbos-publication.yml` as an actual prerequisite.
+An authorized operator publishes the candidate package with fresh input, verifies
+the target installation and signs an exact UTF-8 JSON publication statement.
+The independently configured public key in the protected `production` environment
+authenticates that operator statement. The submitter cannot provide the verifier's
+trust root. Restrict the production environment to reviewed protected branches/tags
+and require independent approval before running candidate workflow code.
+Environment maintainers, permitted signers and the provider administrator
+remain trusted deployment authorities; this is not a provider-issued attestation.
+
+`CerbosPublicationReceiptVerifier` accepts only RSA-PSS/SHA-256 signatures with an
+RSA key of at least 3072 bits. The exact JSON properties are `SchemaVersion`
+(`cerbos-publication.v1`), `Revision`, `ContentHash`, `Environment`, `PdpEndpoint`,
+`PublishedAt`, `ExpiresAt`, and `Succeeded`. Revision, package hash, environment and
+PDP endpoint must equal independently supplied deployment expectations.
+Only successful statements with `PublishedAt <= now < ExpiresAt` and a lifetime
+no longer than 24 hours pass. Duplicate/unknown JSON fields, missing fields,
+invalid signatures, private-key input and missing inputs fail closed. Never sign success after a
+failed or uncertain provider operation.
+
+The package hash is the existing manifest hash, calculated from the ordered
+artifact identities, kinds, byte hashes and sizes. It is not a Git tree hash or
+a Cerbos live-store hash. `.ci/scripts/verify-cerbos-publication.cs` computes it
+from the checked-out candidate. The reusable workflow verifies the receipt before
+retaining it; deploy verifies it again after image builds and environment approval,
+and again before the UI trigger if the API rollout consumed part of its lifetime.
+Pushes have no receipt and cannot deploy. Use workflow dispatch with the exact
+receipt JSON and base64 detached signature after operator publication.
+
+For an operator signing tool backed by the approved external signing authority:
+
+```bash
+openssl dgst -sha256 -sign "$CERBOS_PUBLICATION_SIGNING_KEY_FILE" \
+  -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:digest \
+  -out receipt.sig receipt.json
+base64 -w0 receipt.sig
+```
+
+Do not reformat the signed JSON. Supply its exact bytes to workflow dispatch;
+the signing key never goes to Event, the BFF, GitHub Actions or an artifact.
+GitHub environment variables are `CERBOS_PUBLICATION_PUBLIC_KEY_PEM` and
+`CERBOS_PUBLICATION_PDP_ENDPOINT`. Runtime deployment receives the public key,
+base64 receipt/signature and independently owned revision/environment through
+`Cerbos:PolicyPackage:Publication`. Compose/Aspire map the corresponding
+`CERBOS_PUBLICATION_*` inputs. The receipt's PDP endpoint must exactly match
+`Cerbos:GrpcEndpoint`.
+
+Startup now checks PDP health and signed historical readiness without publishing.
+Role create/update/delete retain permission-cache invalidation without republishing
+the static package. Historical readiness does not establish current store equality,
+custom-role parity or event-resource deployment activation. Resource control-plane
+fences remain independent; uncertain live-store metadata cannot become authorization.
+Before out-of-band ZIP/cerbosctl publication, close affected resource deployments
+through their existing control-plane procedure and drain old writers. Verify every
+reachable PDP alias before the separately authorized coordinated activation.
+Signing or accepting a publication statement never reopens that fence.
+
+If expiry blocks the UI after an API deployment, that API deployment is not rolled
+back. Reconcile the actual component versions and issue a fresh same-candidate
+statement before continuing the rollout.
+
+Recovery is operator-owned: repair or reinstall the same validated package, inspect
+the outcome, then issue a fresh statement and dispatch deployment again. A restart
+after expiry requires a fresh verified statement. Rotate the configured public key
+to revoke a signer, then replace receipts and restart affected hosts. Drain old
+application replicas before revoking the retired runtime administrator credentials;
+do not restore fallback bindings. This source cutover does not delete historical
+database bindings, backups or external credentials.
 
 #### Coolify PDP Deployment
 
@@ -632,6 +1351,22 @@ Footer configuration authority is tenant-scoped. Footer management writes reuse 
 Email dispatch row operations are tenant-scoped operator actions. The status, tenant pause/resume, park, replay, resolve, and reconcile requests use `ResourceKinds.EmailDispatch` with `tenantId` and row-level `outboxId` where applicable. Global processor requests use `ResourceKinds.InstanceSetting` for `email-dispatch.processor`. EmailDispatch DTOs and logs remain bounded and never expose recipient email, message body, subject, provider message ids, raw provider errors, pause actors, or reconciliation evidence text.
 
 Paid-event policy settings follow the settings boundary: instance `view`/`update` applies to the `paid-event-policy` instance setting, while tenant `view`/`update` applies only to the named tenant setting. Those policy resources return `edit` only after the matching setting decision; tenant policy revision cannot use authorization to bypass the instance policy ceiling.
+
+Footer group deletion preserves its required current human identity. It
+acquires the existing footer governance setting lock before the business
+Serializable transaction, evaluates selected Tenant/update policy, and fences
+current instance or tenant administration. Multi-tenant execution reads the
+current stored link-group lock instead of a cached footer settings snapshot;
+single-tenant behavior remains exempt. The stored group must belong to the
+execution tenant; instance-default and foreign groups are not deletable here.
+Its parent fence, raw child-link deletion and parent deletion share that
+transaction, so failure of the parent deletion restores its links too.
+Bulk deletion reconciles only tracked links whose persisted IDs belong to the
+locked tenant-owned group; tracked child-parent substitution rejects before
+deletion. Those deleted children are detached before parent cascade so EF does
+not issue a second delete, while unrelated tracked links are retained.
+Twelve native cases are authored and unrun; this receipt does not establish
+the separately selected machine PATCH capability.
 
 ## 6. Implementation Patterns
 

@@ -2,6 +2,7 @@ using Blazouter.Extensions;
 using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Extensions;
 using Explore.Blazor.Client.Extensions;
+using Explore.Blazor.Configuration;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.Services;
@@ -55,7 +56,8 @@ public static class BlazorHostServiceCollectionExtensions
             builder.Host.UseSerilog((context, services, loggerConfiguration) =>
                 loggerConfiguration.ReadFrom.Configuration(context.Configuration)
                     .ReadFrom.Services(services)
-                    .Enrich.FromLogContext(),
+                    .Enrich.FromLogContext()
+                    .WithBffDiagnosticConfidentiality(),
                 writeToProviders: true);
 
             builder.WebHost.ConfigureKestrel(options =>
@@ -71,6 +73,8 @@ public static class BlazorHostServiceCollectionExtensions
             });
 
             builder.AddServiceDefaults();
+            builder.Logging.AddFilter((category, _) => !BffDiagnosticLoggingExtensions.IsFrameworkCategory(category));
+            builder.Logging.AddOpenTelemetry(options => options.IncludeScopes = false);
             builder.AddResilientDistributedCache(connectionName: "cache");
             builder.AddDistributedCacheReadinessCheck();
             builder.AddOidcDiscoveryReadinessCheck();
@@ -85,7 +89,11 @@ public static class BlazorHostServiceCollectionExtensions
                 ["SecretProvider:Provider"] = "Environment"
             });
         }
-        builder.Configuration.AddSecretAuthorityConfiguration(builder.Environment.EnvironmentName);
+        var acquisitionReceipts = new AuthenticationCredentialAcquisitionReceipts(
+            Guid.TryParse(Environment.GetEnvironmentVariable("AUTHENTICATION_CREDENTIAL_PROFILE_REVISION"),
+                out Guid profileRevision) && profileRevision != Guid.Empty ? profileRevision : null);
+        builder.Configuration.AddSecretAuthorityConfiguration(builder.Environment.EnvironmentName, acquisitionReceipts);
+        builder.Services.AddSingleton(acquisitionReceipts);
 
         builder.Services.AddMudServices(config =>
         {
@@ -182,7 +190,7 @@ public static class BlazorHostServiceCollectionExtensions
         healthChecks.AddCheck<DataProtectionKeyStoreHealthCheck>(
             "data-protection-keys",
             failureStatus: HealthStatus.Unhealthy,
-            tags: ["ready", "data-protection", "redis"]);
+            tags: ["ready", "data-protection", "external-authority"]);
 
         if (profile == BlazorHostProfile.Split)
         {

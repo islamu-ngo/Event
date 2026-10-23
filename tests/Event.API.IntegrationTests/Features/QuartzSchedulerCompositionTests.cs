@@ -444,6 +444,7 @@ public sealed class QuartzSchedulerCompositionTests
         environment.EnvironmentName.Returns(Environments.Production);
         var services = new ServiceCollection();
         services.AddSchedulerProofLogging();
+        services.AddSingleton<TimeProvider>(TimeProvider.System);
         services.AddScoped<IScheduledDeadlineDispatcher, NoOpScheduledDeadlineDispatcher>();
         services.AddSingleton(Substitute.For<ISchedulerJobTelemetry>());
         services.AddApiQuartzScheduler(configuration, environment, enabled: true, useQuartzEmailDispatch: false);

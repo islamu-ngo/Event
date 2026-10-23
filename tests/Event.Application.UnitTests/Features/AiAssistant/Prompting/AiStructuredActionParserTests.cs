@@ -10,6 +10,22 @@ namespace Event.Application.UnitTests.Features.AiAssistant.Prompting;
 public sealed class AiStructuredActionParserTests
 {
     [Test]
+    [Arguments(8)]
+    [Arguments(9)]
+    public async Task ParseBoundsTheWholeTurnBeforeAllocatingOrAcceptingAnyAction(int count)
+    {
+        var candidates = Enumerable.Range(0, count).Select(_ => new AiProposedActionCandidate(
+            AiProposedActionKind.CreateEventDraft,
+            "{\"title\":\"Draft\",\"participationConfiguration\":{\"participationHandlingModeId\":1,\"advanceRegistrationObligationId\":1}}"))
+            .ToArray();
+        var result = new AiStructuredActionParser().Parse(candidates);
+        await Assert.That(result.Succeeded).IsEqualTo(count == 8);
+        await Assert.That(result.Actions.Count).IsEqualTo(count == 8 ? 8 : 0);
+        if (count == 9)
+            await Assert.That(result.FailureCode).IsEqualTo("tool_call_limit_exceeded");
+    }
+
+    [Test]
     public async Task Parse_WhenPayloadIsJsonObject_ReturnsParsedAction()
     {
         var result = new AiStructuredActionParser().Parse(

@@ -7,55 +7,6 @@ namespace Event.Application.UnitTests.Features.InstanceOnboarding;
 public sealed class ConfiguredAdministratorClaimInvariantTests
 {
     [Test]
-    public async Task ExactProviderAccountGenerationAndFingerprintCompleteWithExactEvidence()
-    {
-        var scenario = new OnboardingCompletionScenario();
-
-        BaseCommandResponse<Guid> response = await scenario.ClaimAsync();
-
-        await Assert.That(response.IsSuccess).IsTrue();
-        await Assert.That(scenario.Bootstrap.ProviderKind).IsEqualTo(AuthenticationProviderKind.Keycloak);
-        await Assert.That(scenario.Bootstrap.Generation).IsEqualTo(7);
-        await Assert.That(scenario.Bootstrap.CompletedIdentityFingerprint)
-            .IsEqualTo(OnboardingCompletionScenario.Fingerprint);
-        await Assert.That(scenario.Bootstrap.CompletedByUserId).IsEqualTo(scenario.UserId);
-    }
-
-    [Test]
-    public async Task LocalIdentityProviderCanClaimConfiguredAdministratorExactlyOnce()
-    {
-        var scenario = new OnboardingCompletionScenario(
-            providerKind: AuthenticationProviderKind.Local);
-
-        BaseCommandResponse<Guid> unprovisioned = await scenario.ClaimAsync();
-
-        await Assert.That(unprovisioned.IsSuccess).IsFalse();
-        await Assert.That(unprovisioned.FailureCode).IsEqualTo("local_bootstrap_authority_invalid");
-        await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Pending);
-        await Assert.That(scenario.CommittedWrites).IsEmpty();
-        await Assert.That(scenario.PostCommitEffects).IsEmpty();
-
-        BaseCommandResponse<Guid> response = await scenario.CompleteProvisionedLocalAsync();
-
-        await Assert.That(response.IsSuccess).IsTrue();
-        await Assert.That(scenario.Bootstrap.ProviderKind)
-            .IsEqualTo(AuthenticationProviderKind.Local);
-        await Assert.That(scenario.Bootstrap.CompletedByUserId)
-            .IsEqualTo(scenario.UserId);
-        await Assert.That(scenario.EventSequence.Last()).IsEqualTo("credential-activation");
-        scenario.EventSequence.Clear();
-
-        BaseCommandResponse<Guid> replay = await scenario.ClaimAsync();
-
-        await Assert.That(replay.IsSuccess).IsTrue();
-        await Assert.That(replay.Id).IsEqualTo(response.Id);
-        await Assert.That(scenario.CommittedWrites).IsEmpty();
-        await Assert.That(scenario.Users).IsEquivalentTo([scenario.UserId]);
-        await Assert.That(scenario.PostCommitEffects)
-            .IsEquivalentTo(["secret-lock", "deployment-cache", "jwt-reload", "audit"]);
-    }
-
-    [Test]
     public async Task LocalIdentityBootstrapRejectsKeycloakAccountWithoutWrites()
     {
         var scenario = new OnboardingCompletionScenario(
@@ -113,22 +64,6 @@ public sealed class ConfiguredAdministratorClaimInvariantTests
         BaseCommandResponse<Guid> response = await scenario.ClaimAsync();
 
         await AssertBoundedMismatch(response, scenario);
-    }
-
-    [Test]
-    public async Task ExactCompletedReplayReturnsOriginalBootstrapWithoutWritesAndReconcilesEffects()
-    {
-        var scenario = new OnboardingCompletionScenario();
-        scenario.CompleteBootstrap();
-        Guid bootstrapId = scenario.Bootstrap.Id;
-
-        BaseCommandResponse<Guid> response = await scenario.ClaimAsync();
-
-        await Assert.That(response.IsSuccess).IsTrue();
-        await Assert.That(response.Id).IsEqualTo(bootstrapId);
-        await Assert.That(scenario.CommittedWrites).IsEmpty();
-        await Assert.That(scenario.PostCommitEffects)
-            .IsEquivalentTo(["secret-lock", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]

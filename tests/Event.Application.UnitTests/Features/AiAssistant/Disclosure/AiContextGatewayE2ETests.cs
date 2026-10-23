@@ -229,4 +229,28 @@ public class AiContextGatewayE2ETests
             .Because("All 3 ActorPii non-navigation props are Public or Internal");
         await Assert.That(envelope.DeniedFieldNames).IsEmpty();
     }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task UnexpectedFieldReadFailureDoesNotCopyPrivateExceptionIntoEnvelope(bool oversized)
+    {
+        string canary = Guid.CreateVersion7().ToString("N");
+        var fields = Substitute.For<IReadOnlyDictionary<string, object?>>();
+        fields.GetEnumerator().Returns(_ => throw new InvalidOperationException(
+            canary + (oversized ? new string('x', 8192) : string.Empty)));
+        var gateway = CreateGateway(AiProviderTrustTierEnum.LocalInProcessOrSameNetworkModel);
+
+        var envelopes = gateway.SanitizeMany([
+            CreateInput("ActorPii", fields),
+            CreateInput("ActorPii", new Dictionary<string, object?> { ["DisplayName"] = "Public name" })
+        ]);
+
+        await Assert.That(envelopes[0].Succeeded).IsFalse();
+        await Assert.That(envelopes[0].FailureCode).IsEqualTo("gateway_internal_failure");
+        await Assert.That(envelopes[0].FailureMessage).DoesNotContain(canary);
+        await Assert.That(envelopes[0].DisclosedFields).IsEmpty();
+        await Assert.That(envelopes[1].Succeeded).IsTrue();
+        await Assert.That(envelopes[1].DisclosedFields.Single().Value).IsEqualTo("Public name");
+    }
 }

@@ -8,17 +8,21 @@ using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Explore.API.ExceptionHandling;
 using Explore.API.Mcp;
+using Explore.API.Middleware;
+using Explore.API.Telemetry;
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Configuration;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Management;
 using Explore.Domain.Constants;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -26,9 +30,6 @@ namespace Explore.API.Extensions;
 
 public static class AuthenticationExtensions
 {
-    // Security: audiences validated in both 'aud' and 'azp' claims (Keycloak BFF pattern)
-    private static readonly string[] DefaultValidAudiences = ["islamu-event-api", "islamu-event-blazor"];
-
     public static IServiceCollection AddApiAuthentication(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -41,11 +42,18 @@ public static class AuthenticationExtensions
         // by DynamicJwtBearerPostConfigureOptions from env + DB (IAuthProviderConfigurationService).
         // Handlers call IJwtAuthorityRefreshNotifier.ReloadAsync() after onboarding/save-config
         // to hot-swap Keycloak metadata without restarting the API.
-        var validAudiences = configuration.GetSection("Keycloak:ValidAudiences").Get<string[]>()
-            ?? configuration.GetSection("Authentication:ValidAudiences").Get<string[]>()
-            ?? DefaultValidAudiences;
-        var validAudienceSet = new HashSet<string>(validAudiences.Where(audience => !string.IsNullOrWhiteSpace(audience)), StringComparer.Ordinal);
+        string audience = configuration["Keycloak:Audience"] ?? "islamu-event-api";
+        string[] permittedClients = configuration.GetSection("Keycloak:PermittedClients").Get<string[]>() ?? [];
+        if (string.IsNullOrWhiteSpace(audience)
+            || permittedClients.Any(string.IsNullOrWhiteSpace)
+            || permittedClients.Distinct(StringComparer.Ordinal).Count() != permittedClients.Length)
+            throw new InvalidOperationException("Keycloak resource audience and permitted clients must be nonempty, distinct identifiers.");
+        var tokenContext = new KeycloakTokenContextPolicy(
+            audience, new HashSet<string>(permittedClients, StringComparer.Ordinal));
 
+        services.AddHttpContextAccessor();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        services.AddScoped<IHumanAuthenticationLifetimeObserver, HumanAuthenticationLifetimeObserver>();
         services.AddSingleton<DynamicJwtConfigurationService>();
         services.AddSingleton<IJwtAuthorityRefreshNotifier>(sp =>
             sp.GetRequiredService<DynamicJwtConfigurationService>());
@@ -90,6 +98,7 @@ public static class AuthenticationExtensions
             .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 options.MapInboundClaims = false;
+                options.IncludeErrorDetails = false;
                 options.RequireHttpsMetadata = string.Equals(
                     configuration["Keycloak:RequireHttpsMetadata"],
                     "true",
@@ -98,29 +107,10 @@ public static class AuthenticationExtensions
 
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    // Security: custom audience check covers both 'aud' and 'azp' claims
-                    // because Keycloak puts the client ID in 'azp' rather than 'aud'
                     ValidateAudience = true,
-                    AudienceValidator = (audiences, securityToken, _) =>
-                    {
-                        var audienceList = audiences?.ToList() ?? new List<string>();
-
-                        if (audienceList.Exists(validAudienceSet.Contains))
-                        {
-                            return true;
-                        }
-
-                        if (securityToken is System.IdentityModel.Tokens.Jwt.JwtSecurityToken jwtToken)
-                        {
-                            var azp = jwtToken.Claims.FirstOrDefault(c => c.Type == "azp")?.Value;
-                            if (!string.IsNullOrEmpty(azp) && validAudienceSet.Contains(azp))
-                            {
-                                return true;
-                            }
-                        }
-
-                        return false;
-                    },
+                    ValidAudience = audience,
+                    RequireSignedTokens = true,
+                    ValidTypes = ["JWT"],
 
                     ValidateIssuer = true,
 
@@ -163,9 +153,19 @@ public static class AuthenticationExtensions
                     }
                 };
 
-                // Security: PII-safe logging — only exception messages, never token claims or raw values
+                // Diagnostics are fixed categories, never token/provider exception contents.
                 options.Events = new JwtBearerEvents
                 {
+                    OnTokenValidated = context =>
+                    {
+                        if (!tokenContext.Accepts(context.SecurityToken))
+                        {
+                            context.Fail("Keycloak access-token context is invalid.");
+                            return Task.CompletedTask;
+                        }
+                        HumanAuthenticationLifetimeObserver.CaptureJwt(context);
+                        return Task.CompletedTask;
+                    },
                     // Performance: skip JWT token validation entirely for onboarding paths.
                     // When Keycloak is unreachable, OIDC metadata discovery times out (3+ minutes),
                     // blocking [AllowAnonymous] endpoints that don't need authentication at all.
@@ -184,23 +184,32 @@ public static class AuthenticationExtensions
 
                     OnAuthenticationFailed = context =>
                     {
-                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                            .CreateLogger(ApiDiagnosticLogEnricher.JwtCategory);
                         logger.LogWarning(
-                            "[JWT] Authentication failed for {Method} {Path}: {Error}",
-                            context.Request.Method,
-                            context.Request.Path,
-                            context.Exception?.Message);
+                            "JWT {Code} for {Method} {Route} | TraceId={TraceId} CorrelationId={CorrelationId}",
+                            "authentication_failed",
+                            SafeRouteMetadata.GetMethod(context.HttpContext),
+                            SafeRouteMetadata.GetRouteIdentityOrClassification(context.HttpContext),
+                            context.HttpContext.TraceIdentifier,
+                            context.HttpContext.Items["CorrelationId"] as string);
                         return Task.CompletedTask;
                     },
 
                     OnChallenge = context =>
                     {
-                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                        context.ErrorDescription = null;
+                        context.ErrorUri = null;
+                        context.Error = context.AuthenticateFailure is null ? null : "invalid_token";
+                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                            .CreateLogger(ApiDiagnosticLogEnricher.JwtCategory);
                         logger.LogDebug(
-                            "[JWT] Challenge issued for {Path}. Error: {Error}, Description: {Desc}",
-                            context.Request.Path,
-                            context.Error,
-                            context.ErrorDescription);
+                            "JWT {Code} for {Method} {Route} | TraceId={TraceId} CorrelationId={CorrelationId}",
+                            "authentication_challenge",
+                            SafeRouteMetadata.GetMethod(context.HttpContext),
+                            SafeRouteMetadata.GetRouteIdentityOrClassification(context.HttpContext),
+                            context.HttpContext.TraceIdentifier,
+                            context.HttpContext.Items["CorrelationId"] as string);
                         return Task.CompletedTask;
                     }
                 };
@@ -240,14 +249,18 @@ public static class AuthenticationExtensions
                             context.Fail("Local session authority is invalid.");
                             return;
                         }
-                        var authentication = context.HttpContext.RequestServices.GetRequiredService<ILocalIdentityAuthService>();
+                        await using var identityScope = await context.HttpContext.RequestServices
+                            .GetRequiredService<ILocalIdentityExecutionScopeFactory>().CreateAsync(cancellationToken);
+                        var authentication = identityScope.Services.GetRequiredService<ILocalIdentityAuthService>();
                         LocalSessionValidationOutcome outcome = await authentication.ValidateSessionAsync(authority, cancellationToken)
                             .ConfigureAwait(false);
                         cancellationToken.ThrowIfCancellationRequested();
                         if (outcome != LocalSessionValidationOutcome.Valid)
                         {
                             context.Fail("Local session authority is invalid.");
+                            return;
                         }
+                        HumanAuthenticationLifetimeObserver.CaptureJwt(context);
                     }
                 };
             })
@@ -475,22 +488,7 @@ public static class AuthenticationExtensions
             return RandomNumberGenerator.GetBytes(32);
         }
 
-        byte[] key;
-        try
-        {
-            key = Convert.FromBase64String(configured);
-        }
-        catch (FormatException exception)
-        {
-            throw new InvalidOperationException(
-                "Local Identity JWT validation authority is invalid.",
-                exception);
-        }
-
-        return key.Length >= 32
-            ? key
-            : throw new InvalidOperationException(
-                "Local Identity JWT validation authority does not meet the 256-bit minimum.");
+        return LocalIdentityOptions.DecodeJwtKey(configured);
     }
 
     private static bool ApiKeyCallerHasMcpReadAndEventReadAuthorityOrIsUser(ClaimsPrincipal principal)

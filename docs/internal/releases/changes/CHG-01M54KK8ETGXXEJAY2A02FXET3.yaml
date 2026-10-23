@@ -1,0 +1,29 @@
+Change-Id: CHG-01M54KK8ETGXXEJAY2A02FXET3
+Title: "Keep event aspect details out of lifecycle diagnostics"
+Type: fix
+Scope: privacy
+Summary: "Retain aspect lifecycle events and normal event links without copying event identity or sensitive fields into logs."
+Group: aspect-lifecycle-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODULAR_EVENTS.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODULAR_EVENTS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Keep event identity and sensitive aspect values out of lifecycle diagnostic exports while retaining normal event data and links.
+  Migration:
+    Reference: docs/internal/MODULAR_EVENTS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODULAR_EVENTS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/modular-event-aspects.md
+    Disposition: documented
+    Detail: Read aspect details through the event interface rather than relying on diagnostic copies.

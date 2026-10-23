@@ -8,6 +8,8 @@ public class IntegrationSyncOutboxConfiguration : IEntityTypeConfiguration<Integ
 {
     public void Configure(EntityTypeBuilder<IntegrationSyncOutbox> builder)
     {
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_integration_sync_outbox_evidence_kind", "evidence_kind BETWEEN 0 AND 5"));
         builder.Property(e => e.Id).HasDefaultValueSql("uuidv7()");
         builder.Property(e => e.Kind).IsRequired();
         builder.Property(e => e.SourceType).HasMaxLength(100).IsRequired();
@@ -16,6 +18,7 @@ public class IntegrationSyncOutboxConfiguration : IEntityTypeConfiguration<Integ
         builder.Property(e => e.SubscriberPayloadJson).HasColumnType("jsonb").IsRequired();
         builder.Property(e => e.ListmonkListId).IsRequired();
         builder.Property(e => e.Status).IsRequired();
+        builder.Property(e => e.EvidenceKind).IsRequired();
         builder.Property(e => e.MaxAttempts).HasDefaultValue(5);
         builder.Property(e => e.LastError).HasMaxLength(2000);
         builder.Property(e => e.CorrelationId).HasMaxLength(200);

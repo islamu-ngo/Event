@@ -1,0 +1,30 @@
+Change-Id: CHG-01M52TWM22Q3TNT01PFSMPFX1W
+Title: "Add execute-only native authorization route projection"
+Type: feat
+Scope: access
+Summary: "Read six declared route settings through original enrolled sessions with exact source and body admission."
+Group: native-authorization-route-contract
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: The SELECT-only owner projects fixed keys and rejects incorrect session authority or native catalog drift.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Explicit migrator installation provides the native prerequisite without production installation wiring.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Serializable route projection needs separately composed source-set exclusion and does not itself fence setting changes.

@@ -11,6 +11,9 @@ public sealed class CoopProviderOptions
     public string ApiKeyHeaderName { get; set; } = "Authorization";
     public string ItemType { get; set; } = "event_report";
     public int TimeoutSeconds { get; set; } = 10;
+    public int ResponseMaxBytes { get; set; } = 1_048_576;
+    public int ResponseMaxDepth { get; set; } = 32;
+    public int ResponseMaxCollectionItems { get; set; } = 256;
     public bool AllowLocalProviderEndpoints { get; set; }
     public string WebhookSecret { get; set; } = string.Empty;
     public string WebhookSignatureHeaderName { get; set; } = "X-Coop-Signature";

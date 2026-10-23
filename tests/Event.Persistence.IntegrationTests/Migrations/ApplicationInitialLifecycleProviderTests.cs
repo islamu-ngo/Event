@@ -1,6 +1,8 @@
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
 using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -60,10 +62,85 @@ public sealed class SqliteApplicationInitialLifecycleTests
         await migrator.MigrateAsync(Migration.InitialDatabase);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
 
+        // Schema-less providers share the fixed table prefix, so exercise the external catalogue while application tables are absent.
+        await AssertExternalIdentityLifecycleAsync(databaseOptions);
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
+
         await migrator.MigrateAsync();
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
             .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
         await Assert.That(await context.Database.CanConnectAsync()).IsTrue();
+    }
+
+    private static async Task AssertExternalIdentityLifecycleAsync(
+        PrimaryDatabaseConnectionOptions databaseOptions)
+    {
+        var options = TestDbContextOptions.Create<ExternalIdentityDbContext>();
+        IdentityDatabaseProviderComposition.Configure(options, new ExternalIdentityDatabaseDescriptor(
+            databaseOptions.Provider,
+            PrimaryDatabaseConfiguration.BuildConnectionString(databaseOptions).ConnectionString,
+            IdentityDatabaseConfiguration.DefaultSchema,
+            databaseOptions.ServerVersion,
+            databaseOptions.ServerFlavor));
+        await using var context = new ExternalIdentityDbContext(options.Options);
+        IMigrator migrator = context.GetService<IMigrator>();
+        string[] migrations = context.Database.GetMigrations().ToArray();
+        await Assert.That(migrations).IsNotEmpty();
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
+
+        Exception? primaryFailure = null;
+        try
+        {
+            for (int applyPass = 0; applyPass < 2; applyPass++)
+            {
+                await migrator.MigrateAsync();
+                await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+                    .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
+                var eligibility = await context.Set<LocalIdentityEligibility>()
+                    .AsNoTracking()
+                    .Select(row => new
+                    {
+                        row.Id,
+                        row.LocalSubjectId,
+                        row.CurrentOperationId,
+                        row.PersonalActorId,
+                        row.ExternalLoginId,
+                        row.State,
+                        row.Generation,
+                        row.CreatedAt,
+                        row.UpdatedAt,
+                        row.LockoutUntilUtc
+                    })
+                    .ToArrayAsync();
+                await Assert.That(eligibility.Length).IsEqualTo(0);
+
+                if (applyPass == 0)
+                {
+                    await migrator.MigrateAsync(Migration.InitialDatabase);
+                    await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
+                }
+            }
+        }
+        catch (Exception failure)
+        {
+            primaryFailure = failure;
+            throw;
+        }
+        finally
+        {
+            try
+            {
+                await migrator.MigrateAsync(Migration.InitialDatabase);
+                await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
+            }
+            catch (Exception cleanupFailure) when (primaryFailure is not null)
+            {
+                throw new AggregateException(
+                    "External identity migration lifecycle and cleanup both failed.",
+                    primaryFailure,
+                    cleanupFailure);
+            }
+        }
     }
 
     internal static async Task AssertDataProtectionLifecycleAsync(

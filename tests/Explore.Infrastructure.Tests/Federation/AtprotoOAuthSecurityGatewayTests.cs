@@ -27,6 +27,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;
 using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -109,7 +110,12 @@ public sealed class AtprotoOAuthSecurityGatewayTests
         var fixture = CreateFixture("did:plc:substituted-user");
         await using var visitorSettings = await SmtpSettingsDatabase.CreateAsync();
         var configuration = new ConfigurationBuilder().Build();
-        var systemSettings = new SystemSettingRepository(visitorSettings.Context, visitorSettings.MutationLock);
+        var systemSettings = SystemSettingRepository.CreateReadOnly(visitorSettings.Context, visitorSettings.MutationLock);
+        using var metadataServices = new ServiceCollection().BuildServiceProvider();
+        var settingsReader = new Explore.Persistence.Services.InstanceTenantSettingsReader(
+            visitorSettings.Context, systemSettings,
+            TenantSettingRepository.CreateReadOnly(visitorSettings.Context, visitorSettings.MutationLock),
+            metadataServices);
         var externalLogins = Substitute.For<IUserExternalLoginRepository>();
         var users = Substitute.For<IUserRepository>();
         var actors = Substitute.For<IActorRepository>();
@@ -150,12 +156,19 @@ public sealed class AtprotoOAuthSecurityGatewayTests
             unitOfWork,
             visitorSettings.MutationLock,
             new VisitorAccessCapabilityResolver(
-                systemSettings,
-                new TenantSettingRepository(visitorSettings.Context, visitorSettings.MutationLock),
-                new VisitorAccessProviderReader(systemSettings, configuration),
+                settingsReader,
+                new VisitorAccessProviderReader(configuration),
                 new TenantLifecycleAccessService(new TenantRepository(visitorSettings.Context),
                     Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>(),
-                    new InstanceBootstrapStateRepository(visitorSettings.Context))),
+                    new InstanceBootstrapStateRepository(visitorSettings.Context),
+                    new Explore.Persistence.Services.TenantLookupSource(
+                        new Explore.Persistence.Database.GlobalExploreDbContextFactory(
+                            new Explore.Secrets.Database.PrimaryDatabaseConnectionOptions
+                            {
+                                Role = Explore.Secrets.Database.PrimaryDatabaseRole.Global,
+                                Provider = Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite,
+                                Database = visitorSettings.Context.Database.GetDbConnection().DataSource
+                            })))),
             tenantContext,
             configuration,
             TimeProvider.System,

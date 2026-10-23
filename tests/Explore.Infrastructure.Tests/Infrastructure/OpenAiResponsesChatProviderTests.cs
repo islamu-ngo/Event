@@ -1,18 +1,14 @@
-using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure.Ai;
-using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
 using Explore.Infrastructure.Ai;
-using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
-public sealed class OpenAiResponsesChatProviderTests
+public sealed class OpenAiResponsesChatProviderTests : AiProviderTestBase
 {
     [Test]
     public async Task ListAvailableModels_WhenModelsEndpointResponds_ReturnsDiscoveredModels()
@@ -32,7 +28,7 @@ public sealed class OpenAiResponsesChatProviderTests
         await Assert.That(models.Select(model => model.Id).ToArray()).IsEquivalentTo(["gpt-5.4", "gpt-5.4-mini"]);
         await Assert.That(handler.RequestUri).IsEqualTo(new Uri("https://api.openai.com/v1/models"));
         await Assert.That(handler.Authorization?.Scheme).IsEqualTo("Bearer");
-        await Assert.That(handler.Authorization?.Parameter).IsEqualTo("secret-key");
+        await Assert.That(handler.Authorization?.Parameter).IsEqualTo(Fixture.Credential);
     }
 
     [Test]
@@ -53,15 +49,15 @@ public sealed class OpenAiResponsesChatProviderTests
               "usage": { "input_tokens": 12, "output_tokens": 4, "total_tokens": 16 }
             }
             """, response => response.Headers.Add("x-request-id", "req_test")));
-        var provider = CreateProvider(handler, CreateSettings(apiKey: "secret-key"));
+        var provider = CreateProvider(handler, CreateSettings());
 
         var result = await provider.SendAsync(CreateRequest("write a haiku about ai"));
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.RequestUri).IsEqualTo(new Uri("https://api.openai.com/v1/responses"));
         await Assert.That(handler.Authorization?.Scheme).IsEqualTo("Bearer");
-        await Assert.That(handler.Authorization?.Parameter).IsEqualTo("secret-key");
-        await Assert.That(handler.RequestBody).DoesNotContain("secret-key");
+        await Assert.That(handler.Authorization?.Parameter).IsEqualTo(Fixture.Credential);
+        await Assert.That(handler.RequestBody).DoesNotContain(Fixture.Credential);
         await Assert.That(result.Response!.AssistantMessage).IsEqualTo("Assistant response");
         await Assert.That(result.Response.ProviderRequestId).IsEqualTo("req_test");
         await Assert.That(result.Response.Usage.TotalTokens).IsEqualTo(16);
@@ -267,19 +263,22 @@ public sealed class OpenAiResponsesChatProviderTests
               ]
             }
             """));
-        var provider = CreateProvider(handler, CreateSettings(modelId: "static-model"));
+        var settings = CreateSettings(modelId: "static-model");
+        settings.CredentialScope = AiCredentialScope.Tenant;
+        await Fixture.SelectTenantAsync(AiProviderSettings.ProviderOpenAi, "", AiCredentialScope.Tenant, "tenant-model");
+        var provider = CreateProvider(handler, settings);
 
         var result = await provider.SendAsync(CreateRequest(
             "Hello",
             providerConfiguration: new AiChatProviderConfiguration(
                 AiProviderSettings.ProviderOpenAi,
                 string.Empty,
-                "tenant-key",
+                AiCredentialScope.Tenant,
                 "tenant-model")));
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.RequestUri).IsEqualTo(new Uri("https://api.openai.com/v1/responses"));
-        await Assert.That(handler.Authorization?.Parameter).IsEqualTo("tenant-key");
+        await Assert.That(handler.Authorization?.Parameter).IsEqualTo(Fixture.Credential);
 
         using var document = JsonDocument.Parse(handler.RequestBody!);
         await Assert.That(document.RootElement.GetProperty("model").GetString()).IsEqualTo("gpt-5.4-mini");
@@ -291,7 +290,7 @@ public sealed class OpenAiResponsesChatProviderTests
         var handler = new RecordingMessageHandler(_ => JsonResponse(
             "{\"error\":{\"message\":\"secret prompt leaked\"}}",
             statusCode: HttpStatusCode.TooManyRequests));
-        var provider = CreateProvider(handler, CreateSettings(apiKey: "secret-key"));
+        var provider = CreateProvider(handler, CreateSettings());
 
         var result = await provider.SendAsync(CreateRequest("Sensitive prompt body"));
 
@@ -302,29 +301,26 @@ public sealed class OpenAiResponsesChatProviderTests
         await Assert.That(result.Error.Message).DoesNotContain("Sensitive prompt body");
     }
 
-    private static OpenAiResponsesChatProvider CreateProvider(
+    private OpenAiResponsesChatProvider CreateProvider(
         HttpMessageHandler handler,
         AiProviderSettings settings)
     {
-        var client = new HttpClient(handler);
+        var client = Fixture.CreateClient(handler);
         var factory = new StaticHttpClientFactory(client);
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
 
         return new OpenAiResponsesChatProvider(
             factory,
-            Options.Create(settings),
-            new AiProviderSettingsValidator(),
-            new BusinessMetrics(meterFactory));
+            Fixture.Configuration(settings),
+            Fixture.Validator,
+            Fixture.Metrics);
     }
 
     private static AiProviderSettings CreateSettings(
-        string apiKey = "secret-key",
         string modelId = "gpt-5.4-mini") => new()
         {
             Enabled = true,
             Provider = AiProviderSettings.ProviderOpenAi,
-            ApiKey = apiKey,
+            CredentialScope = AiCredentialScope.Instance,
             ModelId = modelId,
             MaxInputTokens = 8000,
             MaxOutputTokens = 1024,

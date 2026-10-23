@@ -8,15 +8,18 @@ using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Domain.ValueObjects;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Authorization;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventPublicActions.Handlers.Commands;
 
 public sealed class CreateEventPublicActionCommandHandler(
-    IEventRepository eventRepository,
     IEventPublicActionRepository actionRepository,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    RequestAuthorization<CreateEventPublicActionCommand> authorization,
+    ILogger<CreateEventPublicActionCommandHandler> logger)
     : ICommandHandler<CreateEventPublicActionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -30,55 +33,53 @@ public sealed class CreateEventPublicActionCommandHandler(
             return Failure("Public action failed validation.", validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        if (currentUserService.UserId is null)
+        if (!currentUserService.IsAuthenticated || currentUserService.UserId is not { } userId)
         {
             return Failure("Public action could not be created.", ["An authenticated user is required."]);
         }
 
-        var @event = await eventRepository.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
-        if (@event is null || @event.TenantId != tenantContext.TenantId)
+        await authorization.AuthorizeAsync(request, logger, cancellationToken);
+        return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            return Failure("Public action could not be created.", ["Event was not found in the current tenant."]);
-        }
+            var @event = await actionRepository.GetAuthorizedEventForMutationAsync(
+                tenantContext.TenantId, userId, request.EventId, token);
+            if (@event is null)
+                return BaseCommandResponse.Authorization<Guid>();
 
-        if (@event.ParticipationConfiguration is null
-            || !EventAuthorityRules.IsPublicActionAllowed(
-                @event.ParticipationConfiguration.ParticipationHandlingModeId,
-                request.Action.KindId))
-        {
-            return Failure(
-                "Public action could not be created.",
-                ["Public action kind is not available for this event's participation mode."]);
-        }
+            if (@event.ParticipationConfiguration is null
+                || !EventAuthorityRules.IsPublicActionAllowed(
+                    @event.ParticipationConfiguration.ParticipationHandlingModeId,
+                    request.Action.KindId))
+            {
+                return Failure(
+                    "Public action could not be created.",
+                    ["Public action kind is not available for this event's participation mode."]);
+            }
 
-        var action = new EventPublicAction
-        {
-            Id = Guid.CreateVersion7(),
-            TenantId = tenantContext.TenantId,
-            EventId = request.EventId,
-            EventPublicActionKindId = request.Action.KindId,
-            HealthStateId = (int)EventPublicActionHealthStateEnum.PendingReview,
-            Label = NormalizeOptional(request.Action.Label),
-            SortOrder = request.Action.SortOrder,
-            IsPrimary = request.Action.IsPrimary
-        };
-        action.SetDestination(ExternalActionUrl.Create(request.Action.Url));
+            var action = new EventPublicAction
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantContext.TenantId,
+                EventId = request.EventId,
+                EventPublicActionKindId = request.Action.KindId,
+                HealthStateId = (int)EventPublicActionHealthStateEnum.PendingReview,
+                Label = NormalizeOptional(request.Action.Label),
+                SortOrder = request.Action.SortOrder,
+                IsPrimary = request.Action.IsPrimary
+            };
+            action.SetDestination(ExternalActionUrl.Create(request.Action.Url));
 
-        async Task<BaseCommandResponse<Guid>> PersistAsync(CancellationToken ct)
-        {
             if (request.Action.IsPrimary
-                && await actionRepository.HasOtherPrimaryAsync(request.EventId, excludedActionId: null, ct))
+                && await actionRepository.HasOtherPrimaryAsync(request.EventId, excludedActionId: null, token))
             {
                 return Failure("Public action could not be created.", ["The event already has a primary public action."]);
             }
 
+            token.ThrowIfCancellationRequested();
             var created = await actionRepository.Create(action);
+            token.ThrowIfCancellationRequested();
             return Success(created.Id, "Public action created pending review.");
-        }
-
-        return request.Action.IsPrimary
-            ? await unitOfWork.ExecuteSerializableAsync(PersistAsync, cancellationToken)
-            : await PersistAsync(cancellationToken);
+        }, cancellationToken);
     }
 
     private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -1,0 +1,30 @@
+Change-Id: CHG-01M55HP4SSS1293DWT6GEHNCVC
+Title: "Retain original privacy and location correction custody"
+Type: fix
+Scope: privacy
+Summary: "Keep subject erasure and location disclosure correction under original source, subject and committing transaction ownership."
+Group: staged-programme-privacy
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Deploy matching native owners and original-source operation scopes together. Prior reconstructed privileged execution and older runtime composition are no longer accepted.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Keep subject erasure and location disclosure correction under original source, subject and committing transaction ownership.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Review the paired public operator guidance and complete final composed assurance before release. Packaging does not establish deployment readiness.

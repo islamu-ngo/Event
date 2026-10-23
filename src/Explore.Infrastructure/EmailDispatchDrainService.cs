@@ -55,7 +55,7 @@ public sealed class EmailDispatchDrainService(
     private async Task<EmailDispatchDrainResult> ProcessBatchCoreAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IEmailDispatchOutboxRepository>();
+        var repository = scope.ServiceProvider.GetRequiredService<IEmailDispatchAdmission>();
         var now = DateTime.UtcNow;
         var pending = await repository.ClaimPendingBatchAsync(
             new EmailDispatchBatchClaimRequest(
@@ -179,7 +179,7 @@ public sealed class EmailDispatchDrainService(
     public async Task<EmailDispatchRecoveryResult> RecoverStaleProcessingAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IEmailDispatchOutboxRepository>();
+        var repository = scope.ServiceProvider.GetRequiredService<IEmailDispatchAdmission>();
         var recoveredAt = DateTime.UtcNow;
         var processingStartedBefore = recoveredAt.AddSeconds(-_settings.ProcessingLeaseTimeoutSeconds);
         var recovered = await repository.RecoverStaleProcessing(
@@ -224,9 +224,10 @@ public sealed class EmailDispatchDrainService(
         }
 
         await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IEmailDispatchOutboxRepository>();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(tenantId);
+        var admission = scope.ServiceProvider.GetRequiredService<IEmailDispatchAdmission>();
         var now = DateTime.UtcNow;
-        var dispatch = await repository.TryClaimSpecificAsync(
+        var dispatch = await admission.TryClaimSpecificAsync(
             new EmailDispatchSpecificClaimRequest(
                 TenantId: tenantId,
                 PublishEventId: publishEventId,
@@ -242,14 +243,13 @@ public sealed class EmailDispatchDrainService(
             return await ProcessClaimedDispatchAsync(dispatch, consumerId, cancellationToken);
         }
 
+        var repository = scope.ServiceProvider.GetRequiredService<IEmailDispatchOutboxRepository>();
         dispatch = await repository.GetByTenantAndPublishEventId(tenantId, publishEventId, cancellationToken);
         if (dispatch is null)
         {
             metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Rejected, "missing_outbox");
             logger.LogWarning(
-                "Email dispatch pointer for tenant {TenantId} and publish event {PublishEventId} has no durable outbox row",
-                tenantId,
-                publishEventId);
+                "Email dispatch pointer has no durable outbox row");
             return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.Missing);
         }
 
@@ -257,9 +257,7 @@ public sealed class EmailDispatchDrainService(
         {
             metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Acked, "already_settled");
             logger.LogInformation(
-                "Email dispatch pointer {PublishEventId} for outbox row {OutboxId} is already settled with status {Status}",
-                publishEventId,
-                dispatch.Id,
+                "Email dispatch pointer is already settled with status {Status}",
                 dispatch.Status);
             return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.AlreadySettled, dispatch.Id);
         }
@@ -292,12 +290,12 @@ public sealed class EmailDispatchDrainService(
         CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(dispatch.TenantId);
         var repository = scope.ServiceProvider.GetRequiredService<IEmailDispatchOutboxRepository>();
         var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
         var eligibilityEvaluator = scope.ServiceProvider.GetRequiredService<IEmailDispatchEligibilityEvaluator>();
         var unsubscribeTokenService = scope.ServiceProvider.GetRequiredService<IEmailUnsubscribeTokenService>();
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-        var tenantAccessor = scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>();
 
         if (dispatch.ProcessingStartedAt is null)
         {
@@ -310,7 +308,6 @@ public sealed class EmailDispatchDrainService(
 
         var providerHandoffStarted = false;
         var attemptNumber = dispatch.AttemptCount;
-        tenantAccessor.SetTenant(dispatch.TenantId);
 
         try
         {
@@ -333,8 +330,7 @@ public sealed class EmailDispatchDrainService(
                 case EmailDispatchEligibilityOutcome.Skipped:
                     metrics.RecordEmailDispatchOperationalOutcome(eligibility.Outcome, eligibility.SkipReason);
                     logger.LogInformation(
-                        "Email dispatch {Id} skipped before provider handoff with reason {SkipReason}",
-                        dispatch.Id,
+                        "Email dispatch skipped before provider handoff with reason {SkipReason}",
                         eligibility.SkipReason);
                     return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.Skipped, dispatch.Id);
                 case EmailDispatchEligibilityOutcome.TenantPaused:
@@ -385,11 +381,7 @@ public sealed class EmailDispatchDrainService(
 
                 metrics.RecordEmailDispatchAttempt(EmailDispatchDrainOutcome.Sent);
                 logger.LogInformation(
-                    "Email dispatch {Id} sent for tenant {TenantId} and source {SourceType}/{SourceId}",
-                    dispatch.Id,
-                    dispatch.TenantId,
-                    dispatch.SourceType,
-                    dispatch.SourceId);
+                    "Email dispatch sent");
                 return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.Sent, dispatch.Id);
             }
 
@@ -434,7 +426,7 @@ public sealed class EmailDispatchDrainService(
             if (settlementOutcome == EmailDispatchFailureSettlementOutcome.Parked)
             {
                 metrics.RecordEmailDispatchAttempt(EmailDispatchDrainOutcome.Parked);
-                logger.LogWarning("Email dispatch {Id} parked because SMTP configuration is unavailable", dispatch.Id);
+                logger.LogWarning("Email dispatch parked because SMTP configuration is unavailable");
                 return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.Parked, dispatch.Id);
             }
 
@@ -444,8 +436,7 @@ public sealed class EmailDispatchDrainService(
                 : EmailDispatchDrainOutcome.RetryScheduled;
             metrics.RecordEmailDispatchAttempt(failureOutcome);
             logger.LogWarning(
-                "Email dispatch {Id} failed on attempt {Attempt}; outcome {Outcome}; retry delay {Delay}s; SMTP outcome {SmtpOutcome}",
-                dispatch.Id,
+                "Email dispatch failed on attempt {Attempt}; outcome {Outcome}; retry delay {Delay}s; SMTP outcome {SmtpOutcome}",
                 attemptNumber,
                 failureOutcome,
                 delay.TotalSeconds,
@@ -476,10 +467,6 @@ public sealed class EmailDispatchDrainService(
         {
             throw;
         }
-        finally
-        {
-            tenantAccessor.Clear();
-        }
     }
 
     public void Dispose()
@@ -494,6 +481,7 @@ public sealed class EmailDispatchDrainService(
         try
         {
             await using var reconciliationScope = scopeFactory.CreateAsyncScope();
+            reconciliationScope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(settlement.TenantId);
             var reconciliationRepository = reconciliationScope.ServiceProvider.GetRequiredService<IEmailDispatchOutboxRepository>();
             var reconciliation = await reconciliationRepository.ReconcileProviderAccepted(
                 settlement,
@@ -502,30 +490,26 @@ public sealed class EmailDispatchDrainService(
             {
                 metrics.RecordEmailDispatchAttempt(EmailDispatchDrainOutcome.Sent);
                 logger.LogInformation(
-                    "Email dispatch {Id} was already durably settled after an uncertain local commit",
-                    dispatch.Id);
+                    "Email dispatch was already durably settled after an uncertain local commit");
                 return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.Sent, dispatch.Id);
             }
 
             if (reconciliation == EmailDispatchAcceptedReconciliationOutcome.StaleClaim)
             {
                 logger.LogWarning(
-                    "Rejected stale settlement for email dispatch {Id}; a newer lease or attempt owns the row",
-                    dispatch.Id);
+                    "Rejected stale email dispatch settlement because a newer lease or attempt owns the row");
                 return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.AlreadyClaimed, dispatch.Id);
             }
         }
         catch (Exception)
         {
             logger.LogCritical(
-                "Email dispatch {Id} handoff reconciliation failed; the durable provider-handoff fence prevents automatic resend",
-                dispatch.Id);
+                "Email dispatch handoff reconciliation failed; the durable provider-handoff fence prevents automatic resend");
         }
 
         metrics.RecordEmailDispatchAttempt(EmailDispatchDrainOutcome.Unknown);
         logger.LogWarning(
-            "Email dispatch {Id} handoff outcome is unknown; automatic resend is disabled",
-            dispatch.Id);
+            "Email dispatch handoff outcome is unknown; automatic resend is disabled");
         return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.Unknown, dispatch.Id);
     }
 
@@ -535,6 +519,7 @@ public sealed class EmailDispatchDrainService(
         int attemptNumber)
     {
         await using var releaseScope = scopeFactory.CreateAsyncScope();
+        releaseScope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(dispatch.TenantId);
         var releaseRepository = releaseScope.ServiceProvider.GetRequiredService<IEmailDispatchOutboxRepository>();
         var release = await releaseRepository.ReleaseClaimBeforeProviderHandoff(
             new EmailDispatchPreHandoffRelease(

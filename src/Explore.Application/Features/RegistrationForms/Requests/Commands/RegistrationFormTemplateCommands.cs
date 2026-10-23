@@ -12,6 +12,9 @@ public sealed record CreateRegistrationFormTemplateCommand(RegistrationFormTempl
     string? ISecureRequest.ResourceId => Input.SourceRegistrationFormId == Guid.Empty
         ? null
         : Input.SourceRegistrationFormId.ToString();
+
+    IAuthorizationFacts? ISecureRequest.AuthorizationFacts =>
+        new EventScopedAuthorizationFacts(Guid.Empty, Input.SourceEventId);
 }
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManageRegistrationWorkflow)]

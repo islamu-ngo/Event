@@ -6,6 +6,15 @@
 > **Status:** Approved prospective policy; no release automation is active
 > **Owner:** Platform/Ops and Project Steward
 
+## Complete release-impact metadata
+
+Review complete changed-file metadata, including previous names for renames.
+A large PR must not bypass impact classification or lower its declared file count.
+See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
+A workflow correction on a PR branch does not replace the trusted-base version
+used by `pull_request_target`; arrange an independently reviewed base update
+before relying on its rerun.
+
 ## Scope and precedence
 
 This policy governs the future release engine. It does not replace the current manual
@@ -45,6 +54,15 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
   MUST NOT self-promote or influence authoritative attestation.
 
 ## Release sources and exact identity
+
+- Candidate B MUST retain a `security-execution.v1.json` sidecar from actual
+  selected execution at exactly B, together with its contained report/log
+  artifacts. Both required lanes MUST be nonzero, completed and passing.
+  Initial source dispositions and unrelated CI no-ops MUST NOT satisfy this
+  gate. The candidate manifest binds the exact validated packet SHA-256.
+  The sidecar is post-commit execution input, not self-referential content of B.
+  Full provider/host/operator/browser and authenticated-provenance assurance
+  remains separately required; a digest is not producer authentication.
 
 - `release.yaml` MUST contain the selected version, release line, fixed release date,
   range/base references, compatibility references, and impact dispositions.

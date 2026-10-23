@@ -21,7 +21,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         {
             var identity = await fixture.AuthenticateAsync(context);
             var result = await new ModerationEffectLeaseRepository(context, identity.Machine, identity.Bindings,
-                new ExternalApiKeyRepository(context), fixture.Clock).ReadOriginalCompletionAsync(fixture.EffectId);
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                fixture.Clock).ReadOriginalCompletionAsync(fixture.EffectId);
             await Assert.That(result.Outcome).IsEqualTo(ModerationEffectLeaseOutcome.Completed);
             await Assert.That(result.Effect!.CompletedAt).IsEqualTo(receipt.CompletedAt);
             await Assert.That(result.Effect.Revision).IsEqualTo(receipt.LeaseRevision + 1);
@@ -83,7 +84,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.ExpiresAt, Now.UtcDateTime));
         }
         var result = await new ModerationEffectLeaseRepository(context, identity.Machine, identity.Bindings,
-            new ExternalApiKeyRepository(context), fixture.Clock).ReadOriginalCompletionAsync(fixture.EffectId);
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            fixture.Clock).ReadOriginalCompletionAsync(fixture.EffectId);
         await Assert.That(result.Outcome == ModerationEffectLeaseOutcome.Completed).IsFalse();
         await Assert.That(reads.Count).IsEqualTo(0);
     }
@@ -114,7 +116,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         await using var context = fixture.Context(reads);
         var identity = await fixture.AuthenticateAsync(context);
         var result = await new ModerationEffectLeaseRepository(context, identity.Machine, identity.Bindings,
-            new ExternalApiKeyRepository(context), fixture.Clock).ReadOriginalCompletionAsync(fixture.EffectId);
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            fixture.Clock).ReadOriginalCompletionAsync(fixture.EffectId);
         await Assert.That(result.Outcome).IsEqualTo(ModerationEffectLeaseOutcome.Completed);
         await Assert.That(result.Effect!.OriginalCompletionId).IsEqualTo(receipt.Id);
         await Assert.That(result.Effect.OriginalCompletionRevision).IsEqualTo(receipt.LeaseRevision + 1);

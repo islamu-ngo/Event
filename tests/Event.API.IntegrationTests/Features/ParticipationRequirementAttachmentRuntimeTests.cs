@@ -17,13 +17,10 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Schema;
-using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -500,11 +497,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeTests(
 
 public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncInitializer, IAsyncDisposable
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
-        .WithDatabase("participation_requirement_attachments_http")
-        .WithUsername("postgres")
-        .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
-        .Build();
+    private readonly Event.Persistence.IntegrationTests.Fixtures.PostgreSqlContainerFixture _database = new();
 
     private PostgreSqlApiWebApplicationFactory _factory = null!;
     private HttpClient _client = null!;
@@ -513,7 +506,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
     {
         await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
         var writer = scope.ServiceProvider.GetRequiredService<IVisitorAccessSettingsWriter>();
-        var result = await writer.ApplyAsync(
+        var result = await writer.ApplyInternalAsync(
         [
             new(null, GovernanceSettingKeys.Authentication.GoogleSsoEnabled, VisitorAccessSettingMutationKind.SetValue, "true"),
             new(null, GovernanceSettingKeys.Authentication.GoogleClientId, VisitorAccessSettingMutationKind.SetValue, "\"public-client\""),
@@ -526,16 +519,10 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
-        await using (var context = CreateDbContext())
-        {
-            await context.Database.EnsureCreatedAsync();
-            await PostgresModelConstraintApplier.ApplyAsync(context);
-            await LookupTableSeeder.SeedAsync(context);
-        }
+        await _database.InitializeAsync();
 
         _factory = new PostgreSqlApiWebApplicationFactory(
-            _container.GetConnectionString(),
+            _database,
             new Dictionary<string, string?>
             {
                 ["Testing:HostProfile"] = TestHostProfile.RealRuntime,
@@ -556,8 +543,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
         bool nativeChannel,
         bool secondaryTenant = false)
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = CreateDbContext();
         TenantScenarioSeed.TenantScenarioResult organizer = secondaryTenant
             ? await TenantScenarioSeed.SeedSecondaryTenantWithUserAsync(context, "Requirement isolation tenant")
             : await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
@@ -737,8 +723,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
 
     public async Task CancelEventAsync(AttachmentRuntimeScenario scenario)
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = CreateDbContext();
         Explore.Domain.Event @event = await context.Events.IgnoreQueryFilters().SingleAsync(value =>
             value.Id == scenario.EventId && value.TenantId == scenario.TenantId);
         @event.Cancel(DateTime.UtcNow);
@@ -747,8 +732,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
 
     public async Task<Guid> GetConfigurationStampAsync(AttachmentRuntimeScenario scenario)
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = CreateDbContext();
         return await context.EventParticipationConfigurations.IgnoreQueryFilters()
             .Where(value => value.Id == scenario.EventId && value.TenantId == scenario.TenantId)
             .Select(value => value.ConcurrencyStamp)
@@ -757,8 +741,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
 
     public async Task<string> GetPersistenceFingerprintAsync(AttachmentRuntimeScenario scenario)
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = CreateDbContext();
         EventParticipationConfiguration configuration = await context.EventParticipationConfigurations
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -787,8 +770,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
         AttachmentRuntimeScenario scenario,
         int expectedActiveAttachments)
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = CreateDbContext();
         await Assert.That(await context.RegistrationOrders.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
         await Assert.That(await context.RegistrationParticipants.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
         await Assert.That(await context.EventRegistrations.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
@@ -877,15 +859,11 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
             await _factory.DisposeAsync();
         }
 
-        await _container.DisposeAsync();
+        await _database.DisposeAsync();
         GC.SuppressFinalize(this);
     }
 
-    private ExploreDbContext CreateDbContext() => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
-            .UseSnakeCaseNamingConvention()
-            .Options);
+    private ExploreDbContext CreateDbContext() => _database.CreateDbContext();
 
     private static RegistrationRequirement Requirement(
         RegistrationWorkflow workflow,

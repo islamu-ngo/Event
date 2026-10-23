@@ -8,6 +8,7 @@ using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Npgsql;
 using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests.Database;
@@ -143,6 +144,34 @@ public sealed class SecretBindingProviderContractTests
             SecretScope.Tenant,
             tenantId,
             variableName);
+}
+
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[NotInParallel("PersistenceDb")]
+public sealed class PostgresSecretBindingScopeContractTests(PostgreSqlContainerFixture fixture)
+{
+    [Test]
+    [Arguments("")]
+    [Arguments("provider-a")]
+    public async Task ScopeAndQualifierUniquenessUseDisposablePostgresAuthority(string qualifier)
+    {
+        var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
+        await using var metadata = fixture.CreateDbContext();
+        var provider = PrimaryDatabaseProviderBehaviorFixture.Create(new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Migrator,
+            Provider = PrimaryDatabaseProvider.PostgreSql,
+            Host = connection.Host,
+            Port = connection.Port,
+            Database = connection.Database!,
+            Username = connection.Username!,
+            Password = connection.Password!,
+            Schema = metadata.Model.FindEntityType(typeof(SecretBinding))!.GetSchema() ?? "public",
+            TlsMode = PrimaryDatabaseTlsMode.Disabled
+        });
+        await provider.PrepareAsync();
+        await SecretBindingProviderContractTests.AssertScopeUniquenessAsync(provider, qualifier);
+    }
 }
 
 public sealed class SecretBindingModelContractTests

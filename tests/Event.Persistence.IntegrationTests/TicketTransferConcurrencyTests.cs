@@ -275,8 +275,8 @@ public sealed class TicketTransferConcurrencyTests(
             await using ExploreDbContext context =
                 TenantContext(seed.TenantId);
             await gate.ArriveAsync(timeout.Token);
-            return await new EfCoreUnitOfWork(context)
-                .ExecuteInTransactionAsync(
+            return await new Explore.Persistence.Database.ProviderPrimitives.AdmissionTargetTransaction(context, new EfCoreUnitOfWork(context))
+                .ExecuteAsync(seed.TenantId, seed.AdmissionTargetId,
                     token =>
                         new AdmissionCheckInRepository(
                             context)

@@ -1,5 +1,7 @@
+using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -14,6 +16,8 @@ internal sealed class EventDiscoveryDisclosureProviderOperations(ExploreDbContex
     internal async Task<EventDiscoveryRevision> AcquireRevisionAsync(
         Guid tenantId, CancellationToken cancellationToken)
     {
+        if (context.Database.IsNpgsql())
+            return await PostgresDiscoveryTraversalContract.AcquireRevisionAsync(context, tenantId, cancellationToken);
         var mapping = _mapping;
         // A native write also detects a stale PostgreSQL snapshot. An advisory lock
         // followed by an ordinary snapshot SELECT cannot establish current authority.
@@ -38,21 +42,14 @@ internal sealed class EventDiscoveryDisclosureProviderOperations(ExploreDbContex
             .AsNoTracking().ToListAsync(cancellationToken);
         // MySQL may report changed rows rather than matched rows for a no-op.
         // Existence comes from the locking read, never its affected-row count.
-        if (revisions.Count == 0)
-        {
-            string insertSql =
-                $"INSERT INTO {mapping.Table} ({mapping.Id}, {mapping.Tenant}, {mapping.Identity}, {mapping.Disclosure}) VALUES ({{0}}, {{1}}, 0, 0)";
-            await context.Database.ExecuteSqlRawAsync(insertSql, [Guid.CreateVersion7(), tenantId], cancellationToken);
-            revisions = await context.Set<EventDiscoveryRevision>().FromSqlRaw(query, tenantId)
-                .IgnoreTenantFilter(TenantFilterBypassReasons.DiscoveryDisclosureMutation)
-                .AsNoTracking().ToListAsync(cancellationToken);
-        }
-        return revisions.Single();
+        return revisions.SingleOrDefault() ?? throw new EventDiscoveryUnavailableException();
     }
 
     internal Task<int> UpdateRevisionAsync(
         Guid tenantId, EventDiscoveryRevision revision, CancellationToken cancellationToken)
     {
+        if (context.Database.IsNpgsql())
+            return PostgresDiscoveryTraversalContract.UpdateRevisionAsync(context, tenantId, revision, cancellationToken);
         var mapping = _mapping;
         string updateSql =
             $"UPDATE {mapping.Table} SET {mapping.Disclosure} = {{0}}, {mapping.Identity} = {{1}} WHERE {mapping.Tenant} = {{2}}";
@@ -60,22 +57,13 @@ internal sealed class EventDiscoveryDisclosureProviderOperations(ExploreDbContex
             [revision.DisclosureEpoch, revision.IdentityEpoch, tenantId], cancellationToken);
     }
 
-    internal static async Task<T> InTenantAsync<T>(
+    internal static Task<T> InTenantAsync<T>(
         ExploreDbContext context, Guid tenantId, Func<Task<T>> operation, CancellationToken cancellationToken)
     {
-        if (context.Database.ProviderName != RelationalNamedLock.PostgreSqlProvider)
-            return await operation();
-        string previous = await context.Database.SqlQueryRaw<string>(
-            "SELECT COALESCE(current_setting('app.current_tenant_id', true), '') AS \"Value\"")
-            .SingleAsync(cancellationToken);
-        await context.Database.ExecuteSqlRawAsync(
-            "SELECT set_config('app.current_tenant_id', {0}, true)", [tenantId.ToString("D")], cancellationToken);
-        T result = await operation();
-        // On failure the owning transaction rolls back, restoring SET LOCAL. Do not
-        // obscure the original error by issuing a command into an aborted transaction.
-        await context.Database.ExecuteSqlRawAsync(
-            "SELECT set_config('app.current_tenant_id', {0}, true)", [previous], cancellationToken);
-        return result;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (context.Database.IsNpgsql() && (tenantId == Guid.Empty || context.TenantFilterTenantId != tenantId))
+            throw new InvalidOperationException("Discovery tenant operation requires the exact immutable lease.");
+        return operation();
     }
 
     private static (string Table, string Id, string Tenant, string Identity, string Disclosure) Mapping(

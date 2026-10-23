@@ -18,6 +18,7 @@ public sealed class EventResourceConfiguration : IEntityTypeConfiguration<EventR
             table.HasCheckConstraint("ck_event_resources_availability_start", BoundaryCheck("start"));
             table.HasCheckConstraint("ck_event_resources_availability_end", BoundaryCheck("end"));
             table.HasCheckConstraint("ck_event_resources_availability_order", "availability_absolute_start_utc IS NULL OR availability_absolute_end_utc IS NULL OR availability_absolute_end_utc > availability_absolute_start_utc");
+            table.HasCheckConstraint("ck_event_resources_relative_availability_order", "availability_start_anchor_id IS NULL OR availability_end_anchor_id IS NULL OR availability_start_anchor_id <> availability_end_anchor_id OR availability_end_offset_ticks > availability_start_offset_ticks");
             table.HasCheckConstraint("ck_event_resources_payload", PayloadCheck());
             table.HasCheckConstraint("ck_event_resources_quarantine",
                 "moderation_quarantine_count >= 0 AND (moderation_quarantine_count = 0 OR material_version_id IS NOT NULL)");

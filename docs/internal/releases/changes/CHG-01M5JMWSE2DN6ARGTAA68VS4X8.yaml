@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5JMWSE2DN6ARGTAA68VS4X8
+Title: "Read finite discovery and preference facts through EF"
+Type: fix
+Scope: database
+Summary: "Preserve bounded EF membership, preference, retention and discovery reads with owner-local fixed permissions. Complete current-image acceptance remains deferred in the PR75 backlog handoff."
+Group: finite-ef-read-cutover
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/adr/ADR-application-owned-persistence.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Owner-local fixed-column grants support EF reads for membership, preferences and finite retention/discovery facts. Tenant isolation and exact source boundaries remain; no generic privileged executor or merged capability is introduced. Complete current-image native acceptance remains deferred.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

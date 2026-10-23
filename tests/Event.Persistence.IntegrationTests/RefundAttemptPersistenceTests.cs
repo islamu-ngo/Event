@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
@@ -9,16 +10,406 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using TUnit.Assertions;
-using TUnit.Core;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Data.Common;
+using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
 
 public sealed class RefundAttemptPersistenceTests
 {
+    [Test]
+    [Arguments("match")]
+    [Arguments("other_event")]
+    [Arguments("missing_order")]
+    [Arguments("missing_payment")]
+    [Arguments("missing_campaign")]
+    public async Task CancellationLateCaptureRequiresNativeCampaignOrderEventAssociation(string source)
+    {
+        await using var seed = await CreateContextAsync();
+        Guid eventId = Guid.CreateVersion7();
+        Guid paymentId = Guid.CreateVersion7();
+        Guid orderId = Guid.CreateVersion7();
+        await SeedCapturedPaymentAsync(seed, TenantA, paymentId, orderId, eventId);
+        var campaign = RefundCampaign.CreateCancellation(
+            Guid.CreateVersion7(), TenantA, source == "other_event" ? Guid.CreateVersion7() : eventId,
+            Guid.CreateVersion7(), "Cancelled.", UtcNow.AddMinutes(1));
+        seed.RefundCampaigns.Add(campaign);
+        await seed.SaveChangesAsync();
+        if (source == "missing_order")
+            await seed.RegistrationOrders.Where(value => value.Id == orderId).ExecuteDeleteAsync();
+        await using var runtime = new ExploreDbContext(Options((SqliteConnection)seed.Database.GetDbConnection()))
+        {
+            TenantContext = new TestTenantContext(TenantA)
+        };
+        var provider = NSubstitute.Substitute.For<IPaymentCancellationProvider>();
+        provider.CancelAsync(NSubstitute.Arg.Any<PaymentCancellationRequest>(), NSubstitute.Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromException<PaymentCancellationProviderResult>(
+                new InvalidOperationException("Captured payments must not be cancelled externally.")));
+        var service = new RegistrationPaymentCancellationService(
+            new RegistrationPaymentAttemptRepository(runtime), new RefundAttemptRepository(runtime),
+            new RefundCampaignRepository(runtime), provider, new FixedClock(UtcNow.AddMinutes(2)),
+            new RegistrationInventoryRepository(runtime));
+        bool result = await service.CancelAsync(TenantA,
+            source == "missing_campaign" ? Guid.CreateVersion7() : campaign.Id,
+            source == "missing_payment" ? Guid.CreateVersion7() : paymentId, CancellationToken.None);
+        await Assert.That(result).IsEqualTo(source == "match");
+        runtime.ChangeTracker.Clear();
+        var attempts = await runtime.RefundAttempts.AsNoTracking().ToListAsync();
+        await Assert.That(attempts.Count).IsEqualTo(source == "match" ? 1 : 0);
+        if (source == "match")
+        {
+            await Assert.That(attempts[0].PaymentAttemptId).IsEqualTo(paymentId);
+            await Assert.That(attempts[0].SourceCampaignId).IsEqualTo(campaign.Id);
+        }
+        var retained = await runtime.RefundCampaigns.AsNoTracking().SingleAsync(value => value.Id == campaign.Id);
+        await Assert.That(retained.Status).IsEqualTo(campaign.Status);
+    }
+
     private static readonly DateTime UtcNow = new(2026, 8, 25, 12, 0, 0, DateTimeKind.Utc);
     private static readonly Guid TenantA = Guid.Parse("018e4e5c-7f00-7000-8000-000000000001");
     private static readonly Guid TenantB = Guid.Parse("018e4e5c-7f00-7000-8000-000000000002");
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task FeeHandoffSurvivesMaterializationAndLostAcknowledgementWithoutSecondMutation(bool loseAcknowledgement)
+    {
+        await using ExploreDbContext context = await CreateContextAsync();
+        Guid paymentId = Guid.CreateVersion7();
+        Guid orderId = Guid.CreateVersion7();
+        await SeedCapturedPaymentAsync(context, TenantA, paymentId, orderId);
+        RefundAttempt attempt = Refund(TenantA, paymentId, orderId, 400, "fee-owned-once");
+        var repository = new RefundAttemptRepository(context);
+        await repository.ReserveAsync(attempt, CancellationToken.None);
+        var provider = new FeeRefundProvider(loseAcknowledgement);
+        await new RefundDispatchService(repository, provider, new FixedClock(UtcNow.AddMinutes(2)))
+            .DispatchAsync(TenantA, attempt.Id, CancellationToken.None);
+        context.ChangeTracker.Clear();
+        var recovery = new RefundReconciliationService(
+            repository, provider, provider, new FixedClock(UtcNow.AddMinutes(3)));
+        if (loseAcknowledgement)
+        {
+            await Assert.That(async () => await recovery.ReconcileAsync(TenantA, attempt.Id, CancellationToken.None))
+                .Throws<OperationCanceledException>();
+            context.ChangeTracker.Clear();
+        }
+        RefundAttempt? settled = await recovery.ReconcileAsync(TenantA, attempt.Id, CancellationToken.None);
+        await recovery.ReconcileAsync(TenantA, attempt.Id, CancellationToken.None);
+
+        await Assert.That(settled!.Status).IsEqualTo(RefundAttemptStatusEnum.Succeeded);
+        await Assert.That(settled.ApplicationFeeRefundedAmountMinor).IsEqualTo(30L);
+        await Assert.That(provider.BuyerEffects).IsEqualTo(1);
+        await Assert.That(provider.FeeEffects).IsEqualTo(1);
+        await Assert.That(settled.ProviderMutationExpiresAt!.Value.Kind).IsEqualTo(DateTimeKind.Utc);
+        await Assert.That(settled.ReservesCapacity).IsTrue();
+    }
+
+    [Test]
+    public async Task NativeDispatchClaimRejectsSecondOwnerAndStaleSettlementPreservesCallbackSuccess()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = Options(connection);
+        Guid refundId;
+        await using (var seed = await CreateContextAsync(options, bypassTenantFilter: true))
+        {
+            Guid paymentId = Guid.CreateVersion7();
+            Guid orderId = Guid.CreateVersion7();
+            await SeedCapturedPaymentAsync(seed, TenantA, paymentId, orderId);
+            RefundAttempt attempt = Refund(TenantA, paymentId, orderId, 400, "fenced-owner");
+            refundId = attempt.Id;
+            await new RefundAttemptRepository(seed).ReserveAsync(attempt, CancellationToken.None);
+        }
+        await using var owner = await CreateContextAsync(options, bypassTenantFilter: true);
+        await using var contender = await CreateContextAsync(options, bypassTenantFilter: true);
+        var repository = new RefundAttemptRepository(owner);
+        var otherRepository = new RefundAttemptRepository(contender);
+        RefundAttempt first = (await repository.GetByIdAsync(TenantA, refundId, CancellationToken.None))!;
+        RefundAttempt stale = (await otherRepository.GetByIdAsync(TenantA, refundId, CancellationToken.None))!;
+        Guid token = Guid.CreateVersion7();
+        RefundAttempt claimed = (await repository.TryBeginDispatchAsync(
+            first, token, false, UtcNow.AddMinutes(2), UtcNow.AddHours(23),
+            RefundOutboxMessageFactory.CreateReconciliation(first, UtcNow, UtcNow.AddMinutes(3)),
+            CancellationToken.None))!;
+        RefundAttempt? second = await otherRepository.TryBeginDispatchAsync(
+            stale, Guid.CreateVersion7(), false, UtcNow.AddMinutes(2), UtcNow.AddHours(23),
+            RefundOutboxMessageFactory.CreateReconciliation(stale, UtcNow, UtcNow.AddMinutes(3)),
+            CancellationToken.None);
+        await Assert.That(second).IsNull();
+
+        RefundAttempt callback = (await otherRepository.GetByIdAsync(TenantA, refundId, CancellationToken.None))!;
+        RefundAttemptEvidence.Apply(callback,
+            new("re_callback", callback.ProviderPaymentId, RefundProviderStatus.Succeeded, 400, "EUR", 30),
+            UtcNow.AddMinutes(3), "req_callback");
+        await otherRepository.SaveChangesAsync(CancellationToken.None);
+        RefundAttempt? settled = await repository.SettleAndScheduleAsync(
+            claimed, token, RefundProviderResult.Unknown(new("network", RefundProviderFailureKind.Network)),
+            UtcNow.AddMinutes(4),
+            RefundOutboxMessageFactory.CreateReconciliation(claimed, UtcNow, UtcNow.AddMinutes(5)),
+            CancellationToken.None);
+
+        await Assert.That(settled!.Status).IsEqualTo(RefundAttemptStatusEnum.Succeeded);
+        await Assert.That(settled.ProviderRefundId).IsEqualTo("re_callback");
+        await Assert.That(await owner.OutboxMessages.CountAsync()).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CancellationAroundProviderHandoffNeverGrantsAnotherBuyerMutation(bool effectOccurred)
+    {
+        await using ExploreDbContext context = await CreateContextAsync();
+        Guid paymentId = Guid.CreateVersion7();
+        Guid orderId = Guid.CreateVersion7();
+        await SeedCapturedPaymentAsync(context, TenantA, paymentId, orderId);
+        RefundAttempt attempt = Refund(TenantA, paymentId, orderId, 400, "cancel-handoff");
+        var repository = new RefundAttemptRepository(context);
+        await repository.ReserveAsync(attempt, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource();
+        var provider = new CancellationRefundProvider(cancellation, effectOccurred);
+        var service = new RefundDispatchService(repository, provider, new FixedClock(UtcNow.AddMinutes(2)));
+        await Assert.That(async () => await service.DispatchAsync(TenantA, attempt.Id, cancellation.Token))
+            .Throws<OperationCanceledException>();
+        await service.DispatchAsync(TenantA, attempt.Id, CancellationToken.None);
+
+        await Assert.That(provider.BuyerEffects).IsEqualTo(effectOccurred ? 1 : 0);
+        await Assert.That(provider.Handoffs).IsEqualTo(1);
+        RefundAttempt persisted = (await repository.GetByIdAsync(TenantA, attempt.Id, CancellationToken.None))!;
+        await Assert.That(persisted.DispatchPhase).IsEqualTo(RefundDispatchPhase.BuyerHandoffCommitted);
+        await Assert.That(persisted.ReservesCapacity).IsTrue();
+        await Assert.That(await context.OutboxMessages.CountAsync()).IsEqualTo(1);
+        RefundAttempt? reconciled = await new RefundReconciliationService(
+            repository, provider, provider, new FixedClock(UtcNow.AddMinutes(3)))
+            .ReconcileAsync(TenantA, attempt.Id, CancellationToken.None);
+        await Assert.That(reconciled!.Status).IsEqualTo(
+            effectOccurred ? RefundAttemptStatusEnum.Pending : RefundAttemptStatusEnum.Unknown);
+        await Assert.That(reconciled.ProviderRefundId).IsEqualTo(effectOccurred ? "re_cancellation" : null);
+        await Assert.That(provider.BuyerEffects).IsEqualTo(effectOccurred ? 1 : 0);
+        await Assert.That(provider.Handoffs).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task PositivePreHandoffProofPermitsNewOwnerWithoutChangingCommittedActorOrProviderKey()
+    {
+        await using ExploreDbContext context = await CreateContextAsync();
+        Guid paymentId = Guid.CreateVersion7();
+        Guid orderId = Guid.CreateVersion7();
+        await SeedCapturedPaymentAsync(context, TenantA, paymentId, orderId);
+        RefundAttempt attempt = Refund(TenantA, paymentId, orderId, 400, "proven-pre-handoff");
+        Guid historicalActor = Guid.CreateVersion7();
+        attempt.BindNativeInput(400, historicalActor, "system", "operator_refund");
+        var repository = new RefundAttemptRepository(context);
+        await repository.ReserveAsync(attempt, CancellationToken.None);
+        var provider = new PreparedRefundProvider();
+        var service = new RefundDispatchService(repository, provider, new FixedClock(UtcNow.AddMinutes(2)));
+        RefundAttempt? preHandoff = await service.DispatchAsync(TenantA, attempt.Id, CancellationToken.None);
+        Guid? firstOwner = preHandoff!.DispatchToken;
+        await Assert.That(preHandoff.NoProviderHandoffProvenAt).IsNotNull();
+        await Assert.That(preHandoff.CanDispatchBuyer).IsTrue();
+        RefundAttempt? observed = await service.DispatchAsync(TenantA, attempt.Id, CancellationToken.None);
+
+        await Assert.That(observed!.DispatchToken).IsNotEqualTo(firstOwner);
+        await Assert.That(observed.ProviderRefundId).IsEqualTo("re_prepared");
+        await Assert.That(observed.CreatedBy).IsEqualTo(historicalActor);
+        await Assert.That(provider.CommittedKeys.Single()).IsEqualTo("proven-pre-handoff");
+        await Assert.That(observed.ProviderMutationExpiresAt).IsEqualTo(UtcNow.AddMinutes(2).AddHours(23));
+    }
+
+    [Test]
+    public async Task LostClaimCommitAcknowledgementRetainsRecoveryWithoutProviderHandoff()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var fault = new RefundCommitFault();
+        var options = new DbContextOptionsBuilder<ExploreDbContext>(Options(connection)).AddInterceptors(fault).Options;
+        Guid refundId;
+        await using (var setup = await CreateContextAsync(options, bypassTenantFilter: true))
+        {
+            Guid paymentId = Guid.CreateVersion7();
+            Guid orderId = Guid.CreateVersion7();
+            await SeedCapturedPaymentAsync(setup, TenantA, paymentId, orderId);
+            RefundAttempt attempt = Refund(TenantA, paymentId, orderId, 400, "lost-claim-ack");
+            refundId = attempt.Id;
+            await new RefundAttemptRepository(setup).ReserveAsync(attempt, CancellationToken.None);
+        }
+        using var cancellation = new CancellationTokenSource();
+        var provider = new CancellationRefundProvider(cancellation, true);
+        await using (var owner = await CreateContextAsync(options, bypassTenantFilter: true))
+        {
+            fault.LoseAcknowledgement = true;
+            var service = new RefundDispatchService(
+                new RefundAttemptRepository(owner), provider, new FixedClock(UtcNow.AddMinutes(2)));
+            await Assert.That(async () => await service.DispatchAsync(TenantA, refundId, CancellationToken.None))
+                .ThrowsException();
+        }
+        await using var recovery = await CreateContextAsync(options, bypassTenantFilter: true);
+        await new RefundDispatchService(new RefundAttemptRepository(recovery), provider, new FixedClock(UtcNow.AddMinutes(3)))
+            .DispatchAsync(TenantA, refundId, CancellationToken.None);
+        await Assert.That(provider.Handoffs).IsEqualTo(0);
+        await Assert.That((await recovery.RefundAttempts.SingleAsync()).DispatchPhase)
+            .IsEqualTo(RefundDispatchPhase.BuyerHandoffCommitted);
+        await Assert.That(await recovery.OutboxMessages.CountAsync()).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task SettlementAndRecoveryTriggerRollbackTogetherAndRejectWrongToken()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var fault = new RefundCommitFault();
+        var options = new DbContextOptionsBuilder<ExploreDbContext>(Options(connection)).AddInterceptors(fault).Options;
+        await using var context = await CreateContextAsync(options, bypassTenantFilter: true);
+        Guid paymentId = Guid.CreateVersion7();
+        Guid orderId = Guid.CreateVersion7();
+        await SeedCapturedPaymentAsync(context, TenantA, paymentId, orderId);
+        RefundAttempt attempt = Refund(TenantA, paymentId, orderId, 400, "atomic-settlement");
+        var repository = new RefundAttemptRepository(context);
+        await repository.ReserveAsync(attempt, CancellationToken.None);
+        Guid token = Guid.CreateVersion7();
+        RefundAttempt claim = (await repository.TryBeginDispatchAsync(
+            attempt, token, false, UtcNow.AddMinutes(2), UtcNow.AddHours(23),
+            RefundOutboxMessageFactory.CreateReconciliation(attempt, UtcNow, UtcNow.AddMinutes(3)),
+            CancellationToken.None))!;
+        var observation = RefundProviderResult.Observed(
+            new("re_atomic", attempt.ProviderPaymentId, RefundProviderStatus.Pending, 400, "EUR", null), "req_atomic");
+        await repository.SettleAndScheduleAsync(
+            claim, Guid.CreateVersion7(), observation, UtcNow.AddMinutes(3),
+            RefundOutboxMessageFactory.CreateReconciliation(attempt, UtcNow, UtcNow.AddMinutes(4)),
+            CancellationToken.None);
+        await Assert.That(await context.OutboxMessages.CountAsync()).IsEqualTo(1);
+        fault.RejectCommit = true;
+        await Assert.That(async () => await repository.SettleAndScheduleAsync(
+            claim, token, observation, UtcNow.AddMinutes(3),
+            RefundOutboxMessageFactory.CreateReconciliation(attempt, UtcNow, UtcNow.AddMinutes(4)),
+            CancellationToken.None)).Throws<InvalidOperationException>();
+        RefundAttempt unchanged = (await repository.GetByIdAsync(TenantA, attempt.Id, CancellationToken.None))!;
+        await Assert.That(unchanged.ProviderRefundId).IsNull();
+        await Assert.That(await context.OutboxMessages.CountAsync()).IsEqualTo(1);
+        await repository.SettleAndScheduleAsync(
+            unchanged, token, observation, UtcNow.AddMinutes(3),
+            RefundOutboxMessageFactory.CreateReconciliation(unchanged, UtcNow, UtcNow.AddMinutes(4)),
+            CancellationToken.None);
+        context.ChangeTracker.Clear();
+        await Assert.That((await repository.GetByIdAsync(TenantA, attempt.Id, CancellationToken.None))!.ProviderRefundId)
+            .IsEqualTo("re_atomic");
+        await Assert.That(await context.OutboxMessages.CountAsync()).IsEqualTo(2);
+    }
+
+    [Test]
+    [Arguments(null)]
+    [Arguments(1_000L)]
+    public async Task ExactNativeReplayReturnsOriginalRefundAfterCapacityIsExhausted(long? amount)
+    {
+        await using ExploreDbContext context = await CreateContextAsync();
+        Guid paymentId = Guid.CreateVersion7();
+        Guid orderId = Guid.CreateVersion7();
+        Guid actorId = Guid.CreateVersion7();
+        await SeedCapturedPaymentAsync(context, TenantA, paymentId, orderId);
+        PaymentAttempt payment = await context.PaymentAttempts.SingleAsync();
+        context.CheckoutDispatchEffects.Add(CheckoutDispatchEffect.Create(payment, UtcNow));
+        await context.SaveChangesAsync();
+        RegistrationOrder order = await context.RegistrationOrders.SingleAsync();
+        var repository = new RefundAttemptRepository(context);
+        var service = new RegistrationRefundService(
+            new RegistrationPaymentAttemptRepository(context), repository, TimeProvider.System);
+
+        var first = await service.InitiateAsync(
+            order, amount, "native-full-refund", actorId, "organizer", "operator_refund", CancellationToken.None);
+        var replay = await service.InitiateAsync(
+            order, amount, "native-full-refund", actorId, "organizer", "operator_refund", CancellationToken.None);
+
+        await Assert.That(first.IsSuccess).IsTrue();
+        await Assert.That(replay.IsSuccess).IsTrue();
+        await Assert.That(replay.Id).IsEqualTo(first.Id);
+        await Assert.That(await repository.GetRefundableCapacityAsync(TenantA, paymentId, CancellationToken.None))
+            .IsEqualTo(0L);
+        await Assert.That(await context.OutboxMessages.CountAsync()).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments("amount")]
+    [Arguments("omitted")]
+    [Arguments("principal")]
+    [Arguments("authority")]
+    [Arguments("reason")]
+    [Arguments("full-explicit")]
+    public async Task SameNativeKeyWithChangedInputReturnsNoEarlierRefund(string changed)
+    {
+        await using ExploreDbContext context = await CreateContextAsync();
+        Guid paymentId = Guid.CreateVersion7();
+        Guid orderId = Guid.CreateVersion7();
+        Guid actorId = Guid.CreateVersion7();
+        await SeedCapturedPaymentAsync(context, TenantA, paymentId, orderId);
+        PaymentAttempt payment = await context.PaymentAttempts.SingleAsync();
+        context.CheckoutDispatchEffects.Add(CheckoutDispatchEffect.Create(payment, UtcNow));
+        await context.SaveChangesAsync();
+        RegistrationOrder order = await context.RegistrationOrders.SingleAsync();
+        var service = new RegistrationRefundService(
+            new RegistrationPaymentAttemptRepository(context), new RefundAttemptRepository(context), TimeProvider.System);
+        var first = await service.InitiateAsync(
+            order, changed == "full-explicit" ? null : 400, "bound-refund", actorId, "organizer", "operator_refund", CancellationToken.None);
+        var conflict = await service.InitiateAsync(
+            order, changed == "omitted" ? null : changed == "amount" ? 401 : changed == "full-explicit" ? 1_000 : 400,
+            "bound-refund", changed == "principal" ? Guid.CreateVersion7() : actorId,
+            changed == "authority" ? "buyer" : "organizer",
+            changed == "reason" ? "event_cancelled" : "operator_refund", CancellationToken.None);
+
+        await Assert.That(first.IsSuccess).IsTrue();
+        await Assert.That(conflict.IsSuccess).IsFalse();
+        await Assert.That(conflict.FailureCode).IsEqualTo("refund_operation_conflict");
+        await Assert.That(conflict.Refund).IsNull();
+        await Assert.That(await context.RefundAttempts.CountAsync()).IsEqualTo(1);
+        await Assert.That(await context.OutboxMessages.CountAsync()).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task OmittedAmountIsResolvedOnceUnderReservationLockAndReplaysOriginalRemainder()
+    {
+        await using ExploreDbContext context = await CreateContextAsync();
+        Guid paymentId = Guid.CreateVersion7();
+        Guid orderId = Guid.CreateVersion7();
+        Guid actorId = Guid.CreateVersion7();
+        await SeedCapturedPaymentAsync(context, TenantA, paymentId, orderId);
+        PaymentAttempt payment = await context.PaymentAttempts.SingleAsync();
+        context.CheckoutDispatchEffects.Add(CheckoutDispatchEffect.Create(payment, UtcNow));
+        await context.SaveChangesAsync();
+        RegistrationOrder order = await context.RegistrationOrders.SingleAsync();
+        var repository = new RefundAttemptRepository(context);
+        var service = new RegistrationRefundService(
+            new RegistrationPaymentAttemptRepository(context), repository, TimeProvider.System);
+        var partial = await service.InitiateAsync(
+            order, 400, "partial-before-full", actorId, "organizer", "operator_refund", CancellationToken.None);
+        var remainder = await service.InitiateAsync(
+            order, null, "remaining-once", actorId, "organizer", "operator_refund", CancellationToken.None);
+        var replay = await service.InitiateAsync(
+            order, null, "remaining-once", actorId, "organizer", "operator_refund", CancellationToken.None);
+        RefundAttempt committed = (await repository.GetByIdAsync(TenantA, remainder.Id, CancellationToken.None))!;
+
+        await Assert.That(partial.IsSuccess).IsTrue();
+        await Assert.That(remainder.IsSuccess).IsTrue();
+        await Assert.That(replay.Id).IsEqualTo(remainder.Id);
+        await Assert.That(committed.Allocation.TotalMinor).IsEqualTo(600L);
+        await Assert.That(committed.RequestedAmountMinor).IsNull();
+        await Assert.That(await context.RefundAttempts.CountAsync()).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task RepositoryProviderKeyCollisionCannotHideChangedAmount()
+    {
+        await using ExploreDbContext context = await CreateContextAsync();
+        Guid paymentId = Guid.CreateVersion7();
+        Guid orderId = Guid.CreateVersion7();
+        await SeedCapturedPaymentAsync(context, TenantA, paymentId, orderId);
+        var repository = new RefundAttemptRepository(context);
+        await repository.ReserveAsync(Refund(TenantA, paymentId, orderId, 400, "same-provider-key"), CancellationToken.None);
+        RefundReservationResult conflict = await repository.ReserveAsync(
+            Refund(TenantA, paymentId, orderId, 401, "same-provider-key"), CancellationToken.None);
+
+        await Assert.That(conflict.Disposition).IsEqualTo(RefundReservationDisposition.OperationConflict);
+        await Assert.That(conflict.Attempt).IsNull();
+        await Assert.That(await repository.GetRefundableCapacityAsync(TenantA, paymentId, CancellationToken.None)).IsEqualTo(600L);
+    }
 
     [Test]
     public async Task TenantQualifiedRefundAndDisputeIdentitiesPersistIndependentlyAndFilterByTenant()
@@ -418,4 +809,108 @@ public sealed class RefundAttemptPersistenceTests
     }
 
     private sealed record TestTenantContext(Guid TenantId) : ITenantContext;
+
+    private sealed class FixedClock(DateTime utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(utcNow);
+    }
+
+    private sealed class CancellationRefundProvider(CancellationTokenSource cancellation, bool effectOccurred)
+        : IRefundCreator, IRefundRetriever
+    {
+        public int Handoffs { get; private set; }
+        public int BuyerEffects { get; private set; }
+
+        public Task<RefundProviderResult> CreateAsync(RefundCreateRequest request, CancellationToken cancellationToken)
+        {
+            Handoffs++;
+            if (effectOccurred)
+                BuyerEffects++;
+            cancellation.Cancel();
+            throw new OperationCanceledException(cancellation.Token);
+        }
+
+        public Task<RefundProviderResult> RetrieveAsync(RefundRetrieveRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(BuyerEffects == 0
+                ? RefundProviderResult.Unknown(new("not_observed", RefundProviderFailureKind.ProviderDataIncomplete))
+                : RefundProviderResult.Observed(
+                    new("re_cancellation", request.ProviderPaymentId, RefundProviderStatus.Pending,
+                        request.ExpectedAmountMinor, request.ExpectedCurrencyCode, null), "req_recovered"));
+    }
+
+    private sealed class PreparedRefundProvider : IRefundCreator
+    {
+        private bool _prepared;
+        public List<string> CommittedKeys { get; } = [];
+
+        public Task<RefundProviderResult> CreateAsync(RefundCreateRequest request, CancellationToken cancellationToken)
+        {
+            if (!_prepared)
+            {
+                _prepared = true;
+                return Task.FromResult(RefundProviderResult.Unknown(
+                    new("preparation_timeout", RefundProviderFailureKind.Network, ProviderHandoffStarted: false)));
+            }
+            CommittedKeys.Add(request.ProviderIdempotencyKey);
+            return Task.FromResult(RefundProviderResult.Observed(
+                new("re_prepared", request.ProviderPaymentId, RefundProviderStatus.Pending,
+                    request.AmountMinor, request.CurrencyCode, null), "req_prepared"));
+        }
+    }
+
+    private sealed class FeeRefundProvider(bool loseAcknowledgement) : IRefundCreator, IRefundRetriever
+    {
+        public int BuyerEffects { get; private set; }
+        public int FeeEffects { get; private set; }
+
+        public Task<RefundProviderResult> CreateAsync(RefundCreateRequest request, CancellationToken cancellationToken)
+        {
+            BuyerEffects++;
+            return Task.FromResult(RefundProviderResult.Observed(
+                new("re_fee_owned", request.ProviderPaymentId, RefundProviderStatus.Succeeded, 400, "EUR", null),
+                "req_buyer_owned"));
+        }
+
+        public Task<RefundProviderResult> RetrieveAsync(RefundRetrieveRequest request, CancellationToken cancellationToken)
+        {
+            if (request.AllowApplicationFeeMutation)
+            {
+                FeeEffects++;
+                if (loseAcknowledgement)
+                    throw new OperationCanceledException("Application fee committed but acknowledgement was lost.");
+            }
+            return Task.FromResult(RefundProviderResult.Observed(
+                new("re_fee_owned", request.ProviderPaymentId, RefundProviderStatus.Succeeded, 400, "EUR",
+                    FeeEffects > 0 ? 30 : null), "req_fee_observed"));
+        }
+    }
+
+    private sealed class RefundCommitFault : DbTransactionInterceptor
+    {
+        public bool LoseAcknowledgement { get; set; }
+        public bool RejectCommit { get; set; }
+
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(
+            DbTransaction transaction, TransactionEventData eventData, InterceptionResult result,
+            CancellationToken cancellationToken = default)
+        {
+            if (RejectCommit)
+            {
+                RejectCommit = false;
+                throw new InvalidOperationException("Injected failure before refund commit.");
+            }
+            return ValueTask.FromResult(result);
+        }
+
+        public override Task TransactionCommittedAsync(
+            DbTransaction transaction, TransactionEndEventData eventData, CancellationToken cancellationToken = default)
+        {
+            if (LoseAcknowledgement)
+            {
+                LoseAcknowledgement = false;
+                throw new InvalidOperationException("Injected lost refund commit acknowledgement.");
+            }
+            return Task.CompletedTask;
+        }
+    }
 }

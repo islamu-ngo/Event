@@ -253,6 +253,59 @@
       "implicitFlowEnabled": false,
       "protocol": "openid-connect",
       "defaultClientScopes": ["openid", "profile", "email", "web-origins"]
+    },
+    {
+      "clientId": "token-context-no-audience",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "protocol": "openid-connect",
+      "defaultClientScopes": ["openid", "profile", "email"],
+      "protocolMappers": [
+        {
+          "name": "provider-subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "token-context-service",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "protocol": "openid-connect",
+      "defaultClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "provider-subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": { "access.token.claim": "true" }
+        },
+        {
+          "name": "islamu-event-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "islamu-event-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [

@@ -11,7 +11,8 @@ public sealed class AdmissionIssuanceService(
     IAdmissionDeliveryEnvelopeProtector deliveryEnvelopeProtector,
     IAdmissionDeliveryDispatcher deliveryDispatcher,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider) : IAdmissionIssuanceService
+    TimeProvider timeProvider,
+    IRegistrationFinalizationRepository? finalization = null) : IAdmissionIssuanceService
 {
     private const string CredentialPurpose = "AdmissionTicket";
     private static readonly TimeSpan LocalIssuanceTimeout = TimeSpan.FromSeconds(30);
@@ -36,12 +37,19 @@ public sealed class AdmissionIssuanceService(
         {
             staged = await unitOfWork.ExecuteInTransactionAsync(async token =>
             {
+                await RequireFinalizationCustodyAsync(request, token);
                 PreparedIssuance prepared = await PrepareWithinFenceAsync(request, token);
+                await RequireFinalizationCustodyAsync(request, token);
                 staged = prepared;
                 return prepared;
             }, localTimeout.Token);
         }
+        catch (RegistrationFinalizationCustodyLostException)
+        {
+            return Empty(AdmissionIssuanceOutcome.StaleFinalizationClaim);
+        }
         catch (Exception exception) when (
+            request.FinalizationClaim is null &&
             exception is OperationCanceledException or TimeoutException or DbException)
         {
             AdmissionIssuanceContext? committed = await repository.ReloadCommittedAsync(
@@ -72,6 +80,17 @@ public sealed class AdmissionIssuanceService(
             staged.OneTimeCredentials,
             delivery.Outcome,
             delivery.Failure);
+    }
+
+    private async Task RequireFinalizationCustodyAsync(
+        AdmissionIssuanceRequest request, CancellationToken cancellationToken)
+    {
+        if (request.FinalizationClaim is not { } claim)
+            return;
+        if (claim.TenantId != request.TenantId || claim.RegistrationOrderId != request.RegistrationOrderId ||
+            claim.EffectId != request.FinalizationEffectId || finalization is null ||
+            !await finalization.TryAcquireExecutionAsync(claim, cancellationToken))
+            throw new RegistrationFinalizationCustodyLostException();
     }
 
     private async Task<PreparedIssuance> PrepareWithinFenceAsync(
@@ -181,7 +200,10 @@ public sealed class AdmissionIssuanceService(
                 context.RegistrationOrderId,
                 context.FinalizationEffectId,
                 tickets,
-                intents),
+                intents)
+            {
+                FinalizationClaim = request.FinalizationClaim
+            },
             cancellationToken);
         AdmissionIssuanceContext committedContext = context with
         {

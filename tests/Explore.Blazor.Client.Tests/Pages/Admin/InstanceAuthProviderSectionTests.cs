@@ -5,7 +5,6 @@ using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
-using System.Security.Cryptography;
 
 namespace Explore.Blazor.Client.Tests.Pages.Admin;
 
@@ -126,8 +125,7 @@ public sealed class InstanceAuthProviderSectionTests : IDisposable
         AuthProviderConfigurationDto model = LocalModel();
         model.KeycloakAuthority = "https://identity.example.test/realms/event";
         model.KeycloakClientId = "event-bff";
-        model.KeycloakClientSecret = Convert.ToBase64String(
-            RandomNumberGenerator.GetBytes(32));
+        model.KeycloakClientSecretOwnership = new() { Configured = true, Editable = false };
         _dialogs.ShowMessageBoxAsync(
                 Arg.Any<MessageBoxOptions>(),
                 Arg.Any<DialogOptions>())

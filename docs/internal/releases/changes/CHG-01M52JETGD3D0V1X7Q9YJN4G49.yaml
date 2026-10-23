@@ -1,0 +1,30 @@
+Change-Id: CHG-01M52JETGD3D0V1X7Q9YJN4G49
+Title: "Make API correlation identifiers server owned"
+Type: fix
+Scope: privacy
+Summary: "Generate a fresh server correlation identifier instead of copying caller headers into request diagnostics and responses."
+Group: server-owned-correlation-diagnostics
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Caller correlation and request IDs are no longer echoed; clients must capture the returned X-Correlation-ID.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Caller header values cannot become diagnostic scope or response correlation authority.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Use the fresh response correlation ID for support and diagnostic searches.

@@ -1,306 +1,267 @@
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
+using Explore.Application.Services.Registration;
 using Explore.Domain;
+using Explore.Domain.Enums;
+using Explore.Infrastructure.Services;
+using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Repositories;
+using Explore.Persistence.Seed;
+using Explore.Secrets.Database;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Quartz;
-using TUnit.Core;
 
 namespace ApiIntegrationTests.Features;
 
 public sealed class InventoryHoldExpiryJobTests
 {
     [Test]
-    public async Task ExpiryJobExpiresItsOrdersDueHoldsAndTriggersLifecycleRecovery()
+    public async Task DeadlineUsesFreshRuntimeScopeAndExpiresOnlyItsCurrentOwnedDueHoldOnce()
     {
-        var tenantId = Guid.CreateVersion7();
-        var orderId = Guid.CreateVersion7();
-        RegistrationInventoryHold hold = CreateHold(tenantId, orderId);
-
-        var inventory = Substitute.For<IRegistrationInventoryRepository>();
-        inventory.GetHoldsByOrderAsync(orderId, tenantId, Arg.Any<CancellationToken>()).Returns([hold]);
-        inventory.TryExpireDueHoldAsync(hold.Id, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(true);
-        var lifecycle = SubstituteLifecycle();
-        var tenantAccessor = Substitute.For<ITenantContextAccessor>();
-
-        await CreateExpiryJob(inventory, lifecycle, tenantAccessor)
-            .Execute(CreateContext(PointerFor(tenantId, orderId)));
-
-        await inventory.Received(1).TryExpireDueHoldAsync(hold.Id, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
-        await lifecycle.Received(1).RecoverExpiredHoldAsync(orderId, tenantId, Arg.Any<CancellationToken>());
-    }
-
-    /// <summary>
-    /// Tenant scope is ambient, so a job that sets it and does not clear it silently widens whatever runs
-    /// next on that scope. It must be cleared even when the work itself fails.
-    /// </summary>
-    [Test]
-    public async Task ExpiryJobSetsAndClearsTenantContextEvenWhenTheWorkFails()
-    {
-        var tenantId = Guid.CreateVersion7();
-        var orderId = Guid.CreateVersion7();
-        var inventory = Substitute.For<IRegistrationInventoryRepository>();
-        inventory.GetHoldsByOrderAsync(orderId, tenantId, Arg.Any<CancellationToken>())
-            .Returns<Task<IReadOnlyList<RegistrationInventoryHold>>>(_ => throw new InvalidOperationException("database unavailable"));
-        var tenantAccessor = Substitute.For<ITenantContextAccessor>();
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            CreateExpiryJob(inventory, SubstituteLifecycle(), tenantAccessor)
-                .Execute(CreateContext(PointerFor(tenantId, orderId))));
-
-        await Assert.That(exception).IsNotNull();
-        tenantAccessor.Received(1).SetTenant(tenantId);
-        tenantAccessor.Received(1).Clear();
-    }
-
-    /// <summary>
-    /// A deadline can fire after a checkout already consumed the holds. The conditional expiry reports that
-    /// nothing was due, and the job must then leave the order alone rather than re-running recovery on an
-    /// order that has moved on.
-    /// </summary>
-    [Test]
-    public async Task ExpiryJobIsANoOpWhenNoHoldWasStillDue()
-    {
-        var tenantId = Guid.CreateVersion7();
-        var orderId = Guid.CreateVersion7();
-        RegistrationInventoryHold hold = CreateHold(tenantId, orderId);
-
-        var inventory = Substitute.For<IRegistrationInventoryRepository>();
-        inventory.GetHoldsByOrderAsync(orderId, tenantId, Arg.Any<CancellationToken>()).Returns([hold]);
-        inventory.TryExpireDueHoldAsync(hold.Id, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(false);
-        var lifecycle = SubstituteLifecycle();
-
-        await CreateExpiryJob(inventory, lifecycle, Substitute.For<ITenantContextAccessor>())
-            .Execute(CreateContext(PointerFor(tenantId, orderId)));
-
-        await lifecycle.DidNotReceive().RecoverExpiredHoldAsync(
-            Arg.Any<Guid>(),
-            Arg.Any<Guid>(),
-            Arg.Any<CancellationToken>());
+        await using var data = await NativeWorker.CreateAsync();
+        await using var parent = data.Services.CreateAsyncScope();
+        var accessor = parent.ServiceProvider.GetRequiredService<ITenantContextAccessor>();
+        await Assert.That(accessor.TenantId).IsNull();
+        var job = parent.ServiceProvider.GetRequiredService<InventoryHoldExpiryJob>();
+        await job.Execute(Context(data.A.TenantId, data.A.OrderId));
+        var expired = await data.ReadHoldAsync(data.A, data.A.DueHoldId);
+        await Assert.That(expired.RegistrationInventoryHoldStatusId).IsEqualTo((int)RegistrationInventoryHoldStatusEnum.Expired);
+        await Assert.That(expired.ReleasedAt).IsNotNull();
+        await Assert.That((await data.ReadOrderAsync(data.A)).RegistrationOrderStatusId)
+            .IsEqualTo((int)RegistrationOrderStatusEnum.ReadyForCheckout);
+        await Assert.That((await data.ReadHoldAsync(data.B, data.B.DueHoldId)).RegistrationInventoryHoldStatusId)
+            .IsEqualTo((int)RegistrationInventoryHoldStatusEnum.Active);
+        await Assert.That((await data.ReadHoldAsync(data.A, data.A.FutureHoldId)).RegistrationInventoryHoldStatusId)
+            .IsEqualTo((int)RegistrationInventoryHoldStatusEnum.Active);
+        await job.Execute(Context(data.A.TenantId, data.A.OrderId));
+        var replay = await data.ReadHoldAsync(data.A, data.A.DueHoldId);
+        await Assert.That(replay.ReleasedAt).IsEqualTo(expired.ReleasedAt);
+        await Assert.That(replay.ConcurrencyStamp).IsEqualTo(expired.ConcurrencyStamp);
+        await Assert.That(accessor.TenantId).IsNull();
     }
 
     [Test]
-    public async Task ExpiryJobSkipsAnUnusablePointerInsteadOfThrowing()
+    public async Task FrozenRuntimeLeaseRejectsRetargetingAndWorkerScopesRemainIndependent()
     {
-        var inventory = Substitute.For<IRegistrationInventoryRepository>();
-        var dataMap = new JobDataMap
-        {
-            { ScheduledDeadlinePointerKeys.TenantId, "not-a-guid" },
-            { ScheduledDeadlinePointerKeys.RegistrationOrderId, Guid.CreateVersion7().ToString() }
-        };
-
-        await CreateExpiryJob(inventory, SubstituteLifecycle(), Substitute.For<ITenantContextAccessor>())
-            .Execute(CreateContext(dataMap));
-
-        await inventory.DidNotReceive().GetHoldsByOrderAsync(
-            Arg.Any<Guid>(),
-            Arg.Any<Guid>(),
-            Arg.Any<CancellationToken>());
+        await using var data = await NativeWorker.CreateAsync();
+        await using var parent = data.Services.CreateAsyncScope();
+        var factory = parent.ServiceProvider.GetRequiredService<IInventoryHoldExpiryExecutionScopeFactory>();
+        await using var first = await factory.CreateAsync(data.A.TenantId, CancellationToken.None);
+        var contextA = first.Services.GetRequiredService<ExploreDbContext>();
+        var tenantA = first.Services.GetRequiredService<ITenantContextAccessor>();
+        var foreign = new TenantIdentity(data.B.TenantId);
+        var denied = Assert.Throws<InvalidOperationException>(() => contextA.TenantContext = foreign);
+        await Assert.That(denied.Message).IsEqualTo("tenant_lease_identity_changed");
+        Assert.Throws<InvalidOperationException>(() => tenantA.SetTenant(data.B.TenantId));
+        Assert.Throws<InvalidOperationException>(() => tenantA.Clear());
+        await using var second = await factory.CreateAsync(data.B.TenantId, CancellationToken.None);
+        var contextB = second.Services.GetRequiredService<ExploreDbContext>();
+        await Assert.That(ReferenceEquals(contextA, contextB)).IsFalse();
+        await Assert.That(contextA.TenantFilterTenantId).IsEqualTo(data.A.TenantId);
+        await Assert.That(contextB.TenantFilterTenantId).IsEqualTo(data.B.TenantId);
     }
 
-    /// <summary>
-    /// The reason the sweep survived the move to precise deadlines: an order whose deadline never fired —
-    /// lost trigger, hold created before the feature shipped — is still found and released here.
-    /// </summary>
     [Test]
-    public async Task ReconciliationSweepRecoversAnOrderWhoseDeadlineNeverFired()
+    public async Task DeadlineDropsMalformedEmptyAndForeignOrderPointersWithoutExpiringInventory()
     {
-        var tenantId = Guid.CreateVersion7();
-        var orderId = Guid.CreateVersion7();
-        RegistrationInventoryHold orphaned = CreateHold(tenantId, orderId);
-        var lifecycles = new List<IRegistrationOrderLifecycleService>();
-        var repositoryCount = 0;
-
-        var services = new ServiceCollection();
-        services.AddScoped<ITenantContextAccessor>(_ => Substitute.For<ITenantContextAccessor>());
-        services.AddScoped<IRegistrationInventoryRepository>(_ =>
+        await using var data = await NativeWorker.CreateAsync();
+        await using var parent = data.Services.CreateAsyncScope();
+        var job = parent.ServiceProvider.GetRequiredService<InventoryHoldExpiryJob>();
+        await job.Execute(Context(Guid.Empty, data.A.OrderId));
+        var invalid = Substitute.For<IJobExecutionContext>();
+        invalid.MergedJobDataMap.Returns(new JobDataMap
         {
-            var repository = Substitute.For<IRegistrationInventoryRepository>();
-            if (Interlocked.Increment(ref repositoryCount) == 1)
-            {
-                repository.GetExpiredActiveHoldsAsync(Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-                    .Returns([orphaned]);
-                repository.GetHoldExpiryRecoveryTargetsAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
-                    .Returns([]);
-            }
-            else
-            {
-                repository.TryExpireDueHoldAsync(Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-                    .Returns(true);
-            }
-
-            return repository;
+            [ScheduledDeadlinePointerKeys.TenantId] = "not-a-guid",
+            [ScheduledDeadlinePointerKeys.RegistrationOrderId] = data.A.OrderId.ToString()
         });
-        services.AddScoped<IRegistrationOrderLifecycleService>(_ =>
-        {
-            var lifecycle = SubstituteLifecycle();
-            lifecycles.Add(lifecycle);
-            return lifecycle;
-        });
-
-        await using ServiceProvider provider = BuildProvider(services);
-
-        await CreateReconciliationJob(provider).Execute(CreateContext());
-
-        await Assert.That(lifecycles).HasSingleItem();
-        await lifecycles.Single().Received(1).RecoverExpiredHoldAsync(orderId, tenantId, Arg.Any<CancellationToken>());
+        await job.Execute(invalid);
+        await job.Execute(Context(data.A.TenantId, data.B.OrderId));
+        foreach (var owner in new[] { data.A, data.B })
+            await Assert.That((await data.ReadHoldAsync(owner, owner.DueHoldId)).RegistrationInventoryHoldStatusId)
+                .IsEqualTo((int)RegistrationInventoryHoldStatusEnum.Active);
     }
 
-    /// <summary>
-    /// A recovery target has no due hold left — its expiry already happened in an interrupted pass — so the
-    /// sweep must advance its lifecycle on the strength of the target alone.
-    /// </summary>
     [Test]
-    public async Task ReconciliationSweepRecoversATargetThatHasNoDueHoldLeft()
+    public async Task ReconciliationDiscoversBothTenantsAndRecoversInterruptedExpiryWithoutDueHold()
     {
-        var tenantId = Guid.CreateVersion7();
-        var orderId = Guid.CreateVersion7();
-        var lifecycles = new List<IRegistrationOrderLifecycleService>();
-        var repositoryCount = 0;
-
-        var services = new ServiceCollection();
-        services.AddScoped<ITenantContextAccessor>(_ => Substitute.For<ITenantContextAccessor>());
-        services.AddScoped<IRegistrationInventoryRepository>(_ =>
+        await using var data = await NativeWorker.CreateAsync();
+        // Committed prior-pass expiry is the recovery-target signal, not a timing delay.
+        await using (var prior = await data.Runtime.CreateDbContextAsync(data.A.TenantId))
         {
-            var repository = Substitute.For<IRegistrationInventoryRepository>();
-            if (Interlocked.Increment(ref repositoryCount) == 1)
-            {
-                repository.GetExpiredActiveHoldsAsync(Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-                    .Returns([]);
-                repository.GetHoldExpiryRecoveryTargetsAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
-                    .Returns([new RegistrationHoldExpiryRecoveryTarget(tenantId, orderId)]);
-            }
-
-            return repository;
-        });
-        services.AddScoped<IRegistrationOrderLifecycleService>(_ =>
-        {
-            var lifecycle = SubstituteLifecycle();
-            lifecycles.Add(lifecycle);
-            return lifecycle;
-        });
-
-        await using ServiceProvider provider = BuildProvider(services);
-
-        await CreateReconciliationJob(provider).Execute(CreateContext());
-
-        await Assert.That(lifecycles).HasSingleItem();
-        await lifecycles.Single().Received(1).RecoverExpiredHoldAsync(orderId, tenantId, Arg.Any<CancellationToken>());
-    }
-
-    /// <summary>
-    /// Each order is processed in its own scope so a pooled DbContext never carries one order's tracked
-    /// state — or its failure — into the next.
-    /// </summary>
-    [Test]
-    public async Task ReconciliationSweepUsesAFreshScopePerOrder()
-    {
-        RegistrationInventoryHold first = CreateHold(Guid.CreateVersion7(), Guid.CreateVersion7());
-        RegistrationInventoryHold second = CreateHold(Guid.CreateVersion7(), Guid.CreateVersion7());
-        var repositoryCount = 0;
-        var tenantAccessors = new List<ITenantContextAccessor>();
-
-        var services = new ServiceCollection();
-        services.AddScoped<ITenantContextAccessor>(_ =>
-        {
-            var accessor = Substitute.For<ITenantContextAccessor>();
-            tenantAccessors.Add(accessor);
-            return accessor;
-        });
-        services.AddScoped<IRegistrationInventoryRepository>(_ =>
-        {
-            var repository = Substitute.For<IRegistrationInventoryRepository>();
-            if (Interlocked.Increment(ref repositoryCount) == 1)
-            {
-                repository.GetExpiredActiveHoldsAsync(Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-                    .Returns([first, second]);
-                repository.GetHoldExpiryRecoveryTargetsAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
-                    .Returns([]);
-            }
-            else
-            {
-                repository.TryExpireDueHoldAsync(Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-                    .Returns(true);
-            }
-
-            return repository;
-        });
-        services.AddScoped<IRegistrationOrderLifecycleService>(_ => SubstituteLifecycle());
-
-        await using ServiceProvider provider = BuildProvider(services);
-
-        await CreateReconciliationJob(provider).Execute(CreateContext());
-
-        // One discovery scope plus one per order.
-        await Assert.That(repositoryCount).IsEqualTo(3);
-        await Assert.That(tenantAccessors).Count().IsEqualTo(2);
-        foreach (ITenantContextAccessor accessor in tenantAccessors)
-        {
-            accessor.Received(1).Clear();
+            await Assert.That(await new RegistrationInventoryRepository(prior)
+                .TryExpireDueHoldAsync(data.A.DueHoldId, NativeWorker.ObservedAt, CancellationToken.None)).IsTrue();
         }
-    }
-
-    private static ServiceProvider BuildProvider(ServiceCollection services) => services.BuildServiceProvider(
-        new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
-
-    private static InventoryHoldExpiryJob CreateExpiryJob(
-        IRegistrationInventoryRepository inventory,
-        IRegistrationOrderLifecycleService lifecycle,
-        ITenantContextAccessor tenantAccessor) => new(
-            inventory,
-            lifecycle,
-            tenantAccessor,
-            NullLogger<InventoryHoldExpiryJob>.Instance);
-
-    private static InventoryHoldExpiryReconciliationJob CreateReconciliationJob(IServiceProvider provider) => new(
-        provider,
-        NullLogger<InventoryHoldExpiryReconciliationJob>.Instance);
-
-    private static IRegistrationOrderLifecycleService SubstituteLifecycle()
-    {
-        var lifecycle = Substitute.For<IRegistrationOrderLifecycleService>();
-        lifecycle.RecoverExpiredHoldAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(RegistrationOrderLifecycleResponseDto.Success(
-                Guid.Empty,
-                message: null,
-                order: null)));
-        return lifecycle;
-    }
-
-    private static JobDataMap PointerFor(Guid tenantId, Guid orderId)
-    {
-        var pointer = new JobDataMap();
-        foreach (var (key, value) in InventoryHoldDeadline.PointerFor(tenantId, orderId))
+        await using var parent = data.Services.CreateAsyncScope();
+        var discovery = parent.ServiceProvider.GetRequiredService<IInventoryHoldExpiryDiscovery>();
+        var targets = await discovery.GetTargetsAsync(NativeWorker.ObservedAt, 100, CancellationToken.None);
+        await Assert.That(targets.Any(target => target.TenantId == data.A.TenantId && target.HoldId is null)).IsTrue();
+        await Assert.That(targets.Any(target => target.TenantId == data.B.TenantId && target.HoldId == data.B.DueHoldId)).IsTrue();
+        var job = parent.ServiceProvider.GetRequiredService<InventoryHoldExpiryReconciliationJob>();
+        await job.Execute(Substitute.For<IJobExecutionContext>());
+        foreach (var owner in new[] { data.A, data.B })
         {
-            pointer.Put(key, value);
+            await Assert.That((await data.ReadOrderAsync(owner)).RegistrationOrderStatusId)
+                .IsEqualTo((int)RegistrationOrderStatusEnum.ReadyForCheckout);
+            await Assert.That((await data.ReadHoldAsync(owner, owner.DueHoldId)).RegistrationInventoryHoldStatusId)
+                .IsEqualTo((int)RegistrationInventoryHoldStatusEnum.Expired);
+            await Assert.That((await data.ReadHoldAsync(owner, owner.FutureHoldId)).RegistrationInventoryHoldStatusId)
+                .IsEqualTo((int)RegistrationInventoryHoldStatusEnum.Active);
         }
-
-        return pointer;
+        var stamp = (await data.ReadHoldAsync(data.B, data.B.DueHoldId)).ConcurrencyStamp;
+        await job.Execute(Substitute.For<IJobExecutionContext>());
+        await Assert.That((await data.ReadHoldAsync(data.B, data.B.DueHoldId)).ConcurrencyStamp).IsEqualTo(stamp);
     }
 
-    private static IJobExecutionContext CreateContext(JobDataMap? dataMap = null)
+    private static IJobExecutionContext Context(Guid tenantId, Guid orderId)
     {
         var context = Substitute.For<IJobExecutionContext>();
-        context.CancellationToken.Returns(CancellationToken.None);
-        context.MergedJobDataMap.Returns(dataMap ?? []);
+        context.MergedJobDataMap.Returns(new JobDataMap
+        {
+            [ScheduledDeadlinePointerKeys.TenantId] = tenantId.ToString(),
+            [ScheduledDeadlinePointerKeys.RegistrationOrderId] = orderId.ToString()
+        });
         return context;
     }
 
-    private static RegistrationInventoryHold CreateHold(Guid tenantId, Guid orderId)
+    private sealed record Owner(Guid TenantId, Guid OrderId, Guid DueHoldId, Guid FutureHoldId);
+    private sealed record TenantIdentity(Guid TenantId) : ITenantContext;
+
+    private sealed class NativeWorker(string path, ServiceProvider services, TenantExploreDbContextFactory runtime, Owner a, Owner b)
+        : IAsyncDisposable
     {
-        DateTime createdAt = DateTime.UtcNow.AddMinutes(-2);
-        return RegistrationInventoryHold.Create(
-            Guid.CreateVersion7(),
-            orderId,
-            Guid.CreateVersion7(),
-            Guid.CreateVersion7(),
-            tenantId,
-            quantity: 1,
-            createdAt,
-            createdAt.AddMinutes(1));
+        public static readonly DateTime ObservedAt = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        public ServiceProvider Services => services;
+        public TenantExploreDbContextFactory Runtime => runtime;
+        public Owner A => a;
+        public Owner B => b;
+
+        public static async Task<NativeWorker> CreateAsync()
+        {
+            string path = Path.Combine(Path.GetTempPath(), $"hold-expiry-{Guid.CreateVersion7():N}.db");
+            var options = new PrimaryDatabaseConnectionOptions
+            {
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Role = PrimaryDatabaseRole.Runtime,
+                Database = path
+            };
+            var runtime = new TenantExploreDbContextFactory(options);
+            var global = new GlobalExploreDbContextFactory(options with { Role = PrimaryDatabaseRole.Global });
+            await using var setup = await global.CreateDbContextAsync();
+            await setup.Database.EnsureCreatedAsync();
+            await LookupTableSeeder.SeedAsync(setup);
+            await setup.Database.OpenConnectionAsync();
+            // Setup alone omits unrelated parent rows; worker contexts retain ordinary provider constraints.
+            await setup.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF");
+            Owner a = Seed(setup), b = Seed(setup);
+            await setup.SaveChangesAsync();
+            await setup.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = ON");
+            var services = new ServiceCollection();
+            services.AddSingleton<ITenantExploreDbContextFactory>(runtime);
+            services.AddSingleton<IGlobalExploreDbContextFactory>(global);
+            services.AddHttpContextAccessor();
+            services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
+            services.AddInventoryHoldExpiryWorker();
+            services.AddScoped(provider => InventoryHoldExpiryExecutionScopeFactory.GetSelectedRuntimeContext(provider)
+                ?? throw new InvalidOperationException("Worker dependencies resolved before tenant selection."));
+            services.AddScoped<IRegistrationInventoryRepository, RegistrationInventoryRepository>();
+            services.AddScoped<IRegistrationOrderLifecycleService>(provider =>
+            {
+                var context = provider.GetRequiredService<ExploreDbContext>();
+                var inventory = provider.GetRequiredService<IRegistrationInventoryRepository>();
+                return new RegistrationOrderLifecycleService(
+                    inventory, new PromotionRedemptionRepository(context), new RegistrationParticipantRepository(context),
+                    new EventTicketCatalogRepository(context), new PlatformContributionSettingRepository(context),
+                    new EventSessionRepository(context, provider.GetRequiredService<IHttpContextAccessor>()),
+                    new OutboxRepository(context), new EfCoreUnitOfWork(context), new RegistrationFinalizationRepository(context),
+                    new RegistrationPaymentAttemptRepository(context), Substitute.For<IScheduledDeadlineDispatcher>(),
+                    TimeProvider.System, new UnusedPaidAcceptance(), new RegistrationOrderTransitionCoordinator(inventory));
+            });
+            services.AddSingleton<Microsoft.Extensions.Logging.ILogger<InventoryHoldExpiryJob>>(NullLogger<InventoryHoldExpiryJob>.Instance);
+            services.AddSingleton<Microsoft.Extensions.Logging.ILogger<InventoryHoldExpiryReconciliationJob>>(
+                NullLogger<InventoryHoldExpiryReconciliationJob>.Instance);
+            services.AddScoped<InventoryHoldExpiryJob>();
+            services.AddScoped<InventoryHoldExpiryReconciliationJob>();
+            return new NativeWorker(path, services.BuildServiceProvider(new ServiceProviderOptions
+            { ValidateOnBuild = true, ValidateScopes = true }), runtime, a, b);
+        }
+
+        private static Owner Seed(ExploreDbContext context)
+        {
+            Guid tenant = Guid.CreateVersion7(), eventId = Guid.CreateVersion7();
+            context.Tenants.Add(new Tenant
+            {
+                Id = tenant,
+                FullName = "Hold expiry tenant",
+                Slug = $"hold-expiry-{tenant:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
+            });
+            var catalog = EventTicketCatalogVersion.Create(tenant, eventId, "USD", 1);
+            var pool = EventCapacityPool.Create(tenant, eventId, "Hold expiry capacity", 10, 900,
+                CapacityHoldPolicyEnum.TimedHoldOnSelection, CapacityOversellPolicyEnum.Disallow, true);
+            var ticket = EventTicketType.Create(Guid.CreateVersion7(), tenant, catalog.Id, "Admission", "USD",
+                TicketPricingModeEnum.Free, null, null, null, ParticipantDataCollectionModeEnum.None, pool.Id,
+                null, null, false, false, null, null, null, null);
+            catalog.AddTicketType(ticket, pool);
+            catalog.AddEntitlement(ticket, TicketTypeEntitlement.CreateForEvent(ticket.Id, tenant, eventId, 1));
+            catalog.Publish();
+            var order = RegistrationOrder.Create(
+                tenant, eventId, Guid.CreateVersion7(), null, BookingPartyTypeEnum.Individual, catalog.Id,
+                RegistrationParticipationSnapshot.Create(Guid.CreateVersion7(), 4, 3, 2, GuestRecoveryPolicyEnum.VerifiedEmailRequired),
+                null, null, "USD", ObservedAt.AddDays(-1), null);
+            order.AddLine(RegistrationOrderLine.Create(Guid.CreateVersion7(), catalog, ticket, order.Id, 1, null, null));
+            order.TransitionTo(RegistrationOrderStatusEnum.AwaitingParticipantDetails, ObservedAt.AddDays(-1));
+            var due = RegistrationInventoryHold.Create(order.Id, pool.Id, ticket.Id, tenant, 1,
+                ObservedAt.AddDays(-1), ObservedAt.AddHours(-1));
+            var future = RegistrationInventoryHold.Create(order.Id, pool.Id, ticket.Id, tenant, 1,
+                ObservedAt.AddDays(-1), new DateTime(2100, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            context.AddRange(catalog, pool, order, due, future);
+            return new Owner(tenant, order.Id, due.Id, future.Id);
+        }
+
+        public async Task<RegistrationInventoryHold> ReadHoldAsync(Owner owner, Guid holdId)
+        {
+            await using var context = await runtime.CreateDbContextAsync(owner.TenantId);
+            return (await new RegistrationInventoryRepository(context)
+                .GetHoldsByOrderAsync(owner.OrderId, owner.TenantId, CancellationToken.None)).Single(hold => hold.Id == holdId);
+        }
+
+        public async Task<RegistrationOrder> ReadOrderAsync(Owner owner)
+        {
+            await using var context = await runtime.CreateDbContextAsync(owner.TenantId);
+            return (await new RegistrationInventoryRepository(context)
+                .GetOrderWithLinesAsync(owner.OrderId, owner.TenantId, CancellationToken.None))!;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await services.DisposeAsync();
+            using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path }.ToString());
+            SqliteConnection.ClearPool(connection);
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>Paid acceptance is outside the free recovery path; entering it must fail the test.</summary>
+    private sealed class UnusedPaidAcceptance : IPaidOrderAcceptanceService
+    {
+        public Task<PaidOrderAcceptanceResult> DescribeAsync(RegistrationOrder order, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Free hold recovery must not require paid acceptance.");
+        public Task<PaidOrderAcceptanceResult> DescribeAsync(RegistrationOrder order, Guid? reservedPaymentAttemptId, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Free hold recovery must not require paid acceptance.");
+        public Task<PaidOrderAcceptanceResult> AcceptAsync(RegistrationOrder order, PaidOrderAcceptanceAcknowledgementDto? acknowledgement,
+            DateTime acceptedAt, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Free hold recovery must not require paid acceptance.");
     }
 }

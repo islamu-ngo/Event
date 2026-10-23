@@ -1,0 +1,29 @@
+Change-Id: CHG-01M54DEX5ABN1P4MKZMN36QTVG
+Title: "Patch the AppHost MessagePack audit failure"
+Type: fix
+Scope: self-hosting
+Summary: "Pin MessagePack 3.1.9 and regenerate the AppHost restore graph to clear GHSA-qhrr-8q5h-9q3h."
+Group: apphost-messagepack-security-floor
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Apply the upstream MessagePack deserialization denial-of-service fix without disabling NuGet auditing.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: AppHost builds and locked restores use the patched dependency; no database migration is required.

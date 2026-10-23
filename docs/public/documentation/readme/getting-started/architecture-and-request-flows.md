@@ -6,6 +6,33 @@ description: Understand browser routing, application operations, authority, tena
 
 ISLAMU Event follows [Clean Architecture](../contributing/clean-architecture.md). The Domain and Application layers own business rules; Persistence and Infrastructure implement data and provider concerns; `Explore.API` composes the runtime; and `Explore.Blazor` (Backend-for-Frontend / BFF) manages the browser session.
 
+## Application authority and database storage
+
+The backend is the authority; its database is the storage engine. C# application
+workflows enforce authorization, business rules, concurrency coordination and
+completion. Ordinary persistence uses EF Core/LINQ and supported database-provider
+libraries. The request flow is HTTP/API → Application workflows → Domain rules →
+EF Core persistence → database. Controllers stay thin.
+
+Transactions, foreign keys, uniqueness and constraints protect stored consistency.
+Row-level security (RLS), where configured, limits which rows a database session
+can access—for example, keeping an ordinary tenant session inside that tenant.
+It supplements the application's checks; it is not another business-rule engine.
+Runtime is the ordinary request/worker database purpose. Global is an explicitly
+selected purpose for authorized instance-wide work. Neither is an end-user role,
+and selecting Global does not replace application authorization.
+
+Application credentials need permission to perform their legitimate operations.
+Use the documented purpose-specific credentials and migrations, not manual role
+promotion, permission repair or direct business-table edits. Direct database
+access can bypass C# rules within those credentials' reach; protect and rotate
+credentials accordingly. Narrow grants reduce damage but do not turn direct edits
+into application-authorized workflows.
+
+This is the accepted architecture direction. Some existing native SQL business
+paths still await replacement; this guide does not assert that every workflow has
+completed the EF-first cutover or that all provider combinations are verified.
+
 ---
 
 ## 1. Browser Request Flow
@@ -26,7 +53,7 @@ ISLAMU Event follows [Clean Architecture](../contributing/clean-architecture.md)
 1. **Endpoint Boundary**: Authentication and high-level route policies run first.
 2. **Resource Authorization**: Evaluates the caller, tenant boundary, and target entity state via [Authorization (Local RBAC or Cerbos)](../security-and-identity/authorization.md).
 3. **Domain Validation**: The application operation validates the business rules.
-4. **Atomic Settlement**: A single serializable transaction commits state changes to PostgreSQL or SQLite.
+4. **Atomic Settlement**: The application coordinates its concurrency strategy and commits related state changes atomically in the original transaction on the selected database.
 5. **Transactional Outbox**: Side effects (such as [Transactional Emails](../communications-and-notifications/email-smtp.md), [Outgoing Webhooks](../integrations-and-ai/webhooks.md), or [AT Protocol Federation](../federation-and-open-protocols/at-protocol-and-bluesky-jetstream.md)) are written to outbox tables within the same database transaction.
 6. **HAL Affordance**: The response returns the updated resource with freshly computed `_links`.
 

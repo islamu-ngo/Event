@@ -20,7 +20,7 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         await using var context = fixture.Context();
         var identity = await fixture.AuthenticateAsync(context);
         var owner = new ModerationResourceQuarantineRepository(context, identity.Machine, identity.Bindings,
-            new ExternalApiKeyRepository(context), fixture.Clock,
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), fixture.Clock,
             fixture.Database.Privacy.Authority(context, fixture.Clock));
         var result = await owner.ExecuteOriginalAsync(fixture.EffectId, fixture.LeaseId, fixture.LeaseRevision);
         await Assert.That(result.Outcome).IsEqualTo(ModerationOriginalQuarantineOutcome.Accounted);
@@ -71,7 +71,7 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         await using var context = fixture.Context();
         var identity = await fixture.AuthenticateAsync(context);
         var result = await new ModerationResourceQuarantineRepository(context, identity.Machine, identity.Bindings,
-            new ExternalApiKeyRepository(context), fixture.Clock,
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), fixture.Clock,
             fixture.Database.Privacy.Authority(context, fixture.Clock))
             .ExecuteOriginalAsync(fixture.EffectId, fixture.LeaseId, fixture.LeaseRevision);
         await Assert.That(result.Outcome).IsEqualTo(ModerationOriginalQuarantineOutcome.Unavailable);
@@ -88,7 +88,7 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         await using var context = fixture.Context(expiry);
         var identity = await fixture.AuthenticateAsync(context);
         var result = await new ModerationResourceQuarantineRepository(context, identity.Machine, identity.Bindings,
-            new ExternalApiKeyRepository(context), fixture.Clock,
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), fixture.Clock,
             fixture.Database.Privacy.Authority(context, fixture.Clock))
             .ExecuteOriginalAsync(fixture.EffectId, fixture.LeaseId, fixture.LeaseRevision);
         await Assert.That(expiry.Observed).IsTrue();

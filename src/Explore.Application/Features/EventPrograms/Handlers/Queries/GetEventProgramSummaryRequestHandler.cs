@@ -50,14 +50,10 @@ public class GetEventProgramSummaryRequestHandler :
         bool includeManaged,
         CancellationToken cancellationToken)
     {
-        var eventEntity = await _eventRepository.GetEventWithDetails(eventId);
+        var eventEntity = includeManaged
+            ? await _eventRepository.GetEventWithDetails(eventId, cancellationToken)
+            : await _eventRepository.GetPublicEventWithDetailsByIdAsync(eventId, cancellationToken);
         if (eventEntity is null)
-            return null;
-
-        if (!includeManaged && !await _eventRepository.IsPubliclyEligibleAsync(
-                eventEntity.TenantId,
-                eventEntity.Id,
-                cancellationToken))
             return null;
 
         var sessions = includeManaged
@@ -65,10 +61,10 @@ public class GetEventProgramSummaryRequestHandler :
             : await _eventSessionRepository.GetPublicSessionsByEventAsync(eventId, cancellationToken);
         var groups = includeManaged
             ? await _eventSessionGroupRepository.GetActiveByEventAsync(eventId, cancellationToken)
-            : await _eventSessionGroupRepository.GetPublicByEventAsync(eventId, cancellationToken);
+            : eventEntity.SessionGroups.OrderBy(group => group.SortOrder).ThenBy(group => group.Name).ToList();
         var agendaItems = includeManaged
             ? await _eventAgendaItemRepository.GetByEventAsync(eventId, cancellationToken)
-            : await _eventAgendaItemRepository.GetPublicByEventAsync(eventId, cancellationToken);
+            : eventEntity.AgendaItems.OrderBy(item => item.SortOrder).ThenBy(item => item.StartTime).ToList();
         var groupLookup = groups.ToDictionary(group => group.Id);
         IReadOnlyDictionary<Guid, EventLocationPublicDto> eventLocations = includeManaged
             ? ImmutableDictionary<Guid, EventLocationPublicDto>.Empty

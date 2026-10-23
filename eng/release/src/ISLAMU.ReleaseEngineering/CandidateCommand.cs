@@ -179,6 +179,13 @@ public static class CandidateCommand
                 return Reject(output, "candidate_release_notes_mismatch");
             }
 
+            if (!SecurityExecutionEvidence.TryValidate(releaseDirectory, candidateOid,
+                out string? securityExecutionSha256, out string securityDiagnostic) ||
+                securityExecutionSha256 is null)
+            {
+                return Reject(output, "candidate_security_execution_" + securityDiagnostic);
+            }
+
             byte[] manifest = BuildManifest(
                 git.Identity,
                 descriptor,
@@ -190,7 +197,8 @@ public static class CandidateCommand
                 releaseSourceDocuments,
                 summaryBytes,
                 committedContext,
-                committedNotes);
+                committedNotes,
+                securityExecutionSha256);
 
             // The manifest is derived entirely from immutable objects, but the *refs* naming the base
             // and previous tags could be recreated while this command runs. Re-resolving them around
@@ -288,7 +296,8 @@ public static class CandidateCommand
         IReadOnlyList<string> releaseSourceDocuments,
         byte[] summaryBytes,
         byte[] contextBytes,
-        byte[] notesBytes)
+        byte[] notesBytes,
+        string securityExecutionSha256)
     {
         string json = JsonSerializer.Serialize(new
         {
@@ -299,6 +308,7 @@ public static class CandidateCommand
             line = descriptor.Line,
             releaseDate = descriptor.ReleaseDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
             candidateOid = git.CandidateOid,
+            securityExecutionSha256,
             candidateParentOid,
             expectedIntegrationOldOid = candidateParentOid,
             expectedIntegrationNewOid = git.CandidateOid,

@@ -12,6 +12,7 @@ public sealed class TicketPurchaseAuthorityResolver(
     ICurrentUserService currentUser,
     ITenantContext tenant,
     IActorRepository actors,
+    IActorOwnershipReader actorOwnership,
     IGroupMemberRepository groupMembers,
     IOrganizationMemberRepository organizationMembers,
     IRegistrationInventoryRepository inventory) :
@@ -51,15 +52,21 @@ public sealed class TicketPurchaseAuthorityResolver(
             return Unavailable();
         }
 
-        Actor? actor = request.RequestedPurchaserActorId is Guid actorId
-            ? await actors.GetPublicActorProfileByTenantAsync(
-                tenant.TenantId,
-                actorId,
-                cancellationToken)
-            : await actors.GetActorByUserIdAndTenantId(
+        ActorOwnershipFacts? actor;
+        if (request.RequestedPurchaserActorId is Guid actorId)
+        {
+            Actor? requested = await actors.GetPublicActorProfileByTenantAsync(
+                tenant.TenantId, actorId, cancellationToken);
+            actor = requested is null ? null : new ActorOwnershipFacts(
+                requested.Id, requested.UserId, requested.GroupId, requested.OrganizationId);
+        }
+        else
+        {
+            actor = await actorOwnership.ReadForUserAsync(
                 accountId,
                 tenant.TenantId,
                 cancellationToken);
+        }
         if (actor is null
             || !await CanActAsAsync(
                 actor,
@@ -106,7 +113,7 @@ public sealed class TicketPurchaseAuthorityResolver(
     }
 
     private async Task<bool> CanActAsAsync(
-        Actor actor,
+        ActorOwnershipFacts actor,
         Guid accountId,
         CancellationToken cancellationToken)
     {

@@ -17,7 +17,7 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
     IEventResourceRepository resources,
     IEventAuthoritySnapshotService eventAuthority,
     IEventResourceGovernancePolicyReader governance,
-    IExternalApiKeyRepository apiKeys,
+    IExternalApiKeyAuthenticationRepository apiKeys,
     IConfiguredApiKeyResourceAuthorityReader configuredApiKeys,
     IEventResourceModerationSnapshotReader moderation) : IEventResourceAuthoritySnapshotReader
 {

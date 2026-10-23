@@ -6,6 +6,7 @@ using Explore.API.Authentication;
 using Explore.API.ConfigurationImport;
 using Explore.API.ExceptionHandling;
 using Explore.API.Filters;
+using Explore.API.Middleware;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Admissions;
@@ -220,11 +221,11 @@ public static partial class RateLimitingExtensions
                     var loggerFactory = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
                     var logger = loggerFactory.CreateLogger("ExternalApiKeyRateLimiting");
                     logger.LogWarning(
-                        "External API key {KeyId} for tenant {TenantId} was throttled by rate-limit policy {Policy} on {Path}.",
-                        apiKeyPrincipal.KeyId,
-                        apiKeyPrincipal.TenantId?.ToString() ?? "platform",
-                        policyName,
-                        ctx.HttpContext.Request.Path);
+                        "API key {Code} by policy {Policy} for {Method} {Route} | TraceId={TraceId}",
+                        ApiProblemCodes.RateLimited, policyName,
+                        SafeRouteMetadata.GetMethod(ctx.HttpContext),
+                        SafeRouteMetadata.GetRouteIdentityOrClassification(ctx.HttpContext),
+                        ctx.HttpContext.TraceIdentifier);
                 }
 
                 ctx.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
@@ -254,7 +255,7 @@ public static partial class RateLimitingExtensions
                         Detail = hasRetryAfter
                             ? "Rate limit exceeded. Please retry after the period indicated in the Retry-After header."
                             : "Rate limit exceeded. Please try again later.",
-                        Instance = ctx.HttpContext.Request.Path,
+                        Instance = SafeRouteMetadata.GetRouteIdentityOrClassification(ctx.HttpContext),
                         Extensions =
                         {
                             ["code"] = ApiProblemCodes.RateLimited
@@ -596,11 +597,6 @@ public static partial class RateLimitingExtensions
             }
 
             var remoteIp = ResolveClientIp(httpContext);
-
-            if (remoteIp is not null && IPAddress.IsLoopback(remoteIp))
-            {
-                return RateLimitPartition.GetNoLimiter(remoteIp.ToString());
-            }
 
             return RateLimitPartition.GetTokenBucketLimiter(
                 remoteIp?.ToString() ?? "unknown",

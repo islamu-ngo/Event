@@ -30,6 +30,9 @@ public interface IExternalApiKeyIssuanceReceiptRepository
     /// </exception>
     void RequireCleanWriteScope(Guid? tenantId);
 
+    Task<bool> ExistsByOwnerAndNameAsync(
+        ExternalApiKeyOwnerType ownerType, Guid ownerId, string name, CancellationToken cancellationToken);
+
     /// <summary>
     /// Finds durable evidence for an operation in its exact tenant or platform boundary.
     /// </summary>

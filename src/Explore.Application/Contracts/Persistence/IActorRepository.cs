@@ -4,6 +4,8 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IActorRepository : IGenericRepository<Actor, Guid>
 {
+    /// <summary>Gets the tracked scalar aggregate without private profile or related-owner graphs.</summary>
+    Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Actor?> GetActorWithDetails(Guid id, CancellationToken cancellationToken = default);
     Task<Actor?> GetPublicActorProfileAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Actor?> GetPublicActorProfileByTenantAsync(
@@ -37,14 +39,6 @@ public interface IActorRepository : IGenericRepository<Actor, Guid>
     /// Gets the tracked personal Actor used by transactional identity workflows.
     /// </summary>
     Task<Actor?> GetTrackedActorByUserId(Guid userId, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Gets the tenant-scoped Actor associated with a specific User.
-    /// </summary>
-    Task<Actor?> GetActorByUserIdAndTenantId(
-        Guid userId,
-        Guid tenantId,
-        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the Actor associated with a specific Organization.

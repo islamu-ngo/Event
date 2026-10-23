@@ -8,7 +8,8 @@ using Microsoft.Extensions.Options;
 namespace Explore.Infrastructure;
 
 public sealed class IdempotencyCleanupService(
-    IIdempotencyRepository repository,
+    IIdempotencyCleanupTenantDiscoveryRepository discovery,
+    IIdempotencyCleanupExecutionScopeFactory scopeFactory,
     IOptions<IdempotencyCleanupSettings> settings,
     BusinessMetrics metrics,
     ILogger<IdempotencyCleanupService> logger) : IIdempotencyCleanupService
@@ -21,14 +22,31 @@ public sealed class IdempotencyCleanupService(
         CancellationToken cancellationToken = default)
     {
         var expiresBeforeUtc = utcNow.AddHours(-_settings.ExpirationGraceHours);
-        var mode = _settings.DryRun ? "dry_run" : "delete";
+        var mode = _settings.DryRun ? "dry_run" : "scrub";
 
         try
         {
-            var eligibleCount = await repository.CountExpiredAsync(
-                expiresBeforeUtc,
-                _settings.BatchSize,
-                cancellationToken);
+            ArgumentOutOfRangeException.ThrowIfLessThan(_settings.BatchSize, 1);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(_settings.BatchSize, IdempotencyCleanupLimits.MaximumRows);
+            var tenantIds = await discovery.GetExpiredTenantIdsAsync(
+                expiresBeforeUtc, _settings.BatchSize, cancellationToken);
+            var remainingRows = _settings.BatchSize;
+            var eligibleCount = 0;
+            var scrubbedCount = 0;
+            foreach (var tenantId in tenantIds)
+            {
+                if (remainingRows == 0)
+                    break;
+
+                await using var scope = await scopeFactory.CreateAsync(tenantId, cancellationToken);
+                var tenantEligibleCount = await scope.CountExpiredAsync(
+                    expiresBeforeUtc, remainingRows, cancellationToken);
+                eligibleCount += tenantEligibleCount;
+                remainingRows -= tenantEligibleCount;
+                if (!_settings.DryRun && tenantEligibleCount != 0)
+                    scrubbedCount += await scope.ScrubExpiredAsync(
+                        expiresBeforeUtc, tenantEligibleCount, cancellationToken);
+            }
 
             if (_settings.DryRun)
             {
@@ -43,19 +61,15 @@ public sealed class IdempotencyCleanupService(
                 return new IdempotencyCleanupResult(expiresBeforeUtc, eligibleCount, 0, DryRun: true);
             }
 
-            var deletedCount = eligibleCount == 0
-                ? 0
-                : await repository.DeleteExpiredAsync(expiresBeforeUtc, _settings.BatchSize, cancellationToken);
-
             metrics.RecordIdempotencyCleanupRun(mode, "succeeded");
-            metrics.RecordIdempotencyCleanupRows(deletedCount, mode, "deleted");
+            metrics.RecordIdempotencyCleanupRows(scrubbedCount, mode, "scrubbed");
             logger.LogInformation(
-                "Idempotency cleanup deleted {DeletedCount} expired rows before {ExpiresBeforeUtc} from {TableFamily}.",
-                deletedCount,
+                "Idempotency cleanup scrubbed {ScrubbedCount} expired replay payloads before {ExpiresBeforeUtc} in {TableFamily}; operation identities remain fenced.",
+                scrubbedCount,
                 expiresBeforeUtc,
                 TableFamily);
 
-            return new IdempotencyCleanupResult(expiresBeforeUtc, eligibleCount, deletedCount, DryRun: false);
+            return new IdempotencyCleanupResult(expiresBeforeUtc, eligibleCount, scrubbedCount, DryRun: false);
         }
         catch (Exception)
         {

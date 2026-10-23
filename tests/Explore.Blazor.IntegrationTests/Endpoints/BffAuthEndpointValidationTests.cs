@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -14,6 +15,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Explore.Blazor.Hosting;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
 
 namespace Explore.Blazor.IntegrationTests.Endpoints;
 
@@ -173,6 +178,99 @@ public sealed class BffAuthEndpointValidationTests
     }
 
     [Test]
+    [Arguments("keycloak", "missing", true, false)]
+    [Arguments("keycloak", "whitespace", true, false)]
+    [Arguments("keycloak", "present", true, false)]
+    [Arguments("google", "missing", true, false)]
+    [Arguments("google", "whitespace", true, false)]
+    [Arguments("google", "present", true, false)]
+    [Arguments("keycloak", "missing", false, false)]
+    [Arguments("keycloak", "whitespace", false, false)]
+    [Arguments("keycloak", "present", false, false)]
+    [Arguments("keycloak", "present", true, true)]
+    [Arguments("google", "present", true, true)]
+    public async Task ConfidentialOidcColdStartRequiresAcquiredSecret(
+        string provider, string secretState, bool explicitPrimary, bool occupied)
+    {
+        string canary = Guid.CreateVersion7().ToString("N");
+        var sink = new ConfigurationSink();
+        using var serilog = new LoggerConfiguration().MinimumLevel.Debug().Enrich.FromLogContext()
+            .WithBffDiagnosticConfidentiality().WriteTo.Sink(sink).CreateLogger();
+        using var logs = LoggerFactory.Create(builder => builder.AddSerilog(serilog, dispose: false));
+        string? secret = secretState switch
+        {
+            "missing" => null,
+            "whitespace" => " ",
+            "present" => Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
+            _ => throw new ArgumentOutOfRangeException(nameof(secretState))
+        };
+        bool isKeycloak = provider == "keycloak";
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Authentication:Provider"] = explicitPrimary ? isKeycloak ? "keycloak" : "local" : null,
+                ["Keycloak:Authority"] = isKeycloak ? $"https://identity.example.test/realms/{canary}" : null,
+                ["Keycloak:ClientId"] = isKeycloak ? canary : null,
+                ["Keycloak:ClientSecret"] = isKeycloak ? secret : null,
+                ["Google:ClientId"] = isKeycloak ? null : canary,
+                ["Google:ClientSecret"] = isKeycloak ? null : secret
+            })
+            .Build();
+        var environment = Substitute.For<IWebHostEnvironment>();
+        environment.EnvironmentName = "Testing";
+        var schemes = new AuthenticationSchemeProvider(
+            Options.Create(new AuthenticationOptions()));
+        string schemeName = isKeycloak ? AuthSchemeNames.Keycloak : AuthSchemeNames.Google;
+        var optionsCache = new OptionsCache<OpenIdConnectOptions>();
+        if (occupied)
+        {
+            schemes.TryAddScheme(new AuthenticationScheme(schemeName, schemeName, typeof(OpenIdConnectHandler)));
+            optionsCache.TryAdd(schemeName, new OpenIdConnectOptions());
+        }
+        var receipts = new Explore.Blazor.Configuration.AuthenticationCredentialAcquisitionReceipts();
+        var consumer = isKeycloak
+            ? Explore.Blazor.Configuration.AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc
+            : Explore.Blazor.Configuration.AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc;
+        if (secretState == "present")
+            receipts.RecordAcquired(consumer,
+                Explore.Blazor.Configuration.AuthenticationCredentialAcquisitionReceipts.Authority.Environment);
+        using var manager = new DynamicAuthSchemeManager(
+            schemes,
+            optionsCache,
+            Substitute.For<IServiceScopeFactory>(),
+            configuration,
+            new EphemeralDataProtectionProvider(),
+            new EventBffOidcOptionsFactory(
+                environment, Substitute.For<ISafeAuthDiagnosticsPolicy>()),
+            logs.CreateLogger<DynamicAuthSchemeManager>(), receipts);
+
+        await manager.InitializeAsync();
+
+        bool registered = (await manager.GetRegisteredProviderSchemesAsync()).Contains(schemeName);
+        await Assert.That(registered).IsEqualTo(secretState == "present");
+        await Assert.That(await schemes.GetSchemeAsync(schemeName) is not null)
+            .IsEqualTo(secretState == "present");
+        await Assert.That(manager.GetActivePrimaryProvider())
+            .IsEqualTo(isKeycloak ? "keycloak" : "local");
+        await Assert.That(receipts.Snapshot().Any(receipt => receipt.Installed))
+            .IsEqualTo(secretState == "present" && !occupied);
+        await Assert.That(sink.Values.Count > 0).IsTrue();
+        foreach (string exported in sink.Values)
+        {
+            await Assert.That(exported).DoesNotContain(canary);
+            if (!string.IsNullOrWhiteSpace(secret))
+                await Assert.That(exported).DoesNotContain(secret);
+        }
+    }
+
+    private sealed class ConfigurationSink : ILogEventSink
+    {
+        public List<string> Values { get; } = [];
+        public void Emit(LogEvent entry) => Values.Add(entry.RenderMessage() + entry.Exception?.ToString()
+            + string.Join(' ', entry.Properties.Select(property => property.Key + property.Value)));
+    }
+
+    [Test]
     public async Task AuthStatus_WithBrowserAuthorizationHeader_DoesNotAuthenticateOrEchoBearerToken()
     {
         using var factory = new BlazorBffWebApplicationFactory();
@@ -301,7 +399,7 @@ public sealed class BffAuthEndpointValidationTests
     {
         public Task InitializeAsync() => Task.CompletedTask;
 
-        public Task RefreshSchemesAsync(string? setupSecret = null) => Task.CompletedTask;
+        public Task RefreshSchemesAsync() => Task.CompletedTask;
 
         public Task<IReadOnlyList<string>> GetRegisteredProviderSchemesAsync() =>
             throw new InvalidOperationException(
@@ -314,7 +412,7 @@ public sealed class BffAuthEndpointValidationTests
     {
         public Task InitializeAsync() => Task.CompletedTask;
 
-        public Task RefreshSchemesAsync(string? setupSecret = null) => Task.CompletedTask;
+        public Task RefreshSchemesAsync() => Task.CompletedTask;
 
         public Task<IReadOnlyList<string>> GetRegisteredProviderSchemesAsync() =>
             Task.FromResult<IReadOnlyList<string>>([AuthSchemeNames.Keycloak]);
@@ -327,7 +425,7 @@ public sealed class BffAuthEndpointValidationTests
     {
         public Task InitializeAsync() => Task.CompletedTask;
 
-        public Task RefreshSchemesAsync(string? setupSecret = null) =>
+        public Task RefreshSchemesAsync() =>
             Task.CompletedTask;
 
         public Task<IReadOnlyList<string>>
@@ -377,7 +475,7 @@ public sealed class BffAuthEndpointValidationTests
         public void ClearCircuitTokenState(
             HttpContext context,
             ClaimsPrincipal? principal,
-            ILogger logger,
+            Microsoft.Extensions.Logging.ILogger logger,
             string reason)
         {
         }

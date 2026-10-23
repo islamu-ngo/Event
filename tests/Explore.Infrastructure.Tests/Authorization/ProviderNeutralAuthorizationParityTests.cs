@@ -13,13 +13,13 @@ using Cerbos.Sdk;
 using Cerbos.Sdk.Builder;
 using Cerbos.Sdk.Response;
 using Explore.Application.Authorization;
-using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Services;
-using Explore.Application.Settings;
-using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
+using Explore.Infrastructure.Tests.Fixtures;
+using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -65,8 +65,16 @@ public class ProviderNeutralAuthorizationParityTests
         {
             foreach (var providerName in new[] { "local", "cerbos" })
             {
-                var fixture = CreateProvider(providerName, scenario);
-                var decisions = await fixture.Provider.AuthorizeBatchAsync(scenario.Requests);
+                await using var human = new CurrentHumanPrincipalFixture(UserId, TenantId);
+                if (providerName == "local")
+                {
+                    await human.InitializeAsync(authenticate: scenario.Setup != Setup.MissingSubject);
+                    if (scenario.Setup is Setup.TenantAdmin or Setup.HalBatch)
+                        await human.GrantTenantAdminAsync();
+                }
+                human.EnterRequest();
+                var fixture = CreateProvider(providerName, scenario, human);
+                var decisions = await fixture.AuthorizeAsync(scenario.Requests);
 
                 await Assert.That(decisions.Count).IsEqualTo(scenario.Expected.Length);
 
@@ -89,7 +97,7 @@ public class ProviderNeutralAuthorizationParityTests
                         Revision: decision.Provider.ObservedRevision));
                 }
 
-                await AssertTypedProjectionAsync(scenario, providerName, fixture.CapturedRequest());
+                await AssertTypedProjectionAsync(scenario, providerName, fixture.CapturedRequests);
             }
         }
 
@@ -101,44 +109,16 @@ public class ProviderNeutralAuthorizationParityTests
         await File.WriteAllTextAsync(path, serializedArtifact);
     }
 
-    private static ProviderFixture CreateProvider(string providerName, Scenario scenario)
+    private static ProviderFixture CreateProvider(
+        string providerName, Scenario scenario, CurrentHumanPrincipalFixture human)
     {
-        var adminContext = Substitute.For<IAdminContext>();
-        var machinePrincipalAccessor = Substitute.For<IMachinePrincipalAccessor>();
-        var eventAuthority = Substitute.For<IEventAuthoritySnapshotService>();
-        var organizationMembers = Substitute.For<IOrganizationMemberRepository>();
-        var groupMembers = Substitute.For<IGroupMemberRepository>();
+        var adminContext = human.Admin;
+        var machinePrincipalAccessor = human.Machine;
+        var eventAuthority = new EventAuthoritySnapshotService(human.Context);
+        var organizationMembers = new OrganizationMemberRepository(human.Context);
+        var groupMembers = new GroupMemberRepository(human.Context);
         var resolver = Substitute.For<IHierarchicalSettingsResolver>();
-        var tenantContext = Substitute.For<ITenantContext>();
-
-        var hasSubject = scenario.Setup != Setup.MissingSubject;
-        adminContext.UserId.Returns(hasSubject ? UserId : null);
-        adminContext.ResolveUserIdAsync(Arg.Any<CancellationToken>()).Returns(hasSubject ? UserId : null);
-        adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.IsInstanceAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
-        adminContext.IsTenantAdminAsync(TenantId, Arg.Any<CancellationToken>())
-            .Returns(scenario.Setup is Setup.TenantAdmin or Setup.HalBatch);
-        adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        adminContext.GetAdminTenantIdsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns([]);
-        adminContext.GetAdminOrganizationIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        adminContext.GetAdminOrganizationIdsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns([]);
-        adminContext.GetAdminGroupIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
-        adminContext.GetAdminGroupIdsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns([]);
-        machinePrincipalAccessor.IsMachineCaller.Returns(false);
-        machinePrincipalAccessor.Current.Returns((Explore.Application.Authentication.ApiKeyPrincipalContext?)null);
-        tenantContext.TenantId.Returns(TenantId);
-        organizationMembers.GetOrganizationIdsWhereUserHasPermission(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
-        groupMembers.GetGroupIdsWhereUserHasPermission(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
-        eventAuthority.GetForUserAndEventsAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<Guid>(),
-                Arg.Any<IReadOnlyCollection<Guid>>(),
-                Arg.Any<DateTime>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => new EventAuthoritySnapshot(
-                call.ArgAt<Guid>(0),
-                call.ArgAt<Guid>(1),
-                new Dictionary<Guid, EventAuthorityForUser>()));
+        var tenantContext = human.Tenant;
 
         if (providerName == "local")
         {
@@ -154,11 +134,11 @@ public class ProviderNeutralAuthorizationParityTests
             if (scenario.Setup == Setup.ProviderUnavailable)
                 local.ActivateSafeMode();
 
-            return new ProviderFixture(local, () => null);
+            return new ProviderFixture(checks => local.AuthorizeBatchAsync(checks), []);
         }
 
         var client = Substitute.For<ICerbosClient>();
-        Cerbos.Api.V1.Request.CheckResourcesRequest? captured = null;
+        List<Cerbos.Api.V1.Request.CheckResourcesRequest> captured = [];
         if (scenario.Setup == Setup.ProviderUnavailable)
         {
             client.CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>())
@@ -169,46 +149,68 @@ public class ProviderNeutralAuthorizationParityTests
             client.CheckResourcesAsync(Arg.Any<CheckResourcesRequest>(), Arg.Any<Metadata>())
                 .Returns(call =>
                 {
-                    captured = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
-                    var response = new Cerbos.Api.V1.Response.CheckResourcesResponse();
-                    for (var index = 0; index < scenario.Requests.Length; index++)
-                    {
-                        response.Results.Add(CreateResult(
-                            scenario.Requests[index],
-                            scenario.CerbosEffects[index]));
-                    }
+                    var sent = call.ArgAt<CheckResourcesRequest>(0).ToCheckResourcesRequest();
+                    captured.Add(sent);
+                    var resource = sent.Resources.Single();
+                    int index = Array.FindIndex(scenario.Requests, request =>
+                        request.ResourceKind == resource.Resource.Kind
+                        && request.ResourceId == resource.Resource.Id && request.Action == resource.Actions.Single());
+                    var response = new Cerbos.Api.V1.Response.CheckResourcesResponse { RequestId = sent.RequestId };
+                    response.Results.Add(CreateResult(scenario.Requests[index], scenario.CerbosEffects[index]));
 
                     return new CheckResourcesResponse(response);
                 });
         }
 
+        var clientFactory = Substitute.For<ICerbosClientFactory>();
+        clientFactory.GetOrCreate("http://localhost:3593").Returns(client);
         var cerbos = new CerbosAuthorizationService(
             client,
-            new CerbosPrincipalBuilder(adminContext, machinePrincipalAccessor, eventAuthority, organizationMembers, groupMembers),
+            new CerbosPrincipalBuilder(adminContext, machinePrincipalAccessor, eventAuthority, human.Reader),
             adminContext,
             machinePrincipalAccessor,
             resolver,
             tenantContext,
-            Substitute.For<ICerbosClientFactory>(),
+            clientFactory,
             Options.Create(new CerbosSettings { GrpcEndpoint = "http://localhost:3593", PlaintextMode = true }),
             Substitute.For<ILogger<CerbosAuthorizationService>>());
-        return new ProviderFixture(cerbos, () => captured);
+        return new ProviderFixture(async checks =>
+        {
+            if (scenario.Setup == Setup.MissingSubject)
+                return await cerbos.AuthorizeBatchAsync(checks);
+
+            // Projection vectors are independent inputs, not a native observation or admission.
+            Guid memberId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+            bool tenantAdmin = scenario.Setup is Setup.TenantAdmin or Setup.HalBatch;
+            var sources = new HumanPrincipalSourceFacts(
+                UserId, TenantId, [], [], [], [],
+                tenantAdmin ? [new(memberId, TenantId, (int)TenantUserStatusEnum.Active, false)] : [],
+                tenantAdmin ? [new(Guid.Parse("66666666-6666-6666-6666-666666666666"), TenantId,
+                    memberId, (int)RoleEnum.TenantAdmin, (int)RoleScopeEnum.Tenant, null)] : [],
+                [], [], [], [], false, [], [], [], [], null);
+            var principal = CerbosPrincipalBuilder.BuildPrincipalFromSources(sources);
+            var decisions = new List<AuthorizationDecision>();
+            foreach (var check in checks)
+                decisions.Add(await cerbos.AuthorizePreparedHumanAsync(principal, check, TenantId,
+                    usePolicyScope: false, "http://localhost:3593", CancellationToken.None));
+            return decisions;
+        }, captured);
     }
 
     private static async Task AssertTypedProjectionAsync(
         Scenario scenario,
         string providerName,
-        Cerbos.Api.V1.Request.CheckResourcesRequest? captured)
+        IReadOnlyList<Cerbos.Api.V1.Request.CheckResourcesRequest> captured)
     {
         if (providerName != "cerbos" || scenario.Setup is Setup.MissingSubject or Setup.ProviderUnavailable)
             return;
 
-        await Assert.That(captured).IsNotNull();
-        await Assert.That(captured!.Resources.Count).IsEqualTo(scenario.Requests.Length);
+        await Assert.That(captured.Count).IsEqualTo(scenario.Requests.Length);
         for (var index = 0; index < scenario.Requests.Length; index++)
         {
             var request = scenario.Requests[index];
-            var resource = captured.Resources[index];
+            await Assert.That(captured[index].Resources.Count).IsEqualTo(1);
+            var resource = captured[index].Resources[0];
             await Assert.That(resource.Resource.Kind).IsEqualTo(request.ResourceKind);
             await Assert.That(resource.Resource.Id).IsEqualTo(request.ResourceId);
             await Assert.That(resource.Actions).Contains(request.Action);
@@ -331,8 +333,8 @@ public class ProviderNeutralAuthorizationParityTests
         Effect[] CerbosEffects);
 
     private sealed record ProviderFixture(
-        IAuthorizationProvider Provider,
-        Func<Cerbos.Api.V1.Request.CheckResourcesRequest?> CapturedRequest);
+        Func<IReadOnlyList<AuthorizationRequest>, Task<IReadOnlyList<AuthorizationDecision>>> AuthorizeAsync,
+        IReadOnlyList<Cerbos.Api.V1.Request.CheckResourcesRequest> CapturedRequests);
 
     private sealed record Diagnostic(
         string ScenarioId,

@@ -71,10 +71,15 @@ handlers must not acquire another disposal owner through an alias.
 
 `ValidateNativeOperationRegistrations` checks the final service descriptors.
 `ValidateNativeOperations` checks cached constructor dependency availability;
-it does not execute a request or construct the whole graph. Deep construction
-uses `ValidateNativeOperationsDeepAsync` against the actual final provider in a
-disposable scope in CI. The scoped re-entry guard clears state in `finally` and
-reports bounded type-only errors. It cannot prove arbitrary unrelated factories.
+it does not execute a request or construct the whole graph. CI separately proves
+public pipeline construction on the dormant host and exhaustive concrete
+construction under genuine authenticated request scopes. The latter uses the
+actual native catalog, production scope/purpose selection and exact equality
+between discovered and constructed contracts; it invokes no business operation.
+An anonymous universal scope cannot supply protected human authority.
+`ValidateNativeOperationsDeepAsync` remains a limited diagnostic, not that
+authenticated catalog proof. The scoped re-entry guard clears state in `finally`
+and reports bounded type-only errors. It cannot prove arbitrary unrelated factories.
 OpenAPI generation remains descriptor-only; normal/Testing shared API startup
 performs bounded preflight before its workers/traffic. Standalone's own migrations
 and administrator bootstrap precede that shared runtime preflight.
@@ -95,12 +100,14 @@ notifications do not replace them.
 AutoMapper, MediatR and MediatR.Contracts are absent from the supported dependency
 graph. There is no edition-dependent C# define, commercial version group or
 vendor license binding. CI and both API/Blazor Dockerfiles require locked restore.
-The authoritative Setup catalogue owns supported environment metadata; its generator
-owns both the JSON catalogue and the public reference's generated section.
+Event owns supported environment declarations and the public reference.
+Configurator integration is separate: maintainers author its compact YAML using
+the portable skill, then check/revise/build it through the standalone CLI.
+It is not an environment-document generator or an automatically refreshed source.
+See [native definition authoring](CONFIGURATOR_DEFINITION_EXPORT.md).
 
 ```bash
 dotnet restore
-dotnet run --project eng/setup-assistant/EnvironmentCatalogueGenerator/EnvironmentCatalogueGenerator.csproj -- --write
 dotnet restore --locked-mode
 dotnet run .ci/scripts/validate-dependency-license-policy.cs -- .
 ```

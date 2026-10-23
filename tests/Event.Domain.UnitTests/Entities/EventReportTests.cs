@@ -5,6 +5,69 @@ namespace Event.Domain.UnitTests.Entities;
 public class EventReportTests
 {
     [Test]
+    public async Task ProviderSubmissionRetainsOneHistoricalCaseVersionAndPayload()
+    {
+        var report = CreateReport();
+        var reportCase = EventReportCase.Create(report.TenantId, report.Id, "review",
+            EventReportPriority.Normal, null);
+        Guid message = Guid.CreateVersion7(), originalStamp = reportCase.ConcurrencyStamp;
+        string digest = new('A', 64);
+        report.RetainProviderSubmission(message, reportCase, digest);
+        reportCase.ConcurrencyStamp = Guid.CreateVersion7();
+        reportCase.Assign(Guid.CreateVersion7(), report.CreatedAt.AddMinutes(1));
+        await Assert.That(report.ProviderSyncOutboxId).IsEqualTo(message);
+        await Assert.That(report.ProviderSyncCaseId).IsEqualTo(reportCase.Id);
+        await Assert.That(report.ProviderSyncCaseConcurrencyStamp).IsEqualTo(originalStamp);
+        await Assert.That(report.ProviderSyncSubmittedAtUtc).IsEqualTo(report.CreatedAt);
+        await Assert.That(report.ProviderSyncPayloadDigest).IsEqualTo(digest);
+        await Assert.That(() => report.RetainProviderSubmission(Guid.CreateVersion7(), reportCase, digest))
+            .Throws<InvalidOperationException>();
+        await Assert.That(report.ProviderSyncOutboxId).IsEqualTo(message);
+        await Assert.That(report.ProviderSyncCaseConcurrencyStamp).IsEqualTo(originalStamp);
+    }
+
+    [Test]
+    [Arguments("tenant")]
+    [Arguments("report")]
+    [Arguments("assigned")]
+    [Arguments("case_updated")]
+    [Arguments("case_stamp")]
+    [Arguments("report_updated")]
+    [Arguments("created_unspecified")]
+    [Arguments("created_missing")]
+    [Arguments("digest_lower")]
+    [Arguments("digest_short")]
+    public async Task InvalidProviderSubmissionCannotLeavePartialCustody(string invalid)
+    {
+        var report = CreateReport();
+        var reportCase = EventReportCase.Create(
+            invalid == "tenant" ? Guid.CreateVersion7() : report.TenantId,
+            invalid == "report" ? Guid.CreateVersion7() : report.Id,
+            "review", EventReportPriority.Normal, null);
+        if (invalid == "assigned")
+            reportCase.Assign(Guid.CreateVersion7(), report.CreatedAt);
+        if (invalid == "case_updated")
+            reportCase.UpdatedAt = report.CreatedAt;
+        if (invalid == "case_stamp")
+            reportCase.ConcurrencyStamp = Guid.Empty;
+        if (invalid == "report_updated")
+            report.ChangeReporterCommunicationConsent(true, true, report.CreatedAt);
+        if (invalid == "created_unspecified")
+            report.CreatedAt = DateTime.SpecifyKind(report.CreatedAt, DateTimeKind.Unspecified);
+        if (invalid == "created_missing")
+            report.CreatedAt = default;
+        string digest = invalid == "digest_lower" ? new('a', 64)
+            : invalid == "digest_short" ? new('A', 63) : new('A', 64);
+        await Assert.That(() => report.RetainProviderSubmission(Guid.CreateVersion7(), reportCase, digest))
+            .Throws<InvalidOperationException>();
+        await Assert.That(report.ProviderSyncOutboxId).IsNull();
+        await Assert.That(report.ProviderSyncCaseId).IsNull();
+        await Assert.That(report.ProviderSyncCaseConcurrencyStamp).IsNull();
+        await Assert.That(report.ProviderSyncSubmittedAtUtc).IsNull();
+        await Assert.That(report.ProviderSyncPayloadDigest).IsNull();
+    }
+
+    [Test]
     public async Task EventReportingEntities_ImplementExpectedDomainInterfaces()
     {
         await Assert.That(Implements<EventReport>(typeof(ITenantEntity), typeof(IAuditableEntity), typeof(ISoftDeletable), typeof(IConcurrencyAware))).IsTrue();

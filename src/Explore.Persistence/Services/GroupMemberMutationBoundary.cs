@@ -20,7 +20,8 @@ namespace Explore.Persistence.Services;
 /// <summary>Serializes ordinary group membership with native reviewer-independence qualification.</summary>
 public sealed partial class GroupMemberMutationBoundary(
     ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy, IUserContext user, IAdminContext admin,
-    IMachinePrincipalAccessor machine, IAuthorizationProvider authorization, IGroupMemberRepository members)
+    IMachinePrincipalAccessor machine, IAuthorizationProvider authorization, IGroupMemberRepository members,
+    IHumanActionCommitFinalizer finalizer)
     : IGroupMemberMutationBoundary, IGroupCreationMutationBoundary
 {
     public Task<BaseCommandResponse<Guid>> ExecuteAddAsync(Guid tenantId, Guid groupId, Guid memberId, string email, int roleId,
@@ -54,6 +55,7 @@ public sealed partial class GroupMemberMutationBoundary(
             _ => throw new ArgumentOutOfRangeException(nameof(action))
         };
         Attempt? attempted = null;
+        var admission = new NativeHumanMutationAdmission(context, finalizer);
         try
         {
             return await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() =>
@@ -108,6 +110,7 @@ public sealed partial class GroupMemberMutationBoundary(
                     return await privacy.ExecuteEnrollmentSerializedAsync(async privacyToken =>
                         await new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAsync(async inner =>
                         {
+                            admission.RegisterOwning(RecheckAsync);
                             await using var installation = await RelationalNamedLock.AcquireTransactionAsync(
                                 context, "moderation.authority-source.installation", inner);
                             if (groupId is not null)

@@ -81,9 +81,9 @@ public class TolgeeTranslationProvider : ITranslationManagementProvider
             await api.GetProjectAsync(projectId, ct);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Tolgee connection test failed");
+            _logger.LogWarning("tolgee_connection_test_failed");
             return false;
         }
     }

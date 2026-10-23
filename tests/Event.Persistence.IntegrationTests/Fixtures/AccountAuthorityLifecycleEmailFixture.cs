@@ -13,6 +13,10 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure;
 using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Services.Keycloak;
+using Explore.Application.Contracts.Secrets;
+using Explore.Domain.Keycloak;
+using Explore.Domain.Secrets;
+using NSubstitute;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Identity;
@@ -86,11 +90,18 @@ internal sealed class AccountAuthorityLifecycleEmailFixture : IAsyncDisposable
             options.Enabled = true;
             options.BaseUrl = baseUrl;
             options.Realm = "ISLAMU";
-            options.AdminUsername = "runtime-admin";
-            options.AdminPassword = fixture.Http.AdminPassword;
+            options.ClientId = "event-lifecycle";
+            options.ProviderVersion = KeycloakLifecycleGrantProfile.ProviderVersion;
             options.DefaultClientId = "event-client";
             options.DefaultLifespanSeconds = 900;
         });
+        var secretResolver = Substitute.For<ISecretResolver>();
+        secretResolver.ResolveAsync(SecretDefinitionRegistry.Keys.Keycloak.LifecycleClientSecret, null,
+                Arg.Any<CancellationToken>())
+            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
+                SecretDefinitionRegistry.Keys.Keycloak.LifecycleClientSecret, fixture.Http.ClientSecret,
+                SecretSourceType.EnvironmentVariable, SecretScope.Instance, null, DateTimeOffset.UtcNow)));
+        services.AddSingleton(secretResolver);
         services.AddHttpClient(KeycloakAccountAuthorityLifecycleEmailService.HttpClientName)
             .ConfigurePrimaryHttpMessageHandler(() => fixture.Http);
         fixture._provider = services.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
@@ -175,8 +186,12 @@ internal sealed class AccountAuthorityLifecycleEmailFixture : IAsyncDisposable
 
     internal sealed class ProviderHttpHandler : HttpMessageHandler
     {
-        internal string AdminPassword { get; } = Guid.NewGuid().ToString("N");
-        internal string AdminToken { get; } = Guid.NewGuid().ToString("N");
+        internal string ClientSecret { get; } = Guid.NewGuid().ToString("N");
+        internal string AdminToken => _token ??= Token();
+        private string? _token;
+        internal string TokenIssuer { get; set; } = "https://keycloak.example.test/auth/realms/ISLAMU";
+        internal bool HasLifecycleRole { get; set; } = true;
+        internal bool ExcessRole { get; set; }
         internal List<RecordedRequest> Requests { get; } = [];
         internal HttpStatusCode EmailStatus { get; set; } = HttpStatusCode.NoContent;
         internal bool FailTokenTransport { get; set; }
@@ -186,9 +201,9 @@ internal sealed class AccountAuthorityLifecycleEmailFixture : IAsyncDisposable
         {
             Requests.Add(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization,
                 request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken)));
-            if (request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath == "/auth/realms/master/protocol/openid-connect/token")
+            if (request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath == "/auth/realms/ISLAMU/protocol/openid-connect/token")
             {
-                if (FailTokenTransport) throw new HttpRequestException(AdminPassword);
+                if (FailTokenTransport) throw new HttpRequestException(ClientSecret);
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(JsonSerializer.Serialize(new { access_token = AdminToken }),
@@ -197,11 +212,35 @@ internal sealed class AccountAuthorityLifecycleEmailFixture : IAsyncDisposable
             }
             if (request.Method == HttpMethod.Put && request.RequestUri!.AbsolutePath.EndsWith("/execute-actions-email", StringComparison.Ordinal))
             {
-                if (FailEmailTransport) throw new HttpRequestException(AdminPassword);
-                return new HttpResponseMessage(EmailStatus) { Content = new StringContent(AdminPassword) };
+                if (FailEmailTransport) throw new HttpRequestException(ClientSecret);
+                return new HttpResponseMessage(EmailStatus) { Content = new StringContent(ClientSecret) };
             }
             throw new InvalidOperationException($"Unexpected provider request {request.Method} {request.RequestUri}");
         }
+
+        private string Token() => string.Join(".", new[]
+        {
+            Segment(new { alg = "RS256" }),
+            Segment(new
+            {
+                iss = TokenIssuer, azp = "event-lifecycle", sub = Guid.CreateVersion7().ToString(),
+                preferred_username = "service-account-event-lifecycle",
+                exp = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds(),
+                resource_access = new Dictionary<string, object>
+                {
+                    ["realm-management"] = new
+                    {
+                        roles = !HasLifecycleRole ? Array.Empty<string>() : ExcessRole
+                            ? new[] { "manage-users", "realm-admin" } : ["manage-users"]
+                    }
+                }
+            }),
+            Segment(Guid.CreateVersion7().ToString())
+        });
+
+        private static string Segment<T>(T value) =>
+            Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)))
+                .TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 
     internal sealed record RecordedRequest(HttpMethod Method, Uri Uri, AuthenticationHeaderValue? Authorization, string Body);

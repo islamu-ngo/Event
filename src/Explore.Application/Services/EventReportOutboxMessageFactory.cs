@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Explore.Application.Models.InternalEvents;
 using Explore.Domain;
@@ -14,6 +16,11 @@ public static class EventReportOutboxMessageFactory
         EventReportCase reportCase,
         string? correlationId)
     {
+        // PostgreSQL retains microseconds. Canonicalize before both durable records
+        // and their JSON are created so a round-trip does not change source identity.
+        report.CreatedAt = new DateTime(
+            report.CreatedAt.Ticks - report.CreatedAt.Ticks % TimeSpan.TicksPerMicrosecond,
+            report.CreatedAt.Kind);
         var payload = new EventReportProviderSyncRequested
         {
             TenantId = report.TenantId,
@@ -27,7 +34,7 @@ public static class EventReportOutboxMessageFactory
             CorrelationId = string.IsNullOrWhiteSpace(correlationId) ? null : correlationId.Trim()
         };
 
-        return new OutboxMessage
+        var message = new OutboxMessage
         {
             Id = Guid.CreateVersion7(),
             AggregateType = EventReportAggregateType,
@@ -38,5 +45,10 @@ public static class EventReportOutboxMessageFactory
             CreatedAt = report.CreatedAt,
             MaxRetries = 5
         };
+        report.RetainProviderSubmission(
+            message.Id,
+            reportCase,
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(message.Payload))));
+        return message;
     }
 }

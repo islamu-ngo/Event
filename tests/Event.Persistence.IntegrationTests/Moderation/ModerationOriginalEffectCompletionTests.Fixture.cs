@@ -56,7 +56,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             new(context, definitions, fixture.Clock), new(context, definitions, fixture.Clock),
             new(context, definitions, inventory, fixture.Clock), null, runtime, fixture.Clock);
         return new ModerationOriginalEffectCompletionRepository(context, machine, bindings,
-            new ExternalApiKeyRepository(context), fixture.Clock, fixture.Database.Privacy.Authority(context, fixture.Clock),
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            fixture.Clock, fixture.Database.Privacy.Authority(context, fixture.Clock),
             inventory, publications, sources, runtime, new ModerationMeasurementReceiptVerifier());
     }
 

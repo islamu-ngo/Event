@@ -15,12 +15,13 @@ namespace Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 
 public sealed class AssignEventRoleCommandHandler
     : EventRoleAssignmentCommandHandlerBase,
-      ICommandHandler<AssignEventRoleCommand, BaseCommandResponse<Guid>>
+      ICommandHandler<AssignEventRoleCommand, BaseCommandResponse<Guid>>,
+      IHumanEventTeamAssignmentOwner
 {
     private readonly IEventRoleAssignmentRepository _assignmentRepository;
     private readonly IEventRepository _eventRepository;
     private readonly IUserRepository _userRepository;
-    private readonly IEventRoleAuthorityCeilingService _authorityCeilingService;
+    private readonly IHumanEventTeamActionPreparation _preparation;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly BusinessMetrics _metrics;
     private readonly ILogger<AssignEventRoleCommandHandler> _logger;
@@ -30,7 +31,7 @@ public sealed class AssignEventRoleCommandHandler
         IEventRoleAssignmentRepository assignmentRepository,
         IEventRepository eventRepository,
         IUserRepository userRepository,
-        IEventRoleAuthorityCeilingService authorityCeilingService,
+        IHumanEventTeamActionPreparation preparation,
         IAuditLogRepository auditLogRepository,
         BusinessMetrics metrics,
         ILogger<AssignEventRoleCommandHandler> logger,
@@ -43,7 +44,7 @@ public sealed class AssignEventRoleCommandHandler
         _assignmentRepository = assignmentRepository;
         _eventRepository = eventRepository;
         _userRepository = userRepository;
-        _authorityCeilingService = authorityCeilingService;
+        _preparation = preparation;
         _auditLogRepository = auditLogRepository;
         _metrics = metrics;
         _logger = logger;
@@ -57,16 +58,18 @@ public sealed class AssignEventRoleCommandHandler
         CancellationToken cancellationToken)
     {
         var outcomeActor = await RequireActorAsync(request.TenantId, request.EventId, AuthorizationActions.Events.ManageTeam, cancellationToken);
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
         Guid assignmentId = Guid.CreateVersion7();
         Guid auditId = Guid.CreateVersion7();
         string? denialReason = null;
         var result = await _boundary.ExecuteAsync(request.TenantId, request.EventId, assignmentId, request.TargetUserId,
             request.RoleId, request.Status, request.StartsAtUtc, request.ExpiresAtUtc, auditId, expectedEmail,
-            (actor, token) =>
+            async (actor, token) =>
             {
+                await prepared.AcquireAsync(request, token);
                 outcomeActor = actor;
                 denialReason = null;
-                return AssignAsync(request, actor, assignmentId, auditId, reason => denialReason = reason, token);
+                return await AssignAsync(request, actor, assignmentId, auditId, prepared, reason => denialReason = reason, token);
             }, cancellationToken);
         if (result.IsSuccess)
         {
@@ -84,7 +87,7 @@ public sealed class AssignEventRoleCommandHandler
     }
 
     private async Task<BaseCommandResponse<Guid>> AssignAsync(AssignEventRoleCommand request, Guid actorUserId, Guid assignmentId,
-        Guid auditId, Action<string> observeDenial, CancellationToken cancellationToken)
+        Guid auditId, IPreparedHumanEventTeamAction prepared, Action<string> observeDenial, CancellationToken cancellationToken)
     {
         if (request.RoleId == (int)RoleEnum.EventOwner)
         {
@@ -122,8 +125,7 @@ public sealed class AssignEventRoleCommandHandler
             return Failure("Target user not found.", "target_user_not_found");
         }
 
-        var authority = await _authorityCeilingService.CanAssignRoleAsync(
-            request.TenantId, request.EventId, actorUserId, request.RoleId, cancellationToken);
+        var authority = prepared.CanAssignRole(request.RoleId);
 
         if (!authority.IsAllowed)
         {
@@ -194,6 +196,21 @@ public sealed class AssignEventRoleCommandHandler
             },
             affectedColumns: new[] { nameof(EventRoleAssignment.Status), nameof(EventRoleAssignment.StartsAtUtc), nameof(EventRoleAssignment.ExpiresAtUtc) }, auditId: auditId);
 
+        prepared.Complete(assignment.Id);
         return Success(assignment.Id, "Event role assigned successfully.");
+    }
+
+    public async Task<BaseCommandResponse<Guid>> ExecuteHandoffAsync(AssignEventRoleCommand request,
+        IPreparedHumanEventTeamAction prepared, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        _preparation.ConsumeHandoff(request, prepared);
+        await RequireActorAsync(request.TenantId, request.EventId, AuthorizationActions.Events.ManageTeam, token);
+        Guid assignmentId = Guid.CreateVersion7();
+        Guid auditId = Guid.CreateVersion7();
+        var result = await _boundary.ExecuteInCurrentTransactionAsync(request.TenantId, request.EventId, assignmentId,
+            request.TargetUserId, request.RoleId, request.Status, request.StartsAtUtc, request.ExpiresAtUtc,
+            auditId, null, (actor, inner) => AssignAsync(request, actor, assignmentId, auditId, prepared, _ => { }, inner), token);
+        return result;
     }
 }

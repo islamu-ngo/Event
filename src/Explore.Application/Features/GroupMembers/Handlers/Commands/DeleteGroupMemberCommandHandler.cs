@@ -20,17 +20,20 @@ public class DeleteGroupMemberCommandHandler : ICommandHandler<DeleteGroupMember
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
     private readonly IGroupMemberMutationBoundary _boundary;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
 
     public DeleteGroupMemberCommandHandler(
         IGroupMemberRepository groupMemberRepository,
         IUserContext userContext,
         ITenantContext tenantContext,
-        IGroupMemberMutationBoundary boundary)
+        IGroupMemberMutationBoundary boundary,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _groupMemberRepository = groupMemberRepository;
         _userContext = userContext;
         _tenantContext = tenantContext;
         _boundary = boundary;
+        _preparation = preparation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteGroupMemberCommand request, CancellationToken cancellationToken)
@@ -42,8 +45,15 @@ public class DeleteGroupMemberCommandHandler : ICommandHandler<DeleteGroupMember
                 "Invalid requester User ID.");
         }
 
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
         return await _boundary.ExecuteRemovalAsync(request.MemberId,
-            (actor, token) => DeleteAsync(request, actor, token), cancellationToken);
+            async (actor, token) =>
+            {
+                await prepared.AcquireAsync(request, token);
+                var result = await DeleteAsync(request, actor, token);
+                if (result.IsSuccess) prepared.Complete(result.Id);
+                return result;
+            }, cancellationToken);
     }
 
     private async Task<BaseCommandResponse<Guid>> DeleteAsync(DeleteGroupMemberCommand request,

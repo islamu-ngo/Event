@@ -25,10 +25,7 @@ public sealed class HateoasLinkGenerator : IHateoasLinkGenerator
 
         if (path is null)
         {
-            _logger.LogWarning(
-                "Failed to generate link for route '{RouteName}' with values {@RouteValues}",
-                definition.RouteName,
-                definition.RouteValues);
+            _logger.LogWarning("Failed to generate link for route.");
             return null;
         }
 
@@ -50,12 +47,9 @@ public sealed class HateoasLinkGenerator : IHateoasLinkGenerator
                 routeName,
                 routeValues);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(
-                ex,
-                "Exception generating path for route '{RouteName}'",
-                routeName);
+            _logger.LogWarning("Exception generating path for route.");
             return null;
         }
     }

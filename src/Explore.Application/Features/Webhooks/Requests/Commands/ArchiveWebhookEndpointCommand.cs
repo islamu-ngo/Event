@@ -4,7 +4,6 @@ using Explore.Application.Responses;
 
 namespace Explore.Application.Features.Webhooks.Requests.Commands;
 
-[AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.Delete)]
 public sealed record ArchiveWebhookEndpointCommand
     : ICommand<BaseCommandResponse<Guid>>, ISecureRequest, IWebhookPersistedOwnerRequest
 {

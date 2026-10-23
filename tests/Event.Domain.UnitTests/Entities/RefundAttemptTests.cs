@@ -10,6 +10,109 @@ public sealed class RefundAttemptTests
     private static readonly DateTime Now = new(2026, 8, 24, 12, 0, 0, DateTimeKind.Utc);
 
     [Test]
+    public async Task NativeInputBindingRetainsTheOriginalActorAndAmountSelectionOnce()
+    {
+        var attempt = Attempt(RefundAttemptStatusEnum.Requested, 100);
+        Guid actor = Guid.CreateVersion7();
+        string original = attempt.NativeInputDigest;
+        await Assert.That(() => attempt.BindNativeInput(99, actor, attempt.AuthorityCode, attempt.ReasonCode))
+            .Throws<InvalidOperationException>();
+        await Assert.That(attempt.CreatedBy).IsNull();
+        await Assert.That(attempt.NativeInputDigest).IsEqualTo(original);
+        attempt.BindNativeInput(null, actor, attempt.AuthorityCode, attempt.ReasonCode);
+        string bound = attempt.NativeInputDigest;
+        await Assert.That(attempt.CreatedBy).IsEqualTo(actor);
+        await Assert.That(attempt.RequestedAmountMinor).IsNull();
+        await Assert.That(bound).IsNotEqualTo(original);
+        await Assert.That(() => attempt.BindNativeInput(null, Guid.CreateVersion7(), attempt.AuthorityCode, attempt.ReasonCode))
+            .Throws<InvalidOperationException>();
+        await Assert.That(attempt.CreatedBy).IsEqualTo(actor);
+        await Assert.That(attempt.NativeInputDigest).IsEqualTo(bound);
+    }
+
+    [Test]
+    public async Task NativeInputDigestSeparatesOptionalValuesAndStringBoundaries()
+    {
+        string Digest(long? amount, Guid? actor, string authority, string reason) =>
+            RefundAttempt.ComputeInputDigest(TenantId, PaymentId, OrderId, amount, actor, authority, reason);
+        string original = Digest(null, null, "ab", "c");
+        await Assert.That(original).IsEqualTo(Digest(null, null, "ab", "c"));
+        await Assert.That(original).IsNotEqualTo(Digest(0, null, "ab", "c"));
+        await Assert.That(original).IsNotEqualTo(Digest(null, Guid.Empty, "ab", "c"));
+        await Assert.That(original).IsNotEqualTo(Digest(null, null, "a", "bc"));
+    }
+
+    [Test]
+    public async Task RejectedHandoffDoesNotConsumeTheOriginalReadyState()
+    {
+        var attempt = Attempt(RefundAttemptStatusEnum.Requested, 100);
+        await Assert.That(() => attempt.BeginDispatch(
+            Guid.CreateVersion7(), false, Now.AddMinutes(1), Now))
+            .Throws<InvalidOperationException>();
+        await Assert.That(attempt.CanDispatchBuyer).IsTrue();
+        await Assert.That(attempt.DispatchToken).IsNull();
+        await Assert.That(attempt.ProviderMutationExpiresAt).IsNull();
+        await Assert.That(attempt.DispatchPhase).IsEqualTo(RefundDispatchPhase.Ready);
+    }
+
+    [Test]
+    public async Task PositiveFeePreHandoffEvidenceCannotReopenBuyerDispatch()
+    {
+        var attempt = Attempt(RefundAttemptStatusEnum.Requested, 100);
+        attempt.BeginDispatch(Guid.CreateVersion7(), false, Now.AddMinutes(1), Now.AddHours(1));
+        attempt.MarkBuyerRefundSucceeded("re_original", Now.AddMinutes(2), null);
+        Guid feeToken = Guid.CreateVersion7();
+        attempt.BeginDispatch(feeToken, true, Now.AddMinutes(3), Now.AddHours(2));
+        attempt.ProveNoProviderHandoff(feeToken, Now.AddMinutes(4));
+        await Assert.That(attempt.CanDispatchBuyer).IsFalse();
+        await Assert.That(attempt.CanDispatchApplicationFee).IsTrue();
+        await Assert.That(attempt.ProviderMutationExpiresAt).IsEqualTo(Now.AddHours(1));
+        await Assert.That(attempt.ProviderRefundId).IsEqualTo("re_original");
+    }
+
+    [Test]
+    public async Task PendingMarkerAloneNeverAuthorizesAnotherProviderHandoff()
+    {
+        RefundAttempt attempt = Attempt(RefundAttemptStatusEnum.DispatchPending, 100);
+        await Assert.That(attempt.CanDispatchBuyer).IsFalse();
+        await Assert.That(() => attempt.BeginDispatch(
+            Guid.CreateVersion7(), false, Now.AddMinutes(1), Now.AddHours(23)))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task CommittedHandoffCannotBeReclaimedWithoutPositivePreHandoffEvidence()
+    {
+        RefundAttempt attempt = Attempt(RefundAttemptStatusEnum.Requested, 100);
+        Guid token = Guid.CreateVersion7();
+        attempt.BeginDispatch(token, applicationFee: false, Now.AddMinutes(1), Now.AddHours(23));
+        await Assert.That(attempt.CanDispatchBuyer).IsFalse();
+        await Assert.That(() => attempt.BeginDispatch(
+            Guid.CreateVersion7(), false, Now.AddMinutes(2), Now.AddHours(23)))
+            .Throws<InvalidOperationException>();
+        attempt.ProveNoProviderHandoff(token, Now.AddMinutes(2));
+        await Assert.That(attempt.CanDispatchBuyer).IsTrue();
+        attempt.BeginDispatch(Guid.CreateVersion7(), false, Now.AddMinutes(3), Now.AddHours(23));
+        await Assert.That(() => attempt.ProveNoProviderHandoff(token, Now.AddMinutes(4)))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task ApplicationFeeHandoffIsIndependentAndCannotRestartAfterRetention()
+    {
+        RefundAttempt attempt = Attempt(RefundAttemptStatusEnum.Requested, 100);
+        attempt.BeginDispatch(Guid.CreateVersion7(), false, Now.AddMinutes(1), Now.AddHours(23));
+        attempt.MarkBuyerRefundSucceeded("re_native", Now.AddMinutes(2), null);
+        await Assert.That(attempt.CanDispatchApplicationFee).IsTrue();
+        await Assert.That(() => attempt.BeginDispatch(
+            Guid.CreateVersion7(), true, Now.AddHours(23), Now.AddHours(24)))
+            .Throws<InvalidOperationException>();
+        attempt.BeginDispatch(Guid.CreateVersion7(), true, Now.AddMinutes(3), Now.AddHours(23));
+        await Assert.That(attempt.CanDispatchApplicationFee).IsFalse();
+        await Assert.That(attempt.ReservesCapacity).IsTrue();
+    }
+
+    [Test]
     public async Task AllocatePartial_UsesDeterministicLargestRemainderAndPreservesComposition()
     {
         RefundAllocation allocation = RefundAllocation.AllocatePartial(

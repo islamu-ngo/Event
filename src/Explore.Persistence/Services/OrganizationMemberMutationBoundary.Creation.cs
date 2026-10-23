@@ -29,6 +29,7 @@ public sealed partial class OrganizationMemberMutationBoundary
         if (context.Database.CurrentTransaction is not null || context.ChangeTracker.HasChanges()
             || proposedIds.Any(id => id == Guid.Empty) || proposedIds.Distinct().Count() != proposedIds.Length) DenyCreation();
         CreationAttempt? attempted = null;
+        var admission = new NativeHumanMutationAdmission(context, finalizer);
         try
         {
             return await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() =>
@@ -82,6 +83,7 @@ public sealed partial class OrganizationMemberMutationBoundary
                     return await privacy.ExecuteEnrollmentSerializedAsync(async privacyToken =>
                         await new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAttemptAsync(async inner =>
                         {
+                            admission.RegisterOwning(RecheckAsync);
                             result = null;
                             await using var installation = await RelationalNamedLock.AcquireTransactionAsync(
                                 context, "moderation.authority-source.installation", inner);

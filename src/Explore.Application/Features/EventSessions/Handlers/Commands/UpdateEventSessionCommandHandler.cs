@@ -1,5 +1,7 @@
 using Explore.Application.Caching;
+using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession;
@@ -17,6 +19,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
 
@@ -41,6 +44,14 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
     private readonly IRefundCampaignRepository _refundCampaignRepository;
     private readonly IUserContext _userContext;
     private readonly TimeProvider _timeProvider;
+    private readonly ITenantContext _tenantContext;
+    private readonly IAdminContext _adminContext;
+    private readonly IMachinePrincipalAccessor _machinePrincipal;
+    private readonly IMachineMutationCommitAuthority _machineAuthority;
+    private readonly RequestAuthorization<UpdateEventSessionCommand> _authorization;
+    private readonly IAuthorizationProvider _authorizationProvider;
+    private readonly AuthorizationResourceContextResolver _resourceContextResolver;
+    private readonly ILogger<UpdateEventSessionCommandHandler> _logger;
 
     public UpdateEventSessionCommandHandler(
         IEventSessionRepository eventSessionRepository,
@@ -61,7 +72,15 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
         IRefundCampaignRepository refundCampaignRepository,
         IUserContext userContext,
         TimeProvider timeProvider,
-        ISettingMutationLock mutationLock)
+        ISettingMutationLock mutationLock,
+        ITenantContext tenantContext,
+        IAdminContext adminContext,
+        RequestAuthorization<UpdateEventSessionCommand> authorization,
+        IAuthorizationProvider authorizationProvider,
+        AuthorizationResourceContextResolver resourceContextResolver,
+        IMachinePrincipalAccessor machinePrincipal,
+        IMachineMutationCommitAuthority machineAuthority,
+        ILogger<UpdateEventSessionCommandHandler> logger)
     {
         _eventSessionRepository = eventSessionRepository;
         _eventRepository = eventRepository;
@@ -82,10 +101,22 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
         _refundCampaignRepository = refundCampaignRepository;
         _userContext = userContext;
         _timeProvider = timeProvider;
+        _tenantContext = tenantContext;
+        _adminContext = adminContext;
+        _machinePrincipal = machinePrincipal;
+        _machineAuthority = machineAuthority;
+        _authorization = authorization;
+        _authorizationProvider = authorizationProvider;
+        _resourceContextResolver = resourceContextResolver;
+        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSessionCommand request, CancellationToken cancellationToken)
     {
+        Guid? userId = await _adminContext.ResolveUserIdAsync(cancellationToken);
+        bool machine = _machinePrincipal.IsMachineCaller;
+        if (!_userContext.IsAuthenticated || _tenantContext.TenantId == Guid.Empty || !machine && userId is null)
+            return BaseCommandResponse.Authentication<Guid>();
         var validator = new UpdateEventSessionDtoValidator(
             _eventRepository,
             _locationRepository,
@@ -118,13 +149,37 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
                 policyToken => _unitOfWork.ExecuteSerializableAsync(async token =>
             {
                 transactionFailure = null;
-                EventSession? eventSession = await _eventSessionRepository.GetById(request.EventSessionId);
-                if (eventSession is null)
+                EventSession? candidate = await _eventSessionRepository.GetById(request.EventSessionId);
+                if (candidate is null)
                 {
                     transactionFailure = CreateFailureResponse("Event session not found.", failureCode: FailureCodes.NotFound);
                     return false;
                 }
 
+                Guid previousEventId = candidate.EventId;
+                Guid parentEventId = request.EventSessionDto.Event?.EventId ?? previousEventId;
+                await _authorization.AuthorizeAsync(request, _logger, token);
+                if (previousEventId != parentEventId)
+                    await AuthorizeDestinationAsync(request, parentEventId, token);
+                Event? parentEvent = null;
+                foreach (Guid eventId in new[] { previousEventId, parentEventId }.Distinct().Order())
+                {
+                    string action = eventId == previousEventId ? AuthorizationActions.Update : AuthorizationActions.Create;
+                    Event? authorized = machine
+                        ? await _machineAuthority.GetAuthorizedSessionParentAsync(_tenantContext.TenantId, eventId, action, token)
+                        : userId is { } humanId
+                            ? await _eventSessionRepository.GetAuthorizedParentForMutationAsync(
+                                _tenantContext.TenantId, humanId, eventId, action, token)
+                            : null;
+                    if (authorized is null)
+                        throw new AuthorizationException(ResourceKinds.EventSession, AuthorizationActions.Update);
+                    if (eventId == parentEventId)
+                        parentEvent = authorized;
+                }
+                EventSession? eventSession = await _eventSessionRepository.GetForMutationAsync(request.EventSessionId, token);
+                if (eventSession is null || parentEvent is null || eventSession.EventId != previousEventId
+                    || eventSession.TenantId != _tenantContext.TenantId)
+                    throw new AuthorizationException(ResourceKinds.EventSession, AuthorizationActions.Update);
                 if (eventSession.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
                 {
                     throw new ConcurrencyConflictException(
@@ -132,15 +187,6 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
                         "The event session was modified by another request. Reload and retry.",
                         nameof(EventSession),
                         eventSession.Id.ToString());
-                }
-
-                Guid previousEventId = eventSession.EventId;
-                Guid parentEventId = request.EventSessionDto.Event?.EventId ?? previousEventId;
-                Event? parentEvent = await _eventRepository.GetById(parentEventId);
-                if (parentEvent is null || parentEvent.TenantId != eventSession.TenantId)
-                {
-                    transactionFailure = CreateFailureResponse("Event does not belong to the same tenant as the session.");
-                    return false;
                 }
 
                 Guid? featuredImageId = request.EventSessionDto.FeaturedImage?.Value.HasValue == true
@@ -197,6 +243,16 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
                     placement.LocationId,
                     previousEventLocationId,
                     token);
+                async Task RecheckMachine(CancellationToken checkToken)
+                {
+                    foreach (Guid eventId in new[] { previousEventId, parentEvent.Id }.Distinct().Order())
+                    {
+                        string action = eventId == previousEventId ? AuthorizationActions.Update : AuthorizationActions.Create;
+                        if (await _machineAuthority.GetAuthorizedSessionParentAsync(
+                                _tenantContext.TenantId, eventId, action, checkToken) is null)
+                            throw new AuthorizationException(ResourceKinds.EventSession, action);
+                    }
+                }
                 if (eventChanged)
                 {
                     await _eventSessionRepository.MoveToEventAsync(
@@ -204,7 +260,8 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
                         parentEvent.Id,
                         eventLocation,
                         placement.RoomId,
-                        token);
+                        token,
+                        machine ? RecheckMachine : null);
                 }
                 else
                 {
@@ -221,7 +278,7 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
                 ApplyMaxAudienceAttendees(eventSession, request.EventSessionDto.MaxAudienceAttendees);
                 ApplyRegistrationMode(eventSession, request.EventSessionDto.RegistrationMode);
                 await ApplyScheduleAsync(eventSession, parentEvent, eventChanged, request.EventSessionDto.Schedule, token);
-                await _eventSessionRepository.UpdateWithRoomOverlapGuardAsync(eventSession, token);
+                await _eventSessionRepository.UpdateWithRoomOverlapGuardAsync(eventSession, token, machine ? RecheckMachine : null);
                 await ApplyIslamicAspectAsync(eventSession.Id, request.EventSessionDto.IslamicAspect, eventSession.EndTimeType, token);
                 NotificationFanoutChangeField[] changedFields = GetMaterialFanoutChanges(
                     previousStartTime,
@@ -232,6 +289,7 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
                 if (previousStatusId == (int)EventSessionStatusEnum.Published
                     && changedFields.Length > 0)
                 {
+                    Guid materialChangeActor = _userContext.GetRequiredUserId();
                     bool locationChanged = changedFields.Any(field =>
                         field is NotificationFanoutChangeField.Location or NotificationFanoutChangeField.Room);
                     NotificationFanoutLocationSnapshotV1? beforeLocation = locationChanged
@@ -285,7 +343,7 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
                         token);
                     RefundCampaign materialChange = RefundCampaign.CreateMaterialChange(
                         Guid.CreateVersion7(), eventSession.TenantId, parentEvent.Id,
-                        _userContext.GetRequiredUserId(), "Published event session terms changed.", occurredAt);
+                        materialChangeActor, "Published event session terms changed.", occurredAt);
                     await _refundCampaignRepository.CreateAsync(
                         materialChange,
                         RefundOutboxMessageFactory.CreateCampaignProcess(materialChange, occurredAt),
@@ -306,6 +364,8 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
                 }
 
                 await _eventLocationAttachmentService.DetachIfUnreferencedAsync(previousEventLocationId, token);
+                if (machine)
+                    await RecheckMachine(token);
                 updatedSessionId = eventSession.Id;
                 previousEventIdForCache = previousEventId;
                 parentEventIdForCache = parentEvent.Id;
@@ -337,6 +397,29 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantIdForCache), cancellationToken);
 
         return BaseCommandResponse.Success(updatedSessionId, "Event session updated successfully.");
+    }
+
+    private async Task AuthorizeDestinationAsync(
+        UpdateEventSessionCommand request, Guid eventId, CancellationToken cancellationToken)
+    {
+        var destination = await _eventRepository.GetAuthorizationTargetByIdAsync(eventId, cancellationToken);
+        if (destination is null || destination.IsDeleted || destination.TenantId != _tenantContext.TenantId)
+            throw new AuthorizationException(ResourceKinds.EventSession, AuthorizationActions.Create);
+        string resourceId = destination.Id.ToString("D");
+        var context = await _resourceContextResolver.ResolveAsync(
+            request, ResourceKinds.EventSession, AuthorizationActions.Create, resourceId,
+            new PreCreateAuthorizationFacts(destination.TenantId, destination.Id), cancellationToken);
+        if (context.Facts is null)
+            throw new AuthorizationException(ResourceKinds.EventSession, AuthorizationActions.Create);
+        var decision = await _authorizationProvider.AuthorizeAsync(
+            new AuthorizationRequest(ResourceKinds.EventSession, resourceId, AuthorizationActions.Create, Facts: context.Facts),
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (decision.IsAllowed)
+            return;
+        if (decision.ReasonCode == AuthorizationDecisionReasonCodes.ProviderUnavailable)
+            throw new AuthorizationProviderUnavailableException(ResourceKinds.EventSession, AuthorizationActions.Create);
+        throw new AuthorizationException(ResourceKinds.EventSession, AuthorizationActions.Create);
     }
 
     private static BaseCommandResponse<Guid> CreateFailureResponse(

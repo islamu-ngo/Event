@@ -1,52 +1,53 @@
 using System.Security.Cryptography;
 using Event.Standalone.IntegrationTests.Fixtures;
 using Event.Standalone.Hosting;
+using Event.Testing.DataProtection;
 using Explore.Blazor.Extensions;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
-using Explore.Persistence;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace Event.Standalone.IntegrationTests;
 
 public sealed partial class CombinedEventResourceTransportTests
 {
     [Test]
-    public async Task OptionalBffRedisRegistrationCannotReplaceTheCombinedApiDestinationKeyring()
+    public async Task CombinedCompositionUsesOnlyItsExplicitExternalPartition()
     {
         var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddDbContext<DataProtectionKeyContext>();
-        services.AddDataProtection().SetApplicationName(BffDataProtectionExtensions.ApplicationName)
-            .PersistKeysToDbContext<DataProtectionKeyContext>();
-        services.AddBffDataProtection(Guid.CreateVersion7().ToString("N"));
+        services.AddExternalDataProtection("api");
+        services.AddBffDataProtection();
         services.AddCombinedApiDataProtection();
+        services.AddSingleton<IExternalDataProtectionSource>(new ExternalDataProtectionTestAuthority("combined"));
         using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<KeyManagementOptions>>().Value;
-        await Assert.That(options.XmlRepository?.GetType().FullName ?? string.Empty)
-            .Contains("EntityFrameworkCore");
+        var protector = provider.GetRequiredService<IDataProtectionProvider>().CreateProtector("destination");
+        await Assert.That(protector.Unprotect(protector.Protect("synthetic"))).IsEqualTo("synthetic");
+        await Assert.That(provider.GetRequiredService<ExternalDataProtectionProvider>().Admission.Partition)
+            .IsEqualTo("combined");
+        var keys = provider.GetRequiredService<IKeyManager>();
+        await Assert.That(keys.GetAllKeys().Count).IsEqualTo(1);
+        await Assert.That(() => keys.CreateNewKey(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(90)))
+            .Throws<InvalidOperationException>();
+        await Assert.That(() => keys.RevokeAllKeys(DateTimeOffset.UtcNow)).Throws<InvalidOperationException>();
     }
 
     [Test]
-    public async Task CombinedHostWithoutApiDatabaseKeepsItsBffKeyAuthority()
+    public async Task CombinedCannotBorrowBffAuthorityWhenItsOwnRingIsMissing()
     {
         var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddBffDataProtection(Guid.CreateVersion7().ToString("N"));
+        services.AddBffDataProtection();
         services.AddCombinedApiDataProtection();
+        services.AddSingleton<IExternalDataProtectionSource>(new ExternalDataProtectionTestAuthority("bff"));
         using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<KeyManagementOptions>>().Value;
-        await Assert.That(options.XmlRepository?.GetType().FullName ?? string.Empty)
-            .DoesNotContain("EntityFrameworkCore");
+        await Assert.That(() => provider.GetRequiredService<IDataProtectionProvider>())
+            .Throws<InvalidOperationException>();
     }
 
     [Test]
-    public async Task CombinedApiRetainsTheActualDatabaseKeyringAcrossRestart()
+    public async Task CombinedApiRetainsExternalDestinationAcrossActualHostRestart()
     {
         using var deployment = new NativeEmailOptionalStandaloneFixture();
         Guid resourceId = Guid.CreateVersion7();
@@ -58,11 +59,8 @@ public sealed partial class CombinedEventResourceTransportTests
             var protector = scope.ServiceProvider.GetRequiredService<IEventResourceDestinationProtector>();
             protectedValue = protector.Protect(destination, PlatformDefaults.DefaultTenantId, resourceId,
                 protector.CurrentVersion);
-            var options = scope.ServiceProvider.GetRequiredService<IOptions<KeyManagementOptions>>().Value;
-            await Assert.That(options.XmlRepository?.GetType().FullName ?? string.Empty)
-                .Contains("EntityFrameworkCore");
-            var keys = scope.ServiceProvider.GetRequiredService<DataProtectionKeyContext>();
-            await Assert.That(await keys.DataProtectionKeys.CountAsync()).IsGreaterThan(0);
+            await Assert.That(scope.ServiceProvider.GetRequiredService<ExternalDataProtectionProvider>().Admission.Partition)
+                .IsEqualTo("combined");
         }
         await using (var restarted = deployment.CreateHost())
         {

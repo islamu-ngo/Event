@@ -2,14 +2,15 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Text;
-using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
+using Event.Testing.DataProtection;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -80,27 +81,20 @@ public class SafeModeLatchTests : IAsyncDisposable
         var byoConfig = CreateByoCerbosConfig();
 
         _instanceAdminFactory = new SafeModeWebApplicationFactory(
-            keycloak.Authority, keycloak.MetadataAddress,
+            keycloak.Authority, keycloak.MetadataAddress, keycloak.TokenClient,
             _instanceAdminContext, _tenantContext, byoConfig);
         _instanceAdminClient = _instanceAdminFactory.CreateClient();
 
         _regularUserFactory = new SafeModeWebApplicationFactory(
-            keycloak.Authority, keycloak.MetadataAddress,
+            keycloak.Authority, keycloak.MetadataAddress, keycloak.TokenClient,
             _regularUserContext, _tenantContext, byoConfig);
         _regularUserClient = _regularUserFactory.CreateClient();
 
         _tenantAdminFactory = new SafeModeWebApplicationFactory(
-            keycloak.Authority, keycloak.MetadataAddress,
+            keycloak.Authority, keycloak.MetadataAddress, keycloak.TokenClient,
             _tenantAdminContext, _tenantContext, byoConfig);
         _tenantAdminClient = _tenantAdminFactory.CreateClient();
 
-        foreach (var factory in new[] { _instanceAdminFactory, _regularUserFactory, _tenantAdminFactory })
-        {
-            using var scope = factory.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-            db.Tenants.Add(new TenantBuilder().WithId(DefaultTenantId).Build());
-            db.SaveChanges();
-        }
     }
 
     public async ValueTask DisposeAsync()
@@ -328,6 +322,8 @@ public class SafeModeLatchTests : IAsyncDisposable
     /// </summary>
     private sealed class SafeModeWebApplicationFactory : WebApplicationFactory<Program>
     {
+        private readonly KeycloakTokenClient _keycloakTokens;
+        private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority = new("api");
         private readonly string _keycloakAuthority;
         private readonly string _keycloakMetadataAddress;
         private readonly IAdminContext _adminContext;
@@ -337,10 +333,12 @@ public class SafeModeLatchTests : IAsyncDisposable
         public SafeModeWebApplicationFactory(
             string keycloakAuthority,
             string keycloakMetadataAddress,
+            KeycloakTokenClient keycloakTokens,
             IAdminContext adminContext,
             ITenantContext tenantContext,
             ICerbosConfigResolver cerbosConfigResolver)
         {
+            _keycloakTokens = keycloakTokens;
             _keycloakAuthority = keycloakAuthority;
             _keycloakMetadataAddress = keycloakMetadataAddress;
             _adminContext = adminContext;
@@ -384,7 +382,7 @@ public class SafeModeLatchTests : IAsyncDisposable
             {
                 services.RemoveExploreDbContextRegistrations();
 
-                services.AddInMemoryExploreDbContext($"SafeModeDb_{Guid.NewGuid():N}");
+                services.AddKeycloakSecurityDbContext($"SafeModeDb_{Guid.NewGuid():N}", _keycloakTokens, _tenantContext.TenantId);
 
                 services.RemoveAll<IDistributedCache>();
                 services.AddDistributedMemoryCache();
@@ -401,6 +399,8 @@ public class SafeModeLatchTests : IAsyncDisposable
 
             builder.ConfigureTestServices(services =>
             {
+                services.RemoveAll<IExternalDataProtectionSource>();
+                services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
                 {
                     options.RequireHttpsMetadata = false;

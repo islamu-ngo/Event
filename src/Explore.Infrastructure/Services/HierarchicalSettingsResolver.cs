@@ -11,44 +11,27 @@ using ISystemSettingRepository = Explore.Application.Contracts.Persistence.ISyst
 using ITenantSettingRepository = Explore.Application.Contracts.Persistence.ITenantSettingRepository;
 using IUserPreferenceRepository = Explore.Application.Contracts.Persistence.IUserPreferenceRepository;
 using IHierarchicalSettingsResolver = Explore.Application.Contracts.Infrastructure.IHierarchicalSettingsResolver;
-using ISettingGroup = Explore.Application.Contracts.Infrastructure.ISettingGroup;
 using ITenantContext = Explore.Application.Contracts.Infrastructure.ITenantContext;
-using ResolvedSetting = Explore.Application.Contracts.Infrastructure.ResolvedSetting;
 using Explore.Application.Exceptions;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using Explore.Domain.Settings.Definitions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Resolves settings through a 5-tier hierarchy with batch loading.
-/// Loads all settings for requested scopes in ≤2 queries (system + scoped),
-/// then merges with lock precedence.
+/// Batches requested keys by storage family and scope, then merges with lock precedence.
 /// </summary>
-public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
+public class HierarchicalSettingsResolver : HierarchicalSettingsReader, IHierarchicalSettingsResolver
 {
-    private readonly ISystemSettingRepository _systemSettingRepository;
-    private readonly ITenantSettingRepository _tenantSettingRepository;
-    private readonly IOrganizationSettingRepository _organizationSettingRepository;
-    private readonly IGroupSettingRepository _groupSettingRepository;
     private readonly IGroupTenantRepository _groupTenantRepository;
-    private readonly IUserPreferenceRepository _userPreferenceRepository;
     private readonly ITenantContext _tenantContext;
     private readonly ISettingMutationLock _mutationLock;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
     private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
-    private readonly IMemoryCache _cache;
     private readonly ILogger<HierarchicalSettingsResolver> _logger;
-    private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
-
-    private const string SystemCacheKey = "HierSettings:System";
-    private const string TenantCachePrefix = "HierSettings:Tenant:";
-    private const string OrgCachePrefix = "HierSettings:Org:";
-    private const string GroupCachePrefix = "HierSettings:Group:";
-    private const string UserCachePrefix = "HierSettings:User:";
 
     public HierarchicalSettingsResolver(
         ISystemSettingRepository systemSettingRepository,
@@ -62,120 +45,18 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         IMemoryCache cache,
         ILogger<HierarchicalSettingsResolver> logger,
         IEmailDeliverySettingsWriter emailSettingsWriter,
-        IEventResourceSettingsWriter eventResourceSettingsWriter)
+        IEventResourceSettingsWriter eventResourceSettingsWriter,
+        IAtprotoFederationSettingRepository federationSettings,
+        IInstanceTenantSettingsReader? instanceTenantReader = null)
+        : base(systemSettingRepository, tenantSettingRepository, organizationSettingRepository,
+            groupSettingRepository, userPreferenceRepository, cache, federationSettings, instanceTenantReader)
     {
-        _systemSettingRepository = systemSettingRepository;
-        _tenantSettingRepository = tenantSettingRepository;
-        _organizationSettingRepository = organizationSettingRepository;
-        _groupSettingRepository = groupSettingRepository;
         _groupTenantRepository = groupTenantRepository;
-        _userPreferenceRepository = userPreferenceRepository;
         _tenantContext = tenantContext;
         _mutationLock = mutationLock;
-        _cache = cache;
         _logger = logger;
         _emailSettingsWriter = emailSettingsWriter;
         _eventResourceSettingsWriter = eventResourceSettingsWriter;
-    }
-
-    public async Task<T?> ResolveAsync<T>(string key, SettingContext context, CancellationToken ct = default)
-    {
-        var resolved = await ResolveWithMetadataAsync(key, context, ct);
-        if (resolved is null)
-            return default;
-
-        return SettingValueSerializer.Deserialize(resolved.Value, default(T)!);
-    }
-
-    public async Task<ResolvedSetting?> ResolveWithMetadataAsync(
-        string key, SettingContext context, CancellationToken ct = default)
-    {
-        var batch = await ResolveBatchAsync([key], context, ct);
-        return batch.Count > 0 ? batch[0] : null;
-    }
-
-    public async Task<IReadOnlyList<ResolvedSetting>> ResolveBatchAsync(
-        IEnumerable<string> keys, SettingContext context, CancellationToken ct = default)
-    {
-        var keyList = keys.ToList();
-        if (keyList.Count == 0)
-            return [];
-
-        // Current policy boundaries cannot depend on another replica invalidating this process's cache.
-        var requiresAuthoritativePolicy = keyList.Any(key => IsSmtpSetting(key)
-            || key == GovernanceSettingKeys.TenantDelegation.LockSmtp
-            || key.StartsWith("public_experience.", StringComparison.Ordinal)
-            || key.StartsWith("event_discovery.", StringComparison.Ordinal)
-            || key is GovernanceSettingKeys.Events.UserSubmissionEnabled
-                or GovernanceSettingKeys.Events.OrganizationSubmissionEnabled
-                or GovernanceSettingKeys.Events.GroupSubmissionEnabled
-                or GovernanceSettingKeys.Events.RequireApproval
-            || key.StartsWith("federation.", StringComparison.Ordinal));
-        var systemSettings = requiresAuthoritativePolicy
-            ? await _systemSettingRepository.GetAllSettings(cancellationToken: ct)
-            : await GetSystemSettingsAsync(ct);
-        var systemDict = systemSettings.ToDictionary(s => s.SettingKey, s => s);
-
-        // Load tenant settings if context has tenant
-        Dictionary<string, TenantSetting>? tenantDict = null;
-        if (context.TenantId.HasValue)
-        {
-            var tenantSettings = requiresAuthoritativePolicy
-                ? await _tenantSettingRepository.GetAllForTenant(context.TenantId.Value, ct)
-                : await GetTenantSettingsAsync(context.TenantId.Value, ct);
-            tenantDict = tenantSettings.ToDictionary(s => s.SettingKey, s => s);
-        }
-
-        // Organization settings belong to a tenant-specific participation, not the global organization.
-        Dictionary<string, OrganizationSetting>? orgDict = null;
-        if (context.TenantId is { } organizationTenantId && organizationTenantId != Guid.Empty &&
-            context.OrganizationId is { } organizationId && organizationId != Guid.Empty)
-        {
-            var orgSettings = await GetOrganizationSettingsAsync(
-                organizationTenantId,
-                organizationId,
-                ct);
-            orgDict = orgSettings.ToDictionary(s => s.SettingKey, s => s);
-        }
-
-        // Load group settings if context has group
-        Dictionary<string, GroupSetting>? groupDict = null;
-        if (context.GroupId.HasValue)
-        {
-            var groupSettings = await GetGroupSettingsAsync(context.GroupId.Value, ct);
-            groupDict = groupSettings.ToDictionary(s => s.SettingKey, s => s);
-        }
-
-        // Load user preferences if context has user
-        Dictionary<string, UserPreference>? userDict = null;
-        if (context.UserId.HasValue && context.TenantId.HasValue)
-        {
-            var userPrefs = await GetUserPreferencesAsync(context.TenantId.Value, context.UserId.Value, ct);
-            userDict = userPrefs.ToDictionary(s => s.SettingKey, s => s);
-        }
-
-        // Resolve each key through the full cascade
-        var results = new List<ResolvedSetting>(keyList.Count);
-        foreach (var key in keyList)
-        {
-            var resolved = HierarchicalSettingMerge.Resolve(key, systemDict, tenantDict, orgDict, groupDict, userDict);
-            if (resolved is not null)
-                results.Add(resolved);
-        }
-
-        return results;
-    }
-
-    public async Task<TGroup> ResolveGroupAsync<TGroup>(SettingContext context, CancellationToken ct = default)
-        where TGroup : ISettingGroup, new()
-    {
-        var keys = TGroup.SettingKeys;
-        var resolved = await ResolveBatchAsync(keys, context, ct);
-        var dict = resolved.ToDictionary(r => r.Key, r => r);
-
-        var group = new TGroup();
-        group.Populate(dict);
-        return group;
     }
 
     public async Task SetValueAsync(
@@ -392,8 +273,8 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
 
                     InvalidateCache(SettingScope.Tenant, scopeId);
                     _logger.LogInformation(
-                        "Tenant setting locked: {SettingKey} for tenant {TenantId}. User caches refresh within {CacheTtlMinutes}m.",
-                        key, scopeId, _cacheExpiration.TotalMinutes);
+                        "Tenant setting locked. User caches refresh within {CacheTtlMinutes}m.",
+                        _cacheExpiration.TotalMinutes);
                     break;
                 }
 
@@ -466,8 +347,8 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
 
                     InvalidateCache(SettingScope.Tenant, scopeId);
                     _logger.LogInformation(
-                        "Tenant setting unlocked: {SettingKey} for tenant {TenantId}. Cascade restored. User caches refresh within {CacheTtlMinutes}m.",
-                        key, scopeId, _cacheExpiration.TotalMinutes);
+                        "Tenant setting unlocked. Cascade restored. User caches refresh within {CacheTtlMinutes}m.",
+                        _cacheExpiration.TotalMinutes);
                     break;
                 }
 
@@ -497,14 +378,13 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         if (scope is not SettingScope.Instance and not SettingScope.Tenant)
             throw new InvalidOperationException(
                 "Resource governance settings can only be mutated at Instance or Tenant scope.");
-        EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
-            [mutation], actorId, cancellationToken);
+        EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyCurrentHumanAsync(
+            [mutation], scope == SettingScope.Instance
+                ? SettingsMutationOperation.InstanceSettings : SettingsMutationOperation.TenantSettings,
+            actorId, cancellationToken);
         result.EnsureAccepted();
         InvalidateCache(scope, mutation.TenantId);
     }
-
-    private static bool IsSmtpSetting(string key) =>
-        EmailSettingDefinitions.All.Any(definition => definition.Key == key);
 
     private static string[] TenantMutationKeys(string key) =>
         IsSmtpSetting(key) ? [key, GovernanceSettingKeys.TenantDelegation.LockSmtp] : [key];
@@ -520,78 +400,6 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
             if (SettingValueSerializer.DeserializeBool(delegation?.Value, true))
                 throw new SettingSystemLockedException(key);
         }
-    }
-
-    public void InvalidateCache(SettingScope? scope = null, Guid? scopeId = null)
-    {
-        if (scope is null)
-        {
-            _cache.Remove(SystemCacheKey);
-            return;
-        }
-
-        switch (scope.Value)
-        {
-            case SettingScope.Instance:
-                _cache.Remove(SystemCacheKey);
-                break;
-            case SettingScope.Tenant when scopeId.HasValue:
-                _cache.Remove($"{TenantCachePrefix}{scopeId.Value}");
-                break;
-            case SettingScope.Organization:
-                throw new InvalidOperationException(
-                    "Organization cache invalidation requires both tenant and organization scope.");
-            case SettingScope.Group when scopeId.HasValue:
-                _cache.Remove($"{GroupCachePrefix}{scopeId.Value}");
-                break;
-            case SettingScope.User when scopeId.HasValue:
-                _cache.Remove($"{UserCachePrefix}{scopeId.Value}");
-                break;
-        }
-    }
-
-    public void InvalidateOrganizationCache(Guid tenantId, Guid organizationId)
-    {
-        if (tenantId == Guid.Empty)
-        {
-            throw new ArgumentException("Tenant scope is required.", nameof(tenantId));
-        }
-
-        if (organizationId == Guid.Empty)
-        {
-            throw new ArgumentException("Organization scope is required.", nameof(organizationId));
-        }
-
-        _cache.Remove(OrganizationCacheKey(tenantId, organizationId));
-    }
-
-    public void InvalidateUserCache(Guid tenantId, Guid userId)
-    {
-        if (tenantId == Guid.Empty || userId == Guid.Empty)
-        {
-            return;
-        }
-
-        _cache.Remove($"{UserCachePrefix}{tenantId}:{userId}");
-    }
-
-    private async Task<List<SystemSetting>> GetSystemSettingsAsync(CancellationToken ct)
-    {
-        return await _cache.GetOrCreateAsync(SystemCacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = _cacheExpiration;
-            return await _systemSettingRepository.GetAllSettings();
-        }) ?? [];
-    }
-
-    private async Task<List<TenantSetting>> GetTenantSettingsAsync(Guid tenantId, CancellationToken ct)
-    {
-        var cacheKey = $"{TenantCachePrefix}{tenantId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = _cacheExpiration;
-            return await _tenantSettingRepository.GetAllForTenant(tenantId);
-        }) ?? [];
     }
 
     private async Task UpsertSystemSettingAsync(
@@ -678,25 +486,6 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         }
     }
 
-    private async Task<List<OrganizationSetting>> GetOrganizationSettingsAsync(
-        Guid tenantId,
-        Guid organizationId,
-        CancellationToken ct)
-    {
-        string cacheKey = OrganizationCacheKey(tenantId, organizationId);
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = _cacheExpiration;
-            return await _organizationSettingRepository.GetAllForOrganization(
-                tenantId,
-                organizationId,
-                ct);
-        }) ?? [];
-    }
-
-    private static string OrganizationCacheKey(Guid tenantId, Guid organizationId) =>
-        $"{OrgCachePrefix}{tenantId}:{organizationId}";
-
     private Guid RequireAmbientTenantId()
     {
         Guid tenantId = _tenantContext.TenantId;
@@ -705,23 +494,4 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
             : throw new InvalidOperationException("Tenant context is required for organization settings.");
     }
 
-    private async Task<List<GroupSetting>> GetGroupSettingsAsync(Guid groupId, CancellationToken ct)
-    {
-        var cacheKey = $"{GroupCachePrefix}{groupId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = _cacheExpiration;
-            return await _groupSettingRepository.GetAllForGroup(groupId);
-        }) ?? [];
-    }
-
-    private async Task<List<UserPreference>> GetUserPreferencesAsync(Guid tenantId, Guid userId, CancellationToken ct)
-    {
-        var cacheKey = $"{UserCachePrefix}{tenantId}:{userId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = _cacheExpiration;
-            return await _userPreferenceRepository.GetAllForUser(tenantId, userId);
-        }) ?? [];
-    }
 }

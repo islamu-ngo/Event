@@ -9,6 +9,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Federation;
 using Explore.Domain.ValueObjects;
 using NSubstitute;
+using System.Collections.Immutable;
 
 namespace Event.Application.UnitTests.Common;
 
@@ -33,7 +34,7 @@ internal static class AtprotoPublicationPlannerTestFactory
             new AtprotoEventGovernanceResolver(settings),
             Substitute.For<IEventRepository>(),
             Substitute.For<IAtprotoRecordRepository>(),
-            Substitute.For<IUserAuthenticationTokenRepository>(),
+            Substitute.For<IAtprotoSessionBindingReader>(),
             Substitute.For<IUserExternalLoginRepository>(),
             Substitute.For<IAtprotoPublicationPayloadBuilder>(),
             Substitute.For<IPdsSyncOutboxRepository>(),
@@ -47,7 +48,8 @@ internal static class AtprotoPublicationPlannerTestFactory
         IPdsSyncOutboxRepository outbox,
         IEventRepository? eventRepository = null,
         IAtprotoRecordRepository? recordRepository = null,
-        string did = "did:plc:lifecycle-owner")
+        string did = "did:plc:lifecycle-owner",
+        IAtprotoPublicationPayloadBuilder? payloadBuilder = null)
     {
         var settings = Substitute.For<IHierarchicalSettingsResolver>();
         settings.ResolveBatchAsync(
@@ -90,26 +92,12 @@ internal static class AtprotoPublicationPlannerTestFactory
                 SourceVersion = Guid.CreateVersion7(),
                 AtprotoRecord = record
             });
-        var sessions = Substitute.For<IUserAuthenticationTokenRepository>();
-        sessions.GetAtprotoSessionsForReadAsync(
+        var sessions = Substitute.For<IAtprotoSessionBindingReader>();
+        sessions.ReadAsync(
                 tenantId,
                 ownerUserId,
-                RepositoryBackedAtprotoSession.Provider,
                 Arg.Any<CancellationToken>())
-            .Returns([new UserAuthenticationToken
-            {
-                Id = Guid.CreateVersion7(),
-                TenantId = tenantId,
-                Tenant = null!,
-                UserId = ownerUserId,
-                User = null!,
-                Provider = RepositoryBackedAtprotoSession.Provider,
-                SubjectDid = did,
-                SessionCiphertext = [1],
-                EncryptionKeyId = "enc",
-                OAuthClientKeyId = "oauth",
-                PdsHost = "https://pds.example/"
-            }]);
+            .Returns(ImmutableArray.Create(new AtprotoSessionBinding(did, "https://pds.example/")));
         var logins = Substitute.For<IUserExternalLoginRepository>();
         logins.GetByProviderAndKey(PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(
             AtprotoDid.Parse(did)))
@@ -128,7 +116,7 @@ internal static class AtprotoPublicationPlannerTestFactory
             records,
             sessions,
             logins,
-            Substitute.For<IAtprotoPublicationPayloadBuilder>(),
+            payloadBuilder ?? Substitute.For<IAtprotoPublicationPayloadBuilder>(),
             outbox,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<AtprotoEventPublicationPlanner>.Instance);
     }

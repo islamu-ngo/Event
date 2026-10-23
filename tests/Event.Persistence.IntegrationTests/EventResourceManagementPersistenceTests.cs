@@ -144,7 +144,8 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         return new(repository, unit, new EventResourceStorageLifecycleService(
             new EventResourceStorageLifecycleRepository(context), unit, clock), new(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
-                new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                     Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
                     global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),

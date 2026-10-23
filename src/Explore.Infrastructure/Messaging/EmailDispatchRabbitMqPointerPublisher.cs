@@ -69,7 +69,7 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 await repository.MarkRabbitMqPublishFailed(
                     row.Id,
@@ -78,11 +78,7 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
                     CancellationToken.None);
                 failed++;
                 logger.LogWarning(
-                    ex,
-                    "RabbitMQ EmailDispatch pointer producer failed for outbox row {OutboxId}, publish event {PublishEventId}, tenant {TenantId}",
-                    row.Id,
-                    row.PublishEventId,
-                    row.TenantId);
+                    "RabbitMQ EmailDispatch pointer producer failed");
             }
         }
 

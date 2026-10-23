@@ -2,6 +2,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -23,6 +25,9 @@ public sealed class ActorReferenceConsolidationRepository(ExploreDbContext dbCon
         // The sole caller retires source Actor after these bulk writes. Acquire both
         // Actors first, matching review's Actor -> Event order rather than reversing it.
         await dbContext.DisclosureMutations.EnlistActorsAsync([sourceActorId, targetActorId], cancellationToken);
+        if (AtprotoRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.MoveActorReferencesAsync(
+                sourceActorId, targetActorId, targetActorTypeId, cancellationToken).ConfigureAwait(false);
         if (await HasCollisionAsync(sourceActorId, targetActorId, cancellationToken).ConfigureAwait(false))
             return false;
 

@@ -78,6 +78,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
     private readonly AtprotoEventPublicationPlanner _atprotoPublicationPlanner;
     private readonly TimeProvider _timeProvider;
     private readonly IVisitorAccessCapabilityResolver _visitorCapabilities;
+    private readonly IAiEventDraftRecoveryRepository _aiDraftRecovery;
 
     public CreateEventCommandHandler(
         IEventRepository eventRepository,
@@ -132,7 +133,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         EventLocationAttachmentService eventLocationAttachmentService,
         AtprotoEventPublicationPlanner atprotoPublicationPlanner,
         TimeProvider timeProvider,
-        IVisitorAccessCapabilityResolver visitorCapabilities)
+        IVisitorAccessCapabilityResolver visitorCapabilities,
+        IAiEventDraftRecoveryRepository aiDraftRecovery)
     {
         _eventRepository = eventRepository;
         _eventSessionRepository = eventSessionRepository;
@@ -187,11 +189,14 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         _atprotoPublicationPlanner = atprotoPublicationPlanner;
         _timeProvider = timeProvider;
         _visitorCapabilities = visitorCapabilities;
+        _aiDraftRecovery = aiDraftRecovery;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventCommand request, CancellationToken cancellationToken)
     {
         var dto = request.EventDto;
+        if (!request.HasUnchangedAiDraftPayload())
+            return AiDraftAuthorityFailure();
 
         var validationErrors = await ValidateRequestAsync(dto, cancellationToken);
         if (validationErrors.Count > 0)
@@ -211,6 +216,10 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         }
 
         var currentUserId = _userContext.GetRequiredUserId();
+        var aiOrigin = request.AiDraftOrigin;
+        if (aiOrigin is not null && (aiOrigin.Identity.PrincipalUserId != currentUserId
+            || aiOrigin.Identity.TenantId != _tenantContext.TenantId))
+            return AiDraftAuthorityFailure();
 
         Guid?[] imageIds =
         [
@@ -236,6 +245,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                 [actorResult.ErrorDetail!],
                 actorResult.ErrorMessage!);
         }
+        if (aiOrigin is not null && aiOrigin.Identity.ActingActorId != actorResult.ActorId)
+            return AiDraftAuthorityFailure();
 
         List<AddressGovernancePolicyDecision> addressDecisions = [];
         Guid? verifiedOrganizationId = !actorResult.IsCommunitySubmission
@@ -277,7 +288,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         var createdAt = now;
         DateTime occurredAt = now.UtcDateTime;
         bool publishOnCreate = requestedStatusId == (int)EventStatusEnum.Published;
-        var newEventId = Guid.CreateVersion7();
+        var newEventId = aiOrigin?.ReservedEventId ?? Guid.CreateVersion7();
         var initialOwnerId = Guid.CreateVersion7();
         var publicCode = GeneratePublicCode();
         var creation = new EventInitialCreation(_tenantContext.TenantId, newEventId, initialOwnerId,
@@ -301,6 +312,16 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             {
                 var eventEntity = BuildEventEntity(dto, actorResult, timezoneId, creator, createdAt,
                     publishOnCreate, newEventId, publicCode);
+                if (aiOrigin is not null)
+                {
+                    var execution = await _aiDraftRecovery.ReadForPrimaryCreationAsync(
+                        aiOrigin.Identity, aiOrigin.ExecutionId, aiOrigin.ReservedEventId, ct);
+                    if (execution is null)
+                        return AiDraftAuthorityFailure();
+                    if (execution.PrimaryEventId is { } primaryEventId)
+                        return BaseCommandResponse.Success(primaryEventId, "Event created successfully.");
+                }
+
                 var capability = await _visitorCapabilities.ResolveAsync(eventEntity.TenantId, ct);
                 if (dto.ParticipationConfiguration.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
                     && !capability.AllowsAccountRequiredParticipation)
@@ -373,6 +394,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                         publishedAt));
                 }
 
+                if (aiOrigin is not null)
+                    await _aiDraftRecovery.LinkPrimaryAsync(aiOrigin.Identity, aiOrigin.ExecutionId, eventEntity, ct);
                 return BaseCommandResponse.Success(eventEntity.Id, "Event created successfully.");
             }, cancellationToken);
             if (!response.IsSuccess)
@@ -428,7 +451,11 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             _actorRepository);
 
         var validationResult = await validator.ValidateAsync(request, cancellationToken);
-        return validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+        return validationResult.Errors
+            .Select(error => string.IsNullOrEmpty(error.PropertyName)
+                ? error.ErrorMessage
+                : $"{error.PropertyName}: {error.ErrorMessage}")
+            .ToList();
     }
 
     private Task<EventActorResult> ResolvePublisherActorAsync(CreateEventDto request, Guid currentUserId, CancellationToken cancellationToken) =>
@@ -444,17 +471,17 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         Guid eventId,
         string publicCode)
     {
-        var publicSessionRequests = includePublicScheduleRollup
-            ? dto.Sessions
+        IReadOnlyList<CreateEventGraphSessionDto> publicSessionRequests = includePublicScheduleRollup
+            ? dto.Sessions.Where(session => session.StartTime.HasValue).ToArray()
             : [];
         var firstSession = publicSessionRequests.MinBy(s => s.StartTime);
         var lastSession = publicSessionRequests.MaxBy(s => s.StartTime);
         var firstSessionLocal = firstSession is null
             ? (DateOnly?)null
-            : _scheduleProjectionCalculator.Project(firstSession.StartTime, firstSession.EndTime, timezoneId).LocalStartDate;
+            : _scheduleProjectionCalculator.Project(firstSession.StartTime!.Value, firstSession.EndTime, timezoneId).LocalStartDate;
         var lastSessionLocal = lastSession is null
             ? (DateOnly?)null
-            : _scheduleProjectionCalculator.Project(lastSession.StartTime, lastSession.EndTime, timezoneId).LocalStartDate;
+            : _scheduleProjectionCalculator.Project(lastSession.StartTime!.Value, lastSession.EndTime, timezoneId).LocalStartDate;
 
         var eventEntity = new Event(includePublicScheduleRollup
             ? EventStatusEnum.Published
@@ -484,8 +511,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             RegistrationPolicyId = dto.RegistrationPolicyId,
             FirstSessionDate = firstSessionLocal,
             LastSessionDate = lastSessionLocal,
-            FirstSessionStartUtc = firstSession?.StartTime.ToUniversalTime(),
-            LastSessionStartUtc = lastSession?.StartTime.ToUniversalTime(),
+            FirstSessionStartUtc = firstSession?.StartTime?.ToUniversalTime(),
+            LastSessionStartUtc = lastSession?.StartTime?.ToUniversalTime(),
             SessionCount = publicSessionRequests.Count,
             ActorId = actorResult.ActorId,
             Actor = null!,
@@ -517,6 +544,11 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
     }
 
     private static string GeneratePublicCode() => Guid.CreateVersion7().ToString("N")[..12];
+
+    private static BaseCommandResponse<Guid> AiDraftAuthorityFailure() =>
+        BaseCommandResponse.Failure<Guid>(
+            "ai_event_draft_authority_changed",
+            "The confirmed AI event draft is not available for this creation or recovery.");
 
     private static BaseCommandResponse<Guid> AddressGovernanceFailure() =>
         BaseCommandResponse.Failure<Guid>(
@@ -591,7 +623,8 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             .ToDictionary(g => g.Key, g => g.First());
 
         var sessionDates = dto.Sessions
-            .Select(s => _scheduleProjectionCalculator.Project(s.StartTime, s.EndTime, timezoneId).LocalStartDate)
+            .Where(session => session.StartTime.HasValue)
+            .Select(session => _scheduleProjectionCalculator.Project(session.StartTime!.Value, session.EndTime, timezoneId).LocalStartDate)
             .Distinct()
             .Order()
             .ToList();
@@ -731,7 +764,10 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
         }
 
         var index = 0;
-        foreach (var sessionDto in dto.Sessions.OrderBy(s => s.StartTime).ThenBy(s => s.SortOrder))
+        foreach (var sessionDto in dto.Sessions
+                     .OrderBy(session => !session.StartTime.HasValue)
+                     .ThenBy(session => session.StartTime)
+                     .ThenBy(session => session.SortOrder))
         {
             index++;
             var session = new EventSession(eventEntity.EventStatusId == (int)EventStatusEnum.Published
@@ -752,6 +788,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                 CurrentAudienceAttendees = 0,
                 EventSessionKindId = sessionDto.EventSessionKindId,
                 RegistrationModeId = sessionDto.RegistrationModeId,
+                EndTimeType = sessionDto.EndTimeType,
                 Slug = string.IsNullOrWhiteSpace(sessionDto.Slug)
                     ? SlugGenerator.FromTitle(sessionDto.Title ?? $"{eventEntity.Title}-session-{index}", "session")
                     : sessionDto.Slug
@@ -764,38 +801,44 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
                 ct);
             session.AssignEventLocation(eventLocation);
 
-            switch (sessionDto.EndTimeType)
+            if (sessionDto.StartTime is { } startTime)
             {
-                case SessionEndTimeType.Fixed:
-                    session.Reschedule(
-                        UtcInstantRange.Create(sessionDto.StartTime, sessionDto.EndTime!.Value),
-                        timezoneId,
-                        _scheduleProjectionCalculator);
-                    break;
-                case SessionEndTimeType.OpenEnded:
-                    session.ScheduleOpenEnded(
-                        sessionDto.StartTime,
-                        timezoneId,
-                        _scheduleProjectionCalculator);
-                    break;
-                case SessionEndTimeType.RelativeToPrayer when sessionDto.EndTime is { } endTime:
-                    session.ScheduleRelativeToPrayer(
-                        UtcInstantRange.Create(sessionDto.StartTime, endTime),
-                        timezoneId,
-                        _scheduleProjectionCalculator);
-                    break;
-                case SessionEndTimeType.RelativeToPrayer:
-                    session.ScheduleRelativeToPrayer(
-                        sessionDto.StartTime,
-                        timezoneId,
-                        _scheduleProjectionCalculator);
-                    break;
-                default:
-                    throw new InvalidOperationException("Event session end time type is not supported.");
+                switch (sessionDto.EndTimeType)
+                {
+                    case SessionEndTimeType.Fixed:
+                        session.Reschedule(
+                            UtcInstantRange.Create(startTime, sessionDto.EndTime!.Value),
+                            timezoneId,
+                            _scheduleProjectionCalculator);
+                        break;
+                    case SessionEndTimeType.OpenEnded:
+                        session.ScheduleOpenEnded(startTime, timezoneId, _scheduleProjectionCalculator);
+                        break;
+                    case SessionEndTimeType.RelativeToPrayer when sessionDto.EndTime is { } endTime:
+                        session.ScheduleRelativeToPrayer(
+                            UtcInstantRange.Create(startTime, endTime),
+                            timezoneId,
+                            _scheduleProjectionCalculator);
+                        break;
+                    case SessionEndTimeType.RelativeToPrayer:
+                        session.ScheduleRelativeToPrayer(startTime, timezoneId, _scheduleProjectionCalculator);
+                        break;
+                    default:
+                        throw new InvalidOperationException("Event session end time type is not supported.");
+                }
             }
-            session.EventDayId = session.LocalStartDate is not null
-                ? ResolveDayId(sessionDto.DayTempKey, session.LocalStartDate.Value, dayMaps)
-                : null;
+            if (session.LocalStartDate is { } localStartDate)
+            {
+                session.EventDayId = ResolveDayId(sessionDto.DayTempKey, localStartDate, dayMaps);
+            }
+            else if (!string.IsNullOrWhiteSpace(sessionDto.DayTempKey))
+            {
+                session.EventDayId = dayMaps.ByKey[sessionDto.DayTempKey.Trim()].Id;
+            }
+            else
+            {
+                session.EventDayId = null;
+            }
             session = await PersistSessionWithRoomGuardAsync(session, ct);
 
             await CreateSessionAspectsAsync(sessionDto, session, ct);

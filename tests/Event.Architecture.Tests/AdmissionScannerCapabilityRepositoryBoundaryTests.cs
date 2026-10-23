@@ -70,8 +70,11 @@ public sealed class AdmissionScannerCapabilityRepositoryBoundaryTests
             .ToArray();
         await Assert.That(phase21Repositories).IsEquivalentTo([
             repository,
+            typeof(IAdmissionScannerAuthenticationRepository),
             typeof(IAdmissionCheckInReportingRepository)
         ]);
+        await Assert.That(Unwrap(typeof(IAdmissionScannerAuthenticationRepository).GetMethods().Single().ReturnType))
+            .Contains(typeof(AdmissionScannerCapability));
         Type[] reportingSignatureTypes = typeof(IAdmissionCheckInReportingRepository).GetMethods()
             .SelectMany(method => method.GetParameters().Select(parameter => parameter.ParameterType)
                 .Append(method.ReturnType))

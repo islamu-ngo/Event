@@ -195,7 +195,8 @@ public sealed partial class ModerationCaseNativeProofTests
 
         private ModerationMachineSubjectBindingRepository Bindings(
             ExploreDbContext context, AdminContext admin, MachinePrincipalAccessor machine) =>
-            new(context, admin, machine, new ExternalApiKeyRepository(context),
+            new(context, admin, machine,
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), Database.Clock);
 
         private ModerationPolicyPublicationRepository Publications(
@@ -422,7 +423,8 @@ public sealed partial class ModerationCaseNativeProofTests
             {
                 var (admin, machine) = fixture.Identity(claim);
                 var result = await new ModerationEffectLeaseRepository(claim, machine, fixture.Bindings(claim, admin, machine),
-                    new ExternalApiKeyRepository(claim), database.Clock).ClaimAsync(fixture.EffectId, 1);
+                    new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(claim)),
+                    database.Clock).ClaimAsync(fixture.EffectId, 1);
                 await Assert.That(result.Outcome).IsEqualTo(ModerationEffectLeaseOutcome.Known);
                 fixture.LeaseId = result.Effect!.LeaseId!.Value;
                 fixture.LeaseRevision = result.Effect.Revision;
@@ -439,7 +441,7 @@ public sealed partial class ModerationCaseNativeProofTests
             {
                 await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
                 var authority = await new ModerationMaintenanceAuthority(context, machine, Bindings(context, admin, machine),
-                    new ExternalApiKeyRepository(context), Database.Clock)
+                    new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), Database.Clock)
                     .AcquireForEffectAsync(EffectId, LeaseId, LeaseRevision, privacy, token);
                 if (authority is null) throw new InvalidOperationException("The real retained maintenance authority was unavailable.");
                 var source = await context.ModerationNoticeSources.AsNoTracking().SingleAsync(row => row.EffectId == EffectId, token);
@@ -468,7 +470,8 @@ public sealed partial class ModerationCaseNativeProofTests
                 new(context, definitions, Database.Clock), new(context, definitions, Inventory, Database.Clock),
                 null, [], Database.Clock);
             var result = await new ModerationOriginalEffectCompletionRepository(context, machine, Bindings(context, admin, machine),
-                new ExternalApiKeyRepository(context), Database.Clock, original.Privacy.Authority(context, Database.Clock),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Database.Clock, original.Privacy.Authority(context, Database.Clock),
                 Inventory, Publications(context, admin, machine), sources, [], new ModerationMeasurementReceiptVerifier())
                 .CompleteAsync(EffectId, LeaseId, LeaseRevision);
             await Assert.That(context.Database.CurrentTransaction).IsNull();

@@ -14,6 +14,12 @@ public static class RefundAttemptEvidence
     {
         ArgumentNullException.ThrowIfNull(attempt);
         ArgumentNullException.ThrowIfNull(observation);
+        if (observedAt < attempt.LastObservedAt ||
+            attempt.Status is RefundAttemptStatusEnum.Succeeded or RefundAttemptStatusEnum.Failed or RefundAttemptStatusEnum.Cancelled ||
+            attempt.BuyerRefundSucceededAt.HasValue &&
+            observation.Status is not RefundProviderStatus.Succeeded)
+            return;
+
         if (string.IsNullOrWhiteSpace(observation.ProviderRefundId) ||
             observation.ProviderRefundId.Length > 200 ||
             observation.ProviderRefundId.Any(char.IsControl) ||
@@ -23,7 +29,13 @@ public static class RefundAttemptEvidence
             observation.ApplicationFeeRefundFailureCode is { Length: > 80 } ||
             observation.ApplicationFeeRefundFailureCode?.Any(char.IsControl) == true)
         {
-            attempt.MarkUnknown(observedAt, providerRequestId, observation.ProviderRefundId);
+            attempt.MarkUnknown(observedAt, providerRequestId);
+            return;
+        }
+        if (attempt.ProviderRefundId is not null &&
+            !string.Equals(attempt.ProviderRefundId, observation.ProviderRefundId, StringComparison.Ordinal))
+        {
+            attempt.MarkUnknown(observedAt, providerRequestId);
             return;
         }
 

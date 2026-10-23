@@ -8,13 +8,14 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
-using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Identity;
 using Explore.Infrastructure.Services;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Grpc.Core;
@@ -103,12 +104,11 @@ public sealed partial class TenantAuthorityMembershipParityTests
             foreach (var batch in new[] { false, true })
             {
                 using var cache = new MemoryCache(new MemoryCacheOptions());
-                var machine = Substitute.For<IMachinePrincipalAccessor>();
-                machine.IsMachineCaller.Returns(machineOwner);
-                machine.Current.Returns(machineOwner
-                    ? new ApiKeyPrincipalContext("membership-key", database.TenantId,
-                        ExternalApiKeyOwnerType.User, database.UserId, [ExternalApiKeyScopes.AdminTenant])
-                    : null);
+                var machine = database.Machine;
+                machine.Clear();
+                if (machineOwner)
+                    machine.SetPrincipal(new ApiKeyPrincipalContext("membership-key", database.TenantId,
+                        ExternalApiKeyOwnerType.User, database.UserId, [ExternalApiKeyScopes.AdminTenant]));
                 var remote = new CategoryPolicyBoundary();
                 var provider = database.CreateProvider(providerName, cache, machine, remote);
                 var own = DeleteCategory(database.TenantId);
@@ -149,9 +149,9 @@ public sealed partial class TenantAuthorityMembershipParityTests
             foreach (var scenario in new[] { "read-only-scope", "foreign-owner", "wrong-key-tenant" })
             {
                 using var cache = new MemoryCache(new MemoryCacheOptions());
-                var machine = Substitute.For<IMachinePrincipalAccessor>();
-                machine.IsMachineCaller.Returns(true);
-                machine.Current.Returns(new ApiKeyPrincipalContext("membership-key",
+                var machine = database.Machine;
+                machine.Clear();
+                machine.SetPrincipal(new ApiKeyPrincipalContext("membership-key",
                     scenario == "wrong-key-tenant" ? database.SecondTenantId : database.TenantId,
                     ExternalApiKeyOwnerType.User,
                     scenario == "foreign-owner" ? database.ForeignUserId : database.UserId,
@@ -168,6 +168,28 @@ public sealed partial class TenantAuthorityMembershipParityTests
     private static AuthorizationRequest DeleteCategory(Guid tenantId) => TestAuthorizationRequest.Create(
         ResourceKinds.Category, Guid.CreateVersion7().ToString(), AuthorizationActions.Delete,
         new Dictionary<string, object> { ["tenantId"] = tenantId });
+
+    [Test]
+    public async Task LocalOrdinaryUserMayEraseOnlyTheirOwnSubject()
+    {
+        await using var database = new AuthorityDatabase();
+        await database.InitializeAsync(MembershipState.Revoked);
+        var admin = database.CreateAdmin();
+        await Assert.That(await admin.IsTenantAdminAsync(database.TenantId)).IsFalse();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var machine = database.Machine;
+        machine.Clear();
+        var provider = database.CreateProvider("local", cache, machine, new CategoryPolicyBoundary());
+        var selfRequest = TestAuthorizationRequest.Create(ResourceKinds.User, database.UserId.ToString("D"),
+            AuthorizationActions.Delete, new Dictionary<string, object> { ["tenantId"] = database.TenantId });
+        var foreignRequest = TestAuthorizationRequest.Create(ResourceKinds.User, database.ForeignUserId.ToString("D"),
+            AuthorizationActions.Delete, new Dictionary<string, object> { ["tenantId"] = database.TenantId });
+        await Assert.That((await provider.AuthorizeAsync(selfRequest)).IsAllowed).IsTrue();
+        await Assert.That((await provider.AuthorizeAsync(foreignRequest)).IsAllowed).IsFalse();
+        var batch = await provider.AuthorizeBatchAsync([selfRequest, foreignRequest]);
+        await Assert.That(batch[0].IsAllowed).IsTrue();
+        await Assert.That(batch[1].IsAllowed).IsFalse();
+    }
 
     /// <summary>
     /// An external client substitute for the bundled category delete rule and tenant derived role:
@@ -210,11 +232,12 @@ public sealed partial class TenantAuthorityMembershipParityTests
         }
     }
 
-    private sealed class AuthorityDatabase : IAsyncDisposable
+    private sealed class AuthorityDatabase : IAsyncDisposable, IGlobalExploreDbContextFactory
     {
         private readonly SqliteConnection _connection = new(new SqliteConnectionStringBuilder
         {
-            DataSource = ":memory:"
+            DataSource = Path.Combine(Path.GetTempPath(), $"membership-parity-{Guid.CreateVersion7():N}.db"),
+            Pooling = false
         }.ToString());
         public ExploreDbContext Context { get; }
         public Guid UserId { get; } = Guid.CreateVersion7();
@@ -222,6 +245,8 @@ public sealed partial class TenantAuthorityMembershipParityTests
         public Guid TenantId { get; } = Guid.CreateVersion7();
         public Guid SecondTenantId { get; } = Guid.CreateVersion7();
         public Guid ForeignTenantId { get; } = Guid.CreateVersion7();
+        private CurrentHumanPrincipalFixture _human = null!;
+        public MachinePrincipalAccessor Machine => _human.Machine;
 
         public AuthorityDatabase()
         {
@@ -256,6 +281,9 @@ public sealed partial class TenantAuthorityMembershipParityTests
             await Context.SaveChangesAsync();
             Context.ChangeTracker.Clear();
             Context.TenantContext = new TenantContext(TenantId);
+            _human = new CurrentHumanPrincipalFixture(UserId, TenantId,
+                new SqliteConnectionStringBuilder(_connection.ConnectionString).DataSource);
+            await _human.InitializeAsync();
         }
 
         private void AddMembership(Guid tenantId, Guid userId, MembershipState state, TenantStatusEnum tenantStatus)
@@ -295,27 +323,35 @@ public sealed partial class TenantAuthorityMembershipParityTests
 
         public AdminContext CreateAdmin() => new(
             new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, UserId.ToString())], "test")) } },
-            new PlatformUserRoleRepository(Context), new TenantUserRoleGrantRepository(Context),
+            new AdministrativeAuthorityRepository(this),
             new OrganizationMemberRepository(Context), new GroupMemberRepository(Context),
-            new UserExternalLoginRepository(Context), NullLogger<AdminContext>.Instance);
+            new ExternalLoginAuthenticationRepository(this, null), NullLogger<AdminContext>.Instance);
+
+        public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
+                .UseSqlite(_connection.ConnectionString).UseSnakeCaseNamingConvention().Options));
+        }
 
         public RuntimeAuthorizationProvider CreateProvider(string providerName, IMemoryCache cache,
             IMachinePrincipalAccessor machine, CategoryPolicyBoundary remote)
         {
-            var admin = CreateAdmin();
+            _human.EnterRequest();
+            var admin = _human.Admin;
             var organizations = new OrganizationMemberRepository(Context);
             var groups = new GroupMemberRepository(Context);
             var events = new EventAuthoritySnapshotService(Context);
             var settings = Substitute.For<IHierarchicalSettingsResolver>();
             var tenant = new TenantContext(TenantId);
-            var principal = new CerbosPrincipalBuilder(admin, machine, events, organizations, groups);
+            var principal = new CerbosPrincipalBuilder(admin, machine, events, _human.Reader);
             var cerbos = new CerbosAuthorizationService(remote.CreateClient(), principal, admin, machine,
                 settings, tenant, Substitute.For<ICerbosClientFactory>(), Options.Create(new CerbosSettings()),
                 NullLogger<CerbosAuthorizationService>.Instance);
             var local = new FallbackAuthorizationService(admin, machine, events, organizations, groups,
                 settings, tenant, NullLogger<FallbackAuthorizationService>.Instance);
             return new RuntimeAuthorizationProvider(cerbos, local, Substitute.For<ICerbosConfigResolver>(),
-                new SystemSettingRepository(Context, new RelationalSettingMutationLock(Context, new EfCoreUnitOfWork(Context))),
+                SystemSettingRepository.CreateReadOnly(Context, new RelationalSettingMutationLock(Context, new EfCoreUnitOfWork(Context))),
                 cache, NullLogger<RuntimeAuthorizationProvider>.Instance,
                 Options.Create(new AuthorizationProviderDeploymentOptions { Provider = providerName }),
                 Substitute.For<IEventResourceCapabilityAuthorizer>());
@@ -323,8 +359,14 @@ public sealed partial class TenantAuthorityMembershipParityTests
 
         public async ValueTask DisposeAsync()
         {
+            string path = _connection.DataSource;
+            if (_human is not null)
+                await _human.DisposeAsync();
             await Context.DisposeAsync();
             await _connection.DisposeAsync();
+            File.Delete(path);
+            File.Delete(path + "-wal");
+            File.Delete(path + "-shm");
         }
     }
 

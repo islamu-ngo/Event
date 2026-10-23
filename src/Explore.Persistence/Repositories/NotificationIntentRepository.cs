@@ -9,6 +9,7 @@ using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Schema.ProviderPrimitives;
 using Explore.Persistence.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -63,29 +64,28 @@ public sealed partial class NotificationIntentRepository : GenericRepository<Not
 
     private bool IsDeduplicationConflict(DbUpdateException exception)
     {
-        if (exception.InnerException is not Npgsql.PostgresException
-            {
-                SqlState: UniqueViolationSqlState,
-                ConstraintName: { } constraintName
-            })
-        {
+        if (exception.InnerException is not (
+            Npgsql.PostgresException { SqlState: UniqueViolationSqlState, ConstraintName: not null }
+            or SqliteException { SqliteExtendedErrorCode: 1555 or 2067 }))
             return false;
-        }
-
-        string primaryKey = RelationalConstraintDescriptorResolver
-            .PrimaryKey<NotificationIntent>(_dbContext).Name;
-        string deduplication = RelationalConstraintDescriptorResolver.UniqueIndex<NotificationIntent>(
-            _dbContext,
-            nameof(NotificationIntent.TenantId),
-            nameof(NotificationIntent.DeduplicationKey)).Name;
-        string occurrenceRecipient = RelationalConstraintDescriptorResolver.UniqueIndex<NotificationIntent>(
-            _dbContext,
-            nameof(NotificationIntent.TenantId),
-            nameof(NotificationIntent.FanoutOccurrenceId),
-            nameof(NotificationIntent.RecipientUserId)).Name;
-        return constraintName == primaryKey ||
-               constraintName == deduplication ||
-               constraintName == occurrenceRecipient;
+        var constraints = new[]
+        {
+            RelationalConstraintDescriptorResolver.PrimaryKey<NotificationIntent>(_dbContext),
+            RelationalConstraintDescriptorResolver.UniqueIndex<NotificationIntent>(_dbContext,
+                nameof(NotificationIntent.TenantId), nameof(NotificationIntent.DeduplicationKey)),
+            RelationalConstraintDescriptorResolver.UniqueIndex<NotificationIntent>(_dbContext,
+                nameof(NotificationIntent.TenantId), nameof(NotificationIntent.FanoutOccurrenceId),
+                nameof(NotificationIntent.RecipientUserId))
+        };
+        return exception.InnerException switch
+        {
+            Npgsql.PostgresException { SqlState: UniqueViolationSqlState, ConstraintName: { } name } =>
+                constraints.Any(constraint => constraint.Name == name),
+            SqliteException { SqliteExtendedErrorCode: 1555 or 2067 } sqlite =>
+                constraints.Any(constraint => sqlite.Message.EndsWith(
+                    $"constraint failed: {string.Join(", ", constraint.QualifiedColumns)}'.", StringComparison.Ordinal)),
+            _ => false
+        };
     }
 
     public async Task<NotificationIntent?> GetGraphByTenantOccurrenceAndRecipientAsync(

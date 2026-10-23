@@ -122,6 +122,8 @@ public sealed partial class RegistrationOrderLifecycleService(
                 return Success(order, status, "Registration order is already submitted.");
             }
 
+            RegistrationOrderPlatformContribution? contribution = null;
+            RegistrationOrderTotalsSnapshot? contributionTotals = null;
             if (platformContributionBasisPoints.HasValue)
             {
                 if (platformContributionBasisPoints is < 0 or > 10_000)
@@ -129,7 +131,6 @@ public sealed partial class RegistrationOrderLifecycleService(
                     return Failure(orderId, order, "Platform contribution percentage is invalid.");
                 }
 
-                RegistrationOrderPlatformContribution? contribution = null;
                 if (platformContributionBasisPoints > 0)
                 {
                     if (order.OrganizerDirectedTotalMinorSnapshot == 0)
@@ -157,14 +158,12 @@ public sealed partial class RegistrationOrderLifecycleService(
                         order.CurrencyCode);
                 }
 
-                order.SetPlatformContribution(contribution);
-                order.ApplyTotals(RegistrationOrderTotalsSnapshot.Create(
+                contributionTotals = RegistrationOrderTotalsSnapshot.Create(
                     order.CurrencyCode,
                     order.OrganizerDirectedTotalMinorSnapshot,
                     order.PlatformFeeTotalMinorSnapshot,
                     order.OrganizerEarningsTotalMinorSnapshot,
-                    contribution?.AmountMinor ?? 0));
-                await inventory.SaveChangesAsync(token);
+                    contribution?.AmountMinor ?? 0);
             }
 
             bool transitioned = await transitions.PersistAsync(
@@ -174,13 +173,23 @@ public sealed partial class RegistrationOrderLifecycleService(
                 RegistrationOrderStatusEnum.AwaitingRequirements,
                 now,
                 token);
-            return transitioned
-                ? Success(order, RegistrationOrderStatusEnum.AwaitingRequirements, "Registration order submitted.")
-                : await CurrentOrConflictAsync(orderId, tenantId, "Registration order changed while it was submitted.", token);
+            if (!transitioned)
+                return await CurrentOrConflictAsync(orderId, tenantId, "Registration order changed while it was submitted.", token);
+
+            if (contributionTotals is not null)
+            {
+                order.SetPlatformContribution(contribution);
+                order.ApplyTotals(contributionTotals);
+                await inventory.SaveChangesAsync(token);
+            }
+
+            return Success(order, RegistrationOrderStatusEnum.AwaitingRequirements, "Registration order submitted.");
         }, cancellationToken);
     }
 
-    private async Task<RegistrationOrderLifecycleResponseDto> ReadyForCheckoutCoreAsync(Guid orderId, Guid tenantId, CancellationToken cancellationToken)
+    private async Task<RegistrationOrderLifecycleResponseDto> ReadyForCheckoutCoreAsync(
+        Guid orderId, Guid tenantId, CancellationToken cancellationToken,
+        RegistrationFinalizationClaim? claim = null)
     {
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         RegistrationOrder? initialOrder = await inventory.GetOrderWithLinesAsync(orderId, tenantId, cancellationToken);
@@ -192,7 +201,8 @@ public sealed partial class RegistrationOrderLifecycleService(
         RegistrationOrderStatusEnum initialStatus = (RegistrationOrderStatusEnum)initialOrder.RegistrationOrderStatusId;
         if (initialStatus != RegistrationOrderStatusEnum.AwaitingRequirements)
         {
-            return Success(initialOrder, initialStatus, "Registration order is already routed for checkout.");
+            return await ObserveFinalizationResultAsync(claim,
+                Success(initialOrder, initialStatus, "Registration order is already routed for checkout."), cancellationToken);
         }
 
         if (initialOrder.RegistrationWorkflowVersionId.HasValue &&
@@ -205,7 +215,7 @@ public sealed partial class RegistrationOrderLifecycleService(
         bool requiresApproval = await RequiresApprovalAsync(initialOrder, plan.TicketTypes, cancellationToken);
         try
         {
-            return await unitOfWork.ExecuteSerializableAsync(async token =>
+            return await ExecuteFinalizationTransactionAsync(claim, async token =>
             {
                 RegistrationOrder? order = await inventory.GetOrderForUpdateWithLinesAsync(orderId, tenantId, token);
                 if (order is null)
@@ -412,7 +422,8 @@ public sealed partial class RegistrationOrderLifecycleService(
         Guid orderId,
         Guid tenantId,
         bool paid,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        RegistrationFinalizationClaim? claim = null)
     {
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         RegistrationOrder? initialOrder = await inventory.GetOrderWithLinesAsync(orderId, tenantId, cancellationToken);
@@ -426,15 +437,18 @@ public sealed partial class RegistrationOrderLifecycleService(
         {
             if (paid && await GetPaymentEvidenceStateAsync(initialOrder, cancellationToken) == PaymentEvidenceState.Duplicate)
             {
-                return Success(initialOrder, initialStatus, SucceededPaymentLookupResult.DuplicateCode);
+                return await ObserveFinalizationResultAsync(claim,
+                    Success(initialOrder, initialStatus, SucceededPaymentLookupResult.DuplicateCode), cancellationToken);
             }
 
-            return Success(initialOrder, initialStatus, "Registration order is already confirmed.");
+            return await ObserveFinalizationResultAsync(claim,
+                Success(initialOrder, initialStatus, "Registration order is already confirmed."), cancellationToken);
         }
 
         if (RegistrationOrderRules.IsTerminal(initialStatus))
         {
-            return Success(initialOrder, initialStatus, "Registration order is terminal and cannot be finalized.");
+            return await ObserveFinalizationResultAsync(claim,
+                Success(initialOrder, initialStatus, "Registration order is terminal and cannot be finalized."), cancellationToken);
         }
 
         bool eligibleStatus = paid
@@ -460,7 +474,7 @@ public sealed partial class RegistrationOrderLifecycleService(
             string code = initialPayment == PaymentEvidenceState.Duplicate
                 ? SucceededPaymentLookupResult.DuplicateCode
                 : "payment_composition_mismatch";
-            return await ParkPaidIssueAsync(initialOrder, now, code, cancellationToken);
+            return await ParkPaidIssueAsync(initialOrder, now, code, cancellationToken, claim);
         }
 
         RegistrationOrderStatusEnum expectedStatus = initialStatus;
@@ -483,7 +497,7 @@ public sealed partial class RegistrationOrderLifecycleService(
 
         try
         {
-            return await unitOfWork.ExecuteSerializableAsync(async token =>
+            return await ExecuteFinalizationTransactionAsync(claim, async token =>
             {
                 RegistrationOrder? order = await inventory.GetOrderForUpdateWithLinesAsync(orderId, tenantId, token);
                 if (order is null)
@@ -642,9 +656,11 @@ public sealed partial class RegistrationOrderLifecycleService(
             if (current is not null &&
                 (RegistrationOrderStatusEnum)current.RegistrationOrderStatusId == RegistrationOrderStatusEnum.Confirmed)
             {
-                return paid && await GetPaymentEvidenceStateAsync(current, cancellationToken) == PaymentEvidenceState.Duplicate
-                    ? Success(current, RegistrationOrderStatusEnum.Confirmed, SucceededPaymentLookupResult.DuplicateCode)
-                    : Success(current, RegistrationOrderStatusEnum.Confirmed, "Registration order is already confirmed.");
+                return await ObserveFinalizationResultAsync(claim,
+                    paid && await GetPaymentEvidenceStateAsync(current, cancellationToken) == PaymentEvidenceState.Duplicate
+                        ? Success(current, RegistrationOrderStatusEnum.Confirmed, SucceededPaymentLookupResult.DuplicateCode)
+                        : Success(current, RegistrationOrderStatusEnum.Confirmed, "Registration order is already confirmed."),
+                    cancellationToken);
             }
 
             return Failure(orderId, current, "Registration order finalization could not reserve its held inventory.");

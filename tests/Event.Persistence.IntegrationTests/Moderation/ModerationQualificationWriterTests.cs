@@ -766,7 +766,7 @@ public sealed partial class ModerationQualificationWriterTests
                 context, identity.Admin, identity.Machine, Inventory, null, clock);
             var governance = new ControlledGovernance(context, this);
             var activation = new ModerationNativeActivationQualification(context, Inventory, null, governance, clock);
-            var keys = new ExternalApiKeyRepository(context);
+            var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(context, identity.Admin, identity.Machine,
                 keys, new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), clock);
             return new(context, identity.Admin, identity.Machine, bindings, keys, publications, Inventory, activation, clock,

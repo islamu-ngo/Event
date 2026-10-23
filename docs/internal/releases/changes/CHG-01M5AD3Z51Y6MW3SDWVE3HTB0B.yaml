@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5AD3Z51Y6MW3SDWVE3HTB0B
+Title: "Deliver bootstrap effects without private audit reads"
+Type: fix
+Scope: self-hosting
+Summary: "Write versioned key-only effect instructions with the original bootstrap transaction and deliver them through the claim-bound Runtime worker instead of the startup Global identity."
+Group: configuration-bootstrap-effect-handoff
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Detail: Bootstrap effects require version1 key-only instructions. Legacy null payloads and unsupported versions have no compatibility fallback. Keep application and native capability definitions coherent; do not rewrite pending effects manually.
+  Security:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: C# derives the bounded Created-tenant and changed-key audience from the complete Applied receipt in the original transaction. Runtime consumes its exact admitted message without private audit-table SELECT. Existing source identity, lease and digest checks remain; manifest payload replacement is denied natively and in the portable predicate. No new grants or privileged business routine are introduced. The live claim digest is not an independent historic receipt digest or protection against privileged database rewrites before admission.
+  Migration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: No new environment variable or credential is added. Production startup defers effects while retaining Runtime dispatcher and import service registration. The existing outbox worker must remain enabled for delivery.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: Bootstrap commit and worker delivery are distinct outcomes. Monitor pending, retry and dead-letter work; preserve the same effect and committed receipt after failure. Do not reapply configuration or force completion to hide delivery failures. Restore a coherent application/database checkpoint for rollback.

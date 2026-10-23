@@ -21,7 +21,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Features.Calendar;
@@ -135,8 +134,7 @@ public sealed class EventCalendarRuntimeTests(CalendarRouteRuntimeFixture fixtur
 
     private async Task<CalendarRouteScenario> SeedScenarioAsync()
     {
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = fixture.CreateDbContext();
         TenantScenarioSeed.TenantScenarioResult tenant =
             await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
         DateTime now = DateTime.UtcNow;
@@ -354,10 +352,13 @@ public sealed class EventCalendarRuntimeTests(CalendarRouteRuntimeFixture fixtur
 
 public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDisposable
 {
-    private PostgreSqlContainer? _container;
+    private Event.Persistence.IntegrationTests.Fixtures.PostgreSqlContainerFixture? _database;
 
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
+
+    public ExploreDbContext CreateDbContext() => Factory is CalendarMeasurementWebApplicationFactory measurement
+        ? measurement.CreateDbContext() : _database!.CreateDbContext();
 
     public async Task InitializeAsync()
     {
@@ -371,24 +372,11 @@ public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDispo
             return;
         }
 
-        _container = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("calendar_routes")
-            .WithUsername("postgres")
-            .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
-            .Build();
-        await _container.StartAsync();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
-            .UseSnakeCaseNamingConvention()
-            .Options;
-        await using (var context = new ExploreDbContext(options))
-        {
-            await context.Database.MigrateAsync();
-            await LookupTableSeeder.SeedAsync(context);
-        }
+        _database = new();
+        await _database.InitializeAsync();
 
         Factory = new PostgreSqlApiWebApplicationFactory(
-            _container.GetConnectionString(),
+            _database,
             new Dictionary<string, string?>
             {
                 ["Testing:HostProfile"] = TestHostProfile.RealRuntime,
@@ -422,8 +410,8 @@ public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDispo
             await Factory.DisposeAsync();
         }
 
-        if (_container is not null)
-            await _container.DisposeAsync();
+        if (_database is not null)
+            await _database.DisposeAsync();
         GC.SuppressFinalize(this);
     }
 
@@ -450,11 +438,21 @@ public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDispo
 
         public async Task InitializeDatabaseAsync()
         {
+            await using var context = CreateDbContext();
+            await context.Database.EnsureCreatedAsync();
+            context.BindTenantLease();
+            await using var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(context);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new Explore.Persistence.Services.EventDiscoveryEnrollmentGate(context);
+            await using var discovery = await discoveryGate.AcquireAsync();
+            await LookupTableSeeder.SeedAsync(context);
+        }
+
+        public ExploreDbContext CreateDbContext()
+        {
             var options = new DbContextOptionsBuilder<ExploreDbContext>();
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, _database);
-            await using var context = new ExploreDbContext(options.Options);
-            await context.Database.EnsureCreatedAsync();
-            await LookupTableSeeder.SeedAsync(context);
+            return new ExploreDbContext(options.Options);
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -471,6 +469,8 @@ public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDispo
                     PrimaryDatabaseProviderComposition.ConfigureApplication(options, _database));
                 services.AddScoped(provider =>
                 {
+                    if (provider.GetRequiredService<ExploreDbContextExecutionLease>().Context is { } selected)
+                        return selected;
                     var context = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>()
                         .CreateDbContext();
                     context.TenantContext = provider.GetService<ITenantContext>();

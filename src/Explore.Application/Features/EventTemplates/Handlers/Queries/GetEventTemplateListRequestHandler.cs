@@ -14,20 +14,31 @@ public class GetEventTemplateListRequestHandler : IQueryHandler<GetEventTemplate
     private readonly IEventTemplateRepository _eventTemplateRepository;
     private readonly ITenantContext _tenantContext;
     private readonly HybridCache _cache;
+    private readonly IPrivateEventManagementReader? _privateManagement;
 
     public GetEventTemplateListRequestHandler(
         IEventTemplateRepository eventTemplateRepository,
         ITenantContext tenantContext,
-        HybridCache cache)
+        HybridCache cache,
+        IPrivateEventManagementReader? privateManagement = null)
     {
         _eventTemplateRepository = eventTemplateRepository;
         _tenantContext = tenantContext;
         _cache = cache;
+        _privateManagement = privateManagement;
     }
 
     public async Task<PaginatedResult<EventTemplateListDto>> QueryAsync(GetEventTemplateListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<EventTemplateListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
+        if (_privateManagement is not null)
+        {
+            var graph = await _privateManagement.ReadAsync(new(PrivateEventManagementReadKind.Templates,
+                EventTypeId: request.EventTypeId), cancellationToken);
+            return PaginatedResult<EventTemplateListDto>.Create(graph.Templates.OrderBy(template => template.SortOrder)
+                .ThenBy(template => template.DisplayName).Skip(checked((pageNumber - 1) * pageSize)).Take(pageSize)
+                .Select(CustomPropertyMapper.ToListItem).ToList(), graph.Templates.Count, pageNumber, pageSize);
+        }
         var cacheKey = GetCacheKey(_tenantContext.TenantId, request.EventTypeId, pageNumber, pageSize);
 
         return await _cache.GetOrCreateAsync(

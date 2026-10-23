@@ -17,10 +17,6 @@ public interface ITenantSettingRepository
         string key,
         CancellationToken cancellationToken = default);
 
-    Task<TenantSetting?> GetByDomainHostAsync(
-        string normalizedHost,
-        CancellationToken cancellationToken = default);
-
     Task SetValueAsync(
         Guid tenantId,
         string key,

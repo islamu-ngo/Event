@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5JG1GXNH8FT0DFK9NC3ZWGV
+Title: "Project actor ownership without private entity access"
+Type: fix
+Scope: database
+Summary: "Use the original selected-tenant EF context to read only actor linkage identifiers, with fixed PostgreSQL Runtime permissions and drift refusal."
+Group: actor-ownership
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: The obsolete full-entity actor ownership repository method is replaced by a narrow Application read port. Internal callers use ownership facts rather than private Actor graphs.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Runtime receives fixed non-delegable Actor linkage and tenant-membership SELECT columns, not private profiles or Actor writes. A stolen Runtime credential can enumerate permitted Actor linkage metadata outside C# admission.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: The existing Runtime login is retained without new environment variables. Migration and readiness reject unexpected source privileges without silently repairing drift.

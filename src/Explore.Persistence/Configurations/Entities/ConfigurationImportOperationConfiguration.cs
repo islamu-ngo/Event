@@ -46,6 +46,9 @@ public sealed class ConfigurationImportOperationConfiguration :
             .IsFixedLength();
         Utc(builder.Property(operation => operation.SnapshotExpiresAt));
         builder.Property(operation => operation.EffectOutboxId);
+        builder.Property(operation => operation.EffectPayloadDigest)
+            .HasMaxLength(64).IsFixedLength()
+            .Metadata.SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Throw);
         builder.Property(operation => operation.FidelityVerified).IsRequired();
         FixedDigest(builder.Property(operation => operation.FidelityDigest));
         builder.Property(operation => operation.FailureCode)
@@ -69,7 +72,8 @@ public sealed class ConfigurationImportOperationConfiguration :
             operation.TargetAuthorityKey,
             operation.StartedAt
         });
-        builder.HasIndex(operation => operation.SessionId).IsUnique();
+        // Rejected attempts retain history without consuming the session's one success slot.
+        builder.HasIndex(operation => operation.SessionId).IsUnique().HasFilter("status <> 3");
         builder.HasIndex(operation => operation.SourceOperationId);
         builder.HasIndex(operation => operation.SnapshotArtifactHandleId).IsUnique();
         builder.HasOne<ConfigurationImportOperation>()

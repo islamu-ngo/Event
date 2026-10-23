@@ -1,0 +1,29 @@
+Change-Id: CHG-01M53RKQPD9JPATCTTB2W7EHNN
+Title: "Isolate preliminary tenant routing from request database leases"
+Type: fix
+Scope: access
+Summary: "Dispose preliminary routing reads before selecting the request tenant so they cannot freeze its ordinary database lease."
+Group: tenant-routing-leases
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Preliminary directory reads do not acquire the ordinary request tenant lease.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Preserve the bound-tenant guard when diagnosing routing failures.

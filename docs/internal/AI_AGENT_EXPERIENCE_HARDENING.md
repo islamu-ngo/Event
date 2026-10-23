@@ -19,6 +19,143 @@ The allowed control flow is:
 
 Plan previews and catalog visibility never execute commands and never grant execution authority.
 
+`AiToolPayloadGuard` admits at most 64 KiB of UTF-8 argument JSON and nesting
+depth 16. It rejects repeated decoded property names at every object depth,
+including escaped duplicates, before schema validation. Byte accounting is
+separate from character count. Structural rejection has bounded failure codes
+and cannot enter provider alias normalization through `AiToolContractRegistry`.
+Exact-limit positive inputs retain ordinary registry/schema semantics. This
+argument gate does not grant tool execution or replace confirmation, current
+authority, expiry or durable operation recovery.
+
+## Durable Draft Primary Effects
+
+`AiToolExecution` reserves one execution and Event ID for the exact confirmed
+CreateEventDraft payload, conversation, principal and acting actor. Derive
+`AiEventDraftRecoveryIdentity` from persisted confirmation values after commit,
+not unsaved timestamp ticks. `IAiEventDraftRecoveryRepository` acquires and reads
+through fresh ordinary exact-tenant transactions with current actor grants.
+
+`CreateEventCommand.FromAiDraft` carries an internal, JSON-ignored origin whose
+mapped payload must remain unchanged. The native event creator reacquires that
+authority and links the event to its execution inside the event transaction.
+A matching linked primary is recovered rather than rebuilding its graph.
+Settlement accepts only the exact tracked execution, stamp and transaction,
+and cannot fail or reopen a committed primary effect.
+
+Image source digest and upload custody identifiers are retained for later
+orchestration; these contracts themselves perform no image transfer. Exact
+settlement row-fences the native upload session and object: principal,
+operation key, tenant, image purpose/visibility, finalized object identity,
+provider binding and object key must match. A receipt cannot invent custody
+from a supplied GUID. Successful image-bearing settlement additionally
+requires the retained image on the original event. Rejected custody or
+incomplete image settlement leaves the committed primary recoverable and
+the action Confirmed; it neither marks success nor creates a replacement.
+Two native adversarial cases cover these persistence boundaries.
+
+Native positive metadata-custody tests exercise attachment and replay on the
+original draft, settlement of that retained object and rejection of overwrite
+when another image was selected. They do not assert that bytes were transferred.
+Rejection now carries the nested conversation ID to selected-provider
+authorization and checks that parent again under the native action fence.
+Cancellation is observed before reads or mutation; rejection creates no
+execution marker or event.
+
+Conversation HAL confirmation links require a live native CreateEventDraft
+owner. Exact Confirmed actions can expose recovery under their original
+principal, while expired/future/unimplemented proposals cannot advertise
+execution. Reject links remain available for Proposed actions. All links
+still pass through the selected authorization evaluator; state eligibility
+alone is not permission. These eligibility rules describe the current
+implemented owner, not closure of the other registered families.
+
+`AiStructuredActionParser` rejects more than eight calls before allocating
+the parsed action list. `AiProviderResponseResolver` allows only the original
+response plus one correction and counts candidate calls against a 16-call
+run budget. A count-limit failure is not eligible for correction. Explicit
+cancellation checks before and after provider handoff prevent parsing or
+retry after cancellation. `ProcessAiRunCommandHandler` observes cancellation
+before settlement and uses the caller's token for proposal persistence.
+Controlled provider tests cover exact limits, rejection, one correction,
+no third attempt and cancellation at handoff/return. The native API seam
+also tests provider-return cancellation without publishing a message or
+proposal. Native concurrent confirmation and execution-insert fault tests
+now target the real CreateEventDraft owner and original durable recovery.
+
+Full executable-family routing, persisted action version/provenance and
+end-to-end uncertain image transfer recovery remain separate requirements.
+Native regression source is authored; runtime and generated-schema assurance
+remain queued under the approved security programme.
+
+### Current family capability alignment and recovery transport
+
+The complete 41-family source inventory finds only CreateEventDraft wired
+to confirmation execution; forty families remain proposal-only and require
+explicit integration disposition. Publication metadata now requires
+`Event/Publish`, matching the native command, rather than `Event/Update`.
+The twelve custom-property definition/value and event/session-template
+administrative families require `Tenant/Update`, matching their native
+requests rather than inventing item-level permissions. Both normal and
+destructive definitions use this authority mapping. The proposal resolver
+derives Tenant resource identity from the conversation, not model fields.
+A machine-consumed metadata test compares all thirteen requirements with
+the native request attributes. This is not an execution authorization pair.
+
+Full native draft/image regressions now invoke confirmation, real event
+creation, native upload reservation/finalization, receipt custody and
+attachment. A controlled byte provider verifies the original primary exists
+and no database transaction is held at handoff. Success, lost byte-write
+acknowledgement and lost native finalization acknowledgement retain one
+primary, one upload identity and one byte handoff. Finalized custody can be
+recovered without transfer; an uncertain failed upload remains recovery
+required rather than being blindly repeated. These tests are authored and
+editor-checked, not executed.
+
+The API maps recovery and expired/changed-authority conflicts to HTTP 409.
+Only currently authorized `ai_draft_recovery_required` responses carry the
+original draft GUID in the problem's `id` extension. The browser preserves
+this typed GUID while retaining `Success=false`; other failures or invalid
+identifiers do not acquire a recovery identity. Confirmation/rejection
+client logs emit fixed categories/status codes, not exception objects or
+conversation/action IDs. Mapper and client collector regressions cover
+the transport boundary; generated clients and runtime/browser assurance
+remain queued.
+
+### Exact displayed-preview consent
+
+Each proposed-action preview exposes `Version`, a SHA-256 comparison token
+over its persisted action, tenant, conversation, principal, acting actor,
+source-message identity, creation ticks, kind and exact payload digest.
+Mutable confirmation/execution status is excluded so the same accepted
+preview can recover its original confirmed effect. The token is not a grant;
+selected-provider authorization, lifetime, actor grants and native row fences
+remain mandatory.
+
+Confirmation now requires a JSON `ConfirmAiProposedActionRequestDto` body
+with `ExpectedVersion`. The handler compares it after current authorization
+and again under the short claim fence. Missing or changed consent produces
+`proposed_action_version_changed` (HTTP 409), before creating an execution
+or event. The browser passes the displayed version rather than silently
+reading and consenting to a newer server-side payload. Idempotency keys
+remain independent operation metadata.
+
+Six native stale-preview cases cover payload, kind, creation-time, actor,
+source-message and missing-version drift. Existing exact/replay/image cases
+carry their original version; the PostgreSQL HTTP regression reads the
+returned preview once and replays that same version. Controller/client/UI
+companions carry the required body token.
+
+The public contract intentionally breaks old confirmation calls. OpenAPI
+and typed-client regeneration remain forbidden until all programme source
+implementation is complete. Consequently the authored client/UI source
+currently depends on the pending generated request DTO and `Version` member;
+it is not yet compile-certified. No generated artifact was hand-edited,
+compatibility fallback added, warning suppressed or executable run performed.
+Razor editor checks are unavailable because its configured Roslyn cohosting
+server is absent; no install or browser/server execution was attempted under
+the override. Final generation, builds and real UI assurance remain required.
+
 ## Schema-Only Context Summaries
 
 `AiSafeDataContextRegistry` exposes an explicit allow-list for future prompt grounding. The current default context kind is `event-reference-summary`, backed by the existing `AiReferenceSearchResultDto` projection. Allowed fields are limited to public reference metadata such as `kind`, `referenceId`, `displayName`, `summary`, public session dates, `visibility`, and `format`.

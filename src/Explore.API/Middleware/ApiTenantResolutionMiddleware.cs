@@ -3,7 +3,6 @@ using Explore.API.Attributes;
 using Explore.API.Configuration;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Onboarding;
 using Explore.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -29,13 +28,11 @@ public sealed class ApiTenantResolutionMiddleware
     /// </summary>
     public async Task InvokeAsync(
         HttpContext context,
-        IResolverConfigService resolverConfigService,
-        ITenantSlugCache tenantSlugCache,
         ITenantContextAccessor tenantContextAccessor,
         IProblemDetailsService problemDetailsService,
         IDeploymentModeProvider deploymentModeProvider,
         IOptions<McpAdapterSettings> mcpAdapterOptions,
-        ITenantLifecycleAccessService lifecycle)
+        IServiceScopeFactory scopeFactory)
     {
         var isMcpPath = IsEnabledMcpPath(context, mcpAdapterOptions.Value);
         if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) && !isMcpPath)
@@ -68,25 +65,28 @@ public sealed class ApiTenantResolutionMiddleware
             return;
         }
 
-        var configuration = await resolverConfigService.GetConfigurationAsync(context.RequestAborted);
-
         bool privateSessionRead = TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint());
         string? requestedSlug = context.Request.Headers[TenantHeaderNames.TenantSlug].FirstOrDefault();
         bool explicitlySelectedSessionTenant = privateSessionRead && !string.IsNullOrWhiteSpace(requestedSlug);
-        var resolvedTenantId = await ResolveFromSlugHeaderAsync(context, tenantSlugCache);
-        if (!explicitlySelectedSessionTenant)
-        {
-            resolvedTenantId ??= await ResolveFromHostAsync(context, configuration, tenantSlugCache);
-        }
-
         var hasApiKeyHeader = ApiKeyHeaderReader.HasNonEmptyApiKey(context.Request);
-        // The public routing cache intentionally excludes unpublished tenants. Bind only an
-        // explicitly named bootstrap directory for these session endpoints; this grants no authority.
-        if (resolvedTenantId is null && !hasApiKeyHeader && !string.IsNullOrWhiteSpace(requestedSlug)
-            && (TenantLifecycleAccessMiddleware.IsUserSynchronization(context.GetEndpoint())
-                || TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint())))
+        Guid? resolvedTenantId;
+        await using (var routingScope = scopeFactory.CreateAsyncScope())
         {
-            resolvedTenantId = await lifecycle.ResolveConfiguredAdministratorTenantAsync(requestedSlug, context.RequestAborted);
+            var tenantSlugCache = routingScope.ServiceProvider.GetRequiredService<ITenantSlugCache>();
+            resolvedTenantId = await ResolveFromSlugHeaderAsync(context, tenantSlugCache);
+            if (!explicitlySelectedSessionTenant && resolvedTenantId is null
+                && context.Items.TryGetValue(EffectiveHostAuthorityMiddleware.TenantItemKey, out var hostTenant)
+                && hostTenant is Guid verifiedTenant)
+                resolvedTenantId = verifiedTenant;
+
+            // The public routing cache excludes unpublished tenants. This directory binding grants no authority.
+            if (resolvedTenantId is null && !hasApiKeyHeader && !string.IsNullOrWhiteSpace(requestedSlug)
+                && (TenantLifecycleAccessMiddleware.IsUserSynchronization(context.GetEndpoint())
+                    || TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint())))
+            {
+                var lifecycle = routingScope.ServiceProvider.GetRequiredService<ITenantLifecycleAccessService>();
+                resolvedTenantId = await lifecycle.ResolveConfiguredAdministratorTenantAsync(requestedSlug, context.RequestAborted);
+            }
         }
 
         bool unresolvedExplicitSessionTenant = explicitlySelectedSessionTenant && resolvedTenantId is null;
@@ -156,43 +156,6 @@ public sealed class ApiTenantResolutionMiddleware
         return await tenantSlugCache.GetTenantIdBySlugAsync(tenantSlug, context.RequestAborted);
     }
 
-    private static async Task<Guid?> ResolveFromHostAsync(HttpContext context, ResolverConfigurationDto configuration, ITenantSlugCache tenantSlugCache)
-    {
-        var host = GetRequestHost(context);
-        if (string.IsNullOrWhiteSpace(host))
-        {
-            return null;
-        }
-
-        if (configuration.CustomDomainEnabled && configuration.AllowTenantCustomDomains)
-        {
-            var customDomainTenantId = await tenantSlugCache.GetTenantIdByDomainAsync(host, context.RequestAborted);
-            if (customDomainTenantId is Guid resolvedCustomDomainTenantId && resolvedCustomDomainTenantId != Guid.Empty)
-            {
-                return resolvedCustomDomainTenantId;
-            }
-        }
-
-        if (!configuration.SubdomainEnabled || string.IsNullOrWhiteSpace(configuration.InstanceBaseDomain))
-        {
-            return null;
-        }
-
-        var baseDomain = NormalizeHost(configuration.InstanceBaseDomain);
-        var subdomain = ExtractSubdomain(host, baseDomain);
-        if (string.IsNullOrWhiteSpace(subdomain))
-        {
-            return null;
-        }
-
-        return await tenantSlugCache.GetTenantIdByDomainAsync(subdomain, context.RequestAborted);
-    }
-
-    private static string GetRequestHost(HttpContext context)
-    {
-        return NormalizeHost(context.Request.Host.Host) ?? string.Empty;
-    }
-
     internal static bool IsTenantExemptPath(HttpRequest request)
     {
         PathString path = request.Path;
@@ -230,35 +193,6 @@ public sealed class ApiTenantResolutionMiddleware
                context.Request.Path.StartsWithSegments(
                    settings.EndpointPath,
                    StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string? NormalizeHost(string? host)
-    {
-        return string.IsNullOrWhiteSpace(host)
-            ? null
-            : host.Trim().TrimEnd('.').ToLowerInvariant();
-    }
-
-    private static string? ExtractSubdomain(string host, string? baseDomain)
-    {
-        if (string.IsNullOrWhiteSpace(baseDomain) || string.Equals(host, baseDomain, StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        var suffix = "." + baseDomain;
-        if (!host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        var prefix = host[..^suffix.Length];
-        if (string.IsNullOrWhiteSpace(prefix))
-        {
-            return null;
-        }
-
-        return prefix.Split('.', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim().ToLowerInvariant();
     }
 
 }

@@ -51,6 +51,34 @@ snapshot, canonical criteria digest, ordinal, expiry and both epochs. The existi
 configured key ring is shared by replicas; there is no plaintext or stale-cache
 fallback. Logical expiry is independent of the purge job.
 
+PostgreSQL public ID/code detail loading uses `PostgresPublicEventDetailContract`
+through `EventRepository` and `EventDetailsProjectionService.BuildPublicAsync`.
+The selected Runtime login receives only the `event_public_detail_runtime`
+execution capability. A serializable read rechecks published/public eligibility,
+selected tenant and current actor participation without requiring a session row.
+Its entity projection includes public aspects, actions and presentation URI
+references, not private storage entities or managed user/organization graphs.
+The mapper consumes those presentation references; management detail retains
+its separate repository path. Shared enrichment and the final response authority
+remain required. Native installation attests source shape, policies, role graph,
+privileges and compiled body before execution. End-to-end programme acceptance
+of this newly installed path remains pending.
+
+The native presentation also carries immutable public tag/category labels.
+It derives unmoderation eligibility from the latest moderation action, ordered
+by creation instant and ID, without returning reasons, moderator identities or
+history to the application projection. `BuildAsync` consumes this presentation
+instead of issuing private-table enrichment reads on Runtime; ordinary managed
+entity graphs retain their existing repository enrichment. Questionnaire presence
+requires WalkIn participation as well as the published, nonblank artifact checks.
+The standalone questionnaire repository uses that same original Runtime public
+detail capability on PostgreSQL, materializing only the eligible attachment,
+its no-registration-effect requirement and the published form artifacts needed
+by the query handler. It returns entities for application mapping, not private
+form authoring graphs, answers or channel configuration. Retired/deleted versions,
+deleted attachments/requirements and nonpublic Events disclose no questionnaire;
+Runtime retains no raw form-table read privileges.
+
 Ordinary public detail reads also cross this final authority boundary. The client
 preserves `409`, `410` and `503` instead of converting them to a missing event.
 `EventDetail` conceals the rejected payload, renders localized recovery and only

@@ -6,7 +6,6 @@ using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
 
 namespace Explore.API.Authentication;
@@ -87,10 +86,11 @@ public sealed class AtprotoSessionAuthenticationHandler(
         }
 
         var token = values[0]!["Bearer ".Length..].Trim();
-        var principal = await jwtService.ValidateSessionAsync(
+        var credential = await jwtService.ValidateSessionCredentialAsync(
             token,
             tenantContext.TenantId,
             Context.RequestAborted).ConfigureAwait(false);
+        var principal = credential?.Principal;
         if (principal is null)
         {
             return AuthenticateResult.Fail("ATProto session authentication failed.");
@@ -125,6 +125,7 @@ public sealed class AtprotoSessionAuthenticationHandler(
             }
         }
 
+        HumanAuthenticationLifetimeObserver.CaptureAtprotoSession(Context, principal, credential!.Token);
         return AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name));
     }
 

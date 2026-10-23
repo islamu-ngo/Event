@@ -23,7 +23,7 @@ namespace Explore.Persistence.Repositories;
 /// </summary>
 public sealed class ModerationEffectLeaseRepository(
     ExploreDbContext context, IMachinePrincipalAccessor machine,
-    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyRepository keys,
+    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyAuthenticationRepository keys,
     TimeProvider clock) : IModerationEffectLeaseRepository
 {
     private static readonly TimeSpan LeaseWindow = TimeSpan.FromMinutes(2);

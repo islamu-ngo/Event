@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 namespace Explore.API.BackgroundServices;
 
 /// <summary>
-/// Background hosted service that performs zero-touch authorization reconciliation once per process boot.
+/// Performs read-only authorization readiness checks once per process boot.
 /// </summary>
 public sealed class CerbosPolicyBootSyncWorker(
     CerbosPolicyBootSyncRunner runner,
@@ -26,7 +26,7 @@ public sealed class CerbosPolicyBootSyncWorker(
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            logger.LogDebug("Cerbos policy boot sync worker stopped before publishing");
+            logger.LogDebug("Cerbos publication readiness worker stopped before readiness was established");
         }
     }
 }

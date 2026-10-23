@@ -1,5 +1,7 @@
 using System.Reflection;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Application.Operations;
@@ -88,7 +90,40 @@ public static class OperationCompositionValidation
         provider.ValidateNativeOperations();
         await using var scope = provider.CreateAsyncScope();
         foreach (var entry in provider.GetRequiredService<NativeOperationCatalog>().Registrations)
+        {
             _ = scope.ServiceProvider.GetRequiredService(entry.Contract);
+            if (PolicyMutationCommandScope.Handles(entry.Contract.GetGenericArguments()[0])
+                || ModerationMutationCommandScope.Handles(entry.Contract.GetGenericArguments()[0]))
+            {
+                await using var policy = await scope.ServiceProvider.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
+                    .CreateAsync(PolicyMutationScope.Instance, CancellationToken.None);
+                var guard = policy.Services.GetRequiredService<OperationConstructionGuard>();
+                guard.Enter(entry.Contract);
+                try
+                {
+                    _ = policy.Services.GetRequiredService(entry.Implementation);
+                }
+                finally
+                {
+                    guard.Exit(entry.Contract);
+                }
+            }
+            else if (entry.Constructors.SelectMany(constructor => constructor).Any(parameter =>
+                         parameter.ParameterType == typeof(IInstanceAdministratorCommitAuthority)
+                         || parameter.ParameterType == typeof(ITenantAdministratorCommitAuthority)))
+            {
+                var guard = scope.ServiceProvider.GetRequiredService<OperationConstructionGuard>();
+                guard.Enter(entry.Contract);
+                try
+                {
+                    _ = scope.ServiceProvider.GetRequiredService(entry.Implementation);
+                }
+                finally
+                {
+                    guard.Exit(entry.Contract);
+                }
+            }
+        }
     }
 
     internal static InvalidOperationException Error(string reason, Type type)

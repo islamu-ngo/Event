@@ -6,6 +6,7 @@ using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
+using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
@@ -30,7 +31,7 @@ public class GetEventDetailsRequestHandler : IQueryHandler<GetEventDetailsReques
 
     public async Task<EventDto?> QueryAsync(GetEventDetailsRequest request, CancellationToken cancellationToken)
     {
-        var eventDto = await _detailsProjectionService.BuildAsync(request.Id, cancellationToken);
+        var eventDto = await _detailsProjectionService.BuildPublicAsync(request.Id, cancellationToken);
 
         if (eventDto is null || !await _lifecycle.IsPublicAsync(eventDto.TenantId, cancellationToken))
             return null;
@@ -43,11 +44,14 @@ public class GetEventDetailsRequestHandler : IQueryHandler<GetEventDetailsReques
         if (!isPubliclyEligible)
             return null;
 
-        var optionalQuestionnaire = await _optionalQuestionnaireHandler.QueryAsync(
-            new GetOptionalQuestionnaireQuery(request.Id), cancellationToken);
         var responseDto = eventDto.CreateRequestCopy();
         if (responseDto.ParticipationConfiguration is not null)
         {
+            var optionalQuestionnaire = responseDto.ParticipationConfiguration.ParticipationHandlingModeId ==
+                (int)ParticipationHandlingModeEnum.WalkIn
+                    ? await _optionalQuestionnaireHandler.QueryAsync(
+                        new GetOptionalQuestionnaireQuery(request.Id), cancellationToken)
+                    : null;
             responseDto.ParticipationConfiguration = CopyParticipationConfiguration(
                 responseDto.ParticipationConfiguration,
                 optionalQuestionnaire is not null);

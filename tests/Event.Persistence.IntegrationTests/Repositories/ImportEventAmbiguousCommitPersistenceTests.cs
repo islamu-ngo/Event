@@ -1,6 +1,7 @@
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Handlers.Commands;
 using Explore.Application.Features.Events.Requests.Commands;
@@ -60,6 +61,9 @@ public sealed class ImportEventAmbiguousCommitPersistenceTests(PostgreSqlContain
         context.Actors.Add(actor);
         await context.SaveChangesAsync();
 
+        context.TenantContext = new SelectedTenant(tenant.Id);
+        context.ClearTenantFilterBypass();
+        context.BindTenantLease();
         var repository = new EventRepository(context);
         var cache = Substitute.For<HybridCache>();
         var policyProvider = Substitute.For<IEventLifecyclePolicyProvider>();
@@ -80,13 +84,30 @@ public sealed class ImportEventAmbiguousCommitPersistenceTests(PostgreSqlContain
                 RequiredSessionFields = new HashSet<Enum>()
             });
         var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
-        var systemSettings = new SystemSettingRepository(context, mutationLock);
-        var visitorCapabilities = new VisitorAccessCapabilityResolver(systemSettings,
-            new TenantSettingRepository(context, mutationLock),
-            new VisitorAccessProviderReader(systemSettings, new ConfigurationBuilder().Build()),
+        var systemSettings = SystemSettingRepository.CreateReadOnly(context, mutationLock);
+        var tenantSettings = TenantSettingRepository.CreateReadOnly(context, mutationLock);
+        var visitorSettings = Substitute.For<IInstanceTenantSettingsReader>();
+        // Keep metadata on the same real owner as this test's ambiguous-commit injector.
+        visitorSettings.ReadAsync(
+                Arg.Any<Guid?>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                var keys = call.Arg<IReadOnlyCollection<string>>();
+                var token = call.Arg<CancellationToken>();
+                IReadOnlyList<SystemSetting> instance = (await systemSettings.GetAllSettings(cancellationToken: token))
+                    .Where(setting => keys.Contains(setting.SettingKey, StringComparer.Ordinal)).ToList();
+                IReadOnlyList<TenantSetting> selected = call.Arg<Guid?>() is { } selectedTenant
+                    ? await tenantSettings.GetByTenantAndKeys(selectedTenant, keys, token) : [];
+                return (instance, selected);
+            });
+        var visitorCapabilities = new VisitorAccessCapabilityResolver(visitorSettings,
+            new VisitorAccessProviderReader(new ConfigurationBuilder().Build()),
             new TenantLifecycleAccessService(new TenantRepository(context),
                 Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>(),
-                new InstanceBootstrapStateRepository(context)));
+                new InstanceBootstrapStateRepository(context),
+                new Explore.Persistence.Services.TenantLookupSource(
+                    new Explore.Persistence.Database.GlobalExploreDbContextFactory(
+                        fixture.GetNativeQueueOptions(Explore.Secrets.Database.PrimaryDatabaseRole.Global)))));
         var handler = new ImportEventCommandHandler(
             repository,
             Substitute.For<IStorageObjectRepository>(),
@@ -117,6 +138,8 @@ public sealed class ImportEventAmbiguousCommitPersistenceTests(PostgreSqlContain
         await Assert.That(await context.EventParticipationConfigurations.CountAsync(configuration => configuration.Id == result.Id)).IsEqualTo(1);
         await cache.Received(1).RemoveByTagAsync(CacheTags.EventListByTenant(tenant.Id), Arg.Any<CancellationToken>());
     }
+
+    private sealed record SelectedTenant(Guid TenantId) : ITenantContext;
 
     private sealed class TwoPassUnitOfWork : IUnitOfWork
     {

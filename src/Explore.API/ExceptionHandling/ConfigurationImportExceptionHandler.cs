@@ -2,6 +2,7 @@ namespace Explore.API.ExceptionHandling;
 
 using Explore.API.ConfigurationImport;
 using Explore.Application.Features.ConfigurationManifest.Importing;
+using Explore.API.Middleware;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -32,7 +33,7 @@ public sealed class ConfigurationImportExceptionHandler(
             Title = Title(contract.Status),
             Status = contract.Status,
             Detail = Detail(contract.Status),
-            Instance = httpContext.Request.Path
+            Instance = SafeRouteMetadata.GetRouteIdentityOrClassification(httpContext)
         };
         problem.Extensions["code"] = contract.Code;
         if (contract.RetryAfterSeconds is { } retry)

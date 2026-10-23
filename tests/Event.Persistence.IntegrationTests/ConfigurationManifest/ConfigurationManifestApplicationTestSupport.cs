@@ -1,107 +1,29 @@
-using System.Collections.Immutable;
 using System.Text.Json;
-using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Services;
-using Explore.Application.Features.ConfigurationManifest.Application;
-using Explore.Application.Features.PaidEventPolicies;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
-using Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
-using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
-using Explore.Application.Features.ConfigurationManifest.Compilation;
 using Explore.Application.Features.ConfigurationManifest.Ingestion;
-using Explore.Application.Features.ConfigurationManifest.Preflight;
-using Explore.Application.Settings;
-using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
-using Explore.Persistence.Repositories;
-using Explore.Persistence.Services;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Notifications;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
+using Event.Persistence.IntegrationTests.Fixtures;
 
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 internal static class ConfigurationManifestApplicationTestSupport
 {
-    public static ApplyConfigurationManifestCommandHandler CreateHandler(
-        ExploreDbContext context,
-        IConfigurationManifestPreflight preflight,
-        IConfigurationManifestOperationRepository operationRepository,
-        IConfigurationManifestFailureRecorder failureRecorder,
-        bool useRealPolicyBoundary = false,
-        ITenantCreationService? tenantCreationService = null,
-        INotificationHandler<SettingChangedNotification>? effectConsumer = null,
-        ISettingMutationLock? mutationLock = null)
-    {
-        var unitOfWork = new EfCoreUnitOfWork(context);
-        ISettingMutationLock lockBoundary = mutationLock
-            ?? new RelationalSettingMutationLock(context, unitOfWork);
-        var resourcePolicy = new EventResourceSettingsWriter(context, lockBoundary, unitOfWork);
-        IPublicationPolicyMutationBoundary policyBoundary = useRealPolicyBoundary
-            ? new PublicationPolicyMutationBoundary(
-                lockBoundary,
-                new CoordinatedSettingMutationRepository(context))
-            : Substitute.For<IPublicationPolicyMutationBoundary>();
-        if (!useRealPolicyBoundary)
-        {
-            var success = new PublicationPolicyMutationResult(
-                Success: true,
-                FailureCode: null,
-                Message: "Updated.",
-                DeferredNotifications: []);
-            policyBoundary.ApplyTenantInCurrentTransactionAsync(
-                    Arg.Any<PublicationPolicyTenantMutationRequest>(),
-                    Arg.Any<CancellationToken>())
-                .Returns(success);
-            policyBoundary.ApplyInstanceInCurrentTransactionAsync(
-                    Arg.Any<PublicationPolicyInstanceMutationRequest>(),
-                    Arg.Any<CancellationToken>())
-                .Returns(success);
-        }
+    public static ConfigurationManifestBootstrapTestHost CreateHandler(
+        TestDbContextFactory factory, INotificationHandler<SettingChangedNotification>? effectConsumer = null) =>
+        ConfigurationManifestBootstrapTestHost.ForSqlite(factory.CreateDbContext, effectConsumer);
 
-        var settingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
-        var typedSettingsDocumentResolver = Substitute.For<ITypedSettingsDocumentResolver>();
-        var effectDispatcher = new ConfigurationManifestEffectDispatcher(
-            operationRepository,
-            settingsResolver,
-            typedSettingsDocumentResolver,
-            effectConsumer is null ? [] : [effectConsumer]);
-        var applier = new ConfigurationManifestApplier(
-            preflight,
-            lockBoundary,
-            unitOfWork,
-            tenantCreationService ?? new TenantCreationService(
-                    new TenantRepository(context),
-                    new TenantSettingsDocumentRepository(context)),
-            policyBoundary,
-            resourcePolicy,
-            new PaidEventPolicyMutationBoundary(
-                new PaidEventPolicyRepository(context),
-                unitOfWork,
-                lockBoundary),
-            new ConfigurationManifestInstanceSettingMutationBoundary(
-                new SettingUpsertService(
-                    new SystemSettingRepository(context, lockBoundary),
-                    [],
-                    policyBoundary,
-                    Event.Persistence.IntegrationTests.Fixtures.EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, lockBoundary),
-                    resourcePolicy),
-                policyBoundary),
-            new ConfigurationManifestTenantSettingMutationBoundary(
-                new TenantSettingRepository(context, lockBoundary)),
-            operationRepository,
-            failureRecorder,
-            new ConfigurationManifestEffectDelivery(
-                new OutboxRepository(context),
-                effectDispatcher),
-            NullLogger<ConfigurationManifestApplier>.Instance);
-        return new ApplyConfigurationManifestCommandHandler(applier);
-    }
+    public static ConfigurationManifestBootstrapTestHost CreateHandler(
+        PostgreSqlContainerFixture fixture) =>
+        ConfigurationManifestBootstrapTestHost.ForPostgres(fixture);
+
+    public static ConfigurationManifestBootstrapTestHost CreateHandler(
+        EventResourcePersistenceTests.TestDatabase database) =>
+        ConfigurationManifestBootstrapTestHost.ForSqlite(database.CreateIndependentContext);
 
     public static ConfigurationManifestReadResult Source(params string[] slugs)
         => CreateSource(
@@ -278,76 +200,6 @@ internal static class ConfigurationManifestApplicationTestSupport
             ConfigurationManifestMode.Bootstrap,
             digest,
             ByteLength: 512);
-    }
-
-    public sealed class ExistencePreflight(
-        ITenantRepository tenantRepository,
-        IPaidEventPolicyRepository? paidEventPolicies = null,
-        int? forcedExpectedPaidPolicyVersion = null)
-        : IConfigurationManifestPreflight
-    {
-        public async Task<ConfigurationManifestPreflightResult> EvaluateAsync(
-            ConfigurationManifestApplyPlan plan,
-            CancellationToken cancellationToken)
-        {
-            IReadOnlyList<Tenant> existing = await tenantRepository.GetBySlugsAsNoTrackingAsync(
-                plan.Tenants.Select(tenant => tenant.Slug).ToArray(),
-                cancellationToken);
-            IReadOnlyDictionary<string, Tenant> bySlug = existing.ToDictionary(
-                tenant => tenant.Slug,
-                StringComparer.Ordinal);
-            if (plan.Instance.PaidEventPolicy is not null
-                && plan.Instance.PaidEventPolicy.ExpectedActivePolicyVersion is null)
-            {
-                PaidEventPolicyVersion? current = paidEventPolicies is null
-                    ? null
-                    : await paidEventPolicies.GetActiveInstanceAsync(
-                        cancellationToken);
-                if (current is null)
-                {
-                    return new ConfigurationManifestPreflightResult(
-                        plan,
-                        [],
-                        [
-                            new ConfigurationManifestPreflightError(
-                                ManifestIndex: -1,
-                                ConfigurationManifestDocumentKeys
-                                    .InstancePaidEventPolicy,
-                                ConfigurationManifestApplicationFailureCodes
-                                    .PaidPolicyUnavailable,
-                                "An active instance paid-event policy is required.")
-                        ]);
-                }
-
-                plan = plan with
-                {
-                    Instance = plan.Instance with
-                    {
-                        PaidEventPolicy =
-                            plan.Instance.PaidEventPolicy with
-                            {
-                                ExpectedActivePolicyVersion =
-                                forcedExpectedPaidPolicyVersion
-                                ?? current.VersionNumber
-                            }
-                    }
-                };
-            }
-
-            return new ConfigurationManifestPreflightResult(
-                plan,
-                plan.Tenants.Select(tenant => bySlug.TryGetValue(tenant.Slug, out Tenant? found)
-                        ? new ConfigurationManifestPreflightTenant(
-                            tenant,
-                            ConfigurationManifestTenantDisposition.SkippedExisting,
-                            found.Id)
-                        : new ConfigurationManifestPreflightTenant(
-                            tenant,
-                            ConfigurationManifestTenantDisposition.Create,
-                            tenant.PlannedTenantId))
-                    .ToImmutableArray(),
-                []);
-        }
     }
 
     public sealed class TestDbContextFactory(DbContextOptions<ExploreDbContext> options)

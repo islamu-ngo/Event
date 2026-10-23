@@ -66,26 +66,6 @@ public interface INotificationFanoutRunRepository : IGenericRepository<Notificat
         Guid runId,
         CancellationToken cancellationToken);
 
-    Task<NotificationFanoutClaimRoundResult> ClaimDueRoundAsync(
-        NotificationFanoutClaimRoundRequest request,
-        CancellationToken cancellationToken);
-
-    Task<NotificationFanoutProcessorSnapshot> GetProcessorSnapshotAsync(
-        DateTime observedAt,
-        CancellationToken cancellationToken);
-
-    Task<NotificationFanoutClaim?> TryClaimOccurrenceAsync(
-        Guid tenantId,
-        Guid occurrenceId,
-        string leaseOwner,
-        DateTime claimedAt,
-        TimeSpan leaseDuration,
-        int maxActiveClaims,
-        int maxActiveClaimsPerTenant,
-        int optionalReminderBacklogHighWatermark,
-        int optionalReminderBacklogLowWatermark,
-        CancellationToken cancellationToken);
-
     Task<bool> TryRenewClaimAsync(
         NotificationFanoutClaim claim,
         DateTime observedAt,

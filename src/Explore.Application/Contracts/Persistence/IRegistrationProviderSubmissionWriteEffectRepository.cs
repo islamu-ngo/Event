@@ -10,7 +10,8 @@ public sealed record RegistrationProviderSubmissionWriteClaim(
     Guid RegistrationProviderBindingId,
     Guid LeaseToken,
     long ProcessingFence,
-    int AttemptCount);
+    int AttemptCount,
+    DateTime LeaseExpiresAt);
 
 public sealed record RegistrationProviderSubmissionWriteDelivery(
     RegistrationOrder Order,
@@ -22,15 +23,14 @@ public sealed record RegistrationProviderSubmissionWriteDelivery(
 
 public interface IRegistrationProviderSubmissionWriteEffectRepository
 {
-    Task<IReadOnlyList<RegistrationProviderSubmissionWriteClaim>> ClaimDueAsync(
-        string leaseOwner,
-        int batchSize,
-        DateTime claimedAt,
-        TimeSpan leaseDuration,
-        CancellationToken cancellationToken);
-
     Task<RegistrationProviderSubmissionWriteDelivery?> GetDeliveryAsync(
         RegistrationProviderSubmissionWriteClaim claim,
+        CancellationToken cancellationToken);
+
+    /// <summary>Reloads original custody and source lineage after preparation, immediately before sink handoff.</summary>
+    Task<bool> IsDeliveryCurrentAsync(
+        RegistrationProviderSubmissionWriteClaim claim,
+        RegistrationProviderSubmissionWriteDelivery delivery,
         CancellationToken cancellationToken);
 
     Task<bool> CompleteAsync(

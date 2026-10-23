@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure.Ai;
+using Explore.Infrastructure.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -84,11 +85,6 @@ public sealed class AiProviderSettingsValidator : IValidateOptions<AiProviderSet
 
     private static void ValidateOpenAiSettings(AiProviderSettings options, List<string> failures)
     {
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
-        {
-            failures.Add("AiProvider:ApiKey is required for openai providers.");
-        }
-
         if (string.IsNullOrWhiteSpace(options.ModelId))
         {
             failures.Add("AiProvider:ModelId is required for openai providers.");
@@ -117,11 +113,6 @@ public sealed class AiProviderSettingsValidator : IValidateOptions<AiProviderSet
             failures.Add("AiProvider:AzureCredentialMode must be api-key or default-azure-credential.");
         }
 
-        if (options.AzureCredentialMode.Equals(AiProviderSettings.AzureCredentialModeApiKey, StringComparison.OrdinalIgnoreCase)
-            && string.IsNullOrWhiteSpace(options.ApiKey))
-        {
-            failures.Add("AiProvider:ApiKey is required for azure-openai providers using api-key authentication.");
-        }
     }
 
     private static void ValidateOpenAiCompatibleSettings(AiProviderSettings options, List<string> failures)
@@ -152,11 +143,6 @@ public sealed class AiProviderSettingsValidator : IValidateOptions<AiProviderSet
 
     private static void ValidateAnthropicSettings(AiProviderSettings options, List<string> failures)
     {
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
-        {
-            failures.Add("AiProvider:ApiKey is required for anthropic providers.");
-        }
-
         if (string.IsNullOrWhiteSpace(options.ModelId))
         {
             failures.Add("AiProvider:ModelId is required for anthropic providers.");
@@ -182,9 +168,18 @@ public sealed class AiProviderSettingsValidator : IValidateOptions<AiProviderSet
             failures.Add("AiProvider:EndpointUrl must not contain query strings or fragments.");
         }
 
-        if (!options.AllowLocalProviderEndpoints && IsLocalOrPrivateEndpoint(endpoint))
+        try
         {
-            failures.Add("AiProvider:EndpointUrl must not target local, loopback, link-local, or private network hosts unless local provider endpoints are explicitly allowed.");
+            var policy = new OutboundEndpointPolicy(blockPrivateNetworks: !options.AllowLocalProviderEndpoints);
+            policy.RequireEndpoint(endpoint);
+            if (System.Net.IPAddress.TryParse(endpoint.IdnHost.Trim('[', ']'), out var address))
+                policy.RequireAllowed(endpoint, [address]);
+            else if (!options.AllowLocalProviderEndpoints && endpoint.IsLoopback)
+                failures.Add("AiProvider:EndpointUrl must not target local, loopback, link-local, or private network hosts unless local provider endpoints are explicitly allowed.");
+        }
+        catch (OutboundEndpointDeniedException)
+        {
+            failures.Add("AiProvider:EndpointUrl is not permitted by the outbound endpoint policy.");
         }
     }
 
@@ -221,29 +216,4 @@ public sealed class AiProviderSettingsValidator : IValidateOptions<AiProviderSet
         }
     }
 
-    private static bool IsLocalOrPrivateEndpoint(Uri endpoint)
-    {
-        if (endpoint.IsLoopback)
-        {
-            return true;
-        }
-
-        if (!System.Net.IPAddress.TryParse(endpoint.Host, out var address))
-        {
-            return string.Equals(endpoint.Host, "localhost", StringComparison.OrdinalIgnoreCase);
-        }
-
-        byte[] bytes = address.GetAddressBytes();
-
-        return address.AddressFamily switch
-        {
-            System.Net.Sockets.AddressFamily.InterNetwork =>
-                bytes[0] == 10
-                || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
-                || (bytes[0] == 192 && bytes[1] == 168)
-                || (bytes[0] == 169 && bytes[1] == 254),
-            System.Net.Sockets.AddressFamily.InterNetworkV6 => address.IsIPv6LinkLocal || address.IsIPv6SiteLocal,
-            _ => false
-        };
-    }
 }

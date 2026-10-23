@@ -642,7 +642,8 @@ public sealed class EventResourceModerationSnapshotReaderTests
         private ModerationMachineSubjectBindingRepository Repository(ExploreDbContext context)
         {
             var (admin, machine) = Identity(context);
-            return new(context, admin, machine, new ExternalApiKeyRepository(context),
+            return new(context, admin, machine,
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 new UnconfiguredKeys(), new FixtureClock());
         }
 

@@ -1,8 +1,11 @@
+using Event.Persistence.IntegrationTests.ConfigurationManifest;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Domain.Settings.Definitions;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -16,7 +19,8 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
     [Test]
     public async Task SeededInstanceGovernance_IsDisabledPlatformAndLockedWithoutSystemConsent()
     {
-        await using var context = fixture.CreateDbContext();
+        await fixture.ResetAsync();
+        await using var context = FederationManifestStorageSnapshot.OpenMigrator(fixture);
 
         var settings = await context.Set<SystemSetting>()
             .AsNoTracking()
@@ -24,21 +28,22 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
             .OrderBy(setting => setting.DisplayOrder)
             .ToArrayAsync();
 
-        await Assert.That(settings).Count().IsEqualTo(4);
-        await Assert.That(settings[0].SettingKey).IsEqualTo(GovernanceSettingKeys.Federation.AtprotoEventsEnabled);
-        await Assert.That(settings[0].Value).IsEqualTo("false");
+        await Assert.That(settings).Count().IsEqualTo(1);
+        await Assert.That(settings[0].SettingKey).IsEqualTo(GovernanceSettingKeys.Federation.AtprotoEventValidationProfile);
+        await Assert.That(settings[0].Value).IsEqualTo("\"platform\"");
         await Assert.That(settings[0].IsLocked).IsTrue();
-        await Assert.That(settings[1].SettingKey).IsEqualTo(GovernanceSettingKeys.Federation.AtprotoEventValidationProfile);
-        await Assert.That(settings[1].Value).IsEqualTo("\"platform\"");
-        await Assert.That(settings[1].IsLocked).IsTrue();
-        await Assert.That(settings[2].SettingKey).IsEqualTo("federation.atproto_events_backfill_enabled");
-        await Assert.That(settings[2].Value).IsEqualTo("false");
-        await Assert.That(settings[2].IsLocked).IsTrue();
-        await Assert.That(settings[3].SettingKey).IsEqualTo("federation.atproto_events_backfill_mode");
-        await Assert.That(settings[3].Value).IsEqualTo("\"downtime_only\"");
-        var allowedModes = System.Text.Json.JsonSerializer.Deserialize<string[]>(settings[3].AllowedValues!);
-        await Assert.That(allowedModes).IsEquivalentTo(["downtime_only", "full"]);
-        await Assert.That(settings[3].IsLocked).IsTrue();
+        var dedicated = await context.Set<AtprotoFederationInstanceSetting>().AsNoTracking()
+            .OrderBy(setting => setting.SettingKey).ToArrayAsync();
+        await Assert.That(dedicated.Select(setting => (setting.Id, setting.SettingKey, setting.Value, setting.IsLocked)))
+            .IsEquivalentTo([
+                (SeedIds.AtprotoFederationEventsEnabledId, GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "false", true),
+                (SeedIds.AtprotoFederationEventsBackfillEnabledId, GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled, "false", true),
+                (SeedIds.AtprotoFederationEventsBackfillModeId, GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode, "\"downtime_only\"", true)
+            ]);
+        string[] movedKeys = dedicated.Select(setting => setting.SettingKey).ToArray();
+        await Assert.That(await context.SystemSettings.AnyAsync(setting => movedKeys.Contains(setting.SettingKey))).IsFalse();
+        await Assert.That(AtprotoFederationSettingDefinitions.EventsBackfillMode.AllowedValues!)
+            .IsEquivalentTo(["downtime_only", "full"]);
         await Assert.That(settings.Any(setting =>
             setting.SettingKey == GovernanceSettingKeys.Federation.AtprotoPublishMyEvents)).IsFalse();
     }

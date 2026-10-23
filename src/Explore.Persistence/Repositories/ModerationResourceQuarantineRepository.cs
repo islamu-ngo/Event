@@ -16,7 +16,7 @@ namespace Explore.Persistence.Repositories;
 /// </summary>
 public sealed partial class ModerationResourceQuarantineRepository(
     ExploreDbContext context, IMachinePrincipalAccessor machine,
-    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyRepository keys,
+    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyAuthenticationRepository keys,
     TimeProvider clock, IPrivacyIdentityFenceAuthority privacy) : IModerationResourceQuarantineRepository
 {
     public async Task<ModerationResourceQuarantineResult> ExecuteAsync(

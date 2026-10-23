@@ -23,7 +23,7 @@ namespace Explore.Persistence.Repositories;
 /// </summary>
 public sealed partial class ModerationOriginalEffectCompletionRepository(
     ExploreDbContext context, IMachinePrincipalAccessor machine,
-    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyRepository keys,
+    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyAuthenticationRepository keys,
     TimeProvider clock, IPrivacyIdentityFenceAuthority privacy,
     ModerationCapabilityRegistry inventory, IModerationPolicyPublicationRepository publications,
     IModerationActivationSourceOwner sources, IEnumerable<IModerationConsumerRuntimeSource> consumerSources,

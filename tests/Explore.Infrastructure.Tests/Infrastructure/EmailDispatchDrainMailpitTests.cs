@@ -1,12 +1,28 @@
-using System.Diagnostics.Metrics;
+using System.Text.Json;
+using Event.Persistence.IntegrationTests;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
+using Explore.Application.Notifications;
 using Explore.Application.Telemetry;
 using Explore.Domain;
+using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Infrastructure.Mail;
+using Explore.Infrastructure.Mail.Unsubscribe;
+using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Tests.Fixtures;
+using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Repositories;
+using Explore.Persistence.Seed;
+using Explore.Persistence.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -28,46 +44,21 @@ public sealed class EmailDispatchDrainMailpitTests(MailpitContainerFixture mailp
     {
         await mailpit.ClearMessagesAsync();
         var subject = $"Registration confirmation {Guid.CreateVersion7():N}";
-        var dispatch = new EmailDispatchOutbox
-        {
-            Id = Guid.CreateVersion7(),
-            TenantId = Guid.CreateVersion7(),
-            PublishEventId = Guid.CreateVersion7(),
-            Kind = EmailDispatchKind.RegistrationConfirmation,
-            SourceType = "event-registration",
-            SourceId = Guid.CreateVersion7(),
-            RecipientEmail = "attendee@example.test",
-            Subject = subject,
-            PlainTextBody = "Your registration was confirmed by the drain service.",
-            HtmlBody = "<p>Your registration was confirmed by the drain service.</p>",
-            Status = EmailDispatchStatus.Pending,
-            CorrelationId = $"corr-{Guid.CreateVersion7():N}"
-        };
-        var repository = new InMemoryEmailDispatchOutboxRepository(dispatch);
-        var tenantAccessor = Substitute.For<ITenantContextAccessor>();
-        var service = CreateDrainService(repository, tenantAccessor);
+        await using var database = await new PersistedEmailDispatchScenario(mailpit).CreateDatabaseAsync(
+            subject, "Your registration was confirmed by the drain service.");
+        await using var provider = PersistedEmailDispatchScenario.CreateServiceProvider(database, CreateSmtpEmailService());
+        var service = provider.GetRequiredService<EmailDispatchDrainService>();
 
         var result = await service.ProcessBatchAsync(CancellationToken.None);
 
         await Assert.That(result.PendingCount).IsEqualTo(1);
         await Assert.That(result.ProcessedCount).IsEqualTo(1);
         await Assert.That(result.SentCount).IsEqualTo(1);
-        await Assert.That(dispatch.Status).IsEqualTo(EmailDispatchStatus.Sent);
-        await Assert.That(dispatch.SentAt).IsNotNull();
-        await Assert.That(dispatch.ProviderMessageId).IsNull();
-        await Assert.That(repository.Attempts.Count).IsEqualTo(1);
-        await Assert.That(repository.Attempts[0].Outcome).IsEqualTo(EmailDispatchAttemptOutcome.Succeeded);
-        await Assert.That(repository.Attempts[0].ProviderMessageId).IsNull();
-        await Assert.That(repository.Receipts.Count).IsEqualTo(1);
-        await Assert.That(repository.Receipts[0].Status).IsEqualTo(EmailDispatchReceiptStatus.Completed);
-        await Assert.That(repository.Receipts[0].ProviderMessageId).IsNull();
-        tenantAccessor.Received(1).SetTenant(dispatch.TenantId);
-        tenantAccessor.Received(1).Clear();
+        await PersistedEmailDispatchScenario.AssertSentStateAsync(database);
 
-        var summary = await mailpit.WaitForMessageAsync(
-            message => message.Subject == subject
-                && message.To.Any(address => address.Address == "attendee@example.test"),
-            TimeSpan.FromSeconds(10));
+        var messages = await mailpit.GetMessagesAsync(CancellationToken.None);
+        var summary = messages.Single(message => message.Subject == subject
+            && message.To.Any(address => address.Address == "attendee@example.test"));
         var detail = await mailpit.GetMessageAsync(summary.Id);
 
         await Assert.That(summary.From.Address).IsEqualTo("noreply@example.test");
@@ -81,70 +72,52 @@ public sealed class EmailDispatchDrainMailpitTests(MailpitContainerFixture mailp
     {
         await mailpit.ClearMessagesAsync();
         var subject = $"Duplicate claim confirmation {Guid.CreateVersion7():N}";
-        var dispatch = new EmailDispatchOutbox
+        await using var database = await new PersistedEmailDispatchScenario(mailpit).CreateDatabaseAsync(
+            subject, "Only one duplicate-claim email should be delivered.");
+        var transport = new HeldSmtpEmailService(CreateSmtpEmailService());
+        await using var provider = PersistedEmailDispatchScenario.CreateServiceProvider(database, transport);
+        var service = provider.GetRequiredService<EmailDispatchDrainService>();
+        Task accepted = transport.Accepted.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        Task<EmailDispatchSingleDrainResult> first = service.ProcessSingleAsync(
+            database.TenantId, database.PublishEventId, "consumer-a", CancellationToken.None);
+        try
         {
-            Id = Guid.CreateVersion7(),
-            TenantId = Guid.CreateVersion7(),
-            PublishEventId = Guid.CreateVersion7(),
-            Kind = EmailDispatchKind.RegistrationConfirmation,
-            SourceType = "event-registration",
-            SourceId = Guid.CreateVersion7(),
-            RecipientEmail = "attendee@example.test",
-            Subject = subject,
-            PlainTextBody = "Only one duplicate-claim email should be delivered.",
-            HtmlBody = "<p>Only one duplicate-claim email should be delivered.</p>",
-            Status = EmailDispatchStatus.Pending,
-            CorrelationId = $"corr-{Guid.CreateVersion7():N}"
-        };
-        var repository = new InMemoryEmailDispatchOutboxRepository(dispatch);
-        var service = CreateDrainService(repository, Substitute.For<ITenantContextAccessor>());
+            await accepted;
+            await using var context = database.CreateContext(database.TenantId);
+            var claimed = await context.EmailDispatchOutbox.AsNoTracking().SingleAsync();
+            await Assert.That(claimed.Status).IsEqualTo(EmailDispatchStatus.Processing);
+            await Assert.That(claimed.ProcessingLeaseToken).IsNotNull();
+            await Assert.That(claimed.AttemptCount).IsEqualTo(1);
+            var attempt = await context.EmailDispatchAttempts.AsNoTracking().SingleAsync();
+            await Assert.That(attempt.Outcome).IsEqualTo(EmailDispatchAttemptOutcome.Unknown);
+            await Assert.That(attempt.FailureCategory).IsEqualTo("provider_handoff_started");
+            var receipt = await context.EmailDispatchReceipts.AsNoTracking().SingleAsync();
+            await Assert.That(receipt.Status).IsEqualTo(EmailDispatchReceiptStatus.Processing);
 
-        var results = await Task.WhenAll(
-            service.ProcessSingleAsync(dispatch.TenantId, dispatch.PublishEventId, "consumer-a", CancellationToken.None),
-            service.ProcessSingleAsync(dispatch.TenantId, dispatch.PublishEventId, "consumer-b", CancellationToken.None));
+            var duplicate = await service.ProcessSingleAsync(
+                database.TenantId, database.PublishEventId, "consumer-b", CancellationToken.None);
+            await Assert.That(duplicate.Outcome).IsEqualTo(EmailDispatchDrainOutcome.AlreadyClaimed);
+        }
+        finally
+        {
+            transport.Release.TrySetResult();
+            await first;
+        }
 
-        await Assert.That(results.Count(result => result.Outcome == EmailDispatchDrainOutcome.Sent)).IsEqualTo(1);
-        await Assert.That(results.Count(result =>
-            result.Outcome is EmailDispatchDrainOutcome.AlreadyClaimed or EmailDispatchDrainOutcome.AlreadySettled))
-            .IsEqualTo(1);
-        await Assert.That(dispatch.Status).IsEqualTo(EmailDispatchStatus.Sent);
-        await Assert.That(repository.Attempts.Count).IsEqualTo(1);
-        await Assert.That(repository.Receipts.Count).IsEqualTo(1);
-        await Assert.That(repository.Receipts[0].Status).IsEqualTo(EmailDispatchReceiptStatus.Completed);
+        await Assert.That((await first).Outcome).IsEqualTo(EmailDispatchDrainOutcome.Sent);
+        var replay = await service.ProcessSingleAsync(
+            database.TenantId, database.PublishEventId, "consumer-c", CancellationToken.None);
+        await Assert.That(replay.Outcome).IsEqualTo(EmailDispatchDrainOutcome.AlreadySettled);
+        await PersistedEmailDispatchScenario.AssertSentStateAsync(database);
 
-        await mailpit.WaitForMessageAsync(
-            message => message.Subject == subject,
-            TimeSpan.FromSeconds(10));
         var messages = await mailpit.GetMessagesAsync(CancellationToken.None);
         await Assert.That(messages.Count(message => message.Subject == subject)).IsEqualTo(1);
-    }
-
-    private EmailDispatchDrainService CreateDrainService(
-        InMemoryEmailDispatchOutboxRepository repository,
-        ITenantContextAccessor tenantAccessor)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IEmailDispatchOutboxRepository>(repository);
-        services.AddSingleton<IEmailService>(CreateSmtpEmailService());
-        services.AddSingleton(Substitute.For<IUserNotificationPreferenceRepository>());
-        services.AddSingleton(Substitute.For<IEmailUnsubscribeTokenService>());
-        services.AddSingleton(CreateEnabledNotificationPreferenceResolver());
-        services.AddSingleton(tenantAccessor);
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        var serviceProvider = services.BuildServiceProvider();
-
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
-
-        return new EmailDispatchDrainService(
-            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
-            Options.Create(new EmailDispatchProcessorSettings
-            {
-                BatchSize = 10,
-                ConsumerId = "mailpit-drain-test"
-            }),
-            new BusinessMetrics(meterFactory),
-            NullLogger<EmailDispatchDrainService>.Instance);
+        var summary = messages.Single(message => message.Subject == subject);
+        await Assert.That(summary.From.Address).IsEqualTo("noreply@example.test");
+        await Assert.That(summary.To.Single().Address).IsEqualTo("attendee@example.test");
+        var detail = await mailpit.GetMessageAsync(summary.Id);
+        await Assert.That(detail.Text).Contains("Only one duplicate-claim email should be delivered.");
+        await Assert.That(detail.Html).Contains("Only one duplicate-claim email should be delivered.");
     }
 
     private SmtpEmailService CreateSmtpEmailService()
@@ -163,25 +136,24 @@ public sealed class EmailDispatchDrainMailpitTests(MailpitContainerFixture mailp
         return new SmtpEmailService(resolver, NullLogger<SmtpEmailService>.Instance);
     }
 
-    private static INotificationPreferenceResolver CreateEnabledNotificationPreferenceResolver()
+    private sealed class HeldSmtpEmailService(IEmailService smtp) : IEmailService
     {
-        var resolver = Substitute.For<INotificationPreferenceResolver>();
-        resolver.ResolveAsync(Arg.Any<NotificationPreferenceResolveRequest>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                var request = call.Arg<NotificationPreferenceResolveRequest>();
-                return new NotificationPreferenceDecision(
-                    request.CategoryCode,
-                    request.ChannelCode,
-                    IsEnabled: true,
-                    IsRequired: false,
-                    IsLocked: false,
-                    IsMuted: false,
-                    EffectiveSourceScope: "Default",
-                    LockReason: null);
-            });
+        public TaskCompletionSource Accepted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        return resolver;
+        public async Task<EmailResult> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+        {
+            EmailResult result = await smtp.SendAsync(message, cancellationToken);
+            if (!result.Success)
+            {
+                Accepted.TrySetException(new InvalidOperationException("Mailpit SMTP did not accept the message."));
+                return result;
+            }
+
+            Accepted.TrySetResult();
+            await Release.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            return result;
+        }
     }
 
 }

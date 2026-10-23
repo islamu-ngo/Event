@@ -11,13 +11,17 @@ namespace Explore.Application.Features.Footer.Handlers.Queries;
 public sealed class GetTenantFooterSettingsQueryHandler(
     IHierarchicalSettingsResolver settingsResolver,
     ITenantContext tenantContext,
-    IDeploymentModeProvider deploymentModeProvider)
+    IDeploymentModeProvider deploymentModeProvider,
+    IHumanCommitScopePreparation humanScope,
+    IFooterOperationExecution footerExecution)
     : IQueryHandler<GetTenantFooterSettingsQuery, TenantFooterSettingsDto>
 {
     public async Task<TenantFooterSettingsDto> QueryAsync(
         GetTenantFooterSettingsQuery request,
         CancellationToken cancellationToken)
     {
+        await humanScope.PrepareAsync(cancellationToken);
+        await footerExecution.RequireOwnedAsync(request, cancellationToken);
         var tenantId = tenantContext.TenantId;
         var settings = await settingsResolver.ResolveGroupAsync<FooterSettingGroup>(
             new SettingContext(TenantId: tenantId),

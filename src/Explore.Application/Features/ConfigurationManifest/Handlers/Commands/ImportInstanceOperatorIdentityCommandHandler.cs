@@ -24,14 +24,13 @@ public sealed class ImportInstanceOperatorIdentityCommandHandler(
             || actorId == Guid.Empty)
             return BaseCommandResponse.Authorization<InstanceOperatorIdentitySavedDocument>();
 
-        InstanceOperatorIdentitySettings candidate;
         try
         {
             OperatorIdentityManifestJson.Validate(command.Manifest);
             if (command.ExpectedRevisionHash is not { Length: 64 }
                 || command.ExpectedRevisionHash.Any(character => character is not (>= '0' and <= '9' or >= 'a' and <= 'f')))
                 throw new OperatorIdentityManifestException();
-            candidate = command.Manifest.Document.Deserialize<InstanceOperatorIdentitySettings>(JsonOptions)
+            _ = command.Manifest.Document.Deserialize<InstanceOperatorIdentitySettings>(JsonOptions)
                 ?? throw new OperatorIdentityManifestException();
         }
         catch (Exception exception) when (exception is OperatorIdentityManifestException or JsonException)
@@ -40,7 +39,6 @@ public sealed class ImportInstanceOperatorIdentityCommandHandler(
                 "operator_identity_manifest_invalid", "The operator identity manifest or revision precondition is invalid.");
         }
 
-        return await identity.ImportAsync(candidate, command.ExpectedRevisionHash,
-            command.Manifest.ContentDigest, actorId, cancellationToken);
+        return await identity.ImportAsync(command, actorId, cancellationToken);
     }
 }

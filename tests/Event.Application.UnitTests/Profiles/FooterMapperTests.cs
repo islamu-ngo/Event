@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Footer.Handlers.Queries;
 using Explore.Application.Mappings;
@@ -66,7 +67,8 @@ public sealed class FooterMapperTests
         var (group, _) = Graph(shape == 2 ? null : Guid.Parse("01990000-0000-7000-8000-000000000099"));
         var repository = Substitute.For<IFooterLinkGroupRepository>();
         repository.GetWithLinksAsync(GroupId, default).Returns(shape == 0 ? null : group);
-        var handler = new GetFooterLinkGroupDetailsQueryHandler(repository, Context());
+        var handler = new GetFooterLinkGroupDetailsQueryHandler(repository, Context(),
+            Substitute.For<IHumanCommitScopePreparation>(), Substitute.For<IFooterOperationExecution>());
 
         await Assert.That(async () => await handler.QueryAsync(new(GroupId), default)).Throws<NotFoundException>();
     }
@@ -79,9 +81,11 @@ public sealed class FooterMapperTests
         repository.GetWithLinksAsync(GroupId, default).Returns(group);
         repository.GetByTenantIdAsync(TenantId, default).Returns(new List<TenantFooterLinkGroup> { group });
 
-        var detail = await new GetFooterLinkGroupDetailsQueryHandler(repository, Context())
+        var detail = await new GetFooterLinkGroupDetailsQueryHandler(repository, Context(),
+                Substitute.For<IHumanCommitScopePreparation>(), Substitute.For<IFooterOperationExecution>())
             .QueryAsync(new(GroupId), default);
-        var list = await new GetFooterLinkGroupListQueryHandler(repository, Context())
+        var list = await new GetFooterLinkGroupListQueryHandler(repository, Context(),
+                Substitute.For<IHumanCommitScopePreparation>(), Substitute.For<IFooterOperationExecution>())
             .QueryAsync(new(), default);
 
         await Assert.That(detail.TenantId).IsEqualTo(TenantId);

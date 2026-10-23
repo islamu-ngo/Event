@@ -1,10 +1,6 @@
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Instance;
-using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;
@@ -15,16 +11,13 @@ public class UpdateInstanceStorageSettingsCommandHandler : ICommandHandler<Updat
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceStorageSettingService _storageSettingService;
-    private readonly IS3ConfigResolver _s3ConfigResolver;
 
     public UpdateInstanceStorageSettingsCommandHandler(
         IAdminContext adminContext,
-        IInstanceStorageSettingService storageSettingService,
-        IS3ConfigResolver s3ConfigResolver)
+        IInstanceStorageSettingService storageSettingService)
     {
         _adminContext = adminContext;
         _storageSettingService = storageSettingService;
-        _s3ConfigResolver = s3ConfigResolver;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateInstanceStorageSettingsCommand request, CancellationToken cancellationToken)
@@ -44,28 +37,8 @@ public class UpdateInstanceStorageSettingsCommandHandler : ICommandHandler<Updat
             return BaseCommandResponse.Validation<Guid>([message], message);
         }
 
-        var settings = await _storageSettingService.ReadSettingsAsync(cancellationToken);
-        if (request.Patch.Policy.HasValue)
-        {
-            var policy = request.Patch.Policy.Value!;
-            settings.Provider = policy.Provider;
-            settings.DefaultMaxUploadBytes = policy.DefaultMaxUploadBytes;
-            settings.DefaultTenantQuotaBytes = policy.DefaultTenantQuotaBytes;
-            settings.InstanceMaxUploadBytes = policy.InstanceMaxUploadBytes;
-            settings.LockTenantStorage = policy.LockTenantStorage;
-            settings = settings with { Routes = policy.Routes };
-        }
-
-        if (request.Patch.S3Configuration.HasValue)
-        {
-            var s3 = request.Patch.S3Configuration.Value!;
-            settings.S3Endpoint = s3.Endpoint;
-            settings.S3PublicEndpoint = s3.PublicEndpoint;
-            settings.S3BucketName = s3.BucketName;
-            settings.S3Region = s3.Region;
-            settings.S3ForcePathStyle = s3.ForcePathStyle;
-            settings.S3UploadUrlExpirationMinutes = s3.UploadUrlExpirationMinutes;
-        }
+        await using var observation = await _storageSettingService.ObserveConfigurationAsync(request, cancellationToken);
+        var settings = observation.InstanceProjection;
 
         var validator = new InstanceStorageSettingsDtoValidator();
         var validationResult = await validator.ValidateAsync(settings, cancellationToken);
@@ -76,10 +49,7 @@ public class UpdateInstanceStorageSettingsCommandHandler : ICommandHandler<Updat
                 "Storage settings validation failed.");
         }
 
-        await _storageSettingService.ApplySettingsAsync(settings, request.Patch);
-
-        // Invalidate S3 config cache so optional S3 provider changes take effect immediately.
-        _s3ConfigResolver.InvalidateCache();
+        await _storageSettingService.ApplySettingsAsync(observation, cancellationToken);
 
         return BaseCommandResponse.Success(Guid.Empty, "Storage settings updated successfully.");
     }

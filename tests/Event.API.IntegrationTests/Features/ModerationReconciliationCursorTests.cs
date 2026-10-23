@@ -277,7 +277,7 @@ public sealed class ModerationReconciliationCursorTests
             var keyId = ApiKeyHashing.CreateKeyId();
             var secret = ApiKeyHashing.CreateSecret();
             Secrets.Credential = ApiKeyHashing.FormatPersistedApiKey(keyId, secret);
-            var keys = Substitute.For<IExternalApiKeyRepository>();
+            var keys = Substitute.For<IExternalApiKeyAuthenticationRepository>();
             keys.GetByKeyIdForAuthentication(keyId, Arg.Any<CancellationToken>()).Returns(new ExternalApiKey
             {
                 Id = Guid.CreateVersion7(), Name = "Cursor recovery maintenance", KeyId = keyId,

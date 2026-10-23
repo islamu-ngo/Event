@@ -1,9 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.AiAssistant.Actions;
+using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
@@ -14,6 +16,7 @@ using Explore.Domain;
 using Explore.Domain.Ai;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
@@ -26,27 +29,43 @@ public sealed class ConfirmAiProposedActionCommandHandler(
     ICurrentUserService currentUserService,
     ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> createEventCommand,
     ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
-    ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult> finalizeUpload) : ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
+    ICommandHandler<FinalizeStorageUploadSessionCommand, StorageUploadSessionResult> finalizeUpload,
+    IUnitOfWork unitOfWork,
+    IAiEventDraftRecoveryRepository recovery,
+    IAiToolContractRegistry registry,
+    ICommandHandler<AttachAiDraftImageCommand, BaseCommandResponse<Guid>> attachImage,
+    TimeProvider timeProvider,
+    RequestAuthorization<ConfirmAiProposedActionCommand> authorization,
+    ILogger<ConfirmAiProposedActionCommandHandler> logger) : ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ConfirmAiProposedActionCommand request,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!currentUserService.IsAuthenticated || currentUserService.UserId is not { } userId)
         {
             return Failure("AI proposed action confirmation requires an authenticated user.", ["User is not authenticated."], "unauthenticated");
         }
 
-        AiProposedAction? action = await conversationRepository.GetProposedActionForUpdateAsync(request.ProposedActionId, cancellationToken);
-        if (!IsActionVisibleToCurrentPrincipal(action, tenantContext.TenantId, userId))
+        AiProposedAction? action = await conversationRepository.GetProposedActionAsync(request.ProposedActionId, cancellationToken);
+        if (!IsActionVisibleToCurrentPrincipal(action, tenantContext.TenantId, userId)
+            || action!.ConversationId != request.ConversationId)
         {
             return Failure("AI proposed action was not found.", ["Proposed action was not found."], "proposed_action_not_found");
         }
 
-        if (action!.Status == AiProposedActionStatus.Executed)
-        {
-            return Success(action.ResultResourceId ?? action.Id, "AI proposed action was already executed.");
-        }
+        await authorization.AuthorizeAsync(request, logger, cancellationToken);
+        if (!string.Equals(request.ExpectedVersion, action.ConsentVersionFor(userId), StringComparison.Ordinal))
+            return Failure("The displayed AI action preview has changed.",
+                ["Reload and review the exact action before confirming."], "proposed_action_version_changed");
+        if (action.Kind != AiProposedActionKind.CreateEventDraft)
+            return Failure("This action has no implemented execution owner.", ["No tool was dispatched."],
+                "unsupported_action_kind", action.Id);
+        var validation = registry.ValidatePayload(action.Kind, action.PayloadJson);
+        if (!validation.Succeeded)
+            return Failure("The persisted tool arguments are invalid.", ["No tool was dispatched."],
+                validation.FailureCode ?? "invalid_tool_arguments", action.Id);
 
         if (action.Status == AiProposedActionStatus.Rejected)
         {
@@ -58,48 +77,163 @@ public sealed class ConfirmAiProposedActionCommandHandler(
             return Failure("AI proposed action previously failed.", ["Failed proposed actions cannot be confirmed again."], "proposed_action_failed", action.Id);
         }
 
-        var utcNow = DateTime.UtcNow;
         if (action.Status == AiProposedActionStatus.Proposed)
         {
-            action.Confirm(userId, utcNow);
+            var candidate = action;
+            var claim = await unitOfWork.ExecuteSerializableAsync(async token =>
+            {
+                var current = await conversationRepository.GetProposedActionForUpdateAsync(
+                    request.ProposedActionId, candidate.ActingActorId, token);
+                if (!IsActionVisibleToCurrentPrincipal(current, tenantContext.TenantId, userId)
+                    || current!.ConversationId != request.ConversationId)
+                    return (Action: (AiProposedAction?)null, FailureCode: "proposed_action_authority_changed");
+                await authorization.AuthorizeAsync(request, logger, token);
+                if (!string.Equals(request.ExpectedVersion, current.ConsentVersionFor(userId), StringComparison.Ordinal))
+                    return (Action: (AiProposedAction?)null, FailureCode: "proposed_action_version_changed");
+                if (!IsLive(current))
+                    return (Action: (AiProposedAction?)null, FailureCode: "proposed_action_expired");
+                if (current.Status != AiProposedActionStatus.Proposed || current.Kind != candidate.Kind
+                    || current.PayloadJson != candidate.PayloadJson || current.ActingActorId != candidate.ActingActorId
+                    || current.CreatedAt != candidate.CreatedAt || current.MessageId != candidate.MessageId
+                    || current.Conversation!.ActorId != current.ActingActorId)
+                    return (Action: (AiProposedAction?)null, FailureCode: "proposed_action_authority_changed");
+                DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+                current.Confirm(userId, new DateTime(now.Ticks - now.Ticks % 10, DateTimeKind.Utc));
+                await conversationRepository.UpdateProposedActionAsync(current, token);
+                return (Action: (AiProposedAction?)current, FailureCode: (string?)null);
+            }, cancellationToken);
+            action = claim.Action;
+            if (action is null)
+                return Failure("AI action authority or lifetime changed.", ["No tool was dispatched."],
+                    claim.FailureCode!, request.ProposedActionId);
         }
+        if (action.Status is not (AiProposedActionStatus.Confirmed or AiProposedActionStatus.Executed)
+            || action.ConfirmedBy != userId || action.ConfirmedAt is null || action.ActingActorId is null)
+            return Failure("Exact persisted confirmation is required.", ["No tool was dispatched."],
+                "proposed_action_authority_changed", action.Id);
 
-        var execution = new AiToolExecution
+        var identity = AiEventDraftRecoveryIdentity.FromConfirmedAction(action);
+        try
         {
-            Id = Guid.CreateVersion7(),
-            TenantId = action.TenantId,
-            ProposedActionId = action.Id,
-            ToolName = GetToolName(action.Kind),
-            StartedAt = utcNow
-        };
+            if (!IsLive(action))
+            {
+                var completed = await recovery.ReadAsync(identity, cancellationToken);
+                return completed is { Succeeded: true, CompletedAt: not null, PrimaryEventId: { } eventId }
+                    ? Success(eventId, "AI action was already executed.")
+                    : Failure("AI action lifetime expired.", ["No further effects were dispatched."],
+                        "proposed_action_expired", action.Id);
+            }
+            var execution = await recovery.AcquireAsync(identity, cancellationToken);
+            if (execution is null)
+                return Failure("The original execution is unavailable under current authority.",
+                    ["No replacement execution was created."], "proposed_action_authority_changed", action.Id);
+            if (execution.CompletedAt.HasValue)
+                return execution.Succeeded && execution.PrimaryEventId.HasValue
+                    ? Success(execution.PrimaryEventId.Value, "AI action was already executed.")
+                    : Failure("The original execution is terminal.", ["No tool was dispatched."],
+                        "proposed_action_failed", action.Id);
+            if (!IsLive(action))
+                return Failure("AI action lifetime expired.", ["No further effects were dispatched."],
+                    "proposed_action_expired", action.Id);
 
-        CreateEventDraftAiToolExecutionResult executionResult = await ExecuteAsync(action, cancellationToken);
-        if (!executionResult.Succeeded)
-        {
-            action.MarkFailed(
-                executionResult.FailureCode ?? "ai_tool_execution_failed",
-                executionResult.FailureMessage ?? "AI tool execution failed.");
-            execution.MarkFailed(action.FailureCode!, action.FailureMessage, DateTime.UtcNow);
-            await conversationRepository.CreateToolExecutionAsync(execution, cancellationToken);
-            await conversationRepository.UpdateProposedActionAsync(action, cancellationToken);
+            if (execution.PrimaryEventId is null)
+            {
+                var result = await ExecuteAsync(action, execution, cancellationToken);
+                execution = await recovery.ReadAsync(identity, cancellationToken);
+                if (execution?.PrimaryEventId is null)
+                    return Failure("The original draft has not been recovered.", ["Retry the original confirmation."],
+                        result.FailureCode ?? "ai_primary_recovery_required", action.Id);
+            }
 
-            return Failure(
-                "AI proposed action confirmation failed.",
-                [action.FailureMessage ?? "AI tool execution failed."],
-                action.FailureCode,
-                action.Id);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!await IsCurrentActionLiveAsync(identity, cancellationToken))
+                return Failure("AI action authority or lifetime changed.", ["No further effects were dispatched."],
+                    "proposed_action_authority_changed", action.Id);
+            await authorization.AuthorizeAsync(request, logger, cancellationToken);
+            var image = await ResolveFeaturedImageAsync(action, execution, identity, cancellationToken);
+            if (!image.Succeeded)
+                return await AuthorizedRecoveryRequiredAsync(identity, cancellationToken);
+            execution = await recovery.ReadAsync(identity, cancellationToken);
+            if (execution is null)
+                return Failure("AI action authority changed.", ["No further effects were dispatched."],
+                    "proposed_action_authority_changed", action.Id);
+            if (execution.ImageStorageObjectId.HasValue)
+            {
+                var attached = await attachImage.ExecuteAsync(
+                    AttachAiDraftImageCommand.FromExecution(execution), cancellationToken);
+                if (!attached.IsSuccess)
+                    return await AuthorizedRecoveryRequiredAsync(identity, cancellationToken);
+            }
+            return await unitOfWork.ExecuteSerializableAsync(async token =>
+            {
+                var current = await recovery.ReadForSettlementAsync(
+                    identity, execution.Id, execution.ConcurrencyStamp, token);
+                if (current is null || !await IsCurrentActionLiveAsync(identity, token))
+                    return Failure("AI action authority changed before settlement.", ["Retry the original confirmation."],
+                        "proposed_action_authority_changed", action.Id);
+                await authorization.AuthorizeAsync(request, logger, token);
+                current.MarkSucceeded(timeProvider.GetUtcNow().UtcDateTime);
+                await recovery.SaveSettlementAsync(identity, current, token);
+                return Success(current.PrimaryEventId!.Value, "AI proposed action confirmed and executed.");
+            }, cancellationToken);
         }
+        catch
+        {
+            // Uncertain acknowledgement does not authorize another effect. This read
+            // only reports the original primary under current independent authority.
+            using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try
+            {
+                await authorization.AuthorizeAsync(request, logger, bounded.Token);
+                var committed = await recovery.ReadAsync(identity, bounded.Token);
+                if (committed?.PrimaryEventId is { } eventId)
+                    return committed.Succeeded ? Success(eventId, "AI action was already executed.") : RecoveryRequired(eventId);
+            }
+            catch { /* Preserve the original failure when recovery is unavailable. */ }
+            throw;
+        }
+    }
 
-        action.MarkExecuted(executionResult.ResultResourceId!.Value);
-        execution.MarkSucceeded(DateTime.UtcNow);
-        await conversationRepository.CreateToolExecutionAsync(execution, cancellationToken);
-        await conversationRepository.UpdateProposedActionAsync(action, cancellationToken);
+    private bool IsLive(AiProposedAction action)
+    {
+        DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+        return AiProposedAction.IsWithinLifetime(action.CreatedAt, now)
+            && action.Conversation?.Status == AiConversationStatus.Active;
+    }
 
-        return Success(executionResult.ResultResourceId.Value, "AI proposed action confirmed and executed.");
+    private async Task<bool> IsCurrentActionLiveAsync(
+        AiEventDraftRecoveryIdentity identity, CancellationToken cancellationToken)
+    {
+        var current = await conversationRepository.GetProposedActionAsync(identity.ProposedActionId, cancellationToken);
+        return IsActionVisibleToCurrentPrincipal(current, tenantContext.TenantId, identity.PrincipalUserId)
+            && current!.Status is AiProposedActionStatus.Confirmed or AiProposedActionStatus.Executed
+            && current.Kind == AiProposedActionKind.CreateEventDraft
+            && current.ConfirmedBy == identity.PrincipalUserId && current.ActingActorId == identity.ActingActorId
+            && current.ConfirmedAt == identity.ConfirmedAt
+            && AiEventDraftRecoveryIdentity.FromConfirmedAction(current) == identity && IsLive(current);
+    }
+
+    private static BaseCommandResponse<Guid> RecoveryRequired(Guid eventId) =>
+        Failure("The original draft exists; image or completion recovery is required.",
+            ["Retry this confirmation, not a new proposal."], "ai_draft_recovery_required", eventId);
+
+    private async Task<BaseCommandResponse<Guid>> AuthorizedRecoveryRequiredAsync(
+        AiEventDraftRecoveryIdentity identity, CancellationToken cancellationToken)
+    {
+        await authorization.AuthorizeAsync(new ConfirmAiProposedActionCommand
+        {
+            ConversationId = identity.ConversationId,
+            ProposedActionId = identity.ProposedActionId
+        }, logger, cancellationToken);
+        var current = await recovery.ReadAsync(identity, cancellationToken);
+        return current?.PrimaryEventId is { } eventId ? RecoveryRequired(eventId)
+            : Failure("AI action authority changed.", ["No recovery identity was disclosed."],
+                "proposed_action_authority_changed", identity.ProposedActionId);
     }
 
     private async Task<CreateEventDraftAiToolExecutionResult> ExecuteAsync(
         AiProposedAction action,
+        AiToolExecution execution,
         CancellationToken cancellationToken)
     {
         if (action.Kind != AiProposedActionKind.CreateEventDraft)
@@ -119,28 +253,45 @@ public sealed class ConfirmAiProposedActionCommandHandler(
 
         var executor = new CreateEventDraftAiToolExecutor(createEventCommand);
         return await executor.ExecuteAsync(
+            execution,
             action.PayloadJson,
             mappingContext.Context,
-            ct => ResolveFeaturedImageAsync(action, ct),
             cancellationToken);
     }
 
     private async Task<CreateEventDraftAiFeaturedImageResolutionResult> ResolveFeaturedImageAsync(
         AiProposedAction action,
+        AiToolExecution execution,
+        AiEventDraftRecoveryIdentity identity,
         CancellationToken cancellationToken)
     {
+        if (!IsLive(action))
+            return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
+                "proposed_action_expired", "No further image effects are permitted.");
+        if (execution.ImageStorageObjectId is { } retainedObject)
+            return CreateEventDraftAiFeaturedImageResolutionResult.Success(retainedObject);
         AiMessage? imageMessage = FindSourceImageMessage(action);
         if (imageMessage is null)
         {
-            return CreateEventDraftAiFeaturedImageResolutionResult.Success(null);
+            return execution.ImageSourceMessageId is null
+                ? CreateEventDraftAiFeaturedImageResolutionResult.Success(null)
+                : CreateEventDraftAiFeaturedImageResolutionResult.Failure(
+                    "ai_image_source_changed", "The original image source is no longer available.");
         }
+        if (imageMessage.Id != execution.ImageSourceMessageId ||
+            execution.ImageSourceDigest is not { } sourceDigest ||
+            AiToolExecution.DigestPayload(imageMessage.ImageAttachmentsJson!) != sourceDigest ||
+            string.IsNullOrWhiteSpace(execution.ImageUploadOperationKey))
+            return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
+                "ai_image_source_changed", "The original image source is no longer available.");
 
         StoredAiMessageImageAttachmentDto? image = AiMessageImageAttachmentSerializer
             .DeserializeForStorage(imageMessage.ImageAttachmentsJson)
             .FirstOrDefault();
         if (image is null)
         {
-            return CreateEventDraftAiFeaturedImageResolutionResult.Success(null);
+            return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
+                "invalid_ai_image_attachment", "The retained image source has no usable attachment.");
         }
 
         var mediaType = image.MediaType.Trim();
@@ -189,7 +340,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
                 Extension = extension,
                 Purpose = StorageObjectPurposes.EventImage,
                 Visibility = StorageObjectVisibilities.PublicImage,
-                IdempotencyKey = $"ai-action:{action.Id}:featured-image"
+                IdempotencyKey = execution.ImageUploadOperationKey
             }
         }, cancellationToken);
 
@@ -200,27 +351,74 @@ public sealed class ConfirmAiProposedActionCommandHandler(
                 uploadSession.Message ?? "AI event draft image upload session could not be created.");
         }
 
-        await using var content = new MemoryStream(imageBytes, writable: false);
-        await using var finalized = await finalizeUpload.ExecuteAsync(new FinalizeStorageUploadSessionCommand
-        {
-            UploadSessionId = uploadSession.Id.Id,
-            Content = content,
-            ContentType = mediaType,
-            ContentLength = imageBytes.LongLength,
-            TenantId = action.TenantId
-        }, cancellationToken);
-
-        var finalizeResult = finalized.Response;
-        if (finalizeResult is null || !finalizeResult.IsSuccess
-            || finalizeResult.Id?.StorageObjectId is not { } storageObjectId || storageObjectId == Guid.Empty)
-        {
+        Guid sessionId = uploadSession.Id.Id;
+        var sessionExecution = await StoreImageCustodyAsync(identity, execution,
+            value => value.BindImageUploadSession(imageMessage.Id, sourceDigest, sessionId),
+            cancellationToken);
+        if (sessionExecution is null)
             return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
-                finalizeResult?.FailureCode ?? "ai_image_upload_failed",
-                finalizeResult?.Message ?? "AI event draft image could not be stored.");
+                "ai_image_authority_changed", "Image custody could not be retained under current authority.");
+        execution = sessionExecution;
+
+        Guid storageObjectId;
+        if (uploadSession.Id.Status == StorageUploadSessionStates.Finalized &&
+            uploadSession.Id.StorageObjectId is { } finalizedId && finalizedId != Guid.Empty)
+        {
+            storageObjectId = finalizedId;
+        }
+        else if (uploadSession.Id.Status == StorageUploadSessionStates.Reserved)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsLive(action))
+                return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
+                    "proposed_action_expired", "No further image effects are permitted.");
+            await using var content = new MemoryStream(imageBytes, writable: false);
+            await using var finalized = await finalizeUpload.ExecuteAsync(new FinalizeStorageUploadSessionCommand
+            {
+                UploadSessionId = sessionId,
+                Content = content,
+                ContentType = mediaType,
+                ContentLength = imageBytes.LongLength,
+                TenantId = action.TenantId
+            }, cancellationToken);
+            var finalizeResult = finalized.Response;
+            if (finalizeResult is null || !finalizeResult.IsSuccess || finalizeResult.Id?.StorageObjectId is not { } uploadedId || uploadedId == Guid.Empty)
+                return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
+                    "ai_image_recovery_required", "The original image transfer requires reconciliation.");
+            storageObjectId = uploadedId;
+        }
+        else
+        {
+            // Uploading is uncertain ownership, not permission to transfer again.
+            return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
+                "ai_image_recovery_required", "The original image transfer requires reconciliation.");
         }
 
+        var completedCustody = await StoreImageCustodyAsync(identity, execution,
+            value => value.BindImageStorageObject(sessionId, storageObjectId), cancellationToken);
+        if (completedCustody is null)
+            return CreateEventDraftAiFeaturedImageResolutionResult.Failure(
+                "ai_image_authority_changed", "The original storage object could not be retained under current authority.");
         return CreateEventDraftAiFeaturedImageResolutionResult.Success(storageObjectId);
     }
+
+    private Task<AiToolExecution?> StoreImageCustodyAsync(
+        AiEventDraftRecoveryIdentity identity, AiToolExecution expected,
+        Action<AiToolExecution> bind, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteSerializableAsync<AiToolExecution?>(async token =>
+        {
+            var current = await recovery.ReadForSettlementAsync(
+                identity, expected.Id, expected.ConcurrencyStamp, token);
+            if (current is null || !await IsCurrentActionLiveAsync(identity, token)) return null;
+            await authorization.AuthorizeAsync(new ConfirmAiProposedActionCommand
+            {
+                ConversationId = identity.ConversationId,
+                ProposedActionId = identity.ProposedActionId
+            }, logger, token);
+            bind(current);
+            await recovery.SaveSettlementAsync(identity, current, token);
+            return current;
+        }, cancellationToken);
 
     private static AiMessage? FindSourceImageMessage(AiProposedAction action)
     {

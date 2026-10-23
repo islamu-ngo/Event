@@ -4,6 +4,7 @@ using Explore.Application.Exceptions;
 using Explore.Application.Services.Federation;
 using Explore.Domain.Enums;
 using Explore.Persistence.Extensions;
+using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,13 +17,23 @@ namespace Explore.Persistence.Repositories;
 public sealed class EventDiscoveryResponseBoundaryRepository(
     ExploreDbContext context,
     ILocationPrivacyGovernanceService privacy,
-    AtprotoEventGovernanceResolver federation) : IEventDiscoveryResponseBoundaryRepository
+    AtprotoEventGovernanceResolver federation,
+    PublicEventDiscoveryReadBindingFactory? publicDiscoveryBindings = null) : IEventDiscoveryResponseBoundaryRepository
 {
+    private PublicEventDiscoveryReadBinding? _publicReadBinding;
+
     public async Task<DateTimeOffset?> GetNextAsync(
         Guid tenantId, DateTimeOffset observedAtUtc, CancellationToken cancellationToken)
     {
         if (tenantId == Guid.Empty || context.TenantFilterTenantId != tenantId || context.IsTenantFilterBypassed)
             throw new EventDiscoveryUnavailableException();
+
+        if (DiscoveryRepositoryNativeOperations.For(context) is { } native)
+            return await native.GetNextResponseBoundaryAsync(
+                _publicReadBinding ??= (publicDiscoveryBindings
+                    ?? throw new UnauthorizedAccessException("Native response clocks require their selected binding factory."))
+                    .Create(context),
+                privacy, federation, observedAtUtc, cancellationToken);
 
         var publicEvents = context.Events.WherePubliclyEligible(context)
             .Where(value => value.TenantId == tenantId).Select(value => value.Id);

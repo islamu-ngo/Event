@@ -316,6 +316,8 @@ public sealed class RegistrationProviderCapabilityResolverTests
         public IReadOnlyList<RegistrationProviderParkedItem> ParkedItems { get; init; } = [];
         public int SaveCount { get; private set; }
         public Task<RegistrationProviderConnection?> GetConnectionAsync(Guid tenantId, Guid connectionId, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task<RegistrationProviderConnection?> GetConnectionObservationAsync(Guid tenantId, Guid connectionId, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task<RegistrationProviderBinding?> GetBindingObservationAsync(Guid tenantId, Guid bindingId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<IReadOnlyList<RegistrationProviderConnection>> GetConnectionsAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RegistrationProviderConnection>>([]);
         public Task<RegistrationProviderBinding?> GetBindingAsync(Guid tenantId, Guid bindingId, CancellationToken cancellationToken) => cancellationToken.IsCancellationRequested ? Task.FromCanceled<RegistrationProviderBinding?>(cancellationToken) : Task.FromResult<RegistrationProviderBinding?>(binding);
         public Task<RegistrationProviderBinding?> GetBindingForPublicationAsync(Guid tenantId, Guid bindingId,

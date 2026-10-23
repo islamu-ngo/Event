@@ -44,6 +44,16 @@ public sealed class ConfigurationManifestOperation
     public string? Reason { get; private set; }
     public DateTime StartedAt { get; private set; }
     public DateTime CompletedAt { get; private set; }
+    public Guid? EffectOutboxId { get; private set; }
+
+    public void BindEffectOutbox(Guid messageId)
+    {
+        if (Status != ConfigurationManifestOperationStatus.Applied
+            || messageId == Guid.Empty || messageId.Version != 7
+            || EffectOutboxId is not null)
+            throw new InvalidOperationException("Manifest effect receipt cannot be bound.");
+        EffectOutboxId = messageId;
+    }
     private string _instanceChangedSettingKeyNames = string.Empty;
     private string _instanceChangedDocumentKeyNames = string.Empty;
 

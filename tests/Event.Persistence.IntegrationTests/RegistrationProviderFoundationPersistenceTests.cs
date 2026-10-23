@@ -403,6 +403,8 @@ public sealed partial class RegistrationProviderFoundationPersistenceTests
         await using ExploreDbContext firstContext = CreateInMemoryContext(databaseName);
         await using ExploreDbContext secondContext = CreateInMemoryContext(databaseName);
         RegistrationProviderSubscriptionStateRepository repository = new(firstContext);
+        firstContext.TenantContext = new TestTenantContext(tenantId);
+        secondContext.TenantContext = new TestTenantContext(tenantId);
         IReadOnlyList<RegistrationProviderSubscriptionState> claims = await repository.ClaimDueRenewalsAsync(
             1, Now.AddHours(2), Now.AddMinutes(1), TimeSpan.FromMinutes(5), CancellationToken.None);
         RegistrationProviderSubscriptionState stale = (await secondContext.RegistrationProviderSubscriptionStates
@@ -439,6 +441,7 @@ public sealed partial class RegistrationProviderFoundationPersistenceTests
 
         await using ExploreDbContext context = CreateInMemoryContext(databaseName);
         RegistrationProviderSubscriptionStateRepository repository = new(context);
+        context.TenantContext = new TestTenantContext(tenantId);
         IReadOnlyList<RegistrationProviderSubscriptionState> first = await repository.ClaimDueSweepsAsync(
             1, Now.AddMinutes(2), TimeSpan.FromMinutes(5), CancellationToken.None);
         first[0].SettleCheckpoint(first[0].LeaseToken!.Value, first[0].ProcessingGeneration, "sync-2", Now.AddMinutes(3));
@@ -478,6 +481,7 @@ public sealed partial class RegistrationProviderFoundationPersistenceTests
         await using ExploreDbContext context = CreateInMemoryContext(databaseName);
         RegistrationProviderSubscriptionStateRepository repository = new(context);
 
+        context.TenantContext = new TestTenantContext(tenantId);
         await Assert.That(await repository.ClaimDueSweepsAsync(1, Now.AddHours(5), TimeSpan.FromMinutes(5), CancellationToken.None)).IsEmpty();
         await Assert.That(await repository.ClaimDueSweepsAsync(1, Now.AddHours(6), TimeSpan.FromMinutes(5), CancellationToken.None)).HasSingleItem();
     }
@@ -502,6 +506,8 @@ public sealed partial class RegistrationProviderFoundationPersistenceTests
         await using ExploreDbContext secondContext = CreateInMemoryContext(databaseName);
         RegistrationProviderSubscriptionStateRepository firstRepository = new(firstContext);
         RegistrationProviderSubscriptionStateRepository secondRepository = new(secondContext);
+        firstContext.TenantContext = new TestTenantContext(tenantId);
+        secondContext.TenantContext = new TestTenantContext(tenantId);
         IReadOnlyList<RegistrationProviderSubscriptionState> first = await firstRepository.ClaimDueSweepsAsync(
             1, Now.AddMinutes(2), TimeSpan.FromMinutes(5), CancellationToken.None);
         IReadOnlyList<RegistrationProviderSubscriptionState> duplicate = await secondRepository.ClaimDueSweepsAsync(
@@ -535,6 +541,7 @@ public sealed partial class RegistrationProviderFoundationPersistenceTests
 
         await using ExploreDbContext context = CreateInMemoryContext(databaseName);
         RegistrationProviderSubscriptionStateRepository repository = new(context);
+        context.TenantContext = new TestTenantContext(tenantId);
         IReadOnlyList<RegistrationProviderSubscriptionState> sweep = await repository.ClaimDueSweepsAsync(
             1, Now.AddMinutes(2), TimeSpan.FromMinutes(5), CancellationToken.None);
         sweep[0].Fail(RegistrationProviderSubscriptionOperation.Sweep, sweep[0].LeaseToken!.Value, sweep[0].ProcessingGeneration, "sweep_timeout", Now.AddMinutes(20), Now.AddMinutes(3));
@@ -562,6 +569,7 @@ public sealed partial class RegistrationProviderFoundationPersistenceTests
 
         await using ExploreDbContext context = CreateInMemoryContext(databaseName);
         RegistrationProviderSubscriptionStateRepository repository = new(context);
+        context.TenantContext = new TestTenantContext(tenantId);
         IReadOnlyList<RegistrationProviderSubscriptionState> renewal = await repository.ClaimDueRenewalsAsync(
             1, Now.AddHours(1), Now.AddMinutes(2), TimeSpan.FromMinutes(5), CancellationToken.None);
         renewal[0].Fail(RegistrationProviderSubscriptionOperation.Renewal, renewal[0].LeaseToken!.Value, renewal[0].ProcessingGeneration, "renewal_timeout", Now.AddMinutes(20), Now.AddMinutes(3));

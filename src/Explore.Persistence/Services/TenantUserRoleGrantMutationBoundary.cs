@@ -3,6 +3,7 @@ using System.IO;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
@@ -18,7 +19,8 @@ namespace Explore.Persistence.Services;
 /// <summary>Commits participating tenant-role changes and qualification invalidation as one native unit.</summary>
 public sealed class TenantUserRoleGrantMutationBoundary(
     ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy, IUserContext user,
-    IAdminContext admin, IMachinePrincipalAccessor machine, IAuthorizationProvider authorization)
+    IAdminContext admin, IMachinePrincipalAccessor machine, IAuthorizationProvider authorization,
+    IHumanActionCommitFinalizer finalizer)
     : ITenantUserRoleGrantMutationBoundary
 {
     public Task<BaseCommandResponse<Guid>> ExecuteCreateAsync(Guid tenantId, Guid tenantUserId, int roleId,
@@ -39,6 +41,7 @@ public sealed class TenantUserRoleGrantMutationBoundary(
         RequireContext();
         if (context.Database.CurrentTransaction is not null || context.ChangeTracker.HasChanges()) Deny();
         CommittedAttempt<T>? attempted = null;
+        var admission = new NativeHumanMutationAdmission(context, finalizer);
         try
         {
             return await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(
@@ -78,6 +81,7 @@ public sealed class TenantUserRoleGrantMutationBoundary(
                 return await privacy.ExecuteEnrollmentSerializedAsync(async token =>
                     await new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAsync(async inner =>
                     {
+                        admission.RegisterOwning(RecheckAsync);
                         await using var installation = await RelationalNamedLock.AcquireTransactionAsync(
                             context, "moderation.authority-source.installation", inner);
                         var targetId = tenantUserId;

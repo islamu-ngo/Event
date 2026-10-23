@@ -3,6 +3,119 @@
 
 # Security
 
+## Application authority and database defence
+
+C# Domain/Application workflows own authorization, business rules, concurrency
+coordination and completion. EF Core is the default persistence abstraction;
+database transactions, integrity constraints and tenant RLS support that authority.
+RLS restricts a session's accessible rows; it does not replace application access
+checks or orchestrate business actions. An approved application purpose needs the
+fixed storage permissions necessary for its legitimate operations.
+
+The [accepted persistence decision](adr/ADR-application-owned-persistence.md)
+records the separate credential-only compromise risk and approval boundary.
+Do not use that accepted risk to repeatedly require permission approvals or push
+business logic into privileged SQL. Native routine descriptions below record
+existing mechanisms, not a requirement to preserve database business authority;
+replace them through verified C# workflows rather than silently bypassing controls.
+
+## Existing PostgreSQL capability support
+
+`PostgresPrivilegeGuard` generates read-only PostgreSQL assertions from a trusted,
+source-declared contract of dedicated roles, routines, relations and memberships.
+It checks effective table/column privileges, grant options, role attributes,
+routine ownership/ACLs and fixed search paths, including inherited and PUBLIC
+authority. `BuildAssertSql` rejects drift with SQLSTATE `55000`; the guard never
+grants, revokes or derives its allowlist from the live catalogue. Caller enrollment,
+body fingerprints, RLS and business fences remain the owning capability's
+responsibility. Providing this helper does not imply adoption by every capability.
+
+Queue readiness uses `QueueDrainHealthRepository` with an identity-free
+`IGlobalExploreDbContextFactory` lease, never the request Runtime context.
+PostgreSQL executes `queue_drain_health_snapshot` through the
+`event_queue_drain_health_global` group. Its thirteen integer counts expose no
+queue identifiers or payloads. The function owner has only the predicate-column
+reads required for these counts and purpose-specific RLS policies; the Global
+executor has no direct table reads or writes. Routine ACL checks run during
+installation and invocation. Other providers retain the existing count predicates.
+The application migrator installs the function; operators separately enroll the
+configured Global login in the health executor group, not its owner or migrator.
+This contract does not attest every other capability sharing the Global pool.
+
+## Tenant deletion reservation and owner
+
+Human Tenant/Delete uses its exact ExecuteDeletionAsync seam, not a generic
+prepared callback. The original Serializable owner reserves discovery before
+acquiring human principal, route and support sources, then deletes the tenant
+and six discovery row types on that same transaction. Original credential and
+source admission remain terminal requirements. Repository deletion cannot open
+a second owner or substitute a different prepared request. Tenant slug-cache
+refresh follows acknowledgement. Source controls are authored; executable
+programme assurance remains pending.
+
+## Provider connection transaction ownership
+
+Connection upsert, approved-origin replacement and deletion execute directly
+inside HumanTenantMutationPreparation's original physical owner. They do not
+open nested attempt owners. Original acquired authority is checked before
+business writes and at terminal admission; late grant revocation or credential
+expiry rolls back connection metadata and origin rows together. The generic
+UnitOfWork nesting refusal remains intact. Source regression controls are
+authored; executable programme assurance is pending.
+
+## Original governance PATCH ownership
+
+The nine module, organization, branding, domain, tenant-delegation, admin-portal,
+MCP, AI and render-policy handlers select MixedSettingsInstance before source
+construction. TypedSettingsOriginal captures the exact PATCH; the private store
+compiles supplied values and paired locks from acquired DATA, preserving stored
+bytes for lock-only updates. Module capability, default branding document and
+joined SMTP revision effects share the original physical owner. Completion
+requires every compiled effect before terminal authority and deadline checks.
+Cache invalidation and notifications follow acknowledged settlement.
+This source integration adds no policy question and remains pending executable
+programme/provider assurance.
+
+## Configuration import session settlement
+
+Human session creation, preview, cancellation and rollback snapshot copying use
+the original import observation owner. Its private prepared handle permits only
+manager-built operations for the exact target during the callback. Operations
+validate acquired source and physical transaction leases before and after
+storage; a caught storage failure still poisons settlement. The handle ends
+before finalizers run, and results are released only after consumption of the
+owner's post-disposal commit receipt. Generic UnitOfWork nesting remains forbidden.
+
+Artifact bytes and preview collections are captured before asynchronous owner
+selection. Pre-apply artifact reads settle separately before apply admission.
+Enrollment-bound setup-live transactions and worker expiration retain their
+distinct owners. These controls are authored source; executable programme and
+provider assurance remain pending.
+
+## Final file response policy
+
+`SecurityHeadersMiddleware` composes CSP at response start from trusted
+`SandboxedFileResponseAttribute` endpoint metadata. Event-resource content and
+generic storage content/public-raster routes receive `default-src 'none'`,
+`frame-ancestors 'none'` and `sandbox` together with `nosniff`; other API routes
+retain the default denial/no-frame policy. Existing arbitrary CSP strings are
+not merged or trusted. This avoids the former global-header overwrite of the
+file result's sandbox. Combined hosting routes API-owned requests through the
+same middleware/context and excludes those routes from Blazor middleware.
+
+The marker changes browser response containment, not upload inspection or
+access authority. Event-resource delivery still completes its native authority
+lease immediately before taking the prepared stream, then delivers an attachment
+with safe name and no ranges. Generic storage retains its own verified content
+and attachment/range contracts; it does not inherit specialized OOXML inspection
+merely by carrying a file-response marker.
+
+Hosted Local storage validation applies to retained bindings as well as the
+active default root. `StorageProviderBindingService.ResolveAsync` validates the
+persisted root against the current host's web root before constructing a bound
+provider. Rotating the default root cannot silently admit a historical target
+inside a public mount.
+
 ## Identity Correlation Authority
 
 Token admission and account adoption are separate trust decisions. Only the
@@ -129,6 +242,38 @@ provider-neutral:
 - `Explore.API` isolates Local/Keycloak bearer validation and AT Protocol bootstrap/session schemes before applying resource-level authorization.
 - `ISLAMU Event Domain` remains authoritative for tenant memberships, legal entities, and event access control.
 
+### Local login and anonymous recovery failure boundary
+
+Local credential identity uses NFC consistently for creation and verification.
+New credentials require 15–128 Unicode scalars and an immutable, digest-pinned,
+operator-owned whole-password blocklist. Native salted Identity hashing remains
+the cryptographic owner; missing/invalid required snapshots deny readiness and
+all proposed Local credential mutations. See
+[Local password policy](LOCAL_PASSWORD_POLICY.md) for custody, exact normalization,
+safe effective hash status and the unexecuted calibration source.
+
+Missing, incorrect and locked Local credentials share HTTP 401 and the same
+ProblemDetails machine envelope (`code=invalid_credentials`), excluding
+request-specific trace/timestamp metadata. Internal Identity lockout results and
+account-bound counters remain distinct; an already-locked account performs dummy
+native password verification and cannot issue authority even with its correct
+password. No exact timing equivalence is claimed.
+
+Anonymous password-recovery intake returns empty, private/no-store HTTP 202 for
+missing/ineligible targets and classified target-only pre-commit failures.
+Expected transient reads and native concurrency/own-primary-key/write-contention
+failures carry bounded, value-free internal outcomes. Cancellation and genuine
+programming/invariant or permanent database failures propagate. The native owner
+marks possible durable ownership before attempting commit and when reusing a
+live operation; commit acknowledgement loss cannot become an uncommitted failure
+or a promise to replay the write. Only committed Identity lifecycle ledger work
+belongs to the delivery processor. No durable retry is invented for intake that
+never committed, and SMTP readiness never selects another login authority.
+Account-specific remedies require the independently verified recovery channel
+or the existing authorized administrative process, never the public failure
+detail. See [Authentication](AUTHENTICATION.md#local-verification-email-change-and-password-recovery)
+for the native ownership flow and delivery uncertainty rules.
+
 ### Event resource authority boundary
 
 Event resource policy authority uses a separate frozen-input protocol. Generic
@@ -178,7 +323,46 @@ When AT Protocol is primary, a verified DID may JIT-create a passwordless
 Interactive administrator authority remains setup-secret-bound and configured
 administrator authority remains exact-DID, generation, and fingerprint bound.
 
+### Cerbos publication custody and receipt authority
+
+Cerbos administration is a foreground, current-authority operation with a fresh
+complete username/password pair. Runtime endpoint resolution caches only nonsecret
+tenant-qualified endpoint metadata. No startup or role mutation publishes policies;
+the runtime secret catalogue no longer admits Cerbos administrator bindings.
+
+Operator-signed `cerbos-publication.v1` statements authenticate historical
+publication. Deployment verifies RSA-PSS/SHA-256 against its independently managed
+public key and binds the exact revision, package manifest hash, environment, PDP
+endpoint, successful outcome and a maximum 24-hour validity interval. Deployment
+must not derive expected values or the trust root from a submitted receipt.
+CI has no retained Cerbos administrator and cannot mint a publication statement.
+The signer is trusted to inspect the provider; signature validity is not a live
+store measurement or permission to activate event-resource deployments.
+
+The actual Refit clients select separate BYO and fixed-instance handlers.
+`CerbosAdminTransport` retains that classification through `VettedAddressConnector`:
+BYO is HTTPS/public-only; private instance connectivity is restricted to the exact
+deployment-owned origins. Every DNS answer is vetted before literal-address
+connection. Metadata is denied for both profiles; redirects, proxies and cookies
+are disabled, and normal TLS hostname verification remains enabled. Invalid origin
+or transport failures never select a fallback authorization provider.
+
+The publication and recovery contract is documented in
+[Authorization: Cerbos Package Upload](AUTHORIZATION.md#411-cerbos-package-upload).
+Source changes and authored tests do not establish executed provider or deployment
+assurance; that evidence remains a programme-exit requirement.
+
 ## BFF/API Topology and Trust Boundary
+
+Secret acquisition is consumer-bound before HTTP authentication or cache access.
+API, BFF and Combined have exact declared runtime unions; provisioning and
+provider-infrastructure roots are inadmissible to all three. Missing provenance,
+reference expansion and stale persisted coordinates cannot activate a value.
+External vault ACLs must independently deny those requests: local admission and
+identity-string separation are not proof of least privilege. AppHost is a
+trusted launch broker, not a process-isolation boundary against its operator.
+It no longer acquires an aggregate vault configuration or forwards a shared
+machine identity. See [consumer authority](SECRETS.md#consumer-isolated-acquisition-and-orchestration).
 
 `Hosting:Topology=Split` is the default composition: `Explore.Blazor` and `Explore.API` run as separate hosts, and the BFF uses YARP for `/api/*`. `Hosting:Topology=Standalone` explicitly starts `Event.Standalone`, which composes those same host modules in one process. The Standalone `Combined` profile does not register YARP or create a loopback proxy; the one-process bridge routes browser `/api/*` requests into the existing API pipeline in-process.
 
@@ -219,6 +403,34 @@ In Split, YARP carries the sanitized request to the API host. In Standalone, `Co
 The `InProcessEventApiHttpMessageHandler` used by server-side generated API clients is an isolated in-process API/BFF bridge: it creates a fresh service scope and HTTP context and deliberately excludes browser cookies, `Host`, and ambient principals. It preserves HTTP request/response semantics, not ambient authority.
 
 ### Private Local setup handoff
+
+`AdminContext.ResolveUserIdAsync` resolves provider-qualified accounts through
+`IExternalLoginAuthenticationRepository`, the same independent Global
+authentication-binding capability used by claims transformation. It must not
+read the ordinary mutable external-login repository during support forwarding
+or human mutation preparation. The exact provider account key and cancellation
+token cross the read port; absent bindings retain the existing fail-closed
+identity result. No Runtime login-table privilege is required.
+
+`ExternalLoginAuthenticationRepository` uses one untracked EF query for all
+providers, matching both AuthenticationProviderId and ProviderKey without a User
+or UserPii join. PostgreSQL admission requires the declared Global session and
+its fixed column-only read privileges, including system-column grants and the
+full transitive role-membership graph. Binding privileges on member roles other
+than Global itself are rejected, including ADMIN-only delegation paths even
+when INHERIT and SET are disabled. The factory lease keeps
+the connection open across admission and the read; retries repeat both steps.
+The configured Global login can directly read all granted binding columns;
+the account predicate is enforced by C#, not a stored function. Other services
+using that same Global credential share that database-level access.
+
+The public lifecycle check reads current Active identities through
+`ITenantLookupSource`, not full `Tenant` entities through the request Runtime
+repository. PostgreSQL uses the independent Global pool and the existing
+execute-only `PostgresTenantLookupContract` directory. Absence denies public
+access; this read does not confer management or configured-administrator sync
+authority. Private lifecycle state and administrative checks retain their
+separate authorized paths.
 
 Tenant lifecycle enforcement admits only the credential-replacement controller's
 exact completion action with validated restricted replacement authority. The
@@ -358,11 +570,35 @@ Current security gates:
 ## JWT Bearer Configuration (API)
 
 - Authority: Keycloak OIDC metadata endpoint.
-- Multi-client audience validation: `islamu-event-api`, `islamu-event-blazor`.
-- Custom `AudienceValidator`: checks both `aud` claim and `azp` (Keycloak authorized party) claim. Accepts if either contains a valid audience.
+- Resource audience: only `Keycloak:Audience`, default `islamu-event-api`.
+  The BFF client ID is not an API resource audience; `azp` never substitutes for `aud`.
+- After signature, issuer, resource audience and lifetime validation,
+  `KeycloakTokenContextPolicy` reads the signed raw payload from the active
+  `JsonWebToken` or legacy `JwtSecurityToken`. Unknown representations fail closed.
+  It requires exactly one `aud` property (a matching string or nonempty distinct
+  string array), exactly one string payload `typ=Bearer`, and the independently
+  configured client policy. Duplicate properties and wrong JSON types fail.
+- Optional deployment-owned `Keycloak:PermittedClients` restricts `azp` by exact,
+  case-sensitive client ID. When nonempty, exactly one nonblank string `azp`
+  must match. Without a restriction, missing `azp` is allowed; a present
+  malformed, empty or duplicated `azp` still fails. Service clients must be
+  explicitly included whenever the restriction is enabled.
+- The supported Keycloak 26.1.2 realm emits JOSE `typ=JWT` for both access and
+  ID tokens. Only the signed payload's `typ=Bearer` establishes access purpose;
+  signed `typ=ID` cannot become API authority even with a matching resource
+  audience. The API audience mapper adds the resource to access tokens only.
 - Clock skew tolerance: 5 minutes.
 - Dev mode: accepts self-signed certificates, suppresses HTTPS metadata requirement.
 - Detailed JWT event logging on: `OnMessageReceived`, `OnAuthenticationFailed`, and `OnChallenge`.
+
+These settings belong only to the ordinary Keycloak bearer scheme.
+`DynamicJwtBearerPostConfigureOptions` changes issuer and signing metadata,
+not resource/client/purpose policy. Database provider configuration does not
+implicitly authorize its BFF or administration client. Local ordinary-session
+validation and current-session authority checks remain independent; Local
+credential replacement and ATProto purpose-specific audience/zero-skew
+contracts are not broadened. See [Authentication](AUTHENTICATION.md#keycloak-api-access-context)
+and [Testing](TESTING.md#authentic-keycloak-token-context-evidence).
 
 ### Provider email verification evidence
 
@@ -462,6 +698,13 @@ Evidence API and HAL representations expose bounded document display metadata, r
 
 ## Auth Diagnostic Safety
 
+Keycloak JWT failure and challenge callbacks use the native JWT diagnostic
+category with fixed event codes, bounded methods and safe route identities.
+They do not export provider exception text or raw request paths.
+`IncludeErrorDetails` is disabled; challenge descriptions and provider error
+URIs are cleared, with `invalid_token` only when authentication failed.
+This diagnostic boundary does not change audience or principal validation.
+
 Application return destinations are rooted local paths validated with ASP.NET
 Core `RedirectHttpResult.IsLocalUrl`, not prefix checks or relative-URI parsing
 alone. Query-based returns, Local login responses and posted ATProto return paths
@@ -559,6 +802,320 @@ The control-plane UI is an admin-host shell inside the existing browser BFF, not
 
 ## Support Access Trust Boundary
 
+### Original administrative action admission
+
+`HumanAdministrativeActionPreparation` has closed original-request ports for
+tenant template creation/update/deletion, custom-property creation/update/deletion
+and tenant-plan draft creation. Infrastructure
+registers it through `AddHumanAdministrativeActionPreparation`; the seven handlers
+prepare before BEGIN and acquire on their original `ISerializableAttemptOwner`.
+The issuer retains request/principal identity, selected owner, authentic
+credential evidence, draft collection snapshots and serialized template/definition
+request content. It preserves the
+original Tenant/update or InstanceSetting/update question and the handlers'
+existing administrator predicates; it grants no role or generic Settings proof.
+
+Acquisition binds S/P/route/H source leases to that physical owner. Terminal
+callbacks reread all sources before the shared finalizer samples time and checks
+the original credential plus original/fresh support horizons. Any denial rolls
+back earlier effects. The draft/definition domain operations and post-commit
+definition cache invalidation retain their existing behavior. These are seven
+source-integrated consumers with 62 authored Local controls (24 retained,
+35 real-body template/definition cases and three forwarded-support enrichment
+cases), not executed
+acceptance or blanket coverage of other administrative actions.
+The retained Features fixture additionally migrates 27 tenant cases to genuine
+Local authentication while preserving all 94 cases and separate Event/session
+replay contracts. Its request context is installed before asynchronous login
+validation; real owner conflict tests require rollback rather than automatic
+human replay. These retained controls also remain unrun.
+
+Original administrative resource facts now follow the actual request resolver,
+including persisted template lineage instead of posted tenant hints. Acquisition
+rereads those original inputs before effects. Projection maintenance additionally
+revalidates its owning Event/session facts at terminal admission; template deletion
+does not require its intentionally deleted target to reappear.
+
+The expanded bounded administrative audit identified thirty additional missing
+terminal owners and nine direct governance bodies missing their Settings producer.
+Tenant-owned API-key policy update is now source-integrated with original
+management preparation, final persisted owner-tuple admission, original content
+custody and a single human transaction attempt. Its existing unannotated question,
+platform branch and machine execution remain distinct. Seven real-body controls
+are authored but unrun. Five projection and the human room update bodies now
+consume their closed source ports; their retained/new regression migration is
+pending, so those six owners are not complete. Tenant definition purge and Event
+definition creation are now parent source-reviewed, preserving purge/audit atomicity,
+parent ownership, quotas and generated identities. Their twenty genuine terminal
+controls remain unrun. All sixteen definition/value/session-template owners are
+now parent source-reviewed. Their 170 new and 111 retained invocations remain
+unrun; fresh diagnostics on eight retained companions were unavailable because
+the tool timed out. Nine governance producers remain under review; plan owners
+are source-reviewed as described below. The shared administrative fixture transitions the typed
+bootstrap to MultiTenant and invalidates mode cache before authentication, rather
+than relying on the legacy deployment setting.
+
+Human managed-provider provisioning is a separate control-plane owner. Its native
+command route now selects `PolicyMutationScope.Instance` / Standard before
+constructing dependencies; the database tenant is null while original request
+tenant/support facts remain retained. Management-operation/outbox payloads and
+machine callers cannot borrow that human route. Production provisioning preparation
+retains original command content, persisted platform-administrator sources, route,
+authentic credential and support horizons, and refuses a Runtime-selected owner.
+
+This routing is not provisioning DATA permission. Ordinary repositories still
+reject new-tenant document/member writes outside their selected tenant. The fixed
+Global provisioning DATA contracts and compilers are parent source-reviewed;
+enrollment-aware physical settlement integration remains under review.
+Worker bootstrap/outbox authority remains separate.
+Seventeen original-source/routing controls are authored and unrun. No completed
+human provisioning or provider acceptance is claimed.
+The enrollment settlement foundation now consumes the original physical owner's
+witness after disposal and publishes queued callbacks only after acknowledged
+commit. Co-located embedded authority is itself that owner; separate identity
+gates enclose but cannot replace application settlement. Inherited gates are
+refused, and late settlement/publication failure stays Unknown rather than
+authorizing replay. Human coordinator/DATA integration is now parent
+source-reviewed. Its 36 new/migrated/retained controls remain unrun, not provider
+acceptance. Malformed closed Local metadata yields the existing unavailable
+refusal and whole rollback. Exact customer replay preserves the original linkage
+DTO shape while retaining the stored organizer graph without effects.
+The DATA-returning source bridge now performs idle observation, acquires after
+S/P/route/H and validates DATA as the final awaited reader before original clocks.
+Production uses the topology-aware PostgreSQL/SQLite, co-located-only registration.
+Migration and native-fixture installation hooks are authored, not executed.
+All nine direct governance originals now select MixedSettingsInstance before
+dependency construction, including tenant delegation's joined SMTP effects.
+The 87-case governance producer packet remains under parent review. The 34 DATA
+controls are source-reviewed but unrun; no provider-readiness claim follows.
+PostgreSQL independently compiles and seals the complete effect graph; SQLite
+uses parameterized writes, full postimage/remainder comparison and a write-count
+seal. Refusals require whole-owner rollback; returned row identities are not
+settlement witnesses. The DATA API fixture now installs ambient HttpContext
+synchronously before async authentication so original-custody checks exercise
+the actual selected owner.
+
+Provisioning's PostgreSQL source catalog now admits shared epoch writers only on
+their exact source-defined relation intersections. Each owning partial supplies
+its function identity, original body, declared privilege contract and targets.
+Read-only assertions check the trigger's function OID, flags, arguments and target,
+the function's body hash, stamp, execution configuration and privileges. A known
+name on another relation is not an exemption. Principal, Local, Support and
+Assignment are required predecessors; a wholly absent later writer is allowed
+only during the declared migrator's installation window.
+
+Sibling guards attest provisioning whenever any of its roles, routines, source
+anchor or named triggers exists. Whole absence is allowed in sibling guards:
+independent Identity topology deliberately omits this co-located protocol, and
+must not acquire a reverse dependency on it. Provisioning's own readiness still
+requires its complete selected contract. Partial installation or a counterfeit
+named trigger takes the strict assertion path. The leaf provisioning assertion
+does not generate another owner's guard, avoiding recursive body construction.
+Native composition and topology-absence controls are authored but unrun; fresh
+language-server diagnostics do not certify PostgreSQL execution.
+
+The seven remaining plan catalogue/version/assignment owners are parent
+source-reviewed. They acquire original prepared authority inside their
+non-replaying owner before business reads and retain the current instance-admin
+predicate. Published-content immutability, draft validation, pinned versus moved
+assignments, switch idempotence and exact rollback eligibility remain unchanged.
+Thirty-six genuine Local controls and the affected retained HTTP companions are
+authored but unrun. Fresh production diagnostics are clean; fresh diagnostics for
+the four test files were unavailable because the language-server tool timed out.
+
+### Account membership terminal admission
+
+`HumanAccountAdministrativeActionPreparation` retains original authenticated
+subject/lifetime, request identity, selected route/question and support horizon
+for tenant role grants and organization/group membership. Eight mutation owners
+and four protected queries acquire S, then P/route/H and retained role definitions,
+inside their selected non-replaying Serializable owner before business reads.
+Repository saves remain inside that owner; disclosure occurs after admission.
+Organization mutations retain their additional OrgAdmin requirement. Unannotated
+Group mutations retain permission-or-GroupAdmin authority, with tenant-bound
+support mode/deadline checks but no invented PDP decision. Public Group queries
+remain unchanged.
+
+Exact expected self-demotion, soft deletion and grant-revocation transitions
+replace only their original contributor fields; they do not authorize from a
+new role or require intentionally removed authority to survive. Retained role/
+permission definitions prevent self-demotion from hiding definition drift.
+Revocation timestamps use common microsecond precision. Infrastructure and
+Persistence register the real issuer/source. The existing attested PostgreSQL P
+routines now emit `account_roles` and `account_permissions` without new scalar
+grants; changed bodies require migrator installation and fail stale readiness.
+Thirty-seven authentic controls are authored, not executed. SQL Server/MySQL and
+independent Local identity remain refused by this source contract; this does not
+certify remaining Local lifecycle, provisioning or support owners.
+
+### Original Event team terminal admission
+
+`HumanEventTeamActionPreparation` retains the original authenticated lifetime,
+selected tenant, persisted Event and `Event/manage-team` decision for assign,
+assign-by-email, revoke, team disclosure and assignable-preset disclosure. Their
+non-replaying Serializable owner acquires S, P, route, assignment, H and complete
+team definitions before business reads. Assignment and audit saves share that
+owner; final persisted validation precedes synchronous original credential,
+assignment-window and support-horizon admission.
+
+Email resolution binds one exact, once-consumed inner command to the already
+acquired body, without another decorated dispatch or transaction. Exact
+self-revocation retains original authority and permits only the expected revoked
+status, actor, microsecond timestamp and version increment. Original Local
+creating-user/organization-admin/Event-permission predicates and selected Cerbos
+policy remain; no blanket administrator predicate replaces them. Delegation
+uses retained role scope, active permissions, `IsFiltered` and the five existing
+nondelegable exclusions; ownership transfer remains separate.
+
+Production roots register the issuer, narrow inner owner and selected Runtime
+source. Existing attested assignment routines retain q0–q8 and now project
+`event_team_roles`, `event_team_permissions`, `event_team_role_permissions` and
+all selected Event assignments, including terminal rows and revocation metadata.
+Mapped columns, exact privileges, acquisition locks, triggers and body hashes
+derive from the same source inventory. User deletion and UserPii writes join
+the assignment exclusion epoch; no PII value is projected or granted to its
+owner. No broad Runtime scalar grant or native direct-table fallback is added.
+
+Thirty-eight genuine-login controls are authored, all unrun. SQLite/PostgreSQL
+source integration is not installation/provider acceptance; other providers
+and independent Local identity remain refused. Transfer/window owners and
+remaining account families are outside this bounded delivery.
+
+### Local administration physical-owner admission
+
+`LocalAdministrationPreparation` retains the original request, resolved account,
+authentic lifetime, principal/route inputs and support horizon for the five
+unannotated platform-administrator handlers. Both human administration and
+owner-source ports resolve the same scoped `HumanAdministration` adapter.
+The real Local state store opens each non-replaying Serializable transaction;
+its private attempt acquires S, P/route/H before business reads and admits
+persisted sources plus synchronous original deadlines before physical settlement.
+An unrelated Application transaction is rejected rather than borrowed as an
+Identity-store fence.
+
+Creation retains one invocation across pending creation, provisioning read,
+binding, activation and final disclosure. A later failure preserves an earlier
+acknowledged pending identity for newly authorized recovery. Lost commit or
+rollback acknowledgement remains unknown, with no automatic replay or credential
+disclosure. Self-reset admits only the writer's private full scalar postimage
+for user, predecessor/new operations and metadata token; it never refreshes the
+original credential or gains administrator authority. List/status disclosure
+also passes terminal admission. Bootstrap, worker and restricted replacement
+entry points keep their separate ownership paths.
+
+Binding is a closed physical-owner operation, not a caller-supplied callback.
+Its SQLite implementation reads only the receipt's exact User/Actor/Local login
+and collision ranges, rather than rich repository graphs. It preserves exact
+binding replay, partial/conflicting graph refusal, receipt identifiers and actor
+attribution; all three graph saves remain inside the acquired owner.
+
+The adapter now has co-located SQLite and PostgreSQL source paths. PostgreSQL
+uses a separate execute-only DATA capability, not lifecycle rights added to
+S/P/route/H source executors. Its private `UserManager` retains configured
+Identity options, validators, normalizer, hasher and error describer; its
+candidate-scoped store writes the complete pending group before returning
+success. All six stages retain the selected Runtime connection/tenant and actual
+Serializable owner. Native Complete is the last asynchronous finalizer before
+synchronous original deadlines and physical acknowledgement.
+
+The compiler's full postimage remains the expectation through later stages and
+disclosure. Self-reset performs a bounded private native read before original
+source comparison, admitting only its exact intended transition. The preliminary
+EF platform-role read is removed from the five handlers; preparation retains
+the original persisted-administrator requirement and authorization responses.
+
+Sixty native controls and the prior 26 SQLite controls are authored, all unrun.
+Four native API cases authenticate a genuinely provisioned PostgreSQL Local
+principal and exercise private-manager creation/replay, self-reset disclosure
+and terminal expiry. Three Persistence test partials have unresolved same-path
+fixture ambiguity diagnostics; production and new API/fixture diagnostics are
+clean. Installation hooks are authored, not executed. Other providers and
+external Identity remain refused. Retained binding controls now use genuine
+provisioned Local login, production authentication/lifetime and selected owner
+in the API project. Thirteen original cases moved, three cases were added and
+twelve independent Core cases remain in Persistence, including external Core
+coverage. Four formerly positive external human-handler cases now assert the
+deliberate unsupported-owner rejection, unchanged full credential/operation
+images and no application binding. They retain enabled External arguments;
+co-located graph/recovery assertions and unrelated external-login ownership
+remain. The two databases do not supply the same original physical owner; no
+synthetic lifetime or cross-database mutation authority fills that gap.
+
+All 28 retained/new cases are unrun. Worker diagnostics were clean on five
+files before parent changes; fresh parent requests timed out, so current
+compiler acceptance is unresolved. Neither fixture nor provider acceptance
+is certified by source integration.
+
+### Closed typed Settings and original tenant-plan application
+
+The combined source protocol retains closed originals for instance event-policy
+patches, tenant onboarding, reporting intake and tenant-plan assignment. Managed
+compilers derive effects only after acquisition; native routines restrict their
+original footprint and exact rows. Private completion rejects omitted, replayed
+or caught rejected writers. Notifications remain after acknowledged commit.
+
+Plan assignment selects the combined exact-tenant owner before BEGIN and retains
+the original `InstanceSetting/update` question for
+`control-plane.tenant-plan-assignments`. Plan assignment/version/content/quota/
+plan records join DATA exclusions and attestation. Actual Email, visitor and
+publication algorithms precede ordinary effects and assignment audit in one
+owner. SMTP/visitor/ordinary locks remain exact; publication preserves its
+existing tenant lock. Quotas validate the acquired ceiling, not create quota rows.
+Only assignment audit columns gain restricted write authority. Earlier group
+effects, Email revisions and audit roll back on later rejection. The 22 Local
+and 22 native plan controls are authored; parent reviewed their native source
+and bodies, but final installation/runtime assurance remains open.
+
+### Persisted support sessions
+
+The five support administration handlers now use
+`HumanSupportAdministrationPreparation` on their actual non-replaying
+Serializable owner. Production registers its issuer/source and routes those
+original-human annotations to handler-owned preparation; machine evaluation
+remains on the outer evaluator. S/P/route/H and exact target custody precede
+business reads, with session and lifecycle-audit saves inside the same owner.
+Terminal persisted validation precedes original credential/support deadlines.
+
+Own-stop/self force-stop permits only its privately compiled terminal row and
+audit, not renewed authority or an active-session check against the ended row.
+Existing ownership/admin predicates and separate force-stop rules remain.
+Protected list/audit disclosures retain original admission. Post-response
+best-effort request auditing remains a separate boundary.
+
+The target/audit adapter now has SQLite and co-located PostgreSQL source paths;
+external Identity remains refused. PostgreSQL uses a separate closed DATA port,
+independently compiled session/audit effects and full persisted-image completion.
+Its writer epoch covers session, audit, tenant and tenant-user predicates,
+including zero-row statements. Runtime receives execute authority, not scalar
+rights, and native hydration remains detached from EF tracking.
+
+The forwarding repository also supplies a bounded, actor-owned current-session
+discovery read; unannotated current-session requests prepare the original human
+before that read. Native enrollment is resolved lazily at the read, so unrelated
+repository construction does not prematurely acquire unsupported forwarding
+authority. Completion remains before synchronous original deadlines and actual
+settlement. Co-located migrator, repository DI and fixture epoch-preservation
+hooks are authored but unexecuted.
+
+Seventy-one native controls are authored and unrun: 66 native DATA/SOURCE cases
+and five genuine API/DI cases. The API cases exercise real Local authentication,
+all five handlers, forwarding/current discovery, confidentiality and terminal
+expiry; they do not certify genuine forwarded self-stop runtime acceptance.
+Production/new API diagnostics are clean except eight pre-existing root imports.
+One native test partial is clean; three fresh diagnostic requests timed out,
+after earlier shared-fixture ambiguity reports. Provider acceptance stays open.
+
+SQLite repository reads use bounded
+SQL sorting/filtering at full tick precision and normalize stored offsets for
+comparison; the exact-ID ownership read evaluates Domain time semantics on its
+single row. No model/converter/schema change or unbounded client-side history
+sorting is introduced. Ingress expiry uses injected TimeProvider. Removed the
+retained fixture's cached-context query bypass; four diagnostic-sink lifecycle
+controls now authenticate through genuine Local login.
+
+Fifty-seven prior genuine SQLite support/precision controls remain unrun.
+Source integration is not native installation, settlement or provider acceptance.
+
 Admin support access is a persisted, time-boxed support session, not an impersonation cookie or tenant role grant.
 
 - The real actor identity remains authoritative. `ICurrentUserService.UserId` continues to identify the authenticated instance admin; support metadata lives separately in `ISupportAccessContext`.
@@ -585,13 +1142,54 @@ Some machine callbacks are intentionally anonymous because the provider signatur
 
 External registration embeds are browser-only presentation, not authority. The BFF route `/bff/registration-provider-embed/tenants/{tenantId}/events/{eventId}/workflows/{workflowId}/requirements/{requirementId}/channels/{channelId}/bindings/{bindingId}` is authenticated, same-origin, no-store, and accepts no query string. It fetches a server-generated launch descriptor via the generated API client, rejects lineage mismatches and non-approved HTTPS URLs, blocks local/private literal hosts, and emits a route-specific CSP: `default-src 'none'; frame-src {approved-origin}; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; script-src 'none'; style-src 'none'`. The HTML contains only a sandboxed iframe (`allow-forms allow-same-origin allow-scripts`) and a `noopener noreferrer` new-tab fallback. Iframe load or navigation never completes a requirement; clients poll server-owned order/requirement status.
 
+## Scoped AI Egress
+
+`DiscoverAiAssistantModelsQueryHandler` authorizes the explicit discovery scope
+before constructing any outbound client. Omitted scope is `Tenant`; being a
+platform administrator does not promote a tenant request to instance authority.
+Instance discovery requires current platform administration and the enabled
+configured OpenAI-compatible origin. Tenant discovery and tenant provider
+snapshots never inherit the instance local-network or Azure identity opt-in.
+
+`AiTransportAuthority` separates public-only tenant clients from exact-origin
+instance clients. Model discovery, OpenAI/compatible, Anthropic-compatible and
+Azure SDK HTTP paths share the complete-answer literal-IP connector, original
+TLS hostname, and disabled redirects/proxies/cookies. A forbidden DNS answer
+rejects the whole set before a body or credential handoff; metadata remains
+denied under every profile. Instance private access is an operator configuration,
+not a caller-selectable transport flag.
+
+Azure tenant requests use their own API key. Default Azure credentials are
+instance-only and exclude managed identity, whose metadata traffic is never an
+exception to the egress policy. Discovery errors use bounded fixed codes rather
+than provider exception text, and provider failure does not invent models or
+authorize a fallback. Native/API and socket regressions are authored; execution
+and generated request metadata remain deferred to programme completion.
+
 ## Outgoing Webhook Egress
 
 Outgoing LocalProvider endpoints are user-configured URLs, so delivery is an SSRF-sensitive egress boundary.
 
 - Block loopback, localhost, RFC1918/private, link-local, metadata, and internal DNS destinations by default.
 - Allow private CIDRs only through explicit operator configuration for deliberate self-hosted/internal delivery.
-- Disable redirects and use bounded connect/request timeouts.
+- Both `LocalWebhookDeliveryClient` and `RegistrationProvider.WebhookSink`
+  use `VettedAddressConnector`. It resolves the complete A/AAAA answer set
+  immediately before connecting, rejects any forbidden answer, normalizes
+  IPv4-mapped IPv6, and opens the socket to a vetted literal IP. The original
+  request hostname remains the HTTP/TLS/SNI identity with normal certificate
+  validation; there is no second hostname lookup by the socket.
+- Disable redirects, cookies and system proxies and use bounded connect/request
+  timeouts. Connections are not reused across requests, so changes to the
+  operator profile or DNS answers apply before the next handoff. This deliberately
+  trades connection reuse for immediate policy enforcement.
+- Metadata denial survives `BlockPrivateNetworks=false` and broad allowed CIDRs.
+  IPv4 link-local metadata, AWS's IPv6 metadata address, Alibaba's metadata
+  address and metadata hostnames are never authorized by webhook private opt-in.
+  Unspecified, multicast and scoped/link-local IPv6 targets also stay blocked.
+- A connection-time policy rejection settles Local delivery as non-retryable
+  and registration submission as `PermanentBeforeHandoff`, rather than treating
+  it as a retryable network error. Frozen destination, payload, credential
+  version, signatures and claim fences are unchanged.
 - Sign LocalProvider requests with Svix-compatible `svix-id`, `svix-timestamp`, and `svix-signature` headers over the raw body.
 - Store endpoint signing material through secret refs and rotate through the endpoint rotation route; never return old or current secret material after the allowed one-time reveal path.
 - Health checks and metrics may report provider mode, queue counts, bounded failure categories, and secret-resolution booleans only. They must not expose endpoint URLs, query strings, payload JSON, secret refs, tokens, authorization headers, full responses, or raw transport exceptions.
@@ -771,6 +1369,72 @@ The Blazor BFF upload proxy is an SSRF-sensitive boundary because browser upload
 Server-owned internal finalization, download, deletion, and reconciliation code may call a provider directly after applying its trust-boundary checks. No provider upload URL or destination is exposed to browser upload code; browser-facing paths use only the upload-session contract.
 
 The untrusted upload allowlist deliberately excludes SVG and other active document formats. Trusted, packaged static SVG icons and illustrations remain valid presentation assets because they do not cross the storage upload boundary.
+
+## File Intake, Provider Custody and Persisted Windows
+
+`FinalizeStorageUploadSessionCommandHandler` passes the reservation's captured
+`PolicyMaxUploadBytes` to `StorageContentSignaturePolicy`. The policy rejects
+non-positive or excessive lengths before reading input or allocating the complete
+raster buffer. Raster framing remains exact-through-EOF; generic PDF/Office
+checks remain extension/signature checks, not event-resource package inspection
+or malware scanning. A failed inspection settles the no-provider-I/O attempt and
+releases its reservation through the existing transaction owner.
+
+`EventResourceDocumentInspection` retains its private, exact-length temporary
+snapshot and transfers the validated handle, never a reopened caller path.
+`EventResourceDocumentPolicy` keeps exact PDF/DOCX/PPTX declarations and bounded
+OOXML directory, expansion, part, XML-depth, DTD and relationship checks.
+Inspection is not a Clean scan verdict. Unscanned resource access/publication
+continues to require the separate instance-owned policy opt-in.
+
+The registration CSV sink has a 64 KiB UTF-8 budget. It now accounts for quoted
+field framing, doubled quotes, separators and newlines before sorting keys,
+escaping text or materializing the CSV string/byte array. Generated CSVs retain
+captured producer custody and disclosure deadlines before handoff and before
+activation. Native registration file answers remain disabled by default by
+`RegistrationFileAnswerOptions`; an existing answer file starts quarantined and
+NotScanned. Audited manual release does not turn that state into a malware verdict.
+External provider file fields remain opaque references rather than remote fetch
+instructions.
+
+Upload quota reservation remains serializable. Physical storage references,
+including hidden or soft-deleted owners, govern retirement; filtered owner
+projections cannot release independently retained evidence. Producer settlement
+and durable tombstones preserve the captured target after uncertain writes.
+`EventResourceStorageCleanupService` deletes only claimed retired custody and
+requires confirmed absence; elapsed time alone cannot settle a pending producer.
+
+Local storage requires a dedicated private root with service-controlled ancestors,
+not a public static-file mount. Hosted `LocalFileStorageOptionsValidator` rejects
+overlap with the actual web root, including a storage root that contains that web
+root. `LocalFileStorageProvider` rejects existing reparse/link paths through the
+root, ancestors and object target for provider operations. Recursive inventory
+does not follow linked directories. Newly created Unix storage directories use
+0700 and temporary objects use 0600; existing directory permissions and Windows
+ACLs remain deployment custody responsibilities.
+
+These path checks are not an atomic no-follow filesystem API. A deployment where
+an adversary can concurrently replace roots, ancestors or objects is unsupported.
+Operators must also exclude captured historical roots from reverse-proxy/static
+aliases: host web-root validation cannot inspect an external ingress configuration.
+Changing today's root never relocates old captured targets.
+
+S3-compatible endpoints are administratively selected storage egress, not
+browser-supplied upload destinations. `StorageProviderBinding` rejects credentials,
+query and fragment components and captures bucket/endpoint/version and retained
+secret references. HTTP is permitted for explicitly private internal providers;
+external providers require operator-controlled TLS and namespace policy. Buckets
+must deny anonymous object access. Authenticated preflight reachability and probe
+write/delete success do not prove that anonymous access is denied.
+
+`EventResourceConfiguration` declares
+`ck_event_resources_relative_availability_order`: two non-null equal relative
+anchors require end-offset ticks greater than start-offset ticks. The existing
+boundary-shape and absolute-order checks remain separate. Distinct anchors are
+resolved against the schedule, not compared by offset alone; nullable bounds
+remain valid. The constraint requires generated provider migrations before
+deployment. Malformed historic rows must be identified before schema admission,
+not hidden by weakening reconstruction.
 
 ## Storage Object Download Boundary
 
@@ -1219,46 +1883,61 @@ Related authorization references:
 - [API.md](API.md) — API authentication, API-key routing, and error contracts.
 - [BLAZOR.md](BLAZOR.md) — BFF proxy/token/setup-secret boundaries.
 
-## Row-Level Security (RLS) — Prototype Support
+## Row-Level Security (RLS) — Tenant Leases
 
-**Status:** Prototype tenant-session infrastructure exists; production table policies are not enabled yet.
+PostgreSQL uses model-derived forced RLS alongside EF named tenant/soft-delete
+filters and tenant-qualified foreign keys. RLS constrains database row access;
+it does not replace application authorization or make a privileged database
+login safe.
 
-**Current tenant isolation:** EF Core named query filters (`HasQueryFilter(name: "Tenant", ...)`) and tenant-safe database foreign keys are the current production enforcement layers. EF tenant filters now fail closed when `TenantContext` is missing; approved system/admin paths must opt in through an explicit bypass reason. RLS is still defense-in-depth work, not the authority for application authorization.
+`ExploreDatabaseMigrator` retains separate Migrator authority for migrations,
+provider adjustments, policy installation, backfill and seeding. Canonical EF
+migration metadata stays separate from target-namespace execution metadata.
+`PostgresTenantRowLevelSecurityModel` installs direct-tenant, parent-derived
+and nullable-shared policies. Missing tenant identity exposes no private
+tenant rows while preserving the model's explicitly shared lookup rows.
 
-**Implemented prototype pieces:**
-- `Explore.Persistence/Security/PostgresTenantSessionInterceptor.cs` sets PostgreSQL session setting `app.current_tenant_id` with `set_config(..., false)` whenever EF Core opens a connection.
-- Runtime registration is disabled by default and guarded by `Persistence:EnableRlsTenantSession`.
-- `Event.Persistence.IntegrationTests/TenantIsolation/PostgresTenantSessionRlsPrototypeTests.cs` proves a forced RLS policy filters tenant A, tenant B, and missing-tenant access through a non-superuser app-style role.
-- No production migration currently enables RLS on tenant tables.
+Runtime registration always installs `PostgresTenantSessionInterceptor`.
+`ExploreDbContext` freezes its tenant identity for each lease; connection open
+binds `app.current_tenant_id`, and subsequent commands reject a changed
+identity before SQL. Returning a pooled context clears request identity and
+bypass state. `PostgresTenantRuntimeReadiness` performs catalog-only admission:
+it rejects superuser/BYPASSRLS and elevatable roles, table ownership, dangerous
+table-wide privileges, missing FORCE RLS, divergent policy stamps and extra
+applicable permissive policies. Admission never creates or repairs policies.
+The v2 policy stamp hashes stored expression trees rather than search-path
+dependent deparsed SQL.
 
-**Why RLS matters for defense-in-depth:**
-- Direct database access (migrations, reporting, debugging, data exports) bypasses EF query filters.
-- A compromised application layer could disable filters and leak cross-tenant data.
-- PostgreSQL RLS adds kernel-level row filtering that cannot be bypassed from SQL.
+Global work acquires an independent pool from explicitly selected Global
+credentials, normally with a sealed absent-tenant lease. Exact tenant work
+uses `ITenantExploreDbContextFactory` with ordinary Runtime credentials.
+Purpose factories acquire their required identity before exposing a context;
+they never promote or retarget an existing request lease. Preliminary API
+tenant-routing reads finish in a disposed independent service scope before
+binding the request tenant.
 
-**Policy pattern proven by the prototype:**
+Migration-owned `SECURITY DEFINER` functions use fixed search paths and
+separate NOLOGIN owners, migration installers and execution groups. PUBLIC
+execution is revoked. API-key/scanner authentication exposes exact credential
+lookups, membership exposes one user's complete tenant graph, and
+administrative authority exposes primitive scope IDs for an exact user.
+Queue admission/discovery, snapshot maintenance, disclosure fanout, PDS
+settlement and ATProto materialization each retain their own bounded
+predicates, transactions and fences. Granting an execution group does not
+grant arbitrary private-table reads or owner membership. External provider-account
+binding lookup instead uses EF and fixed read-only Global column grants; it has
+no stored routine. Existing deployments containing its obsolete routine or roles
+are rejected and require an explicitly provisioned fresh isolated development
+PostgreSQL instance/cluster without the obsolete capability roles. A new database
+inside a cluster retaining those roles is insufficient because roles are cluster-wide.
+The application never automatically removes those objects or deletes data.
 
-```sql
-CREATE POLICY tenant_isolation ON events
-    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
-    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
-```
-
-The `missing_ok=true` form plus `NULLIF(..., '')` makes absent tenant context fail closed instead of raising a cast error. The interceptor sets an empty string when `ExploreDbContext.TenantContext` is missing or returns `Guid.Empty`.
-
-**Production rollout prerequisites:**
-1. Use a non-superuser, non-`BYPASSRLS` application database role. PostgreSQL superusers always bypass RLS, even when a table uses `FORCE ROW LEVEL SECURITY`.
-2. Keep migration/maintenance credentials separate from the runtime app role so migrations and operator maintenance can intentionally bypass RLS.
-3. Audit all direct `IDbContextFactory<ExploreDbContext>` callers and system/admin paths before enabling policies on real tables; factory-created contexts do not automatically receive scoped property injection.
-4. Enable RLS table families in bounded migrations with integration tests for tenant access, absent-tenant denial, cross-tenant denial, and required host-admin/system paths.
-5. Apply first to high-value tenant tables such as events, event_sessions, organizations, groups, actors, event_registrations, storage_objects, audit_logs, notifications, configuration_change_logs, tenant_user_role_grants, tenant_setting_overrides, and tenant_settings_documents.
-
-**Risks:**
-- Connection pooling: Session variables must be set every time EF opens a connection. Npgsql resets pooled connection state on close by default, and the interceptor rebinds the tenant on open.
-- Role design: A superuser or `BYPASSRLS` runtime connection makes policies ineffective.
-- System/admin reads: cross-tenant maintenance paths need explicit role/session design before real table policies are enabled.
-- Performance: RLS adds a predicate to every query. Indexes on `tenant_id` (already exist) mitigate this.
-- Migrations: Must run with a maintenance role that bypasses RLS intentionally.
+Operators provision the selected Runtime, Migrator and Global logins and only
+the capability groups required by each consumer; see [SECRETS.md](SECRETS.md)
+and the [public database configuration guide](../public/documentation/readme/configuration-and-operations/environment-variables.md).
+Missing privileges or stale policies reject admission rather than falling
+back to another credential source. These are PostgreSQL guarantees; other
+providers retain EF filters and their native relational constraints.
 
 ## Ticketing Recovery Trust Boundary
 

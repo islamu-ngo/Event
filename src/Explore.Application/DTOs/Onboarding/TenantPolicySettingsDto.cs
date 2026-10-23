@@ -66,7 +66,7 @@ public sealed record TenantPolicySettingsDto
     public bool AiAssistantEnabled { get; init; }
     public string AiAssistantProvider { get; init; } = "none";
     public string AiAssistantEndpointUrl { get; init; } = string.Empty;
-    public string AiAssistantApiKey { get; init; } = string.Empty;
+    public string AiAssistantCredentialScope { get; init; } = "none";
     public string AiAssistantModelId { get; init; } = string.Empty;
     public IReadOnlyList<string> AiAssistantAllowedModelIds { get; init; } = [];
     public bool AiAssistantAllowAnonymousAccess { get; init; }

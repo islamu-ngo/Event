@@ -48,7 +48,8 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
         await using var context = database.CreateContext();
         var reader = new EventResourceAuthoritySnapshotReader(
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context), governance,
-            new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
             new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                 Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
                 global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context)));

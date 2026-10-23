@@ -136,96 +136,13 @@ jobs:
 
       - name: Upload Cerbos Policy Evidence
         if: ${{ always() && steps.changes.outputs.run-policies == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cerbos-policy-evidence
           path: artifacts/cerbos-policy/**
           if-no-files-found: warn
           retention-days: 30
 
-  publish-cerbos-policy-store:
-    name: Publish Cerbos Policy Store
-    runs-on: ubuntu-latest
-    needs: cerbos-policy-check
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.cerbos-policy-check.outputs.run-policies == 'true' }}
-    timeout-minutes: 10
-    environment:
-      name: production
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 1
-
-      - name: Publish Cerbos schemas and policies
-        shell: bash
-        env:
-          CERBOS_SERVER: ${{ secrets.CERBOS_SERVER }}
-          CERBOS_USERNAME: ${{ secrets.CERBOS_USERNAME }}
-          CERBOS_PASSWORD: ${{ secrets.CERBOS_PASSWORD }}
-          CERBOS_CA_CERT_PEM: ${{ secrets.CERBOS_CA_CERT_PEM }}
-          CERBOSCTL_IMAGE: ghcr.io/cerbos/cerbosctl:0.53.0@sha256:8eda97fa4e108662c7589bb1acbca83df3ae71783f633ca2837c402558d6e68b
-        run: |
-          set -euo pipefail
-
-          missing=()
-          [[ -z "${CERBOS_SERVER:-}" ]] && missing+=("CERBOS_SERVER")
-          [[ -z "${CERBOS_USERNAME:-}" ]] && missing+=("CERBOS_USERNAME")
-          [[ -z "${CERBOS_PASSWORD:-}" ]] && missing+=("CERBOS_PASSWORD")
-
-          if (( ${#missing[@]} > 0 )); then
-            printf 'Missing required production Cerbos secret(s): %s\n' "${missing[*]}" >&2
-            exit 1
-          fi
-
-          mkdir -p artifacts/cerbos-policy-publish
-
-          ca_mount=()
-          ca_args=()
-          if [[ -n "${CERBOS_CA_CERT_PEM:-}" ]]; then
-            ca_dir="${RUNNER_TEMP}/cerbos-ca"
-            ca_file="${ca_dir}/ca.pem"
-            install -m 700 -d "$ca_dir"
-            printf '%s\n' "$CERBOS_CA_CERT_PEM" > "$ca_file"
-            chmod 600 "$ca_file"
-            ca_mount=(-v "${ca_file}:/cerbos-ca/ca.pem:ro")
-            ca_args=(--ca-cert=/cerbos-ca/ca.pem)
-          fi
-
-          docker run --rm --pull=always \
-            -v "${GITHUB_WORKSPACE}/cerbos/policies/_schemas:/schemas:ro" \
-            "${ca_mount[@]}" \
-            -e CERBOS_SERVER \
-            -e CERBOS_USERNAME \
-            -e CERBOS_PASSWORD \
-            "$CERBOSCTL_IMAGE" \
-            "${ca_args[@]}" \
-            put schema -R /schemas \
-            2>&1 | tee artifacts/cerbos-policy-publish/schema-upload.log
-
-          docker run --rm --pull=always \
-            -v "${GITHUB_WORKSPACE}/cerbos/policies:/policies:ro" \
-            "${ca_mount[@]}" \
-            -e CERBOS_SERVER \
-            -e CERBOS_USERNAME \
-            -e CERBOS_PASSWORD \
-            "$CERBOSCTL_IMAGE" \
-            "${ca_args[@]}" \
-            put policy -R /policies \
-            2>&1 | tee artifacts/cerbos-policy-publish/policy-upload.log
-
-          {
-            echo "## Cerbos Policy Store Publish"
-            echo
-            echo "Published schemas and policies to the production Cerbos Admin API after the main-branch policy validation gate passed."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload Cerbos Publish Evidence
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: cerbos-policy-publish-evidence
-          path: artifacts/cerbos-policy-publish/**
-          if-no-files-found: warn
-          retention-days: 90
+  # Publication authority is operator-owned. Deployment consumes the authenticated
+  # statement through _cerbos-publication.yml; this required validation job never
+  # acquires reusable Cerbos administrator credentials.

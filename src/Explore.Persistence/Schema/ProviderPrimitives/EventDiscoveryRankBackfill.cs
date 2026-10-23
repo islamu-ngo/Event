@@ -1,6 +1,5 @@
 using Explore.Domain.Services.Discovery;
 using Explore.Persistence.QueryFilters;
-using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Schema;
@@ -32,7 +31,7 @@ public static class EventDiscoveryRankBackfill
                 while (true)
                 {
                     var next = await new EfCoreUnitOfWork(database).ExecuteSerializableAsync(
-                        token => EventDiscoveryDisclosureRepository.InTenantAsync(database, tenantId, async () =>
+                        async token =>
                         {
                             var events = database.Events.IgnoreAllFilters(TenantFilterBypassReasons.DiscoveryRankMigration)
                                 .AsNoTracking().Where(entity => entity.TenantId == tenantId
@@ -52,7 +51,7 @@ public static class EventDiscoveryRankBackfill
                                         .SetProperty(entity => entity.DiscoverySourceSortKey, sourceKey), token);
                             }
                             return rows.Count == 0 ? (Guid?)null : rows[^1].Id;
-                        }, token), cancellationToken);
+                        }, cancellationToken);
                     if (next is null)
                         break;
                     afterEvent = next;

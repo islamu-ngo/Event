@@ -1,0 +1,29 @@
+Change-Id: CHG-01M54MH70DSACS4MFWNCKE9ERY
+Title: "Separate settings business audit from diagnostic exports"
+Type: fix
+Scope: privacy
+Summary: "Retain durable audit data while keeping settings values, identities and provider detail out of technical diagnostics."
+Group: settings-audit-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Prevent settings values and identities, storage credentials and private Listmonk detail from entering technical diagnostic exports.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Use the governed business audit for authorized change review and minimized categories for ordinary support diagnostics.

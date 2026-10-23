@@ -19,6 +19,7 @@ Start with [Repository README](../../README.md) or the [Documentation Hub](../RE
 |---|---|---|
 | Browse hosted platform guides & tutorials | [Official Documentation](https://islamu.gitbook.io/islamu-event) | [Docs Hub](../README.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) |
 | Understand the whole codebase & mental model | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md), [REQUEST_FLOWS.md](REQUEST_FLOWS.md) |
+| Understand application versus database authority | [Application-owned persistence decision](adr/ADR-application-owned-persistence.md) | [ARCHITECTURE.md](ARCHITECTURE.md#persistence-capability-ladder), [SECURITY-MODEL.md](SECURITY-MODEL.md#application-authority-and-database-defence) |
 | Follow step-by-step feature recipes | [CONTRIBUTOR_RECIPES.md](CONTRIBUTOR_RECIPES.md) | [QUICK_REFERENCE.md](QUICK_REFERENCE.md), [TESTING.md](TESTING.md) |
 | Understand the product and current scope | [PROJECT.md](PROJECT.md) | [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md), [SECURITY-MODEL.md](SECURITY-MODEL.md) |
 | Run the app locally | [GETTING_STARTED.md](GETTING_STARTED.md) | [TESTING.md](TESTING.md), [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |

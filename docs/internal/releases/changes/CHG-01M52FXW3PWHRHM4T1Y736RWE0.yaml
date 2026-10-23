@@ -1,0 +1,30 @@
+Change-Id: CHG-01M52FXW3PWHRHM4T1Y736RWE0
+Title: "Remove inherited private scope fields from API diagnostics"
+Type: fix
+Scope: privacy
+Summary: "Apply event-owned field enrichment to API Serilog output and report fixed storage-readiness failure categories."
+Group: api-diagnostic-scope-ownership
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Inherited scope properties cannot accompany bounded native diagnostic events unless the template binds those fields.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: API Serilog configuration no longer ingests ambient scopes through FromLogContext.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Storage readiness uses fixed provider_unavailable and policy_unavailable reasons instead of exception subtype names.

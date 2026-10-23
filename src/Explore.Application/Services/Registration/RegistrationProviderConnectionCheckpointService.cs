@@ -6,19 +6,30 @@ namespace Explore.Application.Services.Registration;
 
 public sealed class RegistrationProviderConnectionCheckpointService(
     IRegistrationProviderRepository providerRepository,
-    TimeProvider timeProvider) : IRegistrationProviderConnectionCheckpoint
+    TimeProvider timeProvider,
+    IRegistrationProviderDeferredCheckpointJournal deferredCheckpoints) : IRegistrationProviderConnectionCheckpoint
 {
     public async Task RecordCredentialRefreshAsync(Guid tenantId, Guid connectionId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        DateTime observedAt = timeProvider.GetUtcNow().UtcDateTime;
+        if (deferredCheckpoints.TryDefer(tenantId, connectionId,
+            RegistrationProviderCheckpointEffect.CredentialRefreshed, observedAt))
+            return;
         RegistrationProviderConnection connection = await GetConnectionAsync(tenantId, connectionId, cancellationToken);
-        connection.RecordCredentialRefresh(timeProvider.GetUtcNow().UtcDateTime);
+        connection.RecordCredentialRefresh(observedAt);
         await providerRepository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task RecordAccessValidatedAsync(Guid tenantId, Guid connectionId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        DateTime observedAt = timeProvider.GetUtcNow().UtcDateTime;
+        if (deferredCheckpoints.TryDefer(tenantId, connectionId,
+            RegistrationProviderCheckpointEffect.AccessValidated, observedAt))
+            return;
         RegistrationProviderConnection connection = await GetConnectionAsync(tenantId, connectionId, cancellationToken);
-        connection.RecordAccessValidated(timeProvider.GetUtcNow().UtcDateTime);
+        connection.RecordAccessValidated(observedAt);
         await providerRepository.SaveChangesAsync(cancellationToken);
     }
 

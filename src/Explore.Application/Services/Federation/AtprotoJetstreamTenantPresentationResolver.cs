@@ -8,19 +8,19 @@ using Explore.Domain.Constants;
 public sealed class AtprotoJetstreamTenantPresentationResolver(
     ITenantRepository tenantRepository,
     ISystemSettingRepository systemSettingRepository,
-    ITenantSettingRepository tenantSettingRepository)
+    IAtprotoFederationGlobalReadRepository federationSettings)
 {
     public async Task<IReadOnlyList<Guid>> ResolveEnabledTenantIdsAsync(CancellationToken cancellationToken)
     {
-        SystemSetting? capability = await systemSettingRepository.GetByKey(
-            GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-            cancellationToken);
+        string[] keys = [GovernanceSettingKeys.Federation.AtprotoEventsEnabled];
+        IReadOnlyList<AtprotoFederationInstanceSetting> instanceSettings =
+            await federationSettings.GetInstanceAsync(keys, cancellationToken);
+        AtprotoFederationInstanceSetting? capability = instanceSettings.SingleOrDefault();
         SystemSetting? deploymentMode = await systemSettingRepository.GetByKey(
             GovernanceSettingKeys.Deployment.Mode,
             cancellationToken);
-        List<TenantSetting> tenantSettings = await tenantSettingRepository.GetByKeyAcrossTenants(
-            GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
-            cancellationToken);
+        IReadOnlyList<AtprotoFederationTenantSetting> tenantSettings =
+            await federationSettings.GetOverridesAsync(keys, cancellationToken);
         IReadOnlyList<Tenant> tenants = await tenantRepository.GetActiveAsNoTrackingAsync(cancellationToken);
 
         bool instanceEnabled = SettingValueSerializer.DeserializeBool(capability?.Value, false);
@@ -29,7 +29,7 @@ public sealed class AtprotoJetstreamTenantPresentationResolver(
             "MultiTenant",
             StringComparison.OrdinalIgnoreCase);
         bool tenantOverridesApply = capability is not null && (!isMultiTenant || !capability.IsLocked);
-        Dictionary<Guid, TenantSetting> overrides = tenantSettings
+        Dictionary<Guid, AtprotoFederationTenantSetting> overrides = tenantSettings
             .ToDictionary(setting => setting.TenantId);
 
         return tenants
@@ -43,9 +43,9 @@ public sealed class AtprotoJetstreamTenantPresentationResolver(
         Guid tenantId,
         bool instanceEnabled,
         bool tenantOverridesApply,
-        IReadOnlyDictionary<Guid, TenantSetting> overrides)
+        IReadOnlyDictionary<Guid, AtprotoFederationTenantSetting> overrides)
     {
-        if (!tenantOverridesApply || !overrides.TryGetValue(tenantId, out TenantSetting? tenantSetting))
+        if (!tenantOverridesApply || !overrides.TryGetValue(tenantId, out AtprotoFederationTenantSetting? tenantSetting))
         {
             return instanceEnabled;
         }

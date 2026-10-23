@@ -1,8 +1,10 @@
+using System.Security.Cryptography;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -26,7 +28,7 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
         _container = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("explore_db_projection")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
             .Build();
     }
 
@@ -36,8 +38,9 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
     {
         await _container.StartAsync();
 
-        await using var context = CreateDbContextInternal();
+        await using var context = CreateDbContextInternal(PrimaryDatabaseRole.Migrator);
         await context.Database.EnsureCreatedAsync();
+        await PostgresDiscoveryDisclosureContract.ApplyAsync(context);
         await LookupTableSeeder.SeedAsync(context);
     }
 
@@ -62,12 +65,12 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
         return context;
     }
 
-    private ExploreDbContext CreateDbContextInternal()
+    private ExploreDbContext CreateDbContextInternal(PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime)
     {
         var connection = new NpgsqlConnectionStringBuilder(_container.GetConnectionString());
         var database = new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Runtime,
+            Role = role,
             Provider = PrimaryDatabaseProvider.PostgreSql,
             Host = connection.Host,
             Port = connection.Port,

@@ -74,9 +74,9 @@ public class WeblateTranslationProvider : ITranslationManagementProvider
             await api.Api_projects_retrieveAsync(config.ProjectId, ct);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Weblate connection test failed");
+            _logger.LogWarning("weblate_connection_test_failed");
             return false;
         }
     }

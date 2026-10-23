@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Moderation;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
@@ -19,13 +20,24 @@ namespace Explore.Persistence.Services;
 public sealed class EventPublicationMutationBoundary(
     ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy, IUserContext user,
     IAdminContext identity, IMachinePrincipalAccessor machine, TimeProvider clock,
-    IModerationRecognitionContinuityReader continuity) : IEventPublicationMutationBoundary
+    IModerationRecognitionContinuityReader continuity,
+    IHumanActionCommitFinalizer finalizer) : IEventPublicationMutationBoundary
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(Guid eventId,
-        Func<CancellationToken, Task<BaseCommandResponse<Guid>>> operation, CancellationToken cancellationToken)
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(Guid eventId,
+        Func<CancellationToken, Task<BaseCommandResponse<Guid>>> operation, CancellationToken cancellationToken) =>
+        ExecuteCoreAsync(eventId, operation, cancellationToken, joined: false);
+
+    public Task<BaseCommandResponse<Guid>> ExecuteInCurrentTransactionAsync(Guid eventId,
+        Func<CancellationToken, Task<BaseCommandResponse<Guid>>> operation, CancellationToken cancellationToken) =>
+        ExecuteCoreAsync(eventId, operation, cancellationToken, joined: true);
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteCoreAsync(Guid eventId,
+        Func<CancellationToken, Task<BaseCommandResponse<Guid>>> operation, CancellationToken cancellationToken,
+        bool joined)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        if (context.Database.CurrentTransaction is not null || context.ChangeTracker.HasChanges())
+        if (joined) context.RequireHumanCommitAdmission();
+        else if (context.Database.CurrentTransaction is not null || context.ChangeTracker.HasChanges())
             throw new InvalidOperationException("Publication requires its own native attempt without pending caller changes.");
         Guid tenantId = context.TenantFilterTenantId ?? Guid.Empty;
         if (eventId == Guid.Empty || tenantId == Guid.Empty || !user.IsAuthenticated
@@ -33,13 +45,18 @@ public sealed class EventPublicationMutationBoundary(
             throw Changed();
         Guid? caller = await identity.ResolveUserIdAsync(cancellationToken);
         if (caller is not { } human || human == Guid.Empty || user.GetRequiredUserId() != human) throw Changed();
+        var admission = new NativeHumanMutationAdmission(context, finalizer);
+        var priorTrustDomain = context.ModerationTrustDomainId;
 
         try
         {
-            return await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() =>
-                context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            return joined ? await ExecuteAttemptAsync(cancellationToken)
+                : await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() =>
+                    context.Database.CreateExecutionStrategy().ExecuteAsync(() => ExecuteAttemptAsync(cancellationToken)), cancellationToken);
+
+            async Task<BaseCommandResponse<Guid>> ExecuteAttemptAsync(CancellationToken attemptToken)
             {
-                context.ChangeTracker.Clear();
+                if (!joined) context.ChangeTracker.Clear();
                 EventPublicationModerationFacts? original = null;
                 BaseCommandResponse<Guid>? result = null;
                 EventAuthorityProviderOperations.AuthorityPlan? plan = null;
@@ -68,10 +85,16 @@ public sealed class EventPublicationMutationBoundary(
                     if (current != original || !original.PermitsAt(clock.GetUtcNow())) throw Changed();
                 }
 
-                // The outer privacy callback is also required: co-located identity storage owns the real commit.
-                return await privacy.ExecuteEnrollmentSerializedAsync(async token =>
-                    await new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAsync(async inner =>
+                void RequireCurrent()
                 {
+                    var now = clock.GetUtcNow();
+                    if (acquiredAt is { } start && now < start
+                        || result?.IsSuccess == true && (original is null || !original.PermitsAt(now))) throw Changed();
+                }
+                async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(CancellationToken inner)
+                {
+                    if (joined) admission.RegisterJoined(RecheckAsync, RequireCurrent);
+                    else admission.RegisterOwning(RecheckAsync, RequireCurrent);
                     await using var installation = await RelationalNamedLock.AcquireTransactionAsync(context,
                         "moderation.authority-source.installation", inner);
                     plan = await EventAuthorityProviderOperations.ReadPlanAsync(context, tenantId, [human], [eventId], inner);
@@ -112,10 +135,15 @@ public sealed class EventPublicationMutationBoundary(
                             "Current publication authority does not permit this operation.", id: eventId);
                     result = await operation(inner);
                     return result;
-                }, RecheckAsync, token), RecheckAsync, cancellationToken);
-            }), cancellationToken);
+                }
+                // Keep both the native primary admission and the co-located privacy owner's final admission.
+                return joined ? await ExecuteBodyAsync(attemptToken)
+                    : await privacy.ExecuteEnrollmentSerializedAsync(token =>
+                        new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAsync(
+                            ExecuteBodyAsync, RecheckAsync, token), RecheckAsync, attemptToken);
+            }
         }
-        finally { context.ModerationTrustDomainId = null; }
+        finally { context.ModerationTrustDomainId = priorTrustDomain; }
     }
 
     private Task<Host?> ReadHostAsync(CancellationToken token) => context.ModerationHostBindings.AsNoTracking()

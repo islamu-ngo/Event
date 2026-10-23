@@ -1,7 +1,10 @@
+using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Repositories;
 
@@ -14,7 +17,7 @@ public class EventTemplateRepository : GenericRepository<EventTemplate, Guid>, I
         _dbContext = dbContext;
     }
 
-    public async Task<EventTemplate?> GetTemplateWithDetails(Guid id)
+    public async Task<EventTemplate?> GetTemplateWithDetails(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.EventTemplates
             .AsNoTrackingWithIdentityResolution()
@@ -24,15 +27,44 @@ public class EventTemplateRepository : GenericRepository<EventTemplate, Guid>, I
                 .ThenInclude(d => d.DefaultOption)
             .Include(x => x.Definitions.OrderBy(d => d.SortOrder))
                 .ThenInclude(d => d.Options.OrderBy(o => o.SortOrder))
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
     public async Task<EventTemplate?> GetTrackedTemplateWithDefinitions(Guid id, CancellationToken cancellationToken)
     {
-        return await _dbContext.EventTemplates
+        if (_dbContext.TenantFilterTenantId is not { } tenantId || tenantId == Guid.Empty
+            || _dbContext.IsTenantFilterBypassed
+            || _dbContext.Database.IsRelational()
+                && _dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Template mutation requires an exact tenant and a Serializable transaction.");
+        await RelationalEntityRowFence.AcquireAsync<EventTemplate>(
+            _dbContext, tenantId, template => template.Id, id, cancellationToken);
+        var persisted = await _dbContext.EventTemplates.AsNoTracking()
+            .SingleOrDefaultAsync(template => template.Id == id && template.TenantId == tenantId, cancellationToken);
+        if (persisted is null)
+            return null;
+        var tracked = await _dbContext.EventTemplates
             .Include(x => x.Definitions.OrderBy(d => d.SortOrder))
                 .ThenInclude(d => d.Options.OrderBy(o => o.SortOrder))
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (tracked is null)
+            return null;
+        var persistedValues = _dbContext.Entry(persisted).CurrentValues;
+        foreach (var property in _dbContext.Entry(tracked).Properties)
+        {
+            if (property.Metadata.Name is nameof(EventTemplate.CreatedAt)
+                or nameof(EventTemplate.UpdatedAt) or nameof(EventTemplate.DeletedAt))
+            {
+                // Normalize database-owned audit facts without making a read
+                // dirty merely because the provider reduced timestamp precision.
+                property.CurrentValue = persistedValues[property.Metadata.Name];
+                property.OriginalValue = property.CurrentValue;
+                property.IsModified = false;
+            }
+            else if (!Equals(property.CurrentValue, persistedValues[property.Metadata.Name]))
+                throw new InvalidOperationException("Tracked template values do not match the persisted mutation target.");
+        }
+        return tracked;
     }
 
     public async Task<(List<EventTemplate> Items, int TotalCount)> GetTemplatesPaged(
@@ -120,11 +152,19 @@ public class EventTemplateRepository : GenericRepository<EventTemplate, Guid>, I
 
         foreach (var defWithOptions in definitionsWithOptions)
         {
+            defWithOptions.Definition.EventTemplateId = template.Id;
+            defWithOptions.Definition.EventTemplate = template;
+            defWithOptions.Definition.TenantId = template.TenantId;
             await _dbContext.EventTemplateCustomPropertyDefinitions.AddAsync(defWithOptions.Definition, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             if (defWithOptions.Options.Count > 0)
             {
+                foreach (var option in defWithOptions.Options)
+                {
+                    option.EventTemplateCustomPropertyDefinitionId = defWithOptions.Definition.Id;
+                    option.Definition = defWithOptions.Definition;
+                }
                 await _dbContext.EventTemplateCustomPropertyOptions.AddRangeAsync(defWithOptions.Options, cancellationToken);
                 await _dbContext.SaveChangesAsync(cancellationToken);
             }
@@ -137,7 +177,7 @@ public class EventTemplateRepository : GenericRepository<EventTemplate, Guid>, I
             }
         }
 
-        return await GetTemplateWithDetails(template.Id) ?? template;
+        return await GetTemplateWithDetails(template.Id, cancellationToken) ?? template;
     }
 
     public async Task<EventTemplate> UpdateWithDefinitions(
@@ -172,11 +212,19 @@ public class EventTemplateRepository : GenericRepository<EventTemplate, Guid>, I
 
         foreach (var defWithOptions in definitionsWithOptions)
         {
+            defWithOptions.Definition.EventTemplateId = template.Id;
+            defWithOptions.Definition.EventTemplate = template;
+            defWithOptions.Definition.TenantId = template.TenantId;
             await _dbContext.EventTemplateCustomPropertyDefinitions.AddAsync(defWithOptions.Definition, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             if (defWithOptions.Options.Count > 0)
             {
+                foreach (var option in defWithOptions.Options)
+                {
+                    option.EventTemplateCustomPropertyDefinitionId = defWithOptions.Definition.Id;
+                    option.Definition = defWithOptions.Definition;
+                }
                 await _dbContext.EventTemplateCustomPropertyOptions.AddRangeAsync(defWithOptions.Options, cancellationToken);
                 await _dbContext.SaveChangesAsync(cancellationToken);
             }
@@ -189,7 +237,7 @@ public class EventTemplateRepository : GenericRepository<EventTemplate, Guid>, I
             }
         }
 
-        return await GetTemplateWithDetails(template.Id) ?? template;
+        return await GetTemplateWithDetails(template.Id, cancellationToken) ?? template;
     }
 
     public async Task<bool> DeleteTemplate(Guid id, CancellationToken cancellationToken)

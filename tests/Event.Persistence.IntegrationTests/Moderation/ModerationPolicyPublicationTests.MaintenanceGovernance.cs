@@ -274,10 +274,11 @@ public sealed partial class ModerationPolicyPublicationTests
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
         var machine = new MachinePrincipalAccessor(new HttpContextAccessor());
-        var keys = new ExternalApiKeyRepository(context);
+        var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
         var credential = await new ModerationReconciliationCredentialProvider(
             new GovernanceMaintenanceSettings(new() { Enabled = true, TenantId = database.TenantId }),
-            keys, new GovernanceMaintenanceSecret(ApiKeyHashing.FormatPersistedApiKey(keyId, secret)), clock)
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new GovernanceMaintenanceSecret(ApiKeyHashing.FormatPersistedApiKey(keyId, secret)), clock)
             .AuthenticateAsync(database.TenantId, default);
         await Assert.That(credential).IsNotNull();
         machine.SetPrincipal(credential!);

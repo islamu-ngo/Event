@@ -61,7 +61,7 @@ public sealed class McpAiToolRegistryTests
         await Assert.That(new[] { "tenantId", "actorId", "eventStatusId", "publishedAt", "outboxMessages" }.All(publishEvent.GetProperty("ForbiddenPayloadFields")
             .EnumerateArray()
             .Select(value => value.GetString()).Contains)).IsTrue();
-        await Assert.That(publishEvent.GetProperty("RequiredAuthorization").GetProperty("Action").GetString()).IsEqualTo("update");
+        await Assert.That(publishEvent.GetProperty("RequiredAuthorization").GetProperty("Action").GetString()).IsEqualTo(AuthorizationActions.Events.Publish);
 
         var deleteEvent = tools.EnumerateArray().Single(tool =>
             tool.GetProperty("Name").GetString() == "DeleteEvent");

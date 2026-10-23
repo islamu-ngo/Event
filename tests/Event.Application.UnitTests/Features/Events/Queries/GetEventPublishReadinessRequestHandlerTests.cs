@@ -12,35 +12,33 @@ namespace Event.Application.UnitTests.Features.Events.Queries;
 
 public class GetEventPublishReadinessRequestHandlerTests
 {
-    private readonly IEventRepository _eventRepository;
-    private readonly IEventLocationRepository _eventLocationRepository;
+    private readonly IPrivateEventManagementReader _privateManagement;
+    private readonly PrivateEventManagementGraph _graph = new();
     private readonly IEventLifecyclePolicyProvider _policyProvider;
     private readonly GetEventPublishReadinessRequestHandler _handler;
 
     public GetEventPublishReadinessRequestHandlerTests()
     {
-        _eventRepository = Substitute.For<IEventRepository>();
-        _eventLocationRepository = Substitute.For<IEventLocationRepository>();
-        _eventLocationRepository
-            .GetByEventIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(new List<EventLocation>().AsReadOnly());
+        _privateManagement = Substitute.For<IPrivateEventManagementReader>();
+        _privateManagement.ReadAsync(
+            Arg.Is<PrivateEventManagementRead>(read => read.Kind == PrivateEventManagementReadKind.Readiness),
+            Arg.Any<CancellationToken>()).Returns(_graph);
         _policyProvider = Substitute.For<IEventLifecyclePolicyProvider>();
         _policyProvider
             .GetEffectivePolicyAsync(Arg.Any<Guid?>(), ValidationProfile.EventPublish, Arg.Any<CancellationToken>())
             .Returns(CreateEventPublishPolicy());
 
         _handler = new GetEventPublishReadinessRequestHandler(
-            _eventRepository,
-            _eventLocationRepository,
             _policyProvider,
-            new EventLifecycleReadinessEvaluator());
+            new EventLifecycleReadinessEvaluator(),
+            _privateManagement);
     }
 
     [Test]
     public async Task QueryAsync_WhenEventIsReady_ReturnsReadyResult()
     {
         var @event = CreateReadyEvent();
-        _eventRepository.GetById(@event.Id).Returns(@event);
+        _graph.Events.Add(@event);
 
         var result = await _handler.QueryAsync(new GetEventPublishReadinessRequest { Id = @event.Id }, CancellationToken.None);
 
@@ -55,7 +53,7 @@ public class GetEventPublishReadinessRequestHandlerTests
     {
         var @event = CreateReadyEvent();
         @event.FirstSessionStartUtc = null;
-        _eventRepository.GetById(@event.Id).Returns(@event);
+        _graph.Events.Add(@event);
 
         var result = await _handler.QueryAsync(new GetEventPublishReadinessRequest { Id = @event.Id }, CancellationToken.None);
 
@@ -71,7 +69,7 @@ public class GetEventPublishReadinessRequestHandlerTests
     public async Task QueryAsync_WhenCommunityProfileEventIsModerated_ReturnsHardInvariantError()
     {
         var @event = CreateReadyEvent(EventStatusEnum.Moderated);
-        _eventRepository.GetById(@event.Id).Returns(@event);
+        _graph.Events.Add(@event);
         _policyProvider
             .GetEffectivePolicyAsync(@event.TenantId, ValidationProfile.EventPublish, Arg.Any<CancellationToken>())
             .Returns(CreateCommunityPublishPolicy());
@@ -89,7 +87,6 @@ public class GetEventPublishReadinessRequestHandlerTests
     public async Task QueryAsync_WhenEventDoesNotExist_ReturnsNull()
     {
         var eventId = Guid.NewGuid();
-        _eventRepository.GetById(eventId).Returns((Explore.Domain.Event?)null);
 
         var result = await _handler.QueryAsync(new GetEventPublishReadinessRequest { Id = eventId }, CancellationToken.None);
 

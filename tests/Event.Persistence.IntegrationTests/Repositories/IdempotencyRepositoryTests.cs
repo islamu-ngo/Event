@@ -1,9 +1,15 @@
+using Explore.Persistence.Database.ProviderPrimitives;
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
+using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
+using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using TUnit.Core;
@@ -15,11 +21,54 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 public sealed class IdempotencyRepositoryTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
-    public async Task DeleteExpiredAsync_DeletesOnlyExpiredRowsUpToBatchSize()
+    public async Task RuntimeClaimPreservesExactRequestReceiptWithoutPrivateTableGrants()
+    {
+        Guid tenant = Guid.CreateVersion7();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Tenants.Add(new Tenant
+            {
+                Id = tenant,
+                FullName = "Receipt custody",
+                Slug = $"receipt-{tenant:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
+            });
+            await seed.SaveChangesAsync();
+        }
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
+        builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
+        await using var context = new ExploreDbContext(builder.Options)
+        {
+            TenantContext = new ReceiptTenant(tenant)
+        };
+        context.BindTenantLease();
+        var repository = new IdempotencyRepository(context, enrollment: fixture.NativeQueueEnrollment);
+        var original = NewClaim(Guid.CreateVersion7().ToString("N"), tenant,
+            DateTime.UtcNow);
+        var first = await repository.TryClaimAsync(original);
+        using var firstOwner = first.Owner;
+        var contender = await repository.TryClaimAsync(NewClaim(original.Key, tenant, original.CreatedAt));
+        await Assert.That(first.IsOwner).IsTrue();
+        await Assert.That(contender.IsOwner).IsFalse();
+        await Assert.That(contender.Record.Id).IsEqualTo(original.Id);
+        await Assert.That(contender.Record.RequestBodyHash).IsEqualTo(original.RequestBodyHash);
+        await Assert.That(contender.Record.PrincipalFingerprint).IsEqualTo(original.PrincipalFingerprint);
+        string table = new HumanPrincipalSourceSql(context).Table(typeof(IdempotencyRecord));
+        var denied = await Assert.ThrowsAsync<Npgsql.PostgresException>(() =>
+            context.Database.ExecuteSqlRawAsync($"SELECT * FROM {table} LIMIT 1"));
+        await Assert.That(denied!.SqlState).IsEqualTo("42501");
+    }
+
+    private sealed record ReceiptTenant(Guid TenantId) : ITenantContext;
+
+    [Test]
+    public async Task ScrubExpiredAsyncRetainsFencesUpToBatchSize()
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
-        var repository = new IdempotencyRepository(context);
         var tenantId = Guid.NewGuid();
         var now = new DateTime(2026, 5, 28, 12, 0, 0, DateTimeKind.Utc);
 
@@ -30,12 +79,19 @@ public sealed class IdempotencyRepositoryTests(PostgreSqlContainerFixture fixtur
             NewRecord("live", tenantId, now.AddHours(1)));
         await context.SaveChangesAsync();
 
-        var eligibleBefore = await repository.CountExpiredAsync(now.AddHours(-1), batchSize: 2, CancellationToken.None);
-        var deleted = await repository.DeleteExpiredAsync(now.AddHours(-1), batchSize: 2, CancellationToken.None);
+        var scopes = new IdempotencyCleanupExecutionScopeFactory(
+            new TenantExploreDbContextFactory(fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime), poolSize: 1),
+            enrollment: fixture.NativeQueueEnrollment);
+        await using var scope = await scopes.CreateAsync(tenantId);
+        var eligibleBefore = await scope.CountExpiredAsync(now.AddHours(-1), maximumRows: 2, CancellationToken.None);
+        var scrubbed = await scope.ScrubExpiredAsync(now.AddHours(-1), maximumRows: 2, CancellationToken.None);
 
         await Assert.That(eligibleBefore).IsEqualTo(2);
-        await Assert.That(deleted).IsEqualTo(2);
-        await Assert.That(await context.IdempotencyRecords.CountAsync()).IsEqualTo(2);
+        await Assert.That(scrubbed).IsEqualTo(2);
+        await Assert.That(await context.IdempotencyRecords.CountAsync()).IsEqualTo(4);
+        await Assert.That(await context.IdempotencyRecords.CountAsync(record =>
+            record.StatusCode == IdempotencyRecord.ResponseUnavailableStatusCode
+            && record.ResponseBody == null && record.ContentType == null)).IsEqualTo(2);
         await Assert.That(await context.IdempotencyRecords.AnyAsync(record => record.Key == "live")).IsTrue();
         await Assert.That(await context.IdempotencyRecords.AnyAsync(record => record.Key == "expired-3")).IsTrue();
     }
@@ -45,45 +101,61 @@ public sealed class IdempotencyRepositoryTests(PostgreSqlContainerFixture fixtur
     {
         await fixture.ResetAsync();
         var tenantId = Guid.CreateVersion7();
-        var now = new DateTime(2026, 7, 30, 12, 0, 0, DateTimeKind.Utc);
+        var now = DateTime.UtcNow;
 
-        await using var winnerContext = CreateNonRetryingContext();
-        var contenderGate = new IdempotencyInsertGate();
-        await using var contenderContext = CreateNonRetryingContext(contenderGate);
-        var winnerRepository = new IdempotencyRepository(winnerContext);
-        var contenderRepository = new IdempotencyRepository(contenderContext);
+        await using var winnerContext = CreateRuntimeContext(tenantId);
+        await using var contenderContext = CreateRuntimeContext(tenantId);
+        var winnerRepository = new IdempotencyRepository(winnerContext, enrollment: fixture.NativeQueueEnrollment);
+        var contenderRepository = new IdempotencyRepository(contenderContext, enrollment: fixture.NativeQueueEnrollment);
         await using var winnerTransaction = await winnerContext.Database.BeginTransactionAsync();
 
         var winnerRecord = NewClaim("contended-key", tenantId, now);
         var contenderRecord = NewClaim("contended-key", tenantId, now);
         var winner = await winnerRepository.TryClaimAsync(winnerRecord);
+        using var winnerOwner = winner.Owner;
         await Assert.That(winner.IsOwner).IsTrue();
 
-        Task<IdempotencyClaim> contenderTask = contenderRepository.TryClaimAsync(contenderRecord);
-        await contenderGate.WaitUntilCommandReachedAsync();
-        await Assert.That(contenderTask.IsCompleted).IsFalse();
-
-        contenderGate.Release();
-        await winnerTransaction.CommitAsync();
-        IdempotencyClaim contender = await contenderTask;
+        await contenderContext.Database.OpenConnectionAsync();
+        var connection = (Npgsql.NpgsqlConnection)contenderContext.Database.GetDbConnection();
+        var dispatched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void ObserveDispatch(object sender, Npgsql.NpgsqlNoticeEventArgs notice)
+        {
+            if (notice.Notice.MessageText == "receipt_repository_contender_dispatched") dispatched.TrySetResult();
+        }
+        connection.Notice += ObserveDispatch;
+        IdempotencyClaim contender;
+        try
+        {
+            async Task<IdempotencyClaim> DispatchThenClaim()
+            {
+                await contenderContext.Database.ExecuteSqlRawAsync(
+                    "DO $dispatch$ BEGIN RAISE NOTICE 'receipt_repository_contender_dispatched'; END $dispatch$");
+                return await contenderRepository.TryClaimAsync(contenderRecord);
+            }
+            var contenderTask = DispatchThenClaim();
+            await dispatched.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            await Assert.That(contenderTask.IsCompleted).IsFalse();
+            await winnerTransaction.CommitAsync();
+            contender = await contenderTask.WaitAsync(TimeSpan.FromSeconds(15));
+        }
+        finally { connection.Notice -= ObserveDispatch; }
 
         await Assert.That(contender.IsOwner).IsFalse();
         await Assert.That(contender.Record.Id).IsEqualTo(winnerRecord.Id);
 
-        await using var verificationContext = CreateNonRetryingContext();
+        await using var verificationContext = fixture.CreateDbContext();
         await Assert.That(await verificationContext.IdempotencyRecords
             .CountAsync(record => record.Key == "contended-key" && record.TenantId == tenantId)).IsEqualTo(1);
     }
 
-    private ExploreDbContext CreateNonRetryingContext(params IInterceptor[] interceptors)
+    private ExploreDbContext CreateRuntimeContext(Guid tenant)
     {
-        var options = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(fixture.ConnectionString)
-            .UseSnakeCaseNamingConvention()
-            .AddInterceptors(interceptors)
-            .Options;
-        var context = new ExploreDbContext(options);
-        context.EnableTenantFilterBypass("Idempotency contention integration test.");
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
+        builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
+        var context = new ExploreDbContext(builder.Options) { TenantContext = new ReceiptTenant(tenant) };
+        context.BindTenantLease();
         return context;
     }
 
@@ -114,69 +186,11 @@ public sealed class IdempotencyRepositoryTests(PostgreSqlContainerFixture fixtur
             UserId = "test-user",
             RequestMethod = "POST",
             RequestTarget = "/api/test",
-            RequestBodyHash = Guid.NewGuid().ToString("N"),
-            PrincipalFingerprint = Guid.NewGuid().ToString("N"),
+            RequestBodyHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData("receipt body"u8)),
+            PrincipalFingerprint = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData("receipt principal"u8)),
             StatusCode = IdempotencyRecord.InProgressStatusCode,
             CreatedAt = now,
             ExpiresAt = now.AddHours(24)
         };
 
-    private sealed class IdempotencyInsertGate : DbCommandInterceptor
-    {
-        private readonly TaskCompletionSource _commandReached =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource _release =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int _armed = 1;
-
-        public async Task WaitUntilCommandReachedAsync()
-        {
-            await _commandReached.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        }
-
-        public void Release()
-        {
-            _release.TrySetResult();
-        }
-
-        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
-            DbCommand command,
-            CommandEventData eventData,
-            InterceptionResult<int> result,
-            CancellationToken cancellationToken = default)
-        {
-            await WaitIfArmedAsync(command, cancellationToken);
-
-            return result;
-        }
-
-        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
-            DbCommand command,
-            CommandEventData eventData,
-            InterceptionResult<DbDataReader> result,
-            CancellationToken cancellationToken = default)
-        {
-            await WaitIfArmedAsync(command, cancellationToken);
-            return result;
-        }
-
-        private async Task WaitIfArmedAsync(
-            DbCommand command,
-            CancellationToken cancellationToken)
-        {
-            if (!command.CommandText.TrimStart().StartsWith(
-                    "INSERT",
-                    StringComparison.OrdinalIgnoreCase)
-                || !command.CommandText.Contains(
-                    "idempotency_records",
-                    StringComparison.OrdinalIgnoreCase)
-                || Interlocked.Exchange(ref _armed, 0) != 1)
-            {
-                return;
-            }
-
-            _commandReached.TrySetResult();
-            await _release.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-        }
-    }
 }

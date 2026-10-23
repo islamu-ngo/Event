@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -24,59 +23,54 @@ internal static class InstanceOnboardingProfileSettingHelpers
             Purpose = string.IsNullOrWhiteSpace(profile.Purpose) ? null : profile.Purpose.Trim()
         };
 
-    internal static async Task PersistAsync(
-        ISystemSettingRepository systemSettingRepository,
+    internal static void AddSettings(
+        List<SystemSetting> settings,
         SelfHostOnboardingProfileDto profile,
-        IConfiguration configuration,
-        CancellationToken cancellationToken)
+        IConfiguration configuration)
     {
         var configuredUrl = PublicAddressResolver.ReadOverride(configuration);
         var publicUrl = PublicAddressResolver.IsValid(configuredUrl) ? configuredUrl : profile.PublicUrl;
-        await UpsertAsync(
-            systemSettingRepository,
+        Add(
+            settings,
             GovernanceSettingKeys.Branding.DisplayName,
             JsonSerializer.Serialize(profile.SiteName),
             "Branding",
             1,
-            "Instance brand display name",
-            cancellationToken);
+            "Instance brand display name");
 
-        await UpsertAsync(
-            systemSettingRepository,
+        Add(
+            settings,
             GovernanceSettingKeys.Branding.SupportEmail,
             JsonSerializer.Serialize(profile.SupportEmail),
             "Branding",
             2,
-            "Public support contact for the instance site",
-            cancellationToken);
+            "Public support contact for the instance site");
 
         if (PublicAddressResolver.IsValid(publicUrl))
         {
-            await UpsertAsync(
-                systemSettingRepository,
+            Add(
+                settings,
                 GovernanceSettingKeys.Domains.PublicBaseUrl,
                 JsonSerializer.Serialize(publicUrl),
-                "Domains", 2, "Public address established during authorized setup", cancellationToken);
+                "Domains", 2, "Public address established during authorized setup");
         }
 
-        await UpsertAsync(
-            systemSettingRepository,
+        Add(
+            settings,
             GovernanceSettingKeys.Localization.DefaultLanguage,
             JsonSerializer.Serialize(profile.Locale.ToLowerInvariant()),
             "Localization",
             1,
-            "Default language code (ISO 639-1) for the instance",
-            cancellationToken);
+            "Default language code (ISO 639-1) for the instance");
     }
 
-    private static Task UpsertAsync(
-        ISystemSettingRepository systemSettingRepository,
+    private static void Add(
+        List<SystemSetting> settings,
         string key,
         string value,
         string category,
         int displayOrder,
-        string description,
-        CancellationToken cancellationToken) => systemSettingRepository.UpsertAsync(new SystemSetting
+        string description) => settings.Add(new SystemSetting
         {
             SettingKey = key,
             Value = value,
@@ -87,5 +81,5 @@ internal static class InstanceOnboardingProfileSettingHelpers
             Description = description,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
-        }, cancellationToken);
+        });
 }

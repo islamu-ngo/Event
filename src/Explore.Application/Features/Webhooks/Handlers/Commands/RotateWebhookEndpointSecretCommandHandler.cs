@@ -20,7 +20,8 @@ public sealed class RotateWebhookEndpointSecretCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUserService,
     IMachinePrincipalAccessor machinePrincipalAccessor,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IHumanWebhookMutationPreparation preparation)
     : ICommandHandler<RotateWebhookEndpointSecretCommand, BaseCommandResponse<Guid>>
 {
     private const int DefaultPreviousSecretValidForSeconds = 86_400;
@@ -36,14 +37,14 @@ public sealed class RotateWebhookEndpointSecretCommandHandler(
             return Failure("webhook_endpoint_secret_validation_failed", validationErrors);
         }
 
-        if (!TryResolveActor(out _, out _))
+        if (!TryResolveActor(out _, out var actorUserId))
         {
             return Failure(
                 "webhook_endpoint_configuration_actor_required",
                 ["An authenticated operator identity is required."]);
         }
 
-        return await unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
+        async Task<BaseCommandResponse<Guid>> MutateAsync(CancellationToken transactionCancellationToken)
         {
             var endpoint = await endpointRepository.GetByIdForOwnerOperationAsync(
                 request.EndpointId,
@@ -182,7 +183,11 @@ public sealed class RotateWebhookEndpointSecretCommandHandler(
                 ? $" {uncertainPublicationCount} uncertain provider publication(s) remain on their original snapshots."
                 : string.Empty;
             return BaseCommandResponse.Success(persisted.Id, $"Webhook endpoint signing credential rotated; {migratedTargetCount} eligible pending target(s) migrated.{warning}");
-        }, cancellationToken);
+        }
+
+        return actorUserId.HasValue
+            ? await preparation.ExecuteAsync(request, MutateAsync, cancellationToken)
+            : await unitOfWork.ExecuteInTransactionAsync(MutateAsync, cancellationToken);
     }
 
     private static List<string> Validate(

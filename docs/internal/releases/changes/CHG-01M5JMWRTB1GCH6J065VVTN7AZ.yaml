@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5JMWRTB1GCH6J065VVTN7AZ
+Title: "Admit scanner storage through fixed application-owned permissions"
+Type: fix
+Scope: access
+Summary: "Preserve bounded scanner and required document storage admission with original-transaction parent coordination. Final native management acceptance remains deferred in the PR75 backlog handoff."
+Group: scanner-storage-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/adr/ADR-application-owned-persistence.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Fixed scanner and required-document storage permissions support API-owned authorization and original-transaction parent coordination. No private profile grant or privileged business routine is added. Direct database access can bypass C# rules; current-image native management acceptance remains open.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Apply original-Migrator fixed permission installation with the matching application. Partial, widened or delegated authority is rejected rather than silently repaired. This preservation checkpoint does not claim the outstanding Gitar workflow finding is closed.

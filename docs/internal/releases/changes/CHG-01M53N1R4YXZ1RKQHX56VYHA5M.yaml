@@ -1,0 +1,31 @@
+Change-Id: CHG-01M53N1R4YXZ1RKQHX56VYHA5M
+Title: "Admit original localization governance mutations"
+Type: fix
+Scope: access
+Summary: "Bind exact original localization effects to one source-checked native transaction and publish changes after settlement."
+Group: native-localization-governance-mutation
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Original selected owners retain committed administrator authority and validated credential lifetime through native settlement.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Database preparation installs required native source and execute-only projection contracts.
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: The configured independent Global login receives only the declared projection execution groups.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose credential and native source readiness without expanding settings or identity-table privileges.

@@ -413,9 +413,9 @@ public sealed class CreateOrganizerPaymentOnboardingLinkCommandHandler(
         {
             await MarkOperationManualWithRecoveryTokenAsync(tenantId, operationId, failureCode, providerRequestId, occurredAt);
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            logger.LogWarning(exception, ProviderHandoffRecoveryFailedLogMessage);
+            logger.LogWarning(ProviderHandoffRecoveryFailedLogMessage);
         }
     }
 

@@ -4,82 +4,105 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.Features.ExternalApiKeys.Requests.Queries;
 using Explore.Application.Lookups;
-using Explore.Domain.Constants;
-using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.ExternalApiKeys.Handlers.Queries;
 
 public class GetExternalApiKeyDetailsRequestHandler : IQueryHandler<GetExternalApiKeyDetailsRequest, ExternalApiKeyListDto?>
 {
     private readonly IExternalApiKeyRepository _externalApiKeyRepository;
-    private readonly IOrganizationMemberRepository _organizationMemberRepository;
-    private readonly IGroupMemberRepository _groupMemberRepository;
+    private readonly IExternalApiKeyIssuanceAuthority _ownerAuthority;
+    private readonly IInstanceAdministratorCommitAuthority _instanceAuthority;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IAdminContext _adminContext;
     private readonly IUserContext _userContext;
+    private readonly InstanceApiKeyOperations _instanceOperations;
+    private readonly IHumanApiKeyManagementPreparation _preparation;
+    private readonly ISerializableAttemptOwner _attemptOwner;
+    private readonly IHumanActionCommitFinalizer _finalizer;
 
     public GetExternalApiKeyDetailsRequestHandler(
         IExternalApiKeyRepository externalApiKeyRepository,
-        IOrganizationMemberRepository organizationMemberRepository,
-        IGroupMemberRepository groupMemberRepository,
+        IExternalApiKeyIssuanceAuthority ownerAuthority,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        IUnitOfWork unitOfWork,
         IAdminContext adminContext,
-        IUserContext userContext)
+        IUserContext userContext,
+        InstanceApiKeyOperations instanceOperations,
+        IHumanApiKeyManagementPreparation preparation,
+        ISerializableAttemptOwner attemptOwner,
+        IHumanActionCommitFinalizer finalizer)
     {
         _externalApiKeyRepository = externalApiKeyRepository;
-        _organizationMemberRepository = organizationMemberRepository;
-        _groupMemberRepository = groupMemberRepository;
+        _ownerAuthority = ownerAuthority;
+        _instanceAuthority = instanceAuthority;
+        _unitOfWork = unitOfWork;
         _adminContext = adminContext;
         _userContext = userContext;
+        _instanceOperations = instanceOperations;
+        _preparation = preparation;
+        _attemptOwner = attemptOwner;
+        _finalizer = finalizer;
     }
 
     public async Task<ExternalApiKeyListDto?> QueryAsync(GetExternalApiKeyDetailsRequest request, CancellationToken cancellationToken)
     {
-        var currentUserId = _userContext.GetRequiredUserId();
-        var externalApiKey = await _externalApiKeyRepository.GetByIdIgnoringTenantFilter(request.Id, cancellationToken);
-
-        if (externalApiKey is null || !await CanManageAsync(externalApiKey, currentUserId, cancellationToken))
-        {
+        if (!_userContext.IsAuthenticated
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) is not { } currentUserId)
             return null;
+        if (request.Id == Guid.Empty)
+            return null;
+        if (await _externalApiKeyRepository.GetForTenantAsync(request.Id, cancellationToken) is null)
+        {
+            if (!await _adminContext.IsInstanceAdminAsync(cancellationToken))
+                return null;
+            var platformKey = (await _instanceOperations.ReadAsync(currentUserId, request.Id, cancellationToken)).SingleOrDefault();
+            return platformKey is null ? null : Map(platformKey);
         }
-
-        return new ExternalApiKeyListDto
+        var prepared = await _preparation.PrepareAsync(request, currentUserId, cancellationToken);
+        async Task<ExternalApiKeyListDto?> ReadOwnerAsync(CancellationToken token)
         {
-            Id = externalApiKey.Id,
-            Name = externalApiKey.Name,
-            Description = externalApiKey.Description,
-            KeyId = externalApiKey.KeyId,
-            MaskedKeyId = MaskKeyId(externalApiKey.KeyId),
-            ExternalApiKeyOwnerTypeId = externalApiKey.ExternalApiKeyOwnerTypeId,
-            ExternalApiKeyOwnerTypeCode = NormalizedLookupMetadata.ExternalApiKeyOwnerType(externalApiKey.ExternalApiKeyOwnerTypeId).Code,
-            ExternalApiKeyOwnerTypeName = NormalizedLookupMetadata.ExternalApiKeyOwnerType(externalApiKey.ExternalApiKeyOwnerTypeId).Name,
-            OwnerId = externalApiKey.OwnerId,
-            Scopes = SplitScopes(externalApiKey.Scopes),
-            ExternalApiKeyStatusId = externalApiKey.ExternalApiKeyStatusId,
-            ExternalApiKeyStatusCode = NormalizedLookupMetadata.ExternalApiKeyStatus(externalApiKey.ExternalApiKeyStatusId).Code,
-            ExternalApiKeyStatusName = NormalizedLookupMetadata.ExternalApiKeyStatus(externalApiKey.ExternalApiKeyStatusId).Name,
-            ExpiresAt = externalApiKey.ExpiresAt,
-            LastUsedAt = externalApiKey.LastUsedAt,
-            ExternalApiKeyCreditPeriodId = externalApiKey.ExternalApiKeyCreditPeriodId,
-            ExternalApiKeyCreditPeriodCode = NormalizedLookupMetadata.ExternalApiKeyCreditPeriod(externalApiKey.ExternalApiKeyCreditPeriodId).Code,
-            ExternalApiKeyCreditPeriodName = NormalizedLookupMetadata.ExternalApiKeyCreditPeriod(externalApiKey.ExternalApiKeyCreditPeriodId).Name,
-            CreditLimit = externalApiKey.CreditLimit,
-            MaxRolloverCredits = externalApiKey.MaxRolloverCredits
-        };
+            if (prepared is not null)
+                await prepared.AcquireAsync(request, currentUserId, token);
+            var before = await _externalApiKeyRepository.GetForTenantAsync(request.Id, token);
+            if (before is null || !await ExternalApiKeyManagementAuthority.IsAuthorizedForCommitAsync(
+                    before, currentUserId, _ownerAuthority, _instanceAuthority, token))
+                return null;
+            var externalApiKey = await _externalApiKeyRepository.GetForManagementAsync(request.Id, token);
+            if (externalApiKey is null || !ExternalApiKeyManagementAuthority.HasSameOwner(before, externalApiKey))
+                return null;
+            if (prepared is not null)
+                ExternalApiKeyManagementAuthority.RegisterFinalAdmission(before, currentUserId,
+                    _externalApiKeyRepository, _ownerAuthority, _instanceAuthority, _finalizer);
+            return Map(externalApiKey);
+        }
+        return prepared is null
+            ? await _unitOfWork.ExecuteSerializableAsync(ReadOwnerAsync, cancellationToken)
+            : await _attemptOwner.ExecuteAsync(ReadOwnerAsync, cancellationToken);
     }
 
-    private async Task<bool> CanManageAsync(Explore.Domain.ExternalApiKey externalApiKey, Guid currentUserId, CancellationToken cancellationToken)
+    private static ExternalApiKeyListDto Map(Explore.Domain.ExternalApiKey externalApiKey) => new()
     {
-        return externalApiKey.OwnerType switch
-        {
-            ExternalApiKeyOwnerType.User => externalApiKey.OwnerId == currentUserId,
-            ExternalApiKeyOwnerType.Organization => await _organizationMemberRepository.HasPermissionInOrganization(
-                externalApiKey.OwnerId, currentUserId, PermissionCodes.OrganizationManage),
-            ExternalApiKeyOwnerType.Group => await _groupMemberRepository.HasPermissionInGroup(
-                externalApiKey.OwnerId, currentUserId, PermissionCodes.GroupManage),
-            ExternalApiKeyOwnerType.Tenant => await _adminContext.IsTenantAdminAsync(externalApiKey.TenantId!.Value, cancellationToken),
-            ExternalApiKeyOwnerType.InstanceAdmin => await _adminContext.IsInstanceAdminAsync(cancellationToken),
-            _ => false
-        };
-    }
+        Id = externalApiKey.Id,
+        Name = externalApiKey.Name,
+        Description = externalApiKey.Description,
+        KeyId = externalApiKey.KeyId,
+        MaskedKeyId = MaskKeyId(externalApiKey.KeyId),
+        ExternalApiKeyOwnerTypeId = externalApiKey.ExternalApiKeyOwnerTypeId,
+        ExternalApiKeyOwnerTypeCode = NormalizedLookupMetadata.ExternalApiKeyOwnerType(externalApiKey.ExternalApiKeyOwnerTypeId).Code,
+        ExternalApiKeyOwnerTypeName = NormalizedLookupMetadata.ExternalApiKeyOwnerType(externalApiKey.ExternalApiKeyOwnerTypeId).Name,
+        OwnerId = externalApiKey.OwnerId,
+        Scopes = SplitScopes(externalApiKey.Scopes),
+        ExternalApiKeyStatusId = externalApiKey.ExternalApiKeyStatusId,
+        ExternalApiKeyStatusCode = NormalizedLookupMetadata.ExternalApiKeyStatus(externalApiKey.ExternalApiKeyStatusId).Code,
+        ExternalApiKeyStatusName = NormalizedLookupMetadata.ExternalApiKeyStatus(externalApiKey.ExternalApiKeyStatusId).Name,
+        ExpiresAt = externalApiKey.ExpiresAt,
+        LastUsedAt = externalApiKey.LastUsedAt,
+        ExternalApiKeyCreditPeriodId = externalApiKey.ExternalApiKeyCreditPeriodId,
+        ExternalApiKeyCreditPeriodCode = NormalizedLookupMetadata.ExternalApiKeyCreditPeriod(externalApiKey.ExternalApiKeyCreditPeriodId).Code,
+        ExternalApiKeyCreditPeriodName = NormalizedLookupMetadata.ExternalApiKeyCreditPeriod(externalApiKey.ExternalApiKeyCreditPeriodId).Name,
+        CreditLimit = externalApiKey.CreditLimit,
+        MaxRolloverCredits = externalApiKey.MaxRolloverCredits
+    };
 
     private static List<string> SplitScopes(string scopes)
     {

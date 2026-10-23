@@ -1,4 +1,3 @@
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Domain;
@@ -6,16 +5,18 @@ using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Notifications;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 [NotInParallel("ConfigurationManifestAtomicPersistence")]
-public sealed class ConfigurationManifestAtomicPersistenceTests
+public sealed partial class ConfigurationManifestAtomicPersistenceTests
 {
     [Test]
     public async Task Bootstrap_RerunCreatesOnceThenAuditsWholesaleSkip()
@@ -30,13 +31,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
 
             await using (ExploreDbContext firstContext = factory.CreateDbContext())
             {
-                var repository = new ConfigurationManifestOperationRepository(firstContext);
-                var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                    firstContext,
-                    new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                        new TenantRepository(firstContext)),
-                    repository,
-                    new ConfigurationManifestFailureRepository(factory));
+                await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory);
                 var first = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(source),
                     CancellationToken.None);
@@ -45,13 +40,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
 
             await using (ExploreDbContext secondContext = factory.CreateDbContext())
             {
-                var repository = new ConfigurationManifestOperationRepository(secondContext);
-                var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                    secondContext,
-                    new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                        new TenantRepository(secondContext)),
-                    repository,
-                    new ConfigurationManifestFailureRepository(factory));
+                await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory);
                 var second = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(source),
                     CancellationToken.None);
@@ -118,6 +107,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             Guid existingTenantId = Guid.CreateVersion7();
             await using (ExploreDbContext seed = factory.CreateDbContext())
             {
+                seed.BindTenantLease();
                 seed.Tenants.Add(new Tenant
                 {
                     Id = existingTenantId,
@@ -143,13 +133,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
 
             await using (ExploreDbContext apply = factory.CreateDbContext())
             {
-                var repository = new ConfigurationManifestOperationRepository(apply);
-                var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                    apply,
-                    new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                        new TenantRepository(apply)),
-                    repository,
-                    new ConfigurationManifestFailureRepository(factory));
+                await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory);
                 var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
                         ConfigurationManifestApplicationTestSupport.Source("existing", "new")),
@@ -211,19 +195,16 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             DbContextOptions<ExploreDbContext> options = CreateOptions(databasePath);
             await InitializeAsync(options);
             var factory = new ConfigurationManifestApplicationTestSupport.TestDbContextFactory(options);
-            string firstDigest = new('d', ConfigurationManifestOperation.DigestLength);
-            string secondDigest = new('e', ConfigurationManifestOperation.DigestLength);
-
-            await ApplyAsync(
+            string firstDigest = await ApplyAsync(
                 factory,
                 ConfigurationManifestApplicationTestSupport.DifferentDigestSource(
-                    firstDigest,
+                    new string('d', ConfigurationManifestOperation.DigestLength),
                     "Original Catalog",
                     "digest"));
-            await ApplyAsync(
+            string secondDigest = await ApplyAsync(
                 factory,
                 ConfigurationManifestApplicationTestSupport.DifferentDigestSource(
-                    secondDigest,
+                    new string('e', ConfigurationManifestOperation.DigestLength),
                     "Changed Catalog",
                     "digest"));
 
@@ -238,6 +219,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                     .SingleAsync(operation => operation.Digest == secondDigest);
 
             await Assert.That(persisted.Value).IsEqualTo("\"Original Catalog\"");
+            await Assert.That(firstDigest).IsNotEqualTo(secondDigest);
             await Assert.That(secondOperation.CreatedTenantCount).IsEqualTo(0);
             await Assert.That(secondOperation.SkippedExistingTenantCount).IsEqualTo(1);
         }
@@ -258,14 +240,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             var factory = new ConfigurationManifestApplicationTestSupport.TestDbContextFactory(options);
             await using (ExploreDbContext apply = factory.CreateDbContext())
             {
-                var repository = new ConfigurationManifestOperationRepository(apply);
-                var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                    apply,
-                    new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                        new TenantRepository(apply)),
-                    repository,
-                    new ConfigurationManifestFailureRepository(factory),
-                    useRealPolicyBoundary: true);
+                await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory);
 
                 var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
@@ -312,29 +287,16 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             var source = ConfigurationManifestApplicationTestSupport.Source("effect-retry");
             await using (ExploreDbContext firstContext = factory.CreateDbContext())
             {
-                var repository = new ConfigurationManifestOperationRepository(firstContext);
-                var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                    firstContext,
-                    new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                        new TenantRepository(firstContext)),
-                    repository,
-                    new ConfigurationManifestFailureRepository(factory),
+                await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory,
                     effectConsumer: new ThrowingConsumer());
-                await Assert.That(() => handler.ExecuteAsync(
+                await Assert.ThrowsAsync<AggregateException>(async () => await handler.ExecuteAsync(
                         new ApplyConfigurationManifestCommand(source),
-                        CancellationToken.None))
-                    .Throws<AggregateException>();
+                        CancellationToken.None));
             }
 
             await using (ExploreDbContext secondContext = factory.CreateDbContext())
             {
-                var repository = new ConfigurationManifestOperationRepository(secondContext);
-                var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                    secondContext,
-                    new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                        new TenantRepository(secondContext)),
-                    repository,
-                    new ConfigurationManifestFailureRepository(factory));
+                await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory);
                 var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(source),
                     CancellationToken.None);
@@ -376,13 +338,20 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             var factory = new ConfigurationManifestApplicationTestSupport.TestDbContextFactory(options);
             await using (ExploreDbContext apply = factory.CreateDbContext())
             {
-                var inner = new ConfigurationManifestOperationRepository(apply);
-                var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                    apply,
-                    new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                        new TenantRepository(apply)),
-                    new ThrowingOperationRepository(inner),
-                    new ConfigurationManifestFailureRepository(factory));
+                var entity = apply.Model.FindEntityType(typeof(ConfigurationManifestOperation))!;
+                var names = apply.GetService<ISqlGenerationHelper>();
+                var store = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+                var status = entity.FindProperty(nameof(ConfigurationManifestOperation.Status))!;
+                string table = names.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+                string statusColumn = names.DelimitIdentifier(status.GetColumnName(store)!);
+                string appliedStatus = status.GetRelationalTypeMapping()
+                    .GenerateSqlLiteral(ConfigurationManifestOperationStatus.Applied);
+                await apply.Database.ExecuteSqlRawAsync($"""
+                    CREATE TRIGGER reject_manifest_applied BEFORE INSERT ON {table}
+                    WHEN NEW.{statusColumn} = {appliedStatus}
+                    BEGIN SELECT RAISE(ABORT, 'actual manifest receipt persistence rejected'); END;
+                    """);
+                await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory);
 
                 var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
@@ -433,17 +402,14 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             var factory = new ConfigurationManifestApplicationTestSupport.TestDbContextFactory(options);
             await using (ExploreDbContext apply = factory.CreateDbContext())
             {
-                var innerCreation = new Explore.Application.Services.TenantCreationService(
-                    new TenantRepository(apply),
-                    new TenantSettingsDocumentRepository(apply));
-                var repository = new ConfigurationManifestOperationRepository(apply);
-                var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                    apply,
-                    new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                        new TenantRepository(apply)),
-                    repository,
-                    new ConfigurationManifestFailureRepository(factory),
-                    tenantCreationService: new FailOnSecondTenantCreationService(innerCreation));
+                var entity = apply.Model.FindEntityType(typeof(Tenant))!;
+                string table = apply.GetService<ISqlGenerationHelper>().DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+                await apply.Database.ExecuteSqlRawAsync($"""
+                    CREATE TRIGGER reject_second_manifest_tenant BEFORE INSERT ON {table}
+                    WHEN NEW.slug = 'second'
+                    BEGIN SELECT RAISE(ABORT, 'actual second tenant persistence rejected'); END;
+                    """);
+                await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory);
 
                 var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
@@ -479,29 +445,24 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
         }
     }
 
-    private static async Task ApplyAsync(
+    private static async Task<string> ApplyAsync(
         ConfigurationManifestApplicationTestSupport.TestDbContextFactory factory,
         Explore.Application.Features.ConfigurationManifest.Ingestion
             .ConfigurationManifestReadResult source)
     {
-        await using ExploreDbContext context = factory.CreateDbContext();
-        var repository = new ConfigurationManifestOperationRepository(context);
-        var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-            context,
-            new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                new TenantRepository(context)),
-            repository,
-            new ConfigurationManifestFailureRepository(factory));
+        await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(factory);
         var response = await handler.ExecuteAsync(
             new ApplyConfigurationManifestCommand(source),
             CancellationToken.None);
         await Assert.That(response.IsSuccess).IsTrue();
+        return handler.ArtifactDigest!;
     }
 
     private static async Task InitializeAsync(DbContextOptions<ExploreDbContext> options)
     {
         await using var context = new ExploreDbContext(options);
         context.EnableTenantFilterBypass("Configuration manifest application persistence test.");
+        context.BindTenantLease();
         await context.Database.EnsureCreatedAsync();
         await SqliteDatabaseInitializer.InitializeAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedAsync(context, CancellationToken.None);
@@ -515,65 +476,6 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
 
     private static string TemporaryDatabasePath() =>
         Path.Combine(Path.GetTempPath(), $"tcm-apply-{Guid.CreateVersion7():N}.db");
-
-    private sealed class ThrowingOperationRepository(
-        IConfigurationManifestOperationRepository inner)
-        : IConfigurationManifestOperationRepository
-    {
-        public Task<ConfigurationManifestOperation> CreateAsync(
-            ConfigurationManifestOperation operation,
-            IReadOnlyCollection<ConfigurationManifestTenantResult> tenantResults,
-            CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("Simulated operation audit write failure.");
-
-        public Task<ConfigurationManifestOperation?> GetLatestByDigestAsync(
-            string digest,
-            CancellationToken cancellationToken) =>
-            inner.GetLatestByDigestAsync(digest, cancellationToken);
-
-        public Task<ConfigurationManifestOperation?> GetByIdAsync(
-            Guid operationId,
-            CancellationToken cancellationToken) =>
-            inner.GetByIdAsync(operationId, cancellationToken);
-
-        public Task<ConfigurationManifestOperation?>
-            GetLatestAppliedBootstrapAsync(
-                CancellationToken cancellationToken) =>
-            inner.GetLatestAppliedBootstrapAsync(cancellationToken);
-
-        public Task<IReadOnlyList<ConfigurationManifestTenantResult>>
-            GetResultsByOperationIdAsync(
-                Guid operationId,
-                CancellationToken cancellationToken) =>
-            inner.GetResultsByOperationIdAsync(operationId, cancellationToken);
-
-        public Task<ConfigurationManifestTenantResult?> GetCurrentTenantResultAsync(
-            Guid operationId,
-            CancellationToken cancellationToken) =>
-            inner.GetCurrentTenantResultAsync(operationId, cancellationToken);
-    }
-
-    private sealed class FailOnSecondTenantCreationService(
-        Explore.Application.Contracts.Services.ITenantCreationService inner)
-        : Explore.Application.Contracts.Services.ITenantCreationService
-    {
-        private int _created;
-
-        public async Task<Explore.Application.Contracts.Services.TenantCreationOutcome>
-            CreateInCurrentTransactionAsync(
-                Explore.Application.Contracts.Services.TenantCreationRequest request,
-                CancellationToken cancellationToken)
-        {
-            Explore.Application.Contracts.Services.TenantCreationOutcome outcome =
-                await inner.CreateInCurrentTransactionAsync(request, cancellationToken);
-            if (Interlocked.Increment(ref _created) == 2)
-            {
-                throw new InvalidOperationException("Simulated second tenant failure.");
-            }
-
-            return outcome;
-        }
-    }
 
     private sealed class ThrowingConsumer : INotificationHandler<SettingChangedNotification>
     {

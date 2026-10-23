@@ -1,6 +1,7 @@
 using Explore.Domain;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Webhooks;
+using Explore.Infrastructure.Http;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Configuration;
@@ -90,7 +91,7 @@ public sealed class WebhookOptionsValidator : IValidateOptions<WebhookOptions>
 
         foreach (var cidr in options.Local.AllowedPrivateCidrs)
         {
-            if (!WebhookIpNetwork.TryParse(cidr, out _))
+            if (!OutboundIpNetwork.TryParse(cidr, out _))
             {
                 failures.Add($"Webhooks:Local:AllowedPrivateCidrs contains invalid CIDR '{cidr}'.");
             }

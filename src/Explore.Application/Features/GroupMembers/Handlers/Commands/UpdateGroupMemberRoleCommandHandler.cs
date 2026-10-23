@@ -20,17 +20,20 @@ public class UpdateGroupMemberRoleCommandHandler : ICommandHandler<UpdateGroupMe
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
     private readonly IGroupMemberMutationBoundary _boundary;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
 
     public UpdateGroupMemberRoleCommandHandler(
         IGroupMemberRepository groupMemberRepository,
         IUserContext userContext,
         ITenantContext tenantContext,
-        IGroupMemberMutationBoundary boundary)
+        IGroupMemberMutationBoundary boundary,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _groupMemberRepository = groupMemberRepository;
         _userContext = userContext;
         _tenantContext = tenantContext;
         _boundary = boundary;
+        _preparation = preparation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateGroupMemberRoleCommand request, CancellationToken cancellationToken)
@@ -42,8 +45,15 @@ public class UpdateGroupMemberRoleCommandHandler : ICommandHandler<UpdateGroupMe
                 "Invalid requester User ID.");
         }
 
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
         return await _boundary.ExecuteRoleChangeAsync(request.UpdateGroupMemberRoleDto.Id,
-            (int)request.UpdateGroupMemberRoleDto.Role, (actor, token) => UpdateAsync(request, actor, token), cancellationToken);
+            (int)request.UpdateGroupMemberRoleDto.Role, async (actor, token) =>
+            {
+                await prepared.AcquireAsync(request, token);
+                var result = await UpdateAsync(request, actor, token);
+                if (result.IsSuccess) prepared.Complete(result.Id);
+                return result;
+            }, cancellationToken);
     }
 
     private async Task<BaseCommandResponse<Guid>> UpdateAsync(UpdateGroupMemberRoleCommand request,

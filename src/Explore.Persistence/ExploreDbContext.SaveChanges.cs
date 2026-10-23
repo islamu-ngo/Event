@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Secrets;
@@ -28,7 +29,7 @@ public partial class ExploreDbContext
         {
             PrepareTrackedEntities();
             await PrepareModerationRecoveryAsync(bulkMutation: false, cancellationToken);
-            return await base.SaveChangesAsync(acceptChanges, cancellationToken);
+            return await SaveWithProvisioningPolicyAsync(acceptChanges, cancellationToken);
         }, acceptAllChangesOnSuccess, cancellationToken);
     }
 
@@ -36,6 +37,20 @@ public partial class ExploreDbContext
         => await SaveWithStorageReferencesAsync(
             acceptChanges => SavePrivacyErasureGraphAsync(acceptChanges, cancellationToken),
             acceptAllChangesOnSuccess: true, cancellationToken);
+
+    /// <summary>
+    /// Persists already prepared shared ATProto entries without regenerating stamps,
+    /// while retaining storage and disclosure processing in the owned transaction.
+    /// </summary>
+    internal Task<int> SavePreparedAtprotoChangesAsync(CancellationToken cancellationToken)
+    {
+        if (Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Prepared ATProto changes require an owned transaction.");
+
+        return SaveWithStorageReferencesAsync(
+            acceptChanges => base.SaveChangesAsync(acceptChanges, cancellationToken),
+            acceptAllChangesOnSuccess: true, cancellationToken);
+    }
 
     private async Task<int> SavePrivacyErasureGraphAsync(
         bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
@@ -68,7 +83,7 @@ public partial class ExploreDbContext
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
-    private void PrepareTrackedEntities()
+    internal void PrepareTrackedEntities()
     {
         PrepareClassificationMaterialStamps();
         ValidateEventLocationCarrierConsistency();
@@ -84,6 +99,37 @@ public partial class ExploreDbContext
 
         foreach (var entry in ChangeTracker.Entries())
         {
+            if (entry.Entity is IntegrationSyncOutbox integrationSync
+                && entry.State is EntityState.Added or EntityState.Modified)
+                integrationSync.RequireValidEvidence();
+
+            if (entry.Entity is SystemSetting or TenantSetting
+                && entry.State is EntityState.Added or EntityState.Modified
+                && (entry.Property(nameof(SystemSetting.SettingKey)).CurrentValue is Explore.Domain.Ai.AiCredentialReference.RetiredSettingKey
+                    || entry.Property(nameof(SystemSetting.SettingKey)).OriginalValue is Explore.Domain.Ai.AiCredentialReference.RetiredSettingKey))
+                throw new InvalidOperationException("ai_credential_setting_retired");
+
+            if (entry.Entity is SystemSetting credentialSetting
+                && entry.State is EntityState.Added or EntityState.Modified
+                && (credentialSetting.SettingKey is InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret
+                    or InfrastructureSecretSettingKeys.Authentication.KeycloakClientSecret
+                    || entry.Property(nameof(SystemSetting.SettingKey)).OriginalValue is
+                        InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret
+                        or InfrastructureSecretSettingKeys.Authentication.KeycloakClientSecret))
+            {
+                throw new InvalidOperationException("authentication_credential_setting_retired");
+            }
+
+            if (entry.Entity is SecretBinding credentialBinding
+                && entry.State is EntityState.Added or EntityState.Modified
+                && (AuthenticationCredentialCustodyPolicy.IsRuntimeCredentialKey(credentialBinding.SettingKey)
+                    || entry.Property(nameof(SecretBinding.SettingKey)).OriginalValue is string originalKey
+                        && AuthenticationCredentialCustodyPolicy.IsRuntimeCredentialKey(originalKey))
+                && !AuthenticationCredentialCustodyPolicy.HasCanonicalRuntimeReference(credentialBinding))
+            {
+                throw new InvalidOperationException("authentication_runtime_reference_invalid");
+            }
+
             if (entry.Entity is Explore.Domain.WebhookAuditEvent
                 && entry.State is EntityState.Modified or EntityState.Deleted)
             {
@@ -105,6 +151,7 @@ public partial class ExploreDbContext
             }
 
             if (entry.Entity is Explore.Domain.EventLocationDisclosureAudit
+                    or Explore.Domain.LocationPrivacyCorrectionReceipt
                     or Explore.Domain.EventLocationExactReadAudit
                     or Explore.Domain.PrivacyErasureReplayCheckpoint
                 && entry.State is EntityState.Modified or EntityState.Deleted)
@@ -620,6 +667,13 @@ public partial class ExploreDbContext
 
     private Guid? GetCurrentUserId()
     {
+        if (HasHumanCommitContextLease)
+        {
+            ValidateTenantLease();
+            return (HumanCommitAuditSubject
+                ?? throw new InvalidOperationException("Human audit attribution requires its original canonical subject."))
+                .PrincipalId;
+        }
         return CurrentUserService?.UserId;
     }
 

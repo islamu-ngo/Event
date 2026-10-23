@@ -229,15 +229,15 @@ public sealed class TypedSettingsDocumentResolverTests : IDisposable
         var services = new ServiceCollection();
         IConfiguration configuration = new ConfigurationBuilder().Build();
         services.AddLogging();
-        services.AddScoped<ISystemSettingRepository>(_ => new SystemSettingRepository(fixture.Context, fixture.MutationLock));
-        services.AddScoped<ITenantSettingRepository>(_ => new TenantSettingRepository(fixture.Context, fixture.MutationLock));
+        services.AddScoped<ISystemSettingRepository>(_ => SystemSettingRepository.CreateReadOnly(fixture.Context, fixture.MutationLock));
+        services.AddScoped<ITenantSettingRepository>(_ => TenantSettingRepository.CreateReadOnly(fixture.Context, fixture.MutationLock));
         services.AddScoped<IOrganizationSettingRepository>(_ => new OrganizationSettingRepository(fixture.Context));
         services.AddScoped<IGroupSettingRepository>(_ => new GroupSettingRepository(fixture.Context));
         services.AddScoped<IGroupTenantRepository>(_ => new GroupTenantRepository(fixture.Context));
-        services.AddScoped<IUserPreferenceRepository>(_ => new UserPreferenceRepository(fixture.Context));
+        services.AddScoped<IUserPreferenceRepository>(_ => UserPreferenceRepository.CreateReadOnly(fixture.Context));
         services.AddSingleton<ITenantContext>(fixture);
         services.AddSingleton(fixture.MutationLock);
-        services.AddScoped<IEmailDeliverySettingsWriter>(_ => fixture.Writer);
+        services.AddScoped<IEmailDeliverySettingsWriter>(_ => Substitute.For<IEmailDeliverySettingsWriter>());
         services.AddScoped<IEventResourceSettingsWriter>(_ => Substitute.For<IEventResourceSettingsWriter>());
         services.AddScoped<ITenantSettingsDocumentRepository>(_ => new TenantSettingsDocumentRepository(fixture.Context));
 

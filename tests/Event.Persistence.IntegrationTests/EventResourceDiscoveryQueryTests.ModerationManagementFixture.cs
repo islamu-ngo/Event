@@ -46,7 +46,8 @@ public sealed partial class EventResourceDiscoveryQueryTests
         return new(repository, unit, new EventResourceStorageLifecycleService(
             new EventResourceStorageLifecycleRepository(context), unit, clock), new(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
-                new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new EventResourceModerationSnapshotReader(context,
                     Substitute.For<IModerationMachineSubjectBindingRepository>(),
                     global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),

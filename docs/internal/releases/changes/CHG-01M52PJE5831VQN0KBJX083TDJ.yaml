@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52PJE5831VQN0KBJX083TDJ
+Title: "Provide native PostgreSQL policy source-set exclusion"
+Type: feat
+Scope: access
+Summary: "Install execute-only source-set acquisition and compulsory writer triggers around a private non-PII sentinel."
+Group: postgres-policy-source-set
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Serializable source-set acquisition excludes concurrent permission and route-key membership changes and rejects native capability drift.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Callable native installer is a prerequisite; production enrollment and managed consumers are not enabled by this packet.

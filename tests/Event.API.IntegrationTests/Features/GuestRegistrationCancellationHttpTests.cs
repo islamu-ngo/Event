@@ -5,6 +5,8 @@ using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using static Event.Api.IntegrationTests.Features.AnonymousRegistrationChallengeHttpTests;
 
@@ -59,8 +61,9 @@ public sealed partial class GuestRegistrationStatusHttpTests
         using JsonDocument repeated = JsonDocument.Parse(await reread.Content.ReadAsStringAsync());
         await Assert.That(repeated.RootElement.GetProperty("cancelledAt").GetDateTime()).IsEqualTo(cancelledAt);
         await using AsyncServiceScope scope = host.Factory.Services.CreateAsyncScope();
-        await Assert.That(await scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>()
-            .FindAsync(key, PlatformDefaults.DefaultTenantId)).IsNull();
+        await Assert.That(await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+            .IdempotencyRecords.AsNoTracking().SingleOrDefaultAsync(row =>
+                row.Key == key && row.TenantId == PlatformDefaults.DefaultTenantId)).IsNull();
     }
 
     [Test]

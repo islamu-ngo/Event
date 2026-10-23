@@ -2,8 +2,6 @@
 
 using Event.Api.IntegrationTests.Builders;
 using Explore.Domain.Constants;
-using Explore.Persistence;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Api.IntegrationTests.Fixtures;
 
@@ -17,8 +15,7 @@ public class RealRuntimeApiFixture : PostgreSqlApiFixtureBase
     public async Task ResetWithActiveDefaultTenantAsync()
     {
         await ResetDatabaseAsync();
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var db = CreateSetupDbContext();
         db.Tenants.Add(new TenantBuilder().WithId(PlatformDefaults.DefaultTenantId).Build());
         await db.SaveChangesAsync();
     }

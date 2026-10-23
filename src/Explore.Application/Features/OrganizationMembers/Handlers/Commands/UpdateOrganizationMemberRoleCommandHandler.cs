@@ -18,17 +18,20 @@ public class UpdateOrganizationMemberRoleCommandHandler : ICommandHandler<Update
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IUserContext _userContext;
     private readonly IOrganizationMemberMutationBoundary _mutation;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
 
     public UpdateOrganizationMemberRoleCommandHandler(
         IOrganizationMemberRepository organizationMemberRepository,
         IOrganizationRepository organizationRepository,
         IUserContext userContext,
-        IOrganizationMemberMutationBoundary mutation)
+        IOrganizationMemberMutationBoundary mutation,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _organizationMemberRepository = organizationMemberRepository;
         _organizationRepository = organizationRepository;
         _userContext = userContext;
         _mutation = mutation;
+        _preparation = preparation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateOrganizationMemberRoleCommand request, CancellationToken cancellationToken)
@@ -38,9 +41,16 @@ public class UpdateOrganizationMemberRoleCommandHandler : ICommandHandler<Update
             return BaseCommandResponse.Validation<Guid>(["Invalid requester User ID."], "Invalid requester User ID.");
         }
 
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
         return await _mutation.ExecuteRoleChangeAsync(request.UpdateOrganizationMemberRoleDto.Id,
             (int)request.UpdateOrganizationMemberRoleDto.Role,
-            (actor, token) => UpdateAsync(request, actor, token), cancellationToken);
+            async (actor, token) =>
+            {
+                await prepared.AcquireAsync(request, token);
+                var result = await UpdateAsync(request, actor, token);
+                if (result.IsSuccess) prepared.Complete(result.Id);
+                return result;
+            }, cancellationToken);
     }
 
     private async Task<BaseCommandResponse<Guid>> UpdateAsync(UpdateOrganizationMemberRoleCommand request,
@@ -48,7 +58,7 @@ public class UpdateOrganizationMemberRoleCommandHandler : ICommandHandler<Update
     {
         var dto = request.UpdateOrganizationMemberRoleDto;
 
-        var memberToUpdate = await _organizationMemberRepository.GetOrganizationMemberWithDetails(dto.Id);
+        var memberToUpdate = await _organizationMemberRepository.GetOrganizationMemberWithDetails(dto.Id, cancellationToken);
         if (memberToUpdate == null)
         {
             return BaseCommandResponse.Validation<Guid>(["Member not found"], "Member not found");

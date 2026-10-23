@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Linq.Expressions;
+using System.Security.Cryptography;
 using System.Text;
 using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
@@ -31,7 +33,7 @@ public static class PostgresTenantRowLevelSecurityModel
 
         foreach (var entity in model.GetEntityTypes())
         {
-            if (!TryGetTenantQueryFilter(entity, out var allowsNullTenant))
+            if (!TryGetTenantQueryFilter(entity, out var allowsNullTenant, out var filter))
             {
                 continue;
             }
@@ -61,46 +63,21 @@ public static class PostgresTenantRowLevelSecurityModel
             }
             else
             {
-                // Entity is tenant-scoped via navigation to a principal entity (e.g. 1:1 vertical partition)
-                TenantParentJoinMetadata? parentJoin = null;
-                foreach (var fk in entity.GetForeignKeys())
+                var paths = new TenantOwnershipPaths(filter.Parameters.Single());
+                paths.Visit(filter.Body);
+                if (paths.Paths.Count != 1)
+                    throw new InvalidOperationException(
+                        $"Tenant ownership for {entity.Name} must have one mapped navigation path.");
+                var parentJoin = BuildParentJoin(
+                    entity, paths.Paths.Values.Single(), 0, allowsNullTenant,
+                    new HashSet<IEntityType> { entity });
+                if (!tables.TryGetValue(tableName, out var existing))
                 {
-                    var principalEntity = fk.PrincipalEntityType;
-                    var principalTenantProp = principalEntity.FindProperty("TenantId");
-                    if (principalTenantProp != null)
-                    {
-                        var parentTableName = principalEntity.GetTableName();
-                        if (string.IsNullOrEmpty(parentTableName)) continue;
-
-                        var parentSchema = principalEntity.GetSchema();
-                        var fkProp = fk.Properties[0];
-                        var pkProp = fk.PrincipalKey.Properties[0];
-                        var fkColumn = fkProp.GetColumnName(StoreObjectIdentifier.Table(tableName, schema)) ?? fkProp.Name;
-                        var pkColumn = pkProp.GetColumnName(StoreObjectIdentifier.Table(parentTableName, parentSchema)) ?? pkProp.Name;
-                        var parentTenantColumn = principalTenantProp.GetColumnName(StoreObjectIdentifier.Table(parentTableName, parentSchema)) ?? DefaultTenantIdColumn;
-                        TryGetTenantQueryFilter(principalEntity, out var parentAllowsNull);
-
-                        parentJoin = new TenantParentJoinMetadata(
-                            parentTableName,
-                            parentSchema,
-                            fkColumn,
-                            pkColumn,
-                            parentTenantColumn,
-                            parentAllowsNull || allowsNullTenant);
-                        break;
-                    }
+                    tables.Add(tableName, new TenantTableMetadata(tableName, schema, null, allowsNullTenant, parentJoin));
                 }
-
-                if (parentJoin != null)
+                else if (allowsNullTenant && !existing.AllowsNullTenant)
                 {
-                    if (!tables.TryGetValue(tableName, out var existing))
-                    {
-                        tables.Add(tableName, new TenantTableMetadata(tableName, schema, null, allowsNullTenant, parentJoin));
-                    }
-                    else if (allowsNullTenant && !existing.AllowsNullTenant)
-                    {
-                        tables[tableName] = existing with { AllowsNullTenant = true };
-                    }
+                    tables[tableName] = existing with { AllowsNullTenant = true };
                 }
             }
         }
@@ -114,7 +91,37 @@ public static class PostgresTenantRowLevelSecurityModel
     public static string BuildEnableRlsSql(TenantTableMetadata table, string? defaultSchema = null)
     {
         var tableIdentifier = FormatTableIdentifier(table.TableName, table.Schema, defaultSchema);
+        string condition = BuildCondition(table, defaultSchema);
+        string tableLiteral = tableIdentifier.Replace("'", "''", StringComparison.Ordinal);
+        string fingerprint = BuildPolicyFingerprintPrefix(table, defaultSchema);
+        return $"""
+            ALTER TABLE {tableIdentifier} ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE {tableIdentifier} FORCE ROW LEVEL SECURITY;
+            DROP POLICY IF EXISTS "{PolicyName}" ON {tableIdentifier};
+            CREATE POLICY "{PolicyName}" ON {tableIdentifier}
+                FOR ALL
+                USING ({condition})
+                WITH CHECK ({condition});
+            DO $tenant_policy_stamp$
+            BEGIN
+                EXECUTE (
+                    SELECT format('COMMENT ON POLICY %I ON %s IS %L',
+                        p.polname, '{tableLiteral}',
+                        '{fingerprint}' || md5(p.polqual::text)
+                            || ':' || md5(p.polwithcheck::text))
+                    FROM pg_policy p
+                    WHERE p.polrelid = '{tableLiteral}'::regclass AND p.polname = '{PolicyName}');
+            END $tenant_policy_stamp$;
+            """;
+    }
 
+    internal static string BuildPolicyFingerprintPrefix(TenantTableMetadata table, string? defaultSchema = null) =>
+        "event-tenant-policy:v2:" +
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(BuildCondition(table, defaultSchema)))) + ":";
+
+    private static string BuildCondition(TenantTableMetadata table, string? defaultSchema)
+    {
+        var tableIdentifier = FormatTableIdentifier(table.TableName, table.Schema, defaultSchema);
         string condition;
         if (table.ParentJoin is null)
         {
@@ -125,23 +132,10 @@ public static class PostgresTenantRowLevelSecurityModel
         }
         else
         {
-            var parentTable = FormatTableIdentifier(table.ParentJoin.ParentTableName, table.ParentJoin.ParentSchema, defaultSchema);
-            var parentCondition = table.ParentJoin.ParentAllowsNullTenant
-                ? $"(\"p\".\"{table.ParentJoin.ParentTenantIdColumn}\" IS NULL OR \"p\".\"{table.ParentJoin.ParentTenantIdColumn}\" = nullif(current_setting('{PostgresTenantSessionInterceptor.CurrentTenantSettingName}', true), '')::uuid)"
-                : $"\"p\".\"{table.ParentJoin.ParentTenantIdColumn}\" = nullif(current_setting('{PostgresTenantSessionInterceptor.CurrentTenantSettingName}', true), '')::uuid";
-
-            condition = $"EXISTS (SELECT 1 FROM {parentTable} AS \"p\" WHERE \"p\".\"{table.ParentJoin.ParentKeyColumn}\" = {tableIdentifier}.\"{table.ParentJoin.ForeignKeyColumn}\" AND {parentCondition})";
+            condition = BuildParentCondition(table.ParentJoin, tableIdentifier, defaultSchema, 0);
         }
 
-        return $"""
-            ALTER TABLE {tableIdentifier} ENABLE ROW LEVEL SECURITY;
-            ALTER TABLE {tableIdentifier} FORCE ROW LEVEL SECURITY;
-            DROP POLICY IF EXISTS "{PolicyName}" ON {tableIdentifier};
-            CREATE POLICY "{PolicyName}" ON {tableIdentifier}
-                FOR ALL
-                USING ({condition})
-                WITH CHECK ({condition});
-            """;
+        return condition;
     }
 
     /// <summary>
@@ -227,17 +221,93 @@ public static class PostgresTenantRowLevelSecurityModel
         await context.Database.ExecuteSqlRawAsync(sb.ToString(), cancellationToken);
     }
 
-    private static string FormatTableIdentifier(string tableName, string? schema, string? defaultSchema)
+    private static string FormatTableIdentifier(string tableName, string? schema, string? targetSchema)
     {
-        var effectiveSchema = schema ?? defaultSchema;
+        var effectiveSchema = targetSchema ?? schema;
         return string.IsNullOrEmpty(effectiveSchema)
             ? $"\"{tableName}\""
             : $"\"{effectiveSchema}\".\"{tableName}\"";
     }
 
-    private static bool TryGetTenantQueryFilter(IEntityType entity, out bool allowsNullTenant)
+    private static TenantParentJoinMetadata BuildParentJoin(
+        IEntityType entity, string[] path, int index, bool allowsNullTenant, HashSet<IEntityType> visited)
+    {
+        var navigation = entity.FindNavigation(path[index]);
+        if (navigation is null || navigation.IsCollection || !navigation.IsOnDependent)
+            throw new InvalidOperationException($"Unsupported tenant ownership navigation {entity.Name}.{path[index]}.");
+        var foreignKey = navigation.ForeignKey;
+        var parent = foreignKey.PrincipalEntityType;
+        if (foreignKey.Properties.Count != 1 || foreignKey.PrincipalKey.Properties.Count != 1 || !visited.Add(parent))
+            throw new InvalidOperationException($"Invalid tenant ownership key or cycle at {entity.Name}.{path[index]}.");
+        string parentTable = parent.GetTableName()
+            ?? throw new InvalidOperationException($"Tenant ownership parent {parent.Name} has no table.");
+        var store = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
+        var parentStore = StoreObjectIdentifier.Table(parentTable, parent.GetSchema());
+        string foreignColumn = foreignKey.Properties.Single().GetColumnName(store)
+            ?? throw new InvalidOperationException($"Tenant ownership key for {entity.Name} is unmapped.");
+        string parentColumn = foreignKey.PrincipalKey.Properties.Single().GetColumnName(parentStore)
+            ?? throw new InvalidOperationException($"Tenant ownership key for {parent.Name} is unmapped.");
+        if (index == path.Length - 2)
+        {
+            var tenant = parent.FindProperty("TenantId")
+                ?? throw new InvalidOperationException($"Tenant ownership parent {parent.Name} has no tenant property.");
+            string tenantColumn = tenant.GetColumnName(parentStore)
+                ?? throw new InvalidOperationException($"Tenant ownership for {parent.Name} is unmapped.");
+            TryGetTenantQueryFilter(parent, out bool parentAllowsNull, out _);
+            return new(parentTable, parent.GetSchema(), foreignColumn, parentColumn, tenantColumn,
+                parentAllowsNull || allowsNullTenant);
+        }
+        if (!foreignKey.IsRequired)
+            throw new InvalidOperationException($"Intermediate tenant ownership for {entity.Name} must be required.");
+        return new(parentTable, parent.GetSchema(), foreignColumn, parentColumn, null, false,
+            BuildParentJoin(parent, path, index + 1, allowsNullTenant, visited));
+    }
+
+    private static string BuildParentCondition(
+        TenantParentJoinMetadata join, string referencingRow, string? schema, int depth)
+    {
+        if ((join.ParentTenantIdColumn is null) == (join.ParentJoin is null))
+            throw new InvalidOperationException("Tenant ownership must end in a tenant column or continue through one parent.");
+        string alias = depth == 0 ? "\"p\"" : $"\"p{depth}\"";
+        string parentTable = FormatTableIdentifier(join.ParentTableName, join.ParentSchema, schema);
+        string parentCondition = join.ParentJoin is { } next
+            ? BuildParentCondition(next, alias, schema, depth + 1)
+            : join.ParentAllowsNullTenant
+                ? $"({alias}.\"{join.ParentTenantIdColumn}\" IS NULL OR {alias}.\"{join.ParentTenantIdColumn}\" = nullif(current_setting('{PostgresTenantSessionInterceptor.CurrentTenantSettingName}', true), '')::uuid)"
+                : $"{alias}.\"{join.ParentTenantIdColumn}\" = nullif(current_setting('{PostgresTenantSessionInterceptor.CurrentTenantSettingName}', true), '')::uuid";
+        return $"EXISTS (SELECT 1 FROM {parentTable} AS {alias} WHERE {alias}.\"{join.ParentKeyColumn}\" = {referencingRow}.\"{join.ForeignKeyColumn}\" AND {parentCondition})";
+    }
+
+    private sealed class TenantOwnershipPaths(ParameterExpression parameter) : ExpressionVisitor
+    {
+        public Dictionary<string, string[]> Paths { get; } = new(StringComparer.Ordinal);
+
+        protected override Expression VisitMember(MemberExpression node)
+        {
+            if (node.Member.Name == "TenantId")
+            {
+                var names = new List<string>();
+                Expression? current = node;
+                while (current is MemberExpression member)
+                {
+                    names.Add(member.Member.Name);
+                    current = member.Expression;
+                }
+                if (current == parameter)
+                {
+                    names.Reverse();
+                    Paths.TryAdd(string.Join('.', names), names.ToArray());
+                }
+            }
+            return base.VisitMember(node);
+        }
+    }
+
+    private static bool TryGetTenantQueryFilter(
+        IEntityType entity, out bool allowsNullTenant, out LambdaExpression filter)
     {
         allowsNullTenant = false;
+        filter = null!;
         var qf = entity.FindAnnotation("QueryFilter")?.Value as IEnumerable;
         if (qf is null)
         {
@@ -253,7 +323,9 @@ public static class PostgresTenantRowLevelSecurityModel
             if (string.Equals(key, QueryFilterNames.Tenant, StringComparison.Ordinal))
             {
                 var exprProp = item.GetType().GetProperty("Expression");
-                var expressionStr = exprProp?.GetValue(item)?.ToString() ?? string.Empty;
+                filter = exprProp?.GetValue(item) as LambdaExpression
+                    ?? throw new InvalidOperationException($"Tenant ownership for {entity.Name} has no expression.");
+                var expressionStr = filter.ToString();
                 allowsNullTenant = expressionStr.Contains("== null", StringComparison.Ordinal)
                     || expressionStr.Contains("== null", StringComparison.OrdinalIgnoreCase);
                 return true;
@@ -282,5 +354,6 @@ public sealed record TenantParentJoinMetadata(
     string? ParentSchema,
     string ForeignKeyColumn,
     string ParentKeyColumn,
-    string ParentTenantIdColumn,
-    bool ParentAllowsNullTenant);
+    string? ParentTenantIdColumn,
+    bool ParentAllowsNullTenant,
+    TenantParentJoinMetadata? ParentJoin = null);

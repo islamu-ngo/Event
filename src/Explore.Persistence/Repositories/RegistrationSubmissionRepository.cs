@@ -66,7 +66,7 @@ public sealed class RegistrationSubmissionRepository(ExploreDbContext dbContext)
         CancellationToken cancellationToken) => PersistAcceptedWithNormalizationAsync(
         attempt, submission, expectedAttemptConcurrencyStamp, [], [], [], [], cancellationToken);
 
-    public async Task<RegistrationSubmissionPersistenceResult> PersistAcceptedWithNormalizationAsync(
+    public Task<RegistrationSubmissionPersistenceResult> PersistAcceptedWithNormalizationAsync(
         RegistrationAttempt attempt,
         RegistrationSubmission submission,
         Guid expectedAttemptConcurrencyStamp,
@@ -75,7 +75,21 @@ public sealed class RegistrationSubmissionRepository(ExploreDbContext dbContext)
         IReadOnlyCollection<RegistrationSubmissionIssue> issues,
         IReadOnlyCollection<RegistrationRequirementFulfillment> fulfillments,
         CancellationToken cancellationToken,
-        RegistrationProviderSubmissionWriteEffect? providerWriteEffect = null)
+        RegistrationProviderSubmissionWriteEffect? providerWriteEffect = null) =>
+        PersistAcceptedCoreAsync(attempt, submission, expectedAttemptConcurrencyStamp, answers, consentRecords,
+            issues, fulfillments, cancellationToken, providerWriteEffect, null);
+
+    internal async Task<RegistrationSubmissionPersistenceResult> PersistAcceptedCoreAsync(
+        RegistrationAttempt attempt,
+        RegistrationSubmission submission,
+        Guid expectedAttemptConcurrencyStamp,
+        IReadOnlyCollection<RegistrationAnswer> answers,
+        IReadOnlyCollection<RegistrationConsentRecord> consentRecords,
+        IReadOnlyCollection<RegistrationSubmissionIssue> issues,
+        IReadOnlyCollection<RegistrationRequirementFulfillment> fulfillments,
+        CancellationToken cancellationToken,
+        RegistrationProviderSubmissionWriteEffect? providerWriteEffect,
+        Func<CancellationToken, Task<bool>>? fence)
     {
         ArgumentNullException.ThrowIfNull(attempt);
         ArgumentNullException.ThrowIfNull(submission);
@@ -105,7 +119,7 @@ public sealed class RegistrationSubmissionRepository(ExploreDbContext dbContext)
             throw new ArgumentException("Fulfillment graph must belong to the accepted submission.", nameof(fulfillments));
         }
 
-        RegistrationSubmission? existing = await FindExistingAsync(submission, cancellationToken);
+        RegistrationSubmission? existing = fence is null ? await FindExistingAsync(submission, cancellationToken) : null;
         if (existing is not null)
         {
             return ClassifyAcceptedReplay(submission, existing);
@@ -117,6 +131,23 @@ public sealed class RegistrationSubmissionRepository(ExploreDbContext dbContext)
             await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
             try
             {
+                if (fence is not null)
+                {
+                    if (!await fence(cancellationToken))
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        dbContext.ChangeTracker.Clear();
+                        return new(RegistrationSubmissionPersistenceOutcome.EffectClaimLost, null);
+                    }
+
+                    existing = await FindExistingAsync(submission, cancellationToken);
+                    if (existing is not null)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        return ClassifyAcceptedReplay(submission, existing);
+                    }
+                }
+
                 int claimed = await dbContext.RegistrationAttempts
                     .Where(candidate =>
                         candidate.TenantId == attempt.TenantId &&
@@ -186,6 +217,13 @@ public sealed class RegistrationSubmissionRepository(ExploreDbContext dbContext)
                     await dbContext.SaveChangesAsync(cancellationToken);
                 }
 
+                if (fence is not null && !await fence(cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    dbContext.ChangeTracker.Clear();
+                    return new(RegistrationSubmissionPersistenceOutcome.EffectClaimLost, null);
+                }
+
                 await transaction.CommitAsync(cancellationToken);
                 return new(RegistrationSubmissionPersistenceOutcome.Inserted, submission);
             }
@@ -197,6 +235,12 @@ public sealed class RegistrationSubmissionRepository(ExploreDbContext dbContext)
                 return raced is null
                     ? new(RegistrationSubmissionPersistenceOutcome.AttemptUnavailable, null)
                     : ClassifyAcceptedReplay(submission, raced);
+            }
+            catch when (fence is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                dbContext.ChangeTracker.Clear();
+                throw;
             }
         });
     }
@@ -231,6 +275,69 @@ public sealed class RegistrationSubmissionRepository(ExploreDbContext dbContext)
                 ? new(RegistrationSubmissionPersistenceOutcome.AttemptUnavailable, null)
                 : new(RegistrationSubmissionPersistenceOutcome.EvidenceOnlyConflict, raced);
         }
+    }
+
+    internal async Task<RegistrationSubmissionPersistenceResult> PersistEvidenceCoreAsync(
+        RegistrationSubmission submission,
+        IReadOnlyCollection<RegistrationSubmissionIssue> issues,
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task<bool>> fence)
+    {
+        ArgumentNullException.ThrowIfNull(submission);
+        if (submission.StatusId != (int)RegistrationSubmissionStatusEnum.EvidenceOnly || submission.IsFinalizable)
+        {
+            throw new ArgumentException("Only non-finalizable evidence can use this persistence path.", nameof(submission));
+        }
+
+        ValidateNormalizationGraph(submission, [], [], issues);
+        return await dbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                if (!await fence(cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    dbContext.ChangeTracker.Clear();
+                    return new RegistrationSubmissionPersistenceResult(RegistrationSubmissionPersistenceOutcome.EffectClaimLost, null);
+                }
+
+                RegistrationSubmission? existing = await FindExistingAsync(submission, cancellationToken);
+                if (existing is not null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return new(RegistrationSubmissionPersistenceOutcome.EvidenceOnlyConflict, existing);
+                }
+
+                await dbContext.RegistrationSubmissions.AddAsync(submission, cancellationToken);
+                await dbContext.RegistrationSubmissionIssues.AddRangeAsync(issues, cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                if (!await fence(cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    dbContext.ChangeTracker.Clear();
+                    return new(RegistrationSubmissionPersistenceOutcome.EffectClaimLost, null);
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return new(RegistrationSubmissionPersistenceOutcome.Inserted, submission);
+            }
+            catch (DbUpdateException exception) when (IsSubmissionIdentityUniqueViolation(dbContext, exception))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                dbContext.ChangeTracker.Clear();
+                RegistrationSubmission? raced = await FindExistingAsync(submission, cancellationToken);
+                return raced is null
+                    ? new(RegistrationSubmissionPersistenceOutcome.AttemptUnavailable, null)
+                    : new(RegistrationSubmissionPersistenceOutcome.EvidenceOnlyConflict, raced);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                dbContext.ChangeTracker.Clear();
+                throw;
+            }
+        });
     }
 
     public Task<RegistrationAttempt?> GetAttemptAsync(

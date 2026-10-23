@@ -51,7 +51,7 @@ public class ConfigurationChangeLogService : IConfigurationChangeLogService
         await _repository.Create(entry);
 
         _logger.LogInformation(
-            "Configuration change logged: {ActionType} {SettingKey} at {Scope} scope by user {UserId}",
-            actionType, settingKey, scope, userId);
+            "Configuration change audit recorded at {Scope} scope",
+            Enum.IsDefined(scope) ? scope.ToString() : "unknown");
     }
 }

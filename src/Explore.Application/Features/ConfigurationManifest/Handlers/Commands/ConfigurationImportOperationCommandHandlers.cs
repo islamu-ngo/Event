@@ -3,16 +3,17 @@ namespace Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Contracts.Operations;
+using Microsoft.Extensions.DependencyInjection;
 
 public sealed class ApplyInstanceConfigurationImportCommandHandler(
-    ConfigurationImportApplyService service) : ICommandHandler<
+    IConfigurationInstanceImportExecutor service) : ICommandHandler<
         ApplyInstanceConfigurationImportCommand,
         ConfigurationImportOperationResult>
 {
     public Task<ConfigurationImportOperationResult> ExecuteAsync(
         ApplyInstanceConfigurationImportCommand request,
         CancellationToken cancellationToken) =>
-        service.ApplyInstanceAsync(
+        service.ApplyAsync(
             request.SessionId,
             request.AccessToken,
             request.Preview,
@@ -22,25 +23,33 @@ public sealed class ApplyInstanceConfigurationImportCommandHandler(
 }
 
 public sealed class ApplyTenantConfigurationImportCommandHandler(
-    ConfigurationImportApplyService service) : ICommandHandler<
+    IPolicyMutationExecutionScopeFactory scopes) : ICommandHandler<
         ApplyTenantConfigurationImportCommand,
         ConfigurationImportOperationResult>
 {
-    public Task<ConfigurationImportOperationResult> ExecuteAsync(
+    public async Task<ConfigurationImportOperationResult> ExecuteAsync(
         ApplyTenantConfigurationImportCommand request,
-        CancellationToken cancellationToken) =>
-        service.ApplyTenantAsync(
+        CancellationToken cancellationToken)
+    {
+        var preview = request.Preview?.Capture()
+            ?? throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.ContractInvalid);
+        await using var selected = await scopes.CreateAsync(new PolicyMutationScope(request.TenantId), cancellationToken);
+        var subject = selected.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject
+            ?? throw new UnauthorizedAccessException("Tenant import requires its selected authenticated human owner.");
+        return await selected.Services.GetRequiredService<ConfigurationImportApplyService>().ApplyTenantAsync(
             request.TenantId,
             request.SessionId,
             request.AccessToken,
-            request.Preview,
+            preview,
+            subject,
             request.RollbackOfOperationId,
             request.ManagedScheduleId,
             cancellationToken);
+    }
 }
 
 public sealed class CreateInstanceConfigurationRollbackSessionCommandHandler(
-    ConfigurationImportApplyService service) : ICommandHandler<
+    IConfigurationInstanceImportExecutor service) : ICommandHandler<
         CreateInstanceConfigurationRollbackSessionCommand,
         ConfigurationImportRollbackSessionCreatedResult>
 {
@@ -49,20 +58,22 @@ public sealed class CreateInstanceConfigurationRollbackSessionCommandHandler(
         CancellationToken cancellationToken) =>
         service.CreateRollbackSessionAsync(
             request.OperationId,
-            ConfigurationImportTarget.ForInstance(),
             cancellationToken);
 }
 
 public sealed class CreateTenantConfigurationRollbackSessionCommandHandler(
-    ConfigurationImportApplyService service) : ICommandHandler<
+    IPolicyMutationExecutionScopeFactory scopes) : ICommandHandler<
         CreateTenantConfigurationRollbackSessionCommand,
         ConfigurationImportRollbackSessionCreatedResult>
 {
-    public Task<ConfigurationImportRollbackSessionCreatedResult> ExecuteAsync(
+    public async Task<ConfigurationImportRollbackSessionCreatedResult> ExecuteAsync(
         CreateTenantConfigurationRollbackSessionCommand request,
-        CancellationToken cancellationToken) =>
-        service.CreateRollbackSessionAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var selected = await scopes.CreateAsync(new PolicyMutationScope(request.TenantId), cancellationToken);
+        return await selected.Services.GetRequiredService<ConfigurationImportApplyService>().CreateRollbackSessionAsync(
             request.OperationId,
             ConfigurationImportTarget.ForTenant(request.TenantId),
             cancellationToken);
+    }
 }

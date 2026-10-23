@@ -11,6 +11,16 @@ classification correction is the only reference profile extended to Event scope.
 This model support does not enable a policy, authorize disclosure or certify
 provider migrations and native enforcement.
 
+**SQLite upgrade caution:** the combined develop/moderation histories include
+resource-table rebuilds. The migration generator rejects an unexpected physical
+column layout instead of silently discarding material or quarantine evidence.
+The generated `RestoreMergedResourceAvailabilityOrder` correction restores a
+missing availability check, but cannot recover evidence already lost by an older
+rebuild. Operators must review applied migration order and use an exclusive,
+separately verified upgrade procedure; never bypass the preflight or mark a
+migration applied manually. Merge compilation and SQL generation did not execute
+any migration or certify provider upgrade/rollback behavior.
+
 The operation-receipt and pending-effect models now preserve that Event tag too,
 rather than rejecting it after a qualified change reaches the store. Unknown
 scope tags remain invalid. Eleven authored cases remain unrun; this correction

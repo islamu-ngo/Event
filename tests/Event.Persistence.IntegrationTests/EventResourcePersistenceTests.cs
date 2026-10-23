@@ -4,6 +4,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
 using Microsoft.Data.Sqlite;
@@ -72,7 +73,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
         ResourceScope scope = await database.SeedScopeAsync();
         Guid resourceId;
         Guid laterResourceId;
-        await using (ExploreDbContext seed = database.CreateContext())
+        await using (ExploreDbContext seed = database.CreateSelectedContext(scope.TenantAId))
         {
             EventResource resource = CreateDraft(scope.TenantAId, scope.EventAId);
             resourceId = resource.Id;
@@ -84,7 +85,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             await seed.SaveChangesAsync();
         }
 
-        await using (ExploreDbContext read = database.CreateContext())
+        await using (ExploreDbContext read = database.CreateSelectedContext(scope.TenantAId))
         {
             var repository = new EventResourceRepository(read);
             EventResource loaded = (await repository.GetByIdAsync(scope.TenantAId, scope.EventAId, resourceId, default))!;
@@ -111,14 +112,14 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             await Assert.That(after[0].Id).IsEqualTo(laterResourceId);
         }
 
-        await using ExploreDbContext firstContext = database.CreateContext();
-        await using ExploreDbContext staleContext = database.CreateContext();
+        await using ExploreDbContext firstContext = database.CreateSelectedContext(scope.TenantAId);
+        await using ExploreDbContext staleContext = database.CreateSelectedContext(scope.TenantAId);
         var firstRepository = new EventResourceRepository(firstContext);
         var staleRepository = new EventResourceRepository(staleContext);
         EventResource first = (await firstRepository.GetByIdForUpdateAsync(scope.TenantAId, scope.EventAId, resourceId, default))!;
         EventResource stale = (await staleRepository.GetByIdForUpdateAsync(scope.TenantAId, scope.EventAId, resourceId, default))!;
         Guid resourceVersion = first.ConcurrencyStamp;
-        await using (ExploreDbContext unrelated = database.CreateContext())
+        await using (ExploreDbContext unrelated = database.CreateSelectedContext(scope.TenantAId))
         {
             DomainEvent sibling = await unrelated.Events.SingleAsync(item => item.Id == scope.EventCId);
             sibling.Description = "Independent event edit";
@@ -129,7 +130,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
         await firstContext.SaveChangesAsync();
         stale.UpdateMetadata(Metadata("Stale"), stale.ConcurrencyStamp, scope.ActorId, UtcNow.AddMinutes(2));
         await Assert.That(() => staleContext.SaveChangesAsync()).Throws<DbUpdateConcurrencyException>();
-        await using ExploreDbContext verify = database.CreateContext();
+        await using ExploreDbContext verify = database.CreateSelectedContext(scope.TenantAId);
         await Assert.That((await verify.EventResources.AsNoTracking().SingleAsync(item => item.Id == resourceId)).Title)
             .IsEqualTo("First");
         await Assert.That((await verify.Events.AsNoTracking().SingleAsync(item => item.Id == scope.EventCId)).Description)
@@ -141,7 +142,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
     [Arguments(false)]
     public async Task CandidateCursorRejectsIncompatibleOrdering(bool descending)
     {
-        await using var context = database.CreateContext();
+        await using var context = database.CreateSelectedContext(null);
         var repository = new EventResourceRepository(context);
         var specification = descending
             ? new EventResourceQuerySpecification().SortByDescending(EventResourceSort.SortOrder)
@@ -154,7 +155,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
     public async Task EqualSortOrderCursorVisitsEveryCandidateExactlyOnce()
     {
         ResourceScope scope = await database.SeedScopeAsync();
-        await using (var seed = database.CreateContext())
+        await using (var seed = database.CreateSelectedContext(scope.TenantAId))
         {
             seed.EventResources.AddRange(
                 CreateDraft(scope.TenantAId, scope.EventAId),
@@ -163,7 +164,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             await seed.SaveChangesAsync();
         }
 
-        await using var context = database.CreateContext();
+        await using var context = database.CreateSelectedContext(scope.TenantAId);
         var repository = new EventResourceRepository(context);
         var specification = new EventResourceQuerySpecification().And(EventResourceFilter.Event(scope.EventAId));
         var expected = await repository.ListCandidatesAsync(scope.TenantAId, 10, specification, default);
@@ -184,7 +185,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
     [Test]
     public async Task RepositoryRejectsOversizedAuthorityRequestRatherThanTruncating()
     {
-        await using ExploreDbContext context = database.CreateContext();
+        await using ExploreDbContext context = database.CreateSelectedContext(null);
         var repository = new EventResourceRepository(context);
         Guid[] oversized = Enumerable.Range(0, 501).Select(_ => Guid.CreateVersion7()).ToArray();
 
@@ -198,7 +199,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
     {
         ResourceScope scope = await database.SeedScopeAsync();
         Guid resourceId;
-        await using (var seed = database.CreateContext())
+        await using (var seed = database.CreateSelectedContext(scope.TenantAId))
         {
             var resource = CreateDraft(scope.TenantAId, scope.EventAId);
             resource.ReplacePolicy(resource.Availability, resource.AudienceRules,
@@ -208,8 +209,8 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             await seed.SaveChangesAsync();
         }
 
-        await using var firstContext = database.CreateContext();
-        await using var staleContext = database.CreateContext();
+        await using var firstContext = database.CreateSelectedContext(scope.TenantAId);
+        await using var staleContext = database.CreateSelectedContext(scope.TenantAId);
         var firstRepository = new EventResourceRepository(firstContext);
         var staleRepository = new EventResourceRepository(staleContext);
         var first = (await firstRepository.GetByIdForUpdateAsync(scope.TenantAId, scope.EventAId, resourceId, default))!;
@@ -236,34 +237,40 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
     {
         ResourceScope scope = await database.SeedScopeAsync();
         var resource = CreateDraft(scope.TenantAId, scope.EventAId);
-        await using (var seed = database.CreateContext())
+        await using (var seed = database.CreateSelectedContext(scope.TenantAId))
         {
             seed.EventResources.Add(resource);
             await seed.SaveChangesAsync();
         }
 
-        await using var context = database.CreateContext();
-        var repository = new EventResourceRepository(context);
-        context.TenantContext = new ResourceTenantContext(scope.TenantAId);
-        await Assert.That(await repository.GetByIdAsync(scope.TenantAId, scope.EventAId, resource.Id, default)).IsNotNull();
-        context.TenantContext = new ResourceTenantContext(scope.TenantBId);
-        await Assert.That(await repository.GetByIdAsync(scope.TenantAId, scope.EventAId, resource.Id, default)).IsNull();
-        context.TenantContext = null;
-        await Assert.That(await repository.GetByIdAsync(scope.TenantAId, scope.EventAId, resource.Id, default)).IsNull();
+        await using var tenantA = database.CreateSelectedContext(scope.TenantAId);
+        await using var tenantB = database.CreateSelectedContext(scope.TenantBId);
+        await using var tenantless = database.CreateSelectedContext(null);
+        await Assert.That(await new EventResourceRepository(tenantA)
+            .GetByIdAsync(scope.TenantAId, scope.EventAId, resource.Id, default)).IsNotNull();
+        await Assert.That(await new EventResourceRepository(tenantB)
+            .GetByIdAsync(scope.TenantAId, scope.EventAId, resource.Id, default)).IsNull();
+        await Assert.That(await new EventResourceRepository(tenantless)
+            .GetByIdAsync(scope.TenantAId, scope.EventAId, resource.Id, default)).IsNull();
     }
 
     [Test]
     public async Task LookupRepairAndLargeFileSizeRemainStable()
     {
         ResourceScope scope = await database.SeedScopeAsync();
-        await using ExploreDbContext context = database.CreateContext();
+        await using ExploreDbContext context = database.CreateSelectedContext(null);
+        await using var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(context);
+        await using var human = await humanGate.AcquireAsync();
+        await using var discoveryGate = new Explore.Persistence.Services.EventDiscoveryEnrollmentGate(context);
+        await using var discovery = await discoveryGate.AcquireAsync();
         EventResourceKind removed = await context.EventResourceKinds.SingleAsync(value => value.Id == 13);
         context.EventResourceKinds.Remove(removed);
         await context.SaveChangesAsync();
 
         await LookupTableSeeder.SeedAsync(context);
         await Assert.That(await context.EventResourceKinds.CountAsync()).IsEqualTo(13);
-        await Assert.That((await context.StorageObjects.AsNoTracking().SingleAsync(value => value.Id == scope.StorageAId)).Size)
+        await using var tenant = database.CreateSelectedContext(scope.TenantAId);
+        await Assert.That((await tenant.StorageObjects.AsNoTracking().SingleAsync(value => value.Id == scope.StorageAId)).Size)
             .IsEqualTo((long)int.MaxValue + 42L);
     }
 
@@ -335,7 +342,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
     private static async Task AssertRejectedAsync(TestDatabase database, Action<EventResource> corrupt)
     {
-        await using ExploreDbContext context = database.CreateContext();
+        await using ExploreDbContext context = database.CreateSelectedContext(null);
         EventResource resource = CreateDraft(database.Scope!.TenantAId, database.Scope.EventAId);
         context.EventResources.Add(resource);
         corrupt(resource);
@@ -344,7 +351,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
     private static async Task AssertSiblingSessionRuleRejectedAsync(TestDatabase database, ResourceScope scope)
     {
-        await using ExploreDbContext context = database.CreateContext();
+        await using ExploreDbContext context = database.CreateSelectedContext(null);
         Guid id = Guid.CreateVersion7();
         EventResourceAudienceRule rule = EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, id,
             EventResourceAudienceKindEnum.SessionSpeaker, scope.SessionAId);
@@ -356,7 +363,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
     private static async Task AssertSiblingAdmissionTargetRejectedAsync(TestDatabase database, ResourceScope scope)
     {
-        await using ExploreDbContext context = database.CreateContext();
+        await using ExploreDbContext context = database.CreateSelectedContext(null);
         Guid id = Guid.CreateVersion7();
         EventResourceAudienceRule rule = EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, id,
             EventResourceAudienceKindEnum.CheckedInParticipant,
@@ -371,7 +378,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
     private static async Task AssertForeignTicketQualifierRejectedAsync(
         TestDatabase database, ResourceScope scope, bool sameTenant)
     {
-        await using ExploreDbContext context = database.CreateContext();
+        await using ExploreDbContext context = database.CreateSelectedContext(null);
         Guid id = Guid.CreateVersion7();
         EventResourceAudienceRule rule = EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, id,
             EventResourceAudienceKindEnum.TicketHolder,
@@ -389,7 +396,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
     private static async Task AssertSameTenantForeignEventDayTargetRejectedAsync(TestDatabase database, ResourceScope scope)
     {
-        await using var context = database.CreateContext();
+        await using var context = database.CreateSelectedContext(null);
         var validId = Guid.CreateVersion7();
         var validRule = EventResourceAudienceRule.Create(scope.TenantAId, scope.EventCId, validId,
             EventResourceAudienceKindEnum.CheckedInParticipant, targetType: AdmissionTargetTypeEnum.EventDay,
@@ -408,7 +415,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
     private static async Task AssertNullDraftsAndExclusiveAttachmentAsync(TestDatabase database, ResourceScope scope)
     {
-        await using ExploreDbContext context = database.CreateContext();
+        await using ExploreDbContext context = database.CreateSelectedContext(null);
         EventResource first = CreateDraft(scope.TenantAId, scope.EventAId);
         EventResource second = CreateDraft(scope.TenantAId, scope.EventAId);
         context.EventResources.AddRange(first, second);
@@ -434,7 +441,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
     private static async Task AssertSameEventSiblingSessionTargetRejectedAsync(TestDatabase database, ResourceScope scope)
     {
-        await using ExploreDbContext context = database.CreateContext();
+        await using ExploreDbContext context = database.CreateSelectedContext(null);
         var target = AdmissionTarget.Create(Guid.CreateVersion7(), scope.TenantAId, scope.EventAId,
             AdmissionTargetTypeEnum.EventSession, null, scope.SessionA2Id);
         context.AdmissionTargets.Add(target);
@@ -538,11 +545,20 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             await connection.OpenAsync();
             DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connection, sqlite => sqlite.MigrationsAssembly("Explore.Persistence.Migrations.Sqlite"))
+                .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance,
+                    SqliteProjectionLockTransactionInterceptor.Instance)
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using var context = new ExploreDbContext(options);
             await context.Database.MigrateAsync();
-            await LookupTableSeeder.SeedAsync(context);
+            context.BindTenantLease();
+            await using (var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(context))
+            {
+                await using var human = await humanGate.AcquireAsync();
+                await using var discoveryGate = new Explore.Persistence.Services.EventDiscoveryEnrollmentGate(context);
+                await using var discovery = await discoveryGate.AcquireAsync();
+                await LookupTableSeeder.SeedAsync(context);
+            }
             // Share immutable schema only; keep provider caching disabled and every context's state separate.
             options = TestDbContextOptions.Create(options).UseModel(context.Model).Options;
             _options = options;
@@ -578,6 +594,15 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             return context;
         }
 
+        internal ExploreDbContext CreateSelectedContext(Guid? tenantId)
+        {
+            var context = _contextFactory();
+            context.ClearTenantFilterBypass();
+            context.TenantContext = tenantId is { } selected ? new ResourceTenantContext(selected) : null;
+            context.BindTenantLease();
+            return context;
+        }
+
         public ExploreDbContext CreateIndependentContext()
         {
             if (_measurementDatabase) return CreateContext();
@@ -602,7 +627,11 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
         internal async Task<ResourceScope> SeedScopeAsync(DateTime? eventPublishedAt = null)
         {
-            await using ExploreDbContext context = CreateContext();
+            await using ExploreDbContext context = CreateSelectedContext(null);
+            await using var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(context);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new Explore.Persistence.Services.EventDiscoveryEnrollmentGate(context);
+            await using var discovery = await discoveryGate.AcquireAsync();
             Tenant tenantA = NewTenant("resource-a");
             Tenant tenantB = NewTenant("resource-b");
             var user = new User { Pii = new UserPii { Email = $"resource-{Guid.CreateVersion7():N}@example.test", FirstName = "Resource", LastName = "Owner" } };

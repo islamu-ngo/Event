@@ -10,32 +10,33 @@ namespace Explore.Application.Features.ExternalApiKeys.Handlers.Queries;
 
 public class GetExternalApiKeyUsageReportRequestHandler : IQueryHandler<GetExternalApiKeyUsageReportRequest, List<ExternalApiKeyUsageReportDto>>
 {
-    private readonly IExternalApiKeyQuotaRepository _quotaRepository;
     private readonly IAdminContext _adminContext;
+    private readonly IUserContext _userContext;
+    private readonly InstanceApiKeyOperations _instanceOperations;
+    private readonly IExternalApiKeyTenantUsageReader _tenantReader;
 
     public GetExternalApiKeyUsageReportRequestHandler(
-        IExternalApiKeyQuotaRepository quotaRepository,
-        IAdminContext adminContext)
+        IAdminContext adminContext,
+        IUserContext userContext,
+        InstanceApiKeyOperations instanceOperations,
+        IExternalApiKeyTenantUsageReader tenantReader)
     {
-        _quotaRepository = quotaRepository;
         _adminContext = adminContext;
+        _userContext = userContext;
+        _instanceOperations = instanceOperations;
+        _tenantReader = tenantReader;
     }
 
     public async Task<List<ExternalApiKeyUsageReportDto>> QueryAsync(GetExternalApiKeyUsageReportRequest request, CancellationToken cancellationToken)
     {
+        if (!_userContext.IsAuthenticated
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) is not { } userId)
+            throw new AuthorizationException("The authenticated application user is required.");
         IReadOnlyList<TenantApiKeyUsageSummary> summaries;
 
         if (request.TenantId.HasValue)
         {
-            var isTenantAdmin = await _adminContext.IsTenantAdminAsync(request.TenantId.Value, cancellationToken);
-            var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(cancellationToken);
-
-            if (!isTenantAdmin && !isInstanceAdmin)
-            {
-                throw new AuthorizationException("Only tenant administrators or instance administrators can read tenant API key usage.");
-            }
-
-            summaries = await _quotaRepository.GetUsageByTenant(request.TenantId.Value, request.From, request.To, cancellationToken);
+            summaries = await _tenantReader.ReadAsync(request, cancellationToken);
         }
         else
         {
@@ -44,7 +45,7 @@ public class GetExternalApiKeyUsageReportRequestHandler : IQueryHandler<GetExter
                 throw new AuthorizationException("Only instance administrators can read platform-wide API key usage.");
             }
 
-            summaries = await _quotaRepository.GetUsagePlatformWide(request.From, request.To, cancellationToken);
+            summaries = await _instanceOperations.ReportAsync(userId, request.From, request.To, cancellationToken);
         }
 
         return summaries
@@ -63,4 +64,5 @@ public class GetExternalApiKeyUsageReportRequestHandler : IQueryHandler<GetExter
             })
             .ToList();
     }
+
 }

@@ -3,6 +3,9 @@ namespace Explore.Application.Features.Settings.Handlers;
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Exceptions;
 using Explore.Application.Settings;
 using Explore.Application.Utilities;
 using Explore.Domain;
@@ -11,6 +14,44 @@ using Explore.Domain.Settings;
 
 internal static class SettingCommandHelper
 {
+    internal static HumanCommitSubject RequireHumanSubject(
+        IHumanCommitScopePreparation preparation, Guid? resolvedActorId)
+    {
+        HumanCommitSubject? subject = preparation.Subject;
+        if (subject is null || subject.PrincipalId != resolvedActorId)
+            throw new AuthorizationException("The setting operator must match the selected immutable human subject.");
+        return subject;
+    }
+
+    /// <summary>
+    /// Holds the original action's persisted contributors in the selected Serializable owner.
+    /// The human ports also require this trusted actor to equal the owner's immutable subject.
+    /// </summary>
+    internal static async Task RequireCommitAuthorizationAsync(
+        SettingScope scope,
+        Guid? resolvedActorId,
+        Guid tenantId,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        ITenantAdministratorCommitAuthority tenantAuthority,
+        IHumanSubjectCommitAuthority subjectAuthority,
+        CancellationToken cancellationToken)
+    {
+        if (resolvedActorId is not { } actorId || actorId == Guid.Empty)
+            throw new AuthorizationException("Unable to resolve authenticated setting operator.");
+
+        bool allowed = scope switch
+        {
+            SettingScope.Instance => await instanceAuthority.IsInstanceAdministratorForCommitAsync(
+                actorId, cancellationToken),
+            SettingScope.Tenant => await tenantAuthority.IsTenantAdministratorForCommitAsync(
+                actorId, tenantId, cancellationToken),
+            SettingScope.User => await subjectAuthority.IsSubjectCurrentForCommitAsync(actorId, cancellationToken),
+            _ => false
+        };
+        if (!allowed)
+            throw new AuthorizationException("Current setting administrator authority was revoked or is unavailable.");
+    }
+
     /// <summary>
     /// Validates a plain-text value against its definition's ValueType and AllowedValues,
     /// then serializes to JSON storage format.

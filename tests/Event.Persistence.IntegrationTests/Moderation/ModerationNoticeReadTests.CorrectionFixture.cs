@@ -483,7 +483,7 @@ public sealed partial class ModerationNoticeReadTests
         var publications = new ModerationPolicyPublicationRepository(context, admin, machine, fixture.Database.Inventory, null, clock);
         var activation = new ModerationNativeActivationQualification(context, fixture.Database.Inventory, null,
             new ModerationQualificationPolicySourceOwner(context, clock), clock);
-        var keys = new ExternalApiKeyRepository(context);
+        var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
         var bindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,
             new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), clock);
         var participant = new ModerationAuthorityParticipant(context, admin, machine, bindings, keys,

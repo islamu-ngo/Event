@@ -1,7 +1,7 @@
 
 using System.Data;
 using System.Data.Common;
-using Explore.Application.Configuration;
+using Explore.Domain.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Services;
 using Explore.Persistence.Database;
@@ -40,23 +40,25 @@ internal sealed class LocalIdentityLifecycleStore(
         ArgumentNullException.ThrowIfNull(request);
         EnsureIdle();
         return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
-            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => identityFence.ExecuteIdentityMutationAsync(
-                token => ChangePasswordAttemptAsync(request, token), cancellationToken), cancellationToken));
+            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => credentialStates.ExecuteLifecycleMutationAsync(
+                (lifecycle, token) => ChangePasswordAttemptAsync(request, lifecycle, token), cancellationToken), cancellationToken));
     }
 
-    private async Task<LocalIdentityLifecycleOutcome> ChangePasswordAttemptAsync(LocalIdentityPasswordChangeRequest request, CancellationToken cancellationToken)
+    private async Task<LocalIdentityLifecycleOutcome> ChangePasswordAttemptAsync(LocalIdentityPasswordChangeRequest request,
+        LocalIdentityLifecycleExecutionCustody lifecycle, CancellationToken cancellationToken)
     {
         await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(identityDbContext, applicationDbContext, identityFence, cancellationToken);
         await identityFence.EnsureSubjectMayEnrollAsync(request.Authority.LocalSubjectId, cancellationToken);
         LocalIdentityUser? user = await credentialStates.ReadReadySessionAsync(request.Authority, cancellationToken);
         LocalIdentityBinding? binding = await credentialStates.ReadLinkedIdentityAsync(request.Authority.LocalSubjectId, cancellationToken);
         if (user is null || binding is null || binding.PersonalActorId != request.PersonalActorId || binding.ExternalLoginId != request.ExternalLoginId
-            || request.CurrentPassword.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength
+            || !LocalPasswordPolicy.TryNormalizeForVerification(request.CurrentPassword, out _)
             || userManager.PasswordHasher.VerifyHashedPassword(user, user.PasswordHash!, request.CurrentPassword) == PasswordVerificationResult.Failed)
             return LocalIdentityLifecycleOutcome.Invalid;
         LocalIdentityLifecycleOutcome? invalid = await ValidatePasswordAsync(user, request.NewPassword, cancellationToken);
         if (invalid is { } rejected) return rejected;
         if (await credentialStates.ReadReadySessionAsync(request.Authority, cancellationToken) is null) return LocalIdentityLifecycleOutcome.Invalid;
+        lifecycle.RequireCurrent();
         string hash = userManager.PasswordHasher.HashPassword(user, request.NewPassword);
         string securityStamp = Guid.CreateVersion7().ToString("N");
         string concurrencyStamp = Guid.CreateVersion7().ToString("N");
@@ -67,7 +69,11 @@ internal sealed class LocalIdentityLifecycleStore(
                 .SetProperty(row => row.SecurityStamp, securityStamp).SetProperty(row => row.ConcurrencyStamp, concurrencyStamp)
                 .SetProperty(row => row.UpdatedAt, now), cancellationToken);
         if (rows != 1) return LocalIdentityLifecycleOutcome.Conflict;
-        await transaction.CommitAsync(cancellationToken);
+        lifecycle.RequireCurrent();
+        var current = await credentialStates.ReadAsync(user.Id, securityStamp, cancellationToken)
+            ?? throw new UnauthorizedAccessException("The current Local credential pointer is absent after password change.");
+        await credentialStates.RefreshEligibilityAsync(user.Id, current.OperationId, now, cancellationToken);
+        await lifecycle.CommitAsync(transaction, cancellationToken);
         return LocalIdentityLifecycleOutcome.Consumed;
     }
 
@@ -77,8 +83,8 @@ internal sealed class LocalIdentityLifecycleStore(
         ArgumentNullException.ThrowIfNull(authority); ArgumentNullException.ThrowIfNull(synchronize);
         EnsureIdle();
         return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
-            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => identityFence.ExecuteIdentityMutationAsync(
-                token => SynchronizeAttemptAsync(authority.Operation, authority.Token, synchronize, token), cancellationToken), cancellationToken));
+            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => credentialStates.ExecuteLifecycleMutationAsync(
+                (lifecycle, token) => SynchronizeAttemptAsync(authority.Operation, authority.Token, synchronize, lifecycle, token), cancellationToken), cancellationToken));
     }
 
     public Task<bool> ExecuteSynchronizationAsync(LocalIdentityLifecyclePointer operation,
@@ -87,12 +93,13 @@ internal sealed class LocalIdentityLifecycleStore(
         ArgumentNullException.ThrowIfNull(operation); ArgumentNullException.ThrowIfNull(synchronize);
         EnsureIdle();
         return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
-            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => identityFence.ExecuteIdentityMutationAsync(
-                token => SynchronizeAttemptAsync(operation, null, synchronize, token), cancellationToken), cancellationToken));
+            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => credentialStates.ExecuteLifecycleMutationAsync(
+                (lifecycle, token) => SynchronizeAttemptAsync(operation, null, synchronize, lifecycle, token), cancellationToken), cancellationToken));
     }
 
     private async Task<bool> SynchronizeAttemptAsync(LocalIdentityLifecyclePointer pointer, string? token,
-        Func<LocalIdentityLifecycleSynchronization, CancellationToken, Task<bool>> synchronize, CancellationToken cancellationToken)
+        Func<LocalIdentityLifecycleSynchronization, CancellationToken, Task<bool>> synchronize,
+        LocalIdentityLifecycleExecutionCustody lifecycle, CancellationToken cancellationToken)
     {
         await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(identityDbContext, applicationDbContext, identityFence, cancellationToken);
         await identityFence.EnsureSubjectMayEnrollAsync(pointer.LocalSubjectId, cancellationToken);
@@ -105,15 +112,18 @@ internal sealed class LocalIdentityLifecycleStore(
             if (!WithinDeadline(operation)) return false;
             user.SecurityStamp = operation.SecurityStamp;
             bool authorized = await userManager.VerifyUserTokenAsync(user, Provider(operation.Purpose), TokenPurpose(operation), token);
+            lifecycle.RequireCurrent();
             user.SecurityStamp = operation.ResultSecurityStamp;
             cancellationToken.ThrowIfCancellationRequested();
             if (!authorized || !WithinDeadline(operation)) return false;
         }
         string concurrencyStamp = Guid.CreateVersion7().ToString("N");
+        lifecycle.RequireCurrent();
         int locked = await identityDbContext.Set<LocalIdentityUser>().Where(row => row.Id == user.Id
                 && row.SecurityStamp == operation.ResultSecurityStamp && row.ConcurrencyStamp == user.ConcurrencyStamp)
             .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.ConcurrencyStamp, concurrencyStamp), cancellationToken);
         if (locked != 1) return false;
+        lifecycle.RequireCurrent();
         // This native user write lock is also acquired by every existing credential mutation. In the external
         // topology keep it through the Application mirror commit, then acknowledge; retries are idempotent.
         try
@@ -121,28 +131,44 @@ internal sealed class LocalIdentityLifecycleStore(
             LocalIdentityUser? current = await ReadCurrentUserAsync(operation, operation.ResultSecurityStamp, cancellationToken);
             if (current is null || (token is not null && !WithinDeadline(operation))) return false;
             var receipt = Synchronization(operation, current, consumedAt, operation.SynchronizedAt.HasValue);
-            if (!await synchronize(receipt, cancellationToken) || (token is not null && !WithinDeadline(operation))) return false;
+            lifecycle.RequireCurrent();
+            bool synchronized = await synchronize(receipt, cancellationToken);
+            lifecycle.RequireCurrent();
+            if (!synchronized || (token is not null && !WithinDeadline(operation))) return false;
             await applicationDbContext.SaveChangesAsync(cancellationToken);
+            lifecycle.RequireCurrent();
             if (token is not null && !WithinDeadline(operation)) return false;
             DateTime now = timeProvider.GetUtcNow().UtcDateTime;
             await identityDbContext.Set<LocalIdentityLifecycleOperation>().Where(row => row.Id == operation.Id && row.Generation == operation.Generation)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.SynchronizedAt, now), cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            await lifecycle.CommitAsync(transaction, cancellationToken);
             return true;
         }
         finally { applicationDbContext.ChangeTracker.Clear(); }
     }
 
-    public Task<LocalIdentityLifecyclePointer?> BeginAsync(LocalIdentityLifecycleRequest request, CancellationToken cancellationToken)
+    public async Task<LocalIdentityLifecyclePointer?> BeginAsync(LocalIdentityLifecycleRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         EnsureIdle();
-        return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
-            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => identityFence.ExecuteIdentityMutationAsync(
-                token => BeginAttemptAsync(request, token), cancellationToken), cancellationToken));
+        bool durableOwnershipPossible = false;
+        try
+        {
+            return await identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
+                EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => credentialStates.ExecuteLifecycleMutationAsync(
+                    (lifecycle, token) => BeginAttemptAsync(request, () => durableOwnershipPossible = true, lifecycle, token),
+                    cancellationToken), cancellationToken));
+        }
+        catch (Exception exception) when (request.Purpose == LocalIdentityLifecyclePurpose.PasswordRecovery
+            && !durableOwnershipPossible && LocalIdentityIntakeStoreFailureClassifier.Classify(identityDbContext, exception) is not null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new LocalIdentityIntakeException(LocalIdentityIntakeStoreFailureClassifier.Classify(identityDbContext, exception)!.Value);
+        }
     }
 
-    private async Task<LocalIdentityLifecyclePointer?> BeginAttemptAsync(LocalIdentityLifecycleRequest request, CancellationToken cancellationToken)
+    private async Task<LocalIdentityLifecyclePointer?> BeginAttemptAsync(LocalIdentityLifecycleRequest request,
+        Action observeDurableOwnership, LocalIdentityLifecycleExecutionCustody lifecycle, CancellationToken cancellationToken)
     {
         await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(identityDbContext, applicationDbContext, identityFence, cancellationToken);
         await identityFence.EnsureSubjectMayEnrollAsync(request.LocalSubjectId, cancellationToken);
@@ -180,7 +206,9 @@ internal sealed class LocalIdentityLifecycleStore(
             .OrderBy(row => row.CreatedAt).FirstOrDefaultAsync(cancellationToken);
         if (pending is not null)
         {
+            lifecycle.RequireCurrent();
             // A different proposed address cannot silently revoke an in-flight link, either.
+            observeDurableOwnership();
             return string.Equals(userManager.NormalizeEmail(pending.PendingAddress), normalizedAddress, StringComparison.Ordinal)
                 ? pending.Pointer() : null;
         }
@@ -192,15 +220,21 @@ internal sealed class LocalIdentityLifecycleStore(
         var operation = new LocalIdentityLifecycleOperation(pointer, address, user.SecurityStamp, state.OperationId, now);
         // Serialize new intake against native user/reset writes without rotating the security stamp or invalidating links.
         string concurrencyStamp = Guid.CreateVersion7().ToString("N");
+        lifecycle.RequireCurrent();
         int changed = await identityDbContext.Set<LocalIdentityUser>()
             .Where(row => row.Id == user.Id && row.SecurityStamp == user.SecurityStamp && row.ConcurrencyStamp == user.ConcurrencyStamp)
             .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.ConcurrencyStamp, concurrencyStamp), cancellationToken);
         if (changed != 1) return null;
+        lifecycle.RequireCurrent();
         identityDbContext.Add(operation);
         try
         {
             await identityDbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            lifecycle.RequireCurrent();
+            // This latch survives execution-strategy retries. A failed commit acknowledgement
+            // cannot be reported as uncommitted intake, even if a later attempt also fails.
+            observeDurableOwnership();
+            await lifecycle.CommitAsync(transaction, cancellationToken);
         }
         finally { identityDbContext.Entry(operation).State = EntityState.Detached; }
         return pointer;
@@ -214,12 +248,15 @@ internal sealed class LocalIdentityLifecycleStore(
         if (row is null || !IsLive(row)) return null;
         LocalIdentityUser? user = await ReadCurrentUserAsync(row, row.SecurityStamp, cancellationToken);
         if (user is null) return null;
+        credentialStates.RequireSelectedLifecycleCurrent();
         string token = await userManager.GenerateUserTokenAsync(user, Provider(row.Purpose), TokenPurpose(row));
+        credentialStates.RequireSelectedLifecycleCurrent();
         cancellationToken.ThrowIfCancellationRequested();
         // Generation can await a provider; do not release material after expiry/reset/consumption.
         LocalIdentityLifecycleOperation? current = await ReadOperationAsync(operation, cancellationToken);
         if (current is null || !IsLive(current)
             || await ReadCurrentUserAsync(current, current.SecurityStamp, cancellationToken) is null || !IsLive(current)) return null;
+        credentialStates.RequireSelectedLifecycleCurrent();
         return new LocalIdentityLifecycleTransport(operation, row.PendingAddress, token, new DateTimeOffset(row.ExpiresAt));
     }
 
@@ -228,11 +265,12 @@ internal sealed class LocalIdentityLifecycleStore(
         ArgumentNullException.ThrowIfNull(request);
         EnsureIdle();
         return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
-            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => identityFence.ExecuteIdentityMutationAsync(
-                token => ConsumeAttemptAsync(request, token), cancellationToken), cancellationToken));
+            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => credentialStates.ExecuteLifecycleMutationAsync(
+                (lifecycle, token) => ConsumeAttemptAsync(request, lifecycle, token), cancellationToken), cancellationToken));
     }
 
-    private async Task<LocalIdentityLifecycleResult> ConsumeAttemptAsync(LocalIdentityLifecycleConsumption request, CancellationToken cancellationToken)
+    private async Task<LocalIdentityLifecycleResult> ConsumeAttemptAsync(LocalIdentityLifecycleConsumption request,
+        LocalIdentityLifecycleExecutionCustody lifecycle, CancellationToken cancellationToken)
     {
         try
         {
@@ -265,6 +303,7 @@ internal sealed class LocalIdentityLifecycleStore(
             string securityStamp = Guid.CreateVersion7().ToString("N");
             string concurrencyStamp = Guid.CreateVersion7().ToString("N");
             DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+            lifecycle.RequireCurrent();
             int users = await identityDbContext.Set<LocalIdentityUser>()
                 .Where(row => row.Id == user.Id && row.SecurityStamp == operation.SecurityStamp && row.ConcurrencyStamp == user.ConcurrencyStamp)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.PasswordHash, passwordHash)
@@ -274,6 +313,7 @@ internal sealed class LocalIdentityLifecycleStore(
                     .SetProperty(row => row.UpdatedAt, now), cancellationToken);
             // Recheck time after the awaited write; failure rolls back both receipt and Identity mutation.
             DateTime consumedAt = timeProvider.GetUtcNow().UtcDateTime;
+            lifecycle.RequireCurrent();
             if (!IsLive(operation)) return Rejected(LocalIdentityLifecycleOutcome.Invalid);
             int operations = await identityDbContext.Set<LocalIdentityLifecycleOperation>()
                 .Where(row => row.Id == operation.Id && row.Generation == operation.Generation && row.ConsumedAt == null
@@ -281,7 +321,9 @@ internal sealed class LocalIdentityLifecycleStore(
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.ConsumedAt, consumedAt)
                     .SetProperty(row => row.ResultSecurityStamp, securityStamp), cancellationToken);
             if (users != 1 || operations != 1) return Rejected(LocalIdentityLifecycleOutcome.Conflict);
-            await transaction.CommitAsync(cancellationToken);
+            lifecycle.RequireCurrent();
+            await credentialStates.RefreshEligibilityAsync(user.Id, operation.CredentialOperationId, now, cancellationToken);
+            await lifecycle.CommitAsync(transaction, cancellationToken);
             return new LocalIdentityLifecycleResult(LocalIdentityLifecycleOutcome.Consumed,
                 Synchronization(operation, user, consumedAt, synchronized: false));
         }
@@ -314,7 +356,7 @@ internal sealed class LocalIdentityLifecycleStore(
     {
         ArgumentNullException.ThrowIfNull(operation);
         EnsureIdle();
-        return await identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() => identityFence.ExecuteIdentityMutationAsync(async token =>
+        return await identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() => credentialStates.ExecuteLifecycleMutationAsync(async (lifecycle, token) =>
         {
             await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(identityDbContext, applicationDbContext, identityFence, token);
             await identityFence.EnsureSubjectMayEnrollAsync(operation.LocalSubjectId, token);
@@ -322,11 +364,12 @@ internal sealed class LocalIdentityLifecycleStore(
             if (receipt is null) return false;
             if (receipt.Synchronized) return true;
             DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+            lifecycle.RequireCurrent();
             int rows = await identityDbContext.Set<LocalIdentityLifecycleOperation>()
                 .Where(row => row.Id == operation.OperationId && row.Generation == operation.Generation && row.ConsumedAt != null && row.SynchronizedAt == null)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.SynchronizedAt, now), token);
             if (rows != 1) return false;
-            await transaction.CommitAsync(token);
+            await lifecycle.CommitAsync(transaction, token);
             return true;
         }, cancellationToken));
     }
@@ -354,13 +397,14 @@ internal sealed class LocalIdentityLifecycleStore(
 
     private async Task<LocalIdentityLifecycleOutcome?> ValidatePasswordAsync(LocalIdentityUser user, string? password, CancellationToken cancellationToken)
     {
-        if (password is null || password.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength)
+        if (!LocalPasswordPolicy.TryNormalizeNewCredential(password, out _))
             return LocalIdentityLifecycleOutcome.InvalidPassword;
-        if (userManager.PasswordHasher.VerifyHashedPassword(user, user.PasswordHash!, password) != PasswordVerificationResult.Failed)
+        if (userManager.PasswordHasher.VerifyHashedPassword(user, user.PasswordHash!, password!) != PasswordVerificationResult.Failed)
             return LocalIdentityLifecycleOutcome.SamePassword;
         foreach (IPasswordValidator<LocalIdentityUser> validator in userManager.PasswordValidators)
         {
             IdentityResult validation = await validator.ValidateAsync(userManager, user, password);
+            credentialStates.RequireSelectedLifecycleCurrent();
             cancellationToken.ThrowIfCancellationRequested();
             if (!validation.Succeeded) return LocalIdentityLifecycleOutcome.InvalidPassword;
         }
@@ -373,6 +417,7 @@ internal sealed class LocalIdentityLifecycleStore(
         foreach (IUserValidator<LocalIdentityUser> validator in userManager.UserValidators)
         {
             IdentityResult result = await validator.ValidateAsync(userManager, user);
+            credentialStates.RequireSelectedLifecycleCurrent();
             cancellationToken.ThrowIfCancellationRequested();
             if (!result.Succeeded) return false;
         }

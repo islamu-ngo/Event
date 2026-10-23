@@ -15,7 +15,8 @@ public sealed class RemoveTenantMembershipCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUser,
-    TimeProvider timeProvider) : ICommandHandler<RemoveTenantMembershipCommand, bool>
+    TimeProvider timeProvider,
+    Func<IHumanSecuritySourceGate> securityGates) : ICommandHandler<RemoveTenantMembershipCommand, bool>
 {
     public async Task<bool> ExecuteAsync(
         RemoveTenantMembershipCommand request,
@@ -30,21 +31,30 @@ public sealed class RemoveTenantMembershipCommandHandler(
             throw new AuthorizationException(ResourceKinds.User, AuthorizationActions.Update);
         }
 
+        var securityGate = securityGates();
+        await using var ownedGate = securityGate.TryRequireCurrent()
+            ? null : await securityGate.AcquireAsync(cancellationToken);
+        securityGate.RequireCurrent();
         var removedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
-        return await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        bool removed = await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
+            securityGate.RequireCurrent();
             if (actorUserId.Value != request.UserId
                 && !await roleGrants.IsTenantAdminInCurrentTenantAsync(request.TenantId, actorUserId.Value, ct))
             {
                 throw new AuthorizationException(ResourceKinds.User, AuthorizationActions.Update);
             }
 
-            return await tenantUsers.TryRemoveMembershipAsync(
+            bool changed = await tenantUsers.TryRemoveMembershipAsync(
                 request.TenantId,
                 request.UserId,
                 actorUserId.Value,
                 removedAtUtc,
                 ct);
+            securityGate.RequireCurrent();
+            return changed;
         }, cancellationToken);
+        securityGate.RequireCurrent();
+        return removed;
     }
 }

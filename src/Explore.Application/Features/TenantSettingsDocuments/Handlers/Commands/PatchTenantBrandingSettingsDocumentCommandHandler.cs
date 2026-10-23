@@ -9,17 +9,20 @@ using Explore.Application.DTOs.TenantSettingsDocuments.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.TenantSettingsDocuments.Requests.Commands;
 using Explore.Application.Responses;
-using Explore.Application.Settings;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
-using FluentValidation;
 using Explore.Application.Contracts.Operations;
 
 public sealed class PatchTenantBrandingSettingsDocumentCommandHandler(
     ITenantSettingsDocumentRepository tenantSettingsDocumentRepository,
-    IUnitOfWork unitOfWork,
+    ISerializableAttemptOwner attemptOwner,
     ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
-    ITenantBrandingSettingsDocumentLockService lockService)
+    ITenantBrandingSettingsDocumentLockService lockService,
+    IHumanCommitScopePreparation humanScope,
+    ITenantContext tenantContext,
+    ITenantAdministratorCommitAuthority commitAuthority,
+    IHumanTenantBrandingMutationPreparation preparation,
+    IHumanActionCommitFinalizer finalizer)
     : ICommandHandler<
         PatchTenantBrandingSettingsDocumentCommand,
         BaseCommandResponse<TenantBrandingSettingsDocumentDto>>
@@ -41,39 +44,6 @@ public sealed class PatchTenantBrandingSettingsDocumentCommandHandler(
                 "Tenant branding settings patch failed.");
         }
 
-        var document = await tenantSettingsDocumentRepository.GetTrackedByTenantAndDocumentKey(
-            request.TenantId,
-            SettingsDocumentKeys.Tenant.Branding,
-            cancellationToken);
-
-        if (document is null)
-        {
-            return BaseCommandResponse.NotFound<TenantBrandingSettingsDocumentDto>(
-                "Tenant branding settings document not found.");
-        }
-
-        if (document.ConcurrencyStamp != request.Patch.ExpectedConcurrencyStamp)
-        {
-            throw new ConcurrencyConflictException(
-                ConcurrencyConflictException.ConcurrentUpdate,
-                "Tenant branding settings changed since they were loaded. Refresh the settings and try again.",
-                "tenant_settings_document",
-                document.Id.ToString());
-        }
-
-        var currentPayload = DeserializePayload(document.PayloadJson);
-        var mergedPayload = MergePayload(currentPayload, request.Patch);
-        var mergedPayloadDto = MapPayload(mergedPayload);
-        var payloadValidator = new TenantBrandingSettingsPayloadDtoValidator();
-        validationResult = await payloadValidator.ValidateAsync(mergedPayloadDto, cancellationToken);
-
-        if (!validationResult.IsValid)
-        {
-            return BaseCommandResponse.Validation<TenantBrandingSettingsDocumentDto>(
-                validationResult.Errors.Select(error => error.ErrorMessage),
-                "Tenant branding settings patch failed.");
-        }
-
         var lockState = await lockService.GetLockStateAsync(cancellationToken);
         var errors = ValidateRequestedFieldLocks(request.Patch, lockState);
         if (errors.Count > 0)
@@ -83,17 +53,122 @@ public sealed class PatchTenantBrandingSettingsDocumentCommandHandler(
                 "Tenant branding settings patch failed.");
         }
 
-        var payloadJson = JsonSerializer.Serialize(mergedPayload, SerializerOptions);
-        await unitOfWork.ExecuteInTransactionAsync(async _ =>
+        await humanScope.PrepareAsync(cancellationToken);
+        var subject = humanScope.Subject
+            ?? throw new UnauthorizedAccessException("Original authenticated branding authority is required.");
+        BaseCommandResponse<TenantBrandingSettingsDocumentDto> response;
+        for (int attempt = 1; ; attempt++)
         {
+            IPreparedHumanTenantBrandingMutation prepared;
+            try
+            {
+                prepared = await preparation.PrepareAsync(request, cancellationToken);
+            }
+            catch (AuthorizationException)
+            {
+                return BaseCommandResponse.Authorization<TenantBrandingSettingsDocumentDto>(
+                    "Current tenant branding authority is required.");
+            }
+            try
+            {
+                response = await ExecuteAttemptAsync(prepared);
+                break;
+            }
+            catch (HumanMutationAttemptRolledBackException) when (attempt < 4)
+            {
+                // Only a whole acknowledged rollback allows a fresh action decision.
+                // The original capability is never replayed by an execution strategy.
+            }
+            catch (AuthorizationException)
+            {
+                // The actual owner has finished its failed attempt. Unknown rollback
+                // outcomes propagate rather than being normalized to a business response.
+                return BaseCommandResponse.Authorization<TenantBrandingSettingsDocumentDto>(
+                    "Current tenant branding authority is required.");
+            }
+        }
+
+        if (response.IsSuccess)
+        {
+            typedSettingsDocumentResolver.InvalidateTenantDocumentCache(request.TenantId, SettingsDocumentKeys.Tenant.Branding);
+        }
+
+        return response;
+
+        // These session leases wrap the one selected nonreplaying physical owner, survive
+        // its final admission and commit, and do not introduce another transaction owner.
+        Task<BaseCommandResponse<TenantBrandingSettingsDocumentDto>> ExecuteAttemptAsync(
+            IPreparedHumanTenantBrandingMutation prepared) => lockService.ExecuteWithGovernanceLocksAsync(
+            token => attemptOwner.ExecuteAsync(async transactionToken =>
+        {
+            await prepared.AcquireAsync(request, transactionToken);
+            if (request.TenantId != tenantContext.TenantId
+                || !ReferenceEquals(humanScope.Subject, subject)
+                || !await commitAuthority.IsTenantAdministratorForCommitAsync(
+                    subject.PrincipalId, request.TenantId, transactionToken))
+            {
+                return BaseCommandResponse.Authorization<TenantBrandingSettingsDocumentDto>(
+                    "Current tenant administrator authority is required.");
+            }
+
+            var document = await tenantSettingsDocumentRepository.GetTrackedByTenantAndDocumentKey(
+                request.TenantId,
+                SettingsDocumentKeys.Tenant.Branding,
+                transactionToken);
+
+            if (document is null)
+            {
+                return BaseCommandResponse.NotFound<TenantBrandingSettingsDocumentDto>(
+                    "Tenant branding settings document not found.");
+            }
+
+            if (document.ConcurrencyStamp != request.Patch.ExpectedConcurrencyStamp)
+            {
+                throw new ConcurrencyConflictException(
+                    ConcurrencyConflictException.ConcurrentUpdate,
+                    "Tenant branding settings changed since they were loaded. Refresh the settings and try again.",
+                    "tenant_settings_document",
+                    document.Id.ToString());
+            }
+
+            // Preflight and request flags are advisory; these leases survive this transaction's commit.
+            var commitLockState = await lockService.GetLockStateAsync(transactionToken);
+            var commitErrors = ValidateRequestedFieldLocks(request.Patch, commitLockState);
+            if (commitErrors.Count > 0)
+            {
+                return BaseCommandResponse.Validation<TenantBrandingSettingsDocumentDto>(
+                    commitErrors,
+                    "Tenant branding settings patch failed.");
+            }
+
+            var mergedPayload = MergePayload(DeserializePayload(document.PayloadJson), request.Patch);
+            var payloadValidator = new TenantBrandingSettingsPayloadDtoValidator();
+            var payloadValidation = await payloadValidator.ValidateAsync(MapPayload(mergedPayload), transactionToken);
+            if (!payloadValidation.IsValid)
+            {
+                return BaseCommandResponse.Validation<TenantBrandingSettingsDocumentDto>(
+                    payloadValidation.Errors.Select(error => error.ErrorMessage),
+                    "Tenant branding settings patch failed.");
+            }
+
+            var payloadJson = JsonSerializer.Serialize(mergedPayload, SerializerOptions);
             document.UpdatePayload(document.SchemaVersion, document.DefaultsVersion, payloadJson);
             await tenantSettingsDocumentRepository.Update(document);
-        }, cancellationToken);
-        typedSettingsDocumentResolver.InvalidateTenantDocumentCache(request.TenantId, SettingsDocumentKeys.Tenant.Branding);
+            finalizer.Register(async finalToken =>
+            {
+                var finalLocks = await lockService.GetLockStateAsync(finalToken);
+                if (request.TenantId != tenantContext.TenantId
+                    || !ReferenceEquals(humanScope.Subject, subject)
+                    || !await commitAuthority.IsTenantAdministratorForCommitAsync(
+                        subject.PrincipalId, request.TenantId, finalToken)
+                    || ValidateRequestedFieldLocks(request.Patch, finalLocks).Count != 0)
+                    throw new UnauthorizedAccessException("Current branding governance and original tenant authority are required.");
+            }, _ => { });
+            return BaseCommandResponse.Success(
+                MapDocument(document, mergedPayload, commitLockState),
+                "Tenant branding settings patched successfully.");
+        }, token), cancellationToken);
 
-        return BaseCommandResponse.Success(
-            MapDocument(document, mergedPayload, lockState),
-            "Tenant branding settings patched successfully.");
     }
 
     private static BrandingSettings DeserializePayload(string payloadJson)

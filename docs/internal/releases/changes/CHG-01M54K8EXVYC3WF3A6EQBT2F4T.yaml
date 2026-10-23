@@ -1,0 +1,30 @@
+Change-Id: CHG-01M54K8EXVYC3WF3A6EQBT2F4T
+Title: "Minimize RabbitMQ dispatch diagnostic identity exports"
+Type: fix
+Scope: privacy
+Summary: "Keep native broker outcomes without exposing configured identity, pointer identifiers or exception detail in diagnostics."
+Group: rabbitmq-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: RabbitMQ transport health data no longer returns configured connection or queue names.
+  Security:
+    Reference: docs/internal/EMAIL_NOTIFICATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Keep tenant and pointer identities, configured broker names, remote reply text and exception objects out of dispatch diagnostics.
+  Migration:
+    Reference: docs/internal/EMAIL_NOTIFICATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/EMAIL_NOTIFICATIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Use fixed broker outcomes and numeric facts while keeping private configuration and pointer payloads out of shared support logs.

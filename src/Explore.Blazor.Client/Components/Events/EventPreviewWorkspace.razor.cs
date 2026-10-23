@@ -181,7 +181,7 @@ public partial class EventPreviewWorkspace : ComponentBase, IDisposable
     {
         if (evt.Id is Guid eventId && eventId != Guid.Empty && evt.HasHalLink("edit"))
         {
-            Navigation.NavigateTo($"/events/{eventId}/edit");
+            Navigation.NavigateTo($"/studio/events/{eventId}/details");
         }
     }
 

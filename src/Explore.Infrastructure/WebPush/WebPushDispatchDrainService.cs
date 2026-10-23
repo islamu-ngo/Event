@@ -13,7 +13,10 @@ namespace Explore.Infrastructure.WebPush;
 
 public sealed class WebPushDispatchDrainService(
     IServiceScopeFactory scopeFactory,
+    IWebPushDispatchAdmission admission,
+    IWebPushDispatchExecutionScopeFactory executionScopeFactory,
     IOptions<WebPushSettings> settings,
+    TimeProvider timeProvider,
     ILogger<WebPushDispatchDrainService> logger)
 {
     private const string ProcessingLeaseExpiredFailureCategory = "processing_lease_expired";
@@ -37,9 +40,7 @@ public sealed class WebPushDispatchDrainService(
             return WebPushDispatchDrainResult.Empty;
         }
 
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IWebPushDispatchOutboxRepository>();
-        var pending = await repository.GetPendingBatch(_settings.BatchSize, DateTime.UtcNow, cancellationToken);
+        var pending = await admission.GetPendingBatch(_settings.BatchSize, timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
 
         var result = new WebPushDispatchDrainAccumulator(pending.Count);
         foreach (var dispatch in pending)
@@ -57,11 +58,9 @@ public sealed class WebPushDispatchDrainService(
 
     public async Task<WebPushDispatchRecoveryResult> RecoverStaleProcessingAsync(CancellationToken cancellationToken)
     {
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IWebPushDispatchOutboxRepository>();
-        var recoveredAt = DateTime.UtcNow;
+        var recoveredAt = timeProvider.GetUtcNow().UtcDateTime;
         var processingStartedBefore = recoveredAt.AddSeconds(-_settings.ProcessingLeaseTimeoutSeconds);
-        var recovered = await repository.RecoverStaleProcessing(
+        var recovered = await admission.RecoverStaleProcessing(
             processingStartedBefore,
             recoveredAt,
             ProcessingLeaseExpiredFailureCategory,
@@ -77,21 +76,17 @@ public sealed class WebPushDispatchDrainService(
         return new WebPushDispatchRecoveryResult(recovered, processingStartedBefore);
     }
 
-    private async Task<WebPushDispatchDrainOutcome> ProcessDispatchAsync(WebPushDispatchOutbox dispatch, CancellationToken cancellationToken)
+    private async Task<WebPushDispatchDrainOutcome> ProcessDispatchAsync(WebPushDispatchOwner dispatch, CancellationToken cancellationToken)
     {
-        var now = DateTime.UtcNow;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var leaseToken = Guid.CreateVersion7();
+        if (!await admission.TryMarkAsProcessing(dispatch, leaseToken, now, cancellationToken))
         {
-            await using var claimScope = scopeFactory.CreateAsyncScope();
-            var claimRepository = claimScope.ServiceProvider.GetRequiredService<IWebPushDispatchOutboxRepository>();
-            if (!await claimRepository.TryMarkAsProcessing(dispatch.Id, leaseToken, now, cancellationToken))
-            {
-                return WebPushDispatchDrainOutcome.AlreadyClaimed;
-            }
+            return WebPushDispatchDrainOutcome.AlreadyClaimed;
         }
 
-        await using var executionScope = scopeFactory.CreateAsyncScope();
-        var dispatchRepository = executionScope.ServiceProvider.GetRequiredService<IWebPushDispatchOutboxRepository>();
+        await using var executionScope = await executionScopeFactory.CreateAsync(dispatch.TenantId, cancellationToken);
+        var dispatchRepository = executionScope.DispatchRepository;
         var activeDispatch = await dispatchRepository.GetActiveClaimAsync(
             dispatch.TenantId,
             dispatch.Id,
@@ -102,7 +97,7 @@ public sealed class WebPushDispatchDrainService(
             return WebPushDispatchDrainOutcome.StaleLease;
         }
 
-        var privacyErasureStateRepository = executionScope.ServiceProvider.GetRequiredService<IPrivacyErasureStateRepository>();
+        var privacyErasureStateRepository = executionScope.PrivacyErasureStateRepository;
         if (await privacyErasureStateRepository.GetBySubjectAsync(activeDispatch.UserId, cancellationToken) is not null)
         {
             var skipped = await dispatchRepository.MarkAsSkipped(
@@ -110,7 +105,7 @@ public sealed class WebPushDispatchDrainService(
                 leaseToken,
                 PrivacyErasureFencedFailureCategory,
                 PrivacyErasureFencedMessage,
-                DateTime.UtcNow,
+                timeProvider.GetUtcNow().UtcDateTime,
                 cancellationToken);
             return skipped ? WebPushDispatchDrainOutcome.Skipped : WebPushDispatchDrainOutcome.StaleLease;
         }
@@ -126,7 +121,7 @@ public sealed class WebPushDispatchDrainService(
                 false,
                 TimeSpan.Zero,
                 _settings.MaxAttemptCount,
-                DateTime.UtcNow,
+                timeProvider.GetUtcNow().UtcDateTime,
                 cancellationToken);
             return WebPushDispatchDrainOutcome.DeadLettered;
         }
@@ -145,7 +140,7 @@ public sealed class WebPushDispatchDrainService(
             return WebPushDispatchDrainOutcome.Skipped;
         }
 
-        var preferenceResolver = executionScope.ServiceProvider.GetRequiredService<INotificationPreferenceResolver>();
+        var preferenceResolver = executionScope.PreferenceResolver;
         var decision = await preferenceResolver.ResolveAsync(
             new NotificationPreferenceResolveRequest(
                 activeDispatch.TenantId,
@@ -163,12 +158,12 @@ public sealed class WebPushDispatchDrainService(
                 leaseToken,
                 PreferenceDisabledFailureCategory,
                 PreferenceDisabledMessage,
-                DateTime.UtcNow,
+                timeProvider.GetUtcNow().UtcDateTime,
                 cancellationToken);
             return WebPushDispatchDrainOutcome.Skipped;
         }
 
-        var subscriptionRepository = executionScope.ServiceProvider.GetRequiredService<IWebPushSubscriptionRepository>();
+        var subscriptionRepository = executionScope.SubscriptionRepository;
         var subscription = await subscriptionRepository.GetActiveByIdAsync(
             activeDispatch.TenantId,
             activeDispatch.SubscriptionId,
@@ -183,19 +178,59 @@ public sealed class WebPushDispatchDrainService(
                 false,
                 TimeSpan.Zero,
                 _settings.MaxAttemptCount,
-                DateTime.UtcNow,
+                timeProvider.GetUtcNow().UtcDateTime,
                 cancellationToken);
             return WebPushDispatchDrainOutcome.DeadLettered;
         }
 
-        var sender = executionScope.ServiceProvider.GetRequiredService<IWebPushNotificationSender>();
+        await using var senderScope = scopeFactory.CreateAsyncScope();
+        var sender = senderScope.ServiceProvider.GetRequiredService<IWebPushNotificationSender>();
+        var payloadJson = BuildPayloadJson(deliveryPolicy.Topic);
+        await using var handoffScope = await executionScopeFactory.CreateAsync(dispatch.TenantId, cancellationToken);
+        var eligibilityAt = timeProvider.GetUtcNow().UtcDateTime;
+        var liveClaim = await handoffScope.DispatchRepository.GetSenderEntryClaimAsync(
+            dispatch.TenantId,
+            dispatch.Id,
+            leaseToken,
+            eligibilityAt.AddSeconds(-_settings.ProcessingLeaseTimeoutSeconds),
+            eligibilityAt,
+            cancellationToken);
+        if (liveClaim is null)
+        {
+            return WebPushDispatchDrainOutcome.StaleLease;
+        }
+
+        subscription = liveClaim.Subscription;
+        if (subscription is null)
+        {
+            return WebPushDispatchDrainOutcome.StaleLease;
+        }
+
+        expiresAt = liveClaim.CreatedAt.AddSeconds(deliveryPolicy.TimeToLiveSeconds);
+        cancellationToken.ThrowIfCancellationRequested();
+        var senderEntryAt = timeProvider.GetUtcNow().UtcDateTime;
+        if (liveClaim.ProcessingStartedAt <= senderEntryAt.AddSeconds(-_settings.ProcessingLeaseTimeoutSeconds)
+            || subscription.ExpirationTime <= senderEntryAt)
+        {
+            return WebPushDispatchDrainOutcome.StaleLease;
+        }
+
+        var timeToLiveSeconds = (int)Math.Floor((expiresAt - senderEntryAt).TotalSeconds);
+        if (timeToLiveSeconds <= 0)
+        {
+            var skipped = await handoffScope.DispatchRepository.MarkAsSkipped(
+                dispatch.Id, leaseToken, TimeToLiveExpiredFailureCategory,
+                TimeToLiveExpiredMessage, senderEntryAt, cancellationToken);
+            return skipped ? WebPushDispatchDrainOutcome.Skipped : WebPushDispatchDrainOutcome.StaleLease;
+        }
+
         var sendResult = await sender.SendAsync(new WebPushSendEnvelope(
             subscription.Endpoint,
             subscription.P256Dh,
             subscription.AuthSecret,
-            BuildPayloadJson(deliveryPolicy.Topic),
+            payloadJson,
             activeDispatch.Id.ToString(),
-            Math.Max(1, (int)Math.Floor((expiresAt - DateTime.UtcNow).TotalSeconds)),
+            timeToLiveSeconds,
             deliveryPolicy.Topic,
             deliveryPolicy.Urgency), cancellationToken);
 
@@ -209,9 +244,9 @@ public sealed class WebPushDispatchDrainService(
         DateTime expiresAt,
         CancellationToken cancellationToken)
     {
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IWebPushDispatchOutboxRepository>();
-        var completedAt = DateTime.UtcNow;
+        await using var scope = await executionScopeFactory.CreateAsync(dispatch.TenantId, cancellationToken);
+        var repository = scope.DispatchRepository;
+        var completedAt = timeProvider.GetUtcNow().UtcDateTime;
 
         if (sendResult.Success)
         {

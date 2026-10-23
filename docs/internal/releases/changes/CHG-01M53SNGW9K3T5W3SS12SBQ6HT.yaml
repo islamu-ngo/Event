@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53SNGW9K3T5W3SS12SBQ6HT
+Title: "Isolate paired scanner credential authentication reads"
+Type: fix
+Scope: access
+Summary: "Resolve paired scanner credential digests through an independent execute-only Global lease and reject ambiguous matches."
+Group: scanner-authentication
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Preserve version and digest pairing and reject undeclared authentication routine executors.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Database preparation installs the scanner authentication function and enrolls the configured Global login.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Repair native execution enrollment rather than expanding Runtime scanner access.

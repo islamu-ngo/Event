@@ -1,9 +1,12 @@
+using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.References;
+using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Repositories;
 
@@ -40,9 +43,36 @@ public class CustomPropertyDefinitionRepository : GenericRepository<CustomProper
 
     public async Task<CustomPropertyDefinition?> GetTrackedDefinitionWithOptions(Guid id, CancellationToken cancellationToken)
     {
-        return await _dbContext.CustomPropertyDefinitions
+        if (_dbContext.TenantFilterTenantId is not { } tenantId || tenantId == Guid.Empty
+            || _dbContext.IsTenantFilterBypassed
+            || _dbContext.Database.IsRelational()
+                && _dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Definition mutation requires an exact tenant and a Serializable transaction.");
+        await RelationalEntityRowFence.AcquireAsync<CustomPropertyDefinition>(
+            _dbContext, tenantId, row => row.Id, id, cancellationToken);
+        var persisted = await _dbContext.CustomPropertyDefinitions.AsNoTracking()
+            .SingleOrDefaultAsync(row => row.Id == id && row.TenantId == tenantId, cancellationToken);
+        if (persisted is null)
+            return null;
+        var tracked = await _dbContext.CustomPropertyDefinitions
             .Include(x => x.Options.OrderBy(option => option.SortOrder))
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (tracked is null)
+            return null;
+        var persistedValues = _dbContext.Entry(persisted).CurrentValues;
+        foreach (var property in _dbContext.Entry(tracked).Properties)
+        {
+            if (property.Metadata.Name is nameof(CustomPropertyDefinition.CreatedAt)
+                or nameof(CustomPropertyDefinition.UpdatedAt) or nameof(CustomPropertyDefinition.DeletedAt))
+            {
+                property.CurrentValue = persistedValues[property.Metadata.Name];
+                property.OriginalValue = property.CurrentValue;
+                property.IsModified = false;
+            }
+            else if (!Equals(property.CurrentValue, persistedValues[property.Metadata.Name]))
+                throw new InvalidOperationException("Tracked definition values do not match the persisted mutation target.");
+        }
+        return tracked;
     }
 
     public async Task<(List<CustomPropertyDefinition> Items, int TotalCount)> GetDefinitionsWithDetailsPaged(
@@ -217,6 +247,19 @@ public class CustomPropertyDefinitionRepository : GenericRepository<CustomProper
         return true;
     }
 
+    public async Task<bool> FenceDefinitionForPurgeAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (_dbContext.TenantFilterTenantId is not { } tenantId || tenantId == Guid.Empty
+            || _dbContext.IsTenantFilterBypassed
+            || _dbContext.Database.IsRelational()
+                && _dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Definition purge requires an exact tenant and a Serializable transaction.");
+        await RelationalEntityRowFence.AcquireAsync<CustomPropertyDefinition>(
+            _dbContext, tenantId, row => row.Id, id, cancellationToken);
+        return await _dbContext.CustomPropertyDefinitions.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+            .AsNoTracking().AnyAsync(row => row.Id == id && row.TenantId == tenantId, cancellationToken);
+    }
+
     public async Task<CustomPropertyPurgeDependencySummary?> GetPurgeDependencies(Guid id, CancellationToken cancellationToken)
     {
         var definition = await _dbContext.CustomPropertyDefinitions
@@ -255,6 +298,8 @@ public class CustomPropertyDefinitionRepository : GenericRepository<CustomProper
 
     private async Task<bool> PurgeDefinitionCoreAsync(Guid id, CancellationToken cancellationToken)
     {
+        if (!await FenceDefinitionForPurgeAsync(id, cancellationToken))
+            return false;
         await _dbContext.DisclosureMutations.EnlistQueryAsync(
             _dbContext.CustomPropertyDefinitions.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
                 .Where(value => value.Id == id).Select(value => value.TenantId), cancellationToken);

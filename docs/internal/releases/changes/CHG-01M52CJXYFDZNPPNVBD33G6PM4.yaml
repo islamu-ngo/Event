@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52CJXYFDZNPPNVBD33G6PM4
+Title: "Remove private provider diagnostics from startup workers"
+Type: fix
+Scope: privacy
+Summary: "Export fixed registration and event-type synchronization failure categories without provider text, attempt identifiers or runtime exception subtypes."
+Group: startup-worker-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Startup worker diagnostics omit private registration identifiers and provider failures.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Registration retry disposition, synchronization counts and shutdown cancellation remain intact.

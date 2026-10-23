@@ -20,6 +20,8 @@ using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
 using Explore.Persistence.Services;
 using Microsoft.Data.Sqlite;
@@ -111,7 +113,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task NativeReservationBindsVersionSubjectAndRequestIdentity()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var handler = new CreateEventResourceUploadSessionCommandHandler(Workflow(context, seed).Workflow);
         var dto = Intent(seed.Version);
         var first = await EventResourceUploadTestConsumer.ConsumeAsync(handler.ExecuteAsync(new(seed.ResourceId, dto), default));
@@ -121,7 +123,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         await Assert.That(first.IsSuccess).IsTrue();
         await Assert.That(replay.Id!.Id).IsEqualTo(first.Id!.Id);
         await Assert.That(mismatch.IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var saved = await verify.StorageUploadSessions.SingleAsync(value => value.Id == first.Id.Id);
         await Assert.That(saved.ExpectedResourceVersion).IsEqualTo(seed.Version);
         await Assert.That(saved.UserId).IsEqualTo(seed.UserId);
@@ -135,7 +137,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task GenericFinalizeAndCancelDispatchResourceSessionsWithoutGenericCollectionAuthority()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed);
         var session = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
         var tenant = Substitute.For<ITenantContext>();
@@ -159,7 +161,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             tenant, user, new EfCoreUnitOfWork(context), metrics, workflow.Workflow);
         var result = await EventResourceUploadTestConsumer.ConsumeAsync(handler.ExecuteAsync(command, default));
         await Assert.That(result.IsSuccess).IsTrue();
-        await using var read = database.CreateContext();
+        await using var read = database.CreateTenantContext(seed.TenantId);
         var resource = await read.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
         await Assert.That(resource.StorageObjectId).IsEqualTo(result.Id!.StorageObjectId);
         var pending = (await workflow.ReserveAsync(seed.ResourceId, Intent(resource.ConcurrencyStamp), default)).Id!;
@@ -177,7 +179,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task FinalizationAndReplayProduceOneAttachmentAuditAndQuotaCharge()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed);
         var reservation = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
         var result = await FinalizeAsync(workflow, reservation.Id!.Id);
@@ -185,7 +187,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(replay.IsSuccess).IsTrue();
         await Assert.That(replay.Id!.StorageObjectId).IsEqualTo(result.Id!.StorageObjectId);
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var resource = await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
         var stored = await verify.StorageObjects.SingleAsync(value => value.Id == resource.StorageObjectId);
         await Assert.That(stored.HasBoundDocumentInspection).IsTrue();
@@ -204,11 +206,11 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task ReplayedOrStaleAcknowledgementCannotRewriteCommittedProviderIdentity()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, providerVersion: "original-version");
         var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
         await Assert.That((await FinalizeAsync(workflow, id)).IsSuccess).IsTrue();
-        await using var callback = database.CreateContext();
+        await using var callback = database.CreateTenantContext(seed.TenantId);
         var session = await callback.StorageUploadSessions.SingleAsync(value => value.Id == id);
         var storage = await callback.StorageObjects.SingleAsync(value => value.Id == session.StorageObjectId);
         var stamp = storage.ConcurrencyStamp;
@@ -227,19 +229,19 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task SuccessfulReplacementRetiresOldObjectAndOldReplayConflicts()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed);
         var first = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
         var attached = await FinalizeAsync(workflow, first.Id!.Id);
         await Assert.That(attached.IsSuccess).IsTrue();
         Guid version;
-        await using (var read = database.CreateContext())
+        await using (var read = database.CreateTenantContext(seed.TenantId))
             version = (await read.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
         var second = await workflow.ReserveAsync(seed.ResourceId, Intent(version), default);
         var replacement = await FinalizeAsync(workflow, second.Id!.Id);
         await Assert.That(replacement.IsSuccess).IsTrue();
         await Assert.That((await FinalizeAsync(workflow, first.Id.Id)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var old = await verify.StorageObjects.SingleAsync(value => value.Id == attached.Id!.StorageObjectId);
         await Assert.That(old.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
         var tombstone = await verify.StorageObjectDeletionTombstones.SingleAsync(value => value.Id == old.Id);
@@ -257,19 +259,19 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task InvalidReplacementBytesPreserveExistingAttachment()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed);
         var first = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
         var attached = await FinalizeAsync(workflow, first.Id!.Id);
         Guid version;
-        await using (var read = database.CreateContext())
+        await using (var read = database.CreateTenantContext(seed.TenantId))
             version = (await read.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
         var second = await workflow.ReserveAsync(seed.ResourceId, Intent(version), default);
         using var content = new MemoryStream(new byte[Pdf.Length]);
         var rejected = await workflow.FinalizeAsync(new() { UploadSessionId = second.Id!.Id, Content = content }, default);
         await Assert.That(rejected.IsSuccess).IsFalse();
         await Assert.That(content.CanRead).IsTrue();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).StorageObjectId)
             .IsEqualTo(attached.Id!.StorageObjectId);
         await Assert.That((await verify.StorageObjects.SingleAsync(value => value.Id == attached.Id.StorageObjectId)).LifecycleState)
@@ -281,7 +283,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     {
         var seed = await SeedAsync();
         Guid firstId, secondId;
-        await using (var reserve = database.CreateContext())
+        await using (var reserve = database.CreateTenantContext(seed.TenantId))
         {
             var workflow = Workflow(reserve, seed);
             firstId = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
@@ -289,7 +291,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         }
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var firstContext = database.CreateContext();
+        await using var firstContext = database.CreateTenantContext(seed.TenantId);
         var firstWorkflow = Workflow(firstContext, seed, async () =>
         {
             entered.SetResult();
@@ -297,13 +299,13 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         });
         var first = FinalizeAsync(firstWorkflow, firstId);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(15));
-        await using var secondContext = database.CreateContext();
+        await using var secondContext = database.CreateTenantContext(seed.TenantId);
         var second = await FinalizeAsync(Workflow(secondContext, seed), secondId);
         release.SetResult();
         var loser = await first.WaitAsync(TimeSpan.FromSeconds(15));
         await Assert.That(second.IsSuccess).IsTrue();
         await Assert.That(loser.IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That(await verify.EventResourceAuditEntries.CountAsync(value => value.EventResourceId == seed.ResourceId)).IsEqualTo(1);
         var quota = await verify.StorageUsageCounters.SingleAsync(value => value.TenantId == seed.TenantId);
         await Assert.That(quota.UsedBytes).IsEqualTo(Pdf.Length);
@@ -316,17 +318,17 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task RevocationDuringProviderWritePreventsAttachmentAndReplay()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, async () =>
         {
-            await using var revoke = database.CreateContext();
+            await using var revoke = database.CreateTenantContext(seed.TenantId);
             (await revoke.Events.SingleAsync(value => value.Id == seed.EventId)).OrganizerActorId = null;
             await revoke.SaveChangesAsync();
         });
         var reservation = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
         await Assert.That((await FinalizeAsync(workflow, reservation.Id!.Id)).IsSuccess).IsFalse();
         await Assert.That((await FinalizeAsync(workflow, reservation.Id.Id)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).StorageObjectId).IsNull();
         await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == seed.ResourceId)).IsFalse();
     }
@@ -335,11 +337,11 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task FinalizedReplayRechecksRevokedAuthority()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed);
         var session = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
         await Assert.That((await FinalizeAsync(workflow, session.Id)).IsSuccess).IsTrue();
-        await using (var revoke = database.CreateContext())
+        await using (var revoke = database.CreateTenantContext(seed.TenantId))
         {
             (await revoke.Events.SingleAsync(value => value.Id == seed.EventId)).OrganizerActorId = null;
             await revoke.SaveChangesAsync();
@@ -352,17 +354,17 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     {
         var seed = await SeedAsync();
         Guid id = Guid.Empty;
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, async () =>
         {
-            await using var cancel = database.CreateContext();
+            await using var cancel = database.CreateTenantContext(seed.TenantId);
             var cancellation = Workflow(cancel, seed);
             await Assert.That((await cancellation.CancelAsync(id, default)).IsSuccess).IsTrue();
             await Assert.That((await cancellation.CancelAsync(id, default)).IsSuccess).IsTrue();
         });
         id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
         await Assert.That((await FinalizeAsync(workflow, id)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var quota = await verify.StorageUsageCounters.SingleAsync(value => value.TenantId == seed.TenantId);
         await Assert.That(quota.ReservedBytes).IsEqualTo(0);
         await Assert.That(quota.UsedBytes).IsEqualTo(0);
@@ -379,7 +381,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     {
         var seed = await SeedAsync();
         Guid originalObjectId;
-        await using (var originalContext = database.CreateContext())
+        await using (var originalContext = database.CreateTenantContext(seed.TenantId))
         {
             var original = Workflow(originalContext, seed);
             var reservation = await original.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
@@ -388,21 +390,21 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             originalObjectId = attached.Id!.StorageObjectId!.Value;
         }
         Guid version;
-        await using (var read = database.CreateContext())
+        await using (var read = database.CreateTenantContext(seed.TenantId))
             version = (await read.EventResources.AsNoTracking().SingleAsync(row => row.Id == seed.ResourceId)).ConcurrencyStamp;
 
         Guid replacementId = Guid.Empty;
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, async () =>
         {
-            await using var cancellation = database.CreateContext();
+            await using var cancellation = database.CreateTenantContext(seed.TenantId);
             var cancel = Workflow(cancellation, seed);
             await Assert.That((await cancel.CancelAsync(replacementId, default)).IsSuccess).IsTrue();
             await Assert.That((await cancel.CancelAsync(replacementId, default)).IsSuccess).IsTrue();
         });
         replacementId = (await workflow.ReserveAsync(seed.ResourceId, Intent(version), default)).Id!.Id;
         await Assert.That((await FinalizeAsync(workflow, replacementId)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var resource = await verify.EventResources.AsNoTracking().SingleAsync(row => row.Id == seed.ResourceId);
         await Assert.That(resource.StorageObjectId).IsEqualTo(originalObjectId);
         await Assert.That((await verify.StorageObjects.SingleAsync(row => row.Id == originalObjectId)).LifecycleState)
@@ -426,11 +428,11 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task ProviderSuccessAuditFailureRollsBackAttachmentAndLeavesReconciliationIdentity()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext(new AuditFailure());
+        await using var context = database.CreateTenantContext(seed.TenantId, new AuditFailure());
         var workflow = Workflow(context, seed);
         var session = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
         await Assert.That(async () => await FinalizeAsync(workflow, session.Id)).Throws<DbUpdateException>();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var saved = await verify.StorageUploadSessions.SingleAsync(value => value.Id == session.Id);
         await Assert.That(saved.Status).IsEqualTo(StorageUploadSessionStates.Uploading);
         await Assert.That(saved.ObjectKey).IsNotNull();
@@ -451,7 +453,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task UnpublishAndRepublishRetainTheSameFileWithoutDeletionAuthority()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed);
         var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
         var objectId = (await FinalizeAsync(workflow, id)).Id!.StorageObjectId!.Value;
@@ -466,7 +468,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             var resource = await context.EventResources.AsNoTracking().SingleAsync(value => value.Id == seed.ResourceId);
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, resource.ConcurrencyStamp, action, default)).IsSuccess).IsTrue();
         }
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).StorageObjectId).IsEqualTo(objectId);
         await Assert.That((await verify.StorageObjects.SingleAsync(value => value.Id == objectId)).LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
         await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(value => value.Id == objectId)).IsFalse();
@@ -481,7 +483,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task PublishCannotUseUnfinishedUnsafeForeignOrPolicyDisallowedFiles(string condition)
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var upload = Workflow(context, seed);
         var sessionId = (await upload.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
         if (condition != "pending")
@@ -503,7 +505,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
                 ? ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] : null);
         await Assert.That((await manager.ChangeStateAsync(seed.ResourceId, version,
             EventResourceManagementAction.Publish, default)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId))
             .PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Draft);
         await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == seed.ResourceId
@@ -515,7 +517,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     {
         var seed = await SeedAsync();
         Guid fileId, version;
-        await using (var uploadContext = database.CreateContext())
+        await using (var uploadContext = database.CreateTenantContext(seed.TenantId))
         {
             var upload = Workflow(uploadContext, seed);
             var sessionId = (await upload.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
@@ -527,11 +529,11 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             version = (await uploadContext.EventResources.AsNoTracking()
                 .SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
         }
-        await using (var failing = database.CreateContext(new AuditFailure()))
+        await using (var failing = database.CreateTenantContext(seed.TenantId, new AuditFailure()))
             await Assert.That(async () => await Management(failing, seed, allowUnscanned: true)
                 .ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Publish, default))
                 .Throws<DbUpdateException>();
-        await using (var rolledBack = database.CreateContext())
+        await using (var rolledBack = database.CreateTenantContext(seed.TenantId))
         {
             var resource = await rolledBack.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
             await Assert.That(resource.PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Draft);
@@ -540,7 +542,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             await Assert.That(await rolledBack.EventResourceAuditEntries.AnyAsync(entry =>
                 entry.EventResourceId == seed.ResourceId && entry.Action == EventResourceAuditAction.Publish)).IsFalse();
         }
-        await using (var resumed = database.CreateContext())
+        await using (var resumed = database.CreateTenantContext(seed.TenantId))
         {
             var management = Management(resumed, seed, allowUnscanned: true);
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version,
@@ -548,7 +550,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version,
                 EventResourceManagementAction.Publish, default)).IsSuccess).IsFalse();
         }
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId))
             .PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Published);
         await Assert.That(await verify.EventResourceAuditEntries.CountAsync(entry =>
@@ -560,30 +562,30 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     {
         var seed = await SeedAsync();
         Guid objectId, version;
-        await using (var upload = database.CreateContext())
+        await using (var upload = database.CreateTenantContext(seed.TenantId))
         {
             var workflow = Workflow(upload, seed);
             var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
             objectId = (await FinalizeAsync(workflow, id)).Id!.StorageObjectId!.Value;
             version = (await upload.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
         }
-        await using (var failing = database.CreateContext(new AuditFailure()))
+        await using (var failing = database.CreateTenantContext(seed.TenantId, new AuditFailure()))
             await Assert.That(async () => await Management(failing, seed).ChangeStateAsync(seed.ResourceId, version,
                 EventResourceManagementAction.Delete, default)).Throws<DbUpdateException>();
-        await using (var verify = database.CreateContext())
+        await using (var verify = database.CreateTenantContext(seed.TenantId))
         {
             await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).StorageObjectId).IsEqualTo(objectId);
             await Assert.That((await verify.StorageObjects.SingleAsync(value => value.Id == objectId)).LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
             await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(value => value.Id == objectId)).IsFalse();
             await Assert.That((await verify.StorageUsageCounters.SingleAsync(value => value.TenantId == seed.TenantId)).UsedBytes).IsEqualTo(Pdf.Length);
         }
-        await using (var deleting = database.CreateContext())
+        await using (var deleting = database.CreateTenantContext(seed.TenantId))
         {
             var management = Management(deleting, seed);
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Delete, default)).IsSuccess).IsTrue();
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Delete, default)).IsSuccess).IsFalse();
         }
-        await using var final = database.CreateContext();
+        await using var final = database.CreateTenantContext(seed.TenantId);
         await Assert.That(await final.EventResources.AnyAsync(value => value.Id == seed.ResourceId)).IsFalse();
         await Assert.That((await final.StorageObjectDeletionTombstones.SingleAsync(value => value.Id == objectId)).State).IsEqualTo(StorageObjectDeletionState.Ready);
         var quota = await final.StorageUsageCounters.SingleAsync(value => value.TenantId == seed.TenantId);
@@ -595,13 +597,13 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task SavedParentRedactionStillSettlesFinalizedQuotaExactlyOnce()
     {
         var seed = await SeedAsync();
-        await using (var context = database.CreateContext())
+        await using (var context = database.CreateTenantContext(seed.TenantId))
         {
             var workflow = Workflow(context, seed);
             var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
             await Assert.That((await FinalizeAsync(workflow, id)).IsSuccess).IsTrue();
         }
-        await using (var redacting = database.CreateContext())
+        await using (var redacting = database.CreateTenantContext(seed.TenantId))
             await new EfCoreUnitOfWork(redacting).ExecuteInTransactionAsync(async ct =>
             {
                 var resource = await redacting.EventResources.SingleAsync(value => value.Id == seed.ResourceId, ct);
@@ -614,7 +616,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
                 await Lifecycle(redacting).RemoveTransferredSourcesAsync(seed.TenantId, [seed.ResourceId], [], ct);
                 await Lifecycle(redacting).RemoveTransferredSourcesAsync(seed.TenantId, [seed.ResourceId], [], ct);
             });
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var quota = await verify.StorageUsageCounters.SingleAsync(value => value.TenantId == seed.TenantId);
         await Assert.That(quota.UsedBytes).IsEqualTo(0);
         await Assert.That(quota.ObjectCount).IsEqualTo(0);
@@ -629,25 +631,25 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task ExpiredFinalizedSessionNeverTransfersItsAttachedSource()
     {
         var seed = await SeedAsync();
-        await using (var upload = database.CreateContext())
+        await using (var upload = database.CreateTenantContext(seed.TenantId))
         {
             var workflow = Workflow(upload, seed);
             var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
             await Assert.That((await FinalizeAsync(workflow, id)).IsSuccess).IsTrue();
         }
-        await using (var expiringOnlyThisSession = database.CreateContext())
+        await using (var expiringOnlyThisSession = database.CreateTenantContext(seed.TenantId))
         {
             var session = await expiringOnlyThisSession.StorageUploadSessions.SingleAsync(value =>
                 value.OwningResourceId == seed.ResourceId);
             session.ExpiresAt = Now.AddMinutes(-1);
             await expiringOnlyThisSession.SaveChangesAsync();
         }
-        await using (var expiring = database.CreateContext())
+        await using (var expiring = database.CreateTenantContext(seed.TenantId))
             await Assert.That(await new EfCoreUnitOfWork(expiring).ExecuteSerializableAsync(
                 ct => new EventResourceStorageLifecycleRepository(expiring).RetireExpiredUploadsAsync(
                     Now, 100, ct)))
                 .IsEqualTo(0);
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var resource = await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
         await Assert.That(resource.StorageObjectId).IsNotNull();
         await Assert.That((await verify.StorageObjects.SingleAsync(value => value.Id == resource.StorageObjectId)).LifecycleState)
@@ -667,14 +669,14 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     {
         var seed = await SeedAsync();
         EventResource retainedResource;
-        await using (var setup = database.CreateContext())
+        await using (var setup = database.CreateTenantContext(seed.TenantId))
         {
             retainedResource = EventResourcePersistenceTests.CreateDraft(seed.TenantId, seed.EventId);
             setup.EventResources.Add(retainedResource);
             await setup.SaveChangesAsync();
         }
         Guid ordinaryObjectId, retainedObjectId;
-        await using (var upload = database.CreateContext())
+        await using (var upload = database.CreateTenantContext(seed.TenantId))
         {
             var ordinary = Workflow(upload, seed);
             var ordinarySession = (await ordinary.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
@@ -685,7 +687,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
                 retainedResource.Id, Intent(retainedResource.ConcurrencyStamp), default)).Id!.Id;
             await Assert.That((await FinalizeAsync(evidenceUpload, evidenceSession)).IsSuccess).IsTrue();
         }
-        await using (var evidenceContext = database.CreateContext())
+        await using (var evidenceContext = database.CreateTenantContext(seed.TenantId))
         {
             ordinaryObjectId = (await evidenceContext.EventResources.SingleAsync(item =>
                 item.Id == seed.ResourceId)).StorageObjectId!.Value;
@@ -717,7 +719,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
                 evidenceContext.Add(OrganizationTenantEvidence.CreatePending(participation, source));
             await evidenceContext.SaveChangesAsync();
         }
-        await using (var redacting = database.CreateContext())
+        await using (var redacting = database.CreateTenantContext(seed.TenantId))
             await new EfCoreUnitOfWork(redacting).ExecuteSerializableAsync(async ct =>
             {
                 var resources = await redacting.EventResources.Where(item =>
@@ -733,7 +735,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
                     resources.Select(item => item.Id).ToArray(), [], ct);
                 return true;
             });
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That(await verify.StorageObjects.AnyAsync(item => item.Id == retainedObjectId)).IsTrue();
         await Assert.That(await verify.StorageObjects.AnyAsync(item => item.Id == ordinaryObjectId)).IsFalse();
         if (actorPicture)
@@ -746,7 +748,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             item.Id == retainedObjectId)).IsFalse();
         await Assert.That((await verify.StorageObjectDeletionTombstones.SingleAsync(item =>
             item.Id == ordinaryObjectId)).State).IsEqualTo(StorageObjectDeletionState.Ready);
-        await Assert.That(await verify.EventResources.IgnoreQueryFilters().Where(item =>
+        await Assert.That(await verify.EventResources.IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(item =>
             item.Id == seed.ResourceId || item.Id == retainedResource.Id).AllAsync(item =>
             item.IsDeleted && item.StorageObjectId == null)).IsTrue();
         await Assert.That((await verify.StorageUsageCounters.SingleAsync(item =>
@@ -757,20 +759,20 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task SourceRemovalRejectsAttachedFileAndRollsBackTheEntireTransfer()
     {
         var seed = await SeedAsync();
-        await using (var upload = database.CreateContext())
+        await using (var upload = database.CreateTenantContext(seed.TenantId))
         {
             var workflow = Workflow(upload, seed);
             var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
             await Assert.That((await FinalizeAsync(workflow, id)).IsSuccess).IsTrue();
         }
-        await using (var removing = database.CreateContext())
+        await using (var removing = database.CreateTenantContext(seed.TenantId))
             await Assert.That(async () => await new EfCoreUnitOfWork(removing).ExecuteSerializableAsync(async ct =>
             {
                 await Lifecycle(removing).RetireAsync(seed.TenantId, [seed.ResourceId], [], Now, ct);
                 await Lifecycle(removing).RemoveTransferredSourcesAsync(seed.TenantId, [seed.ResourceId], [], ct);
                 return true;
             })).Throws<InvalidOperationException>();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var resource = await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
         await Assert.That(resource.StorageObjectId).IsNotNull();
         await Assert.That((await verify.StorageObjects.SingleAsync(value => value.Id == resource.StorageObjectId)).LifecycleState)
@@ -785,13 +787,13 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task FailureAfterPhysicalSourceRemovalRollsBackDetachmentAccountingAndAuthority()
     {
         var seed = await SeedAsync();
-        await using (var upload = database.CreateContext())
+        await using (var upload = database.CreateTenantContext(seed.TenantId))
         {
             var workflow = Workflow(upload, seed);
             var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
             await Assert.That((await FinalizeAsync(workflow, id)).IsSuccess).IsTrue();
         }
-        await using (var removing = database.CreateContext())
+        await using (var removing = database.CreateTenantContext(seed.TenantId))
             await Assert.That(async () => await new EfCoreUnitOfWork(removing).ExecuteSerializableAsync<bool>(async ct =>
             {
                 var resource = await removing.EventResources.SingleAsync(value => value.Id == seed.ResourceId, ct);
@@ -802,7 +804,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
                 await Assert.That(await removing.StorageObjects.AnyAsync(value => value.OwningResourceId == seed.ResourceId, ct)).IsFalse();
                 throw new InvalidOperationException("Required parent audit failed after handoff.");
             })).Throws<InvalidOperationException>();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var resource = await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
         await Assert.That(resource.StorageObjectId).IsNotNull();
         await Assert.That((await verify.StorageObjects.SingleAsync(value => value.Id == resource.StorageObjectId)).LifecycleState)
@@ -817,10 +819,10 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task NativeDeleteWinsAgainstInflightProducerAndLateAckCannotAttach()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, async () =>
         {
-            await using var deleting = database.CreateContext();
+            await using var deleting = database.CreateTenantContext(seed.TenantId);
             await Assert.That((await Management(deleting, seed).ChangeStateAsync(seed.ResourceId, seed.Version,
                 EventResourceManagementAction.Delete, default)).IsSuccess).IsTrue();
             var tombstone = await deleting.StorageObjectDeletionTombstones.SingleAsync(value => value.TenantId == seed.TenantId);
@@ -828,7 +830,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         });
         var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
         await Assert.That((await FinalizeAsync(workflow, id)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That(await verify.EventResources.AnyAsync(value => value.Id == seed.ResourceId)).IsFalse();
         await Assert.That((await verify.StorageObjectDeletionTombstones.SingleAsync(value => value.TenantId == seed.TenantId)).State)
             .IsEqualTo(StorageObjectDeletionState.Ready);
@@ -844,10 +846,10 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         Guid objectId = Guid.Empty;
         Guid bindingId = Guid.Empty;
         string? key = null;
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, async () =>
         {
-            await using var removing = database.CreateContext();
+            await using var removing = database.CreateTenantContext(seed.TenantId);
             await new EfCoreUnitOfWork(removing).ExecuteSerializableAsync(async ct =>
             {
                 var source = await removing.StorageObjects.SingleAsync(value => value.OwningResourceId == seed.ResourceId, ct);
@@ -863,7 +865,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         }, providerVersion: "acknowledged-version");
         var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
         await Assert.That((await FinalizeAsync(workflow, id)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var tombstone = await verify.StorageObjectDeletionTombstones.SingleAsync(value => value.Id == objectId);
         await Assert.That(tombstone.State).IsEqualTo(StorageObjectDeletionState.Ready);
         await Assert.That(tombstone.ProviderObjectVersion).IsEqualTo("acknowledged-version");
@@ -885,11 +887,11 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task AmbiguousWriteFailureRetainsUnsettledAuthorityWithoutTimerEligibility()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, () => throw new IOException("Write acknowledgement was lost."));
         var id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
         await Assert.That((await FinalizeAsync(workflow, id)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var session = await verify.StorageUploadSessions.SingleAsync(value => value.Id == id);
         await Assert.That(session.ProducerSettled).IsFalse();
         var tombstone = await verify.StorageObjectDeletionTombstones.SingleAsync(value => value.Id == session.StorageObjectId);
@@ -904,17 +906,17 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     {
         var seed = await SeedAsync();
         Guid id;
-        await using (var context = database.CreateContext(new AuditFailure()))
+        await using (var context = database.CreateTenantContext(seed.TenantId, new AuditFailure()))
         {
             var workflow = Workflow(context, seed, providerVersion: "durable-version");
             id = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
             await Assert.That(async () => await FinalizeAsync(workflow, id)).Throws<DbUpdateException>();
         }
-        await using var stale = database.CreateContext();
+        await using var stale = database.CreateTenantContext(seed.TenantId);
         var session = await stale.StorageUploadSessions.AsNoTracking().SingleAsync(value => value.Id == id);
         await Assert.That(session.ProducerSettled).IsTrue();
         await Assert.That(session.ProviderVersionId).IsEqualTo("durable-version");
-        await using (var retire = database.CreateContext())
+        await using (var retire = database.CreateTenantContext(seed.TenantId))
         {
             await Assert.That(async () => await new EfCoreUnitOfWork(retire).ExecuteSerializableAsync<bool>(async ct =>
             {
@@ -922,14 +924,14 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
                 throw new InvalidOperationException("Required detachment audit failed.");
             })).Throws<InvalidOperationException>();
         }
-        await using (var verify = database.CreateContext())
+        await using (var verify = database.CreateTenantContext(seed.TenantId))
         {
             await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(value => value.Id == session.StorageObjectId)).IsFalse();
             await Assert.That((await verify.StorageUploadSessions.SingleAsync(value => value.Id == id)).Status)
                 .IsEqualTo(StorageUploadSessionStates.Uploading);
             await Assert.That((await verify.StorageUsageCounters.SingleAsync(value => value.TenantId == seed.TenantId)).ReservedBytes).IsEqualTo(Pdf.Length);
         }
-        await using (var retire = database.CreateContext())
+        await using (var retire = database.CreateTenantContext(seed.TenantId))
             await new EfCoreUnitOfWork(retire).ExecuteSerializableAsync(async ct =>
             {
                 await Lifecycle(retire).RetireAsync(seed.TenantId, [seed.ResourceId], [], Now, ct);
@@ -938,7 +940,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             });
         var activated = await new EfCoreUnitOfWork(stale).ExecuteSerializableAsync(ct => Lifecycle(stale).FenceActivationAsync(session, ct));
         await Assert.That(activated).IsNull();
-        await using var final = database.CreateContext();
+        await using var final = database.CreateTenantContext(seed.TenantId);
         var tombstone = await final.StorageObjectDeletionTombstones.SingleAsync(value => value.Id == session.StorageObjectId);
         await Assert.That(tombstone.State).IsEqualTo(StorageObjectDeletionState.Ready);
         await Assert.That(tombstone.ProviderObjectVersion).IsEqualTo("durable-version");
@@ -949,13 +951,17 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task PersistedResourceShapeAndCrossTenantSessionObjectAreRejected()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
-        var session = (await Workflow(context, seed).ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
-        var saved = await context.StorageUploadSessions.SingleAsync(value => value.Id == session.Id);
+        await using var upload = database.CreateTenantContext(seed.TenantId);
+        var session = (await Workflow(upload, seed).ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
+        await using var reader = database.CreateTenantContext(seed.TenantId);
+        await using var context = database.CreateSelectedContext(null);
+        var saved = await reader.StorageUploadSessions.AsNoTracking().SingleAsync(value => value.Id == session.Id);
+        context.Attach(saved);
         saved.Visibility = StorageObjectVisibilities.PublicImage;
         await Assert.That(() => context.SaveChangesAsync()).Throws<DbUpdateException>();
         context.ChangeTracker.Clear();
-        saved = await context.StorageUploadSessions.SingleAsync(value => value.Id == session.Id);
+        saved = await reader.StorageUploadSessions.AsNoTracking().SingleAsync(value => value.Id == session.Id);
+        context.Attach(saved);
         saved.StorageObjectId = seed.ForeignObjectId;
         await Assert.That(() => context.SaveChangesAsync()).Throws<DbUpdateException>();
     }
@@ -965,7 +971,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     {
         var seed = await SeedAsync();
         var policy = EventResourceGovernancePolicy.Default(long.MaxValue);
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, () =>
         {
             policy = EventResourceGovernancePolicy.Default(1);
@@ -973,7 +979,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         }, governancePolicy: () => policy);
         var session = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
         await Assert.That((await FinalizeAsync(workflow, session.Id)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).StorageObjectId).IsNull();
         await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == seed.ResourceId)).IsFalse();
     }
@@ -982,11 +988,11 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task ProviderChecksumMustMatchTheInspectedBytes()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, corruptChecksum: true);
         var session = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
         await Assert.That((await FinalizeAsync(workflow, session.Id)).FailureCode).IsEqualTo(FailureCodes.StorageUploadWriteFailed);
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         var staged = await verify.StorageObjects.SingleAsync(value => value.OwningResourceId == seed.ResourceId);
         await Assert.That(staged.DocumentSafetyState).IsEqualTo(StorageDocumentSafetyStates.Unavailable);
         await Assert.That(staged.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
@@ -997,13 +1003,15 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task SessionOwnerAndCurrentTenantAreRequiredEvenForManagementAuthority()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var session = (await Workflow(context, seed).ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
-        await using var foreign = database.CreateContext();
+        await using var foreign = database.CreateTenantContext(seed.TenantId);
         var differentSubject = Workflow(foreign, seed with { UserId = Guid.CreateVersion7() });
         await Assert.That((await FinalizeAsync(differentSubject, session.Id)).IsSuccess).IsFalse();
         await Assert.That((await differentSubject.CancelAsync(session.Id, default)).IsSuccess).IsFalse();
-        var differentTenant = Workflow(foreign, seed with { TenantId = Guid.CreateVersion7() });
+        var foreignSeed = seed with { TenantId = Guid.CreateVersion7() };
+        await using var foreignTenant = database.CreateTenantContext(foreignSeed.TenantId);
+        var differentTenant = Workflow(foreignTenant, foreignSeed);
         await Assert.That((await FinalizeAsync(differentTenant, session.Id)).IsSuccess).IsFalse();
         await Assert.That((await differentTenant.CancelAsync(session.Id, default)).IsSuccess).IsFalse();
     }
@@ -1012,10 +1020,10 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task PrivacyFenceCommittedDuringWriteBlocksAttachmentAndFurtherReservation()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, async () =>
         {
-            await using var fence = database.CreateContext();
+            await using var fence = database.CreateSelectedContext(null);
             var intent = PrivacyErasureIntent.Record(Guid.CreateVersion7(), 1, PrivacyErasureSubjectKind.User, seed.UserId,
                 Enum.GetValues<PrivacyErasureReasonCode>()[0], 1, Now, Now);
             fence.PrivacyErasureSagas.Add(PrivacyErasureSaga.Start(intent, 1, RandomNumberGenerator.GetBytes(32), Now.AddHours(1), Now));
@@ -1024,7 +1032,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         var session = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
         await Assert.That((await FinalizeAsync(workflow, session.Id)).FailureCode).IsEqualTo("privacy_erasure_fenced");
         await Assert.That((await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).FailureCode).IsEqualTo("privacy_erasure_fenced");
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).StorageObjectId).IsNull();
     }
 
@@ -1032,17 +1040,17 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task ResourceDeletedDuringWriteCannotBeResurrected()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var workflow = Workflow(context, seed, async () =>
         {
-            await using var deleting = database.CreateContext();
+            await using var deleting = database.CreateTenantContext(seed.TenantId);
             var resource = await deleting.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
             resource.Delete(resource.ConcurrencyStamp, seed.UserId, Now);
             await deleting.SaveChangesAsync();
         });
         var session = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!;
         await Assert.That((await FinalizeAsync(workflow, session.Id)).IsSuccess).IsFalse();
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That(await verify.EventResources.AnyAsync(value => value.Id == seed.ResourceId)).IsFalse();
         await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == seed.ResourceId)).IsFalse();
     }
@@ -1051,12 +1059,12 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     public async Task QuotaDenialUsesExistingStructuredContractWithoutReservingBytes()
     {
         var seed = await SeedAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(seed.TenantId);
         var result = await Workflow(context, seed, quotaBytes: Pdf.Length - 1)
             .ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
         await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.QuotaExceeded);
         await Assert.That(result.QuotaExceeded!.Attempted).IsEqualTo(Pdf.Length);
-        await using var verify = database.CreateContext();
+        await using var verify = database.CreateTenantContext(seed.TenantId);
         await Assert.That(await verify.StorageUploadSessions.AnyAsync(value => value.OwningResourceId == seed.ResourceId)).IsFalse();
         await Assert.That((await verify.StorageUsageCounters.SingleAsync(value => value.TenantId == seed.TenantId)).ReservedBytes).IsEqualTo(0);
     }
@@ -1065,7 +1073,11 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
     {
         await using var seeder = EventResourcePersistenceTests.TestDatabase.CreateProvider(() => database.CreateContext());
         var scope = await seeder.SeedScopeAsync();
-        await using var context = database.CreateContext();
+        await using var context = database.CreateTenantContext(scope.TenantAId);
+        await using var humanGate = new HumanSecuritySourceGate(context);
+        await using var human = await humanGate.AcquireAsync();
+        await using var discoveryGate = new EventDiscoveryEnrollmentGate(context);
+        await using var discovery = await discoveryGate.AcquireAsync();
         // The relational-model fixture's large, unattached local document is not
         // part of this upload-only quota fixture. Keep the foreign-tenant document.
         await context.StorageObjects.Where(value => value.Id == scope.StorageAId).ExecuteDeleteAsync();
@@ -1115,7 +1127,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         {
             await Assert.That(context.Database.CurrentTransaction).IsNull();
             var input = call.Arg<FileStorageWriteInput>() ?? throw new InvalidOperationException("A provider write requires content.");
-            await using (var verifyStage = database.CreateContext())
+            await using (var verifyStage = database.CreateTenantContext(seed.TenantId))
                 await Assert.That(await verifyStage.StorageObjects.AnyAsync(value => value.ObjectKey == input.ObjectKey
                     && value.LifecycleState == StorageObjectLifecycleStates.DeleteRequested)).IsTrue();
             if (beforeWrite is not null) await beforeWrite();
@@ -1138,7 +1150,8 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             ModerationRecognitionResourceFixture.Reader(context));
         var authority = new EventResourceAuthorityOrchestrator(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
-                new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                     Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
                     global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
@@ -1169,7 +1182,8 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         user.IsAuthenticated.Returns(true);
         return new(repository, unit, Lifecycle(context), new EventResourceAuthorityOrchestrator(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
-                new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                     Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
                     global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
@@ -1258,7 +1272,14 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             await using var schema = new ExploreDbContext(_options);
             await schema.Database.EnsureCreatedAsync();
             await SqliteDatabaseInitializer.InitializeAsync(schema, CancellationToken.None);
-            await LookupTableSeeder.SeedAsync(schema);
+            schema.BindTenantLease();
+            await using (var humanGate = new HumanSecuritySourceGate(schema))
+            {
+                await using var human = await humanGate.AcquireAsync();
+                await using var discoveryGate = new EventDiscoveryEnrollmentGate(schema);
+                await using var discovery = await discoveryGate.AcquireAsync();
+                await LookupTableSeeder.SeedAsync(schema);
+            }
             _options = TestDbContextOptions.Create(_options).UseModel(schema.Model).Options;
         }
         public ExploreDbContext CreateContext(params IInterceptor[] interceptors)
@@ -1273,5 +1294,19 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             if (_connection is not null) await _connection.DisposeAsync();
             if (Privacy is not null) await Privacy.DisposeAsync();
         }
+        public ExploreDbContext CreateTenantContext(Guid tenantId, params IInterceptor[] interceptors)
+            => CreateSelectedContext(tenantId, interceptors);
+
+        internal ExploreDbContext CreateSelectedContext(Guid? tenantId, params IInterceptor[] interceptors)
+        {
+            var options = TestDbContextOptions.Create(_options).AddInterceptors(interceptors).Options;
+            var context = new ExploreDbContext(options)
+            {
+                TenantContext = tenantId is { } selected ? new TestTenantContext(selected) : null
+            };
+            context.BindTenantLease();
+            return context;
+        }
+        private sealed record TestTenantContext(Guid TenantId) : ITenantContext;
     }
 }

@@ -1,0 +1,30 @@
+Change-Id: CHG-01M52SZX0M0F567Q8TT6BWT6HC
+Title: "Add source-owned PostgreSQL principal observation and acquisition"
+Type: feat
+Scope: access
+Summary: "Provide actor-bound native principal facts and Serializable source exclusion with exact catalog admission."
+Group: native-principal-source-contract
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Execute-only principal routines enforce original session authority and reject source, body, privilege and tenant-policy drift.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Explicit migrator installation provides the native prerequisite; production installation wiring remains separate.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Native prerequisites do not enable mutation protection without production installation and verified consumers.

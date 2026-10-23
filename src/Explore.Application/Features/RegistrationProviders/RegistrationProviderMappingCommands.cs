@@ -1,5 +1,3 @@
-using Explore.Application.Contracts.Identity;
-using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
@@ -15,61 +13,27 @@ using static Explore.Application.Features.RegistrationProviders.Commands.Registr
 
 namespace Explore.Application.Features.RegistrationProviders.Commands;
 
-public sealed record ImportRegistrationProviderSchemaRevisionCommand(
-    Guid TenantId,
-    Guid ConnectionId,
-    RegistrationProviderSchemaAuthorityEnum Authority,
-    RegistrationEvidenceHash RevisionHash,
-    DateTime ObservedAt) : ICommand<BaseCommandResponse<Guid>>;
-
-public sealed record ReplaceDraftRegistrationProviderMappingsCommand(
+// Database-only implementation inputs, not independently discoverable native operations.
+// Production invocation belongs exclusively to the acquired Event management parents.
+internal sealed record ReplaceDraftRegistrationProviderMappingsCommand(
     Guid TenantId,
     Guid BindingId,
     IReadOnlyList<RegistrationProviderFieldMappingInput> Fields,
-    IReadOnlyList<RegistrationProviderOptionMappingInput> Options) : ICommand<BaseCommandResponse<Guid>>;
+    IReadOnlyList<RegistrationProviderOptionMappingInput> Options);
 
-public sealed record PublishRegistrationProviderBindingCommand(
+internal sealed record PublishRegistrationProviderBindingCommand(
     Guid TenantId,
     Guid EventId,
     Guid BindingId,
     RegistrationProviderSchemaDriftClass DriftClass,
-    DateTime PublishedAt) : ICommand<BaseCommandResponse<Guid>>;
+    DateTime PublishedAt);
 
 public sealed record RegistrationProviderFieldMappingInput(string PlatformFieldKey, string ProviderFieldKey, bool IsRequired);
 public sealed record RegistrationProviderOptionMappingInput(string PlatformFieldKey, string PlatformOptionKey, string ProviderOptionKey);
 
-public sealed class ImportRegistrationProviderSchemaRevisionCommandHandler(IRegistrationProviderRepository repository)
-    : ICommandHandler<ImportRegistrationProviderSchemaRevisionCommand, BaseCommandResponse<Guid>>
+internal sealed class ReplaceDraftRegistrationProviderMappingsCommandHandler(IRegistrationProviderRepository repository)
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ImportRegistrationProviderSchemaRevisionCommand request, CancellationToken cancellationToken = default)
-    {
-        await new ImportRegistrationProviderSchemaRevisionCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
-        if (await repository.GetConnectionAsync(request.TenantId, request.ConnectionId, cancellationToken) is null)
-        {
-            return RegistrationProviderCommandResponses.Failure(Guid.Empty, "registration_provider_connection_not_found");
-        }
-
-        RegistrationProviderSchemaRevision revision = RegistrationProviderSchemaRevision.Create(
-            request.TenantId,
-            request.ConnectionId,
-            request.Authority,
-            request.RevisionHash,
-            "legacy",
-            null,
-            "{\"schema\":\"legacy.registration-provider-schema-revision\",\"fields\":[]}",
-            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(request.RevisionHash.Value))),
-            RegistrationProviderDriftClassEnum.NoDrift,
-            request.ObservedAt);
-        await repository.AddSchemaRevisionAsync(revision, cancellationToken);
-        await repository.SaveChangesAsync(cancellationToken);
-        return RegistrationProviderCommandResponses.Success(revision.Id, "Registration provider schema revision imported.");
-    }
-}
-
-public sealed class ReplaceDraftRegistrationProviderMappingsCommandHandler(IRegistrationProviderRepository repository)
-    : ICommandHandler<ReplaceDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>>
-{
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReplaceDraftRegistrationProviderMappingsCommand request, CancellationToken cancellationToken = default)
+    internal async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReplaceDraftRegistrationProviderMappingsCommand request, CancellationToken cancellationToken = default)
     {
         await new ReplaceDraftRegistrationProviderMappingsCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
         RegistrationProviderBinding? binding = await repository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
@@ -121,48 +85,17 @@ public sealed class ReplaceDraftRegistrationProviderMappingsCommandHandler(IRegi
     private static string Normalize(string value) => value.Trim();
 }
 
-public sealed class PublishRegistrationProviderBindingCommandHandler(
+internal sealed class PublishRegistrationProviderBindingCommandHandler(
     IRegistrationProviderRepository repository,
     IRegistrationProviderRegistry registry,
-    IRegistrationProviderManagedPublishPreflight preflight,
-    TimeProvider clock,
-    IMachinePrincipalAccessor machine,
     IEventPublicationMutationBoundary publicationBoundary)
-    : ICommandHandler<PublishRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>,
-      ICommandHandler<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishEventRegistrationProviderBindingCommand request,
-        CancellationToken cancellationToken = default)
-    {
-        RequireEventScope(request.TenantId, request.EventId);
-        var binding = await repository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
-        if (binding is null || !await repository.FormVersionBelongsToEventAsync(request.TenantId, request.EventId,
-                binding.RegistrationFormId, binding.RegistrationFormVersionId, cancellationToken))
-            return Missing(request.BindingId);
-
-        async Task<BaseCommandResponse<Guid>> PublishReadyAsync(RegistrationProviderBinding current, CancellationToken token)
-        {
-            var readiness = await preflight.RunAsync(request.TenantId, request.EventId, current, token);
-            if (!readiness.Succeeded)
-            {
-                string code = readiness.FailureCode ?? "registration_provider_preflight_failed";
-                return BaseCommandResponse.Failure<Guid>(code, code, readiness.Errors, request.BindingId);
-            }
-            return await PublishAsync(current, ToSchemaDriftClass((RegistrationProviderDriftClassEnum)current.DriftClassId),
-                clock.GetUtcNow().UtcDateTime, token);
-        }
-
-        return machine.Current is null && IsLocalDelegated(binding)
-            ? await ExecuteSelectedAsync(request.EventId, binding, PublishReadyAsync, cancellationToken)
-            : await PublishReadyAsync(binding, cancellationToken);
-    }
-
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
+    internal async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
     {
         await new PublishRegistrationProviderBindingCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
         RegistrationProviderBinding? binding = await repository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
         if (binding is null) return Missing(request.BindingId);
-        return machine.Current is null && IsLocalDelegated(binding)
+        return IsLocalDelegated(binding)
             ? await ExecuteSelectedAsync(request.EventId, binding,
                 (current, token) => PublishAsync(current, request.DriftClass, request.PublishedAt, token), cancellationToken)
             : await PublishAsync(binding, request.DriftClass, request.PublishedAt, cancellationToken);
@@ -177,7 +110,7 @@ public sealed class PublishRegistrationProviderBindingCommandHandler(
                 plan.TenantId, eventId, plan.FormId, plan.VersionId, cancellationToken))
             return Missing(original.Id);
 
-        var result = await publicationBoundary.ExecuteAsync(eventId, async token =>
+        var result = await publicationBoundary.ExecuteInCurrentTransactionAsync(eventId, async token =>
         {
             var current = await repository.GetBindingForPublicationAsync(plan.TenantId, plan.BindingId,
                 plan.ConnectionId, plan.FormId, plan.VersionId, token);
@@ -275,18 +208,7 @@ public sealed class PublishRegistrationProviderBindingCommandHandler(
     };
 }
 
-public sealed class ImportRegistrationProviderSchemaRevisionCommandValidator : AbstractValidator<ImportRegistrationProviderSchemaRevisionCommand>
-{
-    public ImportRegistrationProviderSchemaRevisionCommandValidator()
-    {
-        RuleFor(command => command.TenantId).NotEmpty();
-        RuleFor(command => command.ConnectionId).NotEmpty();
-        RuleFor(command => command.RevisionHash).NotNull();
-        RuleFor(command => command.ObservedAt).Must(value => value.Kind == DateTimeKind.Utc && value != default);
-    }
-}
-
-public sealed class ReplaceDraftRegistrationProviderMappingsCommandValidator : AbstractValidator<ReplaceDraftRegistrationProviderMappingsCommand>
+internal sealed class ReplaceDraftRegistrationProviderMappingsCommandValidator : AbstractValidator<ReplaceDraftRegistrationProviderMappingsCommand>
 {
     public ReplaceDraftRegistrationProviderMappingsCommandValidator()
     {
@@ -307,7 +229,7 @@ public sealed class ReplaceDraftRegistrationProviderMappingsCommandValidator : A
     }
 }
 
-public sealed class PublishRegistrationProviderBindingCommandValidator : AbstractValidator<PublishRegistrationProviderBindingCommand>
+internal sealed class PublishRegistrationProviderBindingCommandValidator : AbstractValidator<PublishRegistrationProviderBindingCommand>
 {
     public PublishRegistrationProviderBindingCommandValidator()
     {

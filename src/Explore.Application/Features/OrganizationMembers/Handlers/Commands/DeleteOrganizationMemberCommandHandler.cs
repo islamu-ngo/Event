@@ -18,17 +18,20 @@ public class DeleteOrganizationMemberCommandHandler : ICommandHandler<DeleteOrga
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IUserContext _userContext;
     private readonly IOrganizationMemberMutationBoundary _mutation;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
 
     public DeleteOrganizationMemberCommandHandler(
         IOrganizationMemberRepository organizationMemberRepository,
         IOrganizationRepository organizationRepository,
         IUserContext userContext,
-        IOrganizationMemberMutationBoundary mutation)
+        IOrganizationMemberMutationBoundary mutation,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _organizationMemberRepository = organizationMemberRepository;
         _organizationRepository = organizationRepository;
         _userContext = userContext;
         _mutation = mutation;
+        _preparation = preparation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteOrganizationMemberCommand request, CancellationToken cancellationToken)
@@ -38,14 +41,21 @@ public class DeleteOrganizationMemberCommandHandler : ICommandHandler<DeleteOrga
             return BaseCommandResponse.Validation<Guid>(["Invalid requester User ID."], "Invalid requester User ID.");
         }
 
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
         return await _mutation.ExecuteRemovalAsync(request.MemberId, false,
-            (actor, token) => DeleteAsync(request, actor, token), cancellationToken);
+            async (actor, token) =>
+            {
+                await prepared.AcquireAsync(request, token);
+                var result = await DeleteAsync(request, actor, token);
+                if (result.IsSuccess) prepared.Complete(result.Id);
+                return result;
+            }, cancellationToken);
     }
 
     private async Task<BaseCommandResponse<Guid>> DeleteAsync(DeleteOrganizationMemberCommand request,
         Guid requesterGuid, CancellationToken cancellationToken)
     {
-        var memberToDelete = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.MemberId);
+        var memberToDelete = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.MemberId, cancellationToken);
 
         if (memberToDelete == null)
         {

@@ -13,6 +13,7 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 
 namespace Event.Persistence.IntegrationTests.Keycloak;
 
@@ -58,7 +59,8 @@ public sealed class KeycloakConnectionOwnershipPersistenceTests
         AuthProviderConfigurationDto result = await service.ReadConfigurationAsync();
 
         await Assert.That(result.KeycloakClientSecretOwnership.Configured).IsTrue();
-        await Assert.That(result.KeycloakClientSecret).IsEmpty();
+        string metadata = JsonSerializer.Serialize(result);
+        await Assert.That(metadata.Contains(secretCanary, StringComparison.Ordinal)).IsFalse();
         await Assert.That(result.ToString()).DoesNotContain(secretCanary);
     }
 
@@ -69,20 +71,12 @@ public sealed class KeycloakConnectionOwnershipPersistenceTests
         IConfiguration configuration = new ConfigurationBuilder().Build();
         var unitOfWork = new EfCoreUnitOfWork(fixture.Context);
         var mutationLock = new RelationalSettingMutationLock(fixture.Context, unitOfWork);
-        var writer = new VisitorAccessSettingsWriter(
-            fixture.Context,
-            mutationLock,
-            unitOfWork,
-            new EventParticipationConfigurationRepository(fixture.Context),
-            configuration);
         return new AuthProviderConfigurationService(
-            new SystemSettingRepository(fixture.Context, mutationLock),
+            SystemSettingRepository.CreateReadOnly(fixture.Context, mutationLock),
             configuration,
-            unitOfWork,
-            mutationLock,
-            writer,
+            fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.IPolicyMutationExecutionScopeFactory>(),
             new KeycloakConnectionResolver(secretResolver, configuration),
-            fixture.Services.GetServices<INotificationHandler<SettingChangedNotification>>());
+            secretResolver);
     }
 
     private sealed class StaticSecretResolver(

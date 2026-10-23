@@ -636,6 +636,49 @@ Table "external_api_key_issuance_receipts" {
   Note: 'Durable one-time issuance identity. Digests only; no recoverable credential, TTL, or cascading user/key foreign key. Null tenant denotes explicit global scope.'
 }
 
+Table "integration_sync_outbox" {
+  "id" uuid [pk, not null]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "kind" int [not null]
+  "source_type" varchar(100) [not null]
+  "source_id" uuid [not null]
+  "event_id" uuid [ref: > events.id]
+  "registration_order_id" uuid
+  "user_id" uuid [ref: > users.id]
+  "subscriber_email" varchar(320) [not null]
+  "subscriber_name" varchar(320)
+  "subscriber_payload_json" jsonb [not null]
+  "listmonk_list_id" int [not null]
+  "preconfirm_subscriptions" boolean [not null]
+  "status" int [not null]
+  "evidence_kind" int [not null, note: '0 None; 1 handoff in doubt; 2 ambiguous outcome; 3 accepted by operator evidence; 4 definitely-not-accepted retry; 5 operator dead letter. Range 0–5; C# validates status compatibility. Never derived from last_error.']
+  "attempt_count" int [not null]
+  "max_attempts" int [not null, default: 5]
+  "next_attempt_at" timestamptz
+  "processing_started_at" timestamptz
+  "processing_lease_token" uuid
+  "completed_at" timestamptz
+  "dead_lettered_at" timestamptz
+  "last_failure_at" timestamptz
+  "last_error" varchar(2000)
+  "correlation_id" varchar(200)
+  "created_at" timestamptz [not null]
+  "created_by" uuid
+  "updated_at" timestamptz
+  "updated_by" uuid
+  "is_deleted" boolean [not null]
+  "deleted_at" timestamptz
+  "deleted_by" uuid
+  indexes {
+    (status, next_attempt_at, created_at)
+    (tenant_id, source_type, source_id, kind) [note: 'Unique for non-deleted rows; provider-specific implementation is EF-owned.']
+    (tenant_id, status, last_failure_at)
+  }
+  Note: 'Claim-fenced Listmonk subscriber delivery. Private subscriber/diagnostic data remains separate from non-private typed recovery evidence.'
+}
+
+Ref: integration_sync_outbox.(tenant_id, registration_order_id) > registration_orders.(tenant_id, id) [delete: restrict]
+
 Table "event_discovery_snapshot_reservations" {
   "tenant_id" uuid [pk, not null]
   Note: 'Dedicated native reservation fence. No public-source foreign key; capture acquires this before source reads.'
@@ -8916,6 +8959,41 @@ Ref: "event_resource_audit_entries".("tenant_id", "event_resource_id") > "event_
 // ============================================================
 // Keycloak Operator Safety Receipts
 // ============================================================
+
+Table "authentication_credential_cutover_receipts" {
+  "id" uuid [pk, not null]
+  "instance_id" uuid [not null]
+  "created_by" uuid [not null]
+  "created_at" timestamptz [not null]
+  "deadline" timestamptz [not null]
+  "updated_at" timestamptz [not null]
+  "deployment_revision" uuid [not null]
+  "authority" varchar(32) [not null, note: 'Environment, Infisical, or UserSecrets.']
+  "authority_profile_revision" uuid [not null]
+  "concurrency_stamp" uuid [not null, note: 'Application-generated optimistic mutation fence.']
+  "state" varchar(32) [not null, note: 'Prepared, Collecting, ReadyForCleanup, Cleaned, Failed, Expired, Superseded.']
+  "required_replacements" text [not null, note: 'Owned JSON snapshot: exact replica, previous/new process boot, consumer and opaque generation membership.']
+  "activations" text [not null, note: 'Value-free JSON activation evidence; no credential digests or provider coordinates.']
+  "fence" text [note: 'Exact deployment/operator attestation of old process, writer and session fencing.']
+  "cleaned_setting_count" int [note: 'Null before cleanup; nonnegative committed count afterward.']
+  "cleaned_binding_count" int [note: 'Null before cleanup; nonnegative committed count afterward.']
+
+  indexes {
+    (instance_id, id) [unique, name: 'ak_authentication_credential_cutover_receipts_instance_id_id']
+  }
+
+  Note: 'Retained instance-owned coordinated-restart evidence. A failed or expired operation cannot be reopened by late callbacks. Readiness alone does not prove cleanup. Authorized exact legacy row deletion and nonsecret terminal counts commit atomically; canonical, tenant, qualified and infrastructure references remain intact. Terminal recovery returns counts without repeating deletion.'
+}
+
+Table "authentication_credential_cutover_heads" {
+  "instance_id" uuid [pk, not null]
+  "current_operation_id" uuid [not null]
+  "concurrency_stamp" uuid [not null]
+
+  Note: 'One current operation per instance. Every evidence/replacement/cleanup decision must first flush a conditional head update and retain it through the owning transaction.'
+}
+
+Ref: "authentication_credential_cutover_heads".(instance_id, current_operation_id) > "authentication_credential_cutover_receipts".(instance_id, id) [delete: restrict]
 
 Table "keycloak_operation_receipts" {
   "id" uuid [pk, not null, note: 'Application-generated UUIDv7 operation identity.']

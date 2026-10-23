@@ -114,12 +114,7 @@ public sealed class TransferEventOwnershipCommandHandler
         {
             _metrics.RecordEventRoleAssignmentChanged("transfer-ownership", "denied", RoleCodeFor((int)RoleEnum.EventOwner));
             _logger.LogWarning(
-                "Event ownership transfer denied TenantId={TenantId} EventId={EventId} CurrentOwnerAssignmentId={CurrentOwnerAssignmentId} NewOwnerUserId={NewOwnerUserId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
-                request.TenantId,
-                request.EventId,
-                request.CurrentOwnerAssignmentId,
-                request.NewOwnerUserId,
-                actorUserId,
+                "Event ownership transfer denied: {DenyReason}",
                 "event_ownership_transfer_forbidden");
             await WriteAuditAsync(
                 _auditLogRepository,

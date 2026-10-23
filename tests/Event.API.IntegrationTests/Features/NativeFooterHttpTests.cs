@@ -265,12 +265,13 @@ public sealed class NativeFooterHttpTests
         var services = scope.ServiceProvider;
         services.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
         await Assert.That(async () => await services.GetRequiredService<ICommandHandler<CreateFooterLinkGroupCommand, BaseCommandResponse<Guid>>>()
-            .ExecuteAsync(new() { TenantId = PlatformDefaults.DefaultTenantId, UserId = seed.User.Id, Title = "Denied" }, default)).Throws<AuthorizationException>();
-        var governance = await services.GetRequiredService<ICommandHandler<UpdateFooterGovernanceSettingsCommand, BaseCommandResponse<Guid>>>()
-            .ExecuteAsync(new() { UserId = seed.User.Id, Patch = new() { LockTenantLinkGroups = OptionalUpdate<bool>.Set(true) } }, default);
-        await Assert.That(governance.IsSuccess).IsFalse();
-        await Assert.That(await services.GetRequiredService<IQueryHandler<GetFooterLinkGroupListQuery, List<FooterLinkGroupListDto>>>().QueryAsync(new(), default)).IsEmpty();
-        await Assert.That((await services.GetRequiredService<IQueryHandler<GetFooterGovernanceSettingsQuery, FooterGovernanceSettingsDto>>().QueryAsync(new(), default)).LockTenantLinkGroups).IsFalse();
+            .ExecuteAsync(new() { TenantId = PlatformDefaults.DefaultTenantId, UserId = seed.User.Id, Title = "Denied" }, default)).Throws<UnauthorizedAccessException>();
+        await Assert.That(async () => await services.GetRequiredService<ICommandHandler<UpdateFooterGovernanceSettingsCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(new() { Patch = new() { LockTenantLinkGroups = OptionalUpdate<bool>.Set(true) } }, default)).Throws<UnauthorizedAccessException>();
+        await Assert.That(async () => await services.GetRequiredService<IQueryHandler<GetFooterLinkGroupListQuery, List<FooterLinkGroupListDto>>>()
+            .QueryAsync(new(), default)).Throws<UnauthorizedAccessException>();
+        await Assert.That(async () => await services.GetRequiredService<IQueryHandler<GetFooterGovernanceSettingsQuery, FooterGovernanceSettingsDto>>()
+            .QueryAsync(new(), default)).Throws<UnauthorizedAccessException>();
     }
 
     private static async Task<SeedData> SeedAsync(FooterFactory factory, bool singleTenant = true)

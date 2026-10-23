@@ -1,5 +1,9 @@
 ## Key Decisions
 
+- [2026-10-14 Europe/Brussels] **Native Configurator adoption supersedes the exporter model** — The Steward rejected `eng/configurator/` as contrary to the intended maintainer UX and requested its removal. Contributors use the portable `configurator-integrate` Agentic Skill with an AI agent that researches Event's public configuration declarations, schemas, validators and synthetic examples, then authors the integration file. The standalone Configurator CLI checks, revises, builds and exercises that file; Event retains target validation and apply authority. No bespoke exporter, downloader, compiler wrapper or target runtime dependency is required. The earlier generated-source decision below is historical and superseded. See `docs/internal/CONFIGURATOR_DEFINITION_EXPORT.md` and Configurator's `docs/public/integrate-your-tool.md`.
+
+- **Configurator source and fixture ownership:** Event generates one `configurator.yaml` from its contracts and reviewed host shapes; canonical `definition.json` and its public `release.json` remain the delivery boundary. Synthetic inputs, answers, expected artifacts and catalogue/template snapshots live under `tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/islamu-event/`. The baseline manifest is the two-tenant vector, so only one- and three-tenant variations need separate files. YAML round-trip validation and semantic revision guards preserve scalar meaning and canonical identity while raw source SHA-256 tracks serialization changes. `--write-local` retains compiled bytes and cannot establish compiler freshness; explicit pinned compilation remains a separate gate.
+
 - [2026-09-06 Europe/Brussels] **3-Ring Progressive Verification and Yak-Shaving Quarantine Standards** — Resolved the engineering bottleneck where test diagnosis and failure triage consumed ~50% of developer and agent effort. Codified the 3-Ring Progressive Verification Model: Ring 1 in-memory sliced tests (< 2s) for active coding loops, Ring 2 single-provider integration tests (< 15s) for phase exit gates, and Ring 3 full multi-provider matrix and architecture tests reserved strictly for workstream exit milestones and CI. Codified the Yak-Shaving Quarantine Rule: agents encountering pre-existing, out-of-scope test failures are strictly forbidden from opportunistically fixing them; failures are quarantined in the task context, execution filters are narrowed via `--treenode-filter`, and planned scope is preserved. Hardened persistence integration tests with dynamic schema-per-run PostgreSQL isolation (`SET search_path = test_<run_id>`) and isolated SQLite memory URIs to eliminate container deadlocks and table collision flakes. Re-balanced algorithmic Unicode normalization/casing invariants into sub-millisecond in-memory domain tests. Key files: `AGENTS.md`, `docs/internal/QUICK_REFERENCE.md`, `docs/internal/adr/ADR-028-progressive-testing-and-quarantine.md`, `.agents/CONTEXT_ENGINEERING.md`, `docs/internal/AGENTIC_CONTEXT_ENGINEERING.md`, `tests/Event.Persistence.IntegrationTests/Fixtures/PostgreSqlContainerFixture.cs`, `tests/Event.Persistence.IntegrationTests/Fixtures/SqliteTestDatabaseFactory.cs`, `tests/Event.Domain.UnitTests/UnicodeNormalizationInvariantTests.cs`.
 
 - [2026-09-06 Europe/Brussels] **Self-Contained Agent Interaction & Zero Plan-Opening UX Standard** — Codified Critical Rule #14 and repository-wide interaction policies prohibiting agents from prompting for approval, reporting milestone status, or asking questions using cryptic bare codes (e.g. "P04/P06 with P03 gates open") that force developers to open active plan files in `dev/active/<task>/`. Established the Decision Brief standard: all agent prompts must provide inline context, descriptive feature names, trade-offs, structured options with recommendations, and immediate next actions. The implementation plan serves strictly as internal working memory; the chat response is the developer console. Key files: `AGENTS.md`, `docs/internal/QUICK_REFERENCE.md`, `.agents/CONTEXT_ENGINEERING.md`, `.agents/skills/implement-tasks/SKILL.md`, `.agents/skills/implementation-plan/resources/quality-gates.md`, `.agents/skills/grill-me/SKILL.md`.
@@ -2907,5 +2911,481 @@ Verification executed in the task worktree: `dotnet build src/Explore.Domain/Exp
 
 **Promotion Consideration**:
 - [x] Stays in journal only; native ownership guards, exact model keys and provider-generation regressions own this correction.
+
+---
+
+[2026-10-08 Europe/Brussels] - Policy integrity hashes must not depend on search path
+
+**Context**: PostgreSQL ordinary-role admission was being verified during the tenant-lease security remediation.
+
+**Symptom / Observation**: All five catalog-admission checks and their combined Boolean passed on a raw connection, but the same role and database failed factory admission with `postgres_tenant_runtime_authority_not_ready`. The native search-path regression reproduced false readiness after changing only the connection search path.
+
+**Root Cause**: The installer and readiness check hashed `pg_get_expr` output for USING/CHECK policy expressions. PostgreSQL deparsing can qualify parent-table names differently depending on which schema is visible. The bare API fixture provisioned policies under a different search path from the configured Runtime pool, so unchanged parent-derived policies produced different digests.
+
+**Resolution**: The v2 stamp hashes the stored `polqual::text` and `polwithcheck::text` expression trees together with the source-condition fingerprint. The migrator provisions stamps; Runtime only verifies them. The native regression passed one case, exit0, in1m45s741ms with `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet -- --treenode-filter '/*/*/*PostgresTenantApplicationTableIsolationTests/RuntimeAdmissionPolicyIntegrityDoesNotDependOnConnectionSearchPath' --minimum-expected-tests 1 --no-progress --maximum-parallel-tests 1`. Separate fail-closed and API checks remain pending at this checkpoint.
+
+**Why This Matters for Future Work**: Rendered SQL is presentation, not a connection-independent identity for stored database expressions. Integrity checks must detect policy changes without rejecting legitimate connection configuration differences. Reprovision v2 stamps under migration authority before starting consumers; do not relax Runtime authority or accept old stamps as a fallback.
+
+**References**:
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantRowLevelSecurityModel.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresTenantRuntimeReadiness.cs`
+- `tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresTenantApplicationTableIsolationTests.cs`
+- `docs/internal/SECRETS.md`
+- `docs/public/documentation/readme/configuration-and-operations/environment-variables.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; provisioning and admission guidance already describes the mechanism.
+
+---
+
+[2026-10-08 Europe/Brussels] - Fenced EF reloads must refresh original values
+
+**Context**: Native PostgreSQL materialization was tested with an execute-only federation role, including staged image promotion, replacement, retained physical owners and terminal rollback.
+
+**Symptom / Observation**: Graph-only import passed, but four thumbnail scenarios exhausted retries with `40001: storage_producer_conflict`. Initially, a duplicate tracked `AtprotoRecord` during projection attachment masked that conflict on retry.
+
+**Root Cause**: The native fence updated producer concurrency stamps and returned the refreshed graph. The adapter assigned only current property values before setting the entry to Unchanged, leaving its original comparison values stale. Private deletion compared those originals against the newly fenced database row. Separately, EF relationship fixup had connected a caller-owned projection to the previous attempt's record; clearing tracking did not clear that object reference.
+
+**Resolution**: Reload both current and original mapped values from the authoritative fenced graph. Bind a supplied projection to the current attempt's tracked record before either attachment path. Native `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet -- --treenode-filter '/*/*/*PostgresAtprotoMaterializationAuthorityTests/*' --minimum-expected-tests 5 --no-progress --maximum-parallel-tests 1` passed all five scenarios, exit0, in1m49s472ms. Concurrency predicates, private-table denials, custody checks and rollback assertions remain intact.
+
+**Why This Matters for Future Work**: A server-side fence changes the expected original concurrency value, not just the displayed current value. EF tracking state alone is not a reload contract. Retryable operations must also rebind navigation references on reused input entities to the current attempt's identity map.
+
+**References**:
+- `src/Explore.Persistence/Database/ProviderPrimitives/AtprotoMaterializationProviderOperations.cs`
+- `src/Explore.Persistence/Repositories/AtprotoJetstreamRepository.cs`
+- `tests/Event.Persistence.IntegrationTests/TenantIsolation/PostgresAtprotoMaterializationAuthorityTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the native regression owns this materialization boundary.
+
+---
+
+[2026-10-16 Europe/Brussels] - Shape routine lookup sets without caching live admission
+
+**Context**: Final security programme assurance exposed slow authenticated reads while principal, support and assignment source contracts repeatedly attested PostgreSQL catalog authority.
+
+**Symptom / Observation**: The measured second-pass statement totals were 227.358 ms, 85.022 ms and 152.940 ms respectively. Rewriting only the declared routine-ID lookup set reduced those totals to 150.788 ms, 45.720 ms and 109.092 ms. The targeted authority blocks fell from 82.896/57.116/57.252 ms to 16.184/18.185/18.299 ms.
+
+**Root Cause**: Catalog exclusion predicates embedded repeated scalar `to_regprocedure(signature)` expressions. Representing those same source-declared signatures as an uncorrelated `VALUES` relation changed the query shape without changing the expected routine set or the catalog predicates.
+
+**Resolution**: The three installers now use `SELECT pg_catalog.to_regprocedure(expected.signature) FROM (VALUES ...) expected(signature)` in both existing `NOT IN` predicates. Live role, ACL, ownership, body, schema and source validation remains enabled on every assertion; missing-routine NULL semantics are unchanged. The retained profiler receipt passed 1/1 before its temporary test was removed. Unexpected routine grant/ownership controls passed 2/2, and the disabled-writer control passed 1/1. The unchanged drift controls also passed in the later full support-source cohort. For a focused rerun, use `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --treenode-filter "/*/*/HumanSupportAccessNativeSourceFenceTests/UnexpectedRoutineGrantOrOwnershipFailsLiveAdmission" --minimum-expected-tests 2 --no-progress`; the analogous disabled-writer filter has minimum 1.
+
+**Why This Matters for Future Work**: Optimize a measured catalog query before weakening admission or changing server JIT settings. Faster attestation alone does not prove an end-to-end request meets its budget: subsequent MCP verification still exposed raw settings access and repeated complete graph acquisitions, which required separate fixes.
+
+**References**:
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresHumanPrincipalSourceContract.Installer.cs:100`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresHumanSupportAccessSourceContract.Installer.cs:53`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresHumanEventAssignmentSourceContract.Installer.cs:53`
+- `tests/Event.Persistence.IntegrationTests/HumanSupportAccessNativeSourceFenceTests.cs`
+- `dev/active/event-api-security-remediation/final-programme-assurance-evidence.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; measurements are specific to the retained provider run.
+
+---
+
+[2026-10-16 Europe/Brussels] - Direct SQLite fixtures need transaction lifecycle hooks
+
+**Context**: Final security programme assurance exercised resource-management revocation and authority snapshots over independent SQLite connections.
+
+**Symptom / Observation**: The management class stalled at `RevocationAfterAcceptedReadCannotReuseFinalMutationAuthority`. The independent membership-revocation case failed with `The operation was canceled.` Its stack reached `SemaphoreSlim` acquisition in `RelationalNamedLock.AcquireSqliteProcessLockAsync` during disclosure-epoch finalization. Simple creation and the real 500-resource capacity boundary passed independently, so neither fixture startup nor bulk arrangement explained the stall.
+
+**Root Cause**: The shared test database constructed options with raw `UseSqlite`, omitting the transaction lifecycle interceptors installed by production provider composition. The context constructor installed disclosure interception only. SQLite named locks are process semaphores retained until transaction completion; without the named-lock interceptor, fallback cleanup only scavenged completed transactions on the same physical connection. A different writer connection therefore waited on a semaphore whose database transaction had already completed.
+
+**Resolution**: The existing in-memory fixture now installs `SqliteNamedLockTransactionInterceptor.Instance` and `SqliteProjectionLockTransactionInterceptor.Instance`, matching production lifecycle wiring without inventing a persisted database configuration. The unchanged management class passed 32/32 and authority-snapshot class passed 15/15; the complete nine-class resource cohort passed 145/145 with no failures, skips, aborts or timeouts. Temporary diagnostic source was removed before these receipts. The coherent Release build passed with 600 warnings and zero errors; those warnings remain unclassified.
+
+Exact focused commands, executed under the existing serialized verification locks with a 900-second process bound:
+
+```bash
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --maximum-parallel-tests 1 --treenode-filter "/*/*/EventResourceManagementPersistenceTests/*" --minimum-expected-tests 32 --detailed-stacktrace --report-trx --report-trx-filename Final725-EventResourceManagementPersistenceTests.trx
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --maximum-parallel-tests 1 --treenode-filter "/*/*/EventResourceAuthoritySnapshotPersistenceTests/*" --minimum-expected-tests 15 --detailed-stacktrace --report-trx --report-trx-filename Final725-EventResourceAuthoritySnapshotPersistenceTests.trx
+```
+
+**Why This Matters for Future Work**: A committed database transaction does not by itself release an emulated process lock. Direct-construction fixtures must retain provider lifecycle hooks, especially when testing genuine independent connections. Increasing cancellation budgets or removing the competing writer would hide the missing wiring rather than test revocation.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/EventResourcePersistenceTests.cs`
+- `tests/Event.Persistence.IntegrationTests/EventResourceManagementPersistenceTests.Boundaries.cs`
+- `tests/Event.Persistence.IntegrationTests/EventResourceAuthoritySnapshotPersistenceTests.cs`
+- `src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs:38`
+- `src/Explore.Persistence/Database/ProviderPrimitives/RelationalNamedLock.cs:43`
+- `src/Explore.Persistence/Database/ProviderPrimitives/SqliteNamedLockTransactionInterceptor.cs`
+- `dev/active/event-api-security-remediation/final-programme-assurance-evidence.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; direct fixture composition must follow the existing provider contract.
+
+---
+
+[2026-10-16 Europe/Brussels] - Attest legitimate sibling writers through their owning contracts
+
+**Context**: Managed-provider provisioning attests every non-internal writer on its source relations before native creation or replay.
+
+**Symptom / Observation**: A fully installed database failed the provisioning source catalogue check because the Ordinary Settings Tenant membership row and TRUNCATE writers were absent from the shared inventory. The exact-intersection test also reported these unexpected legitimate writers.
+
+**Root Cause**: Adding a sibling protocol's relation triggers changes the provisioning writer intersection even when provisioning does not own that protocol. Both the production inventory and its independent test inventory omitted the two writers.
+
+**Resolution**: The Ordinary Settings owning partial now supplies both original bodies, role stamp and privilege contract to the existing shared-writer bridge. Provisioning checks their exact function identities, bodies, ACLs and trigger shapes (row flags 29; statement TRUNCATE flags 32), rather than allowing names by prefix or removing the writers. Migration-only whole absence remains distinct from partial installation or a named counterfeit. The fixture retains activation with a valid operator identity and includes both writers in disabled/body-restamped controls.
+
+Fresh native provisioning passed 23/23. Expanded composition passed 48/49, then the remaining original migration-absence/counterfeit case passed 1/1 after correcting explicit-transaction fixture composition and its missing namespace import: 49 distinct cases accepted, not a fresh combined 49-case receipt. The frozen non-incremental build passed with 1,353 unclassified warnings and zero errors.
+
+Exact native commands for the fresh provisioning and final composition case:
+
+```bash
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --maximum-parallel-tests 1 --treenode-filter "/*/*/HumanManagedProviderProvisioningNativeTests/*" --minimum-expected-tests 23 --detailed-stacktrace --report-trx --report-trx-filename Final731-HumanManagedProviderProvisioningNativeTests.trx
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --maximum-parallel-tests 1 --treenode-filter "/*/*/HumanProvisioningSharedWriterCompositionTests/LaterWriterAbsenceIsMigrationOnlyAndCannotHideANamedCounterfeit" --minimum-expected-tests 1 --detailed-stacktrace --report-trx --report-trx-filename Final740-LaterWriterAbsenceIsMigrationOnlyAndCannotHideANamedCounterfeit.trx
+```
+
+**Why This Matters for Future Work**: A closed catalogue must track legitimate cross-protocol composition without learning authority from live metadata. Reusing each owner's original body and privilege declaration preserves strict rejection of drift without duplicating SQL or broadening Runtime authority. Freeze target source during compilation; an incremental success alone did not establish that the changed fixture compiled in this investigation.
+
+**References**:
+- `src/Explore.Persistence/Security/ProviderPrimitives/ProvisioningSharedWriterAssertions.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresOrdinarySettingsContract.Disclosure.cs`
+- `tests/Event.Persistence.IntegrationTests/HumanProvisioningSharedWriterCompositionTests.cs`
+- `dev/active/event-api-security-remediation/final-programme-assurance-evidence.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the existing shared-writer regression owns this composition boundary.
+
+---
+
+[2026-10-12 Europe/Brussels] — Standalone client builds do not export fresh API schema
+
+**Context**: While reviewing the Studio event workspace implementation plan, its phase gates claimed that a standalone Blazor client build would also produce the current backend OpenAPI input. The review changed documentation only.
+
+**Symptom / Observation**: `Explore.Blazor.Client.csproj` regenerates and captures the client from the selected checked-in schema, but its `BuildApiContractForClient` target invokes API export only when `BuildingSolutionFile` is `true`. A successful standalone client build can therefore consume a schema that predates a DTO change.
+
+**Root Cause**: Solution-build ordering and standalone schema-driven generation are deliberately separate contracts. Input hashing proves which schema the client consumed; it does not prove that schema was generated from the latest backend source.
+
+**Resolution**: The reviewed plan now requires native API `GetOpenApiContractInput`, then the API inventory producer, then `GenerateApiClient`, followed by the affected client gate. These commands are planned, not executed or claimed passing in this documentation review. The actual generated client owner is `Clients/EventApiTagClients.g.cs`; older API documentation still contains a retired filename example.
+
+**Why This Matters for Future Work**: Every API contract change needs producer-to-consumer provenance. Standalone client compilation or a matching capture hash alone cannot establish that the backend and browser agree on new nullability or wire shape.
+
+**References**:
+- `src/Explore.Blazor.Client/Explore.Blazor.Client.csproj:134`
+- `src/Explore.API/Explore.API.csproj:109`
+- `eng/tools/Explore.ApiContractInventory/Program.cs:50`
+- `docs/internal/API.md#openapi-export-and-client-generation`
+- Repository evidence: `072f2b6dbd8e4b87e16b795bc02a9ea23f902046`
+
+**Promotion Consideration**:
+- [x] Candidate for updating the API generation guidance when its owning contract work is implemented; no generation tooling change is implied.
+
+---
+
+[2026-10-13 Europe/Brussels] — Projection bootstrap failures depend on shared fixture context
+
+**Context**: Final Studio workspace assurance executed disjoint persistence classes and compared failures against untouched base `c65788c36`. Projection tests unexpectedly failed before reaching their projection assertions.
+
+**Symptom / Observation**: Full-class runs reported `DbUpdateConcurrencyException: Discovery tenant enrollment changed after the empty snapshot.` All three failing methods passed in isolated baseline slices. Full updater-class baseline runs reproduced the exact failing methods; the coordination baseline instead failed Upsert while the current class failed MarkDrained. Both coordination failures stopped in `SeedTenantAsync`, not the dirty-scope behavior being asserted.
+
+**Root Cause**: Projection tests share a PostgreSQL fixture with `SharedType.PerAssembly`. Tenant creation enters the discovery enrollment fence during `SaveChangesAsync`. When its transaction sees an empty tenant catalog, `RequireEmptyCurrentCatalogAsync` checks another ReadCommitted connection and rejects a snapshot that predates an already committed tenant. The reported guard and seed-helper frames are unchanged on base. Concurrent first-tenant bootstrap in a shared fixture can therefore fail a different seeding method depending on execution context; an isolated method does not exercise that contention.
+
+**Resolution**: Preserve the original class failures, isolated passes and different losing coordination methods. Quarantine the existing fixture problem rather than retry until green, serialize the feature's original receipt, change business expectations or modify the enrollment guard. Verification used `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/EventCustomPropertyProjectionUpdaterTests*/*" --minimum-expected-tests 8 --maximum-parallel-tests 2` and the corresponding six-case session-updater and five-case coordination filters on untouched base. Exact-method filters under the same class selected one case each and passed. These are deliberately mixed receipts, not a passing full suite. Future fixture work should establish first-tenant enrollment deterministically before concurrent unrelated projection assertions while retaining separate tests for the real enrollment conflict.
+
+**Why This Matters for Future Work**: A same-class failure count or generic enrollment exception is not proof that the same test failed on base. Compare case identity and seed/guard frames, retain class-versus-isolated differences, and distinguish fixture initialization failure from coverage of later business assertions.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/Projections/CustomPropertyProjectionCoordinationTests.cs:16`
+- `tests/Event.Persistence.IntegrationTests/Projections/CustomPropertyProjectionCoordinationTests.cs:291`
+- `tests/Event.Persistence.IntegrationTests/Projections/EventCustomPropertyProjectionUpdaterTests.cs:393`
+- `tests/Event.Persistence.IntegrationTests/Projections/EventSessionCustomPropertyProjectionUpdaterTests.cs:299`
+- `tests/Event.Persistence.IntegrationTests/Fixtures/ProjectionTestContainerFixture.cs:35`
+- `src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoverySourceProviderOperations.cs:69`
+- `.agents/skills/finding/SKILL.md`
+- Baseline source: `c65788c36`; full-class comparison monitors `mon_559EDJS7B070SM4B` and `mon_BJT4JE70KD30FXY5`; isolated comparison `mon_X9QY8EMF9B0DWN2A`.
+
+**Promotion Consideration**:
+- [x] Stays in journal only; preserve the fixture-context evidence without creating a new product invariant or repairing unrelated tests.
+
+---
+
+[2026-10-18 Europe/Brussels] — Close flock descriptors before starting .NET builds
+
+**Context**: Persistence verification in shared PR #75 serializes expensive builds with an advisory lock in the approved temporary directory.
+
+**Symptom / Observation**: A Release build completed successfully, but the next build waited on the same lock. `lslocks` showed the previous VBCSCompiler process holding `FLOCK WRITE` and the new flock process waiting with `WRITE*`.
+
+**Root Cause**: Without `flock --close`, the launched command inherits the lock descriptor. A compiler server started by that command can outlive the build and retain the descriptor, so command completion does not necessarily release the lock.
+
+**Resolution**: Graceful `dotnet build-server shutdown --vbcscompiler` released the observed inherited lock. Subsequent verification uses `flock --close -w 900 "$TMPDIR/event-security-build.lock" dotnet build ...`; the flock parent retains serialization while compiler children do not inherit the descriptor. The next affected-project Release build completed with exit 0. Do not delete the lock file or kill unrelated builds to bypass contention.
+
+**Why This Matters for Future Work**: A blocked verification process may indicate descriptor inheritance rather than a slow active build. Inspect the actual lock owner before retrying or starting another build, and use close-on-child execution for long-lived compiler processes.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj`
+- `.agents/skills/implement-tasks/SKILL.md`
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; reusable operational diagnosis, no product behavior change.
+
+---
+
+[2026-10-19 Europe/Brussels] — Failed EF saves do not undo earlier native writes
+
+**Context**: PR #75 Persistence verification exercises webhook health changes and evidence insertion on one original PostgreSQL transaction.
+
+**Symptom / Observation**: A real duplicate-key evidence INSERT raised `DbUpdateException` with PostgreSQL state23505. The callback caught it and cleared EF tracking; the unit of work then committed the earlier native health change instead of rejecting completion.
+
+**Root Cause**: EF rolls a failed SaveChanges back to its own savepoint, not to the beginning of the existing transaction. Earlier native writes remain pending, while ChangeTracker.Clear removes tracked evidence that could otherwise reveal incomplete work. Tracking state alone therefore cannot represent the authority to commit the original operation.
+
+**Resolution**: Retain failure state in the original claim binding outside EF tracking and poison only its retained original transaction. Catch failures across binding, insertion and consumption, rethrow the provider error, and require the outer unit of work to reject completion even when the callback catches that error. The existing21 claim cases passed with `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter '/*/*/WebhookLocalDeliveryNativeAuthorityTests/ClaimAuthority*' --minimum-expected-tests 21 --progress off --maximum-parallel-tests 1` (zero failures/skips,exit0). An additional mutable-batch-input counterexample remains under verification; this receipt does not certify that later case or complete PR readiness.
+
+**Why This Matters for Future Work**: A database error and EF savepoint rollback do not prove business-operation rollback. Commit authority must survive tracker clearing, and batch inputs used to find retained bindings must be snapshotted before awaits so caller mutation cannot hide a failed attempt.
+
+**References**:
+- `src/Explore.Persistence/ExploreDbContext.WebhookClaimAuthority.cs:125`
+- `src/Explore.Persistence/Repositories/WebhookDeliveryAttemptRepository.cs:19`
+- `tests/Event.Persistence.IntegrationTests/Repositories/WebhookLocalDeliveryNativeAuthorityTests.ClaimAuthority.cs:395`
+- Official EF transaction behavior, retrieved as prose through Context7: https://learn.microsoft.com/en-us/ef/core/saving/transactions
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; reusable failure-atomicity lesson with a real provider regression.
+
+---
+
+[2026-10-19 Europe/Brussels] — Accepted EF state can outlive creation savepoint effects
+
+**Context**: While moving tenant revision creation into the original C# and EF workflow for PR75, independent security review challenged the lifetime of a private completed-Save receipt. The receipt coalesces initial disclosure without a second epoch update.
+
+**Symptom / Observation**: Two real SQLite cases rolled back a savepoint preceding successful tenant/revision creation, then re-added only the accepted Tenant entry. The original attempt unexpectedly completed, both before and after terminal disclosure flush. The failing-before-fix filter `/*/*/EventDiscoveryEnrollmentProducerTests/SavepointRollbackCannotReuseACompletedCreationReceipt` physically ran two cases, both failed with an expected refusal not thrown; this is not passing mitigation evidence.
+
+**Root Cause**: Savepoint rollback removes database effects but does not rewind accepted EF entries, private completion receipts or an already-flushed flag. Context, connector and physical transaction identity can all remain correct while the receipt's claimed insert no longer exists. Trusting tracked Unchanged state can therefore suppress mandatory revision creation or permit completion after partial rollback.
+
+**Resolution**: The correction invalidates matching original-transaction creation receipts before EF savepoint rollback and poisons terminal completion even when the callback catches an immediate failure. Only whole-attempt rollback/reset permits a fresh lifecycle; no missing-row repair or tenantless Runtime read grant is introduced. Post-fix `/*/*/EventDiscoveryEnrollmentProducerTests/*` physically passed all16cases, zero failures/skips,3m02.415s/exit0 in `pr75-savepoint-bootstrap-workflows.9UguSd.log`, including both before/after-flush counterexamples. This is scoped creation evidence, not full PR readiness. Creation workflows must use EF-owned savepoint APIs: raw provider rollback methods and raw rollback SQL bypass these interceptors and are unsupported by this protocol.
+
+**Why This Matters for Future Work**: A receipt must track the lifetime of the physical effects it attests, not merely successful Save return or unchanged ownership references. Savepoint rollback must invalidate effect-dependent capabilities even after terminal work was previously marked complete. This complements the earlier retained webhook failure-state lesson: partial rollback is not whole-operation rollback in either direction.
+
+**References**:
+- `src/Explore.Persistence/ExploreDbContext.DiscoveryEnrollment.cs`
+- `src/Explore.Persistence/Services/EventDiscoveryDisclosureMutationScope.cs`
+- `src/Explore.Persistence/Database/ProviderPrimitives/EventDiscoveryDisclosureTransactionInterceptor.cs`
+- `tests/Event.Persistence.IntegrationTests/Federation/EventDiscoveryEnrollmentProducerTests.Canonical.cs:148`
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; effect-lifetime and failure-atomicity lesson with behavioral mitigation evidence.
+
+---
+
+[2026-10-19 Europe/Brussels] — SQL boundaries must use EF's stored enum representation
+
+**Context**: PR75 moves configuration and tenant-creation policy into C# while preserving original transactions and fail-closed native boundaries. ConfigurationManifestOperation maps Status and Mode through EF string conversion.
+
+**Symptom / Observation**: The portable failed-history guard attempted GetValue<int>() on the model-serialized string status. An older SQLite failure trigger also compared the stored string against a C# enum ordinal, so the intended failure never occurred. After targeted representation corrections, the full portable atomicity class passed11cases. A separate genuine PostgreSQL regression then reached the original failed-history guard and received22P02 for casting "Applied" to integer, instead of its required42501 rejection. This was a semantic RED, not a missing-authority prerequisite.
+
+**Root Cause**: Handwritten transport, SQL and test-trigger code had duplicated the CLR enum's numeric representation instead of the EF model's provider representation. The enum type itself does not determine whether the stored value is text or numeric. A test can silently stop injecting its intended failure while compilation and normal success paths remain green.
+
+**Resolution**: Derive operation scalars and JSON from the configured EF mapping; retain unrelated integer-backed enums unchanged. The SQLite failure trigger uses the mapped column identifier and relational GenerateSqlLiteral rather than a hand-written ordinal. Portable11 passed with zero failures/skips,2m15.695s/exit0 in `pr75-bootstrap-portable-audit-native-status-red.AENfvn.log`. Native guard plus ValidateOnly2 then passed with zero failures/skips,1m01.279s/exit0 in `pr75-bootstrap-status-validate-corrected.p8Ex29.log`; Applied now reaches the intended42501 refusal. This does not certify successful native failed-history persistence or the separate generic-source locking boundary.
+
+**Why This Matters for Future Work**: Remaining SQL primitives must consume model-derived stored representations instead of maintaining parallel conversion rules. Model-derived formatting is not permission to widen column inventories or grants. Failure tests must demonstrate that the intended real persistence boundary is reached, not merely that an exception occurs somewhere earlier.
+
+**References**:
+- `src/Explore.Persistence/Configurations/Entities/ConfigurationManifestOperationConfiguration.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/ConfigurationManifestBootstrapData.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresConfigurationManifestBootstrapContract.cs`
+- `tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestAtomicPersistenceTests.cs`
+- `tests/Event.Persistence.IntegrationTests/ConfigurationManifest/ConfigurationManifestBootstrapOriginTests.Revisions.cs`
+- Official EF conversion behavior, retrieved through Context7: https://learn.microsoft.com/en-us/ef/core/modeling/value-conversions
+
+**Promotion Consideration**:
+- [x] Stays in journal only; reusable representation-drift and failure-injection lesson with scoped native guard evidence.
+
+---
+
+[2026-10-19 Europe/Brussels] — A committed bootstrap cannot borrow a worker's claim
+
+**Context**: PR75 replaces bootstrap database locking with C# coordination and verifies the genuine Global startup owner against PostgreSQL. Removing the obsolete source-lock privilege failure allowed success cases to reach their post-commit effect handoff.
+
+**Symptom / Observation**: Seven native origin/concurrency cases failed after configuration committed, with `outbox_execution_enrollment_required` during immediate effect failure settlement. The other origin17 and concurrency2 cases passed. Adding enrollment alone would still leave the required original Runtime execution claim absent.
+
+**Root Cause**: Immediate delivery used a direct EF outbox claim, then called settlement that requires the separate native worker's claim-bound Runtime scope. Production Infrastructure selected that same Immediate path. The Deferred option also skipped dispatcher/import registrations, so merely changing its flag would remove services the worker needs. Common Application registration could preselect Immediate before startup through first-wins registration.
+
+**Resolution**: The maintainer authorized a narrow startup/worker repair. Common Application registration now installs services without choosing timing; startup explicitly selects deferred delivery while retaining real dispatcher/import/human-admission services. Bootstrap leaves its atomically stored effect for genuine Runtime admission, dispatch and settlement. Native fixture assertions distinguish durable pending effects from worker completion and do not fabricate an effect for a no-op bootstrap replay. The revised composition/native worker cohort is not yet verified; no passing handoff or deployment readiness is claimed.
+
+**Why This Matters for Future Work**: An outbox message existing in the database is not a worker execution capability. Preserve the original claim, connector and settlement authority instead of recreating a parallel claimer in startup or treating post-commit failure as proof of rollback. Delivery timing must not implicitly remove the services responsible for eventual delivery.
+
+**References**:
+- `src/Explore.Persistence/Security/ConfigurationManifestBootstrapOwnerFactory.cs`
+- `src/Explore.Application/Features/ConfigurationManifest/Application/ConfigurationManifestEffectDelivery.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresOutboxExecutionContract.cs`
+- `src/Explore.Infrastructure/ConfigurationManifest/ConfigurationManifestStartupServicesRegistration.cs`
+- `src/Explore.API/BackgroundServices/OutboxProcessor.cs`
+- `dev/active/event-api-security-remediation/pr75-persistence-verification-current.md`
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; cross-cutting original-claim and registration-ownership lesson pending complete native handoff evidence.
+
+---
+
+[2026-10-19 Europe/Brussels] — Provider snapshot drift can contaminate a new feature migration
+
+**Context**: PR75 adds dedicated federation setting tables with generated EF Core migrations for PostgreSQL, SQLite, SQL Server and MySQL/MariaDB.
+
+**Symptom / Observation**: The generated SQL Server and MySQL federation migrations also widened five unrelated custom-property RegexPattern columns from 1000 to 2048. SQLite carried corresponding snapshot-only differences; PostgreSQL did not.
+
+**Root Cause**: The current C# policy already defines MaximumPatternLength as 2048, and all five configurations use it unchanged. PostgreSQL reconciled the model in 20261017035216_ReconcileProgrammeModel. The other three committed provider snapshots still described 1000, so the next generated feature migration necessarily included their existing drift. Registration-form regex length remains separately and intentionally 1000.
+
+**Resolution**: Isolate a HEAD-only generated provider catch-up prerequisite, then regenerate the unapplied development federation migrations against advanced snapshots. Preserve the intended C# model; never hand-edit a snapshot or generated migration, or reduce the policy to hide the drift. Generation and provider lifecycle verification are still pending at this entry.
+
+**Why This Matters for Future Work**: Review every provider's snapshot baseline before attributing all generated operations to a new feature. Separate prerequisite reconciliation when it makes migration intent and rollback independently reviewable; model-only scaffolding is not proof that database upgrade/downgrade works.
+
+**References**:
+- `src/Explore.Domain/CustomProperties/CustomPropertyPatternPolicy.cs`
+- `src/Explore.Persistence/Migrations/20261017035216_ReconcileProgrammeModel.cs`
+- `src/Explore.Persistence.Migrations.SqlServer/Migrations/ExploreDbContextModelSnapshot.cs`
+- `src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs`
+- `src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs`
+- `dev/active/event-api-security-remediation/pr75-persistence-resume.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal; existing generated-artifact policy already governs the repair.
+
+---
+
+[2026-10-20 Europe/Brussels] — PostgreSQL bootstrap roles cannot prove non-bypass ownership
+
+**Context**: PR75 verifies that the original migration owner retains the required settings visibility after losing SUPERUSER and BYPASSRLS, without replacing its database context or connector.
+
+**Symptom / Observation**: PostgreSQL rejected demotion of the container's initial bootstrap role even when a separate verified superuser issued the command: SQLSTATE 0A000, `The bootstrap superuser must have the SUPERUSER attribute.` The native diagnostic therefore failed during fixture preparation, before its visibility assertion.
+
+**Root Cause**: The cluster bootstrap superuser has a PostgreSQL invariant that an ordinary, separately created migration administrator does not. An additional administrative connection does not make the bootstrap role demotable.
+
+**Resolution**: An opt-in disposable fixture now creates a distinct declared Migrator before migrations, and creates the tested objects under that owner from the outset. The regression then demotes this ordinary role while retaining its original context and connector. This exposed a real FORCE RLS regression: all61 seeded SystemSetting rows became invisible to their owner. Four fixed owner-specific SELECT/INSERT/UPDATE/DELETE policies preserve the declared Migrator's existing storage authority; exact installed-policy attestation rejects drift. The corrected native regression passed in run23074 (one case,0skip,3m17.622s). Runtime, Global and identity-writer permissions are unchanged. Do not transfer ownership after the fact or waive RLS to manufacture evidence.
+
+**Why This Matters for Future Work**: A test of an owner without bypass privileges must actually establish those role attributes. A fixture failure to demote the bootstrap role is neither a product authorization failure nor proof that a demoted owner can still read its data.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/Fixtures/PostgreSqlContainerFixture.cs`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterPermissionsNativeTests.cs`
+- `dev/active/event-api-security-remediation/pr75-persistence-verification-current.md`
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal; provider-specific fixture and FORCE RLS owner-policy lesson.
+
+---
+
+[2026-10-20 Europe/Brussels] — Keep SQL catalog names separate from delimited identifiers
+
+**Context**: PR75 production-migration regressions reapply the installed PostgreSQL PDS queue permissions while verifying identity-writer deployment.
+
+**Symptom / Observation**: Four application-profile cases failed with P0001 `unsafe PDS admission column grants` during the second installation, before reaching writer activation. The fixture and production installer use the same relative PDS installation order.
+
+**Root Cause**: Source review found that the PDS catalog allowlist removed the first and last characters from every result of `ISqlGenerationHelper.DelimitIdentifier`. PostgreSQL provider formatting may leave safe names unquoted, so removing presumed quotes corrupts the catalog names. The initial install sees no column grants, installs its fixed grants, and subsequent installation can reject those same grants. No competing installer reference to the PDS owner/global roles was found in the bounded source review.
+
+**Resolution**: The corrected builder derives raw column names from EF Core model metadata for catalog comparisons, and independently delimits them for SQL identifiers. One fixed property inventory still defines queue SELECT11/UPDATE5 and record SELECT4; permissions, grant-option refusal and role boundaries are unchanged. Two real PostgreSQL regression cases passed in run23074 (0skip,3m15.585s): healthy reapplication succeeds, and an extra SELECT column or grant option is rejected without repairing the injected drift. Production writer-migration verification remains separately pending.
+
+**Why This Matters for Future Work**: An SQL-formatted identifier is not the raw identifier stored in the catalog. Do not recover catalog names with string slicing or assumptions about provider quoting. Test repeat installation as well as an empty-database install; first-install success cannot expose this self-rejection.
+
+**References**:
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresPdsQueueAdmissionContract.cs`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityWriterPermissionsNativeTests.Migrations.cs`
+- `dev/active/event-api-security-remediation/pr75-persistence-verification-current.md`
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal; existing metadata/identifier separation conventions suffice.
+
+---
+
+[2026-10-20 Europe/Brussels] — Resolve configured PostgreSQL roles by exact catalog name
+
+**Context**: PR75 EF-first authentication regression provisions a fresh, accepted deployment login containing mixed case, a backslash, an apostrophe and dollar delimiters. The login is created as an independently quoted identifier; it is not a renamed enrollment.
+
+**Symptom / Observation**: After the authentication profile's literal/deparser correction progressed, the same native regression failed at `PostgresExternalLoginReadPermissions.ApplyAsync` with `55000: external_login_read_permissions_drift`. The failure occurs during installation, before authentication assertions; it is not a successful whole-enrollment test.
+
+**Root Cause**: The external-login column ACL witness resolves a configured raw role name through `to_regrole`. PostgreSQL's object-identifier alias input follows SQL identifier parsing, including case folding outside identifier quotes. Escaping an SQL string literal prevents injection but does not make its contents an exact catalog-name lookup. A separately quoted role creation and an unquoted regrole lookup therefore need not identify the same role. Official PostgreSQL documentation retrieved through Context7 confirms this distinction.
+
+**Resolution**: Resolve the ACL grantee through exact equality against `pg_roles.rolname`, keeping identifier quoting for DDL and complete literal escaping for values separate. Preserve the fixed nine-column inventory, direct owner-issued grants and Runtime/delegation denial. The one-hunk correction is being verified with the existing real fresh-login regression; native GREEN is still pending. The completed failing command was the Persistence integration DLL with `--treenode-filter "/*/*/AuthenticationUnusualLoginSourceTests/*" --minimum-expected-tests 1 --progress off --maximum-parallel-tests 1`, run91234 (one failure, zero skips,47.683 seconds).
+
+**Why This Matters for Future Work**: A trusted deployment name still has several representations: raw catalog name, delimited SQL identifier and escaped SQL literal. Do not pass one representation to an API that parses another. Test accepted mixed-case and punctuation-bearing names through the complete installation chain, not only the first repaired profile.
+
+**References**:
+- `src/Explore.Persistence/Schema/ProviderPrimitives/PostgresExternalLoginReadPermissions.cs`
+- `tests/Event.Persistence.IntegrationTests/TenantIsolation/AuthenticationEfSourceTests.cs`
+- `dev/active/event-api-security-remediation/pr75-persistence-verification-current.md`
+- [PostgreSQL object identifier types](https://www.postgresql.org/docs/17/datatype-oid.html)
+- [PostgreSQL system catalog information functions](https://www.postgresql.org/docs/17/functions-info.html)
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal; complements the existing metadata/identifier separation convention without introducing another authority.
+
+---
+
+[2026-10-20 Europe/Brussels] — Completed lease cleanup must not mask the owner's failure
+
+**Context**: PR #75's application-owned persistence refactor composes the operation error with original-connector and gate-release failures. The same gate adapter can later be disposed by dependency injection.
+
+**Symptom / Observation**: A real PostgreSQL post-COMMIT connector-loss regression reached the injected fault, but later scope disposal exposed only `human_security_source_cleanup_lost_custody`, replacing the original uncertain-settlement classification. A focused SQLite regression reproduces the later-adapter-disposal masking without a host or private data.
+
+**Provider evidence correction (2026-10-20)**: The command regression above uses SQLite, not PostgreSQL: `MutationScopeHumanGateTests.AuthenticatedStore.CreateAsync` selects `EmailDispatchSqliteFixture`. The seven gate regressions and the selected identity-scope factory tests also use SQLite. These results are real transaction/ownership evidence, not PostgreSQL command-path acceptance.
+
+**Root Cause**: The returned lease and scoped adapter both awaited the custody's cached cleanup task. Releasing the lease correctly reported its failure; disposing the adapter later rethrew that already-completed failure over the caller's composed exception.
+
+**Resolution**: The adapter skips only already-completed cleanup. Direct lease disposal still returns the original failure, pending cleanup still joins its original task, and disposal prevents reacquisition through the adapter. Independent HEAD-plus-fix verification passed all seven gate cases with `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/HumanSecuritySourceGateTests/*" --minimum-expected-tests 7 --progress off --maximum-parallel-tests 1`. This primitive correction does not by itself certify the command wrapper's separate post-settlement error composition or the whole PostgreSQL workflow.
+
+**Why This Matters for Future Work**: Distinguish the lease owner's first cleanup result from a containing DI scope's later cleanup. Do not suppress the first failure, abandon a pending release, or replay a possibly committed business operation because cleanup failed.
+
+**References**:
+- `src/Explore.Persistence/Security/HumanSecuritySourceGate.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/HumanSecuritySourceGateCustody.cs`
+- `tests/Event.Persistence.IntegrationTests/HumanSecuritySourceGateTests.cs`
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; a concrete ownership and failure-composition lesson, not a new authorization policy.
+
+---
+
+[2026-10-21 Europe/Brussels] — Email-only saves must retain the account concurrency check
+
+**Context**: While replacing broad account updates with a tracked EF Core profile save in PR75, the email mirror and account verification flag were reviewed together.
+
+**Symptom / Observation**: A real SQLite regression advanced the persisted User stamp, changed only UserPii.Email on the previously loaded account, and saved successfully instead of throwing DbUpdateConcurrencyException. Changing EmailVerified as well had correctly rejected the stale account.
+
+**Root Cause**: UserPii has no concurrency token. When only its email changes, User remains Unchanged, so the normal SaveChanges pipeline neither updates User nor compares its original ConcurrencyStamp. A token on a related entity does not automatically protect an independent row update.
+
+**Resolution**: After validating the narrow dirty-field inventory, SaveIdentityProfileAsync marks only User.ConcurrencyStamp modified for an actual email-only change. Existing SaveChanges rotates its value while retaining the loaded original concurrency predicate. Sync also uses the tracked account resolved inside each retry rather than the outer entity cleared by rollback. The isolated five-path candidate passed all seven profile cases with `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/UserIdentityProfilePersistenceTests/*" --minimum-expected-tests 7 --progress off --maximum-parallel-tests 1` and all46 ActorFederationMapperTests; neither requires a grant or model change.
+
+**Why This Matters for Future Work**: Verify both successful and stale email-only changes when reducing broad EF updates. Do not reset original token values, mark the entire entity Modified, or assume a principal token protects an unchanged principal's dependents. Ordinary SaveChanges still flushes other pending entries in the unit of work; this method is not an exclusive graph-save boundary.
+
+**References**:
+- `src/Explore.Persistence/Repositories/UserRepository.cs`
+- `src/Explore.Persistence/ExploreDbContext.SaveChanges.cs`
+- `src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs`
+- `tests/Event.Persistence.IntegrationTests/Identity/UserIdentityProfilePersistenceTests.cs`
+- [EF Core concurrency documentation](https://learn.microsoft.com/en-us/ef/core/saving/concurrency)
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; concrete tracked-entity and concurrency ownership lesson.
+
+---
+
+[2026-10-21 Europe/Brussels] — Table-privilege cleanup must restore column grants
+
+**Context**: PR75's EF authentication cutover retains adversarial tests that temporarily widen a PostgreSQL permission and prove both admission and installation refuse the drift.
+
+**Symptom / Observation**: The scanner profile's table-SELECT attack passed initial admission and all four refusal/no-repair assertions, but failed its final healthy check. Twenty-three subsequent scanner cases then failed before their intended assertions because they shared the damaged fixture.
+
+**Root Cause**: PostgreSQL table-level privilege revocation also removes the corresponding column privileges. Revoking the deliberately added table SELECT therefore removed the profile's legitimate fixed column SELECT grants; revoking a broader grant is not necessarily the inverse of adding it.
+
+**Resolution**: Only that attack's cleanup now revokes table SELECT and restores the declared sixteen non-grantable column SELECT permissions in one Migrator-owned transaction inside its execution strategy. It uses the fixed property inventory and EF-mapped, quoted physical identifiers, not live ACL inference or production installation as silent repair. All four refusal assertions and the final healthy check remain. The complete scanner class passed 30/30 with no skips using `dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/ScannerAuthenticationReadPortTests/*" --minimum-expected-tests 30 --progress off --maximum-parallel-tests 1`. This does not certify the separate capability or API cohorts.
+
+**Why This Matters for Future Work**: Permission-drift tests need an independently known starting manifest and a healthy check after cleanup. Restore exactly the original authority; do not weaken readiness, expand grants, or interpret a cleanup cascade as many independent product defects.
+
+**References**:
+- `tests/Event.Persistence.IntegrationTests/TenantIsolation/ScannerAuthenticationReadPortTests.cs`
+- `src/Explore.Persistence/Security/ProviderPrimitives/PostgresAdmissionScannerAuthenticationContract.cs`
+- [PostgreSQL 18 REVOKE semantics](https://www.postgresql.org/docs/18/sql-revoke.html), official documentation checked through Context7 on 2026-10-21; behavior facts only, no SQL examples or implementation copied.
+- PR: https://github.com/islamu-ngo/Event/pull/75
+
+**Promotion Consideration**:
+- [x] Stays in journal only; concrete adversarial-fixture restoration lesson. No dependency or production authority change.
 
 ---

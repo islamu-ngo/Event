@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Reflection;
 
 namespace Event.Architecture.Tests;
 
@@ -242,42 +243,32 @@ public sealed class StorageUploadOpenApiContractTests
     [Test]
     public async Task ProviderOperations_MustRetainSafeServerOwnedCallers()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var objectStorageService = await File.ReadAllTextAsync(Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Infrastructure",
-            "Services",
-            "ObjectStorageService.cs"));
-        var presignedDownloadHandler = await File.ReadAllTextAsync(Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Application",
-            "Features",
-            "StorageObjects",
-            "Handlers",
-            "Commands",
-            "IssuePresignedDownloadUrlCommandHandler.cs"));
-        var finalizeHandler = await File.ReadAllTextAsync(Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Application",
-            "Features",
-            "StorageObjects",
-            "Handlers",
-            "Commands",
-            "FinalizeStorageUploadSessionCommandHandler.cs"));
-        var reconciliationService = await File.ReadAllTextAsync(Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Infrastructure",
-            "StorageReconciliationService.cs"));
-
-        await Assert.That(objectStorageService).Contains("GeneratePresignedDownloadUrl");
-        await Assert.That(objectStorageService).DoesNotContain("GeneratePresignedUploadUrl");
-        await Assert.That(presignedDownloadHandler).Contains("GeneratePresignedDownloadUrl");
-        await Assert.That(finalizeHandler).Contains("provider.WriteAsync");
-        await Assert.That(reconciliationService).Contains("ListKnownObjectKeysAsync");
+        Type[] owners =
+        [
+            typeof(Explore.Infrastructure.Services.ObjectStorageService),
+            typeof(Explore.Application.Features.StorageObjects.Handlers.Commands.IssuePresignedDownloadUrlCommandHandler),
+            typeof(Explore.Application.Features.StorageObjects.Handlers.Commands.FinalizeStorageUploadSessionCommandHandler),
+            typeof(Explore.Infrastructure.StorageReconciliationService)
+        ];
+        var calls = owners.Select(owner => owner
+            .GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static
+                | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic
+                | System.Reflection.BindingFlags.DeclaredOnly)
+            .Select(method => method.GetCustomAttribute<System.Runtime.CompilerServices.AsyncStateMachineAttribute>()?.StateMachineType
+                .GetMethod("MoveNext", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic
+                    | System.Reflection.BindingFlags.Public) ?? method)
+            .SelectMany(ConfiguredAdministratorBootstrapArchitectureTests.ReadCalledMethods)
+            .Select(method => method.Name).ToHashSet(StringComparer.Ordinal)).ToArray();
+        await Assert.That(owners[0].GetMethod("GeneratePresignedDownloadUrl")).IsNotNull();
+        await Assert.That(owners[0].GetMethod("GeneratePresignedUploadUrl")).IsNull();
+        await Assert.That(calls[0]).Contains("GetPreSignedURL");
+        await Assert.That(calls[1]).Contains("GeneratePresignedDownloadUrl");
+        await Assert.That(calls[2]).Contains("WriteAsync");
+        await Assert.That(calls[3]).Contains("ListObjectsAsync");
+        var dependencies = owners[3].GetConstructors().Single().GetParameters()
+            .Select(parameter => parameter.ParameterType).ToArray();
+        await Assert.That(dependencies).Contains(typeof(Explore.Application.Contracts.Persistence.IStorageReconciliationOwner));
+        await Assert.That(dependencies).Contains(typeof(Explore.Application.Contracts.Persistence.ILocalStorageQuarantineOwner));
     }
 
     [Test]

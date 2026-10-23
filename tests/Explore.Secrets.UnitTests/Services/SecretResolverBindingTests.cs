@@ -33,6 +33,61 @@ public sealed class SecretResolverBindingTests : IDisposable
     }
 
     [Test]
+    [Arguments(SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)]
+    [Arguments(SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret)]
+    [Arguments(SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks)]
+    public async Task RuntimeCredentialReferenceMutationCannotReuseWarmCredential(string settingKey)
+    {
+        SecretDefinition definition = SecretDefinitionRegistry.GetRequired(settingKey);
+        SecretBinding binding = SecretBinding.CreateEnvironmentVariable(
+            settingKey, SecretScope.Instance, null, definition.DefaultEnvironmentVariableName);
+        binding.Id = Guid.CreateVersion7();
+        var source = new RecordingSecretSource(SecretSourceType.EnvironmentVariable);
+        var resolver = new SecretResolver(new FakeSecretBindingRepository([binding]), [source],
+            _cache, _metrics, NullLogger<SecretResolver>.Instance,
+            Options.Create(new SecretProviderOptions
+            {
+                Provider = SecretProviderType.Environment,
+                Consumer = SecretConsumer.Bff
+            }));
+        SecretResolutionResult initial = await resolver.ResolveAsync(settingKey, null);
+        await Assert.That(initial.IsResolved).IsTrue();
+
+        binding.EnvironmentVariableName = "UNRELATED_BACKEND_CREDENTIAL";
+        SecretResolutionResult changed = await resolver.ResolveAsync(settingKey, null);
+
+        await Assert.That(changed.Status).IsEqualTo(SecretResolutionStatus.Invalid);
+        await Assert.That(changed.Value).IsNull();
+        await Assert.That(source.CallCount).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)]
+    [Arguments(SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret)]
+    [Arguments(SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks)]
+    public async Task RuntimeCredentialLegacyFolderCannotReachSelectedAuthority(string settingKey)
+    {
+        SecretDefinition definition = SecretDefinitionRegistry.GetRequired(settingKey);
+        SecretBinding binding = SecretBinding.CreateInfisical(settingKey, SecretScope.Instance,
+            null, "staging", "/legacy/shared", definition.DefaultInfisicalKey);
+        binding.Id = Guid.CreateVersion7();
+        var source = new RecordingSecretSource(SecretSourceType.Infisical);
+        var resolver = new SecretResolver(new FakeSecretBindingRepository([binding]), [source],
+            _cache, _metrics, NullLogger<SecretResolver>.Instance,
+            Options.Create(new SecretProviderOptions
+            {
+                Provider = SecretProviderType.Infisical,
+                Infisical = new InfisicalOptions { Environment = "staging" }
+            }));
+
+        SecretResolutionResult result = await resolver.ResolveAsync(settingKey, null);
+
+        await Assert.That(result.Status).IsEqualTo(SecretResolutionStatus.Invalid);
+        await Assert.That(result.Value).IsNull();
+        await Assert.That(source.LastBinding).IsNull();
+    }
+
+    [Test]
     public async Task ISecretResolver_RequiresExplicitQualifiedResolutionImplementation()
     {
         var method = typeof(ISecretResolver).GetMethod(nameof(ISecretResolver.ResolveQualifiedAsync));
@@ -318,6 +373,55 @@ public sealed class SecretResolverBindingTests : IDisposable
             await Assert.That(results[index].ScopeId).IsEqualTo(expectedTenant);
             await Assert.That(results[index].Value).IsEqualTo(expectedValue);
         }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExactUnqualifiedTenantResolutionCannotInheritInstanceCredential(bool configured)
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        const string key = SecretDefinitionRegistry.Keys.Ai.OpenAiApiKey;
+        var instance = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Instance, null, "INSTANCE_AI_KEY");
+        instance.Id = Guid.CreateVersion7();
+        var tenant = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Tenant, tenantId, "TENANT_AI_KEY");
+        tenant.Id = Guid.CreateVersion7();
+        string instanceValue = SecretsTestValues.CreateSecret();
+        string tenantValue = SecretsTestValues.CreateSecret();
+        var resolver = Resolver(configured ? [instance, tenant] : [instance], new Dictionary<Guid, string>
+        {
+            [instance.Id] = instanceValue,
+            [tenant.Id] = tenantValue
+        });
+
+        var result = await resolver.ResolveQualifiedAsync(key, SecretScope.Tenant, tenantId, "");
+
+        await Assert.That(result.Status).IsEqualTo(configured ? SecretResolutionStatus.Resolved : SecretResolutionStatus.Unconfigured);
+        await Assert.That(result.Value).IsEqualTo(configured ? tenantValue : null);
+        if (configured)
+        {
+            await Assert.That(result.Scope).IsEqualTo(SecretScope.Tenant);
+            await Assert.That(result.ScopeId).IsEqualTo(tenantId);
+        }
+    }
+
+    [Test]
+    public async Task CompatibleAiReferenceCannotSelectOfficialCredential()
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        const string key = SecretDefinitionRegistry.Keys.Ai.OpenAiApiKey;
+        var official = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Tenant, tenantId, "OFFICIAL_AI_KEY");
+        official.Id = Guid.CreateVersion7();
+        var resolver = Resolver([official], new Dictionary<Guid, string>
+        {
+            [official.Id] = SecretsTestValues.CreateSecret()
+        });
+
+        var result = await resolver.ResolveQualifiedAsync(SecretDefinitionRegistry.Keys.Ai.OpenAiCompatibleApiKey,
+            SecretScope.Tenant, tenantId, "");
+
+        await Assert.That(result.Status).IsEqualTo(SecretResolutionStatus.Unconfigured);
+        await Assert.That(result.Value).IsNull();
     }
 
     [Test]

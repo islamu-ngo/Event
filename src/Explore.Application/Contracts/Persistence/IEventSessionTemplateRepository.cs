@@ -4,7 +4,8 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IEventSessionTemplateRepository : IGenericRepository<EventSessionTemplate, Guid>
 {
-    Task<EventSessionTemplate?> GetSessionTemplateWithDetails(Guid id);
+    Task<EventSessionTemplate?> GetSessionTemplateWithDetails(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Fences the visible parent and validates the tracked target in the exact-tenant Serializable transaction.</summary>
     Task<EventSessionTemplate?> GetTrackedSessionTemplateWithDefinitions(Guid id, CancellationToken cancellationToken);
 
     Task<(List<EventSessionTemplate> Items, int TotalCount)> GetSessionTemplatesPaged(

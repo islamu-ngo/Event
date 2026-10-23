@@ -312,10 +312,16 @@ Environment variables used by local profiles:
 
 ## Health, Metrics, And Retention
 
+Provider-publication drain failures export only closed failure categories:
+`publication_dispatch_failed`, `publication_terminal_reconciliation_failed`,
+or `publication_reconciliation_failed`. Exception types and contents do not
+enter diagnostic state. Caller cancellation still propagates without a failure log;
+publication outcomes, reconciliation authority, and retry ownership are unchanged.
+
 Readiness checks:
 
 - `webhook-local-delivery` reports LocalProvider queue backlog, stale sending leases, and processor settings.
-- `webhook-svix-provider` requires the provider-publication processor when Svix is selected and reports the safe conformance tuple, evidence revision/count, exact-lookup availability, bounded capability count/codes, provider selection, App Portal/event-type-sync flags, and whether server-side Svix secrets resolve. It does not expose tokens, secret refs, or provider URLs and does not perform an outbound network probe.
+- `webhook-svix-provider` requires the provider-publication processor when Svix is selected and reports conformance evidence revision/count, exact-lookup availability, bounded capability count/codes, normalized provider selection, App Portal/event-type-sync flags, and whether server-side Svix secrets resolve. Environment, provider version, and capability policy version are exposed only as `environmentConfigured`, `providerVersionConfigured`, and `capabilityPolicyVersionConfigured` booleans. It does not expose raw configuration text, tokens, secret refs, or provider URLs and does not perform an outbound network probe.
 - `/health/webhooks/local` and `/health/webhooks/svix` expose those checks independently; aggregate `/health` remains the traffic-admission view.
 
 Business metrics use bounded labels:

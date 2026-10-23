@@ -325,7 +325,7 @@ public sealed class LocalCredentialResetResult
     public static LocalCredentialResetResult Reset(LocalCredentialResetReceipt receipt, string temporaryPassword)
     {
         ArgumentNullException.ThrowIfNull(receipt);
-        ArgumentException.ThrowIfNullOrWhiteSpace(temporaryPassword);
+        ArgumentException.ThrowIfNullOrEmpty(temporaryPassword);
         if (receipt.Operation.Stage != LocalCredentialOperationStage.ChangeRequired)
         {
             throw new ArgumentException("A change-required reset receipt is required.", nameof(receipt));
@@ -394,7 +394,7 @@ public sealed record LocalCredentialReplacementRequest
     public LocalCredentialReplacementRequest(LocalCredentialReplacementAuthority authority, string newPassword)
     {
         ArgumentNullException.ThrowIfNull(authority);
-        ArgumentException.ThrowIfNullOrWhiteSpace(newPassword);
+        ArgumentException.ThrowIfNullOrEmpty(newPassword);
         Authority = authority;
         NewPassword = newPassword;
     }
@@ -617,7 +617,7 @@ public sealed class LocalCredentialCreateResult
         string temporaryPassword)
     {
         ArgumentNullException.ThrowIfNull(receipt);
-        ArgumentException.ThrowIfNullOrWhiteSpace(temporaryPassword);
+        ArgumentException.ThrowIfNullOrEmpty(temporaryPassword);
         if (receipt.Kind != LocalCredentialOperationKind.Create
             || receipt.Stage != LocalCredentialOperationStage.ProvisioningPending)
         {

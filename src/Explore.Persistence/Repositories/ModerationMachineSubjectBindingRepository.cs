@@ -18,7 +18,7 @@ namespace Explore.Persistence.Repositories;
 /// </summary>
 public sealed class ModerationMachineSubjectBindingRepository(
     ExploreDbContext context, IAdminContext admin, IMachinePrincipalAccessor machine,
-    IExternalApiKeyRepository apiKeys, IConfiguredApiKeyResourceAuthorityReader configuredKeys,
+    IExternalApiKeyAuthenticationRepository apiKeys, IConfiguredApiKeyResourceAuthorityReader configuredKeys,
     TimeProvider clock) : IModerationMachineSubjectBindingRepository
 {
     public async Task<ModerationMachineSubjectBindingResult> EstablishAsync(

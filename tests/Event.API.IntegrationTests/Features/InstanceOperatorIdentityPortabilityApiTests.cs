@@ -4,19 +4,16 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Event.Api.IntegrationTests.Fixtures;
-using Explore.Application.Contracts.Persistence;
+using Event.Api.IntegrationTests.Authentication;
+using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Services;
 using Explore.Domain;
-using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Persistence;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using NSubstitute;
 
 public partial class InstanceOperatorIdentityControllerTests
 {
@@ -25,11 +22,11 @@ public partial class InstanceOperatorIdentityControllerTests
     [Test]
     public async Task Portability_IdempotencyReplayRechecksRevokedAdministratorGrant()
     {
-        using var factory = new OnboardingWebApplicationFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync();
         using HttpClient client = factory.CreateClient();
-        Guid actor = await SeedPlatformAdminAsync(factory);
+        Guid actor = factory.Actor;
         await SeedPortableIdentityAsync(factory);
-        AuthorizeOperatorClient(client, actor);
+        await factory.AuthorizeAsync(client);
 
         OperatorIdentityManifest manifest = OperatorIdentityManifestJson.Parse(
             await client.GetByteArrayAsync(ManifestUrl));
@@ -63,11 +60,11 @@ public partial class InstanceOperatorIdentityControllerTests
     [Test]
     public async Task Portability_AdminRoundTripAndStaleImportUseRealPersistenceAndProblemDetails()
     {
-        using var factory = new OnboardingWebApplicationFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync();
         using HttpClient client = factory.CreateClient();
-        Guid actor = await SeedPlatformAdminAsync(factory);
+        Guid actor = factory.Actor;
         await SeedPortableIdentityAsync(factory);
-        AuthorizeOperatorClient(client, actor);
+        await factory.AuthorizeAsync(client);
 
         using HttpResponseMessage exported = await client.GetAsync(ManifestUrl);
         await Assert.That(exported.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -94,17 +91,17 @@ public partial class InstanceOperatorIdentityControllerTests
     [Test]
     public async Task Portability_UnauthorizedAndMalformedRequestsCannotMutateIdentity()
     {
-        using var factory = new OnboardingWebApplicationFactory();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync(administrator: false);
         using HttpClient client = factory.CreateClient();
         using HttpResponseMessage anonymous = await client.GetAsync(ManifestUrl);
         await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
-        AuthorizeOperatorClient(client, Guid.CreateVersion7());
+        await factory.AuthorizeAsync(client);
         using HttpResponseMessage denied = await client.GetAsync(ManifestUrl);
         await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
 
-        Guid actor = await SeedPlatformAdminAsync(factory);
+        await factory.GrantAdministratorAsync();
         await SeedPortableIdentityAsync(factory);
-        AuthorizeOperatorClient(client, actor);
+        await factory.AuthorizeAsync(client);
         byte[] before = await client.GetByteArrayAsync(ManifestUrl);
         string[] malformed =
         [
@@ -127,42 +124,30 @@ public partial class InstanceOperatorIdentityControllerTests
     [Test]
     public async Task Portability_AuditFailureAfterSavedIdentityRollsBackDatabaseTransaction()
     {
-        using var factory = new OnboardingWebApplicationFactory();
-        using var failing = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
-        {
-            services.RemoveAll<IOutboxRepository>();
-            IOutboxRepository outbox = Substitute.For<IOutboxRepository>();
-            outbox.CreateRange(Arg.Any<IReadOnlyCollection<OutboxMessage>>(), Arg.Any<CancellationToken>())
-                .Returns(Task.FromException<IReadOnlyList<OutboxMessage>>(new IOException("Audit persistence unavailable.")));
-            services.AddScoped(_ => outbox);
-        }));
-        using HttpClient client = failing.CreateClient();
-        Guid actor = await SeedPlatformAdminAsync(factory);
+        var fault = new InstanceOperatorIdentityPortabilityContractTests.ImportCommitFailure();
+        await using var factory = await OperatorIdentityHttpMigrationFixture.CreateAsync(interceptor: fault);
+        using HttpClient client = factory.CreateClient();
         await SeedPortableIdentityAsync(factory);
-        AuthorizeOperatorClient(client, actor);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", await factory.Local.SignInAsync());
         byte[] before = await client.GetByteArrayAsync(ManifestUrl);
         OperatorIdentityManifest manifest = OperatorIdentityManifestJson.Parse(before);
+        fault.Enabled = true;
         using HttpResponseMessage failed = await client.PostAsJsonAsync(ManifestUrl + "/import",
             new ImportInstanceOperatorIdentityCommand(manifest, manifest.RevisionHash));
         await Assert.That(failed.StatusCode).IsEqualTo(HttpStatusCode.InternalServerError);
+        await Assert.That(fault.SawIdentityAndAudit).IsTrue();
+        fault.Enabled = false;
         await Assert.That((await client.GetByteArrayAsync(ManifestUrl)).SequenceEqual(before)).IsTrue();
     }
 
-    private static void AuthorizeOperatorClient(HttpClient client, Guid actor)
-    {
-        client.DefaultRequestHeaders.Remove(TestAuthHandler.AuthHeaderName);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.AuthHeaderName,
-            TestAuthHandler.CreateAuthHeaderValue(actor, "Instance Admin",
-                ("iss", OnboardingWebApplicationFactory.Issuer), ("idp", "keycloak")));
-    }
-
-    private static async Task SeedPortableIdentityAsync(OnboardingWebApplicationFactory factory)
+    private static async Task SeedPortableIdentityAsync(OperatorIdentityHttpMigrationFixture factory)
     {
         using IServiceScope scope = factory.Services.CreateScope();
         InstanceOperatorIdentityService identity = scope.ServiceProvider.GetRequiredService<InstanceOperatorIdentityService>();
         InstanceOperatorIdentityDocument current = await identity.GetCurrentAsync();
-        await identity.SaveAsync(new InstanceOperatorIdentitySettings
+        var saved = await factory.SaveAsync(new SaveInstanceOperatorIdentityRequestDto
         {
+            ExpectedRevision = current.Settings?.Revision,
             PublicName = "Independent Operator",
             LegalName = "Independent ASBL",
             OperatorKindCode = "registered_organization",
@@ -174,6 +159,7 @@ public partial class InstanceOperatorIdentityControllerTests
             TermsUrl = "https://example.test/terms",
             PrivacyUrl = "https://example.test/privacy",
             OfficialOrigin = "https://example.test"
-        }, current.Settings?.Revision);
+        });
+        await Assert.That(saved.IsSuccess).IsTrue();
     }
 }

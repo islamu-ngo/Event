@@ -126,7 +126,8 @@ public sealed class SetupSecretBindingWriter(
             return (binding, null, SetupSecretBindingWriteOutcome.Invalid);
         if (selectedSource != SecretSourceType.Infisical)
             return (binding, null, SetupSecretBindingWriteOutcome.Unavailable);
-        if (string.IsNullOrWhiteSpace(binding.InfisicalEnvironment)
+        if (!SecretAcquisitionPolicy.AllowsBinding(options.Value.Consumer, binding, options.Value.Infisical.Environment)
+            || string.IsNullOrWhiteSpace(binding.InfisicalEnvironment)
             || string.IsNullOrWhiteSpace(binding.InfisicalPath)
             || string.IsNullOrWhiteSpace(binding.InfisicalKey))
         {

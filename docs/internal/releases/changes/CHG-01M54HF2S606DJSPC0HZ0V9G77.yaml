@@ -1,0 +1,30 @@
+Change-Id: CHG-01M54HF2S606DJSPC0HZ0V9G77
+Title: "Keep Azure AI retries with the native operation owner"
+Type: fix
+Scope: access
+Summary: "Make one Azure HTTP attempt per application dispatch while preserving transient failure classification."
+Group: ai-native-retry-ownership
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/ai-provider-response-limits.md
+    Disposition: documented
+    Detail: Transient Azure failures no longer cause automatic SDK HTTP resends.
+  Security:
+    Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Preserve native mutation retry ownership by limiting one application dispatch to one SDK HTTP attempt.
+  Migration:
+    Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/ai-provider-response-limits.md
+    Disposition: documented
+    Detail: Diagnose transient failures through native operation recovery rather than expecting hidden transport retries.

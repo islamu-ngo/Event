@@ -18,7 +18,7 @@ public sealed class AtprotoCalendarEventRecordMapperTests
             Uris = [new($"/api/storageobject/{imageId}/public", "Featured image")]
         };
 
-        Event record = AtprotoCalendarEventRecordMapper.Map(snapshot,
+        CommunityLexicon.Calendar.Event record = AtprotoCalendarEventRecordMapper.Map(snapshot,
             new Uri("https://events.example.test/community/"));
 
         await Assert.That(AtprotoCalendarEventRecordValidator.Validate(record).IsValid).IsTrue();
@@ -31,7 +31,7 @@ public sealed class AtprotoCalendarEventRecordMapperTests
     {
         AtprotoEventPublicationSnapshot snapshot = CreateSnapshot();
 
-        Event record = AtprotoCalendarEventRecordMapper.Map(snapshot, null);
+        CommunityLexicon.Calendar.Event record = AtprotoCalendarEventRecordMapper.Map(snapshot, null);
         AtprotoCalendarRecordValidationResult validation = AtprotoCalendarEventRecordValidator.Validate(record);
 
         await Assert.That(record.Name).IsEqualTo(snapshot.Name);
@@ -50,7 +50,7 @@ public sealed class AtprotoCalendarEventRecordMapperTests
     [Test]
     public async Task Validate_RejectsInvalidSemanticFieldsBeforeSizeEligibility()
     {
-        Event record = AtprotoCalendarEventRecordMapper.Map(CreateSnapshot(), null);
+        CommunityLexicon.Calendar.Event record = AtprotoCalendarEventRecordMapper.Map(CreateSnapshot(), null);
         record.Mode = "community.lexicon.calendar.event#invalid";
         record.Uris = [new EventUri { Uri = "https://user:secret@example.test/path#fragment", Name = "Unsafe" }];
 
@@ -65,7 +65,7 @@ public sealed class AtprotoCalendarEventRecordMapperTests
     [Test]
     public async Task Validate_LexiconMinimumNameAndCreatedAt_DoesNotRequireDescription()
     {
-        Event record = AtprotoCalendarEventRecordMapper.Map(CreateSnapshot(), null);
+        CommunityLexicon.Calendar.Event record = AtprotoCalendarEventRecordMapper.Map(CreateSnapshot(), null);
         record.Description = null;
 
         AtprotoCalendarRecordValidationResult result = AtprotoCalendarEventRecordValidator.Validate(record);

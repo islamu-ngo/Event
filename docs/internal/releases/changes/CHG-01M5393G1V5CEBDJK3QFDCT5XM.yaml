@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5393G1V5CEBDJK3QFDCT5XM
+Title: "Generate committed programme recovery model migrations"
+Type: fix
+Scope: access
+Summary: "Persist committed recovery evidence fields and widen bounded custom-property regex columns through generated migrations."
+Group: programme-recovery-model-migrations
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Historical generated defaults do not reconstruct recovery authority.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Generated migrations add recovery fields and widen five regex columns; downgrade removes new evidence and narrows storage.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Apply migrations before updated services and use coordinated backup restoration rather than downgrading after new recovery writes.

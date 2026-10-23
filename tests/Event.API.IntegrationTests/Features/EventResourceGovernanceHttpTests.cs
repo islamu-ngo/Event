@@ -240,7 +240,7 @@ public sealed class EventResourceGovernanceHttpTests
         {
             var unit = new EfCoreUnitOfWork(database);
             (await new EventResourceSettingsWriter(database, new RelationalSettingMutationLock(database, unit), unit)
-                .ApplyAsync([new(null, GovernanceSettingKeys.EventResources.MaxActiveResources,
+                .ApplyInternalAsync([new(null, GovernanceSettingKeys.EventResources.MaxActiveResources,
                     EventResourceSettingMutationKind.SetLock, IsLocked: true)], administratorId, Token)).EnsureAccepted();
         }
         await using (var cacheScope = factory.Services.CreateAsyncScope())
@@ -272,10 +272,10 @@ public sealed class EventResourceGovernanceHttpTests
             var writer = new EventResourceSettingsWriter(database, new RelationalSettingMutationLock(database, unit), unit);
             var otherSettings = EventResourceSettingDefinitions.All.Where(definition =>
                 definition.Key != GovernanceSettingKeys.EventResources.MaxActiveResources).ToArray();
-            (await writer.ApplyAsync([.. otherSettings.Select(definition => new EventResourceSettingMutation(
+            (await writer.ApplyInternalAsync([.. otherSettings.Select(definition => new EventResourceSettingMutation(
                 null, definition.Key, EventResourceSettingMutationKind.SetValue, definition.DefaultValue))],
                 administratorId, Token)).EnsureAccepted();
-            (await writer.ApplyAsync([.. otherSettings.Select(definition => new EventResourceSettingMutation(
+            (await writer.ApplyInternalAsync([.. otherSettings.Select(definition => new EventResourceSettingMutation(
                 null, definition.Key, EventResourceSettingMutationKind.SetLock, IsLocked: true))],
                 administratorId, Token)).EnsureAccepted();
         }
@@ -356,7 +356,7 @@ public sealed class EventResourceGovernanceHttpTests
             await database.SaveChangesAsync(Token);
             var unit = new EfCoreUnitOfWork(database);
             (await new EventResourceSettingsWriter(database, new RelationalSettingMutationLock(database, unit), unit)
-                .ApplyAsync([
+                .ApplyInternalAsync([
                     new(null, GovernanceSettingKeys.EventResources.MaxActiveResources, EventResourceSettingMutationKind.SetValue, "100"),
                     new(null, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments, EventResourceSettingMutationKind.SetValue, "true")
                 ], userId, Token)).EnsureAccepted();
@@ -394,7 +394,7 @@ public sealed class EventResourceGovernanceHttpTests
         {
             var unit = new EfCoreUnitOfWork(database);
             (await new EventResourceSettingsWriter(database, new RelationalSettingMutationLock(database, unit), unit)
-                .ApplyAsync([new(null, GovernanceSettingKeys.EventResources.MaxActiveResources,
+                .ApplyInternalAsync([new(null, GovernanceSettingKeys.EventResources.MaxActiveResources,
                     EventResourceSettingMutationKind.SetLock, IsLocked: true)], userId, Token)).EnsureAccepted();
         }
         using (var locked = await client.PutAsJsonAsync(capacityPath, new UpdateSettingValueDto { Value = "25" }, Token))

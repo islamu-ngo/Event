@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53T22DDVMC7QWAFM2ZEHTGC
+Title: "Admit exact-user membership reads through an independent Global lease"
+Type: fix
+Scope: access
+Summary: "Provide a read-only active-membership projection without borrowing request tenancy or silently repairing undeclared executors."
+Group: membership-read-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Exact-user native reads reject undeclared executors at entry and installation without granting Runtime function access.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Database preparation installs the read-only membership projection and enrolls the configured Global login.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Membership discovery does not supply preference-write or resource-management authority.

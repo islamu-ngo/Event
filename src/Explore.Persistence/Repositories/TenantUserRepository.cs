@@ -3,6 +3,8 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Database;
+using Explore.Persistence.Security;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -10,10 +12,13 @@ namespace Explore.Persistence.Repositories;
 public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenantUserRepository
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly PostgresNativeQueueEnrollment? _enrollment;
 
-    public TenantUserRepository(ExploreDbContext dbContext) : base(dbContext)
+    public TenantUserRepository(ExploreDbContext dbContext,
+        PostgresNativeQueueEnrollment? enrollment = null) : base(dbContext)
     {
         _dbContext = dbContext;
+        _enrollment = enrollment;
     }
 
     public async Task<TenantUser?> GetByTenantAndUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default)
@@ -64,31 +69,33 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
         return await IsActiveTenantUserAsync(tenantId, userId, cancellationToken);
     }
 
-    public async Task<List<TenantUser>> GetActiveTenantsForUserAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.TenantUsers
-            .IgnoreTenantFilter(TenantFilterBypassReasons.UserTenantMembershipEnumeration)
-            .Include(x => x.Tenant)
-                .ThenInclude(t => t.TenantStatus)
-            .Where(x => x.UserId == userId
-                && x.StatusId == (int)TenantUserStatusEnum.Active
-                && !x.IsDeleted
-                && x.Tenant.TenantStatusId == (int)TenantStatusEnum.Active)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task<bool> TryRemoveMembershipAsync(
         Guid tenantId,
         Guid userId,
         Guid removedBy,
         DateTime removedAtUtc,
         CancellationToken cancellationToken = default)
-        => await _dbContext.ExecuteDisclosureMutationAsync(
-            token => RemoveMembershipAsync(tenantId, userId, removedBy, removedAtUtc, token), cancellationToken);
+    {
+        await using var securityGate = new HumanSecuritySourceGate(_dbContext);
+        await using var ownedGate = _dbContext.Database.CurrentTransaction is null
+            && !HumanSecuritySourceGate.TryRequireCurrent(_dbContext)
+                ? await securityGate.AcquireAsync(cancellationToken) : null;
+        securityGate.RequireCurrent();
+        bool removed = await _dbContext.ExecuteDisclosureMutationAsync(async token =>
+        {
+            securityGate.RequireCurrent();
+            bool changed = await RemoveMembershipAsync(tenantId, userId, removedBy, removedAtUtc, token);
+            securityGate.RequireCurrent();
+            return changed;
+        }, cancellationToken);
+        securityGate.RequireCurrent();
+        return removed;
+    }
 
     private async Task<bool> RemoveMembershipAsync(
         Guid tenantId, Guid userId, Guid removedBy, DateTime removedAtUtc, CancellationToken cancellationToken)
     {
+        HumanSecuritySourceGate.RequireCurrent(_dbContext);
         if (tenantId == Guid.Empty || userId == Guid.Empty || removedBy == Guid.Empty)
         {
             throw new ArgumentException("Tenant, user, and removal actor identifiers are required.");
@@ -99,6 +106,8 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
             throw new InvalidOperationException("Tenant membership removal requires the matching active tenant filter.");
         }
 
+        await PostgresTenantMembershipMutationPermissions.RequireCurrentAsync(
+            _dbContext, _enrollment, cancellationToken);
         var membershipId = await _dbContext.TenantUsers
             .AsNoTracking()
             .Where(membership => membership.TenantId == tenantId
@@ -107,6 +116,7 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
                 && !membership.IsDeleted)
             .Select(membership => membership.Id)
             .SingleOrDefaultAsync(cancellationToken);
+        HumanSecuritySourceGate.RequireCurrent(_dbContext);
         if (membershipId == Guid.Empty)
         {
             return false;
@@ -130,6 +140,7 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
                 .SetProperty(membership => membership.UpdatedAt, removedAt)
                 .SetProperty(membership => membership.UpdatedBy, removedBy),
                 cancellationToken);
+        HumanSecuritySourceGate.RequireCurrent(_dbContext);
         if (claimed == 0)
         {
             return false;
@@ -138,6 +149,7 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
         await _dbContext.TenantUserProfiles
             .Where(profile => profile.TenantId == tenantId && profile.TenantUserId == membershipId)
             .ExecuteDeleteAsync(cancellationToken);
+        HumanSecuritySourceGate.RequireCurrent(_dbContext);
 
         await _dbContext.TenantUserRoleGrants
             .Where(grant => grant.TenantId == tenantId
@@ -150,6 +162,10 @@ public class TenantUserRepository : GenericRepository<TenantUser, Guid>, ITenant
                 .SetProperty(grant => grant.UpdatedBy, removedBy),
                 cancellationToken);
 
+        HumanSecuritySourceGate.RequireCurrent(_dbContext);
+
+        await PostgresTenantMembershipMutationPermissions.RequireCurrentAsync(
+            _dbContext, _enrollment, cancellationToken);
         return true;
     }
 }

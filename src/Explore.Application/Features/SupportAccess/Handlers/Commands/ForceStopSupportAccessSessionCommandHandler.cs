@@ -16,7 +16,8 @@ public sealed class ForceStopSupportAccessSessionCommandHandler(
     IAdminContext adminContext,
     ISupportAccessSessionRepository sessionRepository,
     ISupportAccessAuditEventRepository auditEventRepository,
-    IUnitOfWork unitOfWork,
+    IHumanSupportAdministrationPreparation preparation,
+    ISerializableAttemptOwner owner,
     BusinessMetrics metrics,
     ILogger<ForceStopSupportAccessSessionCommandHandler> logger)
     : ICommandHandler<ForceStopSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto>
@@ -38,7 +39,27 @@ public sealed class ForceStopSupportAccessSessionCommandHandler(
                 validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var operatorUserId = await adminContext.ResolveUserIdAsync(cancellationToken);
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        var result = await owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, token);
+            return await ExecuteBodyAsync(request, prepared, token);
+        }, cancellationToken);
+        if (result.IsSuccess && result.Session is { } revoked)
+        {
+            metrics.RecordSupportAccessLifecycleEvent("force_stopped",
+                ((SupportAccessModeEnum)revoked.ModeId).ToString(), "succeeded");
+            logger.LogWarning("Support-access session force-stopped mode={Mode}", (SupportAccessModeEnum)revoked.ModeId);
+        }
+        return result;
+    }
+
+    private async Task<SupportAccessSessionCommandResponseDto> ExecuteBodyAsync(
+        ForceStopSupportAccessSessionCommand request, IPreparedHumanSupportAdministration prepared,
+        CancellationToken cancellationToken)
+    {
+        var operatorUserId = prepared.NativeData is not null
+            ? prepared.PrincipalId : await adminContext.ResolveUserIdAsync(cancellationToken);
         if (!operatorUserId.HasValue)
         {
             return Failure(
@@ -50,7 +71,12 @@ public sealed class ForceStopSupportAccessSessionCommandHandler(
                 ["Session expired. Please sign in again."]);
         }
 
-        var session = await sessionRepository.GetByIdAsync(request.SessionId, cancellationToken);
+        if (operatorUserId != prepared.PrincipalId)
+            throw new UnauthorizedAccessException("Support operator differs from the original human.");
+
+        var session = prepared.NativeData is { } targetData
+            ? await targetData.ReadSessionAsync(cancellationToken)
+            : await sessionRepository.GetByIdAsync(request.SessionId, cancellationToken);
         if (session is null)
         {
             return Failure(
@@ -62,7 +88,7 @@ public sealed class ForceStopSupportAccessSessionCommandHandler(
                 ["Support-access session was not found."]);
         }
 
-        var nowUtc = DateTimeOffset.UtcNow;
+        var nowUtc = prepared.TransitionAt;
         if (!session.IsActiveAt(nowUtc))
         {
             return Failure(
@@ -74,41 +100,21 @@ public sealed class ForceStopSupportAccessSessionCommandHandler(
                 ["Only active support-access sessions can be force-stopped."]);
         }
 
-        var revoked = await unitOfWork.ExecuteInTransactionAsync(async ct =>
-        {
-            var revokedAtUtc = DateTimeOffset.UtcNow;
-            session.Revoke(revokedAtUtc, SupportAccessEndReasonEnum.ForceStopped, request.EndReasonText);
-            await sessionRepository.UpdateAsync(session, ct);
-            var auditEvent = SupportAccessAuditEvent.Create(
-                session.Id,
-                SupportAccessAuditEventTypeEnum.Revoked,
-                operatorUserId.Value,
-                session.TargetTenantId,
-                "force_stopped",
-                revokedAtUtc,
-                session.TargetTenantUserId);
-            await auditEventRepository.CreateAsync(auditEvent, ct);
-
-            return session;
-        }, cancellationToken);
-
-        metrics.RecordSupportAccessLifecycleEvent(
-            "force_stopped",
-            ((SupportAccessModeEnum)revoked.ModeId).ToString(),
-            "succeeded");
-        logger.LogWarning(
-            "Support-access session force-stopped sessionId={SupportAccessSessionId} actorUserId={ActorUserId} operatorUserId={OperatorUserId} targetTenantId={TargetTenantId} mode={Mode} endedAtUtc={EndedAtUtc}",
-            revoked.Id,
-            revoked.ActorUserId,
-            operatorUserId,
-            revoked.TargetTenantId,
-            (SupportAccessModeEnum)revoked.ModeId,
-            revoked.EndedAtUtc);
+        prepared.EndSession(session);
+        if (prepared.NativeData is null)
+            await sessionRepository.UpdateAsync(session, cancellationToken);
+        var auditEvent = SupportAccessAuditEvent.Create(session.Id, SupportAccessAuditEventTypeEnum.Revoked,
+            operatorUserId.Value, session.TargetTenantId, "force_stopped", prepared.TransitionAt, session.TargetTenantUserId);
+        if (prepared.NativeData is { } data)
+            await data.SaveForceStoppedAsync(session, auditEvent, prepared.TransitionAt, cancellationToken);
+        else
+            await auditEventRepository.CreateAsync(auditEvent, cancellationToken);
+        prepared.Complete(session, auditEvent);
 
         return SupportAccessSessionCommandResponseDto.Success(
-            revoked.Id,
+            session.Id,
             "Support-access session force-stopped.",
-            SupportAccessMapper.ToDto(revoked, DateTimeOffset.UtcNow));
+            SupportAccessMapper.ToDto(session, prepared.TransitionAt));
     }
 
     private SupportAccessSessionCommandResponseDto Failure(
@@ -121,10 +127,8 @@ public sealed class ForceStopSupportAccessSessionCommandHandler(
     {
         metrics.RecordSupportAccessLifecycleEvent("force_stopped", mode, "failed", failureCode);
         logger.LogWarning(
-            "Support-access force-stop denied failureCode={FailureCode} sessionId={SupportAccessSessionId} operatorUserId={OperatorUserId}",
-            failureCode,
-            sessionId,
-            operatorUserId);
+            "Support-access force-stop denied failureCode={FailureCode}",
+            failureCode);
 
         return SupportAccessSessionCommandResponseDto.Failure(
             BaseCommandResponse.Failure<Guid>(failureCode, message, errors));

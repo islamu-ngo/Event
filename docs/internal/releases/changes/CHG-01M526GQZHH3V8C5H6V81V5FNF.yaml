@@ -1,0 +1,32 @@
+Change-Id: CHG-01M526GQZHH3V8C5H6V81V5FNF
+Title: "Restrict cross-tenant queue health to native aggregates"
+Type: fix
+Scope: observability
+Summary: "Read queue readiness through an independent Global pool and the fixed thirteen-count PostgreSQL capability instead of request Runtime table access."
+Group: native-queue-health
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Queue readiness requires separately configured Global credentials and PostgreSQL health executor enrollment.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Replace Runtime private-table health reads with a fixed thirteen-count native capability on PostgreSQL.
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: Application migration installs the native health function, purpose-specific predicate-column grants and RLS policies.
+  Configuration:
+    Reference: .env.example
+    Disposition: documented
+    Detail: Inject Global username and password independently of Runtime; SQLite remains credential-free.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Enroll the health executor without private-table grants, review existing Global privileges, and restart API pools after credential rotation.

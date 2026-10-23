@@ -1,16 +1,12 @@
 
-using System.Collections.Immutable;
-using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Infrastructure.Mail;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Services;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using static Event.Persistence.IntegrationTests.Fixtures.EmailDispatchSqliteFixture;
@@ -21,6 +17,33 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 public sealed class EmailDeliverySettingsWriterTests
 {
     [Test]
+    public async Task ExplicitInternalDisablePreservesAtomicPolicyWithoutCreatingAHumanActor()
+    {
+        string path = NewPath();
+        try
+        {
+            await CreateDatabaseAsync(path);
+            await using var context = CreateContext(path);
+            await Assert.That(await context.Users.CountAsync()).IsEqualTo(0);
+            long revision = await context.EmailDispatchProcessorStates.AsNoTracking()
+                .Select(state => state.DeliveryPolicyRevision).SingleAsync();
+            var writer = CreateInternalEmailSettingsWriter(context);
+            await Assert.That((await writer.ApplyInternalAsync(
+                [Set(null, GovernanceSettingKeys.Email.DeliveryEnabled, "false")], null)).Status)
+                .IsEqualTo(EmailDeliverySettingsWriteStatus.RequiresDisableConfirmation);
+            await Assert.That((await writer.DisableInternalAsync(null, null)).Status)
+                .IsEqualTo(EmailDeliverySettingsWriteStatus.Applied);
+            await Assert.That(await context.Users.CountAsync()).IsEqualTo(0);
+            await Assert.That((await context.SystemSettings.AsNoTracking().SingleAsync(
+                row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled)).Value).IsEqualTo("false");
+            var state = await context.EmailDispatchProcessorStates.AsNoTracking().SingleAsync();
+            await Assert.That(state.DeliveryPolicyRevision).IsEqualTo(revision + 1);
+            await Assert.That(state.OptionalSuppressedThroughRevision).IsEqualTo(state.DeliveryPolicyRevision);
+        }
+        finally { DeleteDatabase(path); }
+    }
+
+    [Test]
     public async Task HarmlessBatch_PreservesExistingMetadataAndWritesFinalValues()
     {
         string path = NewPath();
@@ -30,7 +53,7 @@ public sealed class EmailDeliverySettingsWriterTests
             await using var context = CreateContext(path);
             var before = await context.SystemSettings.AsNoTracking().SingleAsync(
                 row => row.SettingKey == GovernanceSettingKeys.Email.SmtpHost);
-            var result = await Writer(context).ApplyAsync(
+            var result = await Writer(context).ApplyInternalAsync(
                 [Set(null, GovernanceSettingKeys.Email.SmtpHost, "\"smtp.changed.test\""),
                     Set(null, GovernanceSettingKeys.Email.FromAddress, "\"events@changed.test\"")], actorUserId: null);
             await Assert.That(result.Status).IsEqualTo(EmailDeliverySettingsWriteStatus.Applied);
@@ -61,7 +84,7 @@ public sealed class EmailDeliverySettingsWriterTests
                 token => unitOfWork.ExecuteSerializableAsync(
                     async transactionToken =>
                     {
-                        var result = await writer.ApplyAsync([Set(null, GovernanceSettingKeys.Email.DeliveryEnabled, "false")],
+                        var result = await writer.ApplyInternalAsync([Set(null, GovernanceSettingKeys.Email.DeliveryEnabled, "false")],
                             actorUserId: null, transactionToken);
                         await context.SaveChangesAsync(transactionToken);
                         return result;
@@ -93,7 +116,7 @@ public sealed class EmailDeliverySettingsWriterTests
             EmailDeliverySettingMutation mutation = delegationLock
                 ? Set(null, GovernanceSettingKeys.TenantDelegation.LockSmtp, "true")
                 : new(TenantId: tenantId, Key: GovernanceSettingKeys.Email.SmtpHost, Kind: EmailDeliverySettingMutationKind.Remove);
-            var outcome = await writer.ApplyAsync([mutation], actorUserId: null);
+            var outcome = await writer.ApplyInternalAsync([mutation], actorUserId: null);
             await Assert.That(outcome.Status).IsEqualTo(EmailDeliverySettingsWriteStatus.RequiresDisableConfirmation);
             await Assert.That(outcome.Changes.IsEmpty).IsTrue();
         }
@@ -111,7 +134,7 @@ public sealed class EmailDeliverySettingsWriterTests
             var writer = Writer(context);
             await DisableInstanceAsync(context);
             Guid tenantId = await AddIndependentTenantAsync(context, writer);
-            var outcome = await writer.ApplyAsync(
+            var outcome = await writer.ApplyInternalAsync(
                 [new(TenantId: tenantId, Key: GovernanceSettingKeys.Email.SmtpHost, Kind: EmailDeliverySettingMutationKind.Remove),
                     Set(null, GovernanceSettingKeys.Email.DeliveryEnabled, "true")], actorUserId: null);
             await Assert.That(outcome.Status).IsEqualTo(EmailDeliverySettingsWriteStatus.Applied);
@@ -135,7 +158,7 @@ public sealed class EmailDeliverySettingsWriterTests
             long tenantBefore = await context.EmailDispatchTenantControls
                 .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
                 .AsNoTracking().Where(row => row.TenantId == tenantId).Select(row => row.DeliveryPolicyRevision).SingleAsync();
-            var outcome = await writer.ApplyAsync(
+            var outcome = await writer.ApplyInternalAsync(
                 [Set(null, GovernanceSettingKeys.Email.FromName, "\"Instance sender\""),
                     Set(tenantId, GovernanceSettingKeys.Email.FromName, "\"Tenant sender\"")], actorUserId: null);
             await Assert.That(outcome.Status).IsEqualTo(EmailDeliverySettingsWriteStatus.Applied);
@@ -167,7 +190,7 @@ public sealed class EmailDeliverySettingsWriterTests
                     Kind: EmailDeliverySettingMutationKind.SetLock, IsLocked: true)
                 : new EmailDeliverySettingMutation(TenantId: tenantId, Key: GovernanceSettingKeys.Email.DeliveryEnabled,
                     Kind: EmailDeliverySettingMutationKind.Remove);
-            var result = await writer.ApplyAsync([mutation], actorUserId: null);
+            var result = await writer.ApplyInternalAsync([mutation], actorUserId: null);
             await Assert.That(result.Status).IsEqualTo(EmailDeliverySettingsWriteStatus.RequiresDisableConfirmation);
         }
         finally { DeleteDatabase(path); }
@@ -186,40 +209,10 @@ public sealed class EmailDeliverySettingsWriterTests
             var writer = Writer(context, mutationLock);
             await Assert.That(async () => await mutationLock.ExecuteOrderedGroupsAsync(
                 [[GovernanceSettingKeys.Email.DeliveryEnabled]], token => unitOfWork.ExecuteSerializableAsync(
-                    transactionToken => writer.ApplyAsync([Set(null, GovernanceSettingKeys.Email.FromName, "\"rejected\"")],
+                    transactionToken => writer.ApplyInternalAsync([Set(null, GovernanceSettingKeys.Email.FromName, "\"rejected\"")],
                         actorUserId: null, transactionToken), token))).Throws<InvalidOperationException>();
             await Assert.That(await context.SystemSettings.AsNoTracking().AnyAsync(
                 row => row.SettingKey == GovernanceSettingKeys.Email.FromName && row.Value == "\"rejected\"")).IsFalse();
-        }
-        finally { DeleteDatabase(path); }
-    }
-
-    [Test]
-    [Arguments("actor")]
-    [Arguments("revision")]
-    [Arguments("acknowledgement")]
-    [Arguments("token")]
-    public async Task DirectStoreDisable_RejectsInvalidEvidenceWithoutPolicyMutation(string invalidPart)
-    {
-        string path = NewPath();
-        try
-        {
-            await CreateDatabaseAsync(path);
-            await using var context = CreateContext(path);
-            Guid actorId = Guid.CreateVersion7();
-            var tokens = new EmailDeliveryDisableTokenService(new EphemeralDataProtectionProvider());
-            EmailDeliveryDisableImpactSnapshot snapshot;
-            await using (var transaction = await context.Database.BeginTransactionAsync())
-                snapshot = (await new EmailDeliveryDisableImpactReader(context).ReadAsync(null))!;
-            var result = await Writer(context, tokens: tokens).DisableAsync(new(
-                TenantId: null, ActorUserId: invalidPart == "actor" ? Guid.CreateVersion7() : actorId,
-                ExpectedRevision: snapshot.Revision + (invalidPart == "revision" ? 1 : 0),
-                ConfirmationToken: invalidPart == "token" ? "invalid" : tokens.Issue(actorId, snapshot).Token,
-                Acknowledgement: invalidPart == "acknowledgement" ? "DISABLE EMAIL DELIVERY " : EmailDeliveryDisableConfirmation.RequiredAcknowledgement));
-            await Assert.That(result.Status).IsEqualTo(invalidPart == "acknowledgement"
-                ? EmailDeliverySettingsWriteStatus.InvalidConfirmation : EmailDeliverySettingsWriteStatus.ConfirmationConflict);
-            await Assert.That((await context.SystemSettings.AsNoTracking().SingleAsync(
-                row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled)).Value).IsEqualTo("true");
         }
         finally { DeleteDatabase(path); }
     }
@@ -233,7 +226,7 @@ public sealed class EmailDeliverySettingsWriterTests
             await CreateDatabaseAsync(path);
             await using var context = CreateContext(path);
             var before = await context.SystemSettings.AsNoTracking().SingleAsync(row => row.SettingKey == GovernanceSettingKeys.Email.SmtpHost);
-            var result = await Writer(context).ApplyAsync(
+            var result = await Writer(context).ApplyInternalAsync(
                 [Set(null, GovernanceSettingKeys.Email.SmtpHost, "\"smtp.rejected.test\""),
                     Set(null, GovernanceSettingKeys.Email.DeliveryEnabled, "not-json")], actorUserId: null);
             await Assert.That(result.Status).IsEqualTo(EmailDeliverySettingsWriteStatus.InvalidMutation);
@@ -246,27 +239,17 @@ public sealed class EmailDeliverySettingsWriterTests
     private static EmailDeliverySettingMutation Set(Guid? tenantId, string key, string value) =>
         new(TenantId: tenantId, Key: key, Kind: EmailDeliverySettingMutationKind.SetValue, Value: value);
 
-    private static EmailDeliverySettingsWriter Writer(ExploreDbContext context, RelationalSettingMutationLock? mutationLock = null,
-        EmailDeliveryDisableTokenService? tokens = null) =>
-        new(context, mutationLock ?? new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)),
-            new EfCoreUnitOfWork(context), new EmailDeliveryDisableImpactReader(context),
-            tokens ?? new EmailDeliveryDisableTokenService(new EphemeralDataProtectionProvider()));
+    private static InternalEmailDeliverySettingsWriter Writer(
+        ExploreDbContext context, RelationalSettingMutationLock? mutationLock = null) =>
+        CreateInternalEmailSettingsWriter(context, mutationLock);
 
     private static async Task DisableInstanceAsync(ExploreDbContext context)
     {
-        Guid actorId = await InstanceSettingsCommandFixture.SeedAdministratorAsync(context);
-        var tokens = new EmailDeliveryDisableTokenService(new EphemeralDataProtectionProvider());
-        EmailDeliveryDisableImpactSnapshot snapshot;
-        await using (var transaction = await context.Database.BeginTransactionAsync())
-            snapshot = (await new EmailDeliveryDisableImpactReader(context).ReadAsync(null))!;
-        var result = await Writer(context, tokens: tokens).DisableAsync(new(
-            TenantId: null, ActorUserId: actorId, ExpectedRevision: snapshot.Revision,
-            ConfirmationToken: tokens.Issue(actorId, snapshot).Token,
-            Acknowledgement: EmailDeliveryDisableConfirmation.RequiredAcknowledgement));
+        var result = await Writer(context).DisableInternalAsync(null, null);
         await Assert.That(result.Status).IsEqualTo(EmailDeliverySettingsWriteStatus.Applied);
     }
 
-    private static async Task<Guid> AddIndependentTenantAsync(ExploreDbContext context, EmailDeliverySettingsWriter writer)
+    private static async Task<Guid> AddIndependentTenantAsync(ExploreDbContext context, InternalEmailDeliverySettingsWriter writer)
     {
         Guid tenantId = Guid.CreateVersion7();
         context.Tenants.Add(new Tenant
@@ -279,7 +262,7 @@ public sealed class EmailDeliverySettingsWriterTests
             CreatedAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
-        var outcome = await writer.ApplyAsync(
+        var outcome = await writer.ApplyInternalAsync(
             [Set(null, GovernanceSettingKeys.TenantDelegation.LockSmtp, "false"),
                 Set(tenantId, GovernanceSettingKeys.Email.DeliveryEnabled, "true"),
                 Set(tenantId, GovernanceSettingKeys.Email.SmtpHost, "\"smtp.independent.test\""),

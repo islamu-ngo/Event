@@ -41,4 +41,23 @@ public sealed class LocalBootstrapSecretContractTests
 
         await Assert.That(profile.Mode).IsEqualTo(SecretRotationMode.UnsupportedLive);
     }
+
+    [Test]
+    [Arguments("database.local_identity_writer.password", "/database", "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD")]
+    [Arguments("identity_database.local_identity_writer.password", "/database/identity", "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD")]
+    public async Task LocalWriterPasswordHasItsOwnOptionalInstanceAuthority(
+        string key, string path, string environmentName)
+    {
+        SecretDefinition definition = SecretDefinitionRegistry.GetRequired(key);
+
+        await Assert.That(definition.DefaultEnvironmentVariableName).IsEqualTo(environmentName);
+        await Assert.That(definition.DefaultInfisicalKey).IsEqualTo(environmentName);
+        await Assert.That(definition.DefaultInfisicalPath).IsEqualTo(path);
+        await Assert.That(definition.AllowedScopes).IsEquivalentTo([SecretScope.Instance]);
+        await Assert.That(definition.AllowedSources).Contains(SecretSourceType.Infisical);
+        await Assert.That(definition.AllowedSources).Contains(SecretSourceType.EnvironmentVariable);
+        await Assert.That(definition.Requirement).IsEqualTo(SecretRequirement.OptionalCapability);
+        await Assert.That(() => SecretBinding.CreateEnvironmentVariable(key, SecretScope.Tenant,
+            Guid.CreateVersion7(), environmentName)).Throws<ArgumentException>();
+    }
 }

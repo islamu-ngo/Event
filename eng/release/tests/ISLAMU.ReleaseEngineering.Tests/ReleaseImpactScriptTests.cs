@@ -98,6 +98,22 @@ public sealed class ReleaseImpactScriptTests
         await Assert.That(security).IsEqualTo(0);
     }
 
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task LargePullRequestRequiresEveryFileWithoutEnvironmentPayload(bool omitLastFile)
+    {
+        object[] files = Enumerable.Range(0, omitLastFile ? 3000 : 3001)
+            .Select(index => (object)new
+            {
+                filename = $"assets/reviewed-image-with-a-long-enough-name-to-exceed-environment-limits-{index}.png",
+                status = "modified"
+            }).ToArray();
+        int exit = await RunAsync("contributor", "User",
+            "## Release Impact\n- [x] Not applicable\n", 3001, files);
+        await Assert.That(exit == 0).IsEqualTo(!omitLastFile);
+    }
+
     private static async Task<int> RunAsync(
         string author, string accountType, string? body, int expectedCount, params object[] files)
     {
@@ -128,7 +144,10 @@ public sealed class ReleaseImpactScriptTests
             start.ArgumentList.Add("--");
             start.ArgumentList.Add(eventPath);
             start.Environment.Remove("GITHUB_TOKEN");
-            start.Environment["RELEASE_IMPACT_FILE_METADATA"] = JsonSerializer.Serialize(files);
+            string metadataPath = Path.Combine(directory, "files.json");
+            await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(files));
+            start.Environment.Remove("RELEASE_IMPACT_FILE_METADATA");
+            start.Environment["RELEASE_IMPACT_FILE_METADATA_PATH"] = metadataPath;
             using var process = new Process { StartInfo = start, EnableRaisingEvents = true };
             var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             process.Exited += (_, _) => exited.TrySetResult();

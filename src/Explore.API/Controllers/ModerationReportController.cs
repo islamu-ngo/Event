@@ -279,10 +279,8 @@ public sealed class ModerationReportController : EventControllerBase
             outcome,
             failureCategory);
         _logger.LogInformation(
-            "Moderation report workflow action {Action} completed for event {EventId} report {ReportId} outcome {Outcome} failure {FailureCategory}",
+            "Moderation report workflow action {Action} completed outcome {Outcome} failure {FailureCategory}",
             action,
-            eventId,
-            reportId,
             outcome,
             failureCategory);
 

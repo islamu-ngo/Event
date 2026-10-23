@@ -5,6 +5,7 @@ using System.Text.Json;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Infrastructure.Configuration;
+using Explore.Infrastructure.Http;
 using Explore.Infrastructure.Webhooks;
 using Microsoft.Extensions.Options;
 
@@ -82,7 +83,18 @@ public sealed class WebhookRegistrationProviderSubmissionSink(
                 "registration_data_retention_expired");
         }
 
-        using HttpResponseMessage response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch (Exception exception) when (OutboundEndpointDeniedException.Find(exception) is not null)
+        {
+            throw new RegistrationProviderSubmissionDeliveryException(
+                RegistrationProviderSubmissionDeliveryFailureKind.PermanentBeforeHandoff,
+                "provider_endpoint_blocked");
+        }
+        using var ownedResponse = response;
         if (response.IsSuccessStatusCode)
         {
             return new RegistrationProviderSubmissionSinkResult(true, request.RegistrationSubmissionId, false);

@@ -25,6 +25,6 @@ public sealed class TestTenantStorageProviderCommandHandler(
             throw new AuthorizationException("Only tenant administrators or instance administrators can test tenant storage settings.");
         }
 
-        return await storageSettingService.TestProviderAsync(tenantId, cancellationToken);
+        return await storageSettingService.TestProviderAsync(request, cancellationToken);
     }
 }

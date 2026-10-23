@@ -168,27 +168,17 @@ public sealed class AuditingSecretProviderDecorator : ISecretProvider
     /// </summary>
     private string GetCorrelationId()
     {
-        // Try HTTP request headers first
         var httpContext = _httpContextAccessor?.HttpContext;
         if (httpContext is not null)
         {
-            // Check common correlation ID headers
-            if (httpContext.Request.Headers.TryGetValue("X-Correlation-Id", out var correlationHeader) &&
-                !string.IsNullOrEmpty(correlationHeader.ToString()))
+            if (httpContext.Items["CorrelationId"] is string { Length: <= 38 } correlation &&
+                Guid.TryParse(correlation, out var correlationId))
             {
-                return correlationHeader.ToString();
+                return correlationId.ToString("N");
             }
-
-            if (httpContext.Request.Headers.TryGetValue("X-Request-Id", out var requestIdHeader) &&
-                !string.IsNullOrEmpty(requestIdHeader.ToString()))
+            if (httpContext.TraceIdentifier.Length <= 38 && Guid.TryParse(httpContext.TraceIdentifier, out var traceId))
             {
-                return requestIdHeader.ToString();
-            }
-
-            // Fall back to trace identifier
-            if (!string.IsNullOrEmpty(httpContext.TraceIdentifier))
-            {
-                return httpContext.TraceIdentifier;
+                return traceId.ToString("N");
             }
         }
 
@@ -200,7 +190,7 @@ public sealed class AuditingSecretProviderDecorator : ISecretProvider
         }
 
         // Generate a new one if nothing available
-        return Guid.CreateVersion7().ToString("N")[..8];
+        return Guid.CreateVersion7().ToString("N");
     }
 
     /// <summary>

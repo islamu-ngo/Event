@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Services.Registration;
@@ -16,12 +17,14 @@ public sealed class GetRegistrationOrderQueryHandler(
 }
 
 public sealed class GetEventRegistrationOrdersQueryHandler(
-    RegistrationOrderLifecycleService lifecycle,
-    ITenantContext tenant)
+    IPrivateEventManagementReader privateManagement)
     : IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>>
 {
-    public Task<IReadOnlyList<RegistrationOrderDto>> QueryAsync(
+    public async Task<IReadOnlyList<RegistrationOrderDto>> QueryAsync(
         GetEventRegistrationOrdersQuery request,
-        CancellationToken cancellationToken) =>
-        lifecycle.GetByEventAsync(request.EventId, tenant.TenantId, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var graph = await privateManagement.ReadAsync(new(PrivateEventManagementReadKind.Registrations, request.EventId), cancellationToken);
+        return graph.Registrations.OrderByDescending(order => order.CreatedAt).Select(order => RegistrationOrderDto.From(order)).ToArray();
+    }
 }

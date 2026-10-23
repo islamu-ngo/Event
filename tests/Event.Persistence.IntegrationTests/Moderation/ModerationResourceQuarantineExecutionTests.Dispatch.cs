@@ -113,7 +113,7 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         await using var context = fixture.Context();
         var identity = await fixture.AuthenticateAsync(context);
         var released = await new ModerationEffectLeaseRepository(context, identity.Machine, identity.Bindings,
-            new ExternalApiKeyRepository(context), fixture.Clock)
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), fixture.Clock)
             .ReleaseAsync(fixture.EffectId, fixture.LeaseId, fixture.LeaseRevision);
         await Assert.That(released.Outcome).IsEqualTo(ModerationEffectLeaseOutcome.Known);
     }
@@ -144,7 +144,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                 ? new SelectedTenant(id) : null;
             return context;
         });
-        services.AddScoped<IExternalApiKeyRepository>(provider => new ExternalApiKeyRepository(provider.GetRequiredService<ExploreDbContext>()));
+        services.AddScoped<IExternalApiKeyAuthenticationRepository>(provider => new ExternalApiKeyAuthenticationRepository(
+            new SecurityTestSupport.AdministrativeAuthorityTestFactory(provider.GetRequiredService<ExploreDbContext>())));
         services.AddScoped<IModerationMachineSubjectBindingRepository>(provider =>
         {
             var context = provider.GetRequiredService<ExploreDbContext>();
@@ -152,20 +153,20 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                 new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
                 new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
             return new ModerationMachineSubjectBindingRepository(context, admin,
-                provider.GetRequiredService<MachinePrincipalAccessor>(), provider.GetRequiredService<IExternalApiKeyRepository>(),
+                provider.GetRequiredService<MachinePrincipalAccessor>(), provider.GetRequiredService<IExternalApiKeyAuthenticationRepository>(),
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), fixture.Clock);
         });
         services.AddScoped(provider => new ModerationReconciliationCredentialProvider(
             provider.GetRequiredService<IOptionsMonitor<ModerationReconciliationOptions>>(),
-            provider.GetRequiredService<IExternalApiKeyRepository>(), new Secret(fixture), fixture.Clock));
+            provider.GetRequiredService<IExternalApiKeyAuthenticationRepository>(), new Secret(fixture), fixture.Clock));
         services.AddScoped<IModerationEffectLeaseRepository>(provider => new ModerationEffectLeaseRepository(
             provider.GetRequiredService<ExploreDbContext>(), provider.GetRequiredService<MachinePrincipalAccessor>(),
             provider.GetRequiredService<IModerationMachineSubjectBindingRepository>(),
-            provider.GetRequiredService<IExternalApiKeyRepository>(), fixture.Clock));
+            provider.GetRequiredService<IExternalApiKeyAuthenticationRepository>(), fixture.Clock));
         services.AddScoped<IModerationResourceQuarantineRepository>(provider => new ModerationResourceQuarantineRepository(
             provider.GetRequiredService<ExploreDbContext>(), provider.GetRequiredService<MachinePrincipalAccessor>(),
             provider.GetRequiredService<IModerationMachineSubjectBindingRepository>(),
-            provider.GetRequiredService<IExternalApiKeyRepository>(), fixture.Clock,
+            provider.GetRequiredService<IExternalApiKeyAuthenticationRepository>(), fixture.Clock,
             fixture.Database.Privacy.Authority(provider.GetRequiredService<ExploreDbContext>(), fixture.Clock)));
         services.AddScoped<IModerationOriginalEffectCompletionRepository>(provider => OriginalCompletionRepository(
             fixture, provider.GetRequiredService<ExploreDbContext>(),

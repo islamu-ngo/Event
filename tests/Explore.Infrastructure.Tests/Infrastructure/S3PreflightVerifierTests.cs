@@ -76,7 +76,7 @@ public sealed class S3PreflightVerifierTests
     }
 
     [Test]
-    public async Task VerifyAsync_WithWriteProbe_UploadsAndDeletesZeroByteMarker()
+    public async Task VerifyAsync_WithWriteFlag_RejectsMissingOriginalActionCustody()
     {
         var client = Substitute.For<IAmazonS3>();
         client.HeadBucketAsync(Arg.Any<HeadBucketRequest>(), Arg.Any<CancellationToken>())
@@ -97,23 +97,16 @@ public sealed class S3PreflightVerifierTests
             .Returns(new DeleteObjectResponse());
         var verifier = CreateVerifier(CreateConfig(), client);
 
-        var result = await verifier.VerifyAsync(
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => verifier.VerifyAsync(
             new S3PreflightRequest { TestWritePermissions = true },
-            CancellationToken.None);
+            CancellationToken.None));
 
-        await Assert.That(result.IsSuccess).IsTrue();
-        await Assert.That(result.CanWrite).IsTrue();
-        await Assert.That(putRequest).IsNotNull();
-        await Assert.That(putRequest!.Key).StartsWith(".system/preflight-probe-");
-        await Assert.That(putRequest.Headers.ContentLength).IsEqualTo(0);
-        await Assert.That(deleteRequest).IsNotNull();
-        await Assert.That(deleteRequest!.Key).IsEqualTo(putRequest.Key);
-        await Assert.That(result.Steps.Single(step => step.StepName == "Write/Delete Permissions").Status)
-            .IsEqualTo(S3PreflightStepStatus.Passed);
+        await Assert.That(putRequest).IsNull();
+        await Assert.That(deleteRequest).IsNull();
     }
 
     [Test]
-    public async Task VerifyAsync_WhenCleanupFails_ReportsWarningWithoutProviderDetail()
+    public async Task ProviderTestAsync_CannotPromoteObservationIntoWriteAuthority()
     {
         var client = Substitute.For<IAmazonS3>();
         client.HeadBucketAsync(Arg.Any<HeadBucketRequest>(), Arg.Any<CancellationToken>())
@@ -127,16 +120,9 @@ public sealed class S3PreflightVerifierTests
             });
         var verifier = CreateVerifier(CreateConfig(), client);
 
-        var result = await verifier.VerifyAsync(
-            new S3PreflightRequest { TestWritePermissions = true },
-            CancellationToken.None);
-
-        await Assert.That(result.IsSuccess).IsFalse();
-        await Assert.That(result.CanWrite).IsTrue();
-        var writeStep = result.Steps.Single(step => step.StepName == "Write/Delete Permissions");
-        await Assert.That(writeStep.Status).IsEqualTo(S3PreflightStepStatus.Warning);
-        await Assert.That(writeStep.ErrorCode).IsEqualTo("s3_delete_forbidden");
-        await Assert.That(writeStep.Message).DoesNotContain("secret provider response");
+        var provider = new S3FileStorageProvider(Substitute.For<IS3ConfigResolver>(),
+            Substitute.For<IS3ClientFactory>(), verifier);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => provider.TestAsync(CancellationToken.None, true));
     }
 
     [Test]

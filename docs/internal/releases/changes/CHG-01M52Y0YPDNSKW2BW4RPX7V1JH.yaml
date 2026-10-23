@@ -1,0 +1,30 @@
+Change-Id: CHG-01M52Y0YPDNSKW2BW4RPX7V1JH
+Title: "Add native assignment exclusion and exact-event AI target discovery"
+Type: feat
+Scope: access
+Summary: "Project bounded assignment facts and install the mandatory persisted-administrator exact-event target capability."
+Group: native-human-assignment-capability
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Compulsory contributor writers share acquisition exclusion; AI target discovery requires current persisted administrator state and exact event selection.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Explicit assignment installation includes its mandatory AI target capability in the original migration transaction.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Target discovery is not moderation authorization; parent principal continuity and verified production consumers remain required.

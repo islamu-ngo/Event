@@ -2,6 +2,9 @@ using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Services.Registration;
 using Quartz;
+using RegistrationPaymentCheckoutDispatchService = Explore.Infrastructure.Services.RegistrationPaymentCheckoutDispatchService;
+using RegistrationPaymentCheckoutDispatchRequest = Explore.Application.Contracts.Payments.RegistrationPaymentCheckoutDispatchRequest;
+using RegistrationPaymentCheckoutDispatchResult = Explore.Application.Contracts.Payments.RegistrationPaymentCheckoutDispatchResult;
 
 namespace Explore.API.Scheduling;
 

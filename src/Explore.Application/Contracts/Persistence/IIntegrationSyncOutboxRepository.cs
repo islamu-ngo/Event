@@ -12,6 +12,12 @@ public interface IIntegrationSyncOutboxRepository
         DateTime staleProcessingStartedBefore,
         CancellationToken cancellationToken);
 
+    Task<IntegrationSyncOutbox?> GetPendingAsync(
+        Guid outboxId,
+        DateTime now,
+        DateTime staleProcessingStartedBefore,
+        CancellationToken cancellationToken);
+
     Task<bool> TryClaimAsync(
         IntegrationSyncClaimRequest request,
         CancellationToken cancellationToken);
@@ -53,15 +59,6 @@ public interface IIntegrationSyncOutboxRepository
     Task<IntegrationSyncOutbox?> ResolveAmbiguousAsync(
         IntegrationSyncRecoveryRequest request,
         CancellationToken cancellationToken);
-}
-
-public static class IntegrationSyncFailureCodes
-{
-    public const string ProviderHandoffInDoubt = "provider_handoff_in_doubt";
-    public const string ProviderOutcomeAmbiguous = "provider_outcome_ambiguous";
-    public const string OperatorConfirmedAccepted = "operator_confirmed_accepted";
-    public const string OperatorRetryDefinitelyNotAccepted = "operator_retry_definitely_not_accepted";
-    public const string OperatorDeadLettered = "operator_dead_lettered";
 }
 
 public sealed record IntegrationSyncClaimRequest(

@@ -15,8 +15,8 @@ namespace Explore.Application.Features.InstanceAdmin.Handlers.Queries;
 
 public sealed class GetInstanceOperationsQueryHandler(
     IOutboxRepository outboxRepository,
-    IEmailDispatchOutboxRepository emailDispatchOutboxRepository,
-    IEventReportRepository eventReportRepository,
+    IEmailDispatchHealthSnapshotReader emailDispatchHealthSnapshotReader,
+    IEventReportOperationsRepository eventReportRepository,
     ITenantRepository tenantRepository,
     IHierarchicalSettingsResolver settingsResolver,
     IInstanceStorageSettingService storageSettingService,
@@ -54,12 +54,11 @@ public sealed class GetInstanceOperationsQueryHandler(
 
         var dueOutboxMessages = await outboxRepository.GetPendingBatch(GeneralOutboxSampleLimit, cancellationToken);
         var failedOutboxMessages = await outboxRepository.GetFailedEntries(GeneralOutboxSampleLimit, cancellationToken);
-        var dueEmailDispatchCount = await emailDispatchOutboxRepository.CountDueDispatchAsync(now, cancellationToken);
-        var retryScheduledEmailDispatchCount = await emailDispatchOutboxRepository.CountRetryScheduledAsync(cancellationToken);
-        var staleProcessingEmailDispatchCount = await emailDispatchOutboxRepository.CountStaleProcessingAsync(
-            processingStartedBefore,
-            cancellationToken);
-        var deadLetteredEmailDispatchCount = await emailDispatchOutboxRepository.CountDeadLetteredAsync(cancellationToken);
+        var email = await emailDispatchHealthSnapshotReader.ReadAsync(now, processingStartedBefore, 1, cancellationToken);
+        var dueEmailDispatchCount = email.DueDispatchCount;
+        var retryScheduledEmailDispatchCount = email.RetryScheduledCount;
+        var staleProcessingEmailDispatchCount = email.StaleProcessingCount;
+        var deadLetteredEmailDispatchCount = email.DeadLetteredCount;
         var moderationPendingCount = await eventReportRepository.CountExternalLinksBySyncStateAsync(
             EventReportSyncState.Pending,
             cancellationToken);

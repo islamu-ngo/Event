@@ -1,0 +1,29 @@
+Change-Id: CHG-01M537HT5GRKRS0DSDCVWEBFVR
+Title: "Bound localization file publication and keep failure diagnostics private"
+Type: fix
+Scope: access
+Summary: "Reject invalid localization overrides atomically and bound safe file output without exposing translation content or filesystem coordinates."
+Group: localization-file-provider-boundary
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: File diagnostics retain stable event codes and counts rather than raw exceptions, paths or translation content.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Invalid overrides retain embedded defaults and rejected write candidates leave existing files untouched.

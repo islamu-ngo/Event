@@ -1,5 +1,6 @@
 using System.Reflection;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -78,6 +79,7 @@ public sealed class EventTeamAuthorizationBoundaryTests
             });
         var authorization = new RequestAuthorization<AssignEventRoleCommand>(
             provider,
+            Substitute.For<IMachinePrincipalAccessor>(),
             new AuthorizationResourceContextResolver(eventRepository, tenantContext: tenantContext));
         var innerHandler = Substitute.For<ICommandHandler<AssignEventRoleCommand, BaseCommandResponse<Guid>>>();
         var decorator = new AuthorizationCommandHandlerDecorator<AssignEventRoleCommand, BaseCommandResponse<Guid>>(

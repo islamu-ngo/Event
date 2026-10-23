@@ -10,12 +10,14 @@ public sealed class ReorderFooterLinkGroupsCommandHandler(
     IFooterLinkGroupRepository footerLinkGroupRepository,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
-    FooterLinkMutationGuard mutationGuard)
+    FooterLinkMutationGuard mutationGuard,
+    IFooterOperationExecution footerExecution)
     : ICommandHandler<ReorderFooterLinkGroupsCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ReorderFooterLinkGroupsCommand request, CancellationToken cancellationToken)
     {
+        var human = await footerExecution.RequireOwnedAsync(request, cancellationToken);
         await mutationGuard.EnsureAllowedAsync(tenantContext.TenantId, cancellationToken);
 
         var tenantGroups = await footerLinkGroupRepository.GetByTenantIdAsync(
@@ -23,8 +25,9 @@ public sealed class ReorderFooterLinkGroupsCommandHandler(
 
         var groupById = tenantGroups.ToDictionary(g => g.Id);
 
-        await unitOfWork.ExecuteInTransactionAsync(async _ =>
+        async Task Reorder(CancellationToken token)
         {
+            token.ThrowIfCancellationRequested();
             for (var i = 0; i < request.OrderedGroupIds.Count; i++)
             {
                 var id = request.OrderedGroupIds[i];
@@ -34,7 +37,11 @@ public sealed class ReorderFooterLinkGroupsCommandHandler(
                 group.Order = i;
                 await footerLinkGroupRepository.Update(group);
             }
-        }, cancellationToken);
+        }
+        if (human is null)
+            await unitOfWork.ExecuteInTransactionAsync(Reorder, cancellationToken);
+        else
+            await Reorder(cancellationToken);
 
         return BaseCommandResponse.Success(Guid.Empty);
     }

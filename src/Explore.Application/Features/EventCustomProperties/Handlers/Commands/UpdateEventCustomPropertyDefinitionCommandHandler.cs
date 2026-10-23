@@ -1,3 +1,5 @@
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -11,6 +13,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
 using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Commands;
 
@@ -22,7 +25,14 @@ public class UpdateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ICurrentUserService _currentUserService;
     private readonly HybridCache _cache;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISerializableAttemptOwner _owner;
+    private readonly IHumanAdministrativeActionPreparation _preparation;
+    private readonly ITenantContext _tenantContext;
+    private readonly IAdminContext _adminContext;
+    private readonly ITenantAdministratorCommitAuthority _tenantAuthority;
+    private readonly IInstanceAdministratorCommitAuthority _instanceAuthority;
+    private readonly RequestAuthorization<UpdateEventCustomPropertyDefinitionCommand> _authorization;
+    private readonly ILogger<UpdateEventCustomPropertyDefinitionCommandHandler> _logger;
 
     public UpdateEventCustomPropertyDefinitionCommandHandler(
         IEventCustomPropertyRepository eventCustomPropertyRepository,
@@ -31,7 +41,14 @@ public class UpdateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
         ICustomPropertyQuotaResolver quotaResolver,
         ICurrentUserService currentUserService,
         HybridCache cache,
-        IUnitOfWork unitOfWork)
+        ISerializableAttemptOwner owner,
+        ITenantContext tenantContext,
+        IAdminContext adminContext,
+        ITenantAdministratorCommitAuthority tenantAuthority,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        RequestAuthorization<UpdateEventCustomPropertyDefinitionCommand> authorization,
+        ILogger<UpdateEventCustomPropertyDefinitionCommandHandler> logger,
+        IHumanAdministrativeActionPreparation preparation)
     {
         _eventCustomPropertyRepository = eventCustomPropertyRepository;
         _projectionUpdater = projectionUpdater;
@@ -39,24 +56,57 @@ public class UpdateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
         _quotaResolver = quotaResolver;
         _currentUserService = currentUserService;
         _cache = cache;
-        _unitOfWork = unitOfWork;
+        _owner = owner;
+        _preparation = preparation;
+        _tenantContext = tenantContext;
+        _adminContext = adminContext;
+        _tenantAuthority = tenantAuthority;
+        _instanceAuthority = instanceAuthority;
+        _authorization = authorization;
+        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    {
+        Guid tenantId = _tenantContext.TenantId;
+        if (!_currentUserService.IsAuthenticated || tenantId == Guid.Empty
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) is not { } userId)
+            return BaseCommandResponse.Authentication<Guid>();
+        await _authorization.AuthorizeAsync(request, _logger, cancellationToken);
+        var validation = await new UpdateEventCustomPropertyDefinitionDtoValidator()
+            .ValidateAsync(request.DefinitionDto, cancellationToken);
+        if (!validation.IsValid)
+            return BaseCommandResponse.Validation<Guid>(
+                validation.Errors.Select(error => error.ErrorMessage), "Event custom property definition update failed.");
+        Guid[] optionIds = request.DefinitionDto.Options?.Items?.Select(_ => Guid.CreateVersion7()).ToArray() ?? [];
+        DateTime changedAt = DateTime.UtcNow;
+        EventCustomPropertyDefinition? updatedDefinition = null;
+        var prepared = await _preparation.PrepareAsync(request, userId, cancellationToken);
+        var response = await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, userId, token);
+            updatedDefinition = null;
+            if (!await _instanceAuthority.IsInstanceAdministratorForCommitAsync(userId, token)
+                && !await _tenantAuthority.IsTenantAdministratorForCommitAsync(userId, tenantId, token))
+                return BaseCommandResponse.Authorization<Guid>();
+            return await UpdateAuthorizedAsync(request, tenantId, optionIds, changedAt,
+                definition => updatedDefinition = definition, token);
+        }, cancellationToken);
+        if (response.IsSuccess && updatedDefinition is not null)
+            await _cache.RemoveByTagAsync(
+                EventCustomPropertyCache.ListsByEvent(updatedDefinition.TenantId, updatedDefinition.EventId),
+                CancellationToken.None);
+        return response;
+    }
+
+    private async Task<BaseCommandResponse<Guid>> UpdateAuthorizedAsync(
+        UpdateEventCustomPropertyDefinitionCommand request, Guid tenantId, Guid[] optionIds, DateTime changedAt,
+        Action<EventCustomPropertyDefinition> committed, CancellationToken cancellationToken)
     {
         if (request.DefinitionId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["DefinitionId and ExpectedConcurrencyStamp are required."],
-                "Event custom property definition update failed.");
-        }
-
-        var validator = new UpdateEventCustomPropertyDefinitionDtoValidator();
-        var validationResult = await validator.ValidateAsync(request.DefinitionDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BaseCommandResponse.Validation<Guid>(
-                validationResult.Errors.Select(e => e.ErrorMessage),
                 "Event custom property definition update failed.");
         }
 
@@ -66,9 +116,7 @@ public class UpdateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
             return BaseCommandResponse.NotFound<Guid>("Event custom property definition not found.");
         }
 
-        request = request with { TenantId = definition.TenantId };
-
-        if (request.TenantId == Guid.Empty || request.TenantId != definition.TenantId)
+        if (definition.TenantId != tenantId || definition.IsDeleted)
         {
             return BaseCommandResponse.NotFound<Guid>("Event custom property definition not found.");
         }
@@ -195,41 +243,35 @@ public class UpdateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
         definition.Namespace = governance.NormalizedNamespace;
         definition.Key = governance.NormalizedKey;
         definition.UpdatedBy = _currentUserService.UserId;
-        definition.UpdatedAt = DateTime.UtcNow;
+        definition.UpdatedAt = changedAt;
 
-        await _unitOfWork.ExecuteInTransactionAsync(
-            async ct =>
-            {
-                if (request.DefinitionDto.Options is null)
-                {
-                    await _eventCustomPropertyRepository.Update(definition);
-                }
-                else
-                {
-                    var options = CreateOptionEntities(candidate.Options, definition.Id);
-                    var defaultOption = options.SingleOrDefault(x => x.IsDefault);
-                    await _eventCustomPropertyRepository.UpdateWithOptions(definition, options, defaultOption?.Id, ct);
-                }
-
-                await _projectionUpdater.UpdateForDefinitionAsync(definition.Id, ct);
-            },
-            cancellationToken);
-
-        await _cache.RemoveByTagAsync(
-            EventCustomPropertyCache.ListsByEvent(definition.TenantId, definition.EventId),
-            CancellationToken.None);
+        if (request.DefinitionDto.Options is null)
+        {
+            await _eventCustomPropertyRepository.Update(definition);
+        }
+        else
+        {
+            var options = CreateOptionEntities(candidate.Options, definition.Id, optionIds, changedAt);
+            var defaultOption = options.SingleOrDefault(x => x.IsDefault);
+            await _eventCustomPropertyRepository.UpdateWithOptions(
+                definition, options, defaultOption?.Id, cancellationToken);
+        }
+        await _projectionUpdater.UpdateForDefinitionAsync(definition.Id, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        committed(definition);
 
         return BaseCommandResponse.Success(definition.Id, "Event custom property definition updated successfully.");
     }
 
     private List<EventCustomPropertyOption> CreateOptionEntities(
         IReadOnlyCollection<CreateEventCustomPropertyOptionDto> optionDtos,
-        Guid definitionId)
+        Guid definitionId, Guid[] optionIds, DateTime createdAt)
     {
         return optionDtos
-            .Select(optionDto => new EventCustomPropertyOption
+            .Select((optionDto, index) => new EventCustomPropertyOption
             {
-                Id = Guid.CreateVersion7(),
+                Id = optionIds[index],
+                CreatedAt = createdAt,
                 EventCustomPropertyDefinitionId = definitionId,
                 Namespace = CustomPropertyIdentity.NormalizeNamespace(optionDto.Namespace),
                 Key = CustomPropertyIdentity.NormalizeKey(optionDto.Key),

@@ -117,11 +117,22 @@ Each project has a specific role. Run individually — never use solution-level 
 | `Explore.Diagnostic.UnitTests` | Diagnostic tooling | Doctor exit codes, bounded command evidence, and redaction | No |
 | `ISLAMU.AgentWorkflow.Tests` | Repository tooling | Intents YAML syntax and literal-file commit guard | No |
 | `Event.Standalone.IntegrationTests` | Standalone host | In-process transport, combined host graph, configuration, and API parity | No |
-| `Event.SetupAssistant.Terminal.Tests` | Setup terminal | Terminal.Gui adapter, authoritative Core output parity, localization, and secret-boundary invariants | No |
+| External `Configurator.Terminal.Tests` | Offline terminal (Configurator repository) | Definition workspace, localization and native secret/protected-save boundaries | No |
 | `ISLAMU.ReleaseEngineering.Tests` | Release engineering | Commit/scope policy, release artifact, Git trust, renderer, tag-anchored attestation, provider adapter plans | No (spawns `git`, `ssh-keygen`, and disposable repositories under the temp directory) |
 | `Event.Benchmarks` | Benchmarks | Advisory BenchmarkDotNet performance scenarios; build-only in PRs and executed by `performance-smoke.yml` | Optional PostgreSQL only for the dedicated provider benchmark |
 
 ### Run Commands
+
+The seven bundled Event setup test roots are removed. Portable engine and
+packaging coverage belongs to Configurator. Event retains client adapter tests under
+`Explore.Blazor.Client.Tests/SetupLive/`, wire/generated-contract guards,
+bootstrap architecture tests and the serial 35-case
+`SetupLiveAuthoritySecurityTests` API lane with its TRX and optional coverage.
+The integration source is maintained with the portable `configurator-integrate`
+skill and checked/built by the standalone Configurator CLI. Event has no exporter
+gate or sibling runtime assembly dependency. Its native contract tests validate
+synthetic interoperability vectors independently of Configurator compilation.
+This boundary change does not call for a database-provider matrix.
 
 The release-engine `SecurityChangeSelectionTests` exercise the actual native
 predicate consumed by `security-tests.yml`. They preserve existing selections
@@ -130,11 +141,22 @@ Standalone/shared BFF ingress, empty detection and inaccessible input.
 Run the in-memory selection slice with:
 
 ```bash
-dotnet test --project eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*SecurityChangeSelectionTests/*" --minimum-expected-tests 17 --no-progress
+dotnet test --project eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*SecurityChangeSelectionTests/*" --minimum-expected-tests 23 --no-progress
 ```
 
 This tooling slice does not replace the selected API security/Cerbos runs or
 candidate-bound provider, host and operational evidence.
+
+`SecurityExecutionEvidenceTests` exercise measured TRX counts, artifact digests,
+invocation identity, honest no-ops, traversal/entity/size rejection and producer
+cleanup. `ReleaseCandidateVerificationTests` exercise the actual admission
+decision and deterministic manifest digest. Their synthetic report inputs prove
+protocol invariants, not execution of API security lanes.
+
+`SecurityControlRegisterTests` consume the shipped machine catalogue and reject
+missing/duplicate identities, invalid ownership, missing mitigation pairs,
+mixed ASVS versions and source-only closure claims. None is a prose/source-text
+scrape or a substitute for its owning product boundary tests.
 
 Host-lifetime regressions in `ApiHostLifetimeTests` and
 `GracefulShutdownLifetimeTests` distinguish stopped/never-started host disposal
@@ -158,7 +180,6 @@ dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.
 dotnet test --project tests/Event.Wire.Contracts.UnitTests/Event.Wire.Contracts.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Explore.Diagnostic.UnitTests/Explore.Diagnostic.UnitTests.csproj --configuration Release --verbosity quiet
 dotnet test --project tests/Event.Standalone.IntegrationTests/Event.Standalone.IntegrationTests.csproj --configuration Release --verbosity quiet
-dotnet test --project tests/Event.SetupAssistant.Terminal.Tests/Event.SetupAssistant.Terminal.Tests.csproj --configuration Release --verbosity quiet
 dotnet test --project eng/agent-workflow/tests/ISLAMU.AgentWorkflow.Tests/ISLAMU.AgentWorkflow.Tests.csproj --configuration Release --verbosity quiet
 
 # Release engineering (no infrastructure needed — builds disposable Git repositories)
@@ -290,6 +311,65 @@ dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTest
 ```
 
 Support-access UI tests must assert affordances from HAL `_links`, not local role or claim checks. The tenant evidence view is intentionally read-only; tests should prove it does not render start or force-stop controls and only renders audit drill-in when the session resource contains an `audit-events` link.
+
+### Authentic Keycloak Token Context Evidence
+
+`KeycloakTokenContextHttpTests` uses `KeycloakTokenContextFixture`: each
+condition gets a runtime-generated RSA authority, independent wrong-key
+authority and issuer, controlled public metadata, and a TestServer host
+registered through production `AddApiAuthentication`. No TestAuth handler,
+signature/lifetime validator override or provider container is used.
+The protected endpoint changes an in-memory revision only after ordinary
+authentication and authorization succeed. Each negative asserts `401`,
+unchanged revision and a valid control request on the same host. Both current
+`JsonWebToken` and legacy `JwtSecurityToken` representations are exercised.
+This fixture proves the authentication boundary, not persistence, tenant
+membership, Local current-session authority or provider MFA.
+
+Cases are independently signed, including genuinely expired tokens beyond
+the normal five-minute skew, future not-before, wrong signing key, issuer,
+API/BFF/resource audience, client restrictions, JOSE header and signed
+access-purpose claims. Missing, duplicated/conflicting properties and wrong
+JSON types cannot pass through claim coercion. A separate near-expiry case
+retains normal provider skew. No sleep or wall-clock wait is used.
+
+`KeycloakNativeTokenContextHttpTests` is a separate Runtime lane, using
+`KeycloakContainerFixture` pinned to Keycloak 26.1.2 and the actual imported
+test realm. It asserts fetched issuer/token-endpoint/JWKS metadata and
+actual access/ID token shape; independent RSA verification checks both native
+signatures before purpose rejection. It verifies access-only API audience
+mapper effects, rejects an unmapped client, rejects native ID substitution
+even when the handler's resource audience matches that ID token, and admits
+a mapped service token only under the explicit client allowlist. Every
+HTTP assertion still uses production JwtBearer. Fixture passwords and
+confidential client credentials are generated per disposable container,
+never stored in the realm file or logged. These tests are not proof of
+an operator's live realm or MFA configuration.
+
+`SecurityIntegrationTests` retains separate decoded signature-byte and
+unsigned payload-tampering checks. Changing `exp` with the old signature is
+tampering evidence, not authentic expiry evidence. Unexpected compact-token
+shape fails instead of skipping an assertion. The former mislabeled
+missing-audience success test now describes its actual mapped-audience
+positive condition.
+
+For the source-only security programme these checks are authored, **unrun**.
+After the full implementation is complete, queue the Release API integration
+project build and the two owning classes separately:
+
+```bash
+dotnet build tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/KeycloakTokenContextHttpTests/*" --minimum-expected-tests 1 --no-progress
+dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/KeycloakNativeTokenContextHttpTests/*" --minimum-expected-tests 1 --no-progress
+```
+
+Retain the repaired `SecurityIntegrationTests` and existing Local/ATProto
+purpose/current-authority suites in final programme assurance. No API DTO,
+OpenAPI, client or migration generation is required by this unit. The
+release-engine change fragment allocation/validation is a separate final
+queue item, not generated during source-only execution. Framework token
+representation APIs, pinned provider claims/mappers and metadata acquisition
+remain physically unverified until these queued checks run.
 
 ### Test Taxonomy And CI Lanes
 

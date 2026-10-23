@@ -57,8 +57,7 @@ public sealed class ModerateEventCommandHandler(
         {
             metrics.RecordEventModerationAction(null, ActionKind, "failed", "user_unresolved", irreversible: false);
             logger.LogWarning(
-                "Light event moderation rejected because the authenticated moderator user could not be resolved for event {EventId}.",
-                request.Id);
+                "Light event moderation rejected because the authenticated moderator user could not be resolved");
 
             return Failure(
                 request.Id,
@@ -179,14 +178,12 @@ public sealed class ModerateEventCommandHandler(
             result = result with { MetricOutcome = null };
         }
 
-        await ApplyPostCommitEffectsAsync(result, request.Id, moderatorUserId, cancellationToken);
+        await ApplyPostCommitEffectsAsync(result, cancellationToken);
         return result.Response;
     }
 
     private async Task ApplyPostCommitEffectsAsync(
         ModerationCommandResult result,
-        Guid requestedEventId,
-        Guid? moderatorUserId,
         CancellationToken cancellationToken)
     {
         if (result.CacheEventId is { } eventId && result.TenantId is { } tenantId)
@@ -208,33 +205,18 @@ public sealed class ModerateEventCommandHandler(
         switch (result.LogOutcome)
         {
             case "not_found":
-                logger.LogWarning(
-                    "Light event moderation rejected because event {EventId} was not found.",
-                    requestedEventId);
+                logger.LogWarning("Light event moderation rejected because event was not found.");
                 break;
             case "idempotent":
-                logger.LogInformation(
-                    "Light event moderation skipped because event {EventId} in tenant {TenantId} is already moderated.",
-                    result.Response.Id,
-                    result.TenantId);
+                logger.LogInformation("Light event moderation skipped because event is already moderated.");
                 break;
             case "invalid_status":
                 logger.LogWarning(
-                    "Light event moderation rejected for event {EventId} in tenant {TenantId} because current status {CurrentStatusId} is not Published.",
-                    result.Response.Id,
-                    result.TenantId,
+                    "Light event moderation rejected because current status {CurrentStatusId} is not Published.",
                     result.CurrentStatusId);
                 break;
             case "succeeded":
-                EventModerationRecord moderationRecord = result.ModerationRecord!;
-                logger.LogInformation(
-                    "Light event moderation succeeded for event {EventId} in tenant {TenantId}; moderation record {ModerationRecordId}, moderator {ModeratorUserId}, reason {ReasonCode}, correlation {CorrelationId}.",
-                    result.Response.Id,
-                    result.TenantId,
-                    moderationRecord.Id,
-                    moderatorUserId,
-                    moderationRecord.ReasonCode,
-                    moderationRecord.CorrelationId);
+                logger.LogInformation("Light event moderation succeeded.");
                 break;
         }
     }

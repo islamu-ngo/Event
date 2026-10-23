@@ -102,10 +102,11 @@ internal sealed class LocalIdentityLifecycleDeliveryStore(
 
     public Task<Guid?> TryAdmitAsync(LocalIdentityLifecyclePointer operation, CancellationToken cancellationToken) =>
         identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(() =>
-            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => identityFence.ExecuteIdentityMutationAsync(
-                token => AdmitAttemptAsync(operation, token), cancellationToken), cancellationToken));
+            EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() => credentialStates.ExecuteLifecycleMutationAsync(
+                (lifecycle, token) => AdmitAttemptAsync(operation, lifecycle, token), cancellationToken), cancellationToken));
 
-    private async Task<Guid?> AdmitAttemptAsync(LocalIdentityLifecyclePointer pointer, CancellationToken cancellationToken)
+    private async Task<Guid?> AdmitAttemptAsync(LocalIdentityLifecyclePointer pointer,
+        LocalIdentityLifecycleExecutionCustody lifecycle, CancellationToken cancellationToken)
     {
         await using var transaction = await LocalIdentityMutationTransaction.BeginAsync(
             identityDbContext, applicationDbContext, identityFence, cancellationToken);
@@ -122,13 +123,14 @@ internal sealed class LocalIdentityLifecycleDeliveryStore(
         int attempts = await identityDbContext.Set<LocalIdentityLifecycleOperation>()
             .Where(candidate => candidate.LocalSubjectId == pointer.LocalSubjectId && candidate.Purpose == pointer.Purpose
                 && candidate.DeliveryAdmittedAt >= cutoff).SumAsync(candidate => candidate.DeliveryAttemptCount, cancellationToken);
+        lifecycle.RequireCurrent();
         if (binding is null || binding.PersonalActorId != pointer.PersonalActorId || binding.ExternalLoginId != pointer.ExternalLoginId
             || binding.CredentialState != LocalCredentialState.Ready || metadata?.OperationId != row.CredentialOperationId
             || user is null || attempts >= 3)
         {
             await Exact(pointer).Where(candidate => candidate.DeliveryState == LocalIdentityLifecycleDeliveryState.Pending)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(candidate => candidate.DeliveryState, LocalIdentityLifecycleDeliveryState.Failed), cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            await lifecycle.CommitAsync(transaction, cancellationToken);
             return null;
         }
         // The same native CAS as intake serializes per-account budget against concurrent credential and lifecycle writes.
@@ -136,6 +138,7 @@ internal sealed class LocalIdentityLifecycleDeliveryStore(
             .Where(candidate => candidate.Id == user.Id && candidate.SecurityStamp == row.SecurityStamp && candidate.ConcurrencyStamp == user.ConcurrencyStamp)
             .ExecuteUpdateAsync(setters => setters.SetProperty(candidate => candidate.ConcurrencyStamp, Guid.CreateVersion7().ToString("N")), cancellationToken);
         Guid attemptId = Guid.CreateVersion7();
+        lifecycle.RequireCurrent();
         int operations = await Exact(pointer).Where(candidate => candidate.DeliveryState == LocalIdentityLifecycleDeliveryState.Pending
                 && candidate.ConsumedAt == null && candidate.ExpiresAt > now)
             .ExecuteUpdateAsync(setters => setters.SetProperty(candidate => candidate.DeliveryState, LocalIdentityLifecycleDeliveryState.Unknown)
@@ -144,7 +147,7 @@ internal sealed class LocalIdentityLifecycleDeliveryStore(
                 .SetProperty(candidate => candidate.DeliveryAdmittedAt, now)
                 .SetProperty(candidate => candidate.DeliveryCompletedAt, (DateTime?)null), cancellationToken);
         if (users != 1 || operations != 1) return null;
-        await transaction.CommitAsync(cancellationToken);
+        await lifecycle.CommitAsync(transaction, cancellationToken);
         return attemptId;
     }
 

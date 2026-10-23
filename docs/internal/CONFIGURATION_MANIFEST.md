@@ -27,6 +27,14 @@ manifest applies second, serializable preparation third, and HTTP readiness
 last, in both Split and Standalone. A manifest never completes onboarding, and
 onboarding never rewrites the manifest.
 
+Deferred startup composition registers the native bootstrap applier and deferred
+effect strategy without the human mutation/preflight graph. The bootstrap owner
+performs its own original-source validation; it does not borrow a human Settings
+issuer. `ICoordinatedSettingMutationStore` therefore belongs to full runtime
+persistence composition, where its genuine human preparation and selected-data
+boundary are available. Immediate runtime import composition retains its existing
+preflight, mutation boundaries and effect delivery services.
+
 See [CONFIGURATION.md](CONFIGURATION.md) for the key matrix and
 [OPERATIONS.md](OPERATIONS.md) for lifecycle behavior.
 
@@ -439,6 +447,21 @@ The publication-policy validator evaluates reporting intake, approval, and
 submission settings as a complete proposed state. A combination that disables
 reporting intake while leaving unsafe unapproved publication open is rejected.
 
+The publication boundary's existing `RemoveOverride` behavior can clean up a
+tenant override whose acquired system row is locked. Its original Settings
+issuer now derives that exact Remove effect from the captured tenant Set and
+locked source row before issuing the callback-scoped publication proof.
+Unlocked rows remain Set; `Reject` remains a locked-policy failure. Instance
+owners cannot borrow the cleanup behavior, and the original Set proof does not
+retain Remove permission after the child callback ends. Compilation and the
+coordinated store still validate the complete effective policy before writing.
+Five authentic original-owner/expiry controls are authored and unrun.
+Before projecting supplied mutations to owned keys, the publication boundary now
+rejects foreign/instance-shaped tenant effects, tenant-shaped instance effects,
+invalid kinds and incompatible Set/Remove payload shape. Supplied values still
+cannot replace original prepared effects. Four authenticated shape controls are
+authored and unrun; duplicate/unowned keys retain the private source rejection.
+
 ### Typed documents
 
 | Scope | Key | Schema version | Storage owner |
@@ -581,6 +604,128 @@ For containers, mount the directory read-only at
 `/etc/islamu-event/bootstrap`. The repository reserves
 `deploy/bootstrap/` for the host-side source.
 
+### Original startup authority contract
+
+PostgreSQL ValidateOnly uses the independently attested `validate_source`
+entry, not the retained mutation `source` entry. Both use the declared Global
+reader and Serializable image, but validation takes neither the manifest
+advisory mutex nor source row locks and explicitly rolls back. Its preview
+does not issue a mutation capsule. The genuine-origin regression holds that
+validation read open at an exact observation event and requires an independent
+backend to acquire the manifest mutex immediately.
+
+Bootstrap audit mode and status comparisons use the EF model's provider values,
+not the numeric C# enum ordinals. The source predicate, retained snapshot,
+mutation shape and failed-history guard must agree with the mapped string
+representation. Failed-history writes admit only `Failed`, never an `Applied`
+receipt; a representation mismatch must not become an incidental SQL cast error
+or weaken that guard. Failure-injection tests derive their status column/literal
+from the same relational model and verify actual rollback evidence.
+
+`ConfigurationManifestBootstrapOwnerFactory` coordinates mutation in C#: acquire
+the enrollment gate, then normalized ordered setting-key session leases, before
+opening the original Serializable transaction. Hold that custody through commit
+or rollback. Waiting before BEGIN ensures a cooperating successor observes the
+previous owner's committed image, rather than retaining an older snapshot.
+Native reads do not request SHARE table locks, FOR UPDATE row locks, or a second
+native advisory mutex. Fixed column permissions, scope checks, installed-body
+attestation, exact before/after effects and affected-row checks remain unchanged.
+Global receives function execution, not native-owner membership or broader direct
+table permissions.
+
+This is cooperative API coordination, not a database fence against every writer.
+Direct database edits outside the C# protocol can race, including inserts of
+previously absent settings. Serializable provides a consistent transaction image,
+not fresh observations of arbitrary commits; exact-effect checks and constraints
+do not promise to detect every such edit. Conflicts abort rather than replaying
+an attempt automatically. Operators must use the API for configuration changes.
+The native regression checks both retained API mutex custody and absence of the
+old table/row fences; concurrency tests observe actual advisory-lock contention
+between cooperating owners before asserting create-once/skip-second outcomes.
+
+Bootstrap stores its effect envelope in the same original transaction as the
+configuration, operation audit and tenant results. Production startup selects
+`DeferredConfigurationManifestEffectDelivery`: it does not enumerate, claim or
+settle effects on the bootstrap Global context. The ordinary Runtime outbox
+worker admits the persisted operation/effect pair, selects the original
+claim-bound Runtime scope, dispatches through `ConfigurationManifestEffectDispatcher`
+and settles only the retained claim. A lost claim cannot authorize completion.
+Consumer failure leaves durable retry/dead-letter work under the existing outbox
+protocol; it must not turn a committed bootstrap into fabricated rollback evidence.
+
+`ConfigurationManifestEffectPayload` is the versioned, key-only delivery contract.
+The original C# compiler derives it from the complete Applied receipt and Created
+tenant results, then stores it with those rows in the same physical transaction.
+Version1 contains only the notification UTC time, changed instance setting-key
+names, and Created tenant IDs with their changed setting-key names. It contains
+no setting values, document bodies, secrets, source manifest, names or audit text.
+Skipped tenants are excluded; a no-op replay does not create another effect.
+
+The dispatcher consumes the exact persisted payload bound to its original claim,
+not private operation/result reads or a substitute Global context. .NET10 strict
+JSON metadata rejects duplicate/unknown/missing properties; C# additionally checks
+the version, size, UTC time, canonical tenant identities/order and closed key
+catalogues before any cache invalidation or notification. Applied-operation and
+effect-ID admission, exact payload-byte digest, route and live lease checks remain.
+The worker no longer re-derives metadata from later audit-row edits: the immutable
+atomic payload is its delivery authority. Privileged database rewrites are not an
+API workflow and are not repaired or silently normalized.
+
+Manifest payload replacement is denied in both the repository's atomic portable
+predicate and the existing native queue primitive, using the persisted route.
+Other routes retain their required redaction/scrubbing capabilities. This adds no
+private audit grants, schema columns, migration or privileged business routine.
+Legacy null payloads and unsupported versions have no fallback. Keep the matching
+application and native definitions together; exact body attestation still rejects
+stale definitions rather than upgrading them implicitly. A rollback must restore
+a coherent application/database checkpoint, not rewrite pending effects by hand.
+
+`AddConfigurationManifestApplication` registers common services only. Startup
+registration exclusively selects delivery timing and retains dispatcher/import
+services and real human import admission for deferred delivery. Re-registering
+common services must not silently restore an immediate claimer. Native origin
+tests assert pending operation-linked envelopes, not completed worker delivery;
+the genuine PostgreSQL startup-to-worker cohort remains a separate acceptance
+requirement. See [Outbox pattern](OUTBOX_PATTERN.md) for worker lifecycle.
+
+The Persistence module registers a scoped concrete
+`ConfigurationManifestBootstrapOrigin`; its source-authority interface aliases
+that same instance, and the internal executor and owner require the concrete
+origin. Origin, executor, owner, real runner and post-migration sequence are
+internal sealed Persistence implementations. The private invocation frame is
+created by the actual runner and must remain active when the original source is
+captured. Application exposes only the runner/sequence/exception contracts and
+pure ingestion scanner. Infrastructure supplies reader/options validation and
+the real HTTP-context accessor, not an issuer adapter. PostgreSQL migration and native-fixture
+hooks install `PostgresConfigurationManifestBootstrapContract` and enroll only
+the declared Global login in `event_manifest_bootstrap_global` with inherited
+execution and no SET/admin option. This does not expose Global secrets to
+MigrationService or grant Runtime owner membership.
+
+These are source hooks, not executed installation receipts. The closed
+concrete-origin dependency removes public factory reconstruction with a
+substitute interface; authentic counterfeit-source/native regression and full
+bootstrap source review remain open. Current descriptor-based file custody
+supports Linux only and fails closed on other operating systems; this does not
+establish cross-platform startup acceptance.
+
+The bootstrap origination contract selects the closed deployment origin:
+the actual post-migration startup invocation, its original `Bootstrap` mode,
+selected regular file and exact database/namespace. The reader's SHA-256 digest
+identifies bytes; it does not verify signatures or authenticate a signer.
+Deployment configuration and filesystem custody therefore carry the operator
+trust boundary. A public parsed read-result DTO, configuration selector or
+database credential alone cannot issue mutation authority.
+
+The security programme is implementing retained first-source custody and a
+separate sealed nonhuman completion for this origin. Its audit actor remains
+null rather than a fabricated human or `Guid.Empty`. Fixed manifest-only native
+effects must complete on the original non-replaying physical owner using
+selected Global credentials, without borrowing human Settings, import,
+configured-administrator or setup-ticket authority. This contract is distinct
+from authenticated Day 2 import. Runtime assurance remains deferred until the
+programme implementation is complete; this section is not a passing receipt.
+
 ## End-To-End Bootstrap Flow
 
 The implemented control flow is:
@@ -607,7 +752,7 @@ The implemented control flow is:
     authoritative in-transaction mutation boundaries.
 11. Each absent tenant is created in deterministic slug order with its
     directory-operator identity, branding, settings, and optional paid policy.
-12. The operation audit, per-tenant results, and payload-free outbox effect are
+12. The operation audit, per-tenant results, and versioned key-only outbox effect are
     committed in the same transaction.
 13. Cache invalidation and setting notifications run after commit. In the split
     topology the one-shot owner leaves the effect in the durable general outbox
@@ -675,14 +820,22 @@ Exactly one process owns manifest application in each topology:
 
 | Topology | Owner | Non-owner behavior |
 |---|---|---|
-| Docker Compose split | `event-migrationservice` | API receives no manifest environment or mount |
-| Aspire `Split` | `Event.MigrationService` | API and Blazor do not own bootstrap |
-| Aspire `Standalone` | `Event.Standalone` | Migration project is forced to `Off` for manifest processing |
+| Docker Compose split | `islamu-event-api`, after successful `event-migrationservice` completion | MigrationService receives neither manifest configuration/mount nor Global credentials |
+| Aspire `Split` | `Explore.API`, after `WaitForCompletion(migrations)` | MigrationService and Blazor do not own bootstrap |
+| Aspire `Standalone` | `Event.Standalone` | Migration project receives no manifest configuration; shared API startup does not run it twice |
 | Direct standalone image | `Event.Standalone` | No helper process is required |
 
 In all cases, migration/seed work completes before manifest processing, and
 manifest processing completes before the owning web host can accept traffic.
 A split API waits for successful completion of the one-shot migration service.
+It then runs manifest startup with its existing selected Global composition
+before configured-administrator preparation and HTTP readiness.
+`ApiHostCompositionState.OwnsConfigurationManifestStartup` makes that ownership
+explicit; Standalone passes false because its outer startup sequence already
+performed migration and manifest work. Development API still performs its own
+migration/seed sequence first. No Global credential is added to the migration
+consumer. Direct API deployment must complete migration externally before
+starting with Bootstrap; native capability attestation fails closed otherwise.
 
 ## Operator Workflow
 
@@ -717,20 +870,20 @@ Validate Compose interpolation:
 docker compose config --quiet
 ```
 
-Run the one-shot owner in validation mode:
+Start the migration dependency and API owner in validation mode:
 
 ```bash
-docker compose run --rm \
-  -e CONFIGURATION_MANIFEST_MODE=ValidateOnly \
-  event-migrationservice
+CONFIGURATION_MANIFEST_MODE=ValidateOnly \
+  docker compose up -d --build islamu-event-api
+docker compose logs islamu-event-api
 ```
 
-After validation succeeds, run bootstrap:
+After the API reports validation success, recreate its startup with bootstrap:
 
 ```bash
-docker compose run --rm \
-  -e CONFIGURATION_MANIFEST_MODE=Bootstrap \
-  event-migrationservice
+CONFIGURATION_MANIFEST_MODE=Bootstrap \
+  docker compose up -d islamu-event-api
+docker compose logs islamu-event-api
 ```
 
 Then set `CONFIGURATION_MANIFEST_MODE=Off` and start or restart the runtime:
@@ -739,8 +892,10 @@ Then set `CONFIGURATION_MANIFEST_MODE=Off` and start or restart the runtime:
 docker compose up -d
 ```
 
-The Compose API depends on successful migration-service completion and never
-receives the manifest mount.
+The Compose API depends on successful migration-service completion and owns
+the read-only manifest mount. Validation does not terminate the API host;
+after successful bootstrap, returning mode to Off restores ordinary startup.
+These commands are the updated workflow, not an executed acceptance receipt.
 
 ### Local Aspire
 
@@ -753,9 +908,9 @@ aspire run --apphost src/Explore.AppHost/Explore.AppHost.csproj
 ```
 
 Repeat with `CONFIGURATION_MANIFEST_MODE=Bootstrap` after validation. In the
-default `Split` topology the migration project owns the manifest. With
+default `Split` topology the API owns the manifest after migration completion. With
 `Hosting__Topology=Standalone`, AppHost transfers ownership to
-`Event.Standalone` and forces the migration project's manifest mode to `Off`.
+`Event.Standalone`. The migration project has no manifest configuration.
 
 ### Direct standalone container
 
@@ -857,11 +1012,125 @@ Exports are deterministic and ordered by tenant slug and catalog key. They are
 fully buffered before response bytes are sent. More than 256 active tenants or
 more than 4 MiB fails without a partial file.
 
+The trusted export reader selects the bounded active tenant catalog, then
+`ConfigurationManifestTenantReadScopeFactory` acquires a fresh exact Runtime
+lease for each selected tenant. Both repositories and hierarchical/typed-document
+resolvers are reconstructed inside that scope, so an ambient tenant cannot hide
+another selected tenant's values. Scope-local execution facts leave the request
+tenant and its existing context unchanged. Tenant-package exports select only
+their authorized target instead of reading every tenant's configuration.
+
+Import snapshot reads are a distinct ownership path: `ReadImportSnapshotAsync`
+uses the import owner's dependencies so fidelity checks can see uncommitted
+authoritative mutations. They must not switch to independent read connections
+or split the multi-tenant import transaction. The transaction-enlisted import
+write/read capability remains separate from the export-only acquisition port;
+neither is enrolled by naming convention in policy mutation command dispatch.
+
+Instance preview and apply enter through `IConfigurationInstanceImportExecutor`.
+Its Persistence implementation selects a dedicated sealed-null Global owner
+before resolving the private import graph. `ConfigurationImportApplyService`
+still owns the single serializable apply transaction; the executor does not
+wrap it in another transaction. The request's Runtime lease stays unchanged.
+`PostgresConfigurationImportSnapshotContract` supplies fixed catalog setting,
+document, and active paid-policy reads on that owner connection. Its policy
+restoration preserves stored identity/version and reconstructs validated domain
+children instead of creating replacement policy identities.
+
+The snapshot's latest applied bootstrap metadata is read through the fixed
+`configuration_import_snapshot_bootstrap(uuid)` function, not a raw Global
+table query. `ConfigurationManifestOperationRepository` selects this path only
+for the sealed PostgreSQL instance-import owner. It retains the same connection
+and transaction, restores the full persisted operation, and preserves ordering
+by bootstrap generation, completion time and operation ID. Runtime attests the
+function body and authority; installation refuses drift. The snapshot owner has
+column-level read privileges while Global receives only function execution.
+Runtime assurance for this repair remains pending.
+
+Before apply acquires tenant locks, `TenantRepository.GetBySlugsAsNoTrackingAsync`
+uses the fixed `configuration_import_snapshot_tenant_slugs(uuid,text[])` read on
+the sealed PostgreSQL import owner. The request is bounded by the manifest
+tenant limit and requires distinct non-empty slugs. This selector includes
+inactive matching targets, preserving the original repository semantics so
+later eligibility checks can reject them rather than misreporting them as
+missing. It does not grant Global direct tenant-table reads or switch owners.
+Function source and authority drift reject both execution and reinstallation.
+
+Current legal source is exported under the wire kind names (for example,
+`TermsOfService`), not the lower-case public route codes. Snapshots include
+the current version's audience, localizations, template provenance and fresh
+acceptance requirement, with `ReviewRequired` import intent. They omit review
+identities and publication/acceptance history. A published-only query cannot
+verify an imported draft or preserve its source in a rollback artifact.
+
+`ConfigurationImportSectionApplier` persists each Domain-created imported draft
+or revision through `ILegalDocumentRepository.SaveImportedAsync` before fidelity.
+The owning serializable transaction still controls commit or rollback. PostgreSQL
+uses `PostgresConfigurationImportLegalMutationContract` on that same connection:
+an exact-target aggregate read precedes an append-only write with original
+stamp/version/lifecycle comparison. Historical versions/publications stay
+unchanged, new source stays `ReviewRequired`, and the importing actor receives
+creation/update audit attribution. No published or acceptance state is imported.
+
+`PostgresConfigurationImportReceiptContract` appends terminal instance receipts
+and their exact `ConfigurationImportEffectsRequested` messages on the same
+serializable owner transaction. It validates the consumed session's preview
+digests, snapshot retention and source receipt; PostgreSQL `xmin` proves the
+session/snapshot/receipt were written by that transaction. The effect must match
+the receipt's effect ID, completion timestamp and public selected-setting
+notifications. Failed evidence alone may use a new transaction on the same
+selected connection after rollback. No generic Global receipt/outbox write
+grant or second success transaction is introduced.
+
+Resource setting notifications use the registered `TimeProvider` passed by
+`SelectedEventResourceSettingsWriter` to its selected human writer. Their UTC
+timestamps therefore share the import coordinator's clock and remain inside the
+receipt interval. A mixed batch retains its original captured `OccurredAt`.
+Native timestamp precision normalization and strict notification provenance
+validation remain unchanged.
+
+Snapshot resolution requests authoritative reads for both scalar settings
+and typed documents: only the requested catalog keys are read, shared caches
+are neither consumed nor populated, and fidelity can see the owner's
+uncommitted changes without prematurely publishing them.
+
 An export is suitable as a reviewed starting point for another bootstrap. It is
 not sufficient to restore users, events, registrations, orders, payments,
 secrets, outbox state, audit history, or provider state.
 
 ## Day 2 Import And Tenant Migration
+
+Import application owns cooperative coordination before opening its transaction:
+`ConfigurationImportCoordination` retains Human then Discovery custody on the
+selected context through settlement. Setup acquires those gates before its
+enrollment-generation lock; compatible inner calls borrow rather than reacquire.
+Failure history is written only after an acknowledged rollback and after owned
+gates are released, using the original request credential binding.
+
+Setup apply uses `ISettingMutationLock.ExecuteOrderedGroupsOnceAsync` around
+`ISerializableAttemptOwner`, not a replaying lock or unit-of-work entrypoint.
+This selects execution behavior only: it does not bind a human-authority scope
+or convert internal Setup writers into human mutation writers. Human-only commit
+authorities are resolved lazily on the selected human scope before BEGIN; simply
+constructing the shared import service never fabricates that scope for Setup.
+Setting leases
+are all released in reverse order even if one release fails. Generation and
+outer coordination cleanup retain the primary exception and cleanup causes.
+If commit acknowledgement is lost, the result remains
+`HumanMutationOutcomeUnknownException`: do not retry the prepared operation,
+persist a contradictory failed receipt, or deliver effects from that attempt.
+Committed configuration, consumed session, receipt and outbox remain atomic.
+Effect delivery starts only after outer generation and coordination leases end.
+After commit is acknowledged, cleanup or receipt-mapping failure is a committed
+operation requiring investigation, not an unknown commit or failed apply. Never
+append a second failed receipt or replay it to conceal the cleanup failure.
+The original EF transaction owner also preserves that distinction during
+`DisposeAsync`: `TransactionCommittedCleanupException` means COMMIT returned
+success before disposal failed. It is not a retryable provider conflict, even
+when its cleanup cause resembles one. If acknowledgement was lost instead,
+transaction disposal and later coordination releases retain the original
+`HumanMutationOutcomeUnknownException` and every cleanup cause. Import handling
+must propagate either classification before its failed-history catch path.
 
 Instance administrators import a v1alpha2 `ConfigurationManifest`; tenant
 administrators import a v1alpha2 `TenantConfigurationPackage` into the tenant
@@ -904,9 +1173,58 @@ The administration workspace follows one server-owned state machine:
    configuration values.
 
 An apply commits all selected authoritative mutations, the protected pre-apply
-snapshot, append-only operation evidence, and the payload-free effect outbox or
+snapshot, append-only operation evidence, and the typed effect outbox or
 commits none of them. Cache refresh and other effects may remain `Pending`; the
 configuration transaction is not replayed to repair an effect.
+
+### Original human import publication custody
+
+The genuine import coordinator retains the first resolved mapping target IDs
+and the section compiler's first complete publication image before fresh
+preview validation. The image includes all fixed policy inputs, stored
+identities, absence, value/lock/type metadata and audit fields, not a baseline
+sampled later by the writer. Ordered locks close the complete publication key
+family before the transaction. Accepted internal
+`HumanConfigurationImportPublication` capsules bind the original subject,
+operation, target, artifact and exact effects to the actual import issuer.
+
+`ApplyImportInCurrentTransactionAsync` uses the existing publication compiler,
+safety evaluator and tenant locked-system Reject behavior with a separate
+callback-limited writer admission. It does not borrow ordinary human Settings
+preparation. The selected writer compares retained preimages, verifies exact
+postimages and records private completion for every accepted slice on the same
+context, connection and Serializable transaction. Both callback exit and the
+original commit finalizer require those completions. Blocking source reads
+finish before terminal credential, support and retained-session time checks.
+
+PostgreSQL instance imports use the fixed native publication `source` and
+`write_original` functions. Their expected bodies and execution catalogs are
+independently attested; a recomputed comment stamp cannot substitute a changed
+body. The old raw `write` is owner-only and no longer executable by the Global
+group. The existing migration and native fixture hooks install the updated
+contract; no new credential, source registration or fallback factory is needed.
+Installation and the ten authored regression cases remain unexecuted under
+the programme's deferred-assurance rule. This source integration is separate
+from the nonhuman bootstrap origin and grants no general restore capability.
+
+Live-import effect delivery validates the fixed aggregate/event envelope before
+loading its receipt, then requires the receipt's `EffectOutboxId` to match the
+message and its status to be `Applied` or forward-rollback `RolledBack`.
+`ConfigurationImportEffectDelivery.DispatchClaimedAsync` performs these checks
+before cache invalidation or persisted notification dispatch. A failed receipt
+or mismatched message cannot publish effects. Rejection retains the existing
+claim-fenced failure/retry handling; it does not rewrite receipt history or
+reapply configuration.
+
+Bootstrap tenant-result replay uses `configuration_manifest_replay_results(uuid)`
+on PostgreSQL, not a cross-tenant EF query over the result table. The function
+qualifies one applied bootstrap operation, rejects more than 256 results, and
+returns only safe result identity/status/key-name metadata; created and skipped
+outcomes retain their original meanings. Runtime and Global receive separate
+execute-only groups, with no table DML or owner/migrator membership. Portable
+providers apply the same operation-status check and explicit result bound.
+The existing post-commit dispatcher still owns cache/notification effects;
+this reader neither repeats import writes nor changes the caller's tenant lease.
 
 Rollback is forward recovery. The receipt advertises a rollback relation only
 while its protected snapshot is available. Creating it produces a new import
@@ -965,7 +1283,253 @@ never automatic.
 
 ## Recovery Matrix
 
+### Setup secret-write purpose admission
+
+`SetupSecretBindingWriteRequest` admits only `setup.signing` and
+`setup.encryption`. `SecretDefinitionRegistry` declares both as optional,
+instance-only Infisical targets in `/setup`; their default provider names are
+`SETUP_SIGNING` and `SETUP_ENCRYPTION`. The required registry environment-name
+metadata does not enable Environment or User Secrets bindings for these targets.
+`SetupSecretBindingWriter` retains its selected-authority, stored binding ID/key,
+scope, qualifier, environment, and canonical folder checks before provider work.
+Existing API/Combined `/setup` admission applies; BFF access remains denied.
+The commitment HMAC definition is a separate server-only purpose, not a
+substitute target key. No credential value or fallback authority is introduced.
+
+### Email policy mutation database profiles
+
+The catalogue includes the already-declared instance and tenant email-policy
+mutation credentials. `DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME` and
+`DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD` bind
+`Database:EmailPolicyInstanceMutation`; the corresponding
+`DATABASE_EMAIL_POLICY_TENANT_MUTATION_*` pair binds
+`Database:EmailPolicyTenantMutation`. Their activation is `server-database-config`,
+with no safe defaults. Split Compose projects them through the API-only
+`database-runtime-env` anchor, preserving the separate selected native mutation
+owners rather than borrowing Runtime, Global, or Migrator credentials.
+
+### Operator editor and portable identity authority
+
+Operator save and manifest import retain their actual immutable command.
+`OperatorIdentityMutationAuthority` accepts either the original human
+administrator with current credential/S/P/route-when-annotated/H/support custody,
+or the real setup ticket/secret and unchanged pending state. A human ticket is
+not relabeled as setup. Save is unannotated; import retains its original
+`InstanceSetting/update` decision. Bootstrap completion's create-only operator
+seed remains a separate source and capability.
+
+The actual roots register this authority and `OperatorIdentitySettingsWriter`.
+The writer pins the Global context/lease/connection and one Serializable attempt,
+verifies the complete setting row, readiness projection and import outbox fields
+before final deadline checks, and publishes notifications only after settlement.
+Effect time uses the root TimeProvider; PostgreSQL precision is selected before
+the capsule freezes. The same instant feeds row, audit and notification metadata.
+Credential and support deadlines retain full precision.
+
+The dedicated PostgreSQL editor contract uses existing enrolled Global/Migrator
+identities and constrained NOLOGIN roles, not a generic scalar grant or bootstrap
+purpose. Parameterized native JSON projection canonicalizes the audit on the
+original idle connection before freezing; terminal comparisons remain exact.
+Role graph, function/body/ACL/search-path, schema/column/collation and unique-key
+attestation rejects drift without repair. Actual migrator and shared fixture
+install it after the enrolled Email-delivery-policy contract.
+
+This is source integration: 29 original-source and 43 native/authentication
+controls plus migrated fixtures are unrun. Native PostgreSQL setup-secret HTTP
+acceptance is not claimed. Other outstanding native-purpose and programme
+assurance gates remain open.
+
+### Provider configuration original owners
+
+Authentication and authorization provider configuration retain their actual
+setup or administrator commands. The first private observation selects the
+original owner before validation and retains rows/absence, metadata, bindings
+and participation sources. The human path acquires current principal/policy/support sources and
+instance-administrator authority, and validates those sources and credential/
+support deadlines at settlement. These commands have no annotated PDP action;
+configuration does not synthesize an ordinary Settings route decision.
+
+Setup requires the accepted setup-secret ticket, unchanged request/secret and
+the exact pending bootstrap snapshot. Configured startup retains its distinct
+declaration/material source, not a fabricated human or setup request.
+`ProviderConfigurationMutation` compiles canonical identities, data timestamps,
+metadata, values, locks and audit before the physical attempt.
+`ProviderConfigurationSettingsWriter` consumes them on the original non-replaying
+Serializable unit of work. The existing visitor participation validator hands
+only those closed effects to the fixed writer; its ambient EF persistence is
+not used for provider configuration. Private completion and full effect/audit
+checks are mandatory before settlement. Setup never
+gets public human-repository mutation permission. Source/effect checks use the
+existing terminal callback collection, which is cleared on settlement/pool return.
+Endpoint preflight stays outside source leases; notifications and cache
+activation follow successful settlement. This is source integration, not
+executed provider or runtime acceptance.
+
+SQLite and PostgreSQL source paths are authored. PostgreSQL uses dedicated
+roles/functions, independent source/catalog/body attestation and a preserved
+`provider_configuration_source` singleton. Exclusion coexists with storage
+configuration/probe triggers; runtime drift is denied without repair. Data time
+is represented before freezing while original credential/support deadlines keep
+full precision. SQL Server/MySQL and other unsupported providers fail closed.
+The 64 native/signed cases and nine relocated real-boundary handler scenarios
+are unrun; no SQL installation, concurrency or provider acceptance is claimed.
+
+Email disable preview is a database observation on the dedicated Email owner,
+not an SMTP connectivity probe. Its scoped source protocol and private effect
+issuer are composed in the actual roots. Ordinary Global/Runtime roles cannot
+substitute for that purpose. Impact-reader controls now live in API authentication
+integration, retaining real Local credential custody and independently unchanged
+business state; source acquisition itself requires a write reservation.
+Manifest section boundaries still reject Email keys. Plan Email composition
+and full executable assurance remain unfinished; PostgreSQL/SQLite
+source work is not positive SQL Server/MySQL or external Local acceptance.
+
+The typed instance-tenant Set/Lock/Unlock consumers now prepare their exact Email
+effect through IHumanEmailMutationPreparation before invoking the secured writer.
+The generic Settings producer is not their owner. Nine authentic typed source/
+rollback controls are authored and unrun; plan and other typed governance
+composition still require integration.
+
+Pure Email batches also prepare immutable valid effects before BEGIN and acquire
+the dedicated issuer, without adding a selected PDP question to the generic
+unannotated Settings action.
+
+Combined Email/other or ordinary/specialized non-Email batches now select the distinct `MixedSettings` purpose
+before constructing dependencies. The existing Global connection carries the
+exact instance or tenant target; it does not borrow Email-only, provider or storage
+grants. `HumanEmailMutationPreparation` captures the first original command,
+rows/absence, metadata, principal, credential and support sources before handler
+validation. `MixedSettingsBatchStore` freezes the accepted typed slices and
+requires each actual writer's private completion on one non-replaying Serializable
+attempt. BestEffort can skip invalid inputs before compilation; source replacement,
+expiry or missing completion rejects the entire accepted group.
+
+`AddHumanMixedSettingsSources` composes the source factory and store. The enrolled
+migrator installs `PostgresMixedSettingsContract` after provider/storage contracts;
+the native fixture preserves `mixed_settings_source` across reset. Independent
+native functions, exclusion and deferred completion reject capability drift and
+omitted writes. Notifications and cache activation follow acknowledged settlement;
+lost acknowledgment does not authorize replay. SQLite/PostgreSQL source paths are
+authored; external Local identity and other providers fail closed. All 72 new cases,
+SQL installation and runtime acceptance remain unrun. Complete parent native/source
+review remains an explicit programme task.
+
+`MixedSettingsBatchMutation.RequiresCombinedSource` is shared by the original
+command scope selector, handler, actual source preparation and source factory.
+The non-Email branch covers ordinary keys together with resource, visitor,
+publication or location governance keys at Instance/Tenant scope. Pure ordinary
+and pure specialized requests retain their respective owners; User scope does
+not acquire an administrative combined purpose. The ordinary source compiler
+rejects relabeling a combined request as an ordinary-only accepted subset.
+The existing source store already freezes and privately completes those typed
+slices without requiring an Email effect. Two genuine instance batch controls
+exercise ordinary maximum-session creation plus publication approval, including
+whole-group rollback after direct post-effect corruption. All controls are unrun.
+
+`IOrdinarySettingsMutationStore` is now scoped in Persistence composition.
+Its SQLite source captures full original rows/absence before BEGIN, retains
+definition and creation metadata, and privately verifies canonical effects on
+the same owner. Failed writer entry poisons the genuine source, preventing a
+caught duplicate/dirty-tracker rejection from committing earlier effects.
+The separate PostgreSQL native contract and store adapter are now authored.
+Source observation supplies insertion IDs and a representable audit time;
+all three canonical row writers emit through the opaque native attempt and
+advance only from the verified typed effect. Callback admission uses
+VerifyAsync, whereas the final source pass uses RequireCompleteAsync before
+principal/route/support rereads and final original-human deadline checks.
+The declared Migrator and native fixture install the new contract, and reset
+retains ordinary_settings_source. SQL Server/MySQL remain refused.
+No scalar equality, Serializable transaction, elevated fallback, or the combined
+contract substitutes for ordinary native custody. Bounded source review is
+complete; installation and runtime acceptance remain pending. The 45 direct
+native controls and three original Local API controls remain unrun.
+
+Ordinary PostgreSQL disclosure-setting writes now retain invalidation in the
+private `ordinary_settings_attempt`, rather than calling generic discovery
+enrollment as the selected service login. The existing caller distinction is
+unchanged: instance operations use the declared Global login with no tenant;
+tenant and user operations use the declared Runtime login and exact tenant.
+`SettingRegistry` and the original disclosure-setting classifier generate the
+native key set. Only a canonical changed system or tenant effect adds tenants:
+system changes resolve the bounded complete catalog, tenant changes add exactly
+their tenant, and user preferences or unrelated keys add none. The retained UUID
+array is deduplicated and ordered, with the existing 1024-tenant fanout ceiling.
+
+System disclosure acquisition takes the existing transaction-owned
+`discovery-tenant-enrollment` advisory gate before ordinary source exclusion.
+The `ordinary_settings_source` singleton also carries `tenant_revision`.
+Always-enabled Tenant triggers advance this witness for inserts, deletes,
+actual ID changes and truncation, but not no-op ID fences or metadata updates.
+The original receipt includes the witness; acquisition updates the same singleton
+under Serializable isolation before comparing the receipt. A snapshot predating
+the first committed tenant therefore fails rather than treating the catalog as
+empty, without opening another connector. A truly empty catalog remains valid.
+
+The existing deferred settlement trigger reloads the current attempt row rather
+than trusting an event's historical `NEW` tuple. It requires private completion,
+then clears retained data into the existing transaction/backend tombstone before
+calling disclosure finalization. This prevents queued or immediate constraint
+events from advancing epochs twice. Tenant fences and epoch writes use canonical
+tenant order; each affected tenant receives a fresh revision insertion ID,
+`disclosure=true`, no expected identity revision and zero identity advancement.
+The setting and all disclosure changes commit or roll back together, including
+fanout rejection, epoch overflow and missing completion.
+
+Only `event_ordinary_settings_owner` receives the three exact nested EXECUTE
+grants on disclosure `dependencies(text,uuid[])`, `fence_tenants(uuid[])` and
+`finalize(uuid[],uuid[],boolean[],bigint[],bigint[])`. The disclosure owner still
+owns these routines. Both contracts attest the executor allowlist; ordinary
+readiness additionally verifies exact routine signatures, result and argument
+shapes, owners, security-definer posture, `search_path` and executable bodies
+generated from the same source as installation. Restamping a modified body does
+not admit it. No service login receives discovery disclosure membership or new
+table grants, and traversal's prohibition remains intact.
+
+The managed disclosure scope records a transaction-bound native-owned pending
+marker, seals it at Flush and resets it on transaction change or explicit reset.
+It rejects mixing this owner with generic disclosure, identity or deletion
+accumulation in either order. Non-PostgreSQL ordinary handling is unchanged.
+The extended `OrdinarySettingsNativeContractTests` cover atomic global and tenant
+invalidation, identity preservation, classification/no-ops, rollback, repeated
+settlement, stale empty snapshots, fanout/epoch overflow, nested ACL and helper
+drift, Tenant trigger drift and marker lifecycle. These additions are
+source-complete only; the parent programme owns executable verification.
+
+Branding preparation resolves its policy-source exclusion contract on the
+selected original context before opening the mutation transaction. The prepared
+action retains that contract and acquires its exclusion inside the original
+transaction before principal, route and support source leases. Resolving the
+contract lazily during acquisition violates its selected-owner constructor
+precondition; the constructor remains strict.
+
+Session governance locks open owned connections through EF Core rather than
+direct ADO.NET, so the tenant connection interceptor initializes the original
+Runtime session before native policy admission. Their release balances that
+EF-owned open; a pre-opened caller connection remains caller-owned. The native
+assignment own-write control also starts with a cold session governance lock,
+so bypassing tenant initialization cannot pass source acquisition.
+
+Native principal acquisition retains its actually locked selected Tenant key
+for tracked `TenantSettingsDocument` FK checks. This existence proof is bound
+to the original human subject, connection and serializable transaction; an
+observation, another tenant or a replacement transaction cannot borrow it.
+It does not authorize a document action or attest any other private parent.
+The support-administration prohibition on ambient Runtime Tenant column
+privileges remains intact. Native negative controls cover foreign-tenant,
+rolled-back and observation-only attempts.
+
 ### Day 2 session and operation recovery
+
+Receipt and history services now prepare the existing Settings `view` action
+on their original selected connection before BEGIN. Rollback-session creation
+uses the existing `update` action. The single-attempt Serializable owner acquires
+complete policy, principal, route and support sources before data access, then
+validates original request/credential custody and support deadlines at settlement.
+Only after settlement can history or a newly created rollback token be returned.
+This observation admission never issues setting-effect/apply proof. Tenant view
+preserves the Local instance-admin-or-tenant-admin rule; tenant rollback creation
+retains tenant administration. These changes and authentic controls are source
+delivery; executable/native assurance remains deferred.
 
 | Condition | Safe action |
 |---|---|
@@ -1036,7 +1600,7 @@ evidence.
 
 | Condition | Safe action |
 |---|---|
-| Bootstrap committed but startup reports post-commit effect failure | Preserve the committed operation. Restore runtime/outbox processing and let the payload-free effect retry. |
+| Bootstrap committed but its effect remains pending | Preserve the committed operation. Restore runtime/outbox processing and let the same versioned effect retry; do not reapply configuration or force completion. |
 | Failure audit could not be persisted | Treat startup as failed. Use correlation logs and database health evidence, restore database availability, and rerun. |
 | `configuration_manifest_export_too_large` / HTTP `413` | Use supported Day 2 APIs or a database backup for recovery. Export emits no partial bytes. |
 | Export returns `401` or `403` | Authenticate with instance authority; do not grant tenant admins cross-tenant export |
@@ -1121,7 +1685,7 @@ Bootstrap-lifecycle changes are Tier 1 security work. Preserve:
 - same-section rerun protection;
 - whole-tenant existing skips;
 - safe post-rollback failure recording;
-- payload-free post-commit effects.
+- versioned key-only bootstrap effects, without private audit reads by Runtime.
 
 Use real PostgreSQL collision tests for every shared authority. Tests must
 subscribe to explicit gates/events before triggering competitors; do not add

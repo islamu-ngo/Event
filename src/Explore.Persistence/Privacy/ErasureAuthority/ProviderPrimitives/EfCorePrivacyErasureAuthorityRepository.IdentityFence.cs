@@ -1,14 +1,16 @@
 using System.Data;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Privacy.ErasureAuthority.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using NpgsqlTypes;
 
 namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 
-public sealed partial class EfCorePrivacyErasureAuthorityRepository
+public sealed partial class EfCorePrivacyErasureAuthorityRepository : IOriginalPrivacyIdentityFenceAuthority
 {
     private const string FactColumns =
         "authority_sequence, intent_id, subject_kind, subject_id, reason_code, policy_version, requested_at_utc, recorded_at_utc, retention_expires_at_utc, is_legal_hold_pseudonymized";
@@ -26,13 +28,47 @@ public sealed partial class EfCorePrivacyErasureAuthorityRepository
         return ExecuteSerializedAsync(operation, cancellationToken);
     }
 
+    public Task<T> ExecuteOriginalEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    {
+        if (_identityGate.Value)
+            throw new InvalidOperationException("Original enrollment cannot borrow another identity gate.");
+        return ExecuteSerializedAsync(operation, cancellationToken);
+    }
+
+    public Task<T> ExecuteOriginalEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforePrimaryCommit,
+        Action<DateTimeOffset> requireCurrent,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(beforePrimaryCommit);
+        ArgumentNullException.ThrowIfNull(requireCurrent);
+        if (_identityGate.Value || dbContext.Database.CurrentTransaction is not null
+            || ExecutionStrategy.Current?.RetriesOnFailure == true)
+            throw new InvalidOperationException("Original enrollment cannot borrow or replay another identity owner.");
+        return ExecuteSerializedCoreAsync(operation, beforePrimaryCommit, requireCurrent, cancellationToken);
+    }
+
     public async Task<T> ExecuteSerializedAsync<T>(
         Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
     {
         if (_identityGate.Value)
             return await operation(cancellationToken);
+        return await ExecuteSerializedCoreAsync(operation, null, null, cancellationToken);
+    }
+
+    private async Task<T> ExecuteSerializedCoreAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task>? beforeCommit,
+        Action<DateTimeOffset>? requireCurrent,
+        CancellationToken cancellationToken)
+    {
         await using var transaction = await dbContext.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted, cancellationToken);
+        var contextLease = dbContext.ContextId;
+        var physicalTransaction = transaction.GetDbTransaction();
         await using (NpgsqlCommand command = CreateCommand(
             "SELECT privacy_erasure_authority.lock_identity_fence(NULL, NULL)"))
             await command.ExecuteNonQueryAsync(cancellationToken);
@@ -43,6 +79,12 @@ public sealed partial class EfCorePrivacyErasureAuthorityRepository
         try
         {
             T result = await operation(cancellationToken);
+            RequireOriginalTransaction();
+            if (beforeCommit is not null)
+                await beforeCommit(cancellationToken);
+            RequireOriginalTransaction();
+            requireCurrent?.Invoke(TimeProvider.System.GetUtcNow());
+            RequireOriginalTransaction();
             await transaction.CommitAsync(cancellationToken);
             return result;
         }
@@ -50,6 +92,15 @@ public sealed partial class EfCorePrivacyErasureAuthorityRepository
         {
             _identityGate.Value = false;
             _recoveryGate.Value = null;
+        }
+
+        void RequireOriginalTransaction()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_identityGate.Value || dbContext.ContextId != contextLease
+                || !ReferenceEquals(dbContext.Database.CurrentTransaction, transaction)
+                || !ReferenceEquals(dbContext.Database.GetDbConnection(), physicalTransaction.Connection))
+                throw new InvalidOperationException("Identity admission left its original live physical transaction.");
         }
     }
 

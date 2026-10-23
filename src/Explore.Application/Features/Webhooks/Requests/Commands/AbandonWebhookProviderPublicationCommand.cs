@@ -4,8 +4,8 @@ using Explore.Application.Responses;
 
 namespace Explore.Application.Features.Webhooks.Requests.Commands;
 
-[AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.AbandonPublication)]
-public sealed record AbandonWebhookProviderPublicationCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record AbandonWebhookProviderPublicationCommand
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest, IWebhookPersistedOwnerRequest
 {
     public Guid TenantId { get; init; }
     public Guid PublicationId { get; init; }
@@ -15,8 +15,8 @@ public sealed record AbandonWebhookProviderPublicationCommand : ICommand<BaseCom
 
     string? ISecureRequest.ResourceId => PublicationId == Guid.Empty ? null : PublicationId.ToString("D");
 
-    IAuthorizationFacts? ISecureRequest.AuthorizationFacts =>
-        PublicationId == Guid.Empty
-        ? null
-        : new TenantScopedAuthorizationFacts(TenantId);
+    WebhookOwnedResourceKind IWebhookPersistedOwnerRequest.OwnedResourceKind =>
+        WebhookOwnedResourceKind.ProviderPublication;
+
+    Guid IWebhookPersistedOwnerRequest.OwnedResourceId => PublicationId;
 }

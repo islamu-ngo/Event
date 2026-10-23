@@ -7,7 +7,6 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
-using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
 
@@ -23,12 +22,15 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
 
         await using (var createContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(scope.TenantId)))
         {
+            await using var transaction = await createContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var repository = new AiConversationRepository(createContext);
             await repository.Create(NewConversation(scope, "Planning"));
+            await transaction.CommitAsync();
         }
 
         await using (var updateContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(scope.TenantId)))
         {
+            await using var transaction = await updateContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var repository = new AiConversationRepository(updateContext);
             var conversation = await repository.GetByIdForUpdateAsync(scope.ConversationId, CancellationToken.None);
             await Assert.That(conversation).IsNotNull();
@@ -46,6 +48,7 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
             conversation.CompleteRun(run, DateTime.UtcNow.AddSeconds(5));
 
             await repository.Update(conversation);
+            await transaction.CommitAsync();
         }
 
         await using var verifyContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(scope.TenantId));
@@ -166,6 +169,7 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
 
         await using (var releaseContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantA.TenantId)))
         {
+            await using var transaction = await releaseContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var repository = new AiConversationRepository(releaseContext);
 
             var released = await repository.ReleaseStaleRunningConversationsForUserAsync(
@@ -175,6 +179,7 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
                 "Stale run released.",
                 now,
                 CancellationToken.None);
+            await transaction.CommitAsync();
 
             await Assert.That(released).IsEqualTo(1);
         }
@@ -226,10 +231,12 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
 
         await using var wrongTenantContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantB.TenantId));
         var wrongTenantRepository = new AiConversationRepository(wrongTenantContext);
+        await using var wrongTransaction = await wrongTenantContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var hiddenAction = await wrongTenantRepository.GetProposedActionForUpdateAsync(actionId, CancellationToken.None);
 
         await using var tenantContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantA.TenantId));
         var repository = new AiConversationRepository(tenantContext);
+        await using var transaction = await tenantContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var action = await repository.GetProposedActionForUpdateAsync(actionId, CancellationToken.None);
 
         await Assert.That(hiddenAction).IsNull();
@@ -261,7 +268,9 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
 
         await using (var executionContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantA.TenantId)))
         {
+            await using var transaction = await executionContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var repository = new AiConversationRepository(executionContext);
+            await Assert.That(await repository.GetProposedActionForUpdateAsync(actionId, CancellationToken.None)).IsNotNull();
             var execution = new AiToolExecution
             {
                 Id = Guid.CreateVersion7(),
@@ -285,6 +294,7 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
             failedExecution.MarkFailed("invalid_tool_arguments", "Title is required.", DateTime.UtcNow.AddMilliseconds(30));
 
             await repository.CreateToolExecutionAsync(failedExecution, CancellationToken.None);
+            await transaction.CommitAsync();
         }
 
         await using var wrongTenantContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantB.TenantId));
@@ -377,12 +387,12 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
         {
             var repository = new AiConversationRepository(cleanupContext);
 
-            var result = await repository.RedactExpiredConversationsAsync(
+            var result = await new EfCoreUnitOfWork(cleanupContext).ExecuteSerializableAsync(token => repository.RedactExpiredConversationsAsync(
                 now.AddDays(-30),
                 retentionDays: 30,
                 now,
                 dryRun: false,
-                CancellationToken.None);
+                token));
 
             await Assert.That(result.EligibleConversations).IsEqualTo(1);
             await Assert.That(result.RedactedConversations).IsEqualTo(1);
@@ -442,12 +452,12 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
         await using (var cleanupContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenant.TenantId)))
         {
             var repository = new AiConversationRepository(cleanupContext);
-            var result = await repository.RedactExpiredConversationsAsync(
+            var result = await new EfCoreUnitOfWork(cleanupContext).ExecuteSerializableAsync(token => repository.RedactExpiredConversationsAsync(
                 now.AddDays(-30),
                 retentionDays: 30,
                 now,
                 dryRun: true,
-                CancellationToken.None);
+                token));
 
             await Assert.That(result.EligibleConversations).IsEqualTo(1);
             await Assert.That(result.RedactedConversations).IsEqualTo(0);

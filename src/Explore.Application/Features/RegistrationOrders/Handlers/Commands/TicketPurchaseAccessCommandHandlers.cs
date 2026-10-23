@@ -9,9 +9,8 @@ using Explore.Domain;
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
 
 public sealed class ReserveAuthenticatedTicketPurchaseCommandHandler(
-    IRegistrationInventoryRepository inventory,
+    IRegistrationPrivateReader reader,
     ITicketPurchaseGovernanceRepository governance,
-    ICurrentUserService currentUser,
     ITenantContext tenant,
     ICommandHandler<ReserveTicketPurchaseCommand, BaseCommandResponse<Guid>> reserveHandler) :
     ICommandHandler<
@@ -22,16 +21,11 @@ public sealed class ReserveAuthenticatedTicketPurchaseCommandHandler(
         ReserveAuthenticatedTicketPurchaseCommand command,
         CancellationToken cancellationToken = default)
     {
-        RegistrationOrder? order =
-            await RegistrationOrderAccessGuard
-                .GetCurrentAccountOrderAsync(
-                    inventory,
-                    currentUser,
-                    tenant.TenantId,
-                    command.EventId,
-                    command.OrderId,
-                    cancellationToken);
-        if (order is null)
+        var graph = await reader.ReadAsync(
+            new(RegistrationPrivateReadKind.AccountOrder, command.EventId, command.OrderId),
+            null, cancellationToken);
+        RegistrationOrder? order = graph?.Order;
+        if (order is null || graph!.PrincipalId is null || order.AccountUserId != graph.PrincipalId)
         {
             return NotFound(command.OrderId);
         }
@@ -72,7 +66,7 @@ public sealed class ReserveAuthenticatedTicketPurchaseCommandHandler(
 }
 
 public sealed class ReserveGuestTicketPurchaseCommandHandler(
-    IRegistrationInventoryRepository inventory,
+    IRegistrationPrivateReader reader,
     ITicketPurchaseGovernanceRepository governance,
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
@@ -95,17 +89,11 @@ public sealed class ReserveGuestTicketPurchaseCommandHandler(
                 id: command.OrderId);
         }
 
-        RegistrationOrder? order =
-            await RegistrationOrderAccessGuard.GetGuestOrderAsync(
-                inventory,
-                capabilities,
-                tenant.TenantId,
-                command.EventId,
-                command.OrderId,
-                command.CapabilityToken,
-                timeProvider,
-                cancellationToken);
-        if (order is null)
+        RegistrationOrder? order = (await reader.ReadAsync(
+            new(RegistrationPrivateReadKind.PurchaseOrder, command.EventId, command.OrderId),
+            command.CapabilityToken, cancellationToken))?.Order;
+        if (order is null || !RegistrationOrderAccessGuard.HasGuestAccess(
+            order, command.EventId, command.CapabilityToken, capabilities, timeProvider))
         {
             return NotFound(command.OrderId);
         }

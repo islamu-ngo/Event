@@ -141,7 +141,7 @@ public sealed partial class ModerationCaseNativeProofTests
         var publications = new ModerationPolicyPublicationRepository(context, admin, machine, inventory, null, database.Clock);
         var activation = new ModerationNativeActivationQualification(context, inventory, null,
             new ModerationQualificationPolicySourceOwner(context, database.Clock), database.Clock);
-        var keys = new ExternalApiKeyRepository(context);
+        var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
         var machineBindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,
             new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), database.Clock);
         var responses = new RecordingScheduledResponseOwner(fixture.Responses(context));

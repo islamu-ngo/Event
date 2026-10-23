@@ -10,6 +10,63 @@ namespace Explore.Persistence.Repositories;
 public sealed class AdmissionRevocationRepository(ExploreDbContext dbContext)
     : IAdmissionRevocationRepository, IAdmissionEventCancellationRepository
 {
+    public void RequireCommittedCancellationScope(Guid tenantId)
+    {
+        if (tenantId == Guid.Empty || dbContext.IsTenantFilterBypassed ||
+            dbContext.TenantFilterTenantId != tenantId ||
+            System.Transactions.Transaction.Current is not null ||
+            dbContext.Database.CurrentTransaction is not null ||
+            dbContext.ChangeTracker.HasChanges())
+        {
+            throw new InvalidOperationException(
+                "Committed admission cancellation requires a clean, exact tenant worker scope.");
+        }
+    }
+
+    public async Task<AdmissionRevocationContext?> LoadCommittedCancellationAsync(
+        AdmissionCommittedCancellationRequest request,
+        CancellationToken cancellationToken)
+    {
+        await RelationalEntityRowFence.AcquireAsync<RegistrationOrder>(
+            dbContext, request.TenantId, order => order.Id, request.RegistrationOrderId, cancellationToken);
+        RegistrationOrder? order = await dbContext.RegistrationOrders.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.TenantId == request.TenantId &&
+                value.Id == request.RegistrationOrderId && value.EventId == request.EventId,
+                cancellationToken);
+        if (order is null)
+            return null;
+
+        switch (request.Source)
+        {
+            case AdmissionCancellationSource.Order:
+                if (order.RegistrationOrderStatusId != (int)RegistrationOrderStatusEnum.Cancelled)
+                    return null;
+                break;
+            case AdmissionCancellationSource.Event:
+                if (!await IsCancelledEventForUpdateAsync(request.TenantId, request.EventId, cancellationToken))
+                    return null;
+                break;
+            default:
+                return null;
+        }
+
+        AdmissionRevocationContext? context = await LoadAsync(
+            new(request.TenantId, request.RegistrationOrderId, AdmissionRevocationService.OrderCancellationReason, []),
+            cancellationToken);
+        if (context is not null)
+        {
+            // The worker owns a clean scope, so stale tracked ticket state must not
+            // overwrite a terminal transition or credential rotation committed before its fences.
+            foreach (AdmissionTicket ticket in context.Tickets)
+            {
+                await dbContext.Entry(ticket).ReloadAsync(cancellationToken);
+                foreach (AdmissionTicketCredential credential in ticket.Credentials)
+                    await dbContext.Entry(credential).ReloadAsync(cancellationToken);
+            }
+        }
+        return context;
+    }
+
     public async Task<AdmissionRevocationContext?> LoadAsync(
         AdmissionRevocationRequest request,
         CancellationToken cancellationToken)
@@ -91,6 +148,9 @@ public sealed class AdmissionRevocationRepository(ExploreDbContext dbContext)
             throw new ArgumentException("Admission cancellation batch is invalid.");
         }
 
+        if (!await IsCancelledEventForUpdateAsync(tenantId, eventId, cancellationToken))
+            throw new InvalidOperationException("Committed Event cancellation is required for admission cleanup.");
+
         int[] terminalStatuses =
         [
             (int)AdmissionTicketStatusEnum.Revoked,
@@ -117,6 +177,9 @@ public sealed class AdmissionRevocationRepository(ExploreDbContext dbContext)
         DateTime createdAt,
         CancellationToken cancellationToken)
     {
+        if (!await IsCancelledEventForUpdateAsync(tenantId, eventId, cancellationToken))
+            throw new InvalidOperationException("Committed Event cancellation is required for admission continuation.");
+
         bool continuationExists = await dbContext.OutboxMessages
             .AsNoTracking()
             .AnyAsync(message =>
@@ -137,5 +200,16 @@ public sealed class AdmissionRevocationRepository(ExploreDbContext dbContext)
                 tenantId, eventId, createdAt),
             cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<bool> IsCancelledEventForUpdateAsync(
+        Guid tenantId, Guid eventId, CancellationToken cancellationToken)
+    {
+        await RelationalEntityRowFence.AcquireAsync<Event>(
+            dbContext, tenantId, value => value.Id, eventId, cancellationToken);
+        return await dbContext.Events.AsNoTracking().AnyAsync(value =>
+            value.TenantId == tenantId && value.Id == eventId &&
+            value.EventStatusId == (int)EventStatusEnum.Cancelled,
+            cancellationToken);
     }
 }

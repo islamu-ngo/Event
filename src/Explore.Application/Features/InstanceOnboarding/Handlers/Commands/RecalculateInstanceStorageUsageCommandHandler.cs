@@ -5,7 +5,9 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
-public sealed class RecalculateInstanceStorageUsageCommandHandler : ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto>
+public sealed class RecalculateInstanceStorageUsageCommandHandler :
+    ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto>,
+    ICommandHandler<RecalculateInstanceStorageUsageDuringSetupCommand, InstanceStorageUsageDto>
 {
     private readonly IInstanceStorageSettingService _storageSettingService;
 
@@ -16,6 +18,12 @@ public sealed class RecalculateInstanceStorageUsageCommandHandler : ICommandHand
 
     public async Task<InstanceStorageUsageDto> ExecuteAsync(RecalculateInstanceStorageUsageCommand request, CancellationToken cancellationToken)
     {
-        return await _storageSettingService.RecalculateUsageAsync(cancellationToken);
+        return await _storageSettingService.RecalculateUsageAsync(request, cancellationToken);
+    }
+
+    public async Task<InstanceStorageUsageDto> ExecuteAsync(
+        RecalculateInstanceStorageUsageDuringSetupCommand request, CancellationToken cancellationToken)
+    {
+        return await _storageSettingService.RecalculateUsageAsync(request, cancellationToken);
     }
 }

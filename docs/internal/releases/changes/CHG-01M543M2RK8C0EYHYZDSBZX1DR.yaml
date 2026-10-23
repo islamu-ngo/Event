@@ -1,0 +1,30 @@
+Change-Id: CHG-01M543M2RK8C0EYHYZDSBZX1DR
+Title: "Bind scanner authentication to enrolled database authority"
+Type: fix
+Scope: access
+Summary: "Require exact deployment enrollment and reject inherited Runtime authority before native entry or reinstallation."
+Group: native-scanner-enrollment
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Attest exact role membership, grant options and configured Global session identity without silently normalizing drift.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Database preparation binds the native reader to explicit deployment enrollment.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Reconcile unauthorized role inheritance before reinstallation rather than broadening Runtime privileges.

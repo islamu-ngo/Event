@@ -1,43 +1,48 @@
 using System.Diagnostics;
-using System.Net.Http;
 using System.Text.Json;
+using System.ClientModel;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
+using Explore.Infrastructure.Http;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Ai;
 
 public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiModelCatalog
 {
     public const string ProviderName = "microsoft-extensions-ai";
+    public const string HttpClientName = "AzureOpenAiClient";
 
     private const string CreateEventDraftToolName = "create_event_draft";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly IChatClient _chatClient;
-    private readonly IOptions<AiProviderSettings> _options;
+    private readonly AiProviderConfigurationResolver _configuration;
     private readonly BusinessMetrics _metrics;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     public MicrosoftExtensionsAiChatProvider(
-        IChatClient chatClient,
-        IOptions<AiProviderSettings> options,
-        BusinessMetrics metrics)
+        AiProviderConfigurationResolver configuration,
+        BusinessMetrics metrics,
+        IHttpClientFactory httpClientFactory)
     {
-        _chatClient = chatClient;
-        _options = options;
+        _configuration = configuration;
         _metrics = metrics;
+        _httpClientFactory = httpClientFactory;
     }
 
-    public Task<IReadOnlyList<AiModelDescriptor>> ListAvailableModelsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AiModelDescriptor>> ListAvailableModelsAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var settings = _options.Value;
+        var resolved = await _configuration.ResolveAsync(request: null, cancellationToken);
+        if (resolved.Configuration is not { } configuration)
+            return [];
+        var settings = configuration.Settings;
 
-        if (!settings.Enabled || string.IsNullOrWhiteSpace(settings.ModelId))
+        if (!settings.Enabled || settings.Provider != AiProviderSettings.ProviderAzureOpenAi
+            || string.IsNullOrWhiteSpace(settings.ModelId))
         {
-            return Task.FromResult<IReadOnlyList<AiModelDescriptor>>([]);
+            return [];
         }
 
         IReadOnlyList<AiModelDescriptor> models =
@@ -51,17 +56,22 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 SupportsStreaming: false)
         ];
 
-        return Task.FromResult(models);
+        return models;
     }
 
     public async Task<AiChatProviderResult> SendAsync(AiChatPayload request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var settings = _options.Value;
-        var providerName = ResolveTelemetryProvider(settings);
+        var providerName = AiProviderDefaults.ProviderAzureOpenAi;
         var startedAt = Stopwatch.GetTimestamp();
         using var telemetryActivity = AiProviderTelemetry.StartRequest(providerName, request);
+        var resolved = await _configuration.ResolveAsync(request, cancellationToken);
+        if (resolved.Configuration is not { } configuration)
+            return CompleteFailure(
+                RecordFailure(providerName, resolved.FailureCode!, "AI provider configuration or credential is unavailable."),
+                providerName, startedAt, telemetryActivity);
+        var settings = configuration.Settings;
 
         if (!settings.Enabled)
         {
@@ -70,6 +80,15 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 providerName,
                 startedAt,
                 telemetryActivity);
+        }
+
+        // Only the Azure factory has an owned HTTP pipeline with a pre-SDK response budget.
+        // A newly installed IChatClient/provider must not silently inherit admission.
+        if (settings.Provider != AiProviderSettings.ProviderAzureOpenAi)
+        {
+            return CompleteFailure(
+                RecordFailure(providerName, "provider_transport_unsupported", "The AI provider transport has no bounded response contract."),
+                providerName, startedAt, telemetryActivity);
         }
 
         if (request.Options.StreamingEnabled)
@@ -115,7 +134,10 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
 
         try
         {
-            var response = await _chatClient.GetResponseAsync(
+            using var sdkClient = InfrastructureServicesRegistration.CreateSdkBackedChatClient(
+                settings, configuration.ApiKey, _httpClientFactory.CreateClient(HttpClientName
+                    + (configuration.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : "")));
+            var response = await sdkClient.GetResponseAsync(
                 messages!,
                 chatOptions,
                 timeoutCts.Token);
@@ -145,6 +167,18 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 startedAt,
                 telemetryActivity);
         }
+        catch (Exception exception) when (OutboundEndpointDeniedException.Find(exception) is not null)
+        {
+            return CompleteFailure(
+                RecordFailure(providerName, "provider_endpoint_denied", "The AI provider endpoint is not permitted."),
+                providerName, startedAt, telemetryActivity);
+        }
+        catch (Exception exception) when (AiResponseReader.FindRejection(exception) is { })
+        {
+            return CompleteFailure(
+                RecordFailure(providerName, AiResponseReader.FindRejection(exception)!.Category, "AI provider response was rejected."),
+                providerName, startedAt, telemetryActivity);
+        }
         catch (HttpRequestException)
         {
             return CompleteFailure(
@@ -160,6 +194,15 @@ public sealed class MicrosoftExtensionsAiChatProvider : IAiChatProvider, IAiMode
                 providerName,
                 startedAt,
                 telemetryActivity);
+        }
+        catch (ClientResultException exception)
+        {
+            bool hasStatus = exception.Status is >= 100 and <= 599;
+            bool transient = exception.Status is 408 or 429 or >= 500;
+            return CompleteFailure(
+                RecordFailure(providerName, hasStatus ? $"http_{exception.Status}" : "provider_failure",
+                    "AI provider request failed.", transient),
+                providerName, startedAt, telemetryActivity);
         }
         catch (InvalidOperationException)
         {

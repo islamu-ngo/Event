@@ -3,6 +3,592 @@
 
 # Operations
 
+## Complete release-impact metadata
+
+The release-impact validator reads runner-local file metadata, not an inline
+environment JSON payload. Investigate missing or truncated metadata rather than
+reducing the expected changed-file count.
+See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
+A workflow correction on a PR branch does not replace the trusted-base version
+used by `pull_request_target`; arrange an independently reviewed base update
+before relying on its rerun.
+
+## Human administrator commit fences
+
+Tenant API-key revoke/details now acquire original S/P/H and repeat their existing
+management authorization at final admission. Tenant quota selects its existing
+policy question outside the transaction and compares retained P/route inputs
+inside the actual requested-tenant owner. Platform-key fallback and Footer are
+separate, still-open integrations. Webhook checkpoints and cancellation evidence
+also retain the initially observed support horizon; fresh extensions cannot prolong
+prepared authority. All related runtime controls remain unrun.
+
+Tenant deletion and tenant-level provider connection callbacks now enter an
+actually acquired original single-attempt owner before business work. The private
+issuer's kind/target proof is required by data owners. Callback-originated
+rollback markers cannot trigger re-preparation. Initial support boundaries remain
+required alongside fresh H at acquisition/final time, so session extensions do
+not extend prepared authority. These source-integrated changes remain unrun.
+
+All twelve closed Event-provider consumers now join original S/P/route/A/H/W
+acquisition and final admission in source. Remote reconciliation, publication
+and schema import use a shared one-use deferred checkpoint journal. Actual Google
+refresh/access times and immutable publication proposals apply only inside the
+original prepared owner; provider calls remain outside leases and never replay
+after conflict or unknown acknowledgment. Poll success follows acknowledgment.
+Intentionally admitted schema-only and draft-provisioning refusals also unwrap
+only after acknowledgment. The PostgreSQL installer is wired but has not run;
+source/native SQL review and all programme execution assurance remain open.
+
+Event-provider remote preparation now has a source-level same-original-command
+checkpoint and a one-attempt prepared owner API. It retains initial support
+selection/deadline and checks current principal/route/assignment/support and
+credential time after reads. The owner never reprepares or replays remote work
+after conflict or unknown settlement. This is now integrated into the five
+remote/delegated consumers in source; source review and full provider execution
+assurance remain required.
+
+Exact tenant-branding preparation is now registered at the infrastructure root.
+It retains original TenantSetting/update action, tenant.branding scope and
+final source/governance/time admission. Its native test harness now provisions
+and authenticates PostgreSQL Local identity and uses production selection of the
+same enrolled Runtime owner for preparation, source fencing and finalization.
+The two stale constructors are repaired and all 18 retained controls remain.
+Privileged login setup is not least-privilege HTTP-host certification. Independent
+identity copies are not current source ownership. All genuine controls remain
+unrun under the programme-final execution override.
+
+All 16 closed webhook human consumers are integrated in source. Preliminary
+dispatcher PDP is now omitted only for those exact human command types, because
+their actual owner or portal-release preparation performs the selected decision
+and current source admission. Machine annotations/evaluation and all queries/
+other commands retain the outer path. Genuine dispatcher controls are pending;
+this does not certify runtime composition.
+
+Portal release joins fresh provider custody with original principal/route/support/
+webhook observations before final authentic time and synchronous options/result
+expiry checks. It uses injected expiry anchored before remote issuance and
+propagates source failures. Observed drift can withhold a local response after
+remote issuance; it does not revoke that token or provide atomic authorization
+at remote issuance/delivery. All 51 new genuine-source portal cases remain unrun.
+
+Webhook consumer creation additionally rereads its new persisted product at
+final commit. The original creation W selector covers owner contributors, not
+that product; immediate creation checks alone cannot detect a later own write
+after audit persistence. Exact typed ownership, scope, canonical actor, original
+time, name and initial state/version/mode remain constrained without widening W.
+The new after-audit corruption control is authored/unrun.
+
+Ordinary entity audit preparation now uses the immutable canonical subject
+retained on the original human context lease rather than overwriting actor
+columns with ambient claim attribution. It validates selected tenant custody;
+disposal clears both subject and ContextId marker. This preserves the same actor
+for CreatedBy, UpdatedBy and DeletedBy, including linked-account administration.
+It is not action authority and does not replace acquired/final source admission.
+Four genuine-source attribution/disposal controls are authored/unrun. The main
+context still reports existing nullable DbSet warnings; no build is certified.
+
+Endpoint test and bulk replay scheduling now consume original prepared human
+authority inside their selected Serializable owner in source. Endpoint testing
+retains stable message/plan/target identities through acknowledged rollback
+repreparation and rereads current endpoint, credential reference and untracked
+payload before final time admission. Bulk scheduling retains its tenant lock,
+request-hash idempotency, capacity and current eligibility; intentional pre-write
+refusal audits also require final human admission before returning their failure.
+Neither queue success nor a rejected audit returns before the owner acknowledges
+commit. The 42 new authenticated controls remain unrun; worker execution still
+rechecks future delivery eligibility. No W predicate or machine evaluation
+was widened.
+
+Human bulk cancellation now separates acquired business refusal from rejected
+audit admission in source. The first physical owner must acknowledge whole
+rollback and issue a consumable opaque witness. A fresh selected-provider
+decision for the same original human/credential/action/tenant and current
+principal/route/support/webhook sources precedes a new evidence-only owner.
+That owner permits no business replay or webhook transition and rechecks
+credential/support time and audit retention after blocking validation. Missing
+operation evidence additionally requires exact tenant-scoped absence and an
+independently observed active tenant. The body actor is not human attribution.
+Unknown acknowledgement never permits another audit or retained refusal reply;
+a crash or authority loss between owners may leave no audit. All 28 new
+authenticated controls and provider assurance remain unrun.
+
+Human import rejection now has a source-owned two-owner flow: trusted in-owner
+business refusal, acknowledged whole rollback and consumed opaque witness, then
+fresh original human/action/source admission to an evidence-only failed-history
+transaction. Terminal session/artifact/schedule/rollback predicates and original
+credential/support deadlines follow blocking reads. No business replay or
+success effects occur in that owner. Revocation or retention loss in the gap may
+leave no failed history. Declarative session uniqueness excludes Failed rows;
+MySQL/MariaDB uses a nullable success slot. Generated provider migrations and
+runtime assurance are still deferred; existing database constraints are unchanged
+until migration. This is source delivery, not an executed recovery guarantee.
+
+Actual human import success now consumes opaque acknowledged physical commit
+evidence from the original scoped owner before effects or receipt mapping. The
+persisted operation is reread after consumption; callback output is not a commit
+receipt. Opaque whole-rollback evidence proves disposition only, not business
+rejection or fresh journal authority. Trusted refusal classification and renewed
+original human/action/session/artifact/source admission remain in progress.
+Nonhuman setup failure catches remain unproved. These mechanisms and endpoint
+requester integration are authored source, not executed assurance.
+
+Tenant delegation uses the canonical human subject and actual single-attempt
+owner for SMTP and ordinary governance. Current instance role is checked within
+that owner and again before commit, with authentic credential time admission;
+body `UserId` supplies neither authority nor persisted actor identity.
+Constructor shims that manufactured human email ownership are retired; separate
+internal seed behavior remains. Genuine PostgreSQL branding construction preserves
+native locking/CAS cases, but branding final admission and broader current-source
+closure remain unfinished. All new controls are source-only, not executed
+assurance. Failed history/rejected audit still requires acknowledged whole-owner
+rollback and fresh original-human/action admission, never an exception alone.
+
+Email disable preview now also uses the original single-attempt owner and
+required finalizer. It returns confirmation only after current administration
+and original credential admission; initial post-lock denial remains an ordinary
+authorization response. Genuine Local-authenticated handler/commit/plan controls
+replace the primary synthetic human cohort in source. Ordinary-batch controls
+retain RuntimeTenant rather than borrowing email-only authority. Full HTTP
+scope selection, remaining coupled/native fixtures and final executable
+assurance remain open. Default settings diagnostics expose only bounded scope;
+actor/value/target assertions belong to persisted state and authorized
+notifications, not restored private logger fields.
+
+Human email settings now consume the required original-owner finalizer. Direct
+writes use single-attempt Serializable ownership; borrowed writes require that
+same admission-capable owner. Original target/administrator source is reread at
+commit, followed by authentic credential time and disable-preview token expiry
+after all blocking validation. Internal email setup rejects canonically bound
+human owners. The real disable handler also uses the single-attempt owner.
+Startup manifest scalar construction no longer eagerly resolves human email
+services; SMTP remains excluded. Authentic SMTP/hierarchy controls are authored,
+not executed assurance. Legacy human fixture migration, complete native/source
+closure and shared outer/failure settlement remain open.
+
+Complete principal sources have a separate native contributor-writer epoch and
+execute-only contract. Installation follows policy-source installation; both
+anchors must survive resets. Selected source DI retains the validated original
+Local session observation. Co-located Identity rows are fenced on that same
+context. External Local Identity is currently unsupported by the single-owner
+contract and fails closed. After the unanswered topology question, execution
+continues on that fail-closed default rather than introducing distributed
+authority. Full prepared-policy consumption remains open. Source composition and SDK projection controls are
+authored, not executable installation or concurrency receipts.
+
+The fixed six-key route-source contract is now composed after policy/principal
+installation in the migrator and shared fixture. Its selected DI requires original
+subject and credential custody and rejects email-only owners. Principal final
+validation returns current facts after the owner's own writes; callers must
+rebuild semantic policy inputs instead of trusting acquisition snapshots.
+These source controls and real-auth composition regressions remain unrun.
+
+Assignment sources now have a dedicated contributor epoch and selected-owner
+factory composed in production/shared installation. Resets preserve that epoch.
+The original-owner finalizer bridge retains selected subject/credential/clock;
+source validation precedes final lifetime sampling at the actual commit hook.
+Forwarded support-access session/governance fencing is still being implemented:
+request-cached support context must not become commit authority. Complete
+prepared business consumption and executable assurance remain open.
+
+Seven database-only Event provider binding/channel/queue handlers now consume
+prepared Event/manage-registration-channels authority in the original owner.
+Failed business responses roll back before return. Unknown single-attempt
+rollback propagates a conflict, never a retry certificate. Remote reconciliation,
+CSV/schema import and delegated publication/mapping still need explicit owner/
+remote boundaries; these source changes are not executable acceptance.
+
+Webhook archive/pause/resume now acquire original requester S/P/route/H/W before
+authoritative state reads, CAS and audit, then admit fresh sources/authentic time
+at commit. No-op archive is fenced too. Failed responses roll back local changes.
+The remaining requester consumers, scoped manual retry and final portal release
+are still source integration work; checkpoints alone cannot disclose a token.
+
+Resource/Visitor family factories now retain the selected original human before
+concrete writer construction. Human-bound writers reject internal setup entry.
+Import uses the original single-attempt owner for session, settings, successful
+receipt and effect with final native administration/lifetime admission. Human
+failed-history receipt restoration, broader Local-session source closure,
+mixed native purposes and linked-test project resolution remain open; no
+executable assurance is claimed.
+
+Webhook publication reconciliation/abandonment now use original prepared
+requester authority with state and audit in one owner. Native Resource imports
+still lack independent authentication-to-native human provenance; managed-owner
+checks are not direct SQL authentication proof. The trust-boundary disposition,
+Resource fixture enrollment, owner-bound failed history and final assurance
+remain open. Native test namespace diagnostics cleared in a later LSP read,
+while email pool fixture-member ambiguity now requires physical project/build
+resolution at the deferred final assurance boundary.
+
+Native Resource import's supported human trust boundary is now explicit: API
+authentication and the original managed scope/lifetime are authoritative, while
+PostgreSQL authenticates a trusted service login. The managed native write adapter
+requires its original subject and current Instance administrator source on the
+same sealed Serializable transaction, independent of audit actor. Fixed SQL
+capabilities do not independently authenticate an API human for arbitrary direct
+SQL. No deployment issuer/key/credential/ABI was added. Native fixture enrollment
+and all physical source/commit assurance remain unrun.
+
+Scalar/background settings reads now resolve IHierarchicalSettingsReader without
+constructing a human mutation writer. Full resolver retains its required writers;
+both use the original shared cache/5-tier read implementation.
+AnalyticsConfigResolver, TranslationConfigResolver and ListmonkConnectionTester
+also consume only the reader port. Their observation constructors no longer
+resolve mutation writers or require detached write authority; existing projection,
+secret resolution, cache and diagnostic behavior is unchanged. The real-hierarchy
+confidentiality fixture now supplies that same reader without an adapter.
+These source checks are authored/inspected, not executed test evidence.
+
+Unknown single-attempt commit/rollback settlement is explicit, not ordinary concurrency or
+permission to replay/write failed history. Actual post-commit acknowledgement
+loss controls are authored but unrun. The complete classified-failure evidence
+protocol still requires acknowledged whole rollback and fresh evidence-only
+admission, including shared SQLite outer settlement and single-attempt locks;
+failure history is not guaranteed across that handoff gap.
+
+Human manual webhook retry now uses the original selected preparation owner,
+not a newly created worker scope. The selected scheduler acquires original
+requester custody; wrapper rejects missing/failed acquisition. Common API host
+supplies the original live Local/Composite option gate. Machine route/annotation
+remains separate, with preliminary human dispatch duplication still open.
+Bound canonical human ContextId selects direct ordered lock acquisition rather
+than a replaying EF wrapper; this mode marker grants no action permission.
+All new physical/provider/host controls remain unrun.
+
+Prepared Tenant mutations now capture original principal/route/support inputs
+outside transactions and acquire a private one-use capability in the actual
+owner. Tenant deletion preserves discovery reservation ordering before source
+acquisition and finishes disclosure/storage/deletion in that single attempt.
+Confirmed rollback conflicts restart preparation rather than replay a PDP
+decision. Support epoch installation/reset composition and these actual-owner
+controls are authored; full provider/HTTP/retry assurance remains unrun.
+
+Provider connection creation/update, approved-origin replacement and deletion
+consume exact Tenant/update preparation in their Serializable single-attempt
+owners. Event provider management remains a separate action family. Webhook
+requester resource capability installation follows H; its private W singleton
+is excluded from shared reset. These are source-authored changes; installation,
+HTTP and provider-matrix assurance are not yet executed.
+
+Trusted nonhuman SMTP setup/lifecycle uses a separate internal entry and the
+same full-lease Serializable mutation/revision engine as human administration.
+Intentional internal disable does not mint a user or human confirmation token.
+Selected-owner DI rejects a bound human/authenticated request; configuration
+import retains its human action. Mixed legacy fixture callers and executable
+assurance remain unfinished.
+
+Validated human lifetime observations originate only from successful real
+Keycloak, Local or ATProto ticket validation. Typed final admission compares
+their canonical account with the resolved subject and checks the original
+expiry/skew after blocking source checks. This is not current role or policy
+authority. Exact instance-to-tenant email setting operations now retain the
+instance predicate and selected tenant through the original email owner;
+ordinary tenant settings cannot inherit the disable administrator disjunction.
+Complete prepared action consumption and executable assurance remain pending.
+
+The PostgreSQL source-set contract is installed before lookup seeding and uses a
+separate execute-only sentinel capability plus mandatory writer triggers for
+empty permission sets and absent authorization-route keys. Database resets must
+preserve its anchor. Selected context registration rejects email-only ownership.
+The explicit single-attempt EF owner and post-disclosure final admission hooks
+are authored in ordinary and co-located SQLite owners; complete prepared policy
+consumption and executable installation/concurrency assurance remain pending.
+
+The catalog additionally contains a subject-only Boolean fence for ordinary self
+preferences. It holds the original User/provider binding without requiring an
+administrator role; it does not prove credential lifetime or action policy.
+Location governance named leases precede the original Serializable owner so
+the same human fence is valid at the persistence callback. Both mechanisms and
+their real-provider regression source are authored and unrun.
+
+The native administrator contract is composed after tenant RLS in the migrator.
+Its fixed Boolean instance/tenant entries use the original selected Serializable
+connection; immutable account binding precedes transaction and handler construction.
+Runtime, Global, email-instance and email-tenant logins inherit only their distinct
+execute roles, not IAM table rights. Configuration import retains its original
+Global owning transaction. Ordinary issuance and machine predicates remain separate
+from the subject-bound human interfaces.
+
+Installer composition and regression source are authored; installation, grants,
+concurrency, providers and business-caller integration are not yet accepted.
+Do not interpret editor diagnostics as native operational readiness. Caller
+integration remains open, including ordinary consumer construction. A fresh Cerbos
+response is valid for one structurally unchanged-input attempt, not continuous
+remote-policy authority; unannounced remote policy changes cannot be fenced by
+this database contract.
+
+## AI primary creation and image recovery authority
+
+Confirmation rechecks the selected authorization provider and exact persisted
+preview under its native claim fence. New draft linkage rejects expired action
+lifetime inside the creation transaction, and native primary admission requires
+the fenced conversation to remain Active. A rejected new primary leaves its
+existing reservation intact. Independently authorized linked-primary recovery
+is not globally disabled by a later parent-state or lifetime change.
+
+Image work follows primary creation and requires exact finalized session,
+principal, object, upload-operation and original draft custody. Another selected
+image is preserved; completed execution cannot reattach a removed image.
+Failure retains the original primary for recovery rather than replacing or
+terminally failing its committed effect. Native lifecycle/custody regressions
+are authored and unrun; source diagnostics are not operational acceptance.
+
+## Native observation routine ACL drift
+
+Administrative authority, scanner authentication, federation-governance
+overrides, location review count, API-key lookup/usage, integration owner
+discovery and queue health now check source-declared routine executor ACLs
+before replacement, at definer entry and at install exit. An unknown direct
+EXECUTE grant rejects the operation rather than returning private data or
+being silently retained through a successful reinstall. Repair the deployment's
+unexpected grant through its approved authority; do not widen the application
+role. Nested discovery checks its own per-routine executor declaration, preserving
+the materialization, storage and erasure owner/Global grants made by their source
+installers. An extra grant on one routine is not permission to call the others.
+
+The new native regressions are authored but unrun under the programme-wide
+verification override. C# diagnostics do not prove SQL parsing, bootstrap or
+operational grant correctness.
+
+## Recovery observation, hold expiry and registration retention
+
+`AddTicketingRecoveryHealthPersistence` provides a fresh unbound Global observer
+instead of ordinary Runtime recovery metrics. Its native function exports six
+counts and the oldest due timestamp, not recovery business rows. Authority
+failure maps to Unhealthy. Fair-return effect CHECK definitions now admit the
+domain's `Unknown = 5` state only with cleared lease and terminal markers,
+matching `EnterRecovery`; generated migrations and snapshots remain deferred.
+
+`AddInventoryHoldExpiryWorker` registers tenant scope construction and bounded
+Global reconciliation identity discovery. Both hold jobs select the tenant
+before resolving inventory or lifecycle dependencies.
+
+Registration retention uses UUID-only Global discovery and constructs cleanup
+and its unit of work inside a fresh selected-tenant Runtime context. Active
+eligibility still comes from `TenantStatus.IsActiveState`, so Suspended remains
+excluded. Parent integration retains the existing relational-provider support:
+PostgreSQL uses execute-only discovery, other relational providers project UUIDs
+through the separate Global context. EF InMemory is not a supported physical
+cleanup engine. The original cleanup predicates, locking and retirement rules
+are unchanged.
+
+Form-template creation now supplies source-event authorization facts. The shared
+resolver loads that actual same-tenant event; the creation service independently
+loads the submitted event/form/version tuple. No posted tenant ownership replaces
+those checks. The machine-consumed request-fact regression is authored.
+
+These are source integrations. No build, test, native installation or generator
+has run; ordinary creator-grantor proof remains a final assurance obligation.
+
+## Admission ACL drift and final correction-clock check
+
+Generic and notification outbox admission attest their exact routine owners and
+EXECUTE grantees before replacement, at each definer entry before early returns,
+and at installation exit. An unknown grantee, PUBLIC execution or non-owner
+grant option rejects the contract; reinstall preserves the injected evidence
+rather than silently removing it. Owned executor grants can be restored after
+their ordinary removal.
+
+Location correction admission now observes expiry again after its awaited
+retained-receipt query. The dispatcher still rechecks custody before external
+planning. The new native regression advances a test clock at the actual
+reader-completion event; it does not rely on a sleep or elapsed wall time.
+
+Publication recovery now uses persisted consumer ownership through the native
+authorization decorator. Authored closed-handler regressions retain Local
+authorization, native repositories and actual recovery/audit handlers; only
+the principal's tenant-admin standing is controlled. They require denial and
+unchanged state for a user-owned consumer, then a successful tenant-owned
+control in a fresh scope. All of these specifications remain unrun.
+
+## Declared native queue login enrollment
+
+### Integrated email mutation and fleet worker boundaries
+
+`AddEmailPolicyMutationPersistence` selects independent instance or exact-tenant
+email credentials before constructing the raw writer and its owning transaction.
+Nested operations may borrow only the same purpose and tenant. Tenant preparation
+now passes its sealed tenant into the policy reader; it does not gain execution
+of the cross-tenant override snapshot. Instance preparation retains the fixed-key
+fanout snapshot. The shared transaction contains settings, captured receipt,
+C# evaluation, processor revision and tenant-control reconciliation.
+
+The mutation privilege matrix includes the scalar projections that existing
+mixed settings/plan commands materialize, selected-tenant assignment updates,
+and narrow role/confirmation reads. Tenant-dependent policies retain the sealed
+tenant predicate; instance tenant-setting writes remain limited to email keys.
+The instance processor trigger requires an original mutation receipt, the SMTP
+identity, safe initial operator fields and unchanged pause/rate/token fields on
+policy updates. Other processor writers retain their existing operation path.
+Nonemail settings bypass the email caller restriction, while the trigger's
+structural privilege assertion still runs first.
+
+`AddRegistrationProviderSubscriptionWorker` acquires six-field claims through
+Global admission and constructs a fresh tenant Runtime graph for every claim.
+Fresh persisted checks surround binding lookup, provider handoff and settlement.
+Sweep response messages, effect pointers and checkpoint updates share a fenced
+local transaction. Renewal records its in-doubt marker before network entry.
+
+`AddRefundReconciliationHealthPersistence` registers a separate aggregate observer.
+Its PostgreSQL contract exports eight counts and the oldest timestamp, with
+predicate-column reads only and no business-row export. Missing authority is
+Unhealthy rather than a zero-count Healthy observation. Both additional native
+contracts are installed after forced tenant RLS with the same declared enrollment.
+
+These integrations remain source-only: generators, builds, native installations
+and tests are deferred. Bootstrap now issues declared grants before removing
+fresh creator shortcuts; ordinary CREATEROLE grantor dependencies still require
+the queued native proof.
+
+`PostgresNativeQueueEnrollment` binds five distinct login identities from explicit
+database-purpose configuration: Migrator, Global, Runtime,
+EmailPolicyInstanceMutation and EmailPolicyTenantMutation. `BindUsername` loads
+names only; runtime enrollment does not require the migrator password. The new
+email-purpose environment aliases in `.env.example` use
+`DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_*` and
+`DATABASE_EMAIL_POLICY_TENANT_MUTATION_*`, with no reader credential fallback.
+
+The purpose roles and their privilege matrices remain source-defined. Installers
+must not construct a membership allowlist from `pg_auth_members` or adopt a new
+login on reinstall. A genuinely absent contract can bootstrap its dedicated
+roles after ordinary login provisioning; partial or altered existing membership
+graphs fail before normalization. Expected migration edges use INHERIT false,
+SET true, ADMIN false; executor edges use INHERIT true, SET false, ADMIN false.
+The roles are cluster-wide, so another schema does not create another enrollment
+domain.
+
+Email definer readers and control mutators now embed exact role, routine ACL and
+effective relation/column checks, and compare the original `session_user` with
+the compiled purpose identities. Setting triggers retain transaction-bound
+mutation receipts. The C# evaluator still computes the policy transition;
+dedicated mutation-pool composition and the other queue guard integrations are
+being completed before any installation or test execution. Do not treat this
+source checkpoint as deployment readiness.
+
+## Queue execution fences and bounded discovery
+
+Registration finalization carries its original effect token, fence, tenant and
+order into the checkout, paid-finalization and admission-issuance transactions.
+The native effect row is fenced before business writes and expiry is checked
+again after awaited mutations. Lost custody rolls back that transaction; the
+worker observes a fresh settlement time after issuance. Direct authorized order
+operations retain their own authority rather than fabricating queue claims.
+
+Provider submission acquisition uses a separate Global queue repository; delivery
+still resolves a fresh selected-tenant Runtime scope. Claiming and retention
+cleanup share the same `RelationalNamedLock` SHA-256-derived advisory bigint,
+with storage fenced before effect rows. Do not replace that key with PostgreSQL
+`hashtextextended`: matching lock names alone do not produce matching keys.
+
+Payment reconciliation removes temporary owner schema CREATE after bootstrap
+and refuses remaining effective CREATE authority. Audit-retention discovery
+exports only bounded UUID pages and grants tenant identity-column reads, not
+full Tenant projections. These source changes and authored native specifications
+await whole-programme installation and runtime verification.
+
+## Provider submission queue authority
+
+PostgreSQL provider-write claiming now uses execute-only
+`registration_provider_write_claim(text, integer, timestamptz, interval)`.
+The Global executor needs membership in `event_registration_provider_write_global`,
+not the non-login owner or migrator. Runtime must not receive that execute
+entitlement. Migration/bootstrap installs the function and keeps Global and
+migration membership graphs separate.
+
+The function exports only original effect/tenant/submission/attempt/binding IDs,
+minted token, fence, attempt count and expiry. Its owner reads only those queue
+metadata columns and indirect storage lineage; it may update lease columns and
+storage concurrency stamps, not answers, provider configuration or object keys.
+It snapshots eligible tuples, fences storage in tenant/ID order before locking
+effects, rechecks the tuple and due state, then claims atomically. Future observed
+time is clamped to database statement time. The ordinary writer's lock order is
+preserved; provider calls never run inside this transaction.
+
+Delivery constructs a fresh selected Runtime scope before resolving provider
+dependencies, checks original live custody before hydrating answers, and rechecks
+native pointers/custody after preparation before adapter entry. Later external
+transport cannot be retracted by a database fence. New PostgreSQL entitlement,
+private-read, recovery, future-time and replay cases are authored but unrun.
+SQL installation, generated schema parity and privilege-tail review remain open.
+
+## Retained location correction admission
+
+External location corrections derive the worker tenant and effect identity from
+their immutable `LocationPrivacyCorrectionReceipt`, keyed by original outbox ID.
+Governance receipts bind the original disclosure transition; erasure receipts bind
+the intent, authority sequence and original location. Admission verifies payload
+identities against that retained tuple before creating a selected Runtime scope.
+The consumer rechecks the live original claim after cache work, immediately before
+external planning. PII or a current placement need not survive a committed
+correction. Cache-only Location/User convergence stays tenantless.
+
+The generic SQL owner reads only receipt identity columns for these routes;
+installation revokes its obsolete placement/audit reads. Receipt schema generation,
+role installation and native PostgreSQL execution remain deferred. Do not manually
+reconstruct metadata rows, receipts or outbox messages from payload.
+
+## Configuration effect message custody
+
+Manifest effects now consume the full persisted `OutboxMessage`, not a bare
+operation ID. The operation retains `EffectOutboxId` in the original transaction.
+Delivery checks the exact message ID, operation envelope, null payload, completion
+time, Processing/DeadLettered state and original claim expiry before invalidating
+caches or publishing notifications. Committed operation replay uses this retained
+effect ID rather than the retry caller's plan ID.
+
+Import operations retain `EffectPayloadDigest`, uppercase SHA256 of the exact UTF8
+notification payload (null hashes empty bytes), before operation/outbox persistence.
+Delivery compares the persisted envelope, payload, creation time and original
+expiry, then verifies native operation ID/status/effect ID/time/digest and selected
+settings sections/target tenant before any effects. Both independent startup
+delivery paths reload the claimed row rather than dispatch their preclaim snapshot.
+The generic worker also requires its separate persisted execution authority.
+The native instance receipt writer carries payload as an unchanged string inside
+its JSON argument capsule, includes the retained digest in its fixed column/shape
+contract and proves that digest against actual effect bytes in the same serializable
+transaction. JSON parsing for notification validation does not replace those bytes.
+
+These are authored source controls. The new receipt columns require generated
+provider migrations at the final programme gate; no migration was hand-edited or
+executed, and the native custody tests remain unrun under the implementation hold.
+Ordinary outbox `Payload` now uses text rather than PostgreSQL jsonb so original
+serialized bytes survive persistence for receipt hashing and exact claim replacement.
+Admission performs explicit JSON parsing instead of relying on normalized storage;
+this storage-type change is also part of deferred generated migration parity.
+
+## Consumer authority cutover
+
+Provision exact runtime folders and independent API/BFF/Combined/migration
+machine ACLs before restarting any consumer. Prepare provider container inputs
+and external signed Cerbos publication separately. AppHost cannot bootstrap a
+selected runtime vault using provider-admin authority, nor change Infisical to
+Environment when a local profile fails.
+
+Drain old replicas before revoking old folder grants and credentials. Inspect
+value-free readiness, verify cold start under each deployed consumer identity,
+and demonstrate denied reads for provisioning, infrastructure and sibling roots.
+For local Infisical-backed PostgreSQL, use the explicitly injected stable port
+and database-bootstrap credentials; the vault's runtime/migrator roles must
+already match the service. Do not print resolved configuration or environment
+dumps. Recovery is forward provisioning and restart, never restoration of the
+retired mixed folders or runtime Cerbos administrator.
+
+The authored acquisition, binding, projection and API composition regressions
+remain unexecuted under the programme-wide source-only override. Final assurance
+must cover those native tests, AppHost startup and process inheritance, rendered
+Compose omission of optional permitted clients, provider ACL denial, cold restart
+and replica drain. No source inspection substitutes for that operational evidence.
+
+## AppHost MessagePack Security Floor
+
+The central MessagePack pin is 3.1.9 for
+[GHSA-qhrr-8q5h-9q3h](https://github.com/advisories/GHSA-qhrr-8q5h-9q3h).
+The affected dependency graph belongs to AppHost tooling. Regenerate its NuGet
+lockfile with the native restore command, then build AppHost and audit transitive
+packages. Keep NuGet vulnerability auditing and warning enforcement enabled.
+This dependency repair does not require database migrations.
+
 ## Guided Administration Verification
 
 After private setup, inspect the disclosure, paid-event and recommended groups at
@@ -107,6 +693,30 @@ no inferred historical backfill or Identity changes. Historical guest PII withou
 an original bound is unavailable; changing the current event schedule cannot
 restore it. Prefer a verified forward correction over removing privacy metadata
 to reopen access. Existing user-erasure authority and backup obligations remain.
+
+### Registration Retention Execution Authority
+
+`RegistrationRetentionCleanupJob` discovers at most 128 tenant UUIDs per page
+through `PostgresRegistrationRetentionDiscoveryContract`, using the separately
+enrolled Global login. Its nonlogin owner can read only tenant identity/status
+keys and `TenantStatus.IsActiveState`; it has no registration-data grants.
+The active-state predicate is unchanged: the seeded Suspended status is not
+eligible. Each selected UUID opens a fresh ordinary Runtime tenant lease before
+the cleanup repository and unit of work are constructed. The existing
+500-row per-tenant bounds, immutable deadlines, provider-claim fence, storage
+retirement checks and consent/audit boundaries remain the deletion authority.
+
+Install the discovery contract through declared migration authority after the
+tenant RLS catalog. Acquisition is read-only and does not repair grants.
+Unexpected role edges, routine ACLs, source-column privileges, directory RLS or
+direct Global access to retention rows cause failure before discovery. The
+native capability applies to PostgreSQL; other relational providers retain
+bounded active-tenant identity discovery. EF InMemory raises a visible
+unsupported-operation failure rather than logging an empty successful sweep.
+Do not recover by giving Global broad SELECT/DELETE or looping tenant IDs on
+an unbound Runtime context. Read-time expiry remains effective while physical
+cleanup is unavailable; diagnose the failed scheduled job and restore the
+declared authority before claiming cleanup has completed.
 
 ## Instance Bootstrap Lifecycle
 
@@ -952,6 +1562,34 @@ separate erasure authority.
 
 ### Full development migration reset and regeneration
 
+#### Offline application model scaffolding
+
+For application migration scaffolding without a database connection or secret
+acquisition, explicitly pass `--DesignTime:ModelOnly=true` after the EF argument
+separator. This mode is restricted to Development/Testing and requires a selected
+provider. It shares the application's provider, namespace and migration-generator
+composition but supplies no connection string. It is not the authority-bound
+path for applying migrations or inspecting an existing database.
+
+For example, after building/staging the relevant catalog:
+
+```bash
+env DOTNET_ENVIRONMENT=Development \
+  dotnet ef migrations add <Name> \
+  --context ExploreDbContext \
+  --project src/Explore.Persistence.Migrations.SqlServer/Explore.Persistence.Migrations.SqlServer.csproj \
+  --startup-project src/Explore.Persistence/Explore.Persistence.csproj \
+  --configuration Release --output-dir Migrations --no-build \
+  -- --DesignTime:ModelOnly=true --Database:Provider=SqlServer
+```
+
+Use `PostgreSql`, `Sqlite`, `SqlServer`, `MySql` or `MariaDb` for the provider.
+MySQL/MariaDB must additionally specify the intended server version, for example
+`--Database:ServerVersion=8.4.0` for MySQL. The mode flag is command-line only;
+an environment variable cannot silently select it. The ordinary design-time
+path continues to require the explicitly selected secret authority for database
+operations. Do not invent credentials merely to construct a model.
+
 Run these commands from the repository root. They use the current `src/`
 project paths and cover every generated catalog:
 
@@ -1317,6 +1955,51 @@ Before exposing readiness, require the local checkpoint to match the retained au
 
 For local orchestration, `aspire start --isolated --apphost src/Explore.AppHost/Explore.AppHost.csproj` waits for a stable AppHost state and surfaces early startup failures; inspect with `aspire describe` and `aspire logs explore-api`. Do not infer success from an “app starting” log: prove the socket and the two database watermarks. See the official [Aspire `start` command](https://aspire.dev/reference/cli/commands/aspire-start/).
 
+## Native Diagnostic Export Boundaries
+
+Svix publication drain containment uses fixed
+`publication_dispatch_failed`, `publication_terminal_reconciliation_failed`
+and `publication_reconciliation_failed` categories. The counters and
+publication/reconciliation failure metrics remain the operational signals;
+runtime exception subtype names are not exported. Requested cancellation
+propagates instead of being counted/logged as a provider failure.
+`WebhookProviderPublicationDiagnosticTests` exercises actual dispatch
+containment with a controlled message-repository failure and cancellation.
+Its regression source remains queued for final programme assurance.
+
+Scheduler execution and listener-containment failures emit fixed
+`scheduled_job_failed` and `telemetry_listener_failed` categories, not job
+keys or runtime exception subtypes. Deadline registration/cancellation retains
+the reconciliation-sweep fallback with `scheduler_unavailable`; unknown jobs
+emit `unknown_scheduled_job` without echoing the input. Managed registration
+retains its retry loop using `registration_pending` or
+`registration_retry_failed`, without attempt identifiers or provider state.
+Retention cleanup preserves failed-tenant/eligible/redacted counts while
+reporting `retention_cleanup_failed`. Storage resolution reports
+`provider_unavailable` or `policy_unavailable` without exception objects.
+Listmonk transport, timeout, malformed-payload and configuration failures
+retain subscriber retry disposition with fixed diagnostic categories.
+
+The Split Blazor host owns its own Serilog boundary; it does not depend on
+API hosting. `WithBffDiagnosticConfidentiality` removes inherited scope
+properties that are not native message arguments and excludes framework
+authentication, HTTP, proxy and host copies. Provider logging also excludes
+these categories and OpenTelemetry logging omits scopes.
+`EventBffTokenRefreshCookieEvents` exports no provider URL, scheme, token
+expiry timestamps or exception objects. Token responses are limited to
+64 KiB including unknown-length streams, with JSON depth 16. Rejected
+provider errors use an exact OAuth error vocabulary; unknown or malformed
+errors become `token_endpoint_rejected`, never sanitized provider prose.
+The same fixed reason reaches session rejection and the expired-session
+redirect. A failed sign-out remains contained as `signout_failed`; accepted
+refresh tokens still renew the cookie and preserve refresh-token rotation.
+
+Native producer/collector regressions are authored in
+`SecuritySinkConfidentialityTests`, `EmailDispatchRetentionTelemetryTests`,
+`ListmonkSyncServiceTests` and `BffRefreshDiagnosticConfidentialityTests`.
+These source changes are not runtime evidence: the approved programme-wide
+execution deferral keeps tests, hosts and exporter assurance queued.
+
 ## Health and Metrics Endpoints
 
 Via `Explore.ServiceDefaults` + app-specific checks:
@@ -1346,7 +2029,7 @@ Readiness interpretation:
 | `email-dispatch-rabbitmq` | API | RabbitMQ Dispatch Mode is disabled, or enabled and topology can be declared | Not used | RabbitMQ mode is enabled but the broker/topology is unreachable or invalid |
 | `queue-drains` | API | Scheduler-owned IntegrationSync, incoming-webhook, bulk-replay, optional provider-publication, and PDS lanes are enabled as configured and below aggregate thresholds | A required lane is disabled or any enabled lane reaches its bounded due, stale, ambiguous, unknown, executing, or dead-letter threshold | The bounded aggregate database query fails |
 | `web-push-dispatch` | API | Web Push is disabled, or enabled with bounded backlog/retry/lease/failure counts | Due, stale-processing, or terminal-failure counts crossed configured warning thresholds | Invalid VAPID/worker settings fail startup |
-| `idempotency-cleanup` | API | Expired idempotency cleanup is enabled in delete or dry-run mode | Cleanup is intentionally disabled | Invalid cleanup options fail startup |
+| `idempotency-cleanup` | API | Expired replay-payload scrubbing is enabled in scrub or dry-run mode | Cleanup is intentionally disabled | Invalid cleanup options fail startup |
 | `ai-retention-cleanup` | API | AI retention cleanup is enabled in redaction or dry-run mode | Cleanup is intentionally disabled | Invalid cleanup options fail startup |
 | `storage` | API | Selected storage provider is available. Local mode verifies the API-owned data root is writable; S3-compatible mode verifies bucket reachability only when selected. | Not used | Selected provider cannot be resolved, selected local root is not writable, or selected S3-compatible storage is missing/unreachable |
 | `storage-reconciliation` | API | Storage reconciliation worker is enabled in dry-run or mutation mode | Reconciliation is intentionally disabled | Invalid reconciliation options fail startup |
@@ -1378,7 +2061,7 @@ Operational rules:
 - Web Push readiness is healthy while `WebPush:Enabled=false`. When enabled, `web-push-dispatch` exposes only bounded aggregate dispatch counts and thresholds; it never exposes subscription endpoints, browser keys, VAPID material, tenant IDs, payloads, or provider bodies. Push-service `404`/`410` outcomes deactivate stale subscriptions transactionally, while retryable `429`/`5xx` outcomes remain bounded by the dispatch TTL and maximum attempts.
 - The control-plane operations endpoint includes a `moderation-reporting` status card for managed reporting routing. It reports aggregate-only provider sync metrics (`pending-sync`, `stuck-pending-sync`, `failed-sync`, `disabled-sync`, `ignored-sync`) and active-tenant lock impact metrics (`reporting-locked-tenants`, `reporting-unlocked-tenants`, `osprey-locked-tenants`, `coop-locked-tenants`). `Reporting:Health:StuckProviderSyncMinutes` defaults to `120`; `Reporting:Health:FailedProviderSyncWarningThreshold` defaults to `1`. These metrics are safe for operators and must not include tenant identifiers, report identifiers, provider URLs, API keys, webhook secrets, correlation IDs, provider payloads, or raw provider errors.
 - RabbitMQ Dispatch Mode is optional transport infrastructure. When `EmailDispatchRabbitMq:Enabled=false`, the `email-dispatch-rabbitmq` check is healthy without opening a broker connection. When enabled, missing broker connectivity or failed topology declaration is unhealthy because the operator explicitly selected RabbitMQ transport.
-- Idempotency cleanup is an optional operational worker over the PostgreSQL replay cache. `Degraded` means cleanup is intentionally disabled; stale rows remain ignored for replay but are not physically deleted until cleanup is re-enabled.
+- Idempotency cleanup is an optional operational worker over replay receipts. `Degraded` means cleanup is intentionally disabled; expired payloads remain in storage until scrubbing is re-enabled, but cannot be replayed. Operation identities remain rejection fences rather than being deleted or reacquired after expiry.
 - AI retention cleanup is an optional operational worker over tenant-owned AI assistant history. `Degraded` means cleanup is intentionally disabled; expired conversations remain readable until cleanup is re-enabled. Dry-run is healthy and records counts without redaction.
 - Registration retention cleanup starts five minutes after API startup and then runs daily. It visits active tenants and deletes at most 500 expired answers, sensitive answer values, order PII rows, and participant PII rows per tenant per pass using each row's immutable `RetentionUntil` deadline. `LegalHold` has no automatic deadline. Consent current/history rows and contact-export audits are deliberately outside this cleanup and remain evidentiary records. Failures are logged for the next daily attempt without logging attendee values.
 - Storage readiness follows the selected instance storage policy. Local-first deployments do not need S3 for `/health`; S3 configuration is probed only when `s3_compatible` is the selected provider. The readiness payload exposes bounded provider/status/failure-code fields and does not include filesystem paths, endpoints, bucket names, access keys, object keys, or secrets.
@@ -1571,6 +2254,15 @@ evidence. The selection decision itself proves neither executed tests nor
 security closure. Unrelated-path no-ops remain explicitly distinguishable from
 executed security checks.
 
+Selected security CI now produces `artifacts/security-tests/security-execution.v1.json`
+from actual nonzero TRX outcomes. The native producer rejects missing,
+ambiguous, skipped, failed or inconsistent reports; its context is Testing
+test-host execution, not ordinary-role or production proof. Preserve the
+packet's referenced file layout when retaining it with a release candidate.
+Candidate verification requires the exact tested revision, not a renamed PR
+merge SHA. [Security Verification](SECURITY_VERIFICATION.md) defines the packet,
+CLI and remaining operational admission obligations.
+
 For API-key issuance verification, inspect the `database-provider-<Provider>` CI
 artifact's `Issuance.trx` and the provider summary's API-key issuance outcome.
 The matrix runs at least 14 issuance cases on each migrated real engine. A passing
@@ -1646,6 +2338,7 @@ MCP recovery and operator actions:
 - If MCP must be unmapped entirely, set `Mcp:Enabled=false` and restart the API. Inspect only bounded startup/configuration errors. Do not capture prompts, payloads, provider responses, API keys, endpoint URLs, tenant IDs, or raw MCP request bodies in support tickets.
 - If an MCP API key or captured client configuration is suspected leaked, revoke the key first, verify invalid/revoked-key traffic only sees anonymous-safe discovery and remains IP-partitioned, then create a new least-privilege key for the specific operator smoke scenario.
 - If external agents report mutation failures, inspect the returned failure code from the projected `propose_*` tool or generic `propose_ai_tool_action`, then inspect the normal AI conversation/proposed-action API state. Do not bypass the confirmation flow or write repositories directly.
+- Proposal persistence rechecks selected-provider target authority inside the native serializable transaction after locking the unchanged conversation. Target facts are rebuilt from persisted resources; an earlier permission check cannot authorize a proposal after authority changes. Only CreateEventDraft has a confirmation executor; the other forty families remain proposal-only and do not advertise confirmation.
 - If a client requires legacy SSE, treat that as a new architecture decision. Startup and runtime governance can record intent, but the current adapter intentionally supports stateless Streamable HTTP only and reports `legacySseRuntimeEnabled=false`.
 - If a deployment requests Native AOT for the API host, treat MCP as unverified until a dedicated `dotnet publish` profile proves the SDK, explicit static registrations, and registry-projected dynamic tools all survive trimming/AOT without losing schema metadata.
 
@@ -1708,9 +2401,49 @@ Timeout expiry: `504 Gateway Timeout`.
 
 ### Correlation ID
 
-- `CorrelationIdMiddleware` reads `X-Correlation-ID` or `X-Request-ID` from incoming request.
-- Uses `HttpContext.TraceIdentifier` when both request headers are absent.
+- `CorrelationIdMiddleware` generates a server-owned UUIDv7 correlation identifier.
+- Caller `X-Correlation-ID` and `X-Request-ID` values are not echoed or logged,
+  including printable values that could contain credentials or personal data.
 - Pushes to Serilog `LogContext` as `CorrelationId` property for structured log correlation.
+- Returns it as `X-Correlation-ID`; ProblemDetails uses the same value.
+- API diagnostics retain native route/category, bounded method, status, elapsed
+  time and trace IDs, not raw exception/provider content or private request
+  paths. Framework ASP.NET Core/IdentityModel messages are excluded from API
+  log exports; native API events provide the replacement failure evidence.
+  Turning on Debug does not opt into PII. See
+  [the API sink contract](API.md#confidential-api-diagnostic-sinks).
+
+### Cancellation Campaign Payment Authority
+
+Payment cancellation and late-capture refund scheduling reload the native
+registration order and require its Event ID to match the Event-cancellation
+campaign before provider calls or refund-capacity reservation. Missing campaign,
+payment or order, and unrelated Event associations return an incomplete outcome,
+not successful completion. Existing provider-account snapshots, campaign-linked
+refund identity, capacity checks and provider recovery remain in place.
+
+Financial trigger parsing binds discriminator, aggregate type/ID and nonempty
+typed source/tenant identities before campaign, refund or payment consumers.
+That envelope is a consistency check, not tenant authority; original persisted
+claim/source admission remains required. Dispatch and reconciliation cannot
+acknowledge a missing native refund as completed work.
+
+### Retained Notification Fanout Authority
+
+Publication fanout validates the Event envelope and reloads the native published
+Event under the exact selected tenant. The source actor must match; notification
+content derives from the native Event rather than JSON title/date fields.
+Each recipient transaction rechecks that source before creating notification
+or push work. Retained-heavy fanout binds the envelope Event ID to the native
+irreversible moderation record before coordinating an occurrence.
+
+Moderation record and subscription recipient lookups cannot borrow a supplied
+foreign tenant tuple: they require the ordinary selected tenant, without a
+bypass lease. Historical heavy payload replacement additionally compares the
+original persisted processing lease and exact old payload; a replaced worker
+cannot scrub another worker's row. These are source-wired fences, not complete
+legacy-worker admission or runtime assurance. Purpose-bound admission and
+fresh tenant execution remain a separate programme obligation.
 
 ### Forwarded Header Trust
 
@@ -1743,7 +2476,111 @@ do not carry them.
 
 ### Business Metrics (OpenTelemetry)
 
+Svix readiness data exports canonical provider codes (or `unknown`) and
+environment/version/policy configuration-presence flags, not arbitrary option
+strings. Selected-provider, processor, conformance-capability and secret-binding
+readiness outcomes remain intact. Inspect exact deployment versions through
+authorized configuration rather than public health payloads.
+
+The startup Svix event-type sync worker logs aggregate SyncedCount/FailureCount
+on completion and `event_type_sync_failed` on unexpected failure. It does not
+export exception subtype names or per-event-type failure details. Cancellation
+retains the stopped outcome rather than being counted as a provider failure.
+
+AI browser-client read and mutation failures log fixed operation categories
+and HTTP status, without exception objects, response bodies, conversation/run
+IDs or search text. Authorized typed problem responses still reach the caller;
+removing them from diagnostics does not replace the UI's error/recovery result.
+
 Meter `Explore.Business` exposes source-defined business counters. Counter names and tags are not uniform across all events; check the metric-specific tags before building dashboards.
+
+API-key owner/outcome/throttle, role assignment, registration-provider management,
+purge, idempotency/AI cleanup and AI-health dimensions accept only current native
+category sets. Unknown values emit `unknown`, never transformed private text.
+
+Analytics/report diagnostics retain bounded operation/provider/channel/outcome
+categories rather than private inputs or business identities. Authorized
+provider payloads, report results and HAL identifiers are unchanged. Secrets
+health failures use `provider_unavailable`; moderation transports retain
+status/category/transient outcomes without provider exceptions. Reporting
+intake errors remain fail-closed.
+
+HAL batch authorization retains the selected provider's failure decision.
+An unavailable Cerbos transport denies permission-bound links, including
+duplicates, without removing static self links or exporting private transport
+detail. The native remote batch collector case is authored; runtime assurance
+remains queued with the programme's final checks.
+
+Cerbos publication/reload and live-store diagnostics classify transport failures
+with fixed categories, not runtime exception subtype names. Upload issue codes,
+HTTP status and reload failure remain observable. A failed store-hash read still
+returns no observed revision; it does not establish unchanged store content.
+
+Setting notification logs omit key/value/actor/tenant copies, including
+unregistered settings. Configuration-change diagnostics record a bounded scope,
+while the authorized durable audit repository retains before/after values,
+action and actor/scope identities. Hierarchy resolver logs keep provider/count/
+enabled-culture categories without tenant IDs or rejected governance text.
+Authorization provider diagnostics omit raw settings and exception types;
+setup package failures keep their existing 503 response without exception logs.
+Collector regressions are authored; programme executable assurance remains
+pending under the explicit implementation-first override.
+The API final enricher removes inherited scope properties for every producer,
+retaining only message-template-bound fields and SourceContext. Framework
+HTTP-client, gRPC, EF Core and host lifecycle/error events are not safe default
+export contracts: they can copy URLs, database/connection metadata or provider
+exceptions. Native classified outcomes and instrumentation remain the default
+diagnostic surface.
+
+RabbitMQ diagnostic exports omit configured connection/queue/exchange names,
+tenant/publish identities and provider ReplyText. Default transport health data
+contains only `enabled`; health status still distinguishes disabled, reachable
+and unavailable transport. Broker properties, publish pointers and durable
+replay/settlement identity remain unchanged in authorized native operations.
+Built-in strategy lifecycle diagnostics omit event/aspect values; their existing
+authorized aspect/repository links are preserved.
+Contact export logs retain row count/format, not actor/export identities.
+Unsubscribe logs retain the supported preference category. Team-role denial
+diagnostics retain operation/reason, and unresolved moderator diagnostics retain
+the moderation kind; private tenant/user/event/assignment identities remain in
+authorized business/audit records rather than default logs.
+
+API-triggered operator policy-package reads admit at most 256 artifacts,
+2 MiB per artifact and 16 MiB total. YAML admits at most 65,536 events, depth 32
+and 65,536-character scalars, rejects aliases/anchors/explicit tags/merge keys
+and multiple documents, and checks duplicate keys. JSON has depth 32 and rejects
+duplicate or runtime-type members. Archive export rereads bounded bytes and
+checks them against the manifest hash/length before writing each entry.
+
+YAML syntax failures in the pre-expansion scan use the same fixed
+`PackageUnavailable` outcome as budget/alias rejection. Native publication
+regression source covers alias, tag, nesting, scalar, event-count and malformed
+syntax admission, asserting zero outbound administrator handoffs and no input
+canary/path in final logger fields or publication results. Execution remains
+queued under the security programme override.
+
+Policy publication logs retain artifact counts, HTTP statuses and failure
+classes, not exception objects, deployment endpoints, package identifiers or
+content hashes. Authorized manifest/publication results retain their existing
+identity fields; only default diagnostic export is narrowed.
+
+The default Secrets audit log sink exports only the declared operation/provider,
+success status, fixed failure reason and canonical GUID/trace correlation. It
+does not export key patterns, user identifiers or ErrorMessage payloads at any
+log level. The decorator uses server-owned context correlation and never adopts
+caller correlation/request headers. SecretAuditEntry fields remain available only to separately
+authorized audit consumers; enabling debug does not enable private log exports.
+
+Localization bundle write/probe/temporary-cleanup logs emit fixed failure
+categories rather than raw exceptions, language input or filesystem coordinates.
+The write wrapper exposes `localization_bundle_write_failed`; its inner
+exception remains for private control-flow diagnostics, not log export.
+
+Business counters omit tenant/user identifiers, including event moderation,
+reports, API-key lifecycle and custom-property purge decisions. Keep alerts and
+dashboards aggregated by the documented operation/outcome categories; a tenant
+label is not a supported export or authorization boundary. The owning native
+MeterListener regression observes final measurements, not source text.
 
 AI provider tracing uses the `Explore.Ai.Provider` activity source. Provider spans are platform-owned and redacted; they intentionally do not use SDK GenAI middleware because prompts, responses, tool payloads, provider endpoints, model IDs, provider request IDs, tenant/user IDs, API keys, and raw provider errors must not be exported.
 
@@ -2220,11 +3057,44 @@ manager, title or destination data in Quartz and uses the standard
 `Scheduled job {JobName} completed.` event. Keep the scheduler enabled until
 retained audit rows have expired or been purged.
 
+Owner discovery uses an independent Global context and returns only tenant IDs,
+including suspended tenants that still own audit rows. PostgreSQL requires
+`PostgresEventResourceAuditReadPermissions` after tenant RLS; it grants the
+configured Global login only the audit `TenantId` column alongside its existing
+directory-key permission. `EventResourceAuditOwnerDiscoveryRepository` expresses
+existence, exclusive UUID pagination and ordering through EF Core in its original
+ReadCommitted transaction. No stored discovery workflow is installed. Global
+does not receive audit content or deletion authority. Each deletion batch creates a fresh
+ordinary Runtime tenant context, reads current governance and deletes within
+one serializable transaction. Invalid governance preserves evidence and fails
+the pass. Acquisition does not install or repair the discovery capability.
+
 `payment-reconciliation-drain` performs a dispatch/reconcile/dispatch pass. Missing or invalid `PublicBaseUrl` defers only new Checkout handoff; provider reconciliation still runs. Keep the scheduler enabled after disabling paid sales so retained attempts and late signed evidence can settle.
 
 `fair-return-orchestration` claims at most 10,000 effects per pass using stable cursor order and bounded round-robin tenant selection. Its Quartz payload may contain only `effect_id`; payment, refund, participant, provider payload, and bearer data remain durable and are never scheduled. The health check publishes fixed pending, processing, unknown, dead-letter, and oldest-age fields. Keep this job running after stopping new waitlist allocation so ambiguous replacement payments and refunds can reconcile forward.
 
 For an IntegrationSync row reported as ambiguous by `/health` under `queue-drains`, establish provider evidence before acting. Use the tenant-authenticated `POST /api/integrations/listmonk/queue/{outboxId}/resolve` endpoint with an opaque incident/evidence reference. `ConfirmAccepted` settles without replay; `RetryDefinitelyNotAccepted` schedules a retry only after proof the provider did not accept the POST; `DeadLetter` preserves the terminal refusal. Never select retry from timeout or response-loss evidence alone.
+
+#### Startup worker diagnostic confidentiality
+
+Managed control-plane registration exports completion or the fixed categories
+`registration_pending` and `registration_retry_failed`, not attempt IDs,
+provider state, failure codes or exception subtypes. Its existing retry and
+shutdown behavior remain unchanged. Svix event-type synchronization exports
+aggregate synced/failure counts or `event_type_sync_failed`, without provider
+failure details. Cancellation remains a shutdown outcome, not a provider failure.
+
+#### Scheduler diagnostic confidentiality
+
+Scheduler failure logs retain fixed categories: `scheduled_job_failed`,
+`telemetry_listener_failed`, `scheduler_unavailable` and
+`unknown_scheduled_job`. They omit job/group identities and runtime exception
+subtypes. Default scheduler-control diagnostics retain the closed action token,
+target category and outcome, not operator identity, job keys or caller correlation.
+The full `SchedulerAdminAuditRecord` remains available to a separately registered
+access-controlled audit sink. Metrics retain their existing vocabulary.
+Listener elapsed time uses the injected `TimeProvider` timestamp clock;
+deterministic tests advance that clock without sleeping.
 
 #### Discovery snapshot retention
 
@@ -2260,12 +3130,15 @@ The NOLOGIN/NOBYPASSRLS owner has only the header ownership/expiry column access
 needed by its owner-only SELECT policy. Membership and public-source tables
 remain protected by FORCE RLS; deletion uses ordinary exact-tenant transactions.
 
-Grant `event_discovery_maintenance_runtime` to the actual runtime login with
+Grant `event_discovery_maintenance_runtime` to the actual Global login with
 effective inheritance through the approved deployment role authority. Do not
 grant owner or migrator membership, or BYPASSRLS, to that login. Migration
 authority must manage the dedicated roles and application schema. Missing grants
 fail cleanup rather than silently omitting owners; monitor that failure before
 the physical store reaches capacity.
+The role name is historical: owner enumeration obtains the independent Global
+pool; deletion obtains a fresh exact-tenant Runtime pool. Do not enroll Runtime
+for enumeration or give Global direct snapshot deletion privileges.
 
 Logical expiry never waits for cleanup. Physical capacity includes expired
 membership and independently bounded headers, so stopped cleanup eventually
@@ -2363,7 +3236,132 @@ stops.
 
 ### Lifecycle-Email Operations
 
-The selected primary database remains the email delivery ledger. Parent-aware content retention is implemented by the `email-dispatch-retention-cleanup` Quartz job (`EmailDispatchRetentionCleanupJob`): it runs bounded transactional passes, supports dry-run, and records only counts and cutoff timestamps in summary logs. Per-tenant failure warnings retain only the exception type, never the exception object or provider message. Failed tenants remain counted, cancellation still propagates, and this diagnostic boundary does not change transaction or retry behavior.
+Local quarantine carries original binding/stamp/snapshot/path/hash/expiry into
+the actual filesystem provider. Its native validate_claim capability is
+read-only and attested in the existing contract, preserving Serializable
+row/advisory custody and fresh database expiry before move. Registration
+provider submissions now carry original incoming effect/source/token/fence/
+generation/expiry into the owning normalization/evidence transaction, where
+lost custody rolls back every write. Native/provider tests remain unrun.
+
+Physical deletion consumes its original absolute claim deadline across
+acquisition/binding and rereads persisted custody before deletion and absence
+confirmation. Web Push reacquires original token/privacy/subscription eligibility
+and rejects expired or subsecond TTL before sender entry. PDS transport consumes
+only the remaining renewed absolute lease after its final gate. Branding field
+locks surround commit-time document/stamp/field observations. Local ordinary
+authenticated self Delete follows the existing resolved-user equality rule;
+foreign-subject administration still needs its own authority. These source
+corrections have persisted regression specifications, not executed assurance.
+
+Checkout dispatch acquires identity-only Global claims before selecting a fresh
+immutable tenant Runtime scope. Provider/routing dependencies are constructed
+after persisted original-claim validation and fresh post-read expiry. Native
+installation/entry require exact queue policy and forced RLS, refusing drift
+before reinstall can normalize it. Infrastructure owns dispatch orchestration;
+Application retains payment contracts. Provider recovery/idempotency semantics
+remain unchanged. Native, portable and post-read regressions are authored, unrun.
+
+Local webhook readiness uses an independent unbound Global observer, not the
+ordinary Runtime delivery repository. PostgreSQL exposes only due/stale counts
+through a fixed enrolled execute-only function; owner reads predicate/join
+columns only. Install after forced RLS and claim/endpoint authority. Authority
+drift reports Unhealthy without counts; it must not become a filtered healthy
+zero. Portable providers retain queue predicates. Native and provider tests
+are authored, not executed.
+
+Portable notification admission observes the original processing expiry again
+after awaited source lookup through TimeProvider. Exact expiry is rejected
+before the original claim is returned for bind, require or worker execution.
+No renewal or successor claim is acquired. Native PostgreSQL admission keeps its
+database clock. Ten reader-completion expiry/live regressions are authored but
+unrun; source lookup does not itself confer lasting delivery authority.
+
+Public addon catalog queries require the shared current event eligibility
+predicate, not merely a retained published catalog or platform participation.
+Quantity hydration follows that gate. Management reads retain independent owner
+admission; private event management does not confer anonymous visibility.
+Five real HTTP withdrawal regressions are authored but unrun.
+
+OIDC readiness diagnostics retain canonical provider, numeric response status
+and fixed outcomes, never discovery URI, issuer, options identity or exception
+content. Dynamic scheme and startup logs retain credential-presence flags without
+Authority/ClientId. Actual options and discovery validation remain intact.
+Real-peer readiness and acquisition canaries are authored but unrun; Split and
+Combined composition, framework engines and deployed collectors remain separate
+final assurance obligations.
+
+Local webhook sending now rechecks its original tenant/target/token/fence in a
+fresh Runtime context after awaited policy/safety preflight. Current payload
+retention/clearing and lease expiry are checked before credentials or HTTP;
+lost custody returns LeaseLost/AlreadyClaimed without remote effect or
+replacement-owner substitution. A separate context prevents stale EF tracked
+payload reuse. Reader admission seals the selected tenant and keeps explicit
+message/plan/endpoint scope and retained-consumer linkage. Seven SQLite
+invalidation cases and exact-byte signed positive control await execution.
+Native retained instance endpoint status/health authority is integrated through
+`PostgresWebhookClaimEndpointStateContract`, installed after Local admission.
+Its separate Runtime execute-only routine validates the original tenant-owned
+target/token/fence and retained endpoint/consumer/plan/message before locking
+target and endpoint. Narrow owner columns exclude current URL/secrets/payload;
+nullable-tenant model RLS stays closed. Health runs before the target transition
+and attempt flush release the claim, in the same transaction as attempt/audit
+effects. Portable providers use original-row write fences. Native regressions,
+ordinary-role installation and portable SQL translation remain unrun.
+
+The public tenant directory used by Global lookup and replay discovery now
+rejects undeclared direct EXECUTE grants at routine entry and before/after
+installation. Reinstall does not erase drift: explicitly remove the unintended
+grant with approved database authority, then reinstall the existing contract.
+Directory Active/domain projection and fields are unchanged. The native
+direct-ACL retention and four-field recovery specification is authored and
+awaits final executable assurance; this is not complete login/role certification.
+
+Webhook bulk replay failure diagnostics use only
+`bulk_replay_execution_failed` or `bulk_replay_failure_settlement_failed`, never
+underlying exception subtype names. Original-operation failure settlement,
+selected-tenant transaction/audit and cancellation behavior remain intact.
+Producer-output cases are authored; installed Runtime/Global caller assurance
+and native rollback evidence remain part of final programme verification.
+
+Publication notification fanout persists only `event_publication_fanout_failed`
+when an audience read or delivery fails. Its owning dispatcher still receives the
+original exception; the run retains Failed state/counts and completes on the
+same identity when retried successfully. Native short/oversized failure/retry
+specifications are authored and unrun.
+
+Localization bundle failures propagate only their fixed write category, without
+an inner filesystem exception. AI browser fallback decoding caps responses at
+65,536 characters, JSON depth at 16 and problem codes at 128 characters, rejecting
+nonobject/duplicate code input. These decoding bounds are separate from generated
+client download budgets. AI disclosure gateway failures carry no exception
+detail; failed Event reference envelopes enter provider prompts only as
+`context_unavailable`. The native provider-payload canary case and gateway batch
+failure controls await final programme assurance.
+
+Light moderation fanout retains only `light_moderation_fanout_failed` in its
+persisted run failure field, not the underlying exception message. Failure
+still rethrows for the owning dispatcher; retry uses the original run and clears
+the category on completion. The service's log carries no exception object.
+Native short/oversized-canary and same-run recovery specifications are authored
+and await the final programme run.
+
+The selected primary database remains the email delivery ledger. Parent-aware content retention is implemented by the `email-dispatch-retention-cleanup` Quartz job (`EmailDispatchRetentionCleanupJob`): it runs bounded transactional passes, supports dry-run, and records only counts and cutoff timestamps in summary logs. Per-tenant failure warnings retain only the fixed `retention_cleanup_failed` category, never the exception object or provider message. Failed tenants remain counted, cancellation still propagates, and this diagnostic boundary does not change transaction or retry behavior.
+
+Retention acquires bounded tenant UUIDs from `IEmailRetentionTenantDiscoveryRepository`
+using a fresh bound, tenantless Global context. All supported relational engines
+use the same EF Core eligibility, grouping and ordering query. PostgreSQL's
+`PostgresEmailRetentionReadPermissions` installs only seven metadata-column reads:
+`TenantId`, `CreatedAt`, `Status`, `SentAt`, `LastFailureAt`, `ContentRedactedAt`
+and `IsDeleted`. No stored discovery workflow is installed. Missing or changed
+permission authority fails discovery instead of reporting an empty successful
+fleet. `IEmailRetentionExecutionScopeFactory`
+then seals a fresh selected-tenant Runtime lease before constructing each
+repository and unit of work. Counts and all four redaction relations keep normal
+tenant/soft-delete filtering and explicit tenant predicates. Global receives no
+private content access or redaction authority. Production composition and the
+post-RLS migrator install this capability; source/specifications await final
+programme executable assurance.
 
 - Sent and skipped content redacts after the configured 180-day default; attempt and receipt free text/provider IDs follow the selected parent in the same transaction.
 - Dead-lettered, `Unknown`, and parked replay material remains until its explicit resolution timestamp, then follows the same retention clock. `ContentRedactedAt` permanently removes replay authority.
@@ -2442,11 +3440,11 @@ Package delivery paths:
 
 | Path | Trigger | Notes |
 |---|---|---|
-| GitHub Actions production publish | `Cerbos Policy Validation` on `push` to `main` after policy validation succeeds | Production CI/CD path. Uses the `production` GitHub Environment approval gate, digest-pinned `cerbosctl`, and repository secrets `CERBOS_SERVER`, `CERBOS_USERNAME`, `CERBOS_PASSWORD`, plus optional `CERBOS_CA_CERT_PEM`. Uploads `_schemas` before policies and retains `cerbos-policy-publish-evidence`. |
-| Docker Compose one-shot sync | `docker compose --profile authz run --rm cerbos-policy-sync` | Recommended self-hosting path. Starts the `authz` profile with `cerbos-db`, maps `.env` `CERBOS_ADMIN_USERNAME` to the Cerbos server's `CERBOS_ADMIN_USER` variable, uses `CERBOS_ADMIN_PASSWORD`, recursively uploads policies and `_schemas`, then requests store reload. Set `CERBOS_ADMIN_PASSWORD_HASH` to the hash matching `CERBOS_ADMIN_PASSWORD` before using Admin API sync. |
+| GitHub Actions publication prerequisite | Manual deploy dispatch after operator publication | `_cerbos-publication.yml` compiles the package and authenticates the operator's signed revision/hash/environment/target statement. Deployment rechecks its expiry immediately before triggering Coolify. CI has no standing Cerbos administrator pair. |
+| Docker Compose one-shot sync | `docker compose --profile authz --profile cerbos-publication run --rm cerbos-policy-sync` | Supply fresh `CERBOS_USERNAME`/`CERBOS_PASSWORD` in the operator shell, unset them afterward, and never save them as Event runtime configuration. Uploads schemas before policies and reloads the provider. |
 | Coolify external Cerbos | [CERBOS_COOLIFY.md](CERBOS_COOLIFY.md) | Separate PDP deployment path for Coolify Docker Image resources. Uses PostgreSQL-backed policy storage, a mounted `conf.yaml`, gRPC h2c routing, and manual or CI `cerbosctl` upload from this repo's `cerbos/policies/` tree. |
-| Zero-touch boot sync | API startup when complete instance Admin API config exists | Skips safely when endpoint or credentials are incomplete. |
-| Setup/Admin UI sync | Operator-triggered setup or admin action | Advanced path shown only when server-side Admin API credentials are already configured; the browser does not collect Cerbos Admin API passwords. Returns safe issue codes for missing config, auth failure, unavailable/rejected package, reload failure, or unknown package status. |
+| Read-only boot readiness | API startup with deployment-selected Cerbos | Checks PDP health and the authenticated operator declaration; missing/failed/expired/mismatched declarations fail closed. No Admin API request occurs. |
+| Setup/Admin UI sync | Current authorized setup or admin action | Requires a fresh complete pair and clears both fields after each attempt. `inspectOnly: true` on the same POST reads store metadata without publication. |
 | Manual ZIP fallback | Setup/Admin download endpoint | Always visible in onboarding, including Local RBAC mode. Exports the same bundled package for `cerbosctl put policy --recursive .` and `cerbosctl put schema --recursive _schemas` when Admin API sync is unavailable or intentionally disabled. |
 
 Runtime authorization checks use the PDP gRPC endpoint. Package sync/status uses the Admin API endpoint and credentials. Do not treat a healthy Admin API as proof that runtime PDP checks are healthy, or vice versa.
@@ -2456,10 +3454,10 @@ Runtime authorization checks use the PDP gRPC endpoint. Package sync/status uses
 | Key | Type | Description |
 |---|---|---|
 | `Endpoint` / `Endpoints` | `string` / `List<string>` | Instance Admin API target(s) for package upload/status/reload. |
-| `CERBOS_ADMIN_USERNAME` / `CERBOS_ADMIN_PASSWORD` | secret bindings | Instance-scoped credentials resolved through `ISecretResolver`; they are never projected into `CerbosAdminApiSettings`, reads, or logs. Docker Compose also uses `CERBOS_ADMIN_PASSWORD` for `cerbosctl`. |
+| `Cerbos:PolicyPackage:Publication` | public verification material | Independent public key, receipt, signature and expected revision/environment. See [the authenticated publication contract](AUTHORIZATION.md#hosted-cicd-publishing). |
 | `CERBOS_ADMIN_PASSWORD_HASH` | deployment secret | Verifier consumed by the Cerbos server itself; it is not a package-publishing credential. |
 | `Cerbos:PolicyPackagePath` | `string` | API-local path to bundled or mounted `cerbos/policies`; use `CERBOS__POLICYPACKAGEPATH=/app/cerbos/policies` in containers. |
-| BYO custom Admin API endpoint/credentials | tenant governance/secret settings | Optional per-tenant package target, preserved even when the tenant custom PDP endpoint is blank. |
+| BYO custom Admin API endpoint | tenant governance | Tenant-qualified public HTTPS target, preserved even when the tenant custom PDP endpoint is blank. Credentials are fresh foreground input only. |
 
 Non-local Admin API/PDP endpoints must use safe TLS-capable URLs. Unsafe endpoint changes are rejected before provider settings are persisted. Runtime failure logs must not include raw endpoints, credentials, JWTs/tokens, response bodies, or exception objects/messages.
 
@@ -2477,9 +3475,9 @@ Non-local Admin API/PDP endpoints must use safe TLS-capable URLs. Unsafe endpoin
 
 1. Check the runtime PDP health and the app Cerbos readiness endpoint.
 2. Verify instance `Cerbos:GrpcEndpoint` for runtime checks and `Cerbos:AdminApi:*` for package operations.
-3. For BYO tenants, verify `cerbos.mode`, `cerbos.custom_endpoint`, and optional custom Admin API endpoint/credentials. There is no failure-mode setting; BYO outages always fail closed.
+3. For BYO tenants, verify `cerbos.mode`, `cerbos.custom_endpoint`, and the custom Admin API endpoint. There is no failure-mode setting; BYO outages always fail closed.
 4. If `cerbos.mode=custom_endpoint` has a blank PDP endpoint, runtime authorization activates safe mode; configure the PDP endpoint or explicitly switch the tenant back to instance mode after confirming policy intent.
-5. For package sync failures, inspect the safe issue code before retrying. Prefer `docker compose --profile authz run --rm cerbos-policy-sync` for self-hosted Compose deployments after confirming `CERBOS_ADMIN_PASSWORD_HASH` matches `CERBOS_ADMIN_PASSWORD`, or use setup/admin manual ZIP download plus `cerbosctl put policy --recursive .` and `cerbosctl put schema --recursive _schemas` when Admin API sync is unavailable.
+5. For publication failures, inspect the safe issue code and reconcile possible partial provider changes before retrying with fresh credentials. Use the explicit Compose publication profile or ZIP/cerbosctl recovery, uploading schemas before policies. Verify installation before signing a new receipt. Never restore retired runtime credential bindings.
 6. For missing HAL affordances, confirm the link was not denied by server-side authorization before debugging route generation.
 
 ## Setup Secret Lifecycle
@@ -2498,21 +3496,18 @@ The convention-first launch path is Setup Secret → Admin Auth → Site Profile
 
 ### Terminal Setup Target
 
-`Event.SetupAssistant.Terminal` is the only human terminal interface. It uses
-the audited `ISLAMU.Terminal.Gui` `2.4.17-islamu.1` package and the shared
-CommunityToolkit presentation workspace; `Event.SetupAssistant.Cli` remains
-noninteractive and has no `tui` command or console fallback. Launch the target
-from an interactive terminal with no arguments. Redirected input, output, or
-error fails with `interactive-terminal-required` before secret state is created.
-Below 40 columns by 17 rows the target hides every input/action and shows only
-a resize instruction; it never leaves clipped controls active.
+Offline terminal preparation belongs to the separately installed
+[ISLAMU Configurator terminal](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/terminal.md).
+Its package and protected-save host evidence are owned by Configurator, not
+Event's backend bootstrap. Supply the Event definition; the headless CLI is
+`islamu-configurator`, not an interactive command alias.
 
-The target creates a new `.env.setup` by default and never overwrites an
-existing file. Secret entry is masked, clipboard paste is refused, and the
-buffer is cleared on completion, cancellation, signal, disposal, or failure.
-Protected output currently requires Linux, macOS, or FreeBSD owner-only `0600`
-file semantics; other operating systems fail closed with
-`protected-output-unavailable`. There is no alternate renderer.
+Event still owns setup-secret lifecycle, onboarding and semantic acceptance.
+Prepared files are restricted, create-only native artifacts; unsupported output
+hosts fail closed. Do not introduce plaintext stdout, overwrite fallbacks,
+implicit secret custody or a claim that local success certifies Event readiness.
+The bundled source roots are removed; the literal disposition record is
+`docs/internal/configurator-source-cutover-inventory.md`.
 
 ## External API Key Operations
 
@@ -2743,6 +3738,11 @@ Admin settings management:
 
 ### Localization Metrics & Alerts
 
+Translation language labels admit only CultureRegistry entries; other inputs
+emit `unknown`. Inspected localization diagnostics retain counts, cache mode
+and bounded provider/failure categories without tenant IDs, raw language input,
+paths or exceptions. Import/export failure responses omit exception messages.
+
 | Metric | Alert Threshold | Description |
 |--------|----------------|-------------|
 | `islamu_tms_fallback_activated_total` | > 0 in 5m | TMS provider failed; page on-call |
@@ -2931,7 +3931,7 @@ Lifecycle classes:
 | `email_dispatch_outbox` | Durable side-effect ledger with email PII snapshots | Registration/email dispatch state machine | Implemented: bounded/dry-runnable redaction after sent/skipped or explicitly resolved retention cutoff; purged tenants are immediate; `ContentRedactedAt` blocks replay | Sent rows: 180 days. Dead-lettered/unknown/parked rows: retain until operator resolution, then 180 days | Consider monthly `CreatedAt` range partitions when dispatch history exceeds 25M rows or status polling slows | Monitor bounded cleanup duration/counts and add a dedicated readiness signal if operational evidence requires one |
 | `email_dispatch_attempts`, `email_dispatch_receipts` | Durable side-effect ledger | Email dispatch drain/consumer idempotency | Implemented: free-text errors and provider IDs redact transactionally with the selected parent; typed outcomes and timestamps remain | Attempts/receipts follow parent retention; failed/unknown evidence stays while parent is unresolved | Partition only with parent strategy; independent partitioning risks expensive parent/child maintenance | Keep parent-aware regression coverage in the persistence gate |
 | `ai_conversations`, `ai_messages`, `ai_runs`, `ai_conversation_references`, `ai_proposed_actions`, `ai_tool_executions` | User-facing operational state with provider/prompt sensitivity | AI assistant conversation, proposal, and confirmed-tool audit flows | Implemented: the `ai-retention-cleanup` Quartz job (`AiRetentionCleanupJob`) iterates active tenants, binds tenant context, resolves each tenant's `ai_assistant.retention_days`, supports `AiRetentionCleanup:DryRun`, redacts message content/action payload/reference summaries/failure messages/tool failure messages, and soft-deletes expired conversation shells through tenant-filtered repository cleanup. | 30 days by default via `ai_assistant.retention_days`, tenant-configurable through governance settings | Do not partition initially; cleanup predicates use tenant plus conversation age and should stay index-backed until AI history volume proves otherwise | Monitor `ai-retention-cleanup` readiness and `explore.ai.retention.*` metrics before broad history enablement; never log prompt content, action payloads, provider responses, or model secrets |
-| `idempotency_records` | Ephemeral safety cache | `IdempotencyMiddleware` / `IIdempotencyRepository` | Implemented: reads ignore expired rows, and the `idempotency-cleanup` Quartz job (`IdempotencyCleanupJob`) deletes rows older than `ExpiresAt + IdempotencyCleanup:ExpirationGraceHours` in bounded batches; dry-run is available | Delete after `ExpiresAt + 24h` safety buffer by default | Do not partition initially; TTL delete by `ExpiresAt` should be enough unless write volume is extreme | Monitor `idempotency-cleanup` readiness and cleanup metrics; revisit only if delete volume or index bloat threatens SLOs |
+| `idempotency_records` | Replay payload plus durable rejection fence | `IdempotencyMiddleware` / `IIdempotencyRepository` | Implemented: replay checks expiry; the Quartz cleanup job scrubs payload/content type and marks response unavailable in bounded batches without deleting request identities | Scrub payload after `ExpiresAt + ExpirationGraceHours`; retain fence while old identities may retry | Plan capacity for retained identities; TTL deletion would reopen potentially committed work | Monitor cleanup readiness, scrub counts and retained-fence growth; retirement requires feature-owned lifecycle proof |
 | `atproto_transient_records`, `atproto_transient_assertion_replays` | Ephemeral authentication state and replay protection | Private signed ATProto transient bridge | Implemented: `atproto-transient-cleanup` deletes at most five 500-row batches per table each minute; reads/consumes enforce expiry independently | State at most 10 minutes, handoff at most 2 minutes, synthetic probe 30 seconds; replay claims through assertion acceptance expiry including 5-second skew, then 10-second cleanup retention without extending validity; no 24-hour grace | No partitioning initially; indexed Unix-millisecond expiry supports bounded deletion | Keep cleanup running after disabling login; monitor fixed operation/cleanup counters; active-row deletion does not erase retained backups |
 | `custom_property_projection_dirty_scope` | Rebuildable projection/cache backlog | Projection rebuild/drain coordination | Drained rows remain; pending rows are quota-bounded | Pending rows stay until drained; drained rows retained 7 days for diagnostics | No partitioning initially; the table is quota-bounded per tenant | Add drained-row cleanup and metrics for deleted/drained/pending counts |
 | `event_custom_property_projections`, `event_session_custom_property_projections` | Rebuildable projection/cache | Projection updaters from Layer 3 values | Rebuild and source deletes replace/remove rows; no age cleanup | No independent age retention; rows live while source values and exposure rules require them | Consider tenant/hash or event-date-adjacent strategy only after projection query SLOs require it; range partitioning by `UpdatedAt` is not useful for most lookup predicates | Keep rebuild-first recovery; add periodic consistency checks before partitioning |
@@ -2997,17 +3997,56 @@ Rollback posture:
 
 The `idempotency-cleanup` readiness check reports the current cleanup posture:
 
-- `Healthy` when cleanup is enabled in delete mode or dry-run mode.
+- `Healthy` when cleanup is enabled in scrub mode or dry-run mode.
 - `Degraded` when cleanup is intentionally disabled.
 
-The worker is explicitly instance/system-scoped because `idempotency_records` are an ephemeral replay cache. It does not delete protected audit, dead-letter, email-dispatch, notification, export, or source-of-truth rows. Use `IdempotencyCleanup:DryRun=true` before first enabling destructive cleanup in an environment, then watch logs and `Explore.Business` metrics:
+The scheduler owns an instance-wide pass, but Global authority only discovers
+tenant UUIDs. `IIdempotencyCleanupTenantDiscoveryRepository` selects at most the
+pass row budget of eligible receipt identities ordered by expiry and ID, then
+returns distinct tenants. It neither joins the live tenant directory nor
+aggregates every historical fence. Already scrubbed (`StatusCode = -1`) receipts
+are excluded, so inactive or removed directory entries cannot hide retained work.
+
+`IIdempotencyCleanupExecutionScopeFactory` creates a fresh exact-tenant Runtime
+context before constructing the repository. Its restricted scope exposes only
+counting, scrubbing and async disposal, never replay or claim operations. The
+ambient request/worker context is not mutated. PostgreSQL discovery and
+count/scrub use `PostgresIdempotencyReceiptContract` with the actual selected
+`PostgresNativeQueueEnrollment`; missing enrollment or native authority fails the
+pass rather than falling back to private-table access. Other relational providers
+retain real bounded EF reads and scrubbing under the selected tenant.
+
+`IdempotencyCleanup:BatchSize` is one total pass budget, validated from 1 through
+`IdempotencyCleanupLimits.MaximumRows` (1000), with the default still 500; invalid
+values are rejected, not clamped. Each tenant count consumes the remaining budget
+even if concurrent scrubbing reduces the subsequent mutation count. Dry-run
+counts and scrub counts therefore remain bounded across all scopes. The worker
+does not retry or sleep within a pass.
+
+`ScrubExpiredAsync` clears expired replay payloads and content types and sets
+status to `-1`, retaining unique request identities as nonreopening
+response-unavailable fences. Its result reports `ScrubbedCount`, not a deletion
+count. It does not delete audit, dead-letter, email-dispatch, notification, export,
+or source-of-truth rows. Use `IdempotencyCleanup:DryRun=true` to inspect the bounded
+eligible batch before enabling scrubbing, then watch logs and `Explore.Business`
+metrics:
 
 | Metric | Bounded tags | Meaning |
 |---|---|---|
-| `explore.idempotency.cleanup_runs` | `mode`, `outcome` | One cleanup attempt in `dry_run` or `delete` mode, with `succeeded` or `failed` outcome. |
-| `explore.idempotency.cleanup_rows` | `mode`, `outcome` | Eligible row count in dry-run mode or deleted row count in delete mode. |
+| `explore.idempotency.cleanup_runs` | `mode`, `outcome` | One cleanup attempt in `dry_run` or `scrub` mode, with `succeeded` or `failed` outcome. |
+| `explore.idempotency.cleanup_rows` | `mode`, `outcome` | Eligible row count (`eligible`) in dry-run mode or scrubbed receipt count (`scrubbed`) in scrub mode; not deleted rows. |
 
 Metric tags and logs intentionally exclude raw idempotency keys, request paths, response bodies, tenant IDs, and exception text.
+
+Composition must register `IIdempotencyCleanupTenantDiscoveryRepository` with
+`IdempotencyCleanupTenantDiscoveryRepository` using the separate Global factory,
+and `IIdempotencyCleanupExecutionScopeFactory` with
+`IdempotencyCleanupExecutionScopeFactory` using the Runtime tenant factory.
+Supply the selected PostgreSQL enrollment to both implementations, and the
+selected `TimeProvider` to the execution factory. `IdempotencyCleanupService`
+depends on these two ports rather than the ambient `IIdempotencyRepository`.
+Source changes and authored specifications await the programme's deferred
+build, test and native-authority verification.
 
 ### AI Retention Cleanup Operations
 
@@ -3324,3 +4363,499 @@ Use stable codes and bounded metadata:
   password;
 * provider switching must hide the previous provider from new-login discovery
   while old sessions continue through their original scheme.
+
+### Purpose-bound notification outbox admission
+
+The notification entrypoints in the generic outbox now have a separate admission
+boundary: Event publication, retained light moderation, retained heavy redaction,
+`NotificationFanoutOccurrenceRequested`, and discovery identity correction.
+Pending and expired Processing rows for these five types are excluded from
+`OutboxRepository.GetPendingBatch`.
+`INotificationOutboxAdmission` claims at most 1,000 rows per pass and returns only
+message/source/aggregate/tenant identities, the original persisted expiry fence,
+and a SHA-256 digest of the persisted payload. It never exports Event content,
+moderation reasons, occurrence snapshots, or recipient rows.
+
+`PostgresNotificationOutboxAdmissionContract` is installed by
+`ExploreDatabaseMigrator` in the mapped application namespace. Installation and
+role grants have not been executed as part of the source-only security programme.
+At deployment, the separate Global login needs membership in
+`event_notification_outbox_global` with inherited execution rights and without
+role switching. Never grant it `event_notification_outbox_owner` or
+`event_notification_outbox_migrator`, private-table SELECT, or BYPASSRLS.
+The non-login function owner can read only source identity columns, plus the
+outbox metadata needed to reconcile its pointer; its functions return no payload.
+Runtime receives no admission-function grant.
+
+The source owner comes from the persisted Event, retained moderation record
+whose Event matches the envelope, or persisted occurrence. JSON tenant IDs are
+equality assertions, never the source of authority. A malformed or inconsistent
+source is retained as Failed with `notification_source_not_admitted`, rather
+than exported or retried forever. Investigate the committed source relationship;
+do not repair authority by replacing a tenant ID in JSON.
+
+Discovery correction requires exactly one paired native audit receipt with
+the closed discovery entity/action, Event envelope, source tenant, creation
+time and exact new-values payload. The PostgreSQL source-owner policy limits
+audit reads to those discovery actions; Global receives only receipt identity
+and digest. Missing, foreign, changed or ambiguous receipts fail admission.
+The correction dispatcher no longer sets/restores a tenant from JSON: it
+requires the already-bound fresh execution scope before parsing or delivery.
+
+The worker disposes Global admission before creating an independent scope for
+each claim. `BindExecutionTenant` selects immutable child-execution facts before
+any scoped Runtime context is resolved. The scoped
+`INotificationOutboxExecutionAuthority.BindAsync` validates and single-assigns
+the original claim; `RequireAsync` compares it with current persisted custody,
+the sealed Runtime tenant, envelope, and exact payload digest before dispatch.
+Dispatcher consumers require that guard before retained-payload normalization.
+Composite now applies it before parsing any of the five notification routes,
+including direct dispatcher calls that bypass the worker. Native publication
+fixtures persist their outbox, claim it, and bind a fresh execution scope;
+synthetic, replaced and completed claims cannot enter the consumer.
+
+Light moderation additionally reloads its selected-tenant reversible light
+record and native Event/actor before run creation and within recipient batches.
+Record/Event/actor mismatches fail before effects. Event title and moderation
+time come from the native Event and record, not queued fields; heavy precedence
+continues to block conflicting light work. These source checks do not require
+the original human moderator to reacquire permission for a committed fact.
+
+Rebinding the scope, manufacturing a Processing object, replacing the claim,
+or altering its payload does not establish authority. Completion, failure, and
+historical payload replacement retain the original expiry fence.
+
+Admission/lease loss leaves no settlement through unproven custody. The worker
+emits the fixed category `notification_claim_unavailable` and continues other
+claims; an unchanged abandoned claim expires for recovery. Notification
+dead letters remain terminal for operator investigation: Composite has no
+supported reconciliation route for them, so neither drain redispatches them.
+This is at-least-once delivery, not a transaction spanning every recipient;
+consumer idempotency and the existing source checks remain required.
+
+This boundary deliberately does not convert the whole generic queue into a
+Global reader. User-erasure cache invalidation and instance/multi-tenant
+configuration effects keep their separately justified ownership. Report,
+location-correction, registration/admission, refund/payment,
+and managed-provisioning routes receive no new Global capability or tenant
+inference. Their independent authority review is not closed by this repair.
+The earlier retained-fanout section describes the parent source checks; this
+section supplies its separate worker-admission obligation, without claiming
+executed programme assurance.
+
+### Generic Outbox Execution And Dead-Letter Custody
+
+The generic drain now uses `IGenericOutboxAdmission`, independently of the five
+notification routes. Its claim carries the persisted message ID, nullable native
+tenant, ownership kind, source identity tuple, envelope, payload digest, creation
+time, status and original expiry. It carries no protected admission material,
+provider account snapshot, report content or configuration values. Tenant-owned
+work derives its owner from the native report/case, disclosure audit and
+EventLocation, order/Event, admission intent, refund/campaign/payment lineage,
+or committed tenant import. Subject cache convergence and instance operations
+have no fabricated tenant.
+
+`GenericOutboxExecutionScopeFactory` opens an independent ordinary Runtime
+context, binds the exact source tenant or seals an explicitly tenantless context,
+and installs it in the child scope before repositories resolve. Global is used
+only for admission. PostgreSQL installs `event_generic_outbox_owner`,
+`event_generic_outbox_migrator` and `event_generic_outbox_global`; the last role
+can execute the bounded admission/read functions, not read source tables or
+outbox payloads. The non-login owner has column-limited source identity access.
+Installation rejects admission-role inheritance, migration-login crossover,
+and source ownership/direct source access by the admission role. Effective
+deployment credentials and ACLs still require programme acceptance evidence.
+
+The scoped `IGenericOutboxExecutionAuthority` is single-assignment.
+Its original claim is retained on the selected `ExploreDbContext`, shared with
+the repository, and cleared when the context returns to its pool. A second
+authority instance cannot replace that context's notification or generic claim.
+
+PostgreSQL envelope loading and settlement use `PostgresOutboxExecutionContract`
+on this same Runtime connection. The `event_outbox_execution_runtime`
+capability is enrolled only to the declared Runtime login. Its restricted
+NOLOGIN owner has the mapped outbox columns and nested metadata-read execution,
+not batch admission. Publication fanout additionally has eight explicitly mapped
+Event source columns: identity, tenant, actor, title, lifecycle status, first/last
+session start and deletion state. The publication-source operation requires the
+original publication discriminator and identical source/aggregate/requested Event
+IDs; it cannot read a different Event or run under a generic claim. A dedicated
+SELECT policy and exact source-column privilege declaration are attested before
+execution. Runtime still has no direct Event-table grant. This bounded source
+replaces the raw Event authorization lookup only inside admitted publication work;
+it is not a human authorization or general event-detail capability.
+The migration capability remains
+separate. The adapter attests the compiled routine body, exact privilege graph,
+and nested reader ACLs before invoking the closed read/complete/fail/acknowledge/
+replace/publication-source operation set. SQL checks the full original claim and selected session
+tenant, locks the exact row, revalidates source custody, and checks server-clock
+expiry after acquisition. Neither Runtime nor Global receives direct outbox
+table grants from this contract.
+
+A successful payload compare-and-swap does not renew the bound digest. The old
+scope cannot reload, dispatch or settle those changed bytes; recovery needs a
+fresh admission and execution scope. Native installation and real-role execution
+for this port are still under final programme verification; this description
+is not a green deployment receipt.
+
+`PostgresPublicationFanoutExecutionContract` supplies the remaining publication
+operations through `event_publication_fanout_execution_runtime`: run creation and cursor
+updates, locally discoverable subscribers, erasure-fence presence, notification
+preferences, deduplicated notifications and push enqueueing. Each operation
+retains the same original notification claim, physical Runtime connection and
+tenant. Native source rereads derive the Event, actor, recipient and notification
+content; caller JSON cannot substitute them. Notification and push writes require
+the recipient's serializable transaction and recheck preferences and erasure
+state there. Only its dedicated non-login owner receives mapped column grants;
+its nested metadata reader grant does not permit batch admission. Installation
+rejects existing body, policy, role graph or ACL drift. Real-role end-to-end
+acceptance remains open; do not infer a successful delivery receipt from the
+presence of this installation code.
+
+`RequireAsync` checks Processing custody; `RequireDeadLetterAsync` checks a
+DeadLettered row against the same source, digest and original expiry, including
+the immediate Processing-to-DeadLettered transition. The worker reloads the
+persisted row after admission and reloads the terminal row after failure. It
+checks authority before effects and again before completion/acknowledgement.
+An expired, replaced, unclaimed, changed-source or changed-payload row cannot
+become a new authority inside an already-bound scope.
+
+Composite integration must apply the corresponding guard before generic
+parsing, including dead-letter branches that call its normal routing method.
+The separate persisted credential-intent direct caller must retain its native
+intent/handler authority; a synthesized Pending message is not a generic claim.
+This worker contract does not replace consumer-owned erasure receipts,
+report submission facts, committed cancellation checks, import notification
+target/section checks, or native financial mutation tokens and account binding.
+
+Unadmitted normal rows remain Failed with `generic_source_not_admitted`.
+Unadmitted dead letters retain terminal status and a recovery lease; they are
+not acknowledged as reconciled. Missing financial sources cannot silently
+complete through the worker. `generic_claim_unavailable` indicates that scope
+preparation could not prove custody; the worker leaves that claim unsettled.
+Report sync and Confirmed/Rejected order observations have no automatic
+dead-letter route and remain retained for investigation without blocking the
+portable queue's eligible batch. Unknown routes fail admission.
+
+The complete route dispositions and authored regression cases are recorded in
+the programme's `generic-outbox-admission-evidence.md`. No executable check,
+installation, SQL-role assertion, provider acceptance or topology acceptance
+was performed for this source unit. Native consumer idempotency and recovery
+remain necessary: admission is not a transaction spanning external effects and
+does not promise exactly-once delivery.
+
+### Retained Location Correction Custody
+
+External location correction now requires an immutable
+`LocationPrivacyCorrectionReceipt` under the selected Runtime tenant and the
+original live outbox claim. The identity-only `location_privacy_correction_receipts`
+row retains original message `Id`, `EventType`, `CreatedAtUtc`, `TenantId`,
+`EventId`, `EventLocationId`, and `PolicyVersion`. Governance additionally
+retains the exact `DisclosureAuditId`; erasure instead retains `ErasureIntentId`,
+`AuthoritySequence`, and `LocationId`. It contains no address, subject account,
+provider locator, or foreign-key cascade to disposable source data.
+
+The native governance `correct` function writes receipt, audit and outbox
+atomically. `EventLocationDisclosureAudit.CorrectionMessageId` is bound before
+its first append and cannot be rebound to a cloned message; matching identifiers
+and timestamps alone do not pair a new message with a committed audit.
+Runtime privacy-review completion uses `retain_receipt` to verify
+the persisted audit, projection policy, exact envelope/time and closed identity
+payload in its original transaction. Native subject disposal captures owned
+placement effects and their original message IDs in the erasure transaction;
+the applier uses those returned IDs instead of minting replacement identities.
+Portable providers retain equivalent effects inside their original transaction.
+
+The PostgreSQL `location_correction_receipt_custody` trigger permits insertion
+only while the fixed governance or subject-erasure owner is executing and
+rejects updates/deletes. EF rejects tracked receipt modification/deletion on
+every provider. No Global private-table grant or fabricated tenant is added.
+Generic admission must read this retained receipt rather than hydrate erased
+Location/PII or infer ownership from queued JSON. Its owner needs only the
+receipt's identity columns. The source consumer independently requires the
+persisted Processing or DeadLettered row, exact original unexpired expiry,
+envelope, creation time and payload equality. It compares all queued identity,
+policy and sequence fields with the retained source before cache effects and
+rechecks custody immediately before PDS Update/Delete planning.
+
+Global `LocationPiiErased` and User cache convergence remain cache-only and
+tenantless. External correction retries use the original message ID for existing
+PDS planning idempotency, and current native Event/record ownership still decides
+Update versus Delete. Neither erasure nor governance mutation is rerun to send
+an effect. Old rows without a retained source fail closed; there is no JSON
+backfill or compatibility grant.
+
+This is source-authored, not runtime acceptance. The new EF model must receive
+generated migrations for the supported providers after whole-programme source
+completion, before the native contract is installed. No migration, snapshot,
+generator, build, test, role probe or host was executed for this unit.
+
+### Report Provider Submission Custody
+
+`EventReportOutboxMessageFactory` now retains the original submission on the
+native `EventReport` before `SubmitEventReportCommandHandler` commits the report,
+case and provider-sync outbox in its existing transaction. The report's
+`ProviderSyncOutboxId`, `ProviderSyncCaseId`, `ProviderSyncCaseConcurrencyStamp`,
+`ProviderSyncSubmittedAtUtc` and `ProviderSyncPayloadDigest` identify that one
+submission. The digest is uppercase SHA256 over the exact UTF8 payload.
+Creation time is canonicalized to database microseconds before constructing
+the report receipt, JSON and envelope. The optional scalar columns permit
+reports without a provider submission, but such reports cannot authorize a
+provider dispatch. EF rejects updates to retained fields, and a unique filtered
+outbox-ID index prevents two reports from claiming the same source message.
+
+`EventReportRepository.GetByIdForProviderSyncAsync` requires the exact selected
+nonempty tenant and rejects tenant-filter bypass; it preserves tenant and
+soft-delete filters. `ReportProviderSyncDispatcher` compares the EventReport
+envelope, original message ID, payload digest, tenant/report/Event/case IDs,
+original case version and submitted/envelope/report creation time before either
+skipping a completed marker or calling the provider. Matching JSON alone grants
+nothing. Generic claim admission and Composite execution authority are separate
+prerequisites owned by the generic worker contract, not established by this
+repository projection or the submission DTO.
+
+Later triage, assignment or decision changes can rotate the case concurrency
+stamp. Replay deliberately retains the original submitted stamp and original
+`event-report-provider-sync:{messageId:N}` idempotency key. It must not substitute
+the current case stamp. Outgoing submitted time is the retained source time;
+last-updated time and current status/queue/priority still come from the native
+report/case. Current provider options, target/account separation, post-commit
+provider calls and persisted success/disabled/failure markers remain in force.
+
+`event_report_submission_custody_mismatch` blocks the provider before any marker
+is written. Investigate the committed source rather than changing queue JSON,
+inventing a reporter principal or minting a replacement historical receipt.
+Missing historical receipts are not backfilled from payloads. This source-only
+unit adds nullable receipt columns and an index to the model; generated
+provider migrations and snapshots remain pending until whole-programme source
+completion. No executable checks or deployment acceptance are claimed.
+
+### Committed Admission Cancellation Consumers
+
+Generic outbox admission proves claim/source custody; cancellation consumers
+must still reload their owning native state at mutation time. Composite's
+`RegistrationOrderCancelled` route must call
+`IAdmissionRevocationService.ReconcileCommittedCancellationAsync` with
+`AdmissionCommittedCancellationRequest(TenantId, RegistrationOrderId, EventId,
+AdmissionCancellationSource.Order)` and accept only `Applied`. `NotFound`
+includes a missing, foreign, deleted, mismatched or no-longer-cancelled source;
+it is not successful delivery.
+
+The checked worker entry requires an exact non-bypassed tenant scope, no ambient
+or existing transaction and no pending tracked writes. Its Read Committed unit
+locks the order, reads persisted authority without tracking, then locks tickets
+and refreshes retained ticket/credential state before revocation and save. For
+Event cancellation it also locks and rereads the nondeleted cancelled Event
+after the order, retaining both locks through credential persistence.
+
+`AdmissionEventCancellationService` keeps its public reconciliation signature.
+Its constructor now takes `IUnitOfWork` between the revocation service and
+`TimeProvider`. It validates the cancelled Event under a separate listing
+transaction, processes each order through the checked Event-source entry, and
+revalidates the Event in the continuation transaction. Listing must release the
+Event fence before taking an order fence: issuance owns order before Event.
+The existing 100-order page and source-message exclusion remain; pending or
+processing continuations are deduplicated while the Event fence is held.
+Cancelled Events with no remaining tickets converge to zero; an invalid Event
+cannot pass as an empty successful batch.
+
+Do not move this committed-state requirement into the general revocation core.
+`AnonymousCancellationService` and `RegistrationOrderLifecycleService` retain
+their authorized caller-owned transaction paths, which can revoke before the
+order transition is persisted. Succeeded-refund reconciliation continues to use
+native succeeded refund allocations, not a Cancelled order/Event requirement.
+Caller rollback still rolls back credential revocation.
+
+Native PostgreSQL regression source covers active/missing/foreign/deleted
+sources, wrong Event associations, tracked-state forgery, dirty/ambient worker
+scopes, lock retention through save, replay, empty invalid batches, continuation
+identity/deduplication and direct-call rollback. The existing refund coverage is
+retained. Save interception and `FOR UPDATE NOWAIT` make lock assertions
+event-driven rather than delay-dependent. These tests are authored, not run.
+Parent-owned Composite integration remains separate from this consumer unit;
+no runtime acceptance or provider certification follows from LSP diagnostics.
+
+### Native Registration Provider-Write Custody
+
+Provider submission delivery now acquires its answer graph only under the original
+persisted `RegistrationProviderSubmissionWriteEffect`. The selected ordinary
+Runtime tenant, effect ID, Processing status, lease token, processing fence,
+original expiry, attempt count and submission/attempt/binding pointers must all
+match. Order and Event lineage are resolved from the persisted effect, not
+substituted claim pointers. Ordinary tenant and soft-delete filters remain active
+for the source and sensitive answer reads. The answer query itself is conditioned
+on the live effect; the repository rechecks custody before returning the graph.
+
+`DrainRegistrationProviderSubmissionWriteEffectsCommandHandler` keeps its native
+command and scheduler entrypoint. It uses
+`IRegistrationProviderSubmissionWriteExecutionScopeFactory.CreateAsync` for each
+claim instead of retargeting its existing tenant accessor. The factory binds an
+exact ordinary Runtime context into `ExploreDbContextExecutionLease`, verifies
+that scoped `ExploreDbContext` resolution returns that same instance, and only
+then resolves `RegistrationProviderSubmissionWriteEffectDeliveryService`, its
+registry, sinks, repositories and units of work. Empty tenant selection is
+rejected; there is no default tenant or new Global execution authority.
+
+After answer preparation, `IsDeliveryCurrentAsync` reloads source lineage and
+the original live claim immediately before `AcceptAsync`. It compares retained
+binding/connection versions, form identity, the original anonymous deadline and
+answer/sensitive-value identity and retention metadata. Deleted or replaced
+sources and lost custody prevent handoff. Existing or ambient transactions are
+rejected for delivery acquisition/revalidation; no database transaction spans the
+provider call. This is a local pre-handoff check, not an atomic transaction with
+the provider or a guarantee that custody cannot change after the final check.
+
+Retention filtering still precedes decryption and is checked again before
+handoff. Provider rejection, retry backoff, maximum attempts, ambiguous outcome
+parking and CSV storage-reference fencing retain their existing ownership.
+Completed replay cannot reacquire answers. A worker losing custody during
+preparation does not settle the replacement claim. Cleanup after handoff cannot
+turn an uncertain external result into a successful or pre-handoff outcome.
+
+This bounded unit does not repair or certify the existing tenantless PostgreSQL
+batch-claim admission path. `ClaimDueAsync` still uses its original queue
+discovery contract; an EF filter bypass is not RLS authority. The parent caller
+audit owns that admission integration. The source unit introduces no schema
+change. Native SQLite regression sources and LSP inspection are not executable
+verification; builds, tests, provider checks and programme acceptance remain
+unrun/unchanged under the source-only execution instruction.
+
+### Registration Finalization Execution Custody
+
+Queued checkout routing, paid finalization and admission issuance now retain the
+original `RegistrationFinalizationClaim`. `TryAcquireExecutionAsync` requires an
+active ordinary Runtime transaction, locks the persisted effect, and checks its
+tenant, effect ID, order ID, Processing status, lease token, processing fence and
+lease expiry. Its clock observation follows the awaited lock and native query;
+tracked effect instances cannot supply authority. A reclaim cannot replace that
+row while the business transaction holds the fence.
+
+The claim-aware lifecycle overloads apply the check inside the existing
+Serializable transaction, before inventory, promotion, order or outbox mutation,
+and again after awaited work. Paid reconciliation parking uses the same boundary.
+An expiry detected after a write throws through the native unit of work so that
+the entire transaction rolls back before a bounded custody failure is returned.
+Already-routed or terminal observations also check custody before reporting
+success. Existing direct order/tenant lifecycle methods retain their caller
+authorization contract; they do not acquire a synthetic queue claim.
+
+`AdmissionIssuanceRequest.FinalizationClaim` and the matching persistence-request
+property carry queued custody across credential preparation. The issuance
+service checks it at transaction entry and exit; the native repository checks
+the exact request association before loading or saving and rechecks after save.
+Loss returns `StaleFinalizationClaim` without tickets, one-time credentials or
+delivery dispatch. A queued infrastructure failure does not use the direct
+caller's unfenced committed-reload path. A later current worker can recover
+already-committed issuance through the existing stable effect/assignment IDs.
+Direct authenticated issuance keeps its original confirmed-order/payment and
+readiness rules when no queue claim is supplied.
+
+Protected delivery intents created by a successful issuance transaction retain
+their existing post-commit delivery authority. This boundary does not place a
+network dispatch inside the business transaction or retract an accepted delivery.
+The drain obtains its completion/retry timestamp only after awaited issuance and
+delivery return, so expiry during that work cannot be hidden by an earlier clock
+observation.
+
+Native PostgreSQL regression sources cover expired/replaced custody before
+lifecycle and issuance, substituted orders, expiry during lifecycle save, expiry
+while credential preparation is suspended, native `FOR UPDATE NOWAIT` exclusion
+of a competing reclaim, rollback after ticket save, current replacement recovery
+and positive/direct replay. These are authored specifications, not runtime
+receipts. Queue SQL, role grants and Global graph access are unchanged. Executable
+verification is deferred by the source-only instruction; programme acceptance
+remains 19/163.
+
+### Email Policy Control Mutation Custody
+
+`PostgresEmailDeliveryPolicyContract` separates fixed policy reads from control
+reconciliation. `event_email_policy_runtime` and `event_email_policy_global`
+cannot execute the control reader, mutation preflight or control writer.
+The original setting-writing transaction needs either
+`event_email_policy_instance_mutation` or
+`event_email_policy_tenant_mutation`; the latter remains constrained to its
+existing selected tenant. These roles add no setting-table DML, order access or
+private queue-payload access. Parent deployment enrollment must name the owning
+writer principals explicitly, not promote the general read roles.
+
+Native `SystemSetting` and `TenantSetting` triggers capture actual email-setting
+changes under the already-held delivery-policy advisory lock. They acquire the
+existing dispatch transaction lock and retain the original control revision
+and suppression history in `email_delivery_policy_mutation_receipts`. The
+installation principal owns this private relation; the email contract owner
+has only SELECT, INSERT and UPDATE. Readers and mutation executors have no
+direct receipt privileges. Receipts bind the transaction ID, session login and
+native setting scope. No-op setting updates do not advance their sequence.
+
+`EmailDeliveryPolicyRevisionTracker` checks that custody before processor or
+tenant reconciliation. Existing repository and dedicated settings-writer calls
+therefore retain their original connection, transaction and uncommitted
+instance-lock visibility. The native writer compares proposed revisions to the
+captured baseline and locked current row, derives the next revision from that
+baseline, and uses the database clock for a new cutoff. Committed suppression
+history cannot be cleared. A transient boundary can return only to the native
+transaction's original history after another actual setting change; changing
+the requested boundary without such a change fails closed. Identical repeated
+reconciliation remains idempotent. Setting changes, receipts and controls all
+participate in the same rollback.
+
+The exact Available/Disabled/Misconfigured classification remains in the
+existing C# policy evaluator, including its mail-address and setting-serializer
+semantics. SQL verifies custody and historical bounds; it does not independently
+recompute every policy semantic. Mutation-purpose enrollment consequently
+entrusts that native evaluator, not arbitrary SQL clients, with choosing the
+bounded transition. It does not replace caller authorization, tenant-lease
+admission or the parent programme's exact privilege-graph checks.
+
+Native test sources cover reader-purpose denial, selected-tenant positive
+mutation, instance fanout and uncommitted locks, forged tenant/baseline/revision,
+suppression clearing and replay, commit/rollback, and transaction-receipt reuse.
+All four changed C# files reported no LSP diagnostics. No executable command,
+build, test, generator or database installation ran. PostgreSQL SQL validity,
+effective privileges and runtime behavior still require final programme
+assurance; acceptance remains 19/163.
+
+## Subscription worker claim admission and custody
+
+`RegistrationProviderSubscriptionDrainService` claims only subscription identity,
+tenant, binding lineage, token, generation and original expiry. PostgreSQL uses
+the independent `registration_provider_subscription_claim(integer, integer,
+timestamptz, interval)` capability, with the non-login
+`event_subscription_claim_global` executor enrolled only to
+`PostgresNativeQueueEnrollment.GlobalLogin`. This is not an additional grant on
+any other queue contract. The definer owner can read due/lease metadata and
+update custody columns, but cannot read watch IDs, checkpoints or provider
+payload. Global receives function execution, not business-table DML.
+
+`RegistrationProviderSubscriptionExecutionScopeFactory` binds an exact ordinary
+Runtime context and immutable execution tenant before resolving the lifecycle,
+repositories, unit of work, incoming/effect ports or provider registry. Admission
+and local mutation take the same SHA-256-derived subscription claim advisory lock
+before the subscription row. Local fencing uses the original
+ID/tenant/binding/token/generation/expiry tuple. Persisted custody and retained
+binding/connection versions are checked with a fresh clock after binding lookup,
+immediately before provider entry, after provider return and around protected
+response staging/checkpoint writes.
+
+Renewal commits its in-doubt handoff marker before network entry; network calls
+never run inside a retryable database transaction. Sweep response messages,
+effect pointers and checkpoint settlement share one local transaction. Lost
+custody aborts it; expiry after a staged insert cannot commit a partial response
+page or successful checkpoint. These checks cannot retract a network operation
+that already started. The old cross-tenant watch-entity metric scan is removed;
+bounded operation metrics remain, without inventing private Global reads.
+
+Parent composition must call `AddRegistrationProviderSubscriptionWorker()` after
+registering the existing Global/Runtime factories and selected scoped context,
+and install `PostgresRegistrationProviderSubscriptionClaimContract` in the
+migrator and shared PostgreSQL fixture using the existing native enrollment.
+Fresh bootstrap retains creator ADMIN until declared grants exist, then removes
+only fresh owner/executor shortcuts; the exact migrator edge is preserved.
+Existing privilege drift fails before normalization. Restricted caller checks
+apply inside the definer only, not the privileged installation session.
+
+This is source-authored, not runtime acceptance. Native tests cover real
+repositories, deterministic lookup/provider/staging barriers, original tuple
+substitution, two tenant scopes, private-read denial and privilege drift.
+Builds, tests, SQL installation and ordinary-creator grant dependency behavior
+remain unrun under the whole-programme execution embargo.

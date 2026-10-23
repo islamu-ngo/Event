@@ -35,6 +35,8 @@ ISLAMU Event is a **self-hostable event discovery and management platform** for 
 
 The public ISLAMU instance is Islamic-focused, but the software itself is **purpose-agnostic, white-label, and designed to be rebranded for any event ecosystem**.
 
+- **Application-owned logic, EF-first persistence:** C# Domain/Application workflows own authorization, business rules and concurrency; EF Core handles ordinary storage. The database provides transactions, constraints and tenant-isolation safeguards—not a competing business application. See the [architecture guide](docs/public/documentation/readme/getting-started/architecture-and-request-flows.md#application-authority-and-database-storage) and [accepted engineering decision](docs/internal/adr/ADR-application-owned-persistence.md). The SQL-to-EF cutover is ongoing.
+
 ## ✨ Who It Serves
 
 ### Event Seekers
@@ -96,6 +98,18 @@ ISLAMU Event is architected for sovereign self-hosting across diverse hardware r
 | **[Developer Orchestration](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** | Local development and cloud-native adaptation via .NET Aspire AppHost. | 📖 **[.NET Aspire & Cloud](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** |
 
 For hardware sizing recommendations, reference architecture blueprints, and capacity planning, consult the **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)** and the master **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**.
+
+[ISLAMU Configurator](https://github.com/ISLAMU/Configurator) is the external
+offline configuration preparation utility. Event publishes its own declarative
+definitions and public workflow choices; on a deployed Configurator origin,
+`/launch/a4bcfaa6-9979-43e5-b1f5-00d552618cdf` selects this target without contacting
+Event. The browser accepts public choices only, not secrets or administration.
+Install Configurator separately and supply the matching
+`configurator/definitions/islamu-event/definition.json`; Event backend validation
+and authorization remain authoritative. The generic CLI has no `event-setup`
+aliases and prepares answer workspaces with explicit artifact IDs. Bundled offline
+sources, test projects and release targets are removed from Event. See the
+[handoff and command migration](docs/public/self-hosting/setup-assistant.md#external-configurator-handoff).
 
 ---
 
@@ -359,7 +373,9 @@ We appreciate these generally available public-repository tools. They are not pr
 ## ISLAMU Solutions
 
 - [ISLAMU Event][github-repo-link]: Event Platform & Management System.
+- [ISLAMU Configurator][configurator-github-repo-link]: Offline Configuration Preparation Utility.
 - [I-VSD][ivsd-github-repo-link]: Islamic Value Sensitive Design: A Framework for Provider-Mediated Software Solutions
+- [SecretKit][secretkit-repo-link]: Unified secret management SDK for .NET
 
 ## 🙏 Acknowledgement
 
@@ -546,6 +562,8 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [stripe-oneoff-link]: https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200
 [stripe-donation-link]: https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201
 
+[configurator-github-repo-link]: https://github.com/islamu-ngo/Configurator
 [ivsd-github-repo-link]: https://github.com/islamu-ngo/Islamic-Value-Sensitive-Design
+[secretkit-repo-link]: https://github.com/islamu-ngo/SecretKit
 
 [cla-link]: legal/CLA.md

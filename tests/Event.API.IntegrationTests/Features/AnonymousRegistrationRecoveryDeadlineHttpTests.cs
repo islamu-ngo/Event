@@ -32,18 +32,19 @@ public sealed class AnonymousRegistrationRecoveryDeadlineHttpTests
         RegistrationInventoryHold hold = (await host.HoldsAsync(original.Id)).Single();
         string capability = started.Headers.GetValues("X-Registration-Order-Capability").Single();
 
-        // The ordinary 24h cache has elapsed, but the original proof still has 119 seconds of recovery.
+        // The ordinary receipt has elapsed, but the original proof still has 119 seconds of recovery.
+        // Its operation identity remains fenced; only the feature-owned read may recover it.
         host.Clock.Advance(TimeSpan.FromHours(24).Add(TimeSpan.FromSeconds(1)));
         if (statusZero)
         {
-            var failure = new DatabaseBarrier(responseStore: true);
-            await using var failureHost = WithBarrier(host, failure);
-            using HttpClient client = failureHost.CreateClient();
-            Task<HttpResponseMessage> replacement = host.StartAsync(host.Key, proof, client: client);
-            try { await failure.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30)); }
-            finally { failure.Release.TrySetResult(); }
-            using HttpResponseMessage failed = await replacement.WaitAsync(TimeSpan.FromSeconds(30));
-            await Assert.That(failed.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
+            // Model a lost response completion, not a second execution of the business command.
+            await using AsyncServiceScope scope = host.Factory.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+                .IdempotencyRecords.Where(record => record.Key == host.Key)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(record => record.StatusCode, IdempotencyRecord.InProgressStatusCode)
+                    .SetProperty(record => record.ResponseBody, (string?)null)
+                    .SetProperty(record => record.ExpiresAt, recoverUntil.UtcDateTime));
         }
         else
         {
@@ -54,8 +55,8 @@ public sealed class AnonymousRegistrationRecoveryDeadlineHttpTests
         }
 
         IdempotencyRecord before = await ReadRecordAsync(host);
-        await Assert.That(before.StatusCode).IsEqualTo(statusZero ? 0 : 201);
-        await Assert.That(before.ExpiresAt).IsEqualTo(recoverUntil.UtcDateTime);
+        await Assert.That(before.StatusCode).IsEqualTo(statusZero ? 0 : IdempotencyRecord.ResponseUnavailableStatusCode);
+        if (statusZero) await Assert.That(before.ExpiresAt).IsEqualTo(recoverUntil.UtcDateTime);
         host.Clock.Advance(recoverUntil - host.Clock.GetUtcNow() - TimeSpan.FromTicks(1));
         var barrier = new ReplayDatabaseBarrier(responseStore: false);
         await using var replica = WithBarrier(host, barrier);
@@ -82,7 +83,7 @@ public sealed class AnonymousRegistrationRecoveryDeadlineHttpTests
     }
 
     [Test]
-    public async Task HistoricalResponseCompletionCrossingDeadlineCannotDiscloseRecoveredCapability()
+    public async Task HistoricalUnavailableRecoveryCrossingDeadlineCannotDiscloseRecoveredCapability()
     {
         await using var host = await NativeHost.CreateAsync();
         DateTimeOffset recoverUntil = host.Clock.GetUtcNow().AddSeconds(120).AddHours(24);
@@ -92,8 +93,17 @@ public sealed class AnonymousRegistrationRecoveryDeadlineHttpTests
         RegistrationOrder original = (await host.OrdersAsync()).Single();
         RegistrationInventoryHold hold = (await host.HoldsAsync(original.Id)).Single();
         string capability = started.Headers.GetValues("X-Registration-Order-Capability").Single();
+        await using (AsyncServiceScope scope = host.Factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+                .IdempotencyRecords.Where(record => record.Key == host.Key)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(record => record.StatusCode, IdempotencyRecord.ResponseUnavailableStatusCode)
+                    .SetProperty(record => record.ResponseBody, (string?)null)
+                    .SetProperty(record => record.ExpiresAt, recoverUntil.UtcDateTime));
+        }
         host.Clock.Advance(recoverUntil - host.Clock.GetUtcNow() - TimeSpan.FromTicks(1));
-        var barrier = new ReplayDatabaseBarrier(responseStore: true);
+        var barrier = new ReplayDatabaseBarrier(responseStore: false);
         await using var replica = WithBarrier(host, barrier);
         using HttpClient client = replica.CreateClient();
         barrier.Arm();
@@ -103,7 +113,7 @@ public sealed class AnonymousRegistrationRecoveryDeadlineHttpTests
             await barrier.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
             await Assert.That(pending.IsCompleted).IsFalse();
             IdempotencyRecord inProgress = await ReadRecordAsync(host);
-            await Assert.That(inProgress.StatusCode).IsEqualTo(0);
+            await Assert.That(inProgress.StatusCode).IsEqualTo(IdempotencyRecord.ResponseUnavailableStatusCode);
             await Assert.That(inProgress.ExpiresAt).IsEqualTo(recoverUntil.UtcDateTime);
             host.Clock.Advance(TimeSpan.FromTicks(1));
         }
@@ -121,8 +131,9 @@ public sealed class AnonymousRegistrationRecoveryDeadlineHttpTests
     private static async Task<IdempotencyRecord> ReadRecordAsync(NativeHost host)
     {
         await using AsyncServiceScope scope = host.Factory.Services.CreateAsyncScope();
-        return (await scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>()
-            .FindAsync(host.Key, PlatformDefaults.DefaultTenantId))!;
+        return (await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+            .IdempotencyRecords.AsNoTracking().SingleOrDefaultAsync(row =>
+                row.Key == host.Key && row.TenantId == PlatformDefaults.DefaultTenantId))!;
     }
 
     private static async Task AssertDeniedAsync(HttpResponseMessage response, Guid orderId, string capability)

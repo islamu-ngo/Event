@@ -24,6 +24,7 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
     private readonly IGroupMemberMutationBoundary _boundary;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
 
     public AddGroupMemberCommandHandler(
         IGroupRepository groupRepository,
@@ -32,7 +33,8 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
         IUserRepository userRepository,
         IUserContext userContext,
         ITenantContext tenantContext,
-        IGroupMemberMutationBoundary boundary)
+        IGroupMemberMutationBoundary boundary,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _groupRepository = groupRepository;
         _groupTenantRepository = groupTenantRepository;
@@ -41,6 +43,7 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
         _userContext = userContext;
         _tenantContext = tenantContext;
         _boundary = boundary;
+        _preparation = preparation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddGroupMemberCommand request, CancellationToken cancellationToken)
@@ -52,10 +55,17 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
                 "Invalid requester User ID.");
         }
 
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
         var id = Guid.CreateVersion7();
         return await _boundary.ExecuteAddAsync(_tenantContext.TenantId, request.AddGroupMemberDto.GroupId, id,
             request.AddGroupMemberDto.Email, (int)request.AddGroupMemberDto.Role,
-            (actor, target, token) => AddAsync(request, id, actor, target, token), cancellationToken);
+            async (actor, target, token) =>
+            {
+                await prepared.AcquireAsync(request, token);
+                var result = await AddAsync(request, id, actor, target, token);
+                if (result.IsSuccess) prepared.Complete(result.Id);
+                return result;
+            }, cancellationToken);
     }
 
     private async Task<BaseCommandResponse<Guid>> AddAsync(AddGroupMemberCommand request, Guid id,

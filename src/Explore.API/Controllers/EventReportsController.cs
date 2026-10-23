@@ -204,9 +204,7 @@ public sealed class EventReportsController : EventControllerBase
 
         var response = await _submitReportHandler.ExecuteAsync(command, cancellationToken);
         _logger.LogInformation(
-            "Event report submission completed for event {EventId} report {ReportId} channel {SubmissionChannel} outcome {Outcome} failure {FailureCategory}",
-            request.EventId,
-            response.Id,
+            "Event report submission completed channel {SubmissionChannel} outcome {Outcome} failure {FailureCategory}",
             submissionChannel,
             response.IsSuccess ? "succeeded" : "failed",
             response.FailureCode ?? "none");

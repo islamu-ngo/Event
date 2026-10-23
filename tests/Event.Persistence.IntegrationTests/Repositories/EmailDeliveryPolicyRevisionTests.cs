@@ -8,6 +8,7 @@ using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema.ProviderPrimitives;
+using Explore.Persistence.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -19,6 +20,38 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 [NotInParallel("SqliteEmailDispatchEligibility")]
 public sealed class EmailDeliveryPolicyRevisionTests
 {
+    [Test]
+    public async Task OwningTransactionPolicyReadsSeeUncommittedLockAndRollbackWithRevision()
+    {
+        var databasePath = NewDatabasePath();
+        try
+        {
+            var scenario = await SeedScenarioAsync(databasePath);
+            await using var writer = CreateContext(databasePath);
+            await using var observer = CreateContext(databasePath);
+            var originalRevision = await ReadPolicyAsync(observer, null);
+            await using (var transaction = await writer.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable))
+            {
+                var before = await EmailDeliveryPolicyReader.ReadAllAsync(writer, CancellationToken.None);
+                await Assert.That(before.Tenants[scenario.TenantId].TransportTenantId).IsEqualTo((Guid?)scenario.TenantId);
+                await writer.SystemSettings.Where(row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(row => row.Value, "false").SetProperty(row => row.IsLocked, true));
+                var after = await EmailDeliveryPolicyReader.ReadAllAsync(writer, CancellationToken.None);
+                await Assert.That(after.Tenants[scenario.TenantId].Enabled).IsFalse();
+                await EmailDeliveryPolicyRevisionTracker.RecordInstanceAsync(writer, before, null, CancellationToken.None);
+                await Assert.That((await ReadPolicyAsync(writer, null)).Revision).IsEqualTo(originalRevision.Revision + 1);
+                await transaction.RollbackAsync();
+            }
+            await Assert.That(await ReadPolicyAsync(observer, null)).IsEqualTo(originalRevision);
+            var enabled = await SystemRepository(observer).GetByKey(GovernanceSettingKeys.Email.DeliveryEnabled);
+            await Assert.That(enabled!.Value).IsEqualTo("true");
+            await Assert.That(enabled.IsLocked).IsFalse();
+            await AssertOperatorStatePreservedAsync(observer, scenario);
+        }
+        finally { DeleteDatabase(databasePath); }
+    }
+
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -329,10 +362,10 @@ public sealed class EmailDeliveryPolicyRevisionTests
     }
 
     private static SystemSettingRepository SystemRepository(ExploreDbContext context) =>
-        new(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+        SystemSettingRepository.CreateReadOnly(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
     private static TenantSettingRepository TenantRepository(ExploreDbContext context) =>
-        new(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+        TenantSettingRepository.CreateReadOnly(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
     private static string NewDatabasePath() => Path.Combine(Path.GetTempPath(), $"email-policy-revision-{Guid.CreateVersion7():N}.db");
 

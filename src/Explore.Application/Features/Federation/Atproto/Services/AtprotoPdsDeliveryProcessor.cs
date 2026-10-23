@@ -86,10 +86,11 @@ public sealed class AtprotoPdsDeliveryProcessor(
         }
 
         observedAt = UtcNow();
+        DateTime renewedLeaseExpiresAt = observedAt.Add(leaseDuration);
         var renewed = await outboxRepository.TryRenewClaimAsync(
             claim,
             observedAt,
-            observedAt.Add(leaseDuration),
+            renewedLeaseExpiresAt,
             cancellationToken);
         if (!renewed)
         {
@@ -122,9 +123,23 @@ public sealed class AtprotoPdsDeliveryProcessor(
                 cancellationToken);
         }
 
+        observedAt = UtcNow();
+        if (observedAt >= renewedLeaseExpiresAt
+            || await outboxRepository.GetActiveClaimAsync(claim, observedAt, cancellationToken) is null)
+        {
+            return Result(AtprotoPdsClaimOutcome.ClaimLost);
+        }
+
+        TimeSpan remainingLease = renewedLeaseExpiresAt - UtcNow();
+        if (remainingLease <= TimeSpan.Zero)
+        {
+            return Result(AtprotoPdsClaimOutcome.ClaimLost);
+        }
+
         AtprotoPdsDeliveryResult result;
-        using var remoteCallCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        remoteCallCts.CancelAfter(RemoteCallTimeout(leaseDuration));
+        using var deadlineCts = new CancellationTokenSource(RemoteCallTimeout(remainingLease), timeProvider);
+        using var remoteCallCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, deadlineCts.Token);
         try
         {
             result = await deliveryGateway.DeliverAsync(

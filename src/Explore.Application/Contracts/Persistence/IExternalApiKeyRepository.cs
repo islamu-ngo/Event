@@ -3,20 +3,18 @@ using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Persistence;
 
-public interface IExternalApiKeyRepository : IGenericRepository<ExternalApiKey, Guid>
+public interface IExternalApiKeyRepository
 {
-    Task<ExternalApiKey?> GetByKeyIdForAuthentication(string keyId, CancellationToken cancellationToken = default);
-    Task<bool> TouchUsageMetadata(Guid id, DateTime usedAtUtc, string? lastUsedIp, TimeSpan minUpdateInterval, CancellationToken cancellationToken = default);
     Task<List<ExternalApiKey>> GetByOwner(ExternalApiKeyOwnerType ownerType, Guid ownerId, CancellationToken cancellationToken = default);
     Task<List<ExternalApiKey>> GetByOwners(ExternalApiKeyOwnerType ownerType, IReadOnlyCollection<Guid> ownerIds, CancellationToken cancellationToken = default);
     Task<bool> ExistsByOwnerAndName(ExternalApiKeyOwnerType ownerType, Guid ownerId, string name, CancellationToken cancellationToken = default);
 
-    /// <summary>Lookup by ID bypassing tenant filter. Used by management handlers for platform-scoped keys.</summary>
-    Task<ExternalApiKey?> GetByIdIgnoringTenantFilter(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Fresh lookup restricted to the exact non-bypassed current tenant.</summary>
+    Task<ExternalApiKey?> GetForTenantAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>List keys by owner bypassing tenant filter. Used for InstanceAdmin platform-scoped key listing.</summary>
-    Task<List<ExternalApiKey>> GetByOwnerIgnoringTenantFilter(ExternalApiKeyOwnerType ownerType, Guid ownerId, CancellationToken cancellationToken = default);
+    /// <summary>Fences and rereads the exact visible key in the caller-owned Serializable transaction.</summary>
+    Task<ExternalApiKey?> GetForManagementAsync(Guid id, CancellationToken cancellationToken);
 
-    /// <summary>Name uniqueness check bypassing tenant filter. Used for platform-scoped key creation.</summary>
-    Task<bool> ExistsByOwnerAndNameIgnoringTenantFilter(ExternalApiKeyOwnerType ownerType, Guid ownerId, string name, CancellationToken cancellationToken = default);
+    /// <summary>Persists only the key's management policy, revocation status and update audit fields.</summary>
+    Task Update(ExternalApiKey entity, CancellationToken cancellationToken);
 }

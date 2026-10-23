@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;
-using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -9,7 +8,7 @@ namespace Explore.Persistence.Services;
 
 public sealed class AdmissionDeliveryIntentDispatcher(
     ExploreDbContext dbContext,
-    IOutboxMessageDispatcher dispatcher,
+    IAdmissionCredentialDeliveryOutboxHandler dispatcher,
     ILogger<AdmissionDeliveryIntentDispatcher> logger) : IAdmissionDeliveryDispatcher
 {
     public async Task<AdmissionDeliveryDispatchResult> DispatchAsync(
@@ -65,7 +64,7 @@ public sealed class AdmissionDeliveryIntentDispatcher(
 
         try
         {
-            await dispatcher.DispatchAsync(message, cancellationToken);
+            await dispatcher.HandleAsync(message, cancellationToken);
             return intent.HandoffCompletedAt is not null
                 ? new AdmissionDeliveryDispatchResult(AdmissionDeliveryOutcome.Delivered)
                 : Pending(AdmissionDeliveryFailure.RouteUnavailable);
@@ -76,19 +75,12 @@ public sealed class AdmissionDeliveryIntentDispatcher(
         }
         catch (OperationCanceledException)
         {
-            logger.LogWarning(
-                "Admission delivery cancelled for tenant {TenantId}, intent {DeliveryIntentId}; protected handoff remains pending",
-                intent.TenantId,
-                intent.Id);
+            logger.LogWarning("Admission delivery cancelled; protected handoff remains pending.");
             return Pending(AdmissionDeliveryFailure.Cancelled);
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            logger.LogError(
-                "Admission delivery failed for tenant {TenantId}, intent {DeliveryIntentId}; protected handoff remains pending. Failure type: {FailureType}",
-                intent.TenantId,
-                intent.Id,
-                exception.GetType().Name);
+            logger.LogError("Admission delivery failed; protected handoff remains pending.");
             return Pending(AdmissionDeliveryFailure.RouteUnavailable);
         }
     }

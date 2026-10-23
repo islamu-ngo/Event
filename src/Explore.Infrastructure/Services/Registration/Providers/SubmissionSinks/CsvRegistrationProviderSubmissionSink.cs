@@ -45,13 +45,25 @@ public sealed class CsvRegistrationProviderSubmissionSink(
         RegistrationProviderSubmissionSinkRequest request,
         CancellationToken cancellationToken)
     {
-        byte[] csv = Encoding.UTF8.GetBytes(BuildCsv(request.Answers));
-        if (csv.LongLength > MaxCsvBytes)
+        // Account for UTF-8, doubled quotes, separators and both newlines before
+        // sorting keys, escaping fields, constructing the CSV or allocating bytes.
+        long csvBytes = 2;
+        bool first = true;
+        foreach (var answer in request.Answers)
         {
-            throw new RegistrationProviderSubmissionDeliveryException(
-                RegistrationProviderSubmissionDeliveryFailureKind.PermanentBeforeHandoff,
-                "provider_submission_payload_too_large");
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!first) csvBytes += 2;
+            first = false;
+            foreach (string field in new[] { answer.Key, answer.Value })
+            {
+                if (field.Length > MaxCsvBytes) throw PayloadTooLarge();
+                csvBytes += 2 + Encoding.UTF8.GetByteCount(field);
+                foreach (char character in field)
+                    if (character == '"') csvBytes++;
+                if (csvBytes > MaxCsvBytes) throw PayloadTooLarge();
+            }
         }
+        byte[] csv = Encoding.UTF8.GetBytes(BuildCsv(request.Answers));
 
         string provider = request.Connection.ProviderWorkspaceId;
         if (provider is not (StorageProviders.Local or StorageProviders.S3Compatible))
@@ -136,4 +148,8 @@ public sealed class CsvRegistrationProviderSubmissionSink(
 
     private static string Escape(string value) =>
         '"' + value.Replace("\"", "\"\"", StringComparison.Ordinal) + '"';
+
+    private static RegistrationProviderSubmissionDeliveryException PayloadTooLarge() =>
+        new(RegistrationProviderSubmissionDeliveryFailureKind.PermanentBeforeHandoff,
+            "provider_submission_payload_too_large");
 }

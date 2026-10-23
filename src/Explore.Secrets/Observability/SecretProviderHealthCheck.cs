@@ -98,16 +98,16 @@ public sealed class SecretProviderHealthCheck : IHealthCheck
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError("Health check failed for secret provider with {ExceptionType}.", ex.GetType().Name);
+            _logger.LogError("secret_provider_health_unavailable");
 
             return HealthCheckResult.Unhealthy(
                 description: "Secret provider health check failed.",
                 data: new Dictionary<string, object>
                 {
                     ["provider"] = _provider.ProviderType.ToString(),
-                    ["exceptionType"] = ex.GetType().Name
+                    ["failureCategory"] = "provider_unavailable"
                 });
         }
     }

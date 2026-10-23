@@ -14,6 +14,20 @@ ISLAMU Event implements a clean storage abstraction supporting both **Local Moun
 * **ID-Based Retrieval**: Files are accessed via stable storage-object IDs (`/api/storageobject/{id}/content`), never via raw filesystem paths or raw S3 bucket URLs submitted by users. Public safe-raster images use `/api/storageobject/{id}/public`; resource files use the separately authenticated `/api/eventresource/{id}/content` route.
 * **Presigned Download URLs**: For S3-compatible storage, the API generates short-lived, cryptographically signed presigned download URLs only after verifying caller authorization (see [Authorization Guide](../security-and-identity/authorization.md)).
 
+### File response containment
+
+API file delivery sends a default-deny Content Security Policy with `sandbox`
+and `frame-ancestors 'none'`, plus `X-Content-Type-Options: nosniff`. The combined
+host uses the same final policy for its API files. Event-resource downloads keep
+their safe attachment filename and final access check before bytes are released;
+generic storage retains its existing attachment and range behavior.
+
+These browser headers do not replace upload validation or authorization.
+Generic storage does not claim the event-document OOXML inspection policy.
+Hosted instances also reject retained Local bindings that overlap their public
+web root. Changing the active storage root does not exempt old bindings from
+that check; use private service-owned storage roots throughout their lifecycle.
+
 ### Origin is not a download URL
 
 Storage keeps optional foreign-origin provenance separately from captured
@@ -191,6 +205,43 @@ not a raw bucket URL or object key.
 
 ---
 
+## Private Local Custody and Intake Limits
+
+Use a dedicated, persistent private storage directory. Do not put it inside the
+host's public assets directory, use the public assets directory as storage, or
+expose it through an ingress/static-file alias. Hosted configuration rejects
+overlap with the web root. Review historical captured roots too: changing the
+default does not move existing files or pending cleanup.
+
+Keep the root and its ancestors under service/operator control. Existing
+symlink/reparse roots, ancestors and object paths are rejected, and inventory
+does not descend into linked directories. New Unix storage directories are
+owner-only (0700), with owner-only temporary objects (0600); retain equivalent
+Windows ACLs and review existing permissions. A filesystem on which an adversary
+can concurrently replace these paths is not a supported local-storage profile.
+Lexical path validation and link checks do not remove that race.
+
+Generic uploads retain their captured per-file limit from reservation through
+inspection, before allocating raster bytes. Safe-raster uploads need matching
+MIME, extension and complete container framing. Generic document signature checks
+are narrower than the governed event-document inspection and are not malware
+scanning.
+
+Generated registration CSVs are limited to 64 KiB of final UTF-8 CSV, including
+quoted fields, doubled quotes, separators and newlines. Excess content is rejected
+before the CSV is materialized or a provider target is acquired. Existing
+registration answer files remain quarantined until their audited release;
+native file-answer publication stays disabled by default. A manual release is
+not a Clean malware verdict, and an external provider's file reference does not
+authorize Event to fetch its bytes.
+
+S3-compatible targets are operator-selected administrative configuration. Use
+TLS for external providers; an internal HTTP endpoint requires an explicitly
+private network. Keep buckets private and verify anonymous denial independently:
+successful authenticated storage diagnostics do not prove private bucket policy.
+Preserve retained/shared file uses and the original captured namespace during
+cleanup or relocation.
+
 ## Governed Event Resource Files
 
 Event resource files use their resource's upload and download actions, not
@@ -202,6 +253,13 @@ the default policy denies unscanned publication and access. See the
 for the separate workflow and instance-only opt-in.
 
 ### Resource Deletion and Provider Recovery
+
+Relative availability windows using the same schedule anchor require the end
+offset to follow the start offset. Distinct anchors use the event/session schedule,
+so their offsets need not be numerically ordered; open-ended windows remain valid.
+Install the matching generated provider migration before relying on the persisted
+constraint. Preserve backups and classify any invalid development rows before
+schema admission; do not relax the domain rule or silently rewrite their meaning.
 
 Deleting a resource or applying heavy parent moderation denies new access
 before physical cleanup. Ordinary withdrawal remains reversible and keeps its
@@ -251,6 +309,78 @@ BFF cookie-key storage is not an alternative authority for API destination
 decryption; Combined hosting retains the API database keyring even when
 optional BFF Redis is configured.
 
+## Storage configuration authority
+
+Instance configuration applies complete policy or S3 groups; tenant
+configuration changes only supplied leaves. The server retains the original
+signed administrator and current grants through database settlement. Tenant
+delegation and upload ceilings are checked again within the operation, and a
+revoked grant, expired credential or newly restrictive policy rolls back the
+whole group. Tenant patches preserve existing locks; instance group writes keep
+their existing lock-clearing behavior.
+
+Validation and writing now use the same retained first configuration snapshot,
+including settings and binding winners that were absent when validation began.
+A row inserted or replaced between validation and writing cannot silently become
+the new baseline. The server uses a dedicated writer, not a later dashboard
+read or a generic setting update; cache activation follows acknowledged commit.
+
+SQLite and PostgreSQL paths are authored. PostgreSQL requires its dedicated
+migration-installed configuration contract; missing or altered authority is
+rejected rather than repaired at runtime. Other database-provider custody
+paths remain unsupported and reject editing.
+
+Setup authority is not storage configuration authority. Provider probes and
+accounting recalculation have separate custody requirements. The security
+programme has authored configuration regression controls, but executable
+database-provider assurance remains pending. Instance S3 cache invalidation now
+refreshes all published scopes in the current process and prevents stale
+in-progress reads from republishing. Cross-server refresh is not added or
+certified by this source change.
+
+## Usage recalculation authority
+
+Usage recalculation now retains the original authenticated administrator through
+one atomic database repair. Revoked authority or an expired credential/support
+session rejects the whole operation, including counters already repaired and
+newly inserted counters. Successful totals are returned only after settlement;
+the physical-storage charging and deletion rules remain unchanged.
+
+During unfinished setup, the existing accounting branch requires an ordinary
+authenticated request plus the accepted setup secret. It is not anonymous or
+setup-secret-only access, and does not confer administrator status. A changed
+secret, credential or pending setup state rejects the repair. The source
+implementation has 34 authored controls; executable provider/native assurance
+is still pending. Provider write probes and cache activation use separate
+mechanisms below.
+
+## Provider probe support and cache activation
+
+Write probes keep the original signed administrator or genuine setup request,
+current credentials and provider binding through each remote handoff. Database
+transactions are not held during remote calls. Observation preflight does not
+write objects. S3 cleanup deletes only the version acknowledged for this probe;
+an ambiguous write or missing version does not authorize cleanup.
+
+The source implementation covers SQLite and PostgreSQL with versioned S3 probes.
+PostgreSQL uses its own migration-installed source fence and retains the original
+connection through the action. Changed settings, secret bindings or setup state
+invalidate the retained probe; runtime cannot repair missing or altered authority.
+This fence conservatively covers whole source tables, so even an unrelated
+committed settings change can reject an in-progress probe.
+
+Other database source providers, local write probes and unversioned S3 probes
+still fail closed. The 45 original and 59 native/signed controls are authored
+but unrun; source integration is not production provider acceptance. A grant
+revoked before cleanup rejects that handoff, but revocation cannot atomically
+cancel an already in-flight remote request.
+
+Instance S3 cache invalidation now removes all published tenant entries in the
+current server process. Tenant invalidation leaves other tenants' entries intact.
+In-progress resolution cannot republish stale values after invalidation. Four
+additional regression cases are authored and unrun. This change adds no
+cross-server broadcast and does not certify executable fleet-wide refresh.
+
 ## Organization Evidence PDF Uploads
 
 With local authorization, an organization administrator can reserve an evidence PDF upload for a pending, active organization participation. Only the account that reserved that tenant-local session can finalize its bytes; tenant-administrator status alone does not transfer ownership. Losing the organization role after reservation does not itself revoke the session. Cancellation, expiry, content validation, quota enforcement and privacy-erasure fences remain authoritative. Retrying a completed upload returns the same stored document without another write.
@@ -260,6 +390,44 @@ This repair does not broadly grant storage creation or change the selected autho
 Exact content downloads at `/api/storageobject/{id}/content` use the stored object's tenant, creator, visibility and lifecycle, not a caller's ownership claims. An uploader retains PrivateOwner access after losing an organization role, subject to the selected authorization provider and existing privacy/lifecycle checks. Tenant reviewers can review evidence metadata, but that role alone does not grant another account's PrivateOwner bytes. PDFs remain attachments with sanitized filenames; anonymous public-image access and other storage visibility rules are unchanged. Authorization uses an untracked metadata snapshot; the byte reader reloads the object after the policy decision. Quarantine, deletion, creator erasure or visibility restrictions committed while policy evaluation is pending therefore block the read before storage is opened. During tenant-managed Cerbos transport or configuration failure, owner/public-visibility facts do not confer new emergency access: the existing tenant-authority check still applies, and instance-admin status alone is not a tenant-admin grant. No new generic download or outage-only owner right is granted.
 
 ## 3. Disaster Recovery & Backup Integrity
+
+### Reconciliation Quarantine Recovery
+
+The security programme is replacing ordinary orphan moves with durable
+admission and recovery. Deployment still requires the generated provider
+migrations, selected Global execution grants and final programme assurance;
+the source implementation is not a completed upgrade receipt.
+
+Keep reconciliation in dry-run while checking a restored database against all
+captured local mounts. A file is not orphaned merely because its metadata is
+soft-deleted or its upload session completed. Retained producer, session and
+deletion records still own bytes, including across overlapping historical
+local roots. Never delete those records to make a drift report disappear.
+
+Local identity checks follow the application host, not the database server.
+On Windows/macOS, conservative case handling can leave ambiguous files
+unquarantined, including non-ASCII paths whose aliases cannot be established.
+Treat that as retained custody, not permission to force a move. Keep the
+application-host identity mode consistent with the installed database
+capability; the upgrade's platform assurance is still pending.
+
+Quarantine effects use a private deterministic destination under
+`.quarantine/reconciliation`, identified by the durable quarantine operation.
+After an interrupted move, recovery checks that same destination instead of
+creating another date-based destination. Changed source attributes, conflicting
+destination files or simultaneous source and destination files block the move.
+Preserve blocked records and both targets for investigation. Do not manually
+reuse their object keys or remove their captured binding.
+
+The retained observation preserves exact file timestamp ticks across database
+providers. Completed and blocked outcomes record their terminal time separately
+from admission; a blocked outcome does not mean bytes were moved. Changed
+database role flags, unexpected execution grants or altered custody policies
+fail acquisition rather than activating a broader fallback.
+
+Missing-byte metadata quarantine separately rechecks the original database
+target after the provider observation. A storage outage is not proof of missing
+bytes; restore the original captured mount or provider access before retrying.
 
 Standalone defaults to `/app/data/storage`, so the `/app/data` persistent volume
 retains local uploads with the default database and its Data Protection keys.

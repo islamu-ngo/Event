@@ -1,5 +1,6 @@
 using System.Diagnostics.Metrics;
 using Explore.Application.Services.Registration;
+using Explore.Domain;
 
 namespace Explore.Application.Telemetry;
 
@@ -55,6 +56,16 @@ public sealed class TelemetryPaidCheckoutActivationService(
     PaidCheckoutActivationService inner,
     IPaidCheckoutTelemetry telemetry) : IPaidCheckoutActivationService
 {
+    public async Task<PaidCheckoutActivationResult> EvaluateSaleControlAsync(
+        Guid tenantId, Guid eventId, PaidCheckoutSaleControl? tenantControl,
+        PaidCheckoutSaleControl? eventControl, CancellationToken cancellationToken)
+    {
+        var result = await inner.EvaluateSaleControlAsync(
+            tenantId, eventId, tenantControl, eventControl, cancellationToken);
+        telemetry.RecordActivation(result);
+        return result;
+    }
+
     public async Task<PaidCheckoutActivationResult> EvaluateSaleControlAsync(
         Guid tenantId,
         Guid eventId,

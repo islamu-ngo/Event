@@ -20,6 +20,27 @@ namespace Explore.Blazor.Client.Tests.Services;
 public sealed class EventApiClientSerializationTests
 {
     [Test]
+    public async Task GeneratedCreationGraph_RetainsUnscheduledDraftThroughAotJson()
+    {
+        var options = new JsonSerializerOptions { TypeInfoResolver = AppJsonSerializerContext.Default };
+        var session = JsonSerializer.Deserialize<CreateEventGraphSessionDto>(
+            """{"title":"Prepared discussion","languageIds":[1],"sortOrder":2}""",
+            options)!;
+
+        await Assert.That(session.StartTime).IsNull();
+        await Assert.That(session.EndTime).IsNull();
+        await Assert.That(session.Title).IsEqualTo("Prepared discussion");
+        await Assert.That(session.LanguageIds).IsEquivalentTo([1]);
+
+        using var serialized = JsonDocument.Parse(JsonSerializer.Serialize(session, options));
+        await Assert.That(!serialized.RootElement.TryGetProperty("startTime", out var start)
+            || start.ValueKind == JsonValueKind.Null).IsTrue();
+        await Assert.That(!serialized.RootElement.TryGetProperty("endTime", out var end)
+            || end.ValueKind == JsonValueKind.Null).IsTrue();
+        await Assert.That(serialized.RootElement.GetProperty("sortOrder").GetInt32()).IsEqualTo(2);
+    }
+
+    [Test]
     public async Task OperatorMetadataHal_RoundTripsExtensionDataThroughAotContext()
     {
         const string json = """

@@ -31,6 +31,12 @@ public sealed class GetEventAddOnCatalogQueryHandler(
             return null;
         }
 
+        if (!request.ManagementView &&
+            !await events.IsPubliclyEligibleAsync(tenant.TenantId, request.EventId, cancellationToken))
+        {
+            return null;
+        }
+
         bool canManage = EventAddOnAccess.CanManage(eventTarget!, currentUser);
         if (request.ManagementView && !canManage)
         {
@@ -75,11 +81,7 @@ public sealed class GetEventAddOnCatalogQueryHandler(
 }
 
 public sealed class GetRegistrationOrderAddOnsQueryHandler(
-    IEventRepository events,
-    IEventAddOnRepository addOns,
-    ITenantContext tenant,
-    ICurrentUserService currentUser,
-    IGuestCapabilityTokenService guestTokens,
+    IRegistrationPrivateReader reader,
     TimeProvider timeProvider) :
     IQueryHandler<GetRegistrationOrderAddOnsQuery, RegistrationOrderAddOnSummaryDto?>
 {
@@ -87,39 +89,29 @@ public sealed class GetRegistrationOrderAddOnsQueryHandler(
         GetRegistrationOrderAddOnsQuery request,
         CancellationToken cancellationToken)
     {
-        RegistrationOrder? order = await addOns.GetOrderWithAddOnsAsync(
-            tenant.TenantId,
-            request.EventId,
-            request.RegistrationOrderId,
-            cancellationToken);
-        if (order is null ||
-            !EventAddOnAccess.CanAccessOrder(order, currentUser, request.Capability, guestTokens))
+        var graph = await reader.ReadAsync(new(RegistrationPrivateReadKind.AddOns,
+            request.EventId, request.RegistrationOrderId), request.Capability, cancellationToken);
+        if (graph is null)
         {
             return null;
         }
 
-        DomainEvent? eventTarget =
-            await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
-        bool canManage = EventAddOnAccess.CanManage(eventTarget, currentUser);
-        EventAddOnCatalogVersion? catalog =
-            await addOns.GetPublishedCatalogAsync(
-                tenant.TenantId,
-                request.EventId,
-                cancellationToken);
-        return await EventAddOnMapper.OrderAsync(
-            addOns,
+        RegistrationOrder order = graph.Order;
+        bool canManage = graph.PrincipalId is { } user
+            && (graph.Event?.Actor?.UserId == user || graph.Event?.OrganizerActor?.UserId == user);
+        return EventAddOnMapper.Order(
             order,
+            graph.Fulfillments,
+            graph.Refunds,
             canReserve:
-                currentUser.IsAuthenticated &&
-                currentUser.UserId.HasValue &&
-                order.AccountUserId == currentUser.UserId &&
+                graph.PrincipalId.HasValue &&
+                order.AccountUserId == graph.PrincipalId &&
                 order.RegistrationOrderStatusId == (int)RegistrationOrderStatusEnum.Draft &&
                 order.ExpiresAt > timeProvider.GetUtcNow().UtcDateTime &&
                 order.Lines.Count > 0 &&
                 order.AddOnLines.Count == 0 &&
-                catalog is { Items.Count: > 0 },
-            canManage,
-            cancellationToken);
+                graph.AddOnCatalog is { Items.Count: > 0 },
+            canManage);
     }
 }
 

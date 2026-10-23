@@ -1,6 +1,7 @@
 @page "/onboarding/authz-provider"
 @rendermode InteractiveServer
 @layout SetupLayout
+@implements IDisposable
 @using Explore.Blazor.Client.Components.Forms
 @using Explore.Blazor.Client.Pages.Onboarding.Components
 @inject IInstanceOnboardingService InstanceOnboardingService
@@ -157,7 +158,7 @@
 
                         @if (!PolicyPackageReady && CanShowPolicySync)
                         {
-                            <details class="authz-page__credentials" open="@(!HasServerSideAdminApiCredentials)">
+                            <details class="authz-page__credentials" open>
                                 <summary>@CredentialsDisclosureLabel</summary>
                                 <div class="authz-page__credentials-body">
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">
@@ -346,7 +347,6 @@
         total);
 
     private SecretOwnershipDto EndpointOwnership => _model.CerbosEndpointOwnership ??= new();
-    private SecretOwnershipDto AdminCredentialsOwnership => _model.CerbosAdminCredentialsOwnership ??= new();
 
     private string SelectedProvider
     {
@@ -360,8 +360,7 @@
     private bool NeedsDeploymentRemediation => IsDeploymentFailed
         || (IsDeploymentProvider
             && IsSelected(CerbosProvider)
-            && _model.AuthorizationProviderConfigured != true
-            && !HasServerSideAdminApiCredentials);
+            && _model.AuthorizationProviderConfigured != true);
     private bool ShowCerbosConfiguration => IsSelected(CerbosProvider);
     private bool IsEndpointLocked => EndpointOwnership.Editable != true;
     private bool PolicyPackageReady =>
@@ -372,9 +371,6 @@
         : EndpointOwnership.BootstrapAvailable == true
             ? "Modify before saving if needed. This checks runtime PDP health only; policy installation is tracked below."
             : "This checks runtime PDP health only. Policy installation is tracked below.";
-
-    private bool HasServerSideAdminApiCredentials =>
-        _model.CerbosAdminUsernameConfigured == true && _model.CerbosAdminPasswordConfigured == true;
 
     private bool CanShowPolicySync =>
         IsSelected(CerbosProvider) && !PolicyPackageReady && (!IsDeploymentProvider || NeedsDeploymentRemediation);
@@ -387,8 +383,7 @@
 
     private bool HasPartialOneTimeCredentials => HasAnyOneTimeCredentials && !HasCompleteOneTimeCredentials;
 
-    private bool CanUseSyncCredentials =>
-        HasCompleteOneTimeCredentials || (HasServerSideAdminApiCredentials && !HasAnyOneTimeCredentials);
+    private bool CanUseSyncCredentials => HasCompleteOneTimeCredentials;
 
     private bool CanSyncPolicies =>
         !_isSyncing && !_submitState.IsSubmitting && CanShowPolicySync &&
@@ -413,7 +408,7 @@
     private string PrimaryActionLabel => IsDeploymentProvider
         ? IsSelected(LocalProvider)
             ? "Continue setup"
-            : HasServerSideAdminApiCredentials ? "Retry automatic setup" : "Sync policies and continue"
+            : "Publish policies with one-time credentials"
         : IsSelected(LocalProvider)
         ? "Continue with Local RBAC"
         : _model.CerbosEndpointVerified != true
@@ -438,28 +433,24 @@
         ? "Synchronized"
         : HasCompleteOneTimeCredentials
             ? "One-time credentials"
-            : HasServerSideAdminApiCredentials ? "Deployment credentials" : "Credentials required";
+            : "Fresh credentials required";
 
     private Color SyncStatusColor => PolicyPackageReady
         ? Color.Success
         : CanUseSyncCredentials ? Color.Info : Color.Warning;
 
-    private string CredentialsDisclosureLabel => HasServerSideAdminApiCredentials
-        ? "Use one-time credentials instead"
-        : "Enter one-time Admin API credentials";
+    private string CredentialsDisclosureLabel => "Enter one-time Admin API credentials";
 
     private string SourceLabel => string.Equals(EndpointOwnership.Mode, "deployment-managed", StringComparison.OrdinalIgnoreCase)
         ? "Deployment-managed"
         : EndpointOwnership.BootstrapAvailable == true ? "From deployment" : "Application-managed";
 
-    private string PolicySyncGuidance => IsDeploymentProvider
-        ? "Endpoint checks use deployment settings. Policy sync uses deployment credentials unless you provide a one-time override."
-        : HasServerSideAdminApiCredentials
-            ? $"Sync uses {AdminCredentialsOwnership.Badge?.ToLowerInvariant() ?? "configured"} credentials by default."
-            : "Enter a one-time credential pair to sync from this page, or use the manual package workflow.";
+    private string PolicySyncGuidance =>
+        "Enter a fresh pair for this foreground operation, or use the manual package workflow. Deployment readiness separately requires a signed operator publication receipt.";
 
     protected override async Task OnInitializedAsync()
     {
+        Navigation.LocationChanged += OnLocationChanged;
         var status = await InstanceOnboardingService.GetStatusAsync();
         if (status?.IsCompleted == true)
         {
@@ -625,6 +616,7 @@
             if (_model.CerbosEndpointVerified != true)
             {
                 // Verification failed — error message already set by VerifyCerbosEndpointAsync.
+                ClearOneTimeCredentials();
                 return;
             }
 
@@ -635,6 +627,7 @@
 
         if (!CanSyncPolicies)
         {
+            ClearOneTimeCredentials();
             return;
         }
 
@@ -756,6 +749,11 @@
                 Navigation.NavigateTo("/onboarding/instance", forceLoad: true);
                 return;
             }
+            if (response.Success == true)
+            {
+                _successMessage = "Publication completed. Verify the installation, configure the signed operator receipt and restart to establish deployment readiness.";
+                return;
+            }
 
             _errorMessage = string.IsNullOrWhiteSpace(response.Message)
                 ? _model.AuthorizationProviderBootstrapMessage ?? "Automatic Cerbos setup did not complete."
@@ -777,7 +775,7 @@
         HasCompleteOneTimeCredentials
             ? new AuthorizationPolicyPackageSyncRequestDto
             {
-                AdminUsername = _oneTimeAdminUsername!.Trim(),
+                AdminUsername = _oneTimeAdminUsername,
                 AdminPassword = _oneTimeAdminPassword
             }
             : new();
@@ -786,6 +784,18 @@
     {
         _oneTimeAdminUsername = null;
         _oneTimeAdminPassword = null;
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        ClearOneTimeCredentials();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        ClearOneTimeCredentials();
     }
 
     private async Task CopyComposeCommandAsync()

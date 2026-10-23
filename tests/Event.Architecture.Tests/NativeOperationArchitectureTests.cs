@@ -3,6 +3,7 @@ using Explore.Application;
 using Explore.Application.Operations;
 using Explore.API.Hosting;
 using Explore.Persistence;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -129,7 +130,7 @@ public sealed class NativeOperationArchitectureTests
     }
 
     [Test]
-    public async Task ActualHostProviderConstructsTheEntireNativePartitionWithoutExecutingOperations()
+    public async Task ActualHostProviderConstructsEveryPublicNativePipelineWithoutExecutingOperations()
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -154,11 +155,33 @@ public sealed class NativeOperationArchitectureTests
             ["Instance:OperatorIdentity:PrivacyUrl"] = "https://instance.example.test/privacy"
         });
         builder.AddApiHostServices(static () => false);
-        // Testing omits runtime DbContext registration. Construction-only assurance needs the real
-        // context type but deliberately no database provider, connection, schema or business calls.
-        builder.Services.AddDbContextFactory<ExploreDbContext>();
+        // This construction-only host exercises real cryptography without an external key authority.
+        builder.Services.AddSingleton<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(
+            new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
+        // Testing omits database composition. Retain the real context and Global factory aliases;
+        // the credential-free SQLite Global pool is constructed but no connection or operation runs.
+        builder.Services.AddDbContextFactory<ExploreDbContext>(options =>
+            Microsoft.EntityFrameworkCore.SqliteDbContextOptionsBuilderExtensions.UseSqlite(options,
+                $"Data Source={Path.Combine(Path.GetTempPath(), $"native-runtime-construction-{Guid.CreateVersion7():N}.db")}"));
+        builder.Services.AddGlobalExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Global,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = Path.Combine(Path.GetTempPath(), $"native-partition-construction-{Guid.CreateVersion7():N}.db")
+        });
+        builder.Services.AddSingleton<Explore.Persistence.Database.ITenantExploreDbContextFactory>(
+            new Explore.Persistence.Database.TenantExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
+            {
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Role = PrimaryDatabaseRole.Runtime,
+                Database = Path.Combine(Path.GetTempPath(), $"native-tenant-construction-{Guid.CreateVersion7():N}.db")
+            }));
+        builder.Services.AddPolicyMutationExecutionScopes();
+        builder.Services.AddCheckoutDispatchPersistence();
         await using var app = builder.Build();
-        await app.Services.ValidateNativeOperationsDeepAsync();
+        app.Services.ValidateNativeOperations();
+        // Protected implementations require real selected requests; their exhaustive activation
+        // is covered by NativePartitionConstructsEveryImplementationUnderItsOriginalHumanOwner.
         var nativeContracts = typeof(ApplicationServicesRegistration).Assembly.GetTypes()
             .Where(type => type is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false })
             .SelectMany(type => type.GetInterfaces().Where(OperationContractDiscovery.IsNativeHandler)).Distinct().ToArray();

@@ -14,7 +14,7 @@ public sealed record AiChatPayload(
 public sealed record AiChatProviderConfiguration(
     int Provider,
     string EndpointUrl,
-    string ApiKey,
+    AiCredentialScope CredentialScope,
     string ModelId);
 
 public sealed record AiChatImage(string MediaType, string Data);

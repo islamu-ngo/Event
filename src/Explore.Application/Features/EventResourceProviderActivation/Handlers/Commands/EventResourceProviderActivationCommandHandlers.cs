@@ -3,17 +3,19 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.EventResourceProviderActivation.Requests.Commands;
 using Explore.Application.Services;
 using Explore.Application.Settings;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Application.Features.EventResourceProviderActivation.Handlers.Commands;
 
-public sealed class BindEventResourceProviderCommandHandler(EventResourceProviderControlPlane controlPlane)
+public sealed class BindEventResourceProviderCommandHandler(IPolicyMutationExecutionScopeFactory scopes)
     : ICommandHandler<BindEventResourceProviderCommand, EventResourceProviderOperation>
 {
     public async Task<EventResourceProviderOperation> ExecuteAsync(BindEventResourceProviderCommand command, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await controlPlane.BindAsync(command.Binding, command.ExpectedRevision, cancellationToken);
+            await using var selected = await scopes.CreateAsync(PolicyMutationScope.Instance, cancellationToken);
+            return await selected.Services.GetRequiredService<EventResourceProviderControlPlane>().BindAsync(command, cancellationToken);
         }
         catch (ArgumentException exception)
         {
@@ -21,14 +23,15 @@ public sealed class BindEventResourceProviderCommandHandler(EventResourceProvide
         }
     }
 }
-public sealed class BeginEventResourceProviderOperationCommandHandler(EventResourceProviderControlPlane controlPlane)
+public sealed class BeginEventResourceProviderOperationCommandHandler(IPolicyMutationExecutionScopeFactory scopes)
     : ICommandHandler<BeginEventResourceProviderOperationCommand, EventResourceProviderOperation>
 {
     public async Task<EventResourceProviderOperation> ExecuteAsync(BeginEventResourceProviderOperationCommand command, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await controlPlane.BeginAsync(command.DeploymentId, cancellationToken);
+            await using var selected = await scopes.CreateAsync(PolicyMutationScope.Instance, cancellationToken);
+            return await selected.Services.GetRequiredService<EventResourceProviderControlPlane>().BeginAsync(command, cancellationToken);
         }
         catch (ArgumentException exception)
         {
@@ -36,16 +39,15 @@ public sealed class BeginEventResourceProviderOperationCommandHandler(EventResou
         }
     }
 }
-public sealed class ActivateEventResourceProviderCommandHandler(EventResourceProviderControlPlane controlPlane)
+public sealed class ActivateEventResourceProviderCommandHandler(IPolicyMutationExecutionScopeFactory scopes)
     : ICommandHandler<ActivateEventResourceProviderCommand, bool>
 {
     public async Task<bool> ExecuteAsync(ActivateEventResourceProviderCommand command, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await controlPlane.ActivateAsync(command.DeploymentId, command.OperationId, command.Epoch,
-                command.Scope, command.PolicyVersion, command.PreviousWritersStopped, command.ReachableReplicaCount,
-                command.DeclaredPolicyReplicaCount, command.FrozenParentPolicyContractConfirmed, cancellationToken);
+            await using var selected = await scopes.CreateAsync(PolicyMutationScope.Instance, cancellationToken);
+            return await selected.Services.GetRequiredService<EventResourceProviderControlPlane>().ActivateAsync(command, cancellationToken);
         }
         catch (ArgumentException exception)
         {

@@ -43,6 +43,32 @@ public sealed class KeycloakTokenClient : IDisposable
         string password,
         string scope = "openid profile email",
         CancellationToken cancellationToken = default)
+        => (await GetTokenPairAsync(username, password, scope, cancellationToken)).AccessToken;
+
+    public Task<KeycloakTokenPair> GetUserTokenPairAsync(CancellationToken cancellationToken = default)
+        => GetTokenPairAsync("test-user", _userPasswords["test-user"], cancellationToken: cancellationToken);
+
+    public async Task<string> GetServiceTokenAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync(_tokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = _clientId,
+            ["client_secret"] = _clientSecret
+        }), cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Failed to acquire Keycloak service token. Status: {response.StatusCode}.");
+        var tokens = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken);
+        return !string.IsNullOrEmpty(tokens?.AccessToken)
+            ? tokens.AccessToken
+            : throw new InvalidOperationException("Keycloak service response contained an empty access_token.");
+    }
+
+    private async Task<KeycloakTokenPair> GetTokenPairAsync(
+        string username,
+        string password,
+        string scope = "openid profile email",
+        CancellationToken cancellationToken = default)
     {
         var requestBody = new Dictionary<string, string>
         {
@@ -73,7 +99,7 @@ public sealed class KeycloakTokenClient : IDisposable
                 "Keycloak token response contained an empty access_token.");
         }
 
-        return tokenResponse.AccessToken;
+        return new KeycloakTokenPair(tokenResponse.AccessToken, tokenResponse.IdToken);
     }
 
     /// <summary>
@@ -104,6 +130,9 @@ public sealed class KeycloakTokenClient : IDisposable
         [JsonPropertyName("access_token")]
         public string? AccessToken { get; set; }
 
+        [JsonPropertyName("id_token")]
+        public string? IdToken { get; set; }
+
         [JsonPropertyName("expires_in")]
         public int ExpiresIn { get; set; }
 
@@ -113,4 +142,10 @@ public sealed class KeycloakTokenClient : IDisposable
         [JsonPropertyName("refresh_token")]
         public string? RefreshToken { get; set; }
     }
+}
+
+public sealed class KeycloakTokenPair(string accessToken, string? idToken)
+{
+    public string AccessToken { get; } = accessToken;
+    public string? IdToken { get; } = idToken;
 }

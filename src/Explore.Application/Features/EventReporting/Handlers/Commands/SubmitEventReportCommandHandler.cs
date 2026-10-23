@@ -24,7 +24,7 @@ public sealed class SubmitEventReportCommandHandler(
     IGenericRepository<EventReportTarget, Guid> targetRepository,
     IGenericRepository<EventReportEvidence, Guid> evidenceRepository,
     IGenericRepository<EventReportCase, Guid> caseRepository,
-    IActorRepository actorRepository,
+    IActorOwnershipReader actorOwnership,
     IUserRepository userRepository,
     IOutboxRepository outboxRepository,
     INotificationPreferenceResolver notificationPreferenceResolver,
@@ -189,7 +189,7 @@ public sealed class SubmitEventReportCommandHandler(
         }
 
         var reporterActor = reporterUserId.HasValue
-            ? await actorRepository.GetActorByUserIdAndTenantId(reporterUserId.Value, tenantId, cancellationToken)
+            ? await actorOwnership.ReadForUserAsync(reporterUserId.Value, tenantId, cancellationToken)
             : null;
 
         if (reporterUserId.HasValue && reporterActor is null)

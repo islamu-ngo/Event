@@ -25,3 +25,20 @@ public interface IPrivacyIdentityFenceAuthority
 
     Task<bool> IsSubjectFencedAsync(Guid userId, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// Starts an original enrollment gate and refuses an inherited gate. Human physical
+/// settlement retains it through disposal rather than borrowing a worker invocation's scope.
+/// </summary>
+public interface IOriginalPrivacyIdentityFenceAuthority : IPrivacyIdentityFenceAuthority
+{
+    Task<T> ExecuteOriginalEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken);
+
+    /// <summary>Retains primary-owner continuity through a separately owning privacy gate's actual commit.</summary>
+    Task<T> ExecuteOriginalEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<CancellationToken, Task> beforePrimaryCommit,
+        Action<DateTimeOffset> requireCurrent,
+        CancellationToken cancellationToken);
+}

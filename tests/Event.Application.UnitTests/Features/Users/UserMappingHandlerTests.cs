@@ -97,7 +97,7 @@ public sealed class UserMappingHandlerTests
     public async Task IdentityResolution_UsesProviderAccountBinding_NeverEmailFallback()
     {
         var user = UserMapperTests.CreateUser();
-        var repository = Substitute.For<IUserExternalLoginRepository>();
+        var repository = Substitute.For<IExternalLoginAuthenticationRepository>();
         var key = new ProviderAccountKey(AuthenticationProviderKind.Google, "provider-account");
         repository.GetByProviderAndKey(key).Returns(new UserExternalLogin
         { User = user, UserId = user.Id, AuthenticationProvider = null!, AuthenticationProviderId = (int)AuthenticationProviderKind.Google, ProviderKey = key.Value });

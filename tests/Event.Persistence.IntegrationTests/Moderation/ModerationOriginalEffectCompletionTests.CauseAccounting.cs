@@ -405,7 +405,8 @@ public sealed partial class ModerationCaseNativeProofTests
             await using var context = Context();
             var (admin, machine) = Identity(context);
             return await new ModerationResourceQuarantineRepository(context, machine, Bindings(context, admin, machine),
-                new ExternalApiKeyRepository(context), Database.Clock, Original.Privacy.Authority(context, Database.Clock))
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Database.Clock, Original.Privacy.Authority(context, Database.Clock))
                 .ExecuteOriginalAsync(EffectId, LeaseId, LeaseRevision);
         }
 
@@ -415,7 +416,8 @@ public sealed partial class ModerationCaseNativeProofTests
             await using var context = Context();
             var (admin, machine) = Identity(context);
             return await new ModerationResourceQuarantineRepository(context, machine, Bindings(context, admin, machine),
-                new ExternalApiKeyRepository(context), Database.Clock, Original.Privacy.Authority(context, Database.Clock))
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Database.Clock, Original.Privacy.Authority(context, Database.Clock))
                 .ExecuteAsync(coordinate == "effect" ? Guid.CreateVersion7() : EffectId,
                     coordinate == "lease" ? Guid.CreateVersion7() : LeaseId, LeaseRevision,
                     coordinate == "ordinal" ? 1 : 0,

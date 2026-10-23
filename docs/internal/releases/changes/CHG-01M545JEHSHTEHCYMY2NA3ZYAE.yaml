@@ -1,0 +1,30 @@
+Change-Id: CHG-01M545JEHSHTEHCYMY2NA3ZYAE
+Title: "Bind external-login discovery to enrolled database authority"
+Type: fix
+Scope: access
+Summary: "Require the configured Global session and reject inherited Runtime authority before native provider-account discovery or reinstallation."
+Group: native-external-login-enrollment
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Attest exact executor enrollment and read privileges without silently repairing unexpected grants.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Database preparation binds exact provider-account discovery to explicit deployment enrollment.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Reconcile unauthorized role inheritance before reinstallation instead of broadening binding-table access.

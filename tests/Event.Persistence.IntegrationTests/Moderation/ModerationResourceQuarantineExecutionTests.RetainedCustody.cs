@@ -32,7 +32,7 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         await using var context = fixture.Context(reads);
         var identity = await fixture.AuthenticateAsync(context);
         var result = await new ModerationEffectLeaseRepository(context, identity.Machine, identity.Bindings,
-            new ExternalApiKeyRepository(context), fixture.Clock)
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), fixture.Clock)
             .ReadWithoutSubstantiveWorkAsync(fixture.EffectId);
         await Assert.That(result.Outcome).IsEqualTo(ModerationEffectLeaseOutcome.Unavailable);
         await Assert.That(result.UnavailableReason)
@@ -61,7 +61,7 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             fixture.Clock, Options.Create(new PrivacyErasureOptions()), applicationContext: context);
         var identity = await fixture.AuthenticateAsync(context);
         var owner = new ModerationResourceQuarantineRepository(context, identity.Machine, identity.Bindings,
-            new ExternalApiKeyRepository(context), fixture.Clock, privacy);
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), fixture.Clock, privacy);
         var result = await owner.ExecuteAsync(fixture.EffectId, fixture.LeaseId, fixture.LeaseRevision,
             0, fixture.ResourceId, fixture.MaterialId);
         await Assert.That(checkpoint.QuarantineSaved).IsTrue();
@@ -108,7 +108,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             await using var context = fixture.Context(reads);
             var identity = await fixture.AuthenticateAsync(context);
             var result = await new ModerationResourceQuarantineRepository(context, identity.Machine,
-                identity.Bindings, new ExternalApiKeyRepository(context), fixture.Clock,
+                identity.Bindings,
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), fixture.Clock,
                 fixture.Database.Privacy.Authority(context, fixture.Clock))
                 .ExecuteOriginalAsync(fixture.EffectId, fixture.LeaseId, fixture.LeaseRevision);
             await Assert.That(result.Outcome).IsEqualTo(ModerationOriginalQuarantineOutcome.Unavailable);

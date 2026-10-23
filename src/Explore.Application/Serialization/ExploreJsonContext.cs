@@ -167,6 +167,7 @@ namespace Explore.Application.Serialization;
 [JsonSerializable(typeof(AiReferenceSearchResultDto))]
 [JsonSerializable(typeof(AiSelectedReferenceDto))]
 [JsonSerializable(typeof(AiProposedActionDto))]
+[JsonSerializable(typeof(ConfirmAiProposedActionRequestDto))]
 [JsonSerializable(typeof(HalResource<AiAssistantBootstrapDto>))]
 [JsonSerializable(typeof(HalCollectionResource<AiConversationSummaryDto>))]
 [JsonSerializable(typeof(HalResource<AiConversationSummaryDto>))]

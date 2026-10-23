@@ -15,6 +15,8 @@ public sealed record CreateRegistrationOrderWithHoldCommand : ICommand<BaseComma
 
     public Guid? AccountUserId { get; init; }
 
+    public string? OperationKey { get; init; }
+
     public Guid? PurchaserActorId { get; init; }
 
     public string? VerifiedContactNormalizedEmail { get; init; }

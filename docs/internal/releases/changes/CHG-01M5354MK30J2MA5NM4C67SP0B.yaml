@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5354MK30J2MA5NM4C67SP0B
+Title: "Retain original authority in location correction receipts"
+Type: feat
+Scope: access
+Summary: "Bind location corrections to original audit or committed erasure identity without retaining disposable address payloads."
+Group: location-correction-domain-receipts
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Correction messages cannot replace original bindings and receipt tenant ownership is immutable.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Identity-only domain receipts require persistence mappings, generated migration parity and dispatch integration before deployment.

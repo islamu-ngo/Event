@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schemas.islamu.org/event/tenant-configuration-package/v1alpha2/schema.json",
+  "apiVersion": "configuration.islamu.org/v1alpha2",
+  "kind": "TenantConfigurationPackage",
+  "metadata": {
+    "name": "example-community",
+    "source": { "tenantName": "community" }
+  },
+  "spec": {
+    "displayName": "Community",
+    "settings": { "events.require_approval": true },
+    "documents": {
+      "tenant.branding": {
+        "schemaVersion": 1,
+        "payload": { "displayName": "Community" }
+      }
+    },
+    "legalDocuments": {
+      "TenantPrivacyNotice": {
+        "kind": "TenantPrivacyNotice",
+        "audience": "Public",
+        "lifecycleIntent": "Draft",
+        "requiresFreshAcceptance": false,
+        "jurisdictionAssumptions": ["BE"],
+        "localizations": [
+          {
+            "languageTag": "en",
+            "title": "Example privacy draft",
+            "summary": "Fictional source for interoperability testing.",
+            "markdown": "# Example draft\n\nThis test document is not a published policy."
+          }
+        ]
+      }
+    }
+  }
+}

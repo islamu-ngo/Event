@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5313REMDMF8TK3NBKJWX11B
+Title: "Retain managed principal custody through tracked tenant writes"
+Type: feat
+Scope: access
+Summary: "Bind principal source leases and canonical audit attribution to original transaction custody and validate tracked tenant references before persistence."
+Group: managed-human-principal-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Retained human proof is consumed by the shared tracked-write validator; disposal clears subject and admission state.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Custody primitives retain original identities but production scope registration and verified mutation consumers remain required.

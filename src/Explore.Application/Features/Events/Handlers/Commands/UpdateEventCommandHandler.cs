@@ -3,7 +3,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Caching;
+using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
@@ -22,6 +24,7 @@ using Explore.Domain.Federation;
 using Explore.Application.Contracts.Operations;
 using Explore.Domain.Services.Scheduling;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Events.Handlers.Commands;
 
@@ -46,6 +49,9 @@ public class UpdateEventCommandHandler : ICommandHandler<UpdateEventCommand, Bas
     private readonly IEventLifecycleScheduler _eventLifecycleScheduler;
     private readonly IRefundCampaignRepository _refundCampaignRepository;
     private readonly TimeProvider _timeProvider;
+    private readonly ITenantContext _tenantContext;
+    private readonly RequestAuthorization<UpdateEventCommand> _authorization;
+    private readonly ILogger<UpdateEventCommandHandler> _logger;
 
     public UpdateEventCommandHandler(
         IEventRepository eventRepository,
@@ -66,7 +72,10 @@ public class UpdateEventCommandHandler : ICommandHandler<UpdateEventCommand, Bas
         IEventLifecycleScheduler eventLifecycleScheduler,
         IRefundCampaignRepository refundCampaignRepository,
         TimeProvider timeProvider,
-        ISettingMutationLock mutationLock)
+        ISettingMutationLock mutationLock,
+        ITenantContext tenantContext,
+        RequestAuthorization<UpdateEventCommand> authorization,
+        ILogger<UpdateEventCommandHandler> logger)
     {
         _eventRepository = eventRepository;
         _audienceAgeRepository = audienceAgeRepository;
@@ -87,6 +96,9 @@ public class UpdateEventCommandHandler : ICommandHandler<UpdateEventCommand, Bas
         _eventLifecycleScheduler = eventLifecycleScheduler;
         _refundCampaignRepository = refundCampaignRepository;
         _timeProvider = timeProvider;
+        _tenantContext = tenantContext;
+        _authorization = authorization;
+        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventCommand request, CancellationToken cancellationToken)
@@ -110,6 +122,7 @@ public class UpdateEventCommandHandler : ICommandHandler<UpdateEventCommand, Bas
         }
 
         Guid currentUserId = _userContext.GetRequiredUserId();
+        await _authorization.AuthorizeAsync(request, _logger, cancellationToken);
         DateTime occurredAt = _timeProvider.GetUtcNow().UtcDateTime;
         Guid federationOutboxId = Guid.CreateVersion7();
         Guid occurrenceId = Guid.CreateVersion7();
@@ -121,11 +134,19 @@ public class UpdateEventCommandHandler : ICommandHandler<UpdateEventCommand, Bas
             [[GovernanceSettingKeys.Email.DeliveryEnabled]],
             policyToken => _unitOfWork.ExecuteSerializableAsync(async token =>
         {
+            var authority = await _eventRepository.GetAuthorizedForUpdateAsync(
+                _tenantContext.TenantId, currentUserId, request.EventId, token);
+            if (authority is null)
+                return BaseCommandResponse.Authorization<Guid>();
             Explore.Domain.Event? eventEntity = await _eventRepository.GetScheduleGraphForUpdateAsync(request.EventId, token);
             if (eventEntity is null)
             {
                 return BaseCommandResponse.NotFound<Guid>("Event not found.");
             }
+            if (eventEntity.TenantId != authority.TenantId || eventEntity.ActorId != authority.ActorId
+                || eventEntity.OrganizerActorId != authority.OrganizerActorId
+                || eventEntity.SubmittedByUserId != authority.SubmittedByUserId || eventEntity.IsDeleted)
+                return BaseCommandResponse.Authorization<Guid>();
 
             if (eventEntity.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
             {

@@ -13,7 +13,7 @@ namespace Explore.Infrastructure.Localization;
 /// </summary>
 public class TranslationConfigResolver : ITranslationConfigResolver
 {
-    private readonly IHierarchicalSettingsResolver _resolver;
+    private readonly IHierarchicalSettingsReader _resolver;
     private readonly ITenantContext _tenantContext;
     private readonly IMemoryCache _cache;
     private readonly ILogger<TranslationConfigResolver> _logger;
@@ -23,7 +23,7 @@ public class TranslationConfigResolver : ITranslationConfigResolver
     private const string SafeFallbackLanguage = "en";
 
     public TranslationConfigResolver(
-        IHierarchicalSettingsResolver resolver,
+        IHierarchicalSettingsReader resolver,
         ITenantContext tenantContext,
         IMemoryCache cache,
         ILogger<TranslationConfigResolver> logger)
@@ -82,8 +82,8 @@ public class TranslationConfigResolver : ITranslationConfigResolver
         var forceOfflineMode = ParseBool(forceOfflineModeStr, defaultValue: false);
 
         _logger.LogDebug(
-            "Translation config resolved for tenant {TenantId}: Provider={Provider}, DefaultLanguage={DefaultLanguage}, Enabled=[{Enabled}], Fallback={Fallback}, PickerEnabled={PickerEnabled}, ForceOffline={ForceOffline}",
-            tenantId, provider, resolvedDefaultLanguage, string.Join(",", enabledLanguages), fallbackLanguage, clientPickerEnabled, forceOfflineMode);
+            "Translation config resolved: Provider={Provider}, DefaultLanguage={DefaultLanguage}, EnabledCount={EnabledCount}, Fallback={Fallback}, PickerEnabled={PickerEnabled}, ForceOffline={ForceOffline}",
+            provider, resolvedDefaultLanguage, enabledLanguages.Count, fallbackLanguage, clientPickerEnabled, forceOfflineMode);
 
         return new TranslationConfiguration(
             Provider: provider,
@@ -117,8 +117,8 @@ public class TranslationConfigResolver : ITranslationConfigResolver
             if (!string.IsNullOrWhiteSpace(value))
             {
                 _logger.LogWarning(
-                    "[LOCALIZATION] Governance value '{Value}' is not in CultureRegistry; falling back to '{Fallback}'",
-                    value, fallback);
+                    "[LOCALIZATION] Governance culture is unregistered; falling back to '{Fallback}'",
+                    fallback);
             }
             return fallback;
         }
@@ -140,8 +140,7 @@ public class TranslationConfigResolver : ITranslationConfigResolver
             if (normalised.Length == 0 || !CultureRegistry.Contains(normalised))
             {
                 _logger.LogWarning(
-                    "[LOCALIZATION] enabled_languages entry '{Entry}' is not in CultureRegistry; dropping",
-                    raw);
+                    "[LOCALIZATION] Unregistered enabled culture entry dropped");
                 continue;
             }
             if (seen.Add(normalised))
@@ -174,8 +173,8 @@ public class TranslationConfigResolver : ITranslationConfigResolver
         if (!string.IsNullOrWhiteSpace(value))
         {
             _logger.LogWarning(
-                "[LOCALIZATION] fallback_language '{Value}' is not a valid enabled culture; substituting '{Substitute}'",
-                value, defaultLanguage);
+                "[LOCALIZATION] Fallback culture is not enabled; substituting '{Substitute}'",
+                defaultLanguage);
         }
 
         return enabledLanguages.Contains(defaultLanguage, StringComparer.OrdinalIgnoreCase)

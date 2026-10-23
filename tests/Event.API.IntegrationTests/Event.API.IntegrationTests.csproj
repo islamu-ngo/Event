@@ -3,6 +3,9 @@
   <!-- The provider-neutral parity corpus is declared once and linked into every lane that evaluates it,
        so Local and Cerbos can never drift onto different scenario sets. -->
   <ItemGroup>
+    <Compile Include="..\Shared\OperationalEndpointTestTransport.cs" Link="Fixtures\OperationalEndpointTestTransport.cs" />
+    <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
+    <Compile Include="..\Shared\TransactionCleanupFault.cs" Link="Fixtures\TransactionCleanupFault.cs" />
     <Compile Include="..\Shared\Authorization\ProviderNeutralCorpus.cs" Link="Authorization\ProviderNeutralCorpus.cs" />
     <Compile Include="..\Shared\Moderation\ModerationMeasurementJournalAttribute.cs" Link="Moderation\ModerationMeasurementJournalAttribute.cs" />
     <Compile Include="..\Shared\Settings\SmtpSettingsDatabase.cs" Link="Settings\SmtpSettingsDatabase.cs" />
@@ -11,11 +14,18 @@
     <Compile Include="..\Event.Persistence.IntegrationTests\Moderation\ModerationNoticePrivacyFixture.cs" Link="Moderation\ModerationNoticePrivacyFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\LocalIdentitySqliteTemplate.cs" Link="Fixtures\LocalIdentitySqliteTemplate.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\SqliteTestDatabaseFactory.cs" Link="Fixtures\SqliteTestDatabaseFactory.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AdministrativeAuthorityTestFactory.cs" Link="Fixtures\AdministrativeAuthorityTestFactory.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\TestDbContextOptions.cs" Link="Fixtures\TestDbContextOptions.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Moderation\ModerationNoticeReadTests.CorrectionFixture.cs" Link="Moderation\ModerationNoticeReadTests.CorrectionFixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Moderation\ModerationQualificationWriterTests.Fixture.cs" Link="Moderation\ModerationQualificationWriterTests.Fixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Moderation\ModerationResourceGenerationWriterTests.Fixture.cs" Link="Moderation\ModerationResourceGenerationWriterTests.Fixture.cs" />
     <Compile Include="..\Event.Persistence.IntegrationTests\Moderation\ModerationNativeAuthorityParticipantTests.UnconfiguredKeys.cs" Link="Moderation\ModerationNativeAuthorityParticipantTests.UnconfiguredKeys.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AuthenticatedSettingsFixture.cs" Link="Fixtures\AuthenticatedSettingsFixture.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AuthenticatedSettingsFixture.Postgres.cs" Link="Fixtures\AuthenticatedSettingsFixture.Postgres.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\AuthenticatedSettingsFixture.TenantCreation.cs" Link="Fixtures\AuthenticatedSettingsFixture.TenantCreation.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\InstanceSettingsCommandFixture.cs" Link="Fixtures\InstanceSettingsCommandFixture.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\Fixtures\PostgreSqlContainerFixture.cs" Link="Fixtures\NativePostgreSqlContainerFixture.cs" />
+    <Compile Include="..\Event.Persistence.IntegrationTests\ConfigurationManifest\ConfigurationManifestBootstrapTestHost.cs" Link="Fixtures\ConfigurationManifestBootstrapTestHost.cs" />
   </ItemGroup>
 
   <ItemGroup>

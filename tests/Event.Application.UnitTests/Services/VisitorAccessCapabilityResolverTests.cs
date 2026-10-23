@@ -1,15 +1,55 @@
 
 using System.Text.Json;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Microsoft.Extensions.Configuration;
+using NSubstitute;
 
 namespace Event.Application.UnitTests.Services;
 
 public sealed class VisitorAccessCapabilityResolverTests
 {
+    [Test]
+    public async Task ResolverUsesOneCoherentSnapshotAndObservesTheNextSnapshotOnTheNextResolution()
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        var settings = Substitute.For<IInstanceTenantSettingsReader>();
+        var lifecycle = Substitute.For<ITenantLifecycleAccessService>();
+        lifecycle.IsPublicAsync(tenantId, Arg.Any<CancellationToken>()).Returns(true);
+        int observation = 0;
+        settings.ReadAsync(tenantId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                SystemSetting[] rows =
+                [
+                    new() { SettingKey = GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
+                        Value = "\"FullRegistrationAndAuth\"" },
+                    new() { SettingKey = GovernanceSettingKeys.Authentication.AtprotoLoginEnabled,
+                        Value = observation++ == 0 ? "true" : "false" },
+                    new() { SettingKey = GovernanceSettingKeys.Authentication.AtprotoPublicUrl,
+                        Value = "\"https://events.example.test\"" }
+                ];
+                IReadOnlyList<SystemSetting> selected = rows.Where(row =>
+                    call.Arg<IReadOnlyCollection<string>>().Contains(row.SettingKey)).ToArray();
+                return Task.FromResult((selected, (IReadOnlyList<TenantSetting>)Array.Empty<TenantSetting>()));
+            });
+        var resolver = new VisitorAccessCapabilityResolver(settings,
+            new VisitorAccessProviderReader(new ConfigurationBuilder().Build()), lifecycle);
+
+        var first = await resolver.ResolveAsync(tenantId);
+        var next = await resolver.ResolveAsync(tenantId);
+
+        await Assert.That(first.Mode).IsEqualTo(VisitorAccessMode.FullRegistrationAndAuth);
+        await Assert.That(first.AllowsAccountRequiredParticipation).IsTrue();
+        await Assert.That(next.Mode).IsEqualTo(VisitorAccessMode.FullRegistrationAndAuth);
+        await Assert.That(next.AllowsAccountRequiredParticipation).IsFalse();
+    }
+
     [Test]
     public async Task LocalOnlyNeverCreatesPublicSignupEvenWhenDeclaredAllowed()
     {

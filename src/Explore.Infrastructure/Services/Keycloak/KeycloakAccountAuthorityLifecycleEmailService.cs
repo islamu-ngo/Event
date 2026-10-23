@@ -6,8 +6,12 @@ using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.Notifications;
 using Explore.Application.Services;
+using Explore.Domain.Enums;
+using Explore.Domain.Keycloak;
+using Explore.Domain.Secrets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Refit;
@@ -20,6 +24,7 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
     ITenantUserRepository tenantUsers,
     IOptions<AccountAuthorityLifecycleEmailOptions> lifecycleOptions,
     IOptions<KeycloakLifecycleEmailOptions> keycloakOptions,
+    ISecretResolver secretResolver,
     ILogger<KeycloakAccountAuthorityLifecycleEmailService> logger) : IAccountAuthorityLifecycleEmailProvider
 {
     public const string HttpClientName = "KeycloakLifecycleEmailClient";
@@ -91,7 +96,7 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
 
         try
         {
-            var token = await RequestAdminTokenAsync(api, keycloak, cancellationToken);
+            var token = await RequestServiceTokenAsync(api, baseUri!, keycloak, cancellationToken);
             if (string.IsNullOrWhiteSpace(token))
             {
                 return CreateProviderFailure(action, orchestration, "keycloak_lifecycle_auth_failed");
@@ -177,18 +182,24 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
             });
     }
 
-    private static async Task<string?> RequestAdminTokenAsync(
+    private async Task<string?> RequestServiceTokenAsync(
         IKeycloakLifecycleEmailApi api,
+        Uri baseUri,
         KeycloakLifecycleEmailOptions options,
         CancellationToken cancellationToken)
     {
-        using var tokenResponse = await api.RequestAdminTokenAsync(
+        var secret = await secretResolver.ResolveAsync(
+            SecretDefinitionRegistry.Keys.Keycloak.LifecycleClientSecret, null, cancellationToken);
+        if (!secret.IsResolved || secret.Scope != SecretScope.Instance || secret.ScopeId is not null
+            || string.IsNullOrWhiteSpace(secret.Value))
+            return null;
+        using var tokenResponse = await api.RequestServiceTokenAsync(
+            options.Realm.Trim(),
             new Dictionary<string, object>
             {
-                ["grant_type"] = "password",
-                ["client_id"] = string.IsNullOrWhiteSpace(options.AdminClientId) ? "admin-cli" : options.AdminClientId.Trim(),
-                ["username"] = options.AdminUsername.Trim(),
-                ["password"] = options.AdminPassword
+                ["grant_type"] = "client_credentials",
+                ["client_id"] = options.ClientId.Trim(),
+                ["client_secret"] = secret.Value
             },
             cancellationToken);
 
@@ -196,8 +207,28 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
             return null;
 
         await using var stream = await tokenResponse.Content.ReadAsStreamAsync(cancellationToken);
-        var token = await JsonSerializer.DeserializeAsync<KeycloakTokenResponse>(stream, JsonOptions, cancellationToken);
-        return token?.AccessToken;
+        using var bounded = new MemoryStream();
+        var buffer = new byte[4096];
+        int count;
+        while ((count = await stream.ReadAsync(buffer, cancellationToken)) != 0)
+        {
+            if (bounded.Length + count > 65_536)
+                return null;
+            bounded.Write(buffer, 0, count);
+        }
+        bounded.Position = 0;
+        try
+        {
+            var token = await JsonSerializer.DeserializeAsync<KeycloakTokenResponse>(bounded, JsonOptions, cancellationToken);
+            string issuer = new Uri(baseUri, $"realms/{Uri.EscapeDataString(options.Realm.Trim())}").AbsoluteUri;
+            return token?.AccessToken is { } accessToken && KeycloakLifecycleGrantProfile.AllowsTokenResponse(
+                accessToken, options.ProviderVersion, issuer, options.ClientId.Trim(), DateTimeOffset.UtcNow)
+                ? accessToken : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static bool IsProviderConfigured(
@@ -214,8 +245,10 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
 
         if (string.IsNullOrWhiteSpace(keycloak.BaseUrl)
             || string.IsNullOrWhiteSpace(keycloak.Realm)
-            || string.IsNullOrWhiteSpace(keycloak.AdminUsername)
-            || string.IsNullOrWhiteSpace(keycloak.AdminPassword))
+            || string.IsNullOrWhiteSpace(keycloak.ClientId)
+            || string.IsNullOrWhiteSpace(keycloak.DefaultClientId)
+            || keycloak.ClientId.Trim() == keycloak.DefaultClientId.Trim()
+            || keycloak.ProviderVersion != KeycloakLifecycleGrantProfile.ProviderVersion)
             return false;
 
         return true;
@@ -241,6 +274,8 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
             failureCode = "keycloak_lifecycle_unsafe_host";
             return false;
         }
+        if (uri.Scheme == Uri.UriSchemeHttp && !allowLocalUrls)
+            return false;
 
         baseUri = new Uri(uri.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/");
         return true;
@@ -380,8 +415,9 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
 
     internal interface IKeycloakLifecycleEmailApi
     {
-        [Post("/realms/master/protocol/openid-connect/token")]
-        Task<HttpResponseMessage> RequestAdminTokenAsync(
+        [Post("/realms/{realm}/protocol/openid-connect/token")]
+        Task<HttpResponseMessage> RequestServiceTokenAsync(
+            string realm,
             [Body(BodySerializationMethod.UrlEncoded)] Dictionary<string, object> request,
             CancellationToken cancellationToken = default);
 

@@ -233,14 +233,14 @@ public sealed class EventLocation : ITenantEntity, IAuditableEntity, ISoftDeleta
         Guid actorUserId,
         DateTime changedAtUtc)
     {
-        EventLocationDisclosureAudit audit = ChangeDisclosurePolicy(
-            GetDisclosureFields(),
-            (LocationDisclosureAudienceEnum)FullDetailsAudienceId,
-            RevealFullDetailsFromUtc,
-            PolicyVersion,
-            actorUserId,
-            EventLocationDisclosureAuditReasonEnum.GovernanceTightening,
-            changedAtUtc);
+        EventLocationDisclosureAudit audit = CaptureGovernanceState()
+            .CreateTighteningAudit(actorUserId, changedAtUtc);
+        PolicyVersion = audit.NewPolicyVersion;
+        LastPolicyActorUserId = actorUserId;
+        LastPolicyChangedAtUtc = changedAtUtc;
+        UpdatedAt = changedAtUtc;
+        UpdatedBy = actorUserId;
+        ConcurrencyStamp = Guid.CreateVersion7();
 
         if (requiresPrivacyReview)
         {
@@ -249,6 +249,11 @@ public sealed class EventLocation : ITenantEntity, IAuditableEntity, ISoftDeleta
 
         return audit;
     }
+
+    public EventLocationGovernanceState CaptureGovernanceState() => new(
+        TenantId, EventId, Id, IsDeleted, IsToBeAnnounced, Location?.LocationKindId,
+        GetDisclosureFields(), (LocationDisclosureAudienceEnum)FullDetailsAudienceId,
+        RevealFullDetailsFromUtc, CreatedAt, PolicyVersion, ConcurrencyStamp);
 
     public EventLocationDisclosureAudit CompletePrivacyReview(
         Guid actorUserId,

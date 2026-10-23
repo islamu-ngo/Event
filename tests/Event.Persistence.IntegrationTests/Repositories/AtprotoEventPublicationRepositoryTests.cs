@@ -77,7 +77,7 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
             new PublicEventLocationDisclosureEvaluator(governance, new EventLocationDisclosureEvaluator()));
         var publicAddress = new ConfigurationBuilder().AddInMemoryCollection(
             new Dictionary<string, string?> { ["PUBLIC_BASE_URL"] = "https://publication.example.test" }).Build();
-        var settings = new SystemSettingRepository(context, Substitute.For<ISettingMutationLock>());
+        var settings = SystemSettingRepository.CreateReadOnly(context, Substitute.For<ISettingMutationLock>());
         var payload = await new AtprotoPublicationPayloadBuilder(snapshotFactory, publicAddress, settings)
             .BuildEventAsync(graph, DateTimeOffset.UtcNow, CancellationToken.None);
         await Assert.That(payload.IsValid).IsTrue().Because(payload.FailureCode ?? "Publication payload was invalid");

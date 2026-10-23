@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Explore.Application.Contracts.Scheduling;
 using Quartz;
 using Quartz.Listener;
@@ -19,7 +18,8 @@ namespace Explore.API.Scheduling;
 /// </summary>
 public sealed class SchedulerTelemetryJobListener(
     ISchedulerJobTelemetry telemetry,
-    ILogger<SchedulerTelemetryJobListener> logger) : JobListenerSupport
+    ILogger<SchedulerTelemetryJobListener> logger,
+    TimeProvider timeProvider) : JobListenerSupport
 {
     /// <summary>Key under which the execution's stopwatch timestamp is stashed on the job context.</summary>
     private const string StartTimestampKey = "explore.telemetry.startTimestamp";
@@ -32,7 +32,7 @@ public sealed class SchedulerTelemetryJobListener(
         {
             // Stopwatch timestamps rather than context.JobRunTime: the latter is only populated after the
             // job finishes, and is unavailable on the veto path.
-            context?.Put(StartTimestampKey, Stopwatch.GetTimestamp());
+            context?.Put(StartTimestampKey, timeProvider.GetTimestamp());
         }
         catch (Exception exception)
         {
@@ -69,13 +69,10 @@ public sealed class SchedulerTelemetryJobListener(
 
             if (jobException is not null)
             {
-                // The exception type only: provider errors carry connection strings, hostnames, and payload
-                // fragments that the platform keeps out of logs by convention.
+                // Job keys and runtime subtype names can contain private identifiers.
                 logger.LogError(
-                    "Scheduled job {JobName} in group {JobGroup} failed. FailureType={FailureType}",
-                    context?.JobDetail.Key.Name,
-                    context?.JobDetail.Key.Group,
-                    (jobException.InnerException ?? jobException).GetType().Name);
+                    "Scheduled job failed. FailureCategory={FailureCategory}",
+                    "scheduled_job_failed");
             }
         }
         catch (Exception exception)
@@ -104,10 +101,10 @@ public sealed class SchedulerTelemetryJobListener(
     /// Falls back to zero rather than guessing when the start timestamp is missing, which happens on the
     /// veto path if the veto beat this listener's own <see cref="JobToBeExecuted"/>.
     /// </summary>
-    private static double ReadElapsedSeconds(IJobExecutionContext context)
+    private double ReadElapsedSeconds(IJobExecutionContext context)
     {
         return context.Get(StartTimestampKey) is long startTimestamp
-            ? Stopwatch.GetElapsedTime(startTimestamp).TotalSeconds
+            ? timeProvider.GetElapsedTime(startTimestamp).TotalSeconds
             : 0;
     }
 
@@ -120,9 +117,9 @@ public sealed class SchedulerTelemetryJobListener(
         try
         {
             logger.LogWarning(
-                "Scheduler telemetry listener {ListenerMethod} failed and was contained. FailureType={FailureType}",
+                "Scheduler telemetry listener {ListenerMethod} failed and was contained. FailureCategory={FailureCategory}",
                 listenerMethod,
-                exception.GetType().Name);
+                "telemetry_listener_failed");
         }
         catch (Exception loggingFailure) when (loggingFailure is not OperationCanceledException)
         {

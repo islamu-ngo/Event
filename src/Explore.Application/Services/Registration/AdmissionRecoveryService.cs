@@ -51,12 +51,9 @@ public sealed class AdmissionRecoveryService(
         {
             throw;
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            logger.LogError(
-                "Admission recovery request staging failed uniformly for tenant {TenantId}; failure type {FailureType}",
-                normalized.TenantId,
-                exception.GetType().Name);
+            logger.LogError("Admission recovery request staging failed uniformly.");
             throw new AdmissionRecoveryUnavailableException();
         }
 

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M520ZBZJDCK90FSA94RY249T
+Title: "keep secret diagnostics free of private provider data"
+Type: fix
+Scope: privacy
+Summary: "Secret audit logs and health failures retain bounded operational categories without private identities, key paths or provider exception details."
+Group: secret-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Secret audit and failed health diagnostics exclude private identities, key paths, exception types and provider payloads; correlation identifiers are validated rather than copied from caller headers.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose provider failures using bounded lifecycle reason codes and provider_unavailable health categories rather than private exception content.

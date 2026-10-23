@@ -10,4 +10,10 @@ public interface IEventRoleAssignmentCreationMutationBoundary
         int roleId, EventRoleAssignmentStatus status, DateTime startsAtUtc, DateTime? expiresAtUtc, Guid auditId,
         string? expectedEmail, Func<Guid, CancellationToken, Task<BaseCommandResponse<Guid>>> operation,
         CancellationToken cancellationToken);
+
+    /// <summary>Joins the email assignment owner's transaction and retains qualification admission through its actual commit.</summary>
+    Task<BaseCommandResponse<Guid>> ExecuteInCurrentTransactionAsync(Guid tenantId, Guid eventId, Guid assignmentId, Guid targetUserId,
+        int roleId, EventRoleAssignmentStatus status, DateTime startsAtUtc, DateTime? expiresAtUtc, Guid auditId,
+        string? expectedEmail, Func<Guid, CancellationToken, Task<BaseCommandResponse<Guid>>> operation,
+        CancellationToken cancellationToken);
 }

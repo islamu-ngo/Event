@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52KNNAX21M17AY5AWNQETD1
+Title: "Bound response capture before computing ETags"
+Type: fix
+Scope: access
+Summary: "Limit JSON validator capture to 256 KiB and forward ineligible or streaming output without retaining full bodies."
+Group: bounded-etag-capture
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: ETag capture enforces its retention budget before allocating response storage.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Expect no middleware ETag on oversized, flushed, streaming or ineligible responses.

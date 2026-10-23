@@ -6168,6 +6168,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmAiProposedActionRequestDto"
+              }
+            },
+            "text/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmAiProposedActionRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmAiProposedActionRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -7409,6 +7429,14 @@
             }
           },
           {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "api-version",
             "in": "query",
             "schema": {
@@ -7562,7 +7590,8 @@
           }
         ],
         "x-endpoint-class": "Authenticated",
-        "x-rate-limit-policy": "Write"
+        "x-rate-limit-policy": "Write",
+        "x-idempotency-key-required": true
       },
       "get": {
         "tags": [
@@ -59923,6 +59952,859 @@
         "x-rate-limit-policy": "Write"
       }
     },
+    "/api/admin/instance/authentication-credential-cutovers/{operationId}/cleanup-targets": {
+      "get": {
+        "tags": [
+          "InstanceAuthenticationCredentialCutovers"
+        ],
+        "summary": "Inspect Exact Authentication Credential Cleanup Targets",
+        "operationId": "InspectAuthenticationCredentialCleanup",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticationCredentialCleanupInventoryDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin"
+      }
+    },
+    "/api/admin/instance/authentication-credential-cutovers/cleanup": {
+      "post": {
+        "tags": [
+          "InstanceAuthenticationCredentialCutovers"
+        ],
+        "summary": "Clean Up Exact Approved Legacy Authentication Credential Rows",
+        "operationId": "CleanupAuthenticationCredentials",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticationCredentialCleanupInputDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticationCredentialCleanupInputDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          },
+          {
+            "ApiKey": [ ]
+          }
+        ],
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "ControlPlane"
+      }
+    },
+    "/api/admin/instance/authentication-credential-cutovers/current": {
+      "get": {
+        "tags": [
+          "InstanceAuthenticationCredentialCutovers"
+        ],
+        "summary": "Get Current Authentication Credential Cutover",
+        "operationId": "GetCurrentAuthenticationCredentialCutover",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin"
+      }
+    },
+    "/api/admin/instance/authentication-credential-cutovers/{operationId}": {
+      "get": {
+        "tags": [
+          "InstanceAuthenticationCredentialCutovers"
+        ],
+        "summary": "Get Authentication Credential Cutover Receipt",
+        "operationId": "GetAuthenticationCredentialCutover",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin"
+      }
+    },
+    "/api/admin/instance/authentication-credential-cutovers": {
+      "post": {
+        "tags": [
+          "InstanceAuthenticationCredentialCutovers"
+        ],
+        "summary": "Prepare Authentication Credential Cutover",
+        "operationId": "PrepareAuthenticationCredentialCutover",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepareAuthenticationCredentialCutoverInputDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepareAuthenticationCredentialCutoverInputDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          },
+          {
+            "ApiKey": [ ]
+          }
+        ],
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "ControlPlane"
+      }
+    },
+    "/api/admin/instance/authentication-credential-cutovers/activations": {
+      "post": {
+        "tags": [
+          "InstanceAuthenticationCredentialCutovers"
+        ],
+        "summary": "Report Authentication Credential Acquisition",
+        "operationId": "ReportAuthenticationCredentialActivation",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticationCredentialActivationInputDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticationCredentialActivationInputDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          },
+          {
+            "ApiKey": [ ]
+          }
+        ],
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "ControlPlane"
+      }
+    },
+    "/api/admin/instance/authentication-credential-cutovers/fence": {
+      "post": {
+        "tags": [
+          "InstanceAuthenticationCredentialCutovers"
+        ],
+        "summary": "Attest Authentication Credential Cutover Fences",
+        "operationId": "AttestAuthenticationCredentialFence",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticationCredentialFenceInputDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticationCredentialFenceInputDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfAuthenticationCredentialCutoverDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          },
+          {
+            "ApiKey": [ ]
+          }
+        ],
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "ControlPlane"
+      }
+    },
     "/api/instance/settings/auth-provider": {
       "get": {
         "tags": [
@@ -66406,116 +67288,6 @@
           }
         },
         "x-endpoint-class": "Public"
-      }
-    },
-    "/api/instanceonboarding/auth-provider-configuration/internal": {
-      "get": {
-        "tags": [
-          "InstanceOnboarding"
-        ],
-        "summary": "Get Auth Provider Configuration (Internal)",
-        "description": "Returns auth provider configuration including secrets. For BFF internal use only. Protected by setup secret.",
-        "operationId": "GetInstanceOnboardingAuthProviderConfigurationInternal",
-        "parameters": [
-          {
-            "name": "api-version",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Api-Version",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthProviderConfigurationDto"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthProviderConfigurationDto"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthProviderConfigurationDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "410": {
-            "description": "Gone",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-endpoint-class": "Admin",
-        "x-rate-limit-policy": "SetupSecret"
       }
     },
     "/api/instanceonboarding/authz-provider-configuration/internal": {
@@ -74426,6 +75198,26 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
             "content": {
               "text/plain; v=0.1": {
                 "schema": {
@@ -138923,8 +139715,8 @@
           "endpointUrl": {
             "type": "string"
           },
-          "apiKeyConfigured": {
-            "type": "boolean"
+          "credentialScope": {
+            "type": "string"
           },
           "modelId": {
             "type": "string"
@@ -138949,14 +139741,14 @@
       "AiAssistantModelDiscoveryRequestDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AiModelDiscoveryScope"
+          },
           "endpointUrl": {
             "type": "string"
           },
-          "apiKey": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "credentialScope": {
+            "$ref": "#/components/schemas/AiCredentialScope"
           }
         }
       },
@@ -139004,7 +139796,7 @@
           "endpointUrl": {
             "type": "string"
           },
-          "apiKey": {
+          "credentialScope": {
             "type": "string"
           },
           "modelId": {
@@ -139130,6 +139922,9 @@
                     "string"
                   ],
                   "format": "uuid"
+                },
+                "version": {
+                  "type": "string"
                 },
                 "kind": {
                   "type": "string"
@@ -139340,6 +140135,14 @@
           }
         }
       },
+      "AiCredentialScope": {
+        "enum": [
+          "None",
+          "Instance",
+          "Tenant"
+        ],
+        "type": "string"
+      },
       "AiMessageImageInputDto": {
         "type": "object",
         "properties": {
@@ -139365,6 +140168,13 @@
             "format": "int64"
           }
         }
+      },
+      "AiModelDiscoveryScope": {
+        "enum": [
+          "Tenant",
+          "Instance"
+        ],
+        "type": "string"
       },
       "AiRunDto": {
         "type": "object",
@@ -140047,6 +140857,340 @@
           }
         }
       },
+      "AuthenticationCredentialActivationDto": {
+        "required": [
+          "instanceId",
+          "operationId",
+          "deploymentRevision",
+          "replicaId",
+          "processBootId",
+          "consumer",
+          "generation"
+        ],
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deploymentRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "replicaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processBootId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "consumer": {
+            "$ref": "#/components/schemas/CredentialConsumer"
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AuthenticationCredentialActivationInputDto": {
+        "required": [
+          "operationId",
+          "deploymentRevision",
+          "replicaId",
+          "processBootId",
+          "consumer",
+          "generation",
+          "expectedHeadStamp",
+          "expectedOperationStamp"
+        ],
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deploymentRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "replicaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processBootId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "consumer": {
+            "$ref": "#/components/schemas/CredentialConsumer"
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedHeadStamp": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedOperationStamp": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AuthenticationCredentialCleanupInputDto": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deploymentRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedHeadStamp": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedOperationStamp": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvedSettingIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "approvedBindingIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "AuthenticationCredentialCleanupInventoryDto": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deploymentRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "headStamp": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationStamp": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticationCredentialCleanupTargetDto"
+            }
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticationCredentialCleanupTargetDto"
+            }
+          }
+        }
+      },
+      "AuthenticationCredentialCleanupTargetDto": {
+        "required": [
+          "id",
+          "settingKey"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settingKey": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthenticationCredentialCutoverDto": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deploymentRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authority": {
+            "type": "string"
+          },
+          "authorityProfileRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentHeadStamp": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "requiredReplacements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticationCredentialReplacementDto"
+            }
+          },
+          "activations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticationCredentialActivationDto"
+            }
+          },
+          "fenceAttested": {
+            "type": "boolean"
+          },
+          "cleanedSettingCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cleanedBindingCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "AuthenticationCredentialFenceInputDto": {
+        "required": [
+          "operationId",
+          "deploymentRevision",
+          "expectedHeadStamp",
+          "expectedOperationStamp",
+          "oldProcessesTerminated",
+          "oldWritersFenced",
+          "oldSessionsFenced"
+        ],
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deploymentRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedHeadStamp": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedOperationStamp": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "oldProcessesTerminated": {
+            "type": "boolean"
+          },
+          "oldWritersFenced": {
+            "type": "boolean"
+          },
+          "oldSessionsFenced": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuthenticationCredentialReplacementDto": {
+        "required": [
+          "replicaId",
+          "previousProcessBootId",
+          "processBootId",
+          "consumer",
+          "generation"
+        ],
+        "type": "object",
+        "properties": {
+          "replicaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previousProcessBootId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processBootId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "consumer": {
+            "$ref": "#/components/schemas/CredentialConsumer"
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "AuthenticationProviderKind": {
         "enum": [
           "Keycloak",
@@ -140165,6 +141309,9 @@
               "null",
               "string"
             ]
+          },
+          "inspectOnly": {
+            "type": "boolean"
           }
         }
       },
@@ -140179,12 +141326,6 @@
           },
           "cerbosAdminEndpoint": {
             "type": "string"
-          },
-          "cerbosAdminUsernameConfigured": {
-            "type": "boolean"
-          },
-          "cerbosAdminPasswordConfigured": {
-            "type": "boolean"
           },
           "cerbosDetectedFromEnvironment": {
             "type": "boolean"
@@ -140211,9 +141352,6 @@
             ]
           },
           "cerbosEndpointOwnership": {
-            "$ref": "#/components/schemas/SecretOwnershipDto"
-          },
-          "cerbosAdminCredentialsOwnership": {
             "$ref": "#/components/schemas/SecretOwnershipDto"
           }
         }
@@ -140284,9 +141422,6 @@
           "keycloakClientId": {
             "type": "string"
           },
-          "keycloakClientSecret": {
-            "type": "string"
-          },
           "keycloakDetectedFromEnvironment": {
             "type": "boolean"
           },
@@ -140305,8 +141440,8 @@
           "googleClientId": {
             "type": "string"
           },
-          "googleClientSecret": {
-            "type": "string"
+          "googleClientSecretOwnership": {
+            "$ref": "#/components/schemas/SecretOwnershipDto"
           },
           "keycloakPublicOnboardingPolicy": {
             "$ref": "#/components/schemas/PublicOnboardingPolicy"
@@ -140360,9 +141495,6 @@
           "googleClientId": {
             "type": "string"
           },
-          "googleClientSecret": {
-            "type": "string"
-          },
           "lockAtprotoLoginEnabled": {
             "type": "boolean"
           },
@@ -140381,7 +141513,8 @@
           "googlePublicSignupUrl": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "AvailablePresetDto": {
         "required": [
@@ -142457,6 +143590,17 @@
           }
         }
       },
+      "ConfirmAiProposedActionRequestDto": {
+        "required": [
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "string"
+          }
+        }
+      },
       "ConfirmEventLocationRemediationDto": {
         "required": [
           "expectedPolicyVersion",
@@ -143546,7 +144690,10 @@
             ]
           },
           "startTime": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "date-time"
           },
           "endTime": {
@@ -145680,6 +146827,13 @@
             "format": "int32"
           }
         }
+      },
+      "CredentialConsumer": {
+        "enum": [
+          "GoogleOidc",
+          "KeycloakOidc"
+        ],
+        "type": "string"
       },
       "CurrentSupportAccessSessionDto": {
         "type": "object",
@@ -162981,6 +164135,9 @@
                   ],
                   "format": "uuid"
                 },
+                "version": {
+                  "type": "string"
+                },
                 "kind": {
                   "type": "string"
                 },
@@ -163406,6 +164563,107 @@
           }
         }
       },
+      "HalResourceOfAuthenticationCredentialCutoverDto": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deploymentRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authority": {
+            "type": "string"
+          },
+          "authorityProfileRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentHeadStamp": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "requiredReplacements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticationCredentialReplacementDto"
+            }
+          },
+          "activations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticationCredentialActivationDto"
+            }
+          },
+          "fenceAttested": {
+            "type": "boolean"
+          },
+          "cleanedSettingCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cleanedBindingCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfAuthProviderConfigurationDto": {
         "type": "object",
         "properties": {
@@ -163442,9 +164700,6 @@
           "keycloakClientId": {
             "type": "string"
           },
-          "keycloakClientSecret": {
-            "type": "string"
-          },
           "keycloakDetectedFromEnvironment": {
             "type": "boolean"
           },
@@ -163469,6 +164724,12 @@
               "configured": {
                 "type": "boolean"
               },
+              "resolutionStatus": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
               "bootstrapAvailable": {
                 "type": "boolean"
               }
@@ -163486,8 +164747,37 @@
           "googleClientId": {
             "type": "string"
           },
-          "googleClientSecret": {
-            "type": "string"
+          "googleClientSecretOwnership": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "badge": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "editable": {
+                "type": "boolean"
+              },
+              "configured": {
+                "type": "boolean"
+              },
+              "resolutionStatus": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "bootstrapAvailable": {
+                "type": "boolean"
+              }
+            }
           },
           "keycloakPublicOnboardingPolicy": {
             "$ref": "#/components/schemas/PublicOnboardingPolicy"
@@ -171874,6 +173164,19 @@
               "null",
               "string"
             ]
+          },
+          "authenticationCredentialAuthority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authenticationCredentialProfileRevision": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "totalTenantCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -184678,18 +185981,27 @@
         "additionalProperties": false
       },
       "ImportLocalizationBundleDto": {
+        "required": [
+          "languageCode",
+          "translations"
+        ],
         "type": "object",
         "properties": {
           "languageCode": {
+            "maxLength": 35,
+            "minLength": 1,
             "type": "string"
           },
           "translations": {
+            "maxProperties": 16384,
             "type": "object",
             "additionalProperties": {
+              "maxLength": 16384,
               "type": "string"
             }
           }
-        }
+        },
+        "additionalProperties": false
       },
       "IncomingWebhookEffectStatusDto": {
         "type": "object",
@@ -185680,6 +186992,19 @@
               "null",
               "string"
             ]
+          },
+          "authenticationCredentialAuthority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authenticationCredentialProfileRevision": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "totalTenantCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -187920,8 +189245,6 @@
         "type": "object",
         "properties": {
           "newPassword": {
-            "maxLength": 128,
-            "minLength": 12,
             "type": "string"
           }
         },
@@ -188233,13 +189556,9 @@
         "type": "object",
         "properties": {
           "currentPassword": {
-            "maxLength": 128,
-            "minLength": 1,
             "type": "string"
           },
           "newPassword": {
-            "maxLength": 128,
-            "minLength": 12,
             "type": "string"
           }
         },
@@ -188287,8 +189606,6 @@
             "type": "string"
           },
           "newPassword": {
-            "maxLength": 128,
-            "minLength": 12,
             "type": "string"
           }
         },
@@ -201402,6 +202719,42 @@
         ],
         "type": "string"
       },
+      "PrepareAuthenticationCredentialCutoverInputDto": {
+        "type": "object",
+        "properties": {
+          "deploymentRevision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requiredReplacements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticationCredentialReplacementDto"
+            }
+          },
+          "expectedCurrentOperationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expectedHeadStamp": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expectedPredecessorStamp": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "PrepareModerationPolicyPublicationCommand": {
         "required": [
           "request",
@@ -210312,6 +211665,12 @@
           "configured": {
             "type": "boolean"
           },
+          "resolutionStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "bootstrapAvailable": {
             "type": "boolean"
           }
@@ -213560,7 +214919,7 @@
           "aiAssistantEndpointUrl": {
             "type": "string"
           },
-          "aiAssistantApiKey": {
+          "aiAssistantCredentialScope": {
             "type": "string"
           },
           "aiAssistantModelId": {
@@ -218073,7 +219432,7 @@
           "aiAssistantEndpointUrl": {
             "type": "string"
           },
-          "aiAssistantApiKey": {
+          "aiAssistantCredentialScope": {
             "type": "string"
           },
           "aiAssistantModelId": {
@@ -221217,6 +222576,9 @@
     },
     {
       "name": "InstanceTenantLifecycle"
+    },
+    {
+      "name": "InstanceAuthenticationCredentialCutovers"
     },
     {
       "name": "InstanceAuthenticationSettings"

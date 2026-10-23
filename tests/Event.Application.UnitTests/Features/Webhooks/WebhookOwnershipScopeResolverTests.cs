@@ -71,7 +71,8 @@ public sealed class WebhookOwnershipScopeResolverTests
             Substitute.For<IWebhookConsumerRepository>(),
             Substitute.For<IWebhookEndpointRepository>(),
             Substitute.For<IWebhookMessageRepository>(),
-            Substitute.For<IWebhookDeliveryAttemptRepository>());
+            Substitute.For<IWebhookDeliveryAttemptRepository>(),
+            Substitute.For<IWebhookProviderPublicationRepository>());
 
     private static TenantUser CreateActiveTenantUser(Guid tenantId, Guid userId) => new()
     {

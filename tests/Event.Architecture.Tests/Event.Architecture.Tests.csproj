@@ -23,11 +23,17 @@
     <ProjectReference Include="..\..\src\Explore.Persistence.Migrations.Sqlite\Explore.Persistence.Migrations.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\Explore.Infrastructure\Explore.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Explore.API\Explore.API.csproj" />
+    <ProjectReference Include="..\..\src\Event.Standalone\Event.Standalone.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\Explore.Blazor.Client\Explore.Blazor.Client.csproj" />
     <ProjectReference Include="..\..\eng\tools\Explore.GeneratedContracts\Explore.GeneratedContracts.csproj" />
     <ProjectReference Include="..\..\eng\tools\Explore.AssuranceAudit\Explore.AssuranceAudit.csproj" />
     <ProjectReference Include="..\..\eng\configuration-manifest-schema\src\ISLAMU.ConfigurationManifest.SchemaGenerator\ISLAMU.ConfigurationManifest.SchemaGenerator.csproj" />
   </ItemGroup>
+
+  <Target Name="CopyReservedRouteManifest" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Copy SourceFiles="../../src/Event.Standalone/obj/$(Configuration)/$(TargetFramework)/staticwebassets.build.endpoints.json"
+          DestinationFiles="$(TargetDir)ReservedRoots.staticwebassets.endpoints.json" SkipUnchangedFiles="true" />
+  </Target>
 
   <!-- The standalone test-project entry point needs the same ordering as a solution build. -->
   <Target Name="PrepareArchitectureContractInputs" BeforeTargets="AssignProjectConfiguration" Condition="'$(DesignTimeBuild)' != 'true'">

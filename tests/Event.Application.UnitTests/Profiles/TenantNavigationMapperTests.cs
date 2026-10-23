@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Services;
+using Explore.Application.Models.Tenants;
 using Explore.Application.Services;
 using Explore.Domain.Enums;
 using Explore.Application.Contracts.Persistence;
@@ -45,8 +47,13 @@ public sealed class TenantNavigationMapperTests
         repository.GetByTenantIdOrderedAsync(TenantId, default).Returns(rows);
         var tenants = Substitute.For<ITenantRepository>();
         tenants.GetByIdAsNoTrackingAsync(TenantId, default).Returns(tenant);
+        var directory = Substitute.For<ITenantLookupSource>();
+        directory.GetTenantLookupsAsync(default).Returns(new List<TenantLookupRecord>
+        {
+            new() { TenantId = TenantId, Slug = tenant.Slug }
+        });
         var lifecycle = new TenantLifecycleAccessService(tenants, Substitute.For<IAdminContext>(),
-            Substitute.For<IInstanceBootstrapStateRepository>());
+            Substitute.For<IInstanceBootstrapStateRepository>(), directory);
         var handler = new GetTenantNavLinksQueryHandler(repository, Context(), lifecycle);
 
         var result = await handler.QueryAsync(new(), default);

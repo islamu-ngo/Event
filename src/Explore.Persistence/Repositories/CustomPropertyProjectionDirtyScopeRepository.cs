@@ -1,7 +1,9 @@
+using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Repositories;
 
@@ -80,13 +82,17 @@ public class CustomPropertyProjectionDirtyScopeRepository : ICustomPropertyProje
         DateTimeOffset drainedAt,
         CancellationToken cancellationToken)
     {
+        if (_dbContext.TenantFilterTenantId is not { } tenantId || tenantId == Guid.Empty
+            || _dbContext.IsTenantFilterBypassed
+            || _dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Projection draining requires the exact tenant Serializable transaction.");
         if (ids.Count == 0)
         {
             return;
         }
 
         await _dbContext.CustomPropertyProjectionDirtyScopes
-            .Where(e => ids.Contains(e.Id) && e.DrainedAt == null)
+            .Where(e => e.TenantId == tenantId && ids.Contains(e.Id) && e.DrainedAt == null)
             .ExecuteUpdateAsync(
                 setters => setters.SetProperty(e => e.DrainedAt, drainedAt),
                 cancellationToken);

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M534XF8WGJQJZYVDB24GZD98
+Title: "Retain immutable event report submission custody"
+Type: feat
+Scope: access
+Summary: "Bind one original report submission outbox, case version, UTC submission time and payload digest after complete validation."
+Group: event-report-submission-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Mismatched or changed reports and cases cannot retain partial or replacement provider submission custody.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Historical case version remains unchanged; persistence and provider publication integration remain required.

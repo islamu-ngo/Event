@@ -2,6 +2,13 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface ISettingMutationLock
 {
+    /// <summary>Acquires ordered coordination without replaying the operation or creating authority.</summary>
+    Task<T> ExecuteOrderedGroupsOnceAsync<T>(
+        IEnumerable<IEnumerable<string>> settingKeyGroups,
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This setting lock does not support single-attempt coordination.");
+
     Task<T> ExecuteAsync<T>(
         string settingKey,
         Func<CancellationToken, Task<T>> operation,

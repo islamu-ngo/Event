@@ -78,4 +78,48 @@ public sealed class LegalMarkdownRenderingInvariantTests
             .IsEqualTo("legal_markdown_link_text_weak");
         await Assert.That(diagnostic.Subject).IsNull();
     }
+
+    [Test]
+    public async Task Render_RejectsRepeatedPlaceholderExpansionIncludingLinkLabels()
+    {
+        var identities = new Dictionary<string, string> { ["accountable_identity"] = "Operator" };
+        string repeated = string.Concat(Enumerable.Repeat("{{accountable_identity}} ",
+            LegalMarkdownContentLimits.MaximumPlaceholdersPerLocale));
+        string label = "[{{accountable_identity}}](https://example.test/legal)";
+
+        await Assert.That(() => LegalMarkdownCodec.Inspect(repeated + label))
+            .Throws<ArgumentException>();
+        await Assert.That(() => LegalMarkdownCodec.Render(repeated + label, identities))
+            .Throws<ArgumentException>();
+
+        LegalMarkdownRenderResult bounded = LegalMarkdownCodec.Render(repeated, identities);
+        await Assert.That(bounded.IsReady).IsTrue();
+        await Assert.That(bounded.Html.Length)
+            .IsLessThanOrEqualTo(LegalMarkdownContentLimits.MaximumRenderedHtmlCharacters);
+    }
+
+    [Test]
+    public async Task Render_RejectsEncodedOutputExpansionEvenWithBoundedInput()
+    {
+        string markdown = new('&', LegalMarkdownContentLimits.MaximumMarkdownUtf8BytesPerLocale);
+        await Assert.That(() => LegalMarkdownCodec.Render(markdown, new Dictionary<string, string>()))
+            .Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task Render_IdentityValueIsEncodedOnceAndNeverReparsedAsTemplateOrMarkup()
+    {
+        LegalMarkdownRenderResult rendered = LegalMarkdownCodec.Render(
+            "{{accountable_identity}}",
+            new Dictionary<string, string>
+            {
+                ["accountable_identity"] = "{{secret}} <script>alert(1)</script> &"
+            });
+
+        await Assert.That(rendered.IsReady).IsTrue();
+        await Assert.That(rendered.Html)
+            .IsEqualTo("<p>{{secret}} &lt;script&gt;alert(1)&lt;/script&gt; &amp;</p>\n");
+        await Assert.That(rendered.Diagnostics).IsEmpty();
+        await Assert.That(rendered.LinkTargets).IsEmpty();
+    }
 }

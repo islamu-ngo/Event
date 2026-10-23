@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Domain.Ai;
 
 namespace Explore.Application.Features.AiAssistant.Actions;
 
@@ -8,16 +9,10 @@ public sealed class CreateEventDraftAiToolExecutor(ICommandHandler<CreateEventCo
 {
     private readonly CreateEventDraftAiActionMapper _mapper = new();
 
-    public Task<CreateEventDraftAiToolExecutionResult> ExecuteAsync(
-        string payloadJson,
-        CreateEventDraftAiActionMappingContext? mappingContext,
-        CancellationToken cancellationToken)
-        => ExecuteAsync(payloadJson, mappingContext, null, cancellationToken);
-
     public async Task<CreateEventDraftAiToolExecutionResult> ExecuteAsync(
+        AiToolExecution execution,
         string payloadJson,
         CreateEventDraftAiActionMappingContext? mappingContext,
-        Func<CancellationToken, Task<CreateEventDraftAiFeaturedImageResolutionResult>>? featuredImageResolver,
         CancellationToken cancellationToken)
     {
         var mappingResult = _mapper.Map(payloadJson, mappingContext);
@@ -28,24 +23,9 @@ public sealed class CreateEventDraftAiToolExecutor(ICommandHandler<CreateEventCo
                 mappingResult.FailureMessage ?? "AI event draft payload could not be mapped.");
         }
 
-        var draft = mappingResult.Draft!;
-        if (draft.FeaturedImageId is null && featuredImageResolver is not null)
-        {
-            var featuredImageResult = await featuredImageResolver(cancellationToken);
-            if (!featuredImageResult.Succeeded)
-            {
-                return CreateEventDraftAiToolExecutionResult.Failure(
-                    featuredImageResult.FailureCode ?? "ai_image_upload_failed",
-                    featuredImageResult.FailureMessage ?? "AI event draft image could not be stored.");
-            }
-
-            draft.FeaturedImageId = featuredImageResult.FeaturedImageId;
-        }
-
-        BaseCommandResponse<Guid> createResult = await createCommandHandler.ExecuteAsync(new CreateEventCommand
-        {
-            EventDto = draft.ToCreateEventDto()
-        }, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        BaseCommandResponse<Guid> createResult = await createCommandHandler.ExecuteAsync(
+            CreateEventCommand.FromAiDraft(execution, payloadJson, mappingContext), cancellationToken);
 
         if (!createResult.IsSuccess || createResult.Id == Guid.Empty)
         {

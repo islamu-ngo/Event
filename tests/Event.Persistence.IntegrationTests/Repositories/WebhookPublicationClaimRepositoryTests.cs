@@ -2,12 +2,22 @@ using System.Diagnostics;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Authorization;
+using Explore.Application.Features.Webhooks.Requests.Commands;
+using Explore.Application.Services.Webhooks;
+using Explore.Application.Exceptions;
+using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using NSubstitute;
+using Microsoft.Extensions.DependencyInjection;
 using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
@@ -18,6 +28,170 @@ public sealed class WebhookPublicationClaimRepositoryTests(PostgreSqlContainerFi
 {
     private static readonly DateTime PreparedAt =
         new(2026, 7, 14, 8, 0, 0, DateTimeKind.Utc);
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task NativeRecoveryCommandDeniesUserOwnerDespiteTenantAdminStanding(bool abandon)
+    {
+        var admin = Substitute.For<IAdminContext>();
+        await using var host = await EventVisitorCapabilitySqliteFixture.CreateAsync(
+            services => services.AddScoped<IAdminContext>(_ => admin));
+        admin.UserId.Returns(host.UserId);
+        admin.ResolveUserIdAsync(Arg.Any<CancellationToken>()).Returns((Guid?)host.UserId);
+        admin.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
+        admin.IsTenantAdminAsync(host.TenantId, Arg.Any<CancellationToken>()).Returns(true);
+        var context = host.Context;
+        Guid ownerId = Guid.CreateVersion7();
+        context.Users.Add(new User
+        {
+            Id = ownerId,
+            Pii = new UserPii { Email = "native-owner@example.test", FirstName = "Native", LastName = "Owner" }
+        });
+        context.TenantUsers.Add(new TenantUser
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = host.TenantId,
+            Tenant = null!,
+            UserId = ownerId,
+            User = null!,
+            StatusId = (int)TenantUserStatusEnum.Active
+        });
+        var consumer = CreateConsumer(host.TenantId);
+        consumer.ConsumerKind = WebhookConsumerKind.User;
+        consumer.OwnerUserId = ownerId;
+        var binding = CreateBinding(host.TenantId, consumer.Id);
+        var message = CreateMessage(host.TenantId, consumer.Id, $"owner-recovery-{Guid.CreateVersion7():N}");
+        var plan = CreatePlan(host.TenantId, message.Id, consumer.Id);
+        var publication = CreatePublication(host.TenantId, message.Id, plan.Id, binding.Id,
+            $"provider-{Guid.CreateVersion7():N}", $"transport-{Guid.CreateVersion7():N}");
+        Guid token = Guid.CreateVersion7();
+        publication.ClaimForPublishing("setup", token, PreparedAt.AddMinutes(3), PreparedAt.AddMinutes(1), 2);
+        publication.MarkPublicationUnknown(token, publication.PublicationFence, "setup_unknown",
+            null, PreparedAt.AddMinutes(4), PreparedAt.AddMinutes(2));
+        publication.RequireManualReconciliation("setup_manual", null, PreparedAt.AddMinutes(3));
+        context.AddRange(consumer, binding, message, plan, publication);
+        await context.SaveChangesAsync();
+        long version = publication.ConcurrencyVersion;
+        int attempts = publication.Attempts.Count;
+        int auditCount = await context.WebhookAuditEvents.CountAsync();
+        context.ChangeTracker.Clear();
+
+        async Task RecoverAsync(IServiceProvider services)
+        {
+            if (abandon)
+                await services.GetRequiredService<ICommandHandler<AbandonWebhookProviderPublicationCommand, BaseCommandResponse<Guid>>>()
+                    .ExecuteAsync(new()
+                    {
+                        TenantId = host.TenantId,
+                        PublicationId = publication.Id,
+                        ActorUserId = host.UserId,
+                        ExpectedConcurrencyVersion = version,
+                        ReasonCode = "owner_recovery"
+                    }, CancellationToken.None);
+            else
+                await services.GetRequiredService<ICommandHandler<ReconcileWebhookProviderPublicationCommand, BaseCommandResponse<Guid>>>()
+                    .ExecuteAsync(new()
+                    {
+                        TenantId = host.TenantId,
+                        PublicationId = publication.Id,
+                        ActorUserId = host.UserId,
+                        ExpectedConcurrencyVersion = version,
+                        ReasonCode = "owner_recovery",
+                        ExternalProviderMessageId = "confirmed-provider-id"
+                    }, CancellationToken.None);
+        }
+
+        await Assert.ThrowsAsync<AuthorizationException>(() => RecoverAsync(host.Services));
+        var retained = await context.WebhookProviderPublications.AsNoTracking().SingleAsync(row => row.Id == publication.Id);
+        await Assert.That(retained.Status).IsEqualTo(WebhookProviderPublicationStatus.ManualReconciliation);
+        await Assert.That(retained.ConcurrencyVersion).IsEqualTo(version);
+        await Assert.That(await context.WebhookProviderPublicationAttempts.CountAsync(row =>
+            row.WebhookProviderPublicationId == publication.Id)).IsEqualTo(attempts);
+        await Assert.That(await context.WebhookAuditEvents.CountAsync()).IsEqualTo(auditCount);
+
+        var controlConsumer = await context.WebhookConsumers.SingleAsync(row => row.Id == consumer.Id);
+        controlConsumer.ConsumerKind = WebhookConsumerKind.Tenant;
+        controlConsumer.OwnerUserId = null;
+        await context.SaveChangesAsync();
+        await using var control = host.CreateScope();
+        await RecoverAsync(control.ServiceProvider);
+        var completed = await context.WebhookProviderPublications.AsNoTracking().SingleAsync(row => row.Id == publication.Id);
+        await Assert.That(completed.Status).IsEqualTo(abandon
+            ? WebhookProviderPublicationStatus.Abandoned : WebhookProviderPublicationStatus.ProviderQueued);
+        await Assert.That(completed.ConcurrencyVersion).IsGreaterThan(version);
+        await Assert.That(await context.WebhookAuditEvents.CountAsync()).IsEqualTo(auditCount + 1);
+    }
+
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task PublicationRecoveryResolvesOriginalUserOwnerAndRejectsForeignTenant(
+        bool abandon, bool foreignTenant)
+    {
+        var scenario = await SeedAsync(publicationCount: 1, makeUnknown: true);
+        Guid ownerId = Guid.CreateVersion7();
+        await using (var writer = fixture.CreateDbContext())
+        {
+            var user = new User
+            {
+                Id = ownerId,
+                Pii = new UserPii { Email = "publication-owner@example.test", FirstName = "Publication", LastName = "Owner" }
+            };
+            writer.Users.Add(user);
+            writer.TenantUsers.Add(new TenantUser
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = scenario.TenantId,
+                Tenant = null!,
+                UserId = ownerId,
+                User = user,
+                StatusId = (int)TenantUserStatusEnum.Active
+            });
+            var consumer = await writer.WebhookConsumers.SingleAsync(row => row.TenantId == scenario.TenantId);
+            consumer.ConsumerKind = WebhookConsumerKind.User;
+            consumer.OwnerUserId = ownerId;
+            await writer.SaveChangesAsync();
+        }
+        var tenant = Substitute.For<ITenantContext>();
+        tenant.TenantId.Returns(foreignTenant ? scenario.OtherTenantId : scenario.TenantId);
+        await using var context = fixture.CreateDbContext();
+        context.ClearTenantFilterBypass();
+        context.TenantContext = tenant;
+        var ownership = new WebhookOwnershipScopeResolver(
+            tenant, Substitute.For<ICurrentUserService>(),
+            Substitute.For<IInstanceBootstrapStateRepository>(),
+            Substitute.For<IOrganizationRepository>(), Substitute.For<IGroupRepository>(),
+            Substitute.For<ITenantUserRepository>(), new WebhookConsumerRepository(context),
+            Substitute.For<IWebhookEndpointRepository>(), Substitute.For<IWebhookMessageRepository>(),
+            Substitute.For<IWebhookDeliveryAttemptRepository>(),
+            new WebhookProviderPublicationRepository(context));
+        var resolver = new AuthorizationResourceContextResolver(
+            webhookOwnershipScopeResolver: ownership, tenantContext: tenant);
+        Guid publicationId = scenario.Publications.Single().Id;
+        ISecureRequest command = abandon
+            ? new AbandonWebhookProviderPublicationCommand { TenantId = tenant.TenantId, PublicationId = publicationId }
+            : new ReconcileWebhookProviderPublicationCommand { TenantId = tenant.TenantId, PublicationId = publicationId };
+        string action = abandon ? AuthorizationActions.Webhooks.AbandonPublication : AuthorizationActions.Webhooks.ReconcilePublication;
+        if (foreignTenant)
+        {
+            await Assert.ThrowsAsync<AuthorizationException>(async () =>
+                await resolver.ResolveAsync(command, ResourceKinds.Webhook, action,
+                    publicationId.ToString("D"), command.AuthorizationFacts, CancellationToken.None));
+        }
+        else
+        {
+            var resolved = await resolver.ResolveAsync(command, ResourceKinds.Webhook, action,
+                publicationId.ToString("D"), command.AuthorizationFacts, CancellationToken.None);
+            await Assert.That(resolved.Facts).IsTypeOf<WebhookOwnershipAuthorizationFacts>();
+            var facts = (WebhookOwnershipAuthorizationFacts)resolved.Facts!;
+            await Assert.That(facts.Kind).IsEqualTo(WebhookConsumerKind.User);
+            await Assert.That(facts.UserId).IsEqualTo(ownerId);
+            await Assert.That(facts.TenantId).IsEqualTo(scenario.TenantId);
+        }
+    }
 
     [Test]
     public async Task ConcurrentDueClaims_ReturnEachEntityOnceAndHonorBatchLimit()

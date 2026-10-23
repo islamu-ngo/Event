@@ -1,8 +1,6 @@
 
-using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
@@ -12,17 +10,17 @@ namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
 public sealed class ResetLocalCredentialCommandHandler(
     IAdminContext adminContext,
-    IPlatformUserRoleRepository platformUserRoles,
-    ILocalCredentialAdministration credentialAdministration)
+    ILocalHumanCredentialAdministration credentialAdministration,
+    ILocalAdministrationPreparation preparation)
     : ICommandHandler<ResetLocalCredentialCommand, LocalCredentialIssueCommandResponse>
 {
     public async Task<LocalCredentialIssueCommandResponse> ExecuteAsync(
         ResetLocalCredentialCommand request, CancellationToken cancellationToken = default)
     {
-        Guid? actor = await LocalCredentialAdministrator.ResolveAsync(
-            adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
+        var original = await LocalCredentialAdministrator.ResolveAsync(
+            adminContext, preparation, request, cancellationToken)
             .ConfigureAwait(false);
-        if (actor is null)
+        if (original is null)
         {
             return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Authorization<Guid>());
         }
@@ -40,18 +38,7 @@ public sealed class ResetLocalCredentialCommandHandler(
                 errors: validation.IsValid ? ["A Local subject is required."]
                     : validation.Errors.Select(error => error.ErrorMessage)));
         }
-        var intent = new LocalCredentialResetRequest(
-            operationId: request.OperationId, initiatingApplicationUserId: actor.Value,
-            localSubjectId: request.LocalSubjectId, expectedCurrentOperationId: request.ExpectedCurrentOperationId,
-            expectedCurrentOperationConcurrencyStamp: request.ExpectedCurrentOperationConcurrencyStamp,
-            reason: request.Reason);
-        if (await LocalCredentialAdministrator.ResolveAsync(
-                adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
-                .ConfigureAwait(false) != actor)
-        {
-            return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Authorization<Guid>());
-        }
-        LocalCredentialResetResult reset = await credentialAdministration.ResetAsync(intent, cancellationToken)
+        LocalCredentialResetResult reset = await credentialAdministration.ResetAsync(original, request, cancellationToken)
             .ConfigureAwait(false);
         switch (reset.Outcome)
         {
@@ -70,13 +57,7 @@ public sealed class ResetLocalCredentialCommandHandler(
                 throw new InvalidOperationException("Unknown Local reset outcome.");
         }
         LocalCredentialOperationStatus? status = await credentialAdministration.ReadOperationAsync(
-            operationId: request.OperationId, cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (await LocalCredentialAdministrator.ResolveAsync(
-                adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
-                .ConfigureAwait(false) != actor)
-        {
-            return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Authorization<Guid>());
-        }
+            original, request, cancellationToken).ConfigureAwait(false);
         if (status is null)
         {
             return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Conflict(id: request.OperationId));

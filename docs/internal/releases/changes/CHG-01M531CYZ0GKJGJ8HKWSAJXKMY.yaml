@@ -1,0 +1,30 @@
+Change-Id: CHG-01M531CYZ0GKJGJ8HKWSAJXKMY
+Title: "Bind AI execution reservations to confirmed action identity"
+Type: feat
+Scope: access
+Summary: "Reserve one primary event and immutable image custody from confirmed action evidence, with terminal-state and lifetime guards."
+Group: ai-execution-domain-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Domain reservations bind owner, conversation and payload evidence; preview comparison tokens do not grant authorization.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Persistence configuration and generated migration parity remain pending programme dependencies before deployment.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: These domain primitives do not enable production tool execution or durable recovery without verified persistence and callers.

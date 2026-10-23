@@ -3,9 +3,11 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Explore.API.Extensions;
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationOrders;
@@ -17,14 +19,22 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure;
 using Explore.Persistence;
+using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
+using Explore.Application.Configuration;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Explore.Secrets.Extensions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Fixtures;
 
@@ -34,18 +44,29 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     private ServiceProvider _provider = null!;
     private IServiceCollection _services = null!;
     private bool _deleteSqliteFiles = true;
+    private ExploreDbContext? _seedContext;
     private AsyncServiceScope _scope;
     public Guid TenantId { get; } = Guid.CreateVersion7();
     internal Guid UserId { get; } = Guid.CreateVersion7();
     internal Guid ActorId { get; } = Guid.CreateVersion7();
     internal IServiceProvider Services => _scope.ServiceProvider;
-    internal ExploreDbContext Context => Services.GetRequiredService<ExploreDbContext>();
+    internal ExploreDbContext Context => _seedContext ?? Services.GetRequiredService<ExploreDbContext>();
     internal string DatabasePath => _path;
 
     internal AsyncServiceScope CreateScope() => _provider.CreateAsyncScope();
 
     internal ServiceProvider CreateReplica() =>
         _services.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+
+    internal ServiceProvider CreateReplica(ITenantContext tenantContext)
+    {
+        IServiceCollection replica = new ServiceCollection();
+        foreach (ServiceDescriptor descriptor in _services)
+            replica.Add(descriptor);
+        replica.RemoveAll<ITenantContext>();
+        replica.AddSingleton(tenantContext);
+        return replica.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+    }
 
     internal static async Task<EventVisitorCapabilitySqliteFixture> CreateAsync(
         Action<IServiceCollection>? configureServices = null)
@@ -61,21 +82,29 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
 
     internal static Task<EventVisitorCapabilitySqliteFixture> CreatePostgreSqlAsync(
         string connectionString,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IDictionary<string, string?>>? configureDatabase = null,
+        Func<ExploreDbContext>? createSeedContext = null)
     {
         var connection = new NpgsqlConnectionStringBuilder(connectionString);
-        var fixture = new EventVisitorCapabilitySqliteFixture { _deleteSqliteFiles = false };
-        return CreateAsync(fixture, new Dictionary<string, string?>
+        var fixture = new EventVisitorCapabilitySqliteFixture
+        {
+            _deleteSqliteFiles = false,
+            _seedContext = createSeedContext?.Invoke()
+        };
+        var database = new Dictionary<string, string?>
         {
             ["Database:Provider"] = "PostgreSql",
             ["Database:Host"] = connection.Host,
             ["Database:Port"] = connection.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["Database:Database"] = connection.Database,
             ["Database:Schema"] = connection.SearchPath,
-            ["Database:Username"] = connection.Username,
-            ["Database:Password"] = connection.Password,
+            ["Database:Runtime:Username"] = connection.Username,
+            ["Database:Runtime:Password"] = connection.Password,
             ["Database:TlsMode"] = "Disabled",
-        }, configureServices);
+        };
+        configureDatabase?.Invoke(database);
+        return CreateAsync(fixture, database, configureServices);
     }
 
     private static async Task<EventVisitorCapabilitySqliteFixture> CreateAsync(
@@ -113,6 +142,10 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
             options.PrivacyUrl = "https://example.test/privacy";
         });
         services.ConfigureApplicationServices(configuration);
+        var webEnvironment = Substitute.For<IWebHostEnvironment>();
+        webEnvironment.EnvironmentName.Returns(Environments.Production);
+        services.AddSingleton(webEnvironment);
+        services.AddApiAuthentication(configuration, webEnvironment, skipAuthorityWarmup: true);
         services.ConfigureInfrastructureServices(configuration);
         services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(fixture._path + "-keys"))
             .SetApplicationName("islamu-event");
@@ -128,6 +161,22 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
                     [new Claim(ClaimTypes.NameIdentifier, fixture.UserId.ToString())], "fixture"))
             }
         });
+        var authorityOptions = new DbContextOptionsBuilder<EmbeddedPrivacyErasureAuthorityDbContext>()
+            .UseSqlite(new SqliteConnectionStringBuilder
+            {
+                DataSource = fixture._path + "-authority.db",
+                Pooling = false
+            }.ToString()).UseSnakeCaseNamingConvention().Options;
+        var authorityFactory = new FixtureAuthorityFactory(authorityOptions);
+        await using (var authority = authorityFactory.CreateDbContext())
+            await authority.Database.EnsureCreatedAsync();
+        services.AddScoped(_ => new EmbeddedPrivacyErasureAuthorityRepository(
+            authorityFactory, TimeProvider.System, Options.Create(new PrivacyErasureOptions())));
+        services.AddScoped<IPrivacyIdentityFenceAuthority>(provider =>
+            provider.GetRequiredService<EmbeddedPrivacyErasureAuthorityRepository>());
+        services.AddScoped<IPrivacyErasureAuthority>(provider =>
+            provider.GetRequiredService<EmbeddedPrivacyErasureAuthorityRepository>());
+        services.AddScoped<IRegistrationCreationPrincipal, FixtureCreationPrincipal>();
         configureServices?.Invoke(services);
         fixture._services = services;
         fixture._provider = fixture.CreateReplica();
@@ -217,7 +266,7 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         return entity;
     }
 
-    internal async Task<(Guid CatalogId, Guid TicketId)> SeedTicketAsync(Guid eventId)
+    internal async Task<(Guid CatalogId, Guid TicketId)> SeedTicketAsync(Guid eventId, int ticketCount = 1)
     {
         var catalog = EventTicketCatalogVersion.Create(TenantId, eventId, "USD", 1);
         var pool = EventCapacityPool.Create(TenantId, eventId, "Native allocation", 10, 900,
@@ -227,6 +276,14 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
             null, null, false, false, null, null, null, null);
         catalog.AddTicketType(ticket, pool);
         catalog.AddEntitlement(ticket, TicketTypeEntitlement.CreateForEvent(ticket.Id, TenantId, eventId, 1));
+        for (int index = 1; index < ticketCount; index++)
+        {
+            var additional = EventTicketType.Create(Guid.CreateVersion7(), TenantId, catalog.Id, $"Free admission {index}", "USD",
+                TicketPricingModeEnum.Free, null, null, null, ParticipantDataCollectionModeEnum.None, pool.Id,
+                null, null, false, false, null, null, null, null);
+            catalog.AddTicketType(additional, pool);
+            catalog.AddEntitlement(additional, TicketTypeEntitlement.CreateForEvent(additional.Id, TenantId, eventId, 1));
+        }
         catalog.Publish();
         Context.AddRange(catalog, pool);
         await Context.SaveChangesAsync();
@@ -292,8 +349,24 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         public HttpContext? HttpContext { get; set; }
     }
 
+    private sealed class FixtureCreationPrincipal(ICurrentUserService current) : IRegistrationCreationPrincipal
+    {
+        public RegistrationCreationPrincipal? GetCurrent() =>
+            current.IsAuthenticated && current.UserId is { } userId && userId != Guid.Empty
+                ? new(userId, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("fixture-account"))))
+                : null;
+    }
+
+    private sealed class FixtureAuthorityFactory(DbContextOptions<EmbeddedPrivacyErasureAuthorityDbContext> options)
+        : IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>
+    {
+        public EmbeddedPrivacyErasureAuthorityDbContext CreateDbContext() => new(options);
+    }
+
     public async ValueTask DisposeAsync()
     {
+        if (_seedContext is not null)
+            await _seedContext.DisposeAsync();
         await _scope.DisposeAsync();
         await _provider.DisposeAsync();
         if (_deleteSqliteFiles)
@@ -305,5 +378,8 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
             File.Delete(_path + "-shm");
         }
         if (Directory.Exists(_path + "-keys")) Directory.Delete(_path + "-keys", recursive: true);
+        File.Delete(_path + "-authority.db");
+        File.Delete(_path + "-authority.db-wal");
+        File.Delete(_path + "-authority.db-shm");
     }
 }

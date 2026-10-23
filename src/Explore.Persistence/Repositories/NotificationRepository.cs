@@ -3,6 +3,7 @@ using Explore.Domain;
 using Explore.Domain.References;
 using Explore.Persistence.Extensions;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -10,10 +11,12 @@ namespace Explore.Persistence.Repositories;
 public class NotificationRepository : GenericRepository<Notification, Guid>, INotificationRepository
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly PostgresNativeQueueEnrollment? _nativeEnrollment;
 
-    public NotificationRepository(ExploreDbContext dbContext) : base(dbContext)
+    public NotificationRepository(ExploreDbContext dbContext, PostgresNativeQueueEnrollment? nativeEnrollment = null) : base(dbContext)
     {
         _dbContext = dbContext;
+        _nativeEnrollment = nativeEnrollment;
     }
 
     public async Task<bool> ExistsByDeduplicationKeyAsync(Guid tenantId, Guid userId, string deduplicationKey, CancellationToken cancellationToken = default)
@@ -29,6 +32,10 @@ public class NotificationRepository : GenericRepository<Notification, Guid>, INo
 
     public async Task<Notification?> GetByDeduplicationKeyAsync(Guid tenantId, Guid userId, string deduplicationKey, CancellationToken cancellationToken = default)
     {
+        if (PostgresPublicationFanoutExecutionContract.Applies(_dbContext))
+            return await PostgresPublicationFanoutExecutionContract.ReadAsync<Notification>(
+                _dbContext, _nativeEnrollment, "notification",
+                new { TenantId = tenantId, UserId = userId, DeduplicationKey = deduplicationKey }, cancellationToken);
         return await _dbContext.Notifications
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .AsNoTracking()
@@ -41,6 +48,27 @@ public class NotificationRepository : GenericRepository<Notification, Guid>, INo
     public override async Task<Notification> Create(Notification entity)
     {
         EnsureRegisteredReference(entity);
+        if (PostgresPublicationFanoutExecutionContract.Applies(_dbContext))
+        {
+            await PostgresPublicationFanoutExecutionContract.ExecuteAsync(_dbContext, _nativeEnrollment,
+                "create_notification", new
+                {
+                    entity.Id,
+                    entity.TenantId,
+                    entity.UserId,
+                    entity.Title,
+                    entity.Body,
+                    entity.DeduplicationKey,
+                    entity.NotificationTypeId,
+                    entity.NotificationEntityTypeId,
+                    entity.EntityId,
+                    entity.NotificationScopeId,
+                    entity.SourceActorId,
+                    entity.RecipientContextActorId,
+                    entity.NotificationReasonId
+                }, CancellationToken.None);
+            return entity;
+        }
         return await base.Create(entity);
     }
 

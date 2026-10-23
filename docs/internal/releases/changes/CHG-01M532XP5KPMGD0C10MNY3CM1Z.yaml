@@ -1,0 +1,29 @@
+Change-Id: CHG-01M532XP5KPMGD0C10MNY3CM1Z
+Title: "Revalidate managed event assignment facts on original owners"
+Type: feat
+Scope: access
+Summary: "Compose original-owner assignment leases and pure ordinary-authority projection without tracker or administrator shortcuts."
+Group: managed-human-assignment-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Assignment facts remain bound to original actor, tenant, event set and Serializable source-set owner.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Ordinary roles, time boundaries and separate organizer control remain unchanged; production registration and final parent admission remain required.

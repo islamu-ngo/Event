@@ -83,7 +83,7 @@ public sealed class ActorModerationRecordConfiguration : IEntityTypeConfiguratio
 {
     public void Configure(EntityTypeBuilder<ActorModerationRecord> builder)
     {
-        builder.Property(e => e.Id).HasValueGenerator<GuidVersion7ValueGenerator>();
+        builder.Property(e => e.Id).ValueGeneratedNever();
         builder.Property(e => e.ReasonCode).HasMaxLength(128).IsRequired();
         builder.HasOne(e => e.Actor)
             .WithMany(e => e.ModerationRecords)
@@ -96,7 +96,7 @@ public sealed class AtprotoIdentityModerationRecordConfiguration : IEntityTypeCo
 {
     public void Configure(EntityTypeBuilder<AtprotoIdentityModerationRecord> builder)
     {
-        builder.Property(e => e.Id).HasValueGenerator<GuidVersion7ValueGenerator>();
+        builder.Property(e => e.Id).ValueGeneratedNever();
         builder.Property(e => e.ReasonCode).HasMaxLength(128).IsRequired();
         builder.HasOne(e => e.AtprotoIdentity)
             .WithMany(e => e.ModerationRecords)

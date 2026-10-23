@@ -255,7 +255,7 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                 TrustSafetyModerationOwner = route
             })), graph);
         return new ModerationResourceQuarantineDutyRepository(context, identity.Machine, identity.Bindings,
-            new ExternalApiKeyRepository(context),
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
             new EmbeddedPrivacyErasureAuthorityRepository(privacy, fixture.Clock, Options.Create(new PrivacyErasureOptions()),
                 applicationContext: context), materializer, settings, fixture.Clock);
     }

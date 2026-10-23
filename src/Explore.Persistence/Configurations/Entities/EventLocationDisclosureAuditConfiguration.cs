@@ -52,5 +52,6 @@ public sealed class EventLocationDisclosureAuditConfiguration
         builder.HasIndex(item => new { item.TenantId, item.EventLocationId, item.NewPolicyVersion })
             .IsUnique();
         builder.HasIndex(item => new { item.TenantId, item.EventLocationId, item.OccurredAtUtc });
+        builder.HasIndex(item => item.CorrectionMessageId);
     }
 }

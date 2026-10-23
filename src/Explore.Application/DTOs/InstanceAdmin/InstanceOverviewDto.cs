@@ -7,6 +7,8 @@ public sealed record InstanceOverviewDto
     public string? PublicOrigin { get; init; }
     public string? AdminOrigin { get; init; }
     public string? InstanceBaseDomain { get; init; }
+    public string? AuthenticationCredentialAuthority { get; init; }
+    public Guid? AuthenticationCredentialProfileRevision { get; init; }
     public int TotalTenantCount { get; init; }
     public int ActiveTenantCount { get; init; }
     public IReadOnlyList<InstanceTenantStatusCountDto> TenantStatusCounts { get; init; } = [];

@@ -132,8 +132,8 @@ public sealed class PrivacyErasureCredentialCleanupJob(
 /// </summary>
 [DisallowConcurrentExecution]
 public sealed class RegistrationRetentionCleanupJob(
-    ITenantRepository tenantRepository,
-    IRegistrationRetentionCleanupRepository cleanupRepository,
+    IRegistrationRetentionTenantDiscoveryRepository tenants,
+    IRegistrationRetentionExecutionScopeFactory executionScopes,
     ILogger<RegistrationRetentionCleanupJob> logger) : IJob
 {
     private const int TenantBatchSize = 500;
@@ -143,13 +143,20 @@ public sealed class RegistrationRetentionCleanupJob(
         ArgumentNullException.ThrowIfNull(context);
 
         var deleted = 0;
-        foreach (var tenant in await tenantRepository.GetActiveAsNoTrackingAsync(context.CancellationToken))
+        Guid? afterTenantId = null;
+        while (true)
         {
-            deleted += (await cleanupRepository.CleanupTenantAsync(
-                tenant.Id,
-                DateTime.UtcNow,
-                TenantBatchSize,
-                context.CancellationToken)).TotalDeleted;
+            var page = await tenants.GetTenantIdsAsync(
+                afterTenantId, IRegistrationRetentionTenantDiscoveryRepository.PageSize, context.CancellationToken);
+            foreach (Guid tenantId in page)
+            {
+                await using var scope = await executionScopes.CreateAsync(tenantId, context.CancellationToken);
+                deleted += (await scope.CleanupAsync(
+                    DateTime.UtcNow, TenantBatchSize, context.CancellationToken)).TotalDeleted;
+            }
+            if (page.Count < IRegistrationRetentionTenantDiscoveryRepository.PageSize)
+                break;
+            afterTenantId = page[^1];
         }
 
         logger.LogInformation(

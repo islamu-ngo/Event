@@ -1,11 +1,20 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Security;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class AtprotoBootstrapReplayRepository(ExploreDbContext dbContext) : IAtprotoBootstrapReplayRepository
+public sealed class AtprotoBootstrapReplayRepository(
+    ExploreDbContext dbContext, TimeProvider? clock = null,
+    PostgresNativeQueueEnrollment? enrollment = null, IServiceProvider? services = null) : IAtprotoBootstrapReplayRepository
 {
     private const string KeyPrefix = "atproto-bootstrap:";
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+    private readonly ExploreDbContextExecutionLease? _lease = services?.GetService<ExploreDbContextExecutionLease>();
 
     public async Task<bool> TryConsumeAsync(
         string jti,
@@ -19,15 +28,21 @@ public sealed class AtprotoBootstrapReplayRepository(ExploreDbContext dbContext)
         }
 
         var key = KeyPrefix + jti;
-        var now = DateTime.UtcNow;
+        var now = _clock.GetUtcNow().UtcDateTime;
         if (expiresAt <= now)
         {
             return false;
         }
 
-        var claim = await new IdempotencyRepository(dbContext).TryClaimAsync(
+        var context = _lease?.Context ?? dbContext;
+        if (context.IsTenantFilterBypassed || context.BindTenantLease() != tenantId)
+            throw new UnauthorizedAccessException("Bootstrap receipt requires its selected tenant.");
+        if (AtprotoRepositoryNativeOperations.For(context) is { } native)
+            return await native.ConsumeBootstrapAsync(enrollment, tenantId, jti, now, expiresAt.UtcDateTime, cancellationToken);
+        var claim = await new IdempotencyRepository(context, _clock).TryClaimAsync(
             CreateRecord(key, tenantId, now, expiresAt.UtcDateTime),
             cancellationToken).ConfigureAwait(false);
+        using var owner = claim.Owner;
         return claim.IsOwner;
     }
 

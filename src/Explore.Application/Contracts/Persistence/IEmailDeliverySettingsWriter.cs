@@ -1,7 +1,15 @@
 
 using System.Collections.Immutable;
+using Explore.Application.Features.Settings;
 
 namespace Explore.Application.Contracts.Persistence;
+
+/// <summary>Only a privately compiled active mixed batch can borrow the selected Email writer.</summary>
+public interface IMixedEmailDeliverySettingsWriter
+{
+    Task<EmailDeliverySettingsWriteResult> ApplyMixedAsync(
+        MixedSettingsBatchMutation mutation, CancellationToken cancellationToken = default);
+}
 
 public interface IEmailDeliverySettingsWriter
 {
@@ -12,6 +20,15 @@ public interface IEmailDeliverySettingsWriter
 
     Task<EmailDeliverySettingsWriteResult> DisableAsync(
         EmailDeliveryDisableConfirmation confirmation,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fixed instance-administrator action on the selected tenant. Ordinary tenant
+    /// settings use ApplyAsync and never inherit this administrator disjunction.
+    /// </summary>
+    Task<EmailDeliverySettingsWriteResult> ApplyInstanceTenantAsync(
+        ImmutableArray<EmailDeliverySettingMutation> mutations,
+        Guid? actorUserId,
         CancellationToken cancellationToken = default);
 }
 

@@ -22,7 +22,7 @@ namespace Explore.Persistence.Repositories;
 /// </summary>
 internal sealed class ModerationMaintenanceAuthority(
     ExploreDbContext context, IMachinePrincipalAccessor machine,
-    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyRepository keys, TimeProvider clock)
+    IModerationMachineSubjectBindingRepository bindings, IExternalApiKeyAuthenticationRepository keys, TimeProvider clock)
 {
     public Task<ModerationSourceAuthority?> AcquireAsync(ModerationOperation operation, CancellationToken token) =>
         operation.Kind == ModerationOperationKind.Reconcile

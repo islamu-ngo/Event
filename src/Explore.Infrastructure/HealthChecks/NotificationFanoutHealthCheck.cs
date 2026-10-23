@@ -41,7 +41,7 @@ public sealed class NotificationFanoutHealthCheck(
 
         DateTime observedAt = timeProvider.GetUtcNow().UtcDateTime;
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<INotificationFanoutRunRepository>();
+        var repository = scope.ServiceProvider.GetRequiredService<INotificationFanoutAdmission>();
         NotificationFanoutProcessorSnapshot snapshot = await repository.GetProcessorSnapshotAsync(
             observedAt,
             cancellationToken);

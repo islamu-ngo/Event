@@ -154,7 +154,7 @@ public class TenantPublicExperienceAdminServiceTests
                     Setting("ai_assistant.enabled", "true"),
                     Setting("ai_assistant.provider", "\"openai-compatible\""),
                     Setting("ai_assistant.endpoint_url", "\"https://ai.example.test\""),
-                    Setting("ai_assistant.api_key", "\"secret-ref\""),
+                    Setting("ai_assistant.credential_scope", "\"tenant\""),
                     Setting("ai_assistant.model_id", "\"gpt-test\""),
                     Setting("ai_assistant.allow_anonymous_access", "true")
                 ]
@@ -175,7 +175,7 @@ public class TenantPublicExperienceAdminServiceTests
         await Assert.That(model.AiAssistantEnabled).IsTrue();
         await Assert.That(model.AiAssistantProvider).IsEqualTo("openai-compatible");
         await Assert.That(model.AiAssistantEndpointUrl).IsEqualTo("https://ai.example.test");
-        await Assert.That(model.AiAssistantApiKey).IsEqualTo("secret-ref");
+        await Assert.That(model.AiAssistantCredentialScope).IsEqualTo("tenant");
         await Assert.That(model.AiAssistantModelId).IsEqualTo("gpt-test");
         await Assert.That(model.AiAssistantAllowAnonymousAccess).IsTrue();
         await Assert.That(model.CanTenantOmitVerification).IsTrue();
@@ -482,7 +482,7 @@ public class TenantPublicExperienceAdminServiceTests
             AiAssistantEnabled = true,
             AiAssistantProvider = "openai-compatible",
             AiAssistantEndpointUrl = "https://ai.example.test",
-            AiAssistantApiKey = "secret-ref",
+            AiAssistantCredentialScope = "tenant",
             AiAssistantModelId = "gpt-test",
             AiAssistantAllowAnonymousAccess = false
         };
@@ -516,7 +516,7 @@ public class TenantPublicExperienceAdminServiceTests
     }
 
     [Test]
-    public async Task SaveSingleTenantPolicySettingsAsync_IgnoresAiAssistantConfigWithoutApiKey()
+    public async Task SaveSingleTenantPolicySettingsAsync_LeavesCredentialFreeAiConfigurationToItsOwner()
     {
         // Arrange
         var model = new TenantPolicySettingsDto
@@ -528,7 +528,7 @@ public class TenantPublicExperienceAdminServiceTests
             AiAssistantEnabled = true,
             AiAssistantProvider = "openai-compatible",
             AiAssistantEndpointUrl = "http://127.0.0.1:1337/v1",
-            AiAssistantApiKey = string.Empty,
+            AiAssistantCredentialScope = "none",
             AiAssistantModelId = "Gemma-4-E2B-Uncensored-HauhauCS-Aggressive-Q8_K_P"
         };
 
@@ -560,7 +560,7 @@ public class TenantPublicExperienceAdminServiceTests
             AiAssistantEnabled = true,
             AiAssistantProvider = "openai-compatible",
             AiAssistantEndpointUrl = "https://ai.example.test",
-            AiAssistantApiKey = "secret-ref",
+            AiAssistantCredentialScope = "tenant",
             AiAssistantModelId = string.Empty
         };
 
@@ -590,7 +590,7 @@ public class TenantPublicExperienceAdminServiceTests
             AiAssistantEnabled = true,
             AiAssistantProvider = "fake",
             AiAssistantEndpointUrl = "https://stale.example.test",
-            AiAssistantApiKey = "stale-secret",
+            AiAssistantCredentialScope = "tenant",
             AiAssistantModelId = "stale-model",
             AiAssistantAllowAnonymousAccess = true
         };

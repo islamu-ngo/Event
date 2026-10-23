@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -15,6 +16,7 @@ using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
@@ -24,6 +26,97 @@ internal static class EventResourceFileProviderContractAssertions
     private static readonly DateTime Now = new(2040, 1, 1, 12, 0, 0, DateTimeKind.Utc);
     private static readonly byte[] Pdf = "%PDF-1.7\nprovider contract\n%%EOF"u8.ToArray();
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
+
+    public static async Task AssertOverlappingQuotaReservationsAsync(PrimaryDatabaseProviderBehaviorFixture fixture)
+    {
+        await fixture.PrepareAsync();
+        await AssertOverlappingQuotaReservationsAsync(
+            interceptors => fixture.CreateSystemContext(interceptors),
+            (tenantId, interceptors) => fixture.CreateTenantContext(tenantId, interceptors));
+    }
+
+    internal static async Task AssertOverlappingQuotaReservationsAsync(
+        Func<IInterceptor[], ExploreDbContext> create,
+        Func<Guid, IInterceptor[], ExploreDbContext> createTenant)
+    {
+        await using var privacy = await global::Event.Persistence.IntegrationTests.Moderation.ModerationNoticePrivacyFixture.CreateAsync();
+        Func<ExploreDbContext> contextFactory = () => create([]);
+        UploadSeed seed = await SeedUploadAsync(contextFactory);
+        long existingBytes;
+        await using (var snapshot = contextFactory())
+            existingBytes = await snapshot.StorageObjects.Where(row =>
+                row.TenantId == seed.TenantId && row.Provider == StorageProviders.Local).SumAsync(row => row.Size);
+        await using (var accounting = createTenant(seed.TenantId, []))
+        {
+            await new EfCoreUnitOfWork(accounting).ExecuteSerializableAsync(async token =>
+            {
+                var counter = await new StorageUsageCounterRepository(accounting).RecalculateScopeAsync(
+                    seed.TenantId, StorageProviders.Local, Now, token);
+                await accounting.SaveChangesAsync(token);
+                await Assert.That(counter.UsedBytes).IsEqualTo(existingBytes);
+                return true;
+            }, CancellationToken.None);
+        }
+        long quota = existingBytes + Pdf.Length;
+        var reserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var contenderAuthorized = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseContender = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var contenderEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var boundary = new ReservationTransactionBoundary(contenderEntered);
+        using var deadline = new CancellationTokenSource(Timeout);
+        await using var firstContext = createTenant(seed.TenantId, []);
+        await using var secondContext = createTenant(seed.TenantId, [boundary]);
+        var firstWorkflow = UploadWorkflow(firstContext, contextFactory, seed, privacy, quotaBytes: quota,
+            beforeCapture: async token =>
+            {
+                reserved.TrySetResult();
+                await release.Task.WaitAsync(token);
+            });
+        var secondWorkflow = UploadWorkflow(secondContext, contextFactory, seed, privacy, quotaBytes: quota,
+            beforePolicy: async token =>
+            {
+                contenderAuthorized.TrySetResult();
+                await releaseContender.Task.WaitAsync(token);
+            });
+        // SQLite's async transaction API can block synchronously while acquiring its
+        // write lock. A separate execution thread lets the coordinator release the
+        // first transaction after observing the exact second reservation attempt.
+        var second = Task.Run(() => secondWorkflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), deadline.Token));
+        Task<Explore.Application.Responses.BaseCommandResponse<Explore.Application.DTOs.StorageObject.StorageUploadSessionDto>>? first = null;
+        try
+        {
+            await contenderAuthorized.Task.WaitAsync(Timeout, deadline.Token);
+            first = firstWorkflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), deadline.Token);
+            await reserved.Task.WaitAsync(Timeout, deadline.Token);
+            boundary.Armed = true;
+            releaseContender.TrySetResult();
+            await contenderEntered.Task.WaitAsync(Timeout, deadline.Token);
+        }
+        finally
+        {
+            release.TrySetResult();
+            releaseContender.TrySetResult();
+            if (first is not null) await first.WaitAsync(Timeout);
+            await second.WaitAsync(Timeout);
+        }
+        var winner = await first!.WaitAsync(Timeout, deadline.Token);
+        var denied = await second.WaitAsync(Timeout, deadline.Token);
+        await Assert.That(winner.IsSuccess).IsTrue();
+        await Assert.That(denied.IsSuccess).IsFalse();
+        await Assert.That(denied.FailureCode is Explore.Application.Responses.FailureCodes.QuotaExceeded
+            or Explore.Application.Responses.FailureCodes.ConcurrencyConflict).IsTrue();
+        await using var retryContext = createTenant(seed.TenantId, []);
+        var retry = await UploadWorkflow(retryContext, contextFactory, seed, privacy, quotaBytes: quota)
+            .ReserveAsync(seed.ResourceId, Intent(seed.Version), deadline.Token);
+        await Assert.That(retry.FailureCode).IsEqualTo(Explore.Application.Responses.FailureCodes.QuotaExceeded);
+        await using var verification = contextFactory();
+        await Assert.That(await verification.StorageUploadSessions.CountAsync(row =>
+            row.TenantId == seed.TenantId && row.Status == StorageUploadSessionStates.Reserved)).IsEqualTo(1);
+        var counter = await verification.StorageUsageCounters.AsNoTracking().SingleAsync(row =>
+            row.TenantId == seed.TenantId && row.Provider == StorageProviders.Local);
+        await Assert.That(counter.ReservedBytes).IsEqualTo((long)Pdf.Length);
+    }
 
     public static async Task AssertRevocationPrecedesFinalSnapshotAsync(
         PrimaryDatabaseProviderBehaviorFixture fixture)
@@ -81,7 +174,8 @@ internal static class EventResourceFileProviderContractAssertions
         PrimaryDatabaseProviderBehaviorFixture fixture)
     {
         await fixture.PrepareAsync();
-        await AssertAttachmentHasOneOwnerAsync(() => fixture.CreateSystemContext());
+        await AssertAttachmentHasOneOwnerAsync(
+            () => fixture.CreateSystemContext(), tenantId => fixture.CreateTenantContext(tenantId));
     }
 
     public static async Task AssertPolicyTighteningDeniesNewAccessAsync(
@@ -140,7 +234,7 @@ internal static class EventResourceFileProviderContractAssertions
     }
 
     internal static async Task AssertAttachmentHasOneOwnerAsync(
-        Func<ExploreDbContext> contextFactory)
+        Func<ExploreDbContext> contextFactory, Func<Guid, ExploreDbContext> createTenant)
     {
         await using var privacy = await global::Event.Persistence.IntegrationTests.Moderation.ModerationNoticePrivacyFixture.CreateAsync();
         UploadSeed seed = await SeedUploadAsync(contextFactory);
@@ -148,7 +242,7 @@ internal static class EventResourceFileProviderContractAssertions
         Guid secondSessionId;
         long existingBytes;
         long existingObjects;
-        await using (ExploreDbContext reserve = contextFactory())
+        await using (ExploreDbContext reserve = createTenant(seed.TenantId))
         {
             var inventory = reserve.StorageObjects.AsNoTracking()
                 .Where(row => row.TenantId == seed.TenantId && row.Provider == StorageProviders.Local);
@@ -168,7 +262,7 @@ internal static class EventResourceFileProviderContractAssertions
         var firstProviderEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirstProvider = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var deadline = new CancellationTokenSource(Timeout);
-        await using var firstContext = contextFactory();
+        await using var firstContext = createTenant(seed.TenantId);
         EventResourceUploadTestConsumer firstWorkflow = UploadWorkflow(firstContext, contextFactory, seed, privacy,
             async cancellationToken =>
             {
@@ -180,7 +274,7 @@ internal static class EventResourceFileProviderContractAssertions
         await firstProviderEntered.Task.WaitAsync(Timeout, deadline.Token);
 
         Explore.Application.Responses.BaseCommandResponse<Explore.Application.DTOs.StorageObject.StorageUploadSessionDto> winner;
-        await using (ExploreDbContext secondContext = contextFactory())
+        await using (ExploreDbContext secondContext = createTenant(seed.TenantId))
             winner = await FinalizeAsync(UploadWorkflow(secondContext, contextFactory, seed, privacy), secondSessionId, deadline.Token);
         releaseFirstProvider.TrySetResult();
         var loser = await first.WaitAsync(Timeout, deadline.Token);
@@ -443,7 +537,9 @@ internal static class EventResourceFileProviderContractAssertions
     private static EventResourceUploadTestConsumer UploadWorkflow(ExploreDbContext context,
         Func<ExploreDbContext> contextFactory, UploadSeed seed,
         global::Event.Persistence.IntegrationTests.Moderation.ModerationNoticePrivacyFixture privacy,
-        Func<CancellationToken, Task>? beforeWrite = null)
+        Func<CancellationToken, Task>? beforeWrite = null,
+        long quotaBytes = 10_000_000, Func<CancellationToken, Task>? beforeCapture = null,
+        Func<CancellationToken, Task>? beforePolicy = null)
     {
         var repository = new EventResourceRepository(context);
         var unit = new EfCoreUnitOfWork(context);
@@ -463,9 +559,13 @@ internal static class EventResourceFileProviderContractAssertions
         user.IsAuthenticated.Returns(true);
         var storagePolicy = Substitute.For<IStoragePolicyResolver>();
         storagePolicy.ResolveAsync(seed.TenantId, Arg.Any<StoragePolicyIntent>(), Arg.Any<CancellationToken>())
-            .Returns(new ResolvedStoragePolicy(seed.TenantId, StorageProviders.Local, 1_000_000, 10_000_000,
+            .Returns(async call =>
+            {
+                if (beforePolicy is not null) await beforePolicy(call.ArgAt<CancellationToken>(2));
+                return new ResolvedStoragePolicy(seed.TenantId, StorageProviders.Local, 1_000_000, quotaBytes,
                 1_000_000, false, true, SettingSource.SystemDefault, SettingSource.SystemDefault,
-                SettingSource.SystemDefault));
+                SettingSource.SystemDefault);
+            });
         var provider = Substitute.For<IFileStorageProvider>();
         provider.Provider.Returns(StorageProviders.Local);
         provider.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
@@ -479,8 +579,9 @@ internal static class EventResourceFileProviderContractAssertions
                 Convert.ToHexStringLower(SHA256.HashData(bytes)));
         });
         var providers = Substitute.For<IStorageProviderBindingService>();
-        providers.CaptureAsync(StorageProviders.Local, seed.TenantId, Arg.Any<CancellationToken>()).Returns(async _ =>
+        providers.CaptureAsync(StorageProviders.Local, seed.TenantId, Arg.Any<CancellationToken>()).Returns(async call =>
         {
+            if (beforeCapture is not null) await beforeCapture(call.ArgAt<CancellationToken>(2));
             var binding = StorageProviderBinding.Local(Path.GetFullPath("provider-contract-storage"));
             await context.Set<StorageProviderBinding>().AddAsync(binding);
             return binding;
@@ -488,7 +589,8 @@ internal static class EventResourceFileProviderContractAssertions
         providers.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(provider);
         var authority = new EventResourceAuthorityOrchestrator(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
-                new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                     Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
                     global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
@@ -528,7 +630,7 @@ internal static class EventResourceFileProviderContractAssertions
         var unit = new EfCoreUnitOfWork(context);
         var mutationLock = new RelationalSettingMutationLock(context, unit);
         var governance = new EventResourceGovernancePolicyReader(
-            new SystemSettingRepository(context, mutationLock), new TenantSettingRepository(context, mutationLock));
+            SystemSettingRepository.CreateReadOnly(context, mutationLock), TenantSettingRepository.CreateReadOnly(context, mutationLock));
         var routes = Substitute.For<IEventResourceProviderSnapshotReader>();
         routes.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default"));
@@ -537,7 +639,8 @@ internal static class EventResourceFileProviderContractAssertions
             .Returns(EventResourceProviderDecision.Allow);
         var repository = new EventResourceRepository(context);
         return new(unit, new EventResourceAuthoritySnapshotReader(repository,
-            new EventAuthoritySnapshotService(context), governance, new ExternalApiKeyRepository(context),
+            new EventAuthoritySnapshotService(context), governance,
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
             Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
             new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                 Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
@@ -550,7 +653,7 @@ internal static class EventResourceFileProviderContractAssertions
         await using ExploreDbContext context = contextFactory();
         var unit = new EfCoreUnitOfWork(context);
         var writer = new EventResourceSettingsWriter(context, new RelationalSettingMutationLock(context, unit), unit);
-        EventResourceSettingsWriteResult result = await writer.ApplyAsync(
+        EventResourceSettingsWriteResult result = await writer.ApplyInternalAsync(
             [new(null, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
                 EventResourceSettingMutationKind.SetValue, allowed ? "true" : "false")], null);
         await Assert.That(result.Success).IsTrue().Because(result.FailureCode ?? "accepted");
@@ -586,6 +689,18 @@ internal static class EventResourceFileProviderContractAssertions
         public override DateTimeOffset GetUtcNow() => new(Now);
     }
 
+    private sealed class ReservationTransactionBoundary(TaskCompletionSource entered) : DbTransactionInterceptor
+    {
+        public bool Armed { get; set; }
+        public override ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection, TransactionStartingEventData eventData, InterceptionResult<DbTransaction> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (Armed) entered.TrySetResult();
+            return ValueTask.FromResult(result);
+        }
+    }
+
     private sealed class TrackingStream(byte[] content) : MemoryStream(content)
     {
         public bool WasDisposed { get; private set; }
@@ -603,6 +718,12 @@ public sealed class NormalizedSqliteEventResourceFileProviderContractTests(
     EventResourceFileUploadTests.Database database)
 {
     [Test]
+    public Task OverlappingReservationsCannotExceedTenantQuota() =>
+        EventResourceFileProviderContractAssertions.AssertOverlappingQuotaReservationsAsync(
+            interceptors => database.CreateContext(interceptors),
+            (tenantId, interceptors) => database.CreateTenantContext(tenantId, interceptors));
+
+    [Test]
     public Task EventResourceRevocationPrecedesFinalSnapshot() =>
         EventResourceFileProviderContractAssertions.AssertRevocationPrecedesFinalSnapshotAsync(
             () => database.CreateContext());
@@ -610,7 +731,7 @@ public sealed class NormalizedSqliteEventResourceFileProviderContractTests(
     [Test]
     public Task EventResourceAttachmentHasOneOwner() =>
         EventResourceFileProviderContractAssertions.AssertAttachmentHasOneOwnerAsync(
-            () => database.CreateContext());
+            () => database.CreateContext(), tenantId => database.CreateTenantContext(tenantId));
 
     [Test]
     public Task EventResourcePolicyTighteningDeniesNewAccess() =>

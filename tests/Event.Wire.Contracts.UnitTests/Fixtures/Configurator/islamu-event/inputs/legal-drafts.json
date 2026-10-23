@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schemas.islamu.org/event/configuration-manifest/v1alpha2/schema.json",
+  "apiVersion": "configuration.islamu.org/v1alpha2",
+  "kind": "ConfigurationManifest",
+  "metadata": { "name": "example-legal-drafts" },
+  "spec": {
+    "instance": {
+      "settings": {},
+      "documents": {},
+      "legalDocuments": {
+        "TermsOfService": {
+          "kind": "TermsOfService",
+          "audience": "Public",
+          "lifecycleIntent": "Draft",
+          "requiresFreshAcceptance": false,
+          "jurisdictionAssumptions": ["BE"],
+          "localizations": [
+            {
+              "languageTag": "en",
+              "title": "Example terms draft",
+              "summary": "Fictional source for interoperability testing.",
+              "markdown": "# Example terms\n\nThis test document has no legal approval or publication status."
+            },
+            {
+              "languageTag": "fr",
+              "title": "Projet de conditions",
+              "summary": "Exemple fictif pour les tests.",
+              "markdown": "# Projet de conditions\n\nDocument de test sans approbation juridique."
+            }
+          ]
+        }
+      }
+    },
+    "tenants": []
+  }
+}

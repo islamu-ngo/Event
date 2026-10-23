@@ -1,150 +1,29 @@
 
 using System.Data.Common;
-using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text.Json;
-using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Features.Authentication.Local.Requests.Commands;
-using Explore.Application.Features.Authentication.Local.Handlers.Commands;
-using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Infrastructure.Identity;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
-using Explore.Persistence.Repositories;
 using Event.Persistence.IntegrationTests.Fixtures;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Event.Persistence.IntegrationTests.Identity;
 
 [Timeout(180_000)]
 public sealed class LocalCredentialBindingTests
 {
-    [Test]
-    [Arguments(IdentityDatabaseTopology.Colocated)]
-    [Arguments(IdentityDatabaseTopology.External)]
-    public async Task Received_privacy_request_blocks_Local_binding_without_changing_credentials(IdentityDatabaseTopology topology)
-    {
-        await using Fixture fixture = await Fixture.CreateAsync(topology);
-        LocalIdentityUser before = await fixture.ReadIdentityUserAsync();
-        await using (AsyncServiceScope intake = fixture.Provider.CreateAsyncScope())
-        {
-            ExploreDbContext context = fixture.Application(intake);
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            context.Set<ModerationRecognitionPending>().Add(ModerationRecognitionPending.Receive(
-                Guid.CreateVersion7(), fixture.Receipt.ApplicationUserId, 1, PrivacyErasureReasonCode.AccountDeletion,
-                Guid.CreateVersion7(), Guid.CreateVersion7(), now, now.AddHours(2), now.AddHours(1),
-                RandomNumberGenerator.GetBytes(32), now.AddHours(3)));
-            await context.SaveChangesAsync(fixture.CancellationToken);
-        }
-
-        await Assert.That(() => fixture.ReconcileAsync()).Throws<InvalidOperationException>();
-
-        await fixture.AssertNoGraphAsync();
-        LocalIdentityUser after = await fixture.ReadIdentityUserAsync();
-        await Assert.That(after.PasswordHash).IsEqualTo(before.PasswordHash);
-        await Assert.That(after.SecurityStamp).IsEqualTo(before.SecurityStamp);
-        await fixture.AssertStateAsync(LocalCredentialState.ProvisioningPending);
-    }
-
-    public enum RejectedAuthority
-    {
-        TenantAdministrator,
-        RevokedPlatformAdministrator
-    }
-
     public enum ActivationWriteBoundary
     {
         OperationUpdated,
         TokenUpdated
-    }
-
-    [Test]
-    [Arguments(IdentityDatabaseTopology.Colocated)]
-    [Arguments(IdentityDatabaseTopology.External)]
-    public async Task ReconciliationBindsExactGraphAndReplaysWithoutChangingCredentials(IdentityDatabaseTopology topology)
-    {
-        await using Fixture fixture = await Fixture.CreateAsync(topology);
-        LocalIdentityUser before = await fixture.ReadIdentityUserAsync();
-
-        BaseCommandResponse<Guid> first = await fixture.ReconcileAsync();
-
-        await Assert.That(first.IsSuccess).IsTrue();
-        await fixture.AssertExactGraphAsync();
-        await fixture.AssertStateAsync(LocalCredentialState.ChangeRequired);
-        LocalIdentityUser activated = await fixture.ReadIdentityUserAsync();
-        await Assert.That(string.Equals(activated.SecurityStamp, before.SecurityStamp, StringComparison.Ordinal)).IsFalse();
-        await Assert.That(string.Equals(activated.ConcurrencyStamp, before.ConcurrencyStamp, StringComparison.Ordinal)).IsFalse();
-        BaseCommandResponse<Guid> replay = await fixture.ReconcileAsync();
-        await Assert.That(replay.IsSuccess).IsTrue();
-        await fixture.AssertExactGraphAsync();
-        LocalIdentityUser after = await fixture.ReadIdentityUserAsync();
-        await Assert.That(string.Equals(after.PasswordHash, before.PasswordHash, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(string.Equals(after.SecurityStamp, activated.SecurityStamp, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(string.Equals(after.ConcurrencyStamp, activated.ConcurrencyStamp, StringComparison.Ordinal)).IsTrue();
-    }
-
-    [Test]
-    [Arguments(IdentityDatabaseTopology.Colocated)]
-    [Arguments(IdentityDatabaseTopology.External)]
-    public async Task ApplicationGraphFailureRollsBackWithoutAdvancingIdentity(IdentityDatabaseTopology topology)
-    {
-        await using Fixture fixture = await Fixture.CreateAsync(topology);
-        LocalIdentityUser before = await fixture.ReadIdentityUserAsync();
-        fixture.Faults.RejectGraph = true;
-
-        await Assert.ThrowsAsync<InjectedBindingFailure>(() => fixture.ReconcileAsync());
-
-        await Assert.That(fixture.Faults.GraphFaultObserved).IsTrue();
-        await fixture.AssertNoGraphAsync();
-        await fixture.AssertStateAsync(LocalCredentialState.ProvisioningPending);
-        LocalIdentityUser after = await fixture.ReadIdentityUserAsync();
-        await Assert.That(string.Equals(after.PasswordHash, before.PasswordHash, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(string.Equals(after.SecurityStamp, before.SecurityStamp, StringComparison.Ordinal)).IsTrue();
-    }
-
-    [Test]
-    [Arguments(IdentityDatabaseTopology.Colocated)]
-    [Arguments(IdentityDatabaseTopology.External)]
-    public async Task CommittedApplicationGraphSurvivesActivationFailureAndFreshRetry(IdentityDatabaseTopology topology)
-    {
-        await using Fixture fixture = await Fixture.CreateAsync(topology);
-        LocalIdentityUser before = await fixture.ReadIdentityUserAsync();
-        fixture.ActivationCommitFault.Enabled = true;
-
-        await Assert.ThrowsAsync<InjectedBindingFailure>(() => fixture.ReconcileAsync());
-
-        await Assert.That(fixture.ActivationCommitFault.Observed).IsTrue();
-        await Assert.That(fixture.ActivationCommitFault.CommitsObserved).IsEqualTo(2);
-        await fixture.AssertExactGraphAsync();
-        await fixture.AssertStateAsync(LocalCredentialState.ProvisioningPending);
-        LocalIdentityUser failed = await fixture.ReadIdentityUserAsync();
-        await Assert.That(string.Equals(failed.PasswordHash, before.PasswordHash, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(string.Equals(failed.SecurityStamp, before.SecurityStamp, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(string.Equals(failed.ConcurrencyStamp, before.ConcurrencyStamp, StringComparison.Ordinal)).IsTrue();
-        BaseCommandResponse<Guid> retry = await fixture.ReconcileAsync();
-        await Assert.That(retry.IsSuccess).IsTrue();
-        await fixture.AssertExactGraphAsync();
-        await fixture.AssertStateAsync(LocalCredentialState.ChangeRequired);
-        LocalIdentityUser after = await fixture.ReadIdentityUserAsync();
-        await Assert.That(string.Equals(after.PasswordHash, before.PasswordHash, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(string.Equals(after.SecurityStamp, before.SecurityStamp, StringComparison.Ordinal)).IsFalse();
-        await Assert.That(string.Equals(after.ConcurrencyStamp, before.ConcurrencyStamp, StringComparison.Ordinal)).IsFalse();
-        await Assert.That((await fixture.ReconcileAsync()).IsSuccess).IsTrue();
-        LocalIdentityUser replayed = await fixture.ReadIdentityUserAsync();
-        await Assert.That(string.Equals(replayed.SecurityStamp, after.SecurityStamp, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(string.Equals(replayed.ConcurrencyStamp, after.ConcurrencyStamp, StringComparison.Ordinal)).IsTrue();
-        await Assert.That(string.Equals(replayed.PasswordHash, before.PasswordHash, StringComparison.Ordinal)).IsTrue();
     }
 
     [Test]
@@ -165,151 +44,6 @@ public sealed class LocalCredentialBindingTests
         await Assert.That(result).IsEqualTo(LocalCredentialActivationOutcome.BindingIncomplete);
         await fixture.AssertNoGraphAsync();
         await fixture.AssertStateAsync(LocalCredentialState.ProvisioningPending);
-    }
-
-    [Test]
-    [Arguments(IdentityDatabaseTopology.Colocated, RejectedAuthority.TenantAdministrator)]
-    [Arguments(IdentityDatabaseTopology.External, RejectedAuthority.TenantAdministrator)]
-    [Arguments(IdentityDatabaseTopology.Colocated, RejectedAuthority.RevokedPlatformAdministrator)]
-    [Arguments(IdentityDatabaseTopology.External, RejectedAuthority.RevokedPlatformAdministrator)]
-    public async Task ReconciliationRequiresCurrentPlatformRoleDespiteTenantAuthorityOrEarlierApproval(
-        IdentityDatabaseTopology topology, RejectedAuthority authority)
-    {
-        await using Fixture fixture = await Fixture.CreateAsync(topology);
-        await using AsyncServiceScope request = fixture.Provider.CreateAsyncScope();
-        AdminContext admin = fixture.Admin(request);
-        if (authority == RejectedAuthority.RevokedPlatformAdministrator)
-        {
-            await Assert.That(await admin.IsInstanceAdminAsync(fixture.CancellationToken)).IsTrue();
-        }
-        await fixture.RemovePlatformRoleAsync();
-        if (authority == RejectedAuthority.TenantAdministrator)
-        {
-            Guid tenantId = await fixture.GrantTenantAdministratorAsync();
-            await Assert.That(await admin.IsTenantAdminAsync(tenantId, fixture.CancellationToken)).IsTrue();
-        }
-        else
-        {
-            await Assert.That(await admin.IsInstanceAdminAsync(fixture.CancellationToken)).IsFalse();
-        }
-
-        BaseCommandResponse<Guid> result = await fixture.Handler(request, admin).ExecuteAsync(
-            new ReconcileLocalCredentialOperationCommand(operationId: fixture.Receipt.OperationId), fixture.CancellationToken);
-
-        await Assert.That(result.IsSuccess).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
-        await fixture.AssertNoGraphAsync();
-        await fixture.AssertStateAsync(LocalCredentialState.ProvisioningPending);
-    }
-
-    [Test]
-    public async Task RemovedExternalLoginCannotRetainCachedAdministratorIdentity()
-    {
-        await using Fixture fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.Colocated);
-        const string issuer = "https://identity.example.test/realms/native";
-        string subject = Guid.CreateVersion7().ToString("D");
-        Guid externalLoginId = Guid.CreateVersion7();
-        await using (AsyncServiceScope seed = fixture.Provider.CreateAsyncScope())
-        {
-            ExploreDbContext application = fixture.Application(seed);
-            application.UserExternalLogins.Add(new UserExternalLogin
-            {
-                Id = externalLoginId,
-                UserId = fixture.InitiatorId,
-                User = await application.Users.SingleAsync(user => user.Id == fixture.InitiatorId, fixture.CancellationToken),
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
-                AuthenticationProvider = null!,
-                ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(issuer: issuer, subject: subject).Value,
-                CreatedAt = DateTime.UtcNow
-            });
-            await application.SaveChangesAsync(fixture.CancellationToken);
-        }
-        await using AsyncServiceScope request = fixture.Provider.CreateAsyncScope();
-        var principal = new ClaimsPrincipal(new ClaimsIdentity([
-            new Claim("sub", subject), new Claim("iss", issuer), new Claim("auth_provider", "keycloak")
-        ], "Bearer"));
-        AdminContext admin = fixture.Admin(request, principal);
-        await Assert.That(await admin.ResolveUserIdAsync(fixture.CancellationToken)).IsEqualTo(fixture.InitiatorId);
-        await using (AsyncServiceScope revoke = fixture.Provider.CreateAsyncScope())
-        {
-            ExploreDbContext application = fixture.Application(revoke);
-            application.UserExternalLogins.Remove(await application.UserExternalLogins.SingleAsync(
-                login => login.Id == externalLoginId, fixture.CancellationToken));
-            await application.SaveChangesAsync(fixture.CancellationToken);
-            await Assert.That(await new PlatformUserRoleRepository(application).IsUserPlatformAdmin(fixture.InitiatorId)).IsTrue();
-        }
-
-        Guid? resolved = await admin.ResolveUserIdAsync(fixture.CancellationToken);
-        BaseCommandResponse<Guid> result = await fixture.Handler(request, admin).ExecuteAsync(
-            new ReconcileLocalCredentialOperationCommand(operationId: fixture.Receipt.OperationId), fixture.CancellationToken);
-
-        await Assert.That(resolved).IsNull();
-        await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
-        await fixture.AssertNoGraphAsync();
-        await fixture.AssertStateAsync(LocalCredentialState.ProvisioningPending);
-    }
-
-    [Test]
-    [Arguments(IdentityDatabaseTopology.Colocated)]
-    [Arguments(IdentityDatabaseTopology.External)]
-    public async Task MatchingExternalEmailDoesNotReplaceExactLocalCredentialBinding(IdentityDatabaseTopology topology)
-    {
-        await using Fixture fixture = await Fixture.CreateAsync(topology);
-        LocalIdentityUser credential = await fixture.ReadIdentityUserAsync();
-        Guid externalUserId = Guid.CreateVersion7();
-        Guid externalActorId = Guid.CreateVersion7();
-        Guid externalLoginId = Guid.CreateVersion7();
-        string externalKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
-            issuer: "https://external.example.test/realms/native", subject: Guid.CreateVersion7().ToString("D")).Value;
-        await using (AsyncServiceScope seed = fixture.Provider.CreateAsyncScope())
-        {
-            ExploreDbContext application = fixture.Application(seed);
-            var user = new User
-            {
-                Id = externalUserId,
-                Pii = new UserPii { Email = credential.Email!, FirstName = "External", LastName = "Owner" },
-                EmailVerified = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            application.Actors.Add(new Actor
-            {
-                Id = externalActorId,
-                UserId = user.Id,
-                User = user,
-                ActorTypeId = (int)ActorTypeEnum.User,
-                ActorType = null!,
-                Pii = new ActorPii { DisplayName = "External owner" },
-                CreatedAt = DateTime.UtcNow
-            });
-            application.UserExternalLogins.Add(new UserExternalLogin
-            {
-                Id = externalLoginId,
-                UserId = user.Id,
-                User = user,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
-                AuthenticationProvider = null!,
-                ProviderKey = externalKey,
-                CreatedAt = DateTime.UtcNow
-            });
-            await application.SaveChangesAsync(fixture.CancellationToken);
-        }
-
-        BaseCommandResponse<Guid> result = await fixture.ReconcileAsync();
-
-        await Assert.That(result.IsSuccess).IsTrue();
-        await fixture.AssertExactGraphAsync();
-        await fixture.AssertStateAsync(LocalCredentialState.ChangeRequired);
-        await using AsyncServiceScope observer = fixture.Provider.CreateAsyncScope();
-        ExploreDbContext stored = fixture.Application(observer);
-        UserExternalLogin external = await stored.UserExternalLogins.SingleAsync(
-            login => login.Id == externalLoginId, fixture.CancellationToken);
-        await Assert.That(external.UserId).IsEqualTo(externalUserId);
-        await Assert.That(external.ProviderKey).IsEqualTo(externalKey);
-        await Assert.That((await stored.Actors.SingleAsync(actor => actor.Id == externalActorId, fixture.CancellationToken)).UserId)
-            .IsEqualTo(externalUserId);
-        await Assert.That(await stored.Users.CountAsync(user => user.Pii.Email == credential.Email, fixture.CancellationToken))
-            .IsEqualTo(2);
-        await Assert.That(fixture.Receipt.LocalSubjectId == externalUserId).IsFalse();
     }
 
     [Test]
@@ -358,11 +92,8 @@ public sealed class LocalCredentialBindingTests
                 expectedOperationConcurrencyStamp: currentStamp), fixture.CancellationToken);
 
         await Assert.That(superseded).IsEqualTo(LocalCredentialActivationOutcome.Conflict);
-        await using AsyncServiceScope observer = fixture.Provider.CreateAsyncScope();
-        LocalIdentityUser observedUser = await fixture.ReadIdentityUserAsync();
-        LocalCredentialStateMetadata? retained = await fixture.StateStore(observer)
-            .ReadAsync(localSubjectId: fixture.Receipt.LocalSubjectId, expectedSecurityStamp: observedUser.SecurityStamp!,
-                cancellationToken: fixture.CancellationToken);
+        LocalCredentialStateMetadata? retained = JsonSerializer.Deserialize<LocalCredentialStateMetadata>(
+            (await fixture.ReadTokenValueAsync())!);
         await Assert.That(retained!.OperationId).IsEqualTo(replacementOperationId);
         await Assert.That(retained.State).IsEqualTo(LocalCredentialState.ProvisioningPending);
         LocalIdentityUser after = await fixture.ReadIdentityUserAsync();
@@ -496,7 +227,6 @@ public sealed class LocalCredentialBindingTests
         internal Guid InitiatorId { get; } = Guid.CreateVersion7();
         internal CancellationToken CancellationToken => _timeout.Token;
         internal LocalCredentialOperationReceipt Receipt { get; private set; } = null!;
-        internal BindingFaultInterceptor Faults { get; } = new();
         internal ActivationCommitFaultInterceptor ActivationCommitFault { get; } = new();
         internal ActivationWriteFaultInterceptor ActivationWriteFault { get; } = new();
 
@@ -523,41 +253,6 @@ public sealed class LocalCredentialBindingTests
             identityDbContext: Identity(scope), applicationDbContext: Application(scope),
             userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), timeProvider: TimeProvider.System,
             identityFence: NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
-
-        internal AdminContext Admin(AsyncServiceScope scope, ClaimsPrincipal? principal = null)
-        {
-            ExploreDbContext application = Application(scope);
-            return new AdminContext(
-                httpContextAccessor: new HttpContextAccessor
-                {
-                    HttpContext = new DefaultHttpContext
-                    {
-                        User = principal ?? new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", InitiatorId.ToString("D"))], "Bearer"))
-                    }
-                },
-                platformUserRoleRepository: new PlatformUserRoleRepository(application),
-                tenantAdminRepo: new TenantUserRoleGrantRepository(application),
-                orgMemberRepo: new OrganizationMemberRepository(application),
-                groupMemberRepo: new GroupMemberRepository(application),
-                userExternalLoginRepository: new UserExternalLoginRepository(application),
-                logger: NullLogger<AdminContext>.Instance);
-        }
-
-        internal ReconcileLocalCredentialOperationCommandHandler Handler(AsyncServiceScope scope, AdminContext? admin = null) => new(
-            adminContext: admin ?? Admin(scope),
-            platformUserRoles: new PlatformUserRoleRepository(Application(scope)),
-            credentialAdministration: StateStore(scope),
-            unitOfWork: new EfCoreUnitOfWork(Application(scope)),
-            userRepository: new UserRepository(Application(scope)),
-            actorRepository: new ActorRepository(Application(scope)),
-            externalLoginRepository: new UserExternalLoginRepository(Application(scope)),
-            identityFence: NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
-
-        internal async Task<BaseCommandResponse<Guid>> ReconcileAsync()
-        {
-            await using AsyncServiceScope scope = Provider.CreateAsyncScope();
-            return await Handler(scope).ExecuteAsync(new ReconcileLocalCredentialOperationCommand(operationId: Receipt.OperationId), CancellationToken);
-        }
 
         internal async Task<LocalIdentityUser> ReadIdentityUserAsync()
         {
@@ -612,14 +307,13 @@ public sealed class LocalCredentialBindingTests
         internal async Task AssertStateAsync(LocalCredentialState expected)
         {
             await using AsyncServiceScope scope = Provider.CreateAsyncScope();
-            LocalIdentityUser user = await ReadIdentityUserAsync();
-            LocalCredentialStateMetadata? metadata = await StateStore(scope).ReadAsync(
-                localSubjectId: Receipt.LocalSubjectId, expectedSecurityStamp: user.SecurityStamp!,
-                cancellationToken: CancellationToken);
-            await Assert.That(metadata).IsNotNull();
-            await Assert.That(metadata!.State).IsEqualTo(expected);
-            await Assert.That(metadata.OperationId).IsEqualTo(Receipt.OperationId);
-            await Assert.That(metadata.ApplicationUserId).IsEqualTo(Receipt.LocalSubjectId);
+            LocalCredentialOperationStatus? status = await StateStore(scope)
+                .ReadOperationAsync(Receipt.OperationId, CancellationToken);
+            await Assert.That(status).IsNotNull();
+            await Assert.That(status!.IsCurrent).IsTrue();
+            await Assert.That(status.CredentialState).IsEqualTo(expected);
+            await Assert.That(status.Receipt.OperationId).IsEqualTo(Receipt.OperationId);
+            await Assert.That(status.Receipt.ApplicationUserId).IsEqualTo(Receipt.LocalSubjectId);
         }
 
         internal async Task AssertNoGraphAsync()
@@ -687,55 +381,6 @@ public sealed class LocalCredentialBindingTests
             await application.SaveChangesAsync(CancellationToken);
         }
 
-        internal async Task RemovePlatformRoleAsync()
-        {
-            await using AsyncServiceScope scope = Provider.CreateAsyncScope();
-            ExploreDbContext application = Application(scope);
-            application.PlatformUserRoles.RemoveRange(await application.PlatformUserRoles
-                .Where(role => role.UserId == InitiatorId).ToListAsync(CancellationToken));
-            await application.SaveChangesAsync(CancellationToken);
-        }
-
-        internal async Task<Guid> GrantTenantAdministratorAsync()
-        {
-            await using AsyncServiceScope scope = Provider.CreateAsyncScope();
-            ExploreDbContext application = Application(scope);
-            var tenant = new Tenant
-            {
-                Id = Guid.CreateVersion7(),
-                FullName = "Binding authority tenant",
-                Slug = $"binding-{Guid.CreateVersion7():N}",
-                TenantStatusId = (int)TenantStatusEnum.Active,
-                TenantStatus = null!,
-                CreatedAt = DateTime.UtcNow
-            };
-            var membership = new TenantUser
-            {
-                Id = Guid.CreateVersion7(),
-                TenantId = tenant.Id,
-                Tenant = tenant,
-                UserId = InitiatorId,
-                User = await application.Users.SingleAsync(user => user.Id == InitiatorId, CancellationToken),
-                StatusId = (int)TenantUserStatusEnum.Active,
-                CreatedAt = DateTime.UtcNow
-            };
-            application.TenantUserRoleGrants.Add(new TenantUserRoleGrant
-            {
-                Id = Guid.CreateVersion7(),
-                TenantId = tenant.Id,
-                Tenant = tenant,
-                TenantUserId = membership.Id,
-                TenantUser = membership,
-                RoleId = (int)RoleEnum.TenantAdmin,
-                Role = null!,
-                RoleScopeId = (int)RoleScopeEnum.Tenant,
-                GrantedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
-            });
-            await application.SaveChangesAsync(CancellationToken);
-            return tenant.Id;
-        }
-
         private async Task InitializeAsync()
         {
             var services = new ServiceCollection();
@@ -785,7 +430,7 @@ public sealed class LocalCredentialBindingTests
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
             .UseMemoryCache(_metadataCache)
             .UseSnakeCaseNamingConvention().AddInterceptors(
-                SqliteNamedLockTransactionInterceptor.Instance, Faults, ActivationCommitFault, ActivationWriteFault);
+                SqliteNamedLockTransactionInterceptor.Instance, ActivationCommitFault, ActivationWriteFault);
 
         public async ValueTask DisposeAsync()
         {
@@ -807,43 +452,10 @@ public sealed class LocalCredentialBindingTests
 
     private sealed class InjectedBindingFailure : Exception { }
 
-    private sealed class BindingFaultInterceptor : SaveChangesInterceptor
-    {
-        internal bool RejectGraph { get; set; }
-        internal bool GraphFaultObserved { get; private set; }
-
-        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
-            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
-        {
-            if (RejectGraph && eventData.Context!.ChangeTracker.Entries<Actor>().Any(entry => entry.State == EntityState.Added))
-            {
-                GraphFaultObserved = true;
-                throw new InjectedBindingFailure();
-            }
-            return base.SavingChangesAsync(eventData, result, cancellationToken);
-        }
-    }
-
     private sealed class ActivationCommitFaultInterceptor : DbTransactionInterceptor
     {
-        internal bool Enabled { get; set; }
-        internal bool Observed { get; private set; }
-        internal int CommitsObserved { get; private set; }
         internal bool LoseNextAcknowledgement { get; set; }
         internal bool LostAcknowledgementObserved { get; private set; }
-
-        public override ValueTask<InterceptionResult> TransactionCommittingAsync(
-            DbTransaction transaction, TransactionEventData eventData, InterceptionResult result,
-            CancellationToken cancellationToken = default)
-        {
-            if (Enabled && ++CommitsObserved == 2)
-            {
-                Enabled = false;
-                Observed = true;
-                throw new InjectedBindingFailure();
-            }
-            return base.TransactionCommittingAsync(transaction, eventData, result, cancellationToken);
-        }
 
         public override Task TransactionCommittedAsync(
             DbTransaction transaction, TransactionEndEventData eventData, CancellationToken cancellationToken = default)

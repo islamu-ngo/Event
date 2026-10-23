@@ -445,20 +445,6 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
         }
     }
 
-    public Task<IReadOnlyList<Guid>> GetRetentionTenantIds(
-        DateTime cutoffUtc,
-        int maxTenants,
-        CancellationToken cancellationToken)
-    {
-        lock (_gate)
-        {
-            IReadOnlyList<Guid> tenantIds = maxTenants > 0 && IsRetentionEligible(cutoffUtc)
-                ? [dispatch.TenantId]
-                : [];
-            return Task.FromResult(tenantIds);
-        }
-    }
-
     public Task<int> CountRetentionRedactionEligible(
         Guid tenantId,
         DateTime cutoffUtc,

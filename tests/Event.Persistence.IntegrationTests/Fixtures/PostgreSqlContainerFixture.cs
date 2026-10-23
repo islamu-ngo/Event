@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
+using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
@@ -12,7 +14,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Npgsql;
-using Respawn;
 using Respawn.Graph;
 using Testcontainers.PostgreSql;
 using TUnit.Core;
@@ -22,24 +23,58 @@ namespace Event.Persistence.IntegrationTests.Fixtures;
 
 /// <summary>
 /// Shared PostgreSQL container fixture that provides production-faithful schema via MigrateAsync
-/// and deterministic state reset via Respawn between tests.
+/// and native DELETE state reset between tests.
 /// Supports dynamic schema-per-run isolation (SET search_path = test_<run_id>) for race-free test execution.
 /// </summary>
 public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 {
     private readonly PostgreSqlContainer _container;
+    private readonly IdentityDatabaseTopology _identityTopology;
+    private readonly object _initializationLock = new();
+    private Task? _initialization;
+    private Task? _localIdentityWriterPreparation;
     private readonly ConcurrentBag<string> _isolatedSchemas = new();
     private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
     private string? _runtimeConnectionString;
-    private Respawner? _respawner;
+    private PostgreSqlDatabaseReset? _reset;
+    private readonly IReadOnlyDictionary<PrimaryDatabaseRole, (string Username, string Password)> _nativeQueueLogins;
+    public PostgresNativeQueueEnrollment NativeQueueEnrollment { get; }
 
-    public PostgreSqlContainerFixture()
+    public PostgreSqlContainerFixture() : this(IdentityDatabaseTopology.Colocated)
     {
+    }
+
+    protected PostgreSqlContainerFixture(
+        IdentityDatabaseTopology identityTopology, bool distinctMigrator = false, string? globalLoginSuffix = null)
+    {
+        if (!Enum.IsDefined(identityTopology))
+            throw new ArgumentOutOfRangeException(nameof(identityTopology));
+        _identityTopology = identityTopology;
         _container = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("explore_db_test")
             .WithUsername("postgres")
             .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
             .Build();
+        string suffix = Guid.CreateVersion7().ToString("N");
+        var purposes = new[]
+        {
+            PrimaryDatabaseRole.Global, PrimaryDatabaseRole.Runtime,
+            PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation,
+            PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
+            PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport,
+            PrimaryDatabaseRole.LocalIdentityWriter
+        }.ToList();
+        if (distinctMigrator) purposes.Add(PrimaryDatabaseRole.Migrator);
+        _nativeQueueLogins = purposes.ToDictionary(role => role, role => (
+            Username: $"queue_{(int)role}_{suffix}" + (role == PrimaryDatabaseRole.Global ? globalLoginSuffix : null),
+            Password: Convert.ToHexString(RandomNumberGenerator.GetBytes(24))));
+        NativeQueueEnrollment = new PostgresNativeQueueEnrollment(
+            _nativeQueueLogins.TryGetValue(PrimaryDatabaseRole.Migrator, out var migrator)
+                ? migrator.Username : "postgres",
+            _nativeQueueLogins[PrimaryDatabaseRole.Global].Username,
+            _nativeQueueLogins[PrimaryDatabaseRole.Runtime].Username,
+            _nativeQueueLogins[PrimaryDatabaseRole.EmailPolicyInstanceMutation].Username,
+            _nativeQueueLogins[PrimaryDatabaseRole.EmailPolicyTenantMutation].Username);
     }
 
     /// <summary>
@@ -47,32 +82,242 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     /// </summary>
     public string ConnectionString => _runtimeConnectionString ?? _container.GetConnectionString();
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
+    {
+        lock (_initializationLock)
+            return _initialization ??= InitializeCoreAsync();
+    }
+
+    /// <summary>
+    /// Activates the API host's declared writer profile; independent installer tests retain a fresh profile.
+    /// </summary>
+    internal Task PrepareLocalIdentityWriterAsync()
+    {
+        lock (_initializationLock)
+            return _localIdentityWriterPreparation ??= PrepareLocalIdentityWriterCoreAsync();
+    }
+
+    private async Task PrepareLocalIdentityWriterCoreAsync()
+    {
+        await InitializeAsync();
+        await using var migrator = CreateDbContextInternal(PrimaryDatabaseRole.Migrator);
+        migrator.BindTenantLease();
+        var enrollment = new PostgresLocalIdentityWriterEnrollment(
+            NativeQueueEnrollment.MigratorLogin,
+            NativeQueueEnrollment.RuntimeLogin,
+            _nativeQueueLogins[PrimaryDatabaseRole.LocalIdentityWriter].Username,
+            NativeQueueEnrollment.GlobalLogin);
+        await PostgresLocalIdentityWriterPermissions.ApplyAsync(migrator, enrollment,
+            _identityTopology, LocalIdentityWriterInventory.Store.Application);
+    }
+
+    private async Task InitializeCoreAsync()
     {
         await _container.StartAsync();
+        await ProvisionNativeQueueLoginsAsync();
 
         // Apply all migrations for production-faithful schema
         await using (var migratorContext = CreateDbContextInternal(PrimaryDatabaseRole.Migrator))
         {
+            migratorContext.BindTenantLease();
             await migratorContext.Database.MigrateAsync();
             await PostgresModelConstraintApplier.ApplyAsync(migratorContext);
             await PostgresTenantRowLevelSecurityModel.ApplyAsync(migratorContext);
+            await PostgresDiscoveryDisclosureContract.ApplyAsync(migratorContext);
+            await PostgresDiscoveryTraversalContract.ApplyAsync(
+                migratorContext, NativeQueueEnrollment);
+            await PostgresPublicEventDiscoveryContract.ApplyAsync(
+                migratorContext, NativeQueueEnrollment);
+            await PostgresIdempotencyReceiptContract.ApplyAsync(
+                migratorContext, NativeQueueEnrollment);
+            await PostgresAiActorContextReadContract.ApplyAsync(
+                migratorContext, NativeQueueEnrollment);
+            await PostgresEventCreationPublisherReadContract.ApplyAsync(
+                migratorContext, NativeQueueEnrollment);
+            await PostgresAiConversationOwnerFenceContract.ApplyAsync(
+                migratorContext, NativeQueueEnrollment);
+            await LookupTableSeeder.SeedAsync(migratorContext);
+            await PostgresTenantLookupContract.ApplyAsync(migratorContext);
+            await migratorContext.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresTenantLookupContract.GlobalRole}"
+                TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """);
+            await PostgresSubjectPrivacyErasureContract.ApplyAsync(migratorContext);
+            await PostgresPdsSettlementContract.ApplyAsync(migratorContext);
+            await PostgresPdsQueueAdmissionContract.ApplyAsync(migratorContext);
+            await PostgresAtprotoModerationCompensationContract.ApplyAsync(migratorContext);
+            await PostgresIntegrationSyncReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEmailDispatchAdmissionContract.ApplyAsync(migratorContext);
+            await PostgresAtprotoMaterializationContract.ApplyAsync(migratorContext);
+            await PostgresTenantApiKeyStoragePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresExternalApiKeyAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresInstanceApiKeyManagementContract.ApplyAsync(migratorContext);
+            await PostgresInstanceApiKeyIssuanceContract.ApplyAsync(migratorContext);
+            await PostgresPlatformApiKeyUsageReportContract.ApplyAsync(migratorContext);
+            foreach (var (role, executor) in new[]
+            {
+                (PrimaryDatabaseRole.InstanceKeyRead, PostgresInstanceApiKeyManagementContract.ReadExecutor),
+                (PrimaryDatabaseRole.InstanceKeyWrite, PostgresInstanceApiKeyManagementContract.WriteExecutor),
+                (PrimaryDatabaseRole.InstanceKeyIssuance, PostgresInstanceApiKeyIssuanceContract.ExecutorRole),
+                (PrimaryDatabaseRole.PlatformKeyReport, PostgresPlatformApiKeyUsageReportContract.ExecutorRole)
+            })
+            {
+                await migratorContext.Database.ExecuteSqlRawAsync(
+                    $"""
+                    GRANT "{executor}" TO "{_nativeQueueLogins[role].Username.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                    WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                    """);
+            }
+            await PostgresAdmissionScannerAuthenticationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresUserTenantMembershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresExternalLoginReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresAdministrativeAuthorityContract.ApplyAsync(migratorContext);
+            foreach (string executor in new[]
+            {
+                PostgresAdministrativeAuthorityContract.GlobalRole
+            })
+            {
+                await migratorContext.Database.ExecuteSqlRawAsync(
+                    $"""
+                    GRANT "{executor}"
+                    TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                    WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                    """);
+            }
+            await PostgresActorConsolidationContract.ApplyAsync(migratorContext);
+            await PostgresManagedTenantDomainContract.ApplyAsync(migratorContext);
+            await PostgresNotificationFanoutAdmissionContract.ApplyAsync(migratorContext);
+            await PostgresNotificationOutboxAdmissionContract.ApplyAsync(migratorContext);
+            await PostgresGenericOutboxAdmissionContract.ApplyAsync(migratorContext);
+            await PostgresOutboxExecutionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPublicationFanoutExecutionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPublicEventDetailContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPrivateEventManagementContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresRegistrationPrivateReadContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPublicEventResponseClockContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresLookupCatalogueReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresAtprotoFederationSettingPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await migratorContext.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresNotificationOutboxAdmissionContract.GlobalRole}", "{PostgresGenericOutboxAdmissionContract.GlobalRole}"
+                TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """);
+            await PostgresWebPushDispatchAdmissionContract.ApplyAsync(migratorContext);
+            await PostgresQueueDrainHealthContract.ApplyAsync(migratorContext);
+            await PostgresLocationPrivacyReviewContract.ApplyAsync(migratorContext);
+            await PostgresLocationPrivacyGovernanceContract.ApplyAsync(migratorContext);
+            await PostgresManifestReplayContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationManifestBootstrapContract.ApplyAsync(
+                migratorContext, NativeQueueEnrollment.GlobalLogin);
+            await migratorContext.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresConfigurationManifestBootstrapContract.GlobalRole}"
+                TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """);
+            await PostgresConfigurationImportSnapshotContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportStateContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportLegalSourceContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportLegalMutationContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportPublicationPolicyContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportScalarSettingContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportReceiptContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportPaidPolicyContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportTenantIdentityContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportBrandingContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportEventResourceContract.ApplyAsync(migratorContext);
+            // Enrollment is separate from installation: exercise the actual restricted
+            // Global capability, not an unrelated missing-role denial.
+            await migratorContext.Database.ExecuteSqlRawAsync(
+                $"""
+                GRANT "{PostgresConfigurationImportEventResourceContract.GlobalRole}"
+                TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                """);
+            await PostgresConfigurationImportTenantSettingContract.ApplyAsync(migratorContext);
+            foreach (string role in new[]
+            {
+                PostgresConfigurationImportSnapshotContract.GlobalRole,
+                PostgresConfigurationImportStateContract.GlobalRole,
+                PostgresConfigurationImportLegalSourceContract.GlobalRole,
+                PostgresConfigurationImportLegalMutationContract.GlobalRole,
+                PostgresConfigurationImportPublicationPolicyContract.GlobalRole,
+                PostgresConfigurationImportScalarSettingContract.GlobalRole,
+                PostgresConfigurationImportReceiptContract.GlobalRole,
+                PostgresConfigurationImportPaidPolicyContract.GlobalRole,
+                PostgresConfigurationImportTenantIdentityContract.GlobalRole,
+                PostgresConfigurationImportBrandingContract.GlobalRole,
+                PostgresConfigurationImportTenantSettingContract.GlobalRole
+            })
+                await migratorContext.Database.ExecuteSqlRawAsync(
+                    $"""
+                    GRANT "{role}" TO "{NativeQueueEnrollment.GlobalLogin.Replace("\"", "\"\"", StringComparison.Ordinal)}"
+                    WITH INHERIT TRUE, SET FALSE, ADMIN FALSE
+                    """);
+            await PostgresIncomingWebhookQueueContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEventReportOperationsContract.ApplyAsync(migratorContext);
+            await PostgresEmailRetentionReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEventResourceAuditReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresWebhookLocalDeliveryAdmissionContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresWebhookClaimEndpointStateContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresWebhookLocalDeliveryHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresHumanAdministratorCommitAuthorityContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPolicySourceSetContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresHumanPrincipalSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresHumanAuthorizationRouteContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresHumanEventAssignmentSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresHumanSupportAccessSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            if (_identityTopology == IdentityDatabaseTopology.Colocated)
+            {
+                await PostgresLocalAdministrationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+                await PostgresSupportAdministrationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+                await PostgresManagedProviderProvisioningContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            }
+            await PostgresHumanEmailSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPlatformApiKeySourceContract.ApplyAsync(migratorContext,
+                new PlatformApiKeySourceEnrollment(NativeQueueEnrollment,
+                    _nativeQueueLogins[PrimaryDatabaseRole.InstanceKeyRead].Username,
+                    _nativeQueueLogins[PrimaryDatabaseRole.InstanceKeyWrite].Username,
+                    _nativeQueueLogins[PrimaryDatabaseRole.PlatformKeyReport].Username));
+            await PostgresHumanWebhookResourceSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresHumanEventProviderSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresRegistrationFinalizationQueueContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresRegistrationProviderWriteQueueContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresRegistrationProviderSubscriptionClaimContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPaymentReconciliationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresCheckoutDispatchContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresRefundReconciliationHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresTicketingRecoveryHealthContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresInventoryHoldExpiryReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresVisitorPolicyAuthorityContract.ApplyAsync(migratorContext);
+            await PostgresEmailDeliveryPolicyContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresOperatorIdentityEditorContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresResolverConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresStorageProbeSourceContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresStorageConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresProviderConfigurationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresMixedSettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresOrdinarySettingsContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresLocalizationSecretStatusReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresTenantPreferencePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresUserTenantNavigationReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresEventResourceProviderContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresPaidPolicyCeilingContract.ApplyAsync(migratorContext);
+            await PostgresInstanceStorageAdministrationContract.ApplyAsync(migratorContext);
+            await PostgresStorageReconciliationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresLocalStorageQuarantineContract.ApplyAsync(migratorContext);
+            await PostgresDiscoveryMetadataPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresTenantMembershipMutationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresActorOwnershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
         }
 
-        await using (var runtimeContext = CreateDbContextInternal(PrimaryDatabaseRole.Runtime))
-        {
-            await LookupTableSeeder.SeedAsync(runtimeContext);
-        }
-
-        // Initialize Respawn for deterministic reset between tests
+        // Retain source custody metadata; ordinary DELETE must invalidate the original rows.
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();
-        _respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = [ApplicationSchema],
-            TablesToIgnore = CreateLookupTables()
-        });
+        _reset = await PostgreSqlDatabaseReset.CreateAsync(connection, ApplicationSchema);
     }
 
     public async ValueTask DisposeAsync()
@@ -217,15 +462,70 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     /// </summary>
     public async Task ResetAsync()
     {
-        if (_respawner is null)
+        if (_reset is null)
             throw new InvalidOperationException("Fixture not initialized. Call InitializeAsync first.");
 
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();
-        await _respawner.ResetAsync(connection);
+        await _reset.ResetAsync(connection);
 
         await using var context = CreateDbContextInternal();
+        context.BindTenantLease();
         await LookupTableSeeder.SeedAsync(context);
+    }
+
+    /// <summary>Stable declared purpose accounts; test-specific grants never extend this enrollment.</summary>
+    public PrimaryDatabaseConnectionOptions GetNativeQueueOptions(PrimaryDatabaseRole role, string? schema = null)
+    {
+        PrimaryDatabaseConnectionOptions options = CreateDatabaseOptions(role, schema);
+        if (role == PrimaryDatabaseRole.Migrator)
+            return options;
+        if (!_nativeQueueLogins.TryGetValue(role, out var login))
+            throw new ArgumentOutOfRangeException(nameof(role), role, null);
+        return options with { Username = login.Username, Password = login.Password };
+    }
+
+    /// <summary>Uses the actual enrolled Runtime login and enforced original tenant, without test bypass.</summary>
+    public ExploreDbContext CreateEnrolledTenantDbContext(
+        ITenantContext tenantContext, params IInterceptor[] interceptors)
+    {
+        ArgumentNullException.ThrowIfNull(tenantContext);
+        if (tenantContext.TenantId == Guid.Empty)
+            throw new ArgumentException("An enrolled Runtime owner requires its exact tenant.", nameof(tenantContext));
+        return CreateEnrolledRuntimeDbContext(tenantContext, interceptors);
+    }
+
+    /// <summary>Uses the actual Runtime account with an explicitly absent tenant for subject/instance work.</summary>
+    public ExploreDbContext CreateEnrolledTenantlessDbContext(params IInterceptor[] interceptors) =>
+        CreateEnrolledRuntimeDbContext(null, interceptors);
+
+    private ExploreDbContext CreateEnrolledRuntimeDbContext(ITenantContext? tenantContext, IInterceptor[] interceptors)
+    {
+        var builder = TestDbContextOptions.Create<ExploreDbContext>().UseMemoryCache(_metadataCache);
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder,
+            GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
+        builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
+        builder.AddInterceptors(interceptors);
+        return new ExploreDbContext(builder.Options) { TenantContext = tenantContext };
+    }
+
+    private async Task ProvisionNativeQueueLoginsAsync()
+    {
+        NativeQueueEnrollment.Validate();
+        await using var connection = new NpgsqlConnection(_container.GetConnectionString());
+        await connection.OpenAsync();
+        foreach (var (role, login) in _nativeQueueLogins)
+        {
+            await using var command = connection.CreateCommand();
+            string username = "\"" + login.Username.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+            string password = "'" + login.Password.Replace("'", "''", StringComparison.Ordinal) + "'";
+            // Only the opt-in migration administrator is demoted after creating its own schema.
+            string attributes = role == PrimaryDatabaseRole.Migrator
+                ? "SUPERUSER CREATEDB CREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
+                : "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS";
+            command.CommandText = $"CREATE ROLE {username} LOGIN {attributes} PASSWORD {password}";
+            await command.ExecuteNonQueryAsync();
+        }
     }
 
     private ExploreDbContext CreateDbContextInternal(
@@ -260,6 +560,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         string? schema = null)
     {
         var container = new NpgsqlConnectionStringBuilder(_container.GetConnectionString());
+        bool declaredMigrator = _nativeQueueLogins.TryGetValue(PrimaryDatabaseRole.Migrator, out var migrator);
         return new PrimaryDatabaseConnectionOptions
         {
             Role = role,
@@ -268,14 +569,14 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             Port = container.Port,
             Database = container.Database,
             Schema = schema ?? RelationalModelNamespace.DefaultSchema,
-            Username = container.Username,
-            Password = container.Password,
+            Username = declaredMigrator ? migrator.Username : container.Username,
+            Password = declaredMigrator ? migrator.Password : container.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled,
         };
     }
 
     /// <summary>
-    /// Lookup tables seeded by LookupTableSeeder that Respawn must preserve.
+    /// Application schema shared by migration and reset.
     /// </summary>
     private string ApplicationSchema => GetApplicationSchema(ConnectionString);
 
@@ -285,13 +586,158 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             .FirstOrDefault()
         ?? RelationalModelNamespace.DefaultSchema;
 
-    private static Table[] CreateLookupTables() => UnqualifiedLookupTables
-        .Select(table => new Table(table.Name))
-        .ToArray();
+}
+
+/// <summary>
+/// Deletes referencing foreign-key components first, with one statement per cycle.
+/// Native guards and OLD-image invalidation run unchanged; no schema or privilege changes occur.
+/// This helper is also compiled into the API suite through its existing fixture source link.
+/// </summary>
+internal sealed class PostgreSqlDatabaseReset(string[] tables, IReadOnlyDictionary<string, string[]> dependencies)
+{
+    public static async Task<PostgreSqlDatabaseReset> CreateAsync(NpgsqlConnection connection, string schema)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT c.relname
+            FROM pg_catalog.pg_class c
+            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = @schema AND c.relkind IN ('r', 'p') AND NOT c.relispartition
+            ORDER BY c.relname COLLATE "C"
+            """;
+        command.Parameters.AddWithValue("schema", schema);
+        var preserved = UnqualifiedLookupTables.Select(table => table.Name).ToHashSet(StringComparer.Ordinal);
+        var tables = new List<string>();
+        using var identifiers = new NpgsqlCommandBuilder();
+        await using (var rows = await command.ExecuteReaderAsync())
+        {
+            while (await rows.ReadAsync())
+            {
+                string table = rows.GetString(0);
+                if (!preserved.Contains(table))
+                    tables.Add($"{identifiers.QuoteIdentifier(schema)}.{identifiers.QuoteIdentifier(table)}");
+            }
+        }
+        var references = tables.ToDictionary(table => table, _ => new HashSet<string>(StringComparer.Ordinal),
+            StringComparer.Ordinal);
+        command.CommandText = """
+            SELECT child.relname, parent.relname
+            FROM pg_catalog.pg_constraint constraint_row
+            JOIN pg_catalog.pg_class child ON child.oid = constraint_row.conrelid
+            JOIN pg_catalog.pg_namespace child_namespace ON child_namespace.oid = child.relnamespace
+            JOIN pg_catalog.pg_class parent ON parent.oid = constraint_row.confrelid
+            JOIN pg_catalog.pg_namespace parent_namespace ON parent_namespace.oid = parent.relnamespace
+            WHERE constraint_row.contype = 'f'
+                AND child_namespace.nspname = @schema AND parent_namespace.nspname = @schema
+            """;
+        await using (var rows = await command.ExecuteReaderAsync())
+        {
+            while (await rows.ReadAsync())
+            {
+                string child = $"{identifiers.QuoteIdentifier(schema)}.{identifiers.QuoteIdentifier(rows.GetString(0))}";
+                string parent = $"{identifiers.QuoteIdentifier(schema)}.{identifiers.QuoteIdentifier(rows.GetString(1))}";
+                if (references.TryGetValue(child, out var parents) && references.ContainsKey(parent))
+                    parents.Add(parent);
+            }
+        }
+        return new(tables.ToArray(), references.ToDictionary(pair => pair.Key,
+            pair => pair.Value.ToArray(), StringComparer.Ordinal));
+    }
+
+    public async Task ResetAsync(NpgsqlConnection connection)
+    {
+        if (tables.Length == 0)
+            throw new InvalidOperationException("The reset schema contains no transactional tables.");
+
+        await using var transaction = await connection.BeginTransactionAsync();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        // Empty DELETE statements still execute native statement guards. Select actual
+        // populated relations first rather than planning every possible source mutation.
+        command.CommandText = "SELECT " + string.Join(", ", tables.Select(table =>
+            $"EXISTS (SELECT 1 FROM {table})"));
+        var populated = new List<string>();
+        await using (var rows = await command.ExecuteReaderAsync())
+        {
+            if (!await rows.ReadAsync())
+                throw new InvalidOperationException("Native reset could not observe its transactional tables.");
+            for (int index = 0; index < tables.Length; index++)
+                if (rows.GetBoolean(index))
+                    populated.Add(tables[index]);
+        }
+        if (populated.Count != 0)
+        {
+            var pending = populated.ToHashSet(StringComparer.Ordinal);
+            var reachable = populated.ToDictionary(table => table, table =>
+            {
+                var visited = new HashSet<string>(StringComparer.Ordinal);
+                void Visit(string current)
+                {
+                    if (!visited.Add(current))
+                        return;
+                    foreach (string parent in dependencies[current])
+                        if (pending.Contains(parent))
+                            Visit(parent);
+                }
+                Visit(table);
+                return visited;
+            }, StringComparer.Ordinal);
+            while (pending.Count != 0)
+            {
+                bool deleted = false;
+                foreach (string table in populated.Where(pending.Contains))
+                {
+                    // Mutual reachability is exactly one strongly connected FK component.
+                    var component = pending.Where(other =>
+                        reachable[table].Contains(other) && reachable[other].Contains(table))
+                        .ToHashSet(StringComparer.Ordinal);
+                    if (pending.Except(component).Any(child => dependencies[child].Any(component.Contains)))
+                        continue;
+
+                    // Delete referencing components first; only a true cycle needs a
+                    // multi-table statement. All groups retain one owning transaction.
+                    command.CommandText = "WITH " + string.Join(",\n",
+                        component.Order(StringComparer.Ordinal).Select((relation, index) =>
+                            $"reset_{index} AS (DELETE FROM {relation})")) + "\nSELECT 1;";
+                    await command.ExecuteNonQueryAsync();
+                    pending.ExceptWith(component);
+                    deleted = true;
+                    break;
+                }
+                if (!deleted)
+                    throw new InvalidOperationException("Native reset could not order its foreign-key components.");
+            }
+        }
+
+        // Fail and roll back rather than silently accepting a trigger that retained business rows.
+        command.CommandText = "SELECT " + string.Join(" OR ", tables.Select(table =>
+            $"EXISTS (SELECT 1 FROM {table})"));
+        if (await command.ExecuteScalarAsync() is not false)
+            throw new InvalidOperationException("Native reset left transactional rows behind.");
+        await transaction.CommitAsync();
+    }
 
     private static readonly Table[] UnqualifiedLookupTables =
     [
         new("__EFMigrationsHistory"),
+        new("__EFDataProtectionMigrationsHistory"),
+        new("__EFPrivacyErasureAuthorityMigrationsHistory"),
+        new("policy_source_set"),
+        new("resolver_configuration_source"),
+        new("storage_probe_source"),
+        new("storage_configuration_source"),
+        new("provider_configuration_source"),
+        new("mixed_settings_source"),
+        new("ordinary_settings_source"),
+        new("event_resource_provider_source"),
+        new("local_administration_source"),
+        new("support_administration_source"),
+        new("human_provisioning_source"),
+        new("human_principal_source_epoch"),
+        new("human_event_assignment_source_epoch"),
+        new("human_support_access_source_epoch"),
+        new("human_webhook_resource_source_epoch"),
+        new("human_event_provider_source_epochs"),
         new("account_authority_kinds"),
         new("ai_conversation_statuses"),
         new("ai_message_roles"),
@@ -317,6 +763,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         new("event_public_action_health_states"),
         new("event_public_action_kinds"),
         new("event_registration_policies"),
+        new("event_session_kinds"),
         new("event_session_statuses"),
         new("event_statuses"),
         new("event_types"),
@@ -359,6 +806,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         new("registration_scopes"),
         new("role_scopes"),
         new("roles"),
+        new("role_permissions"),
         new("schedule_item_kinds"),
         new("secret_source_types"),
         new("secret_validation_statuses"),
@@ -376,6 +824,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         new("tenant_plan_assignment_statuses"),
         new("tenant_plan_statuses"),
         new("tenant_statuses"),
+        new("ui_theme_presets"),
         new("visibility_types"),
         new("incoming_webhook_message_statuses"),
         new("incoming_webhook_processing_attempt_outcomes"),

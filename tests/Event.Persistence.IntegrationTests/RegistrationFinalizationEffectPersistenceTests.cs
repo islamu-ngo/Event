@@ -3,8 +3,14 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
+using Explore.Persistence.Schema;
+using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using System.Security.Cryptography;
 using Testcontainers.PostgreSql;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -246,9 +252,30 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         await using var database = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("phase85")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
             .Build();
         await database.StartAsync();
+        string suffix = Guid.CreateVersion7().ToString("N");
+        var enrollment = new PostgresNativeQueueEnrollment("postgres", $"final_global_{suffix}",
+            $"final_runtime_{suffix}", $"final_instance_{suffix}", $"final_tenant_{suffix}");
+        string globalPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        await using (var connection = new NpgsqlConnection(database.GetConnectionString()))
+        {
+            await connection.OpenAsync();
+            foreach (string login in new[]
+                     {
+                         enrollment.GlobalLogin, enrollment.RuntimeLogin,
+                         enrollment.EmailInstanceMutationLogin, enrollment.EmailTenantMutationLogin
+                     })
+            {
+                await using var command = connection.CreateCommand();
+                string password = login == enrollment.GlobalLogin
+                    ? $" PASSWORD '{globalPassword}'"
+                    : string.Empty;
+                command.CommandText = $"CREATE ROLE \"{login}\" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS{password}";
+                await command.ExecuteNonQueryAsync();
+            }
+        }
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(database.GetConnectionString())
             .UseSnakeCaseNamingConvention()
@@ -277,21 +304,37 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
             await Assert.That(ready).IsTrue();
             await Assert.That(await setup.RegistrationRequirementFulfillments.CountAsync()).IsEqualTo(1);
             await Assert.That(await setup.RegistrationFinalizationEffects.CountAsync()).IsEqualTo(1);
+            await PostgresRegistrationFinalizationQueueContract.ApplyAsync(setup, enrollment);
         }
 
+        var databaseConnection = new NpgsqlConnectionStringBuilder(database.GetConnectionString());
+        var global = new GlobalExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Global,
+            Provider = PrimaryDatabaseProvider.PostgreSql,
+            Host = databaseConnection.Host,
+            Port = databaseConnection.Port,
+            Database = databaseConnection.Database,
+            Schema = RelationalModelNamespace.DefaultSchema,
+            Username = enrollment.GlobalLogin,
+            Password = globalPassword,
+            TlsMode = PrimaryDatabaseTlsMode.Disabled
+        });
         await using ExploreDbContext firstContext = CreateContext(options, false);
         await using ExploreDbContext secondContext = CreateContext(options, false);
+        firstContext.TenantContext = new FinalizationTenantContext(order.TenantId);
+        secondContext.TenantContext = new FinalizationTenantContext(order.TenantId);
         var first = new RegistrationFinalizationRepository(firstContext);
         var second = new RegistrationFinalizationRepository(secondContext);
         var claims = await Task.WhenAll(
-            first.ClaimDueAsync("worker-a", 1, UtcNow.AddSeconds(1), TimeSpan.FromMinutes(1), CancellationToken.None),
-            second.ClaimDueAsync("worker-b", 1, UtcNow.AddSeconds(1), TimeSpan.FromMinutes(1), CancellationToken.None));
+            ClaimAsync(global, "worker-a", UtcNow.AddSeconds(1)),
+            ClaimAsync(global, "worker-b", UtcNow.AddSeconds(1)));
         RegistrationFinalizationClaim abandonedClaim = claims.SelectMany(value => value).Single();
-        IReadOnlyList<RegistrationFinalizationClaim> prematureRecovery = await first.ClaimDueAsync(
-            "worker-c", 1, UtcNow.AddSeconds(30), TimeSpan.FromMinutes(1), CancellationToken.None);
+        IReadOnlyList<RegistrationFinalizationClaim> prematureRecovery = await ClaimAsync(
+            global, "worker-c", UtcNow.AddSeconds(30));
         var recoveredClaims = await Task.WhenAll(
-            first.ClaimDueAsync("worker-c", 1, UtcNow.AddMinutes(1).AddSeconds(1), TimeSpan.FromMinutes(1), CancellationToken.None),
-            second.ClaimDueAsync("worker-d", 1, UtcNow.AddMinutes(1).AddSeconds(1), TimeSpan.FromMinutes(1), CancellationToken.None));
+            ClaimAsync(global, "worker-c", UtcNow.AddMinutes(1).AddSeconds(1)),
+            ClaimAsync(global, "worker-d", UtcNow.AddMinutes(1).AddSeconds(1)));
         RegistrationFinalizationClaim recoveredClaim = recoveredClaims.SelectMany(value => value).Single();
         bool staleCompletion = await first.CompleteAsync(
             abandonedClaim, UtcNow.AddMinutes(1).AddSeconds(2), CancellationToken.None);
@@ -402,6 +445,17 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
 
     private static string Hash(string value) =>
         Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value)));
+
+    private static async Task<IReadOnlyList<RegistrationFinalizationClaim>> ClaimAsync(
+        IGlobalExploreDbContextFactory factory, string owner, DateTime claimedAt)
+    {
+        await using var context = await factory.CreateDbContextAsync();
+        return await context.Database.SqlQueryRaw<RegistrationFinalizationClaim>(
+            $"SELECT * FROM {PostgresRegistrationFinalizationQueueContract.FunctionSql(context)}({{0}}, {{1}}, {{2}}, {{3}})",
+            owner, 1, claimedAt, TimeSpan.FromMinutes(1)).ToListAsync();
+    }
+
+    private sealed record FinalizationTenantContext(Guid TenantId) : Explore.Application.Contracts.Infrastructure.ITenantContext;
 
     private static ExploreDbContext CreateContext(DbContextOptions<ExploreDbContext> options, bool bypassTenantFilter)
     {

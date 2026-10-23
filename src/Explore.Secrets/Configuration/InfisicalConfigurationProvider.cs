@@ -68,7 +68,8 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
     /// </summary>
     private void LoadViaRestApi()
     {
-        using var handler = CreateIpv4Handler();
+        SecretAcquisitionPolicy.AdmitPaths(_source.Consumer, _source.Paths);
+        using var handler = _source.MessageHandlerFactory?.Invoke() ?? CreateIpv4Handler();
         using var http = new HttpClient(handler, disposeHandler: false)
         {
             Timeout = TimeSpan.FromSeconds(15),
@@ -111,7 +112,7 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 + $"?workspaceId={Uri.EscapeDataString(_source.ProjectId)}"
                 + $"&environment={Uri.EscapeDataString(_source.Environment)}"
                 + $"&secretPath={Uri.EscapeDataString(path)}"
-                + "&expandSecretReferences=true&recursive=true";
+                + "&expandSecretReferences=false&recursive=false&include_imports=false";
 
             var listResp = http.GetAsync(listUrl).GetAwaiter().GetResult();
 
@@ -124,30 +125,31 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 .ReadFromJsonAsync<InfisicalListSecretsResponse>()
                 .GetAwaiter().GetResult();
 
-            if (listJson?.Secrets is null || listJson.Secrets.Count == 0)
-            {
-                continue;
-            }
+            if (listJson?.Secrets is null)
+                throw new InvalidOperationException("secret_authority_invalid");
 
             foreach (var secret in listJson.Secrets)
             {
-                if (string.IsNullOrEmpty(secret.SecretKey)) continue;
-
-                var secretValue = secret.SecretValue;
-                if (string.IsNullOrWhiteSpace(secretValue)) continue;
-
                 var secretPath = ValidateSecretPath(secret.SecretPath, path);
+                if (string.IsNullOrEmpty(secret.SecretKey)
+                    || secret.SecretValue is null
+                    || secret.SecretValue.Contains("${", StringComparison.Ordinal))
+                    throw new InvalidOperationException("secret_authority_invalid");
+                var secretValue = secret.SecretValue;
+                SecretAcquisitionPolicy.AdmitEntry(secretPath, secret.SecretKey);
                 var configKey = ConvertToConfigurationKey(secret.SecretKey, secretPath);
                 if (configKey is null)
                 {
                     continue;
                 }
 
-                newData[configKey] = secretValue;
+                if (!newData.TryAdd(configKey, secretValue))
+                    throw new InvalidOperationException("secret_authority_invalid");
 
-                // Flat deployment aliases belong to the requested folder, not recursive children.
+                // Flat deployment aliases belong only to the exact requested folder.
                 // Explicit identity/erasure reads must also never publish primary database aliases.
                 if (secretPath.Equals(path.TrimEnd('/'), StringComparison.Ordinal)
+                    && !secretPath.StartsWith("/runtime/bff/", StringComparison.Ordinal)
                     && (!secretPath.StartsWith("/database/", StringComparison.Ordinal)
                         || secretPath == "/database/identity" && secret.SecretKey.StartsWith("IDENTITY_DATABASE_", StringComparison.OrdinalIgnoreCase)
                         || secretPath == "/database/erasure" && secret.SecretKey.StartsWith("ERASURE_DATABASE_", StringComparison.OrdinalIgnoreCase)))
@@ -252,15 +254,11 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
 
     private static string ValidateSecretPath(string? secretPath, string requestedPath)
     {
-        var path = secretPath?.TrimEnd('/');
-        var root = requestedPath.TrimEnd('/');
-        if (secretPath is null || !secretPath.StartsWith('/')
-            || secretPath.Split('/').Any(segment => segment is "." or "..")
-            || !(root.Length == 0 || path == root || path!.StartsWith(root + "/", StringComparison.Ordinal)))
+        if (!string.Equals(secretPath, requestedPath, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("secret_authority_invalid");
         }
-        return path!;
+        return secretPath!;
     }
 
     private static InvalidOperationException ProviderFailure(HttpStatusCode statusCode) =>
@@ -271,7 +269,8 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
     private static bool IsBoundedReasonCode(string message) => message is
         "secret_authority_unauthorized" or
         "secret_authority_unavailable" or
-        "secret_authority_invalid";
+        "secret_authority_invalid" or
+        "secret_consumer_scope_invalid";
 
     /// <summary>
     /// Creates an HttpHandler that forces IPv4 connections.
@@ -280,6 +279,7 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
     /// </summary>
     internal static SocketsHttpHandler CreateIpv4Handler() => new()
     {
+        AllowAutoRedirect = false,
         ConnectTimeout = TimeSpan.FromSeconds(5),
         ConnectCallback = static async (context, cancellationToken) =>
         {
@@ -332,13 +332,43 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
     /// </summary>
     private static string? ConvertToConfigurationKey(string secretKey, string path)
     {
+        const string permittedClientPrefix = "KEYCLOAK__PERMITTEDCLIENTS__";
+        if (path == "/runtime/api/authentication/keycloak"
+            && secretKey.StartsWith(permittedClientPrefix, StringComparison.Ordinal)
+            && int.TryParse(secretKey[permittedClientPrefix.Length..],
+                System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out _))
+            return secretKey.Replace("__", ":", StringComparison.Ordinal);
+        if (path.StartsWith("/runtime/", StringComparison.Ordinal))
+            return (path, secretKey) switch
+            {
+                ("/runtime/api/authentication/keycloak", "KEYCLOAK_ENDPOINT") => "Keycloak:Endpoint",
+                ("/runtime/api/authentication/keycloak", "KEYCLOAK_REALM") => "Keycloak:Realm",
+                ("/runtime/api/authentication/keycloak", "KEYCLOAK_CLIENT_ID") => "Keycloak:ClientId",
+                ("/runtime/api/authentication/keycloak", "KEYCLOAK__AUDIENCE") => "Keycloak:Audience",
+                ("/runtime/api/authentication/keycloak", "KEYCLOAK_INTERNAL_URL") => "Keycloak:InternalUrl",
+                ("/runtime/api/authentication/keycloak", "KEYCLOAK_REQUIRE_HTTPS_METADATA") => "Keycloak:RequireHttpsMetadata",
+                ("/runtime/api/keycloak/lifecycle", "KEYCLOAK_LIFECYCLE_CLIENT_SECRET") => "Keycloak:Lifecycle:ClientSecret",
+                ("/runtime/api/authorization/cerbos", "CERBOS_GRPC_ENDPOINT") => "Cerbos:GrpcEndpoint",
+                ("/runtime/api/authorization/cerbos", "CERBOS_HTTP_ENDPOINT") => "Cerbos:HttpEndpoint",
+                ("/runtime/api/authorization/cerbos", "CERBOS_USE_POLICY_SCOPE") => "Cerbos:UsePolicyScope",
+                ("/runtime/api/authorization/cerbos", "CERBOS_USE_TLS") => "Cerbos:UseTls",
+                ("/runtime/api/authorization/cerbos", "CERBOS_PLAINTEXT_MODE") => "Cerbos:PlaintextMode",
+                ("/runtime/bff/oidc/keycloak", "KEYCLOAK_BLAZOR_CLIENT_SECRET") => "Keycloak:BlazorClientSecret",
+                ("/runtime/bff/oidc/keycloak", "KEYCLOAK_ENDPOINT") => "Bff:Keycloak:Endpoint",
+                ("/runtime/bff/oidc/keycloak", "KEYCLOAK_REALM") => "Bff:Keycloak:Realm",
+                ("/runtime/bff/oidc/keycloak", "KEYCLOAK_CLIENT_ID") => "Bff:Keycloak:ClientId",
+                ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_ID") => "Google:ClientId",
+                ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_SECRET") => "Google:ClientSecret",
+                ("/runtime/bff/atproto/oauth", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS") => "Atproto:OauthClientPrivateJwks",
+                _ => throw new InvalidOperationException("secret_authority_invalid")
+            };
         var normalizedPath = path.Trim('/');
 
         // 1. Privacy Erasure Authority Database (/database/erasure) -> Database:Erasure:*
         if (normalizedPath.Equals("database/erasure", StringComparison.OrdinalIgnoreCase))
         {
-            // ERASURE_DATABASE_ is the external authority contract. Recursive reads use the
-            // returned folder provenance, so child fields cannot become primary database fields.
+            // ERASURE_DATABASE_ is the external authority contract. Exact folder provenance
+            // keeps erasure fields separate from primary database fields.
             return secretKey.ToUpperInvariant() switch
             {
                 "ERASURE_DATABASE_HOST" => "Database:Erasure:Host",
@@ -363,7 +393,6 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
             {
                 "IDENTITY_DATABASE_TOPOLOGY" => "IdentityDatabase:Topology",
                 "IDENTITY_DATABASE_PROVIDER" or "PROVIDER" => "IdentityDatabase:Provider",
-                "IDENTITY_DATABASE_CONNECTION_STRING" or "CONNECTION_STRING" => "IdentityDatabase:ConnectionString",
                 "IDENTITY_DATABASE_HOST" or "HOST" => "IdentityDatabase:Host",
                 "IDENTITY_DATABASE_PORT" or "PORT" => "IdentityDatabase:Port",
                 "IDENTITY_DATABASE_NAME" or "DATABASE" or "NAME" => "IdentityDatabase:Name",
@@ -372,6 +401,9 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 "IDENTITY_DATABASE_RUNTIME_PASSWORD" or "RUNTIME_PASSWORD" => "IdentityDatabase:Runtime:Password",
                 "IDENTITY_DATABASE_MIGRATOR_USERNAME" or "MIGRATOR_USERNAME" => "IdentityDatabase:Migrator:Username",
                 "IDENTITY_DATABASE_MIGRATOR_PASSWORD" or "MIGRATOR_PASSWORD" => "IdentityDatabase:Migrator:Password",
+                "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME" or "LOCAL_IDENTITY_WRITER_USERNAME" => "IdentityDatabase:LocalIdentityWriter:Username",
+                "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "LOCAL_IDENTITY_WRITER_PASSWORD" => "IdentityDatabase:LocalIdentityWriter:Password",
+                "IDENTITY_DATABASE_SERVER_VERSION" or "SERVER_VERSION" => "IdentityDatabase:ServerVersion",
                 "IDENTITY_DATABASE_TLS_MODE" or "TLS_MODE" => "IdentityDatabase:TlsMode",
                 "IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE" or "TRUST_SERVER_CERTIFICATE" => "IdentityDatabase:TrustServerCertificate",
                 _ => $"IdentityDatabase:{ToPascalCase(secretKey)}"
@@ -390,6 +422,18 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 "DATABASE_SCHEMA" or "SCHEMA" => "Database:Schema",
                 "DATABASE_RUNTIME_USERNAME" or "RUNTIME_USERNAME" => "Database:Runtime:Username",
                 "DATABASE_RUNTIME_PASSWORD" or "RUNTIME_PASSWORD" => "Database:Runtime:Password",
+                "DATABASE_GLOBAL_USERNAME" or "GLOBAL_USERNAME" => "Database:Global:Username",
+                "DATABASE_GLOBAL_PASSWORD" or "GLOBAL_PASSWORD" => "Database:Global:Password",
+                "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME" or "LOCAL_IDENTITY_WRITER_USERNAME" => "Database:LocalIdentityWriter:Username",
+                "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD" or "LOCAL_IDENTITY_WRITER_PASSWORD" => "Database:LocalIdentityWriter:Password",
+                "DATABASE_INSTANCE_KEY_READ_USERNAME" or "INSTANCE_KEY_READ_USERNAME" => "Database:InstanceKeyRead:Username",
+                "DATABASE_INSTANCE_KEY_READ_PASSWORD" or "INSTANCE_KEY_READ_PASSWORD" => "Database:InstanceKeyRead:Password",
+                "DATABASE_INSTANCE_KEY_WRITE_USERNAME" or "INSTANCE_KEY_WRITE_USERNAME" => "Database:InstanceKeyWrite:Username",
+                "DATABASE_INSTANCE_KEY_WRITE_PASSWORD" or "INSTANCE_KEY_WRITE_PASSWORD" => "Database:InstanceKeyWrite:Password",
+                "DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME" or "INSTANCE_KEY_ISSUANCE_USERNAME" => "Database:InstanceKeyIssuance:Username",
+                "DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD" or "INSTANCE_KEY_ISSUANCE_PASSWORD" => "Database:InstanceKeyIssuance:Password",
+                "DATABASE_PLATFORM_KEY_REPORT_USERNAME" or "PLATFORM_KEY_REPORT_USERNAME" => "Database:PlatformKeyReport:Username",
+                "DATABASE_PLATFORM_KEY_REPORT_PASSWORD" or "PLATFORM_KEY_REPORT_PASSWORD" => "Database:PlatformKeyReport:Password",
                 "DATABASE_MIGRATOR_USERNAME" or "MIGRATOR_USERNAME" => "Database:Migrator:Username",
                 "DATABASE_MIGRATOR_PASSWORD" or "MIGRATOR_PASSWORD" => "Database:Migrator:Password",
                 "DATABASE_TLS_MODE" or "TLS_MODE" => "Database:TlsMode",

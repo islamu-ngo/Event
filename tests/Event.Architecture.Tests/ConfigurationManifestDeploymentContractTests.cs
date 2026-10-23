@@ -5,7 +5,7 @@ public sealed class ConfigurationManifestDeploymentContractTests
     private static readonly string RepoRoot = ContextSystemHelpers.RepoRoot;
 
     [Test]
-    public async Task Compose_RoutesManifestOnlyToOneShotMigrationService()
+    public async Task Compose_RoutesManifestOnlyToApiAfterMigrationService()
     {
         string composePath = Path.Combine(RepoRoot, "docker-compose.yml");
         string migrationService = ExtractComposeService(
@@ -15,12 +15,15 @@ public sealed class ConfigurationManifestDeploymentContractTests
             await File.ReadAllLinesAsync(composePath),
             "islamu-event-api");
 
-        await Assert.That(migrationService).Contains("CONFIGURATION_MANIFEST_MODE");
-        await Assert.That(migrationService).Contains("CONFIGURATION_MANIFEST_PATH");
-        await Assert.That(migrationService).Contains("CONFIGURATION_MANIFEST_HOST_DIRECTORY");
-        await Assert.That(migrationService).Contains("/etc/islamu-event/bootstrap");
-        await Assert.That(migrationService).Contains("read_only: true");
-        await Assert.That(apiService).DoesNotContain("CONFIGURATION_MANIFEST_");
+        await Assert.That(apiService).Contains("CONFIGURATION_MANIFEST_MODE");
+        await Assert.That(apiService).Contains("CONFIGURATION_MANIFEST_PATH");
+        await Assert.That(apiService).Contains("CONFIGURATION_MANIFEST_HOST_DIRECTORY");
+        await Assert.That(apiService).Contains("/etc/islamu-event/bootstrap");
+        await Assert.That(apiService).Contains("read_only: true");
+        await Assert.That(apiService).Contains("event-migrationservice:");
+        await Assert.That(apiService).Contains("condition: service_completed_successfully");
+        await Assert.That(migrationService).DoesNotContain("CONFIGURATION_MANIFEST_");
+        await Assert.That(migrationService).DoesNotContain("/etc/islamu-event/bootstrap");
     }
 
     [Test]
@@ -39,13 +42,13 @@ public sealed class ConfigurationManifestDeploymentContractTests
             "exploreAPI = ConfigureConfigurationManifestOwner(",
             StringComparison.Ordinal);
 
-        await Assert.That(splitOwner).IsGreaterThanOrEqualTo(0);
-        await Assert.That(source[splitOwner..]).Contains(
-            "hostingTopology == HostingTopology.Split");
+        await Assert.That(splitOwner).IsEqualTo(-1);
+        await Assert.That(apiOwner).IsGreaterThanOrEqualTo(0);
         await Assert.That(standaloneOwner).IsGreaterThanOrEqualTo(0);
+        await Assert.That(source[apiOwner..standaloneOwner]).Contains(
+            "ownsConfigurationManifest: true");
         await Assert.That(source[standaloneOwner..]).Contains(
             "hostingTopology == HostingTopology.Standalone");
-        await Assert.That(apiOwner).IsEqualTo(-1);
     }
 
     [Test]

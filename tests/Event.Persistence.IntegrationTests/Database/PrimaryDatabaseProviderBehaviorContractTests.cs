@@ -6,6 +6,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Federation;
 using Explore.Domain.Keycloak;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -136,6 +137,81 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
         await VerifyCrudPagingTenantIsolationAndSoftDeleteAsync(fixture, scope);
         await VerifyOptimisticConcurrencyAsync(fixture, scope);
         await VerifyTransactionsOutboxAndIdempotentReplayAsync(fixture);
+        await VerifyExactPdsActiveUniquenessAsync(fixture, scope.TenantAId);
+    }
+
+    private static async Task VerifyExactPdsActiveUniquenessAsync(
+        PrimaryDatabaseProviderBehaviorFixture fixture, Guid tenantId)
+    {
+        await using var context = fixture.CreateSystemContext();
+        Guid userId = Guid.CreateVersion7();
+        Guid otherUserId = Guid.CreateVersion7();
+        DateTime now = new(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
+        foreach (Guid id in new[] { userId, otherUserId })
+        {
+            context.Users.Add(new User
+            {
+                Id = id,
+                Pii = new UserPii { Email = string.Empty, FirstName = "Queue", LastName = "Owner" },
+                CreatedAt = now
+            });
+            context.TenantUsers.Add(new TenantUser
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                UserId = id,
+                User = null!,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = now,
+                CreatedAt = now
+            });
+        }
+        await context.SaveChangesAsync();
+        Guid sourceId = Guid.CreateVersion7();
+        Guid sourceVersion = Guid.CreateVersion7();
+        string did = "did:web:" + string.Join('.', new string('a', 63), new string('b', 63),
+            new string('c', 63), new string('d', 55));
+        string collection = "com." + string.Join('.', new string('a', 63), new string('b', 63),
+            new string('c', 63), new string('d', 59));
+        string key = new string('a', 254);
+        string emptyHash = Convert.ToHexStringLower(
+            System.Security.Cryptography.SHA256.HashData(ReadOnlySpan<byte>.Empty));
+        PdsSyncOutbox Row(Guid owner, string recordKey) => new()
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            UserId = owner,
+            Did = did,
+            Collection = collection,
+            RecordKey = recordKey,
+            SourceEntityType = "Event",
+            SourceEntityId = sourceId,
+            SourceVersion = sourceVersion,
+            Operation = PdsSyncOperation.Delete,
+            Payload = null,
+            PayloadHash = emptyHash,
+            IdempotencyKey = Guid.CreateVersion7().ToString("N"),
+            PdsHost = "https://pds.example.test/",
+            Status = PdsSyncStatus.Pending,
+            CreatedAt = now,
+            MaxRetries = 10
+        };
+        var first = Row(userId, key + "0");
+        context.PdsSyncOutbox.AddRange(first, Row(userId, key + "1"), Row(otherUserId, key + "0"));
+        await context.SaveChangesAsync();
+        context.PdsSyncOutbox.Add(Row(userId, key + "0"));
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+        context.ChangeTracker.Clear();
+        first = await context.PdsSyncOutbox.SingleAsync(row => row.Id == first.Id);
+        first.Status = PdsSyncStatus.Failed;
+        await context.SaveChangesAsync();
+        context.PdsSyncOutbox.Add(Row(userId, key + "0"));
+        await context.SaveChangesAsync();
+        await Assert.That(await context.PdsSyncOutbox.CountAsync(row =>
+            row.SourceEntityId == sourceId && row.Status == PdsSyncStatus.Pending)).IsEqualTo(3);
+        await Assert.That(await context.PdsSyncOutbox.CountAsync(row =>
+            row.SourceEntityId == sourceId && row.Status == PdsSyncStatus.Failed)).IsEqualTo(1);
     }
 
     [Test]
@@ -150,6 +226,20 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
     {
         var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
         return EventResourceProviderContractAssertions.AssertInvalidPersistedOwnershipRejectedAsync(fixture);
+    }
+
+    [Test]
+    public Task EventResourceRelativeAvailabilityRejectsDirectMalformedWrites()
+    {
+        var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
+        return EventResourceRelativeAvailabilityContractAssertions.AssertProviderContractAsync(fixture);
+    }
+
+    [Test]
+    public Task OverlappingResourceReservationsCannotExceedTenantQuota()
+    {
+        var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
+        return EventResourceFileProviderContractAssertions.AssertOverlappingQuotaReservationsAsync(fixture);
     }
 
     [Test]
@@ -664,19 +754,21 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
         var idempotencyKey = $"provider-contract-{suffix}";
         var now = DateTime.UtcNow;
         var ownerRecord = NewIdempotencyRecord(idempotencyKey, tenantId, now);
-        await using (var context = fixture.CreateSystemContext())
+        await using (var context = fixture.CreateReceiptContext(tenantId))
         {
-            var repository = new IdempotencyRepository(context);
+            var repository = new IdempotencyRepository(context, enrollment: fixture.ReceiptEnrollment);
             var claim = await repository.TryClaimAsync(ownerRecord);
+            using var owner = claim.Owner;
             await Assert.That(claim.IsOwner).IsTrue();
-            await Assert.That(await repository.CompleteAsync(ownerRecord.Id, 201, "{\"result\":\"created\"}", "application/json")).IsTrue();
+            await Assert.That(await repository.CompleteAsync(owner!, 201, "{\"result\":\"created\"}", "application/json")).IsTrue();
         }
 
-        await using (var context = fixture.CreateSystemContext())
+        await using (var context = fixture.CreateReceiptContext(tenantId))
         {
-            var repository = new IdempotencyRepository(context);
+            var repository = new IdempotencyRepository(context, enrollment: fixture.ReceiptEnrollment);
             var replay = await repository.TryClaimAsync(NewIdempotencyRecord(idempotencyKey, tenantId, now.AddSeconds(1)));
-            var persisted = await repository.FindAsync(idempotencyKey, tenantId);
+            var persisted = (await repository.LookupAsync(
+                IdempotencyRequestDescriptor.FromRecord(ownerRecord), now.AddSeconds(1))).Record;
 
             await Assert.That(replay.IsOwner).IsFalse();
             await Assert.That(replay.Record.Id).IsEqualTo(ownerRecord.Id);

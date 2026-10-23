@@ -39,6 +39,7 @@ public sealed record StartAuthenticatedRegistrationOrderCommand(
     Guid TicketCatalogVersionId,
     BookingPartyTypeEnum BookingPartyType,
     IReadOnlyList<RegistrationOrderLineSelection> Lines,
+    string OperationKey,
     int? PlatformContributionBasisPoints = null)
     : ICommand<BaseCommandResponse<Guid>>;
 

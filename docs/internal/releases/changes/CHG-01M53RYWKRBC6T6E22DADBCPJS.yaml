@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53RYWKRBC6T6E22DADBCPJS
+Title: "Separate API-key authentication from request tenant leases"
+Type: fix
+Scope: access
+Summary: "Authenticate exact persisted API keys and update bounded usage metadata through an independent execute-only Global reader."
+Group: api-key-authentication
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Native lookup and usage functions reject undeclared executors without granting Runtime credential-table access.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Database preparation installs the native authentication functions and enrolls the configured Global account.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Repair native installation and Global execution enrollment instead of expanding Runtime privileges.

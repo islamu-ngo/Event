@@ -11,10 +11,12 @@ public sealed class GetEventSessionTemplateSyncHistoryQueryHandler
     : IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>>
 {
     private readonly IAuditLogRepository _auditLogRepository;
+    private readonly IPrivateEventManagementReader? _privateManagement;
 
-    public GetEventSessionTemplateSyncHistoryQueryHandler(IAuditLogRepository auditLogRepository)
+    public GetEventSessionTemplateSyncHistoryQueryHandler(IAuditLogRepository auditLogRepository, IPrivateEventManagementReader? privateManagement = null)
     {
         _auditLogRepository = auditLogRepository;
+        _privateManagement = privateManagement;
     }
 
     public async Task<PaginatedResult<EventSessionTemplateSyncHistoryItemDto>> QueryAsync(
@@ -22,7 +24,11 @@ public sealed class GetEventSessionTemplateSyncHistoryQueryHandler
         CancellationToken cancellationToken)
     {
         (int pageNumber, int pageSize) = PaginatedResult<EventSessionTemplateSyncHistoryItemDto>.NormalizeParameters(request.PageNumber, request.PageSize);
-        (IReadOnlyList<AuditLog> items, int totalCount) = await _auditLogRepository.GetTemplateSyncHistoryAsync(
+        var graph = _privateManagement is null ? null :
+            await _privateManagement.ReadSessionHistoryAsync(request.EventSessionId, pageNumber, pageSize, cancellationToken);
+        (IReadOnlyList<AuditLog> items, int totalCount) = graph is not null
+            ? (graph.History.OrderByDescending(row => row.Timestamp).Skip(checked((pageNumber - 1) * pageSize)).Take(pageSize).ToArray(), graph.History.Count)
+            : await _auditLogRepository.GetTemplateSyncHistoryAsync(
             nameof(EventSession),
             request.EventSessionId.ToString(),
             pageNumber,
@@ -36,7 +42,7 @@ public sealed class GetEventSessionTemplateSyncHistoryQueryHandler
         return PaginatedResult<EventSessionTemplateSyncHistoryItemDto>.Create(mapped, totalCount, pageNumber, pageSize);
     }
 
-    private static EventSessionTemplateSyncHistoryItemDto Map(AuditLog auditLog, Guid eventSessionId)
+    internal static EventSessionTemplateSyncHistoryItemDto Map(AuditLog auditLog, Guid eventSessionId)
     {
         AuditOldValues oldValues = Deserialize<AuditOldValues>(auditLog.OldValues) ?? new AuditOldValues();
         AuditNewValues newValues = Deserialize<AuditNewValues>(auditLog.NewValues) ?? new AuditNewValues();

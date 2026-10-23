@@ -203,7 +203,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         {
             var identity = await fixture.AuthenticateAsync(context);
             var result = await new ModerationNoticeCleanupRepository(context, identity.Machine, identity.Bindings,
-                new ExternalApiKeyRepository(context), fixture.Clock).PruneAsync(null, 100);
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                fixture.Clock).PruneAsync(null, 100);
             await Assert.That(result.Outcome).IsEqualTo(ModerationNoticeCleanupOutcome.Applied);
         }
         preparation = preparation with
@@ -290,7 +291,7 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         {
             await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
             var authority = await new ModerationMaintenanceAuthority(context, identity.Machine, identity.Bindings,
-                new ExternalApiKeyRepository(context), fixture.Clock)
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)), fixture.Clock)
                 .AcquireForEffectAsync(fixture.EffectId, fixture.LeaseId, fixture.LeaseRevision, privacy, token);
             if (authority is null) return null;
             var source = await context.ModerationNoticeSources.AsNoTracking()

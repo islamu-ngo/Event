@@ -1,0 +1,29 @@
+Change-Id: CHG-01M54JH3DQQY8G44S13FKKHPZ0
+Title: "Keep moderation provider failures out of private diagnostics"
+Type: fix
+Scope: privacy
+Summary: "Preserve fixed retry categories without exporting transport exceptions, remote detail or tenant identifiers."
+Group: moderation-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/COOP_INTEGRATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/COOP_INTEGRATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Prevent exception objects, remote gRPC detail and intake tenant identifiers from entering moderation diagnostics.
+  Migration:
+    Reference: docs/internal/COOP_INTEGRATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/COOP_INTEGRATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/coop-and-osprey.md
+    Disposition: documented
+    Detail: Diagnose provider failures with fixed retry categories and typed gRPC status rather than private exception exports.

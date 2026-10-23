@@ -28,14 +28,15 @@ public sealed class PaidEventPolicyVersion : IAuditableEntity
         IEnumerable<PaidEventRefundProtection> refundProtections,
         IEnumerable<PaidEventPolicyCurrencyRiskLimit> currencyRiskLimits,
         bool requiresFirstPaidEventReview,
-        int? farFutureReviewThresholdDays)
+        int? farFutureReviewThresholdDays,
+        Guid? restoredId = null)
     {
         ActorTypeEnum[] normalizedOrganizerKinds = NormalizeOrganizerKinds(allowedOrganizerKinds);
         string[] normalizedCurrencyCodes = NormalizeCurrencyCodes(allowedCurrencyCodes);
         PaidEventRefundProtection[] normalizedRefundProtections = NormalizeRefundProtections(refundProtections);
         PaidEventPolicyCurrencyRiskLimit[] normalizedRiskLimits = NormalizeRiskLimits(currencyRiskLimits, normalizedCurrencyCodes);
 
-        Id = Guid.CreateVersion7();
+        Id = restoredId ?? Guid.CreateVersion7();
         TenantId = tenantId;
         PolicyScopeKey = CreatePolicyScopeKey(tenantId);
         VersionNumber = versionNumber;
@@ -185,6 +186,43 @@ public sealed class PaidEventPolicyVersion : IAuditableEntity
             farFutureReviewThresholdDays);
         RetireActiveSlot();
         return revision;
+    }
+
+    /// <summary>
+    /// Restores an active policy's fixed evaluation aggregate with its stored identity and version.
+    /// Persistence returns this snapshot untracked; mutations load their own tracked policy.
+    /// </summary>
+    public static PaidEventPolicyVersion RestoreActiveForPolicyEvaluation(
+        Guid id,
+        Guid? tenantId,
+        int versionNumber,
+        bool isPaymentsEnabled,
+        IEnumerable<ActorTypeEnum> allowedOrganizerKinds,
+        bool requiresLocalVerification,
+        IEnumerable<string> allowedCurrencyCodes,
+        string? defaultCurrencyCode,
+        IEnumerable<PaidEventRefundProtection> refundProtections,
+        IEnumerable<PaidEventPolicyCurrencyRiskLimit> currencyRiskLimits,
+        bool requiresFirstPaidEventReview,
+        int? farFutureReviewThresholdDays)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(id, Guid.Empty);
+        if (tenantId is { } targetTenant)
+            ArgumentOutOfRangeException.ThrowIfEqual(targetTenant, Guid.Empty);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(versionNumber);
+        return new PaidEventPolicyVersion(
+            tenantId,
+            versionNumber,
+            isPaymentsEnabled,
+            allowedOrganizerKinds,
+            requiresLocalVerification,
+            allowedCurrencyCodes,
+            defaultCurrencyCode,
+            refundProtections,
+            currencyRiskLimits,
+            requiresFirstPaidEventReview,
+            farFutureReviewThresholdDays,
+            id);
     }
 
     public void Retire()

@@ -1,24 +1,22 @@
 using System.Text.Json;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
-[ClassDataSource<EventResourcePersistenceTests.TestDatabase>(Shared = SharedType.PerClass)]
 [NotInParallel("EventResourceManifest")]
-public sealed class EventResourceManifestPersistenceTests(EventResourcePersistenceTests.TestDatabase database)
+public sealed class EventResourceManifestPersistenceTests
 {
     [Test]
     [Arguments(true)]
     [Arguments(false)]
     public async Task ResourceArrayImport_PreservesSetsAndRejectsTenantWideningAtomically(bool accepted)
     {
+        await using var database = new EventResourcePersistenceTests.TestDatabase();
+        await database.InitializeAsync();
         string key = GovernanceSettingKeys.EventResources.EnabledDeliveryTypes;
         string slug = $"arrays-{Guid.CreateVersion7():N}";
         var source = ConfigurationManifestApplicationTestSupport.Source(slug);
@@ -46,12 +44,7 @@ public sealed class EventResourceManifestPersistenceTests(EventResourcePersisten
         await using (var context = database.CreateContext())
         {
             await context.SystemSettings.Where(row => row.SettingKey == key).ExecuteDeleteAsync();
-            var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                context,
-                new ConfigurationManifestApplicationTestSupport.ExistencePreflight(new TenantRepository(context)),
-                new ConfigurationManifestOperationRepository(context),
-                Substitute.For<IConfigurationManifestFailureRecorder>(),
-                useRealPolicyBoundary: true);
+            await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(database);
             var result = await handler.ExecuteAsync(new ApplyConfigurationManifestCommand(source), CancellationToken.None);
             await Assert.That(result.IsSuccess).IsEqualTo(accepted).Because(result.FailureCode ?? "accepted");
         }
@@ -77,6 +70,8 @@ public sealed class EventResourceManifestPersistenceTests(EventResourcePersisten
     [Arguments(20, false)]
     public async Task BootstrapValidatesTenantChoicesAgainstTheProposedInstanceAndRollsBackAllScopes(int tenantCapacity, bool accepted)
     {
+        await using var database = new EventResourcePersistenceTests.TestDatabase();
+        await database.InitializeAsync();
         string key = GovernanceSettingKeys.EventResources.MaxActiveResources;
         string slug = $"resources-{Guid.CreateVersion7():N}";
         var source = ConfigurationManifestApplicationTestSupport.Source(slug);
@@ -100,12 +95,7 @@ public sealed class EventResourceManifestPersistenceTests(EventResourcePersisten
         await using (var context = database.CreateContext())
         {
             await context.SystemSettings.Where(row => row.SettingKey == key).ExecuteDeleteAsync();
-            var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                context,
-                new ConfigurationManifestApplicationTestSupport.ExistencePreflight(new TenantRepository(context)),
-                new ConfigurationManifestOperationRepository(context),
-                Substitute.For<IConfigurationManifestFailureRecorder>(),
-                useRealPolicyBoundary: true);
+            await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(database);
             var result = await handler.ExecuteAsync(new ApplyConfigurationManifestCommand(source), CancellationToken.None);
             await Assert.That(result.IsSuccess).IsEqualTo(accepted).Because(result.FailureCode ?? "accepted");
         }

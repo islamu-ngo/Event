@@ -5,7 +5,7 @@ namespace Explore.Application.Services.Registration;
 
 public sealed class AdmissionScannerAuthenticationService(
     IAdmissionScannerCapabilityMaterialService materialService,
-    IAdmissionScannerCapabilityRepository repository,
+    IAdmissionScannerAuthenticationRepository repository,
     TimeProvider timeProvider) : IAdmissionScannerAuthenticationService
 {
     private const int MaximumCapabilityLength = 512;

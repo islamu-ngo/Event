@@ -4,24 +4,18 @@ using System.Collections.Immutable;
 using System.Data;
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
-using Event.Persistence.IntegrationTests.ConfigurationManifest;
-using Explore.Application.Contracts.Persistence;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
-using Explore.Application.Features.ConfigurationManifest.Compilation;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Application;
-using Explore.Application.Features.ConfigurationManifest.Preflight;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Features.Tenants;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
-using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using NSubstitute;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 [NotInParallel("PersistenceDb")]
@@ -39,31 +33,24 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseLock = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var inspectedLock = new InspectableManifestMutationLock(
-            new RelationalSettingMutationLock(
-                manifestContext,
-                new EfCoreUnitOfWork(manifestContext)),
-            manifestContext,
-            lockEntered,
-            releaseLock);
-        var failureRecorder =
-            Substitute.For<IConfigurationManifestFailureRecorder>();
-        var transactionInspectingPreflight =
-            new TransactionInspectingPreflight(
-                new ConfigurationManifestApplicationTestSupport
-                    .ExistencePreflight(
-                        new TenantRepository(manifestContext),
-                        new PaidEventPolicyRepository(manifestContext)),
-                manifestContext);
-        var handler =
-            ConfigurationManifestApplicationTestSupport.CreateHandler(
-                manifestContext,
-                transactionInspectingPreflight,
-                new ConfigurationManifestOperationRepository(
-                    manifestContext),
-                failureRecorder,
-                useRealPolicyBoundary: true,
-                mutationLock: inspectedLock);
+        var acquiredOrder = new List<string>();
+        bool transactionDuringLockAcquisition = false;
+        bool transactionDuringObservation = false;
+        IsolationLevel observedIsolation = IsolationLevel.Unspecified;
+        await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
+        handler.BeforeLock = (key, actualOwner, _) =>
+        {
+            acquiredOrder.Add(key);
+            transactionDuringLockAcquisition |= actualOwner.Database.CurrentTransaction is not null;
+            return Task.CompletedTask;
+        };
+        handler.AfterObservation = async (actualOwner, _, token) =>
+        {
+            transactionDuringObservation = actualOwner.Database.CurrentTransaction is not null;
+            observedIsolation = actualOwner.Database.CurrentTransaction!.GetDbTransaction().IsolationLevel;
+            lockEntered.TrySetResult();
+            await releaseLock.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+        };
 
         Task<Explore.Application.Responses.BaseCommandResponse<Guid>>
             manifestTask = handler.ExecuteAsync(
@@ -78,7 +65,7 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
                 CancellationToken.None);
         await lockEntered.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
-        ImmutableArray<string> captured = inspectedLock.CapturedKeys;
+        ImmutableArray<string> captured = acquiredOrder.ToImmutableArray();
         string tenantPaidPolicyKey = captured.Single(key =>
             key.StartsWith(
                 "paid-event-policy:tenant:",
@@ -116,10 +103,10 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
         Explore.Application.Responses.BaseCommandResponse<Guid> result =
             await manifestTask.WaitAsync(TimeSpan.FromSeconds(30));
         await Assert.That(result.IsSuccess).IsTrue();
-        await Assert.That(inspectedLock.TransactionWasActive).IsFalse();
-        await Assert.That(transactionInspectingPreflight.TransactionWasActive)
+        await Assert.That(transactionDuringLockAcquisition).IsFalse();
+        await Assert.That(transactionDuringObservation)
             .IsTrue();
-        await Assert.That(transactionInspectingPreflight.TransactionIsolation)
+        await Assert.That(observedIsolation)
             .IsEqualTo(IsolationLevel.Serializable);
         await Assert.That(captured.ToHashSet(StringComparer.Ordinal)
             .SetEquals(expected)).IsTrue();
@@ -153,18 +140,7 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
         await fixture.ResetAsync();
         await SeedInstancePolicyAsync();
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var failureRecorder =
-            Substitute.For<IConfigurationManifestFailureRecorder>();
-        var handler =
-            ConfigurationManifestApplicationTestSupport.CreateHandler(
-                context,
-                new ConfigurationManifestApplicationTestSupport
-                    .ExistencePreflight(
-                        new TenantRepository(context),
-                        new PaidEventPolicyRepository(context)),
-                new ConfigurationManifestOperationRepository(context),
-                failureRecorder,
-                useRealPolicyBoundary: true);
+        await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
 
         Explore.Application.Responses.BaseCommandResponse<Guid> result =
             await handler.ExecuteAsync(
@@ -253,7 +229,7 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
         await context.SaveChangesAsync();
     }
 
-    private static async Task<bool> TryAcquireCompetingLockAsync(
+    internal static async Task<bool> TryAcquireCompetingLockAsync(
         ExploreDbContext context,
         string normalizedKey)
     {
@@ -276,108 +252,4 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
         return value is true;
     }
 
-    private sealed class TransactionInspectingPreflight(
-        IConfigurationManifestPreflight inner,
-        ExploreDbContext context) : IConfigurationManifestPreflight
-    {
-        private int _evaluationCount;
-
-        public bool TransactionWasActive { get; private set; }
-        public IsolationLevel? TransactionIsolation { get; private set; }
-
-        public async Task<ConfigurationManifestPreflightResult> EvaluateAsync(
-            ConfigurationManifestApplyPlan plan,
-            CancellationToken cancellationToken)
-        {
-            if (Interlocked.Increment(ref _evaluationCount) == 2)
-            {
-                TransactionWasActive =
-                    context.Database.CurrentTransaction is not null;
-                TransactionIsolation = context.Database.CurrentTransaction
-                    ?.GetDbTransaction()
-                    .IsolationLevel;
-            }
-
-            return await inner.EvaluateAsync(plan, cancellationToken);
-        }
-    }
-
-    private sealed class InspectableManifestMutationLock(
-        ISettingMutationLock inner,
-        ExploreDbContext context,
-        TaskCompletionSource entered,
-        TaskCompletionSource release) : ISettingMutationLock
-    {
-        public ImmutableArray<string> CapturedKeys { get; private set; } = [];
-        public bool TransactionWasActive { get; private set; }
-        public IsolationLevel? TransactionIsolation { get; private set; }
-
-        public Task<T> ExecuteAsync<T>(
-            string settingKey,
-            Func<CancellationToken, Task<T>> operation,
-            CancellationToken cancellationToken = default) =>
-            ExecuteManyAsync(
-                [settingKey],
-                operation,
-                cancellationToken);
-
-        public Task<T> ExecuteManyAsync<T>(
-            IEnumerable<string> settingKeys,
-            Func<CancellationToken, Task<T>> operation,
-            CancellationToken cancellationToken = default)
-        {
-            string[] keys = settingKeys.ToArray();
-            return inner.ExecuteManyAsync(
-                keys,
-                async token =>
-                {
-                    CapturedKeys =
-                    [
-                        .. RelationalSettingMutationLock
-                            .NormalizeSettingKeys(keys)
-                    ];
-                    TransactionWasActive =
-                        context.Database.CurrentTransaction is not null;
-                    TransactionIsolation = context.Database.CurrentTransaction
-                        ?.GetDbTransaction()
-                        .IsolationLevel;
-                    entered.TrySetResult();
-                    await release.Task.WaitAsync(token);
-                    return await operation(token);
-                },
-                cancellationToken);
-        }
-
-        public Task<T> ExecuteOrderedGroupsAsync<T>(
-            IEnumerable<IEnumerable<string>> settingKeyGroups,
-            Func<CancellationToken, Task<T>> operation,
-            CancellationToken cancellationToken = default)
-        {
-            string[][] groups = settingKeyGroups
-                .Select(group => group.ToArray())
-                .ToArray();
-            return inner.ExecuteOrderedGroupsAsync(
-                groups,
-                async token =>
-                {
-                    var seen = new HashSet<string>(StringComparer.Ordinal);
-                    CapturedKeys =
-                    [
-                        .. groups.SelectMany(group =>
-                                RelationalSettingMutationLock
-                                    .NormalizeSettingKeys(group))
-                            .Where(seen.Add)
-                    ];
-                    TransactionWasActive =
-                        context.Database.CurrentTransaction is not null;
-                    TransactionIsolation = context.Database.CurrentTransaction
-                        ?.GetDbTransaction()
-                        .IsolationLevel;
-                    entered.TrySetResult();
-                    await release.Task.WaitAsync(token);
-                    return await operation(token);
-                },
-                cancellationToken);
-        }
-    }
 }

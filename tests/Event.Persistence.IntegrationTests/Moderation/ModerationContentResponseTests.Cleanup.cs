@@ -47,7 +47,7 @@ public sealed partial class ModerationContentResponseTests
             var admin = new AdminContext(new HttpContextAccessor(), new PlatformUserRoleRepository(context),
                 new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
                 new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
-            var keys = new ExternalApiKeyRepository(context);
+            var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), fixture.Clock);
             var cleanup = await new ModerationNoticeCleanupRepository(context, machine, bindings, keys, fixture.Clock)

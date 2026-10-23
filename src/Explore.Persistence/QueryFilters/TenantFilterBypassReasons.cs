@@ -2,6 +2,18 @@ namespace Explore.Persistence.QueryFilters;
 
 public static class TenantFilterBypassReasons
 {
+    public const string IdempotencyCleanupTenantDiscovery =
+        "Global idempotency cleanup discovers tenants from a bounded eligible receipt identity page.";
+
+    public const string WebhookLocalDeliveryHealth =
+        "Independent Global readiness observes Local webhook due/stale counts only.";
+
+    public const string EventResourceProviderOriginalSnapshot =
+        "Original Global provider mutation captures complete tenant setting after-images, including suppressed rows, before private compilation.";
+
+    public const string StorageConfigurationOriginalSnapshot =
+        "Original storage configuration mutation reads selected keys for its exact ambient tenant, including suppressed rows, before private compilation.";
+
     public const string DiscoveryRankMigration =
         "Migration authority backfills bounded exact-tenant source keysets, including suppressed rows, before API readiness.";
     public const string DiscoverySnapshotRetention =

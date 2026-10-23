@@ -3,31 +3,23 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
-using Explore.Domain.Secrets;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Explore.Infrastructure.Authentication;
 
 internal sealed class LocalJwtTokenGenerator(
-    ISecretResolver secretResolver,
     IOptions<LocalIdentityOptions> options,
     TimeProvider timeProvider)
     : ILocalJwtTokenGenerator
 {
-    public async Task<LocalIssuedReplacementChallenge> GenerateReplacementChallengeAsync(
+    public Task<LocalIssuedReplacementChallenge> GenerateReplacementChallengeAsync(
         LocalCredentialReplacementSubject subject,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(subject);
         cancellationToken.ThrowIfCancellationRequested();
-        SecretResolutionResult resolution = await secretResolver.ResolveAsync(
-            SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-            tenantId: null,
-            cancellationToken).ConfigureAwait(false);
-        byte[] signingKey = DecodeSigningKey(resolution);
-        cancellationToken.ThrowIfCancellationRequested();
+        byte[] signingKey = LocalIdentityOptions.DecodeJwtKey(options.Value.JwtKey);
 
         DateTimeOffset issuedAt = DateTimeOffset.FromUnixTimeSeconds(timeProvider.GetUtcNow().ToUnixTimeSeconds());
         DateTimeOffset expiresAt = issuedAt.Add(LocalCredentialChallengeToken.MaximumLifetime);
@@ -50,21 +42,18 @@ internal sealed class LocalJwtTokenGenerator(
             signingCredentials: new SigningCredentials(new SymmetricSecurityKey(signingKey),
                 LocalCredentialChallengeToken.RequiredAlgorithm));
         token.Header["typ"] = LocalCredentialChallengeToken.TokenType;
-        return new LocalIssuedReplacementChallenge(
+        return Task.FromResult(new LocalIssuedReplacementChallenge(
             token: new JwtSecurityTokenHandler().WriteToken(token),
-            expiresAt: expiresAt);
+            expiresAt: expiresAt));
     }
 
-    public async Task<LocalIssuedToken> GenerateAsync(
+    public Task<LocalIssuedToken> GenerateAsync(
         LocalJwtTokenSubject subject,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(subject);
-        SecretResolutionResult resolution = await secretResolver.ResolveAsync(
-            SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-            tenantId: null,
-            cancellationToken).ConfigureAwait(false);
-        byte[] signingKey = DecodeSigningKey(resolution);
+        cancellationToken.ThrowIfCancellationRequested();
+        byte[] signingKey = LocalIdentityOptions.DecodeJwtKey(options.Value.JwtKey);
 
         DateTimeOffset issuedAt = timeProvider.GetUtcNow();
         DateTimeOffset expiresAt = issuedAt.AddMinutes(
@@ -97,37 +86,8 @@ internal sealed class LocalJwtTokenGenerator(
                 new SymmetricSecurityKey(signingKey),
                 SecurityAlgorithms.HmacSha256));
 
-        return new LocalIssuedToken(
+        return Task.FromResult(new LocalIssuedToken(
             Token: new JwtSecurityTokenHandler().WriteToken(token),
-            ExpiresAt: expiresAt);
-    }
-
-    private static byte[] DecodeSigningKey(SecretResolutionResult resolution)
-    {
-        if (!resolution.IsResolved || string.IsNullOrWhiteSpace(resolution.Value))
-        {
-            throw new InvalidOperationException(
-                "Local Identity JWT signing authority is unavailable.");
-        }
-
-        byte[] key;
-        try
-        {
-            key = Convert.FromBase64String(resolution.Value);
-        }
-        catch (FormatException exception)
-        {
-            throw new InvalidOperationException(
-                "Local Identity JWT signing authority is invalid.",
-                exception);
-        }
-
-        if (key.Length < 32)
-        {
-            throw new InvalidOperationException(
-                "Local Identity JWT signing authority does not meet the 256-bit minimum.");
-        }
-
-        return key;
+            ExpiresAt: expiresAt));
     }
 }

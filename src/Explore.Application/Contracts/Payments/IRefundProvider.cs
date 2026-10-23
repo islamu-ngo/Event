@@ -20,6 +20,8 @@ public sealed record RefundCreateRequest(
     string CurrencyCode,
     long ApplicationFeeRefundAmountMinor)
 {
+    public DateTime? MutationExpiresAt { get; init; }
+
     public static RefundCreateRequest Create(
         Guid refundAttemptId,
         string providerCode,
@@ -80,6 +82,10 @@ public sealed record RefundRetrieveRequest(
     string ExpectedCurrencyCode,
     long ExpectedApplicationFeeRefundAmountMinor)
 {
+    public Guid RefundAttemptId { get; init; }
+    public bool AllowApplicationFeeMutation { get; init; }
+    public DateTime? MutationExpiresAt { get; init; }
+
     public static RefundRetrieveRequest Create(
         string providerCode,
         string externalAccountId,
@@ -100,7 +106,9 @@ public sealed record RefundRetrieveRequest(
             RefundCreateRequest.Normalize(providerCode, nameof(providerCode), 80),
             RefundCreateRequest.Normalize(externalAccountId, nameof(externalAccountId), 200),
             RefundCreateRequest.Normalize(providerPaymentId, nameof(providerPaymentId), 200),
-            RefundCreateRequest.Normalize(providerRefundId, nameof(providerRefundId), 200),
+            providerRefundId.Length == 0
+                ? string.Empty
+                : RefundCreateRequest.Normalize(providerRefundId, nameof(providerRefundId), 200),
             RefundCreateRequest.Normalize(providerIdempotencyKey, nameof(providerIdempotencyKey), 160),
             expectedAmountMinor,
             RefundCreateRequest.NormalizeCurrency(expectedCurrencyCode),
@@ -115,7 +123,8 @@ public sealed record RefundProviderObservation(
     long AmountMinor,
     string CurrencyCode,
     long? ApplicationFeeRefundAmountMinor,
-    string? ApplicationFeeRefundFailureCode = null);
+    string? ApplicationFeeRefundFailureCode = null,
+    bool? ApplicationFeeHandoffStarted = null);
 
 public sealed record RefundProviderFailure(
     string Code,

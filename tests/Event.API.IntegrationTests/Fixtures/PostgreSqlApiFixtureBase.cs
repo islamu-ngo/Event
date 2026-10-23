@@ -1,5 +1,5 @@
 using System.Threading.Channels;
-using System.Security.Cryptography;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;
@@ -8,34 +8,26 @@ using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Fixtures;
 
 /// <summary>
 /// Abstract base for PostgreSQL-backed test fixtures. Manages container lifecycle,
-/// runs migrations and lookup seeding, and provides per-test Respawn reset.
+/// enrolls native purpose roles and provides source-preserving per-test DELETE reset.
 /// Subclasses supply host-profile-specific configuration overrides.
 /// </summary>
 public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDisposable
 {
-    private readonly PostgreSqlContainer _container;
+    private readonly PostgreSqlContainerFixture _database = new();
     private readonly TestPrivacyIdentityFenceKeyProvider _identityFenceKeys = new();
 
     public PostgreSqlApiWebApplicationFactory Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
     public TestDatabaseReset DatabaseReset { get; private set; } = null!;
-    public string ConnectionString => _container.GetConnectionString();
+    public string ConnectionString => _database.ConnectionString;
 
-    protected PostgreSqlApiFixtureBase()
-    {
-        _container = new PostgreSqlBuilder("postgres:18-alpine")
-            .WithDatabase("explore_db_test")
-            .WithUsername("postgres")
-            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
-            .Build();
-    }
+    protected ExploreDbContext CreateSetupDbContext() => _database.CreateDbContext();
 
     /// <summary>
     /// Returns additional configuration entries specific to the host profile.
@@ -53,7 +45,7 @@ public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDispos
         configuration.TryAdd("PrivacyErasure:Authority:Topology", "EmbeddedSqlite");
         configuration.TryAdd("PrivacyErasureAuthorityEmbedded:Path", _identityFenceKeys.AuthorityPath);
         Factory = new PostgreSqlApiWebApplicationFactory(
-            _container.GetConnectionString(),
+            _database,
             configuration,
             services =>
             {
@@ -67,14 +59,7 @@ public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDispos
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
-            .UseSnakeCaseNamingConvention()
-            .Options;
-        await using var dbContext = new ExploreDbContext(options);
-        await dbContext.Database.MigrateAsync();
-        await LookupTableSeeder.SeedAsync(dbContext);
+        await _database.InitializeAsync();
 
         RecreateHost();
         await using (var scope = Factory.Services.CreateAsyncScope())
@@ -86,7 +71,7 @@ public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDispos
             await using var authority = await authorityFactory.CreateDbContextAsync();
             await authority.Database.MigrateAsync();
         }
-        DatabaseReset = await TestDatabaseReset.CreateAsync(_container.GetConnectionString());
+        DatabaseReset = await TestDatabaseReset.CreateAsync(_database.ConnectionString);
     }
 
     /// <summary>
@@ -107,7 +92,7 @@ public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDispos
         var factory = Factory ?? throw new InvalidOperationException("PostgreSQL API test host was not recreated.");
 
         await using var scope = factory.Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var dbContext = _database.CreateDbContext();
         await LookupTableSeeder.SeedAsync(dbContext);
 
         var outputCacheStore = scope.ServiceProvider.GetRequiredService<IOutputCacheStore>();
@@ -172,7 +157,7 @@ public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDispos
             await DisposeFactoryAsync();
         }
 
-        await _container.DisposeAsync();
+        await _database.DisposeAsync();
         _identityFenceKeys.Dispose();
         GC.SuppressFinalize(this);
     }

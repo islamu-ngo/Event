@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;
@@ -303,8 +304,8 @@ public sealed class EmailDispatchDrainServiceTests
         await Assert.That(fixture.Logger.Entries.All(entry =>
             !entry.Message.Contains(providerResponseCanary, StringComparison.Ordinal) &&
             entry.Exception?.Message.Contains(providerResponseCanary, StringComparison.Ordinal) != true)).IsTrue();
-        fixture.TenantAccessor.Received(1).SetTenant(dispatch.TenantId);
-        fixture.TenantAccessor.Received(1).Clear();
+        await Assert.That(fixture.TenantScopes.All(scope => scope.TenantId == dispatch.TenantId && scope.Disposed)).IsTrue();
+        await Assert.That(fixture.TenantScopes.Any(scope => scope.Captured)).IsTrue();
     }
 
     [Test]
@@ -655,7 +656,8 @@ public sealed class EmailDispatchDrainServiceTests
                 settlement.FailureCategory == "smtp_send_failed" &&
                 settlement.FailureMessage == "SMTP send failed before provider acceptance was confirmed."),
             Arg.Any<CancellationToken>());
-        fixture.TenantAccessor.Received(1).Clear();
+        await Assert.That(fixture.TenantScopes.All(scope => scope.TenantId == dispatch.TenantId && scope.Disposed)).IsTrue();
+        await Assert.That(fixture.TenantScopes.Any(scope => scope.Captured)).IsTrue();
     }
 
     [Test]
@@ -1051,7 +1053,6 @@ public sealed class EmailDispatchDrainServiceTests
             EmailService = Substitute.For<IEmailService>();
             EligibilityEvaluator = Substitute.For<IEmailDispatchEligibilityEvaluator>();
             UnsubscribeTokenService = Substitute.For<IEmailUnsubscribeTokenService>();
-            TenantAccessor = Substitute.For<ITenantContextAccessor>();
             Configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -1104,11 +1105,25 @@ public sealed class EmailDispatchDrainServiceTests
                 });
 
             var services = new ServiceCollection();
-            services.AddSingleton(Repository);
+            services.AddScoped<IEmailDispatchOutboxRepository>(provider =>
+            {
+                ((CapturedTenantScope)provider.GetRequiredService<ITenantContextAccessor>()).Capture();
+                return Repository;
+            });
+            services.AddSingleton<IEmailDispatchAdmission>(Repository);
             services.AddSingleton(EmailService);
-            services.AddSingleton(EligibilityEvaluator);
+            services.AddScoped<IEmailDispatchEligibilityEvaluator>(provider =>
+            {
+                ((CapturedTenantScope)provider.GetRequiredService<ITenantContextAccessor>()).Capture();
+                return EligibilityEvaluator;
+            });
             services.AddSingleton(UnsubscribeTokenService);
-            services.AddSingleton(TenantAccessor);
+            services.AddScoped<ITenantContextAccessor>(_ =>
+            {
+                var scope = new CapturedTenantScope();
+                TenantScopes.Add(scope);
+                return scope;
+            });
             services.AddSingleton<IConfiguration>(Configuration);
             services.AddSingleton(SystemSettings);
             ServiceProvider = services.BuildServiceProvider();
@@ -1133,7 +1148,7 @@ public sealed class EmailDispatchDrainServiceTests
 
         public IEmailUnsubscribeTokenService UnsubscribeTokenService { get; }
 
-        public ITenantContextAccessor TenantAccessor { get; }
+        public ConcurrentBag<CapturedTenantScope> TenantScopes { get; } = [];
 
         public IConfiguration Configuration { get; }
 
@@ -1142,5 +1157,45 @@ public sealed class EmailDispatchDrainServiceTests
         public ServiceProvider ServiceProvider { get; }
 
         public EmailDispatchDrainService Service { get; }
+    }
+
+    private sealed class CapturedTenantScope : ITenantContextAccessor, IDisposable
+    {
+        public Guid? TenantId { get; private set; }
+        public bool IsResolved => TenantId.HasValue;
+        internal bool Captured { get; private set; }
+        internal bool Disposed { get; private set; }
+
+        public void SetTenant(Guid tenantId)
+        {
+            if (Captured && TenantId != tenantId)
+                throw new InvalidOperationException("A captured execution scope cannot change tenant.");
+            TenantId = tenantId;
+        }
+
+        public void Clear()
+        {
+            if (Captured)
+                throw new InvalidOperationException("A captured execution scope cannot clear tenant.");
+            TenantId = null;
+        }
+
+        public void BindExecutionTenant(Guid tenantId)
+        {
+            ArgumentOutOfRangeException.ThrowIfEqual(tenantId, Guid.Empty);
+            if (Captured)
+                throw new InvalidOperationException("A captured execution scope cannot bind again.");
+            SetTenant(tenantId);
+            Capture();
+        }
+
+        internal void Capture()
+        {
+            if (TenantId is null || TenantId == Guid.Empty)
+                throw new InvalidOperationException("Resolve execution dependencies only after binding the tenant.");
+            Captured = true;
+        }
+
+        public void Dispose() => Disposed = true;
     }
 }

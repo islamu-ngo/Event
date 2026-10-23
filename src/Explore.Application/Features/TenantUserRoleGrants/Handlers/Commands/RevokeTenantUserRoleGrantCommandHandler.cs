@@ -9,23 +9,34 @@ public class RevokeTenantUserRoleGrantCommandHandler : ICommandHandler<RevokeTen
 {
     private readonly ITenantUserRoleGrantRepository _tenantUserRoleGrantRepository;
     private readonly ITenantUserRoleGrantMutationBoundary _boundary;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
 
     public RevokeTenantUserRoleGrantCommandHandler(
         ITenantUserRoleGrantRepository tenantUserRoleGrantRepository,
-        ITenantUserRoleGrantMutationBoundary boundary)
+        ITenantUserRoleGrantMutationBoundary boundary,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _tenantUserRoleGrantRepository = tenantUserRoleGrantRepository;
         _boundary = boundary;
+        _preparation = preparation;
     }
 
-    public Task<bool> ExecuteAsync(RevokeTenantUserRoleGrantCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(RevokeTenantUserRoleGrantCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return _boundary.ExecuteRevokeAsync(request.TenantId, request.Id,
-            (actor, token) => RevokeAsync(request, actor, token), cancellationToken);
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        return await _boundary.ExecuteRevokeAsync(request.TenantId, request.Id, async (actor, token) =>
+        {
+            if (actor != prepared.PrincipalId) return false;
+            await prepared.AcquireAsync(request, token);
+            var result = await ExecuteBodyAsync(request, prepared);
+            if (result) prepared.Complete(request.Id);
+            return result;
+        }, cancellationToken);
     }
 
-    private async Task<bool> RevokeAsync(RevokeTenantUserRoleGrantCommand request, Guid actor, CancellationToken cancellationToken)
+    private async Task<bool> ExecuteBodyAsync(RevokeTenantUserRoleGrantCommand request,
+        IPreparedHumanAccountAdministrativeAction prepared)
     {
         var tenantUserRoleGrant = await _tenantUserRoleGrantRepository.GetById(request.Id);
         if (tenantUserRoleGrant == null || tenantUserRoleGrant.TenantId != request.TenantId
@@ -34,10 +45,10 @@ public class RevokeTenantUserRoleGrantCommandHandler : ICommandHandler<RevokeTen
             return false;
         }
 
-        tenantUserRoleGrant.RevokedAt = DateTime.UtcNow;
-        tenantUserRoleGrant.RevokedBy = actor;
-        tenantUserRoleGrant.UpdatedAt = DateTime.UtcNow;
-        tenantUserRoleGrant.UpdatedBy = actor;
+        tenantUserRoleGrant.RevokedAt = prepared.ChangedAt;
+        tenantUserRoleGrant.RevokedBy = prepared.PrincipalId;
+        tenantUserRoleGrant.UpdatedAt = prepared.ChangedAt;
+        tenantUserRoleGrant.UpdatedBy = prepared.PrincipalId;
 
         await _tenantUserRoleGrantRepository.Update(tenantUserRoleGrant);
         return true;

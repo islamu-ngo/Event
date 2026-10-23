@@ -1,0 +1,31 @@
+Change-Id: CHG-01M52BD82GVRQGFS62Y2BDX22F
+Title: "Bind registration retention cleanup to selected tenant authority"
+Type: fix
+Scope: access
+Summary: "Discover bounded active tenant identities separately from deletion and construct each cleanup transaction through a fresh Runtime tenant lease."
+Group: registration-retention-tenant-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md
+    Disposition: documented
+    Detail: Install the PostgreSQL registration-retention discovery capability before enabling cleanup.
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Global authority discovers only active tenant identities; deletion retains independently selected Runtime authority.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Install the native discovery capability after tenant RLS under declared migration authority.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md
+    Disposition: documented
+    Detail: Failed discovery remains visible; suspended tenants remain ineligible and read-time expiry continues during cleanup outages.

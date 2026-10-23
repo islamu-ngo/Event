@@ -302,6 +302,9 @@ public sealed class DefaultNotificationOrchestratorTests
 
         public void Fence(Guid subjectId) => _fencedSubjectIds.Add(subjectId);
 
+        public Task<bool> ExistsBySubjectAsync(Guid subjectId, CancellationToken cancellationToken) =>
+            Task.FromResult(_fencedSubjectIds.Contains(subjectId));
+
         public Task<PrivacyErasureSaga?> GetBySubjectAsync(Guid subjectId, CancellationToken cancellationToken)
         {
             ChecksInsideSerializableBoundary.Add(isExecutingSerializable?.Invoke() ?? false);

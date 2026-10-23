@@ -344,9 +344,10 @@ public sealed class OrganizationMapperTests
             IsDeleted = true
         };
         var store = new OrganizationMappingHandlerTests.OrganizationMemberStore([member]);
-        var detail = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetOrganizationMemberDetailsRequestHandler(store);
-        var list = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetOrganizationMembersRequestHandler(store);
-        var dto = (await detail.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetOrganizationMemberDetailsRequest { Id = ActorId }, default))!;
+        var invites = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetMyInvitationsRequestHandler(store);
+        // Formatting retained/deleted entities is separate from admitting a protected
+        // member read; genuine detail/list admission is covered by the native API cohort.
+        var dto = OrganizationMapper.ToOrganizationMember(member);
         await Assert.That(dto.Id).IsEqualTo(ActorId);
         await Assert.That(dto.TenantId).IsEqualTo(TenantId);
         await Assert.That(dto.OrganizationId).IsEqualTo(Guid.Empty);
@@ -359,10 +360,12 @@ public sealed class OrganizationMapperTests
         await Assert.That(dto.OrganizationPositionId).IsEqualTo(4);
         await Assert.That(dto.OrganizationPositionFullName).IsEqualTo("Coordinator");
         await AssertFields(dto, "id", "tenantId", "organizationId", "organizationFullName", "userId", "userEmail", "userFullName", "roleId", "roleName", "organizationPositionId", "organizationPositionFullName");
-        var items = await list.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetOrganizationMembersRequest { OrganizationId = Id }, default);
+        var items = (await store.GetMembersByOrganizationId(Id))
+            .Select(OrganizationMapper.ToOrganizationMember).ToList();
         await Assert.That(items.Single()).IsEqualTo(dto);
-        await Assert.That(await detail.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetOrganizationMemberDetailsRequest { Id = TenantId }, default)).IsNull();
-        var invitation = OrganizationMapper.ToOrganizationInvitation(member);
+        await Assert.That(await store.GetOrganizationMemberWithDetails(TenantId, default)).IsNull();
+        var invitations = await invites.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetMyInvitationsRequest { Email = "member@example.test" }, default);
+        var invitation = invitations.Single();
         await Assert.That(invitation.Id).IsEqualTo(ActorId);
         await Assert.That(invitation.OrganizationId).IsEqualTo(Id);
         await Assert.That(invitation.OrganizationName).IsEqualTo("Community organization");

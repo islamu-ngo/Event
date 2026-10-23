@@ -21,25 +21,25 @@ public class CustomPropertyQuotaResolver : ICustomPropertyQuotaResolver
 
     public async Task<int> GetIntAsync(string key, Guid tenantId, CancellationToken cancellationToken)
     {
-        var raw = await ResolveRawAsync(key, tenantId);
+        var raw = await ResolveRawAsync(key, tenantId, cancellationToken);
         return ParseInt(raw, key);
     }
 
     public async Task<bool> GetBoolAsync(string key, Guid tenantId, CancellationToken cancellationToken)
     {
-        var raw = await ResolveRawAsync(key, tenantId);
+        var raw = await ResolveRawAsync(key, tenantId, cancellationToken);
         return ParseBool(raw, key);
     }
 
-    private async Task<string> ResolveRawAsync(string key, Guid tenantId)
+    private async Task<string> ResolveRawAsync(string key, Guid tenantId, CancellationToken cancellationToken)
     {
-        var tenantOverride = await _tenantSettingRepository.GetByTenantAndKey(tenantId, key);
+        var tenantOverride = await _tenantSettingRepository.GetByTenantAndKey(tenantId, key, cancellationToken);
         if (tenantOverride is not null)
         {
             return tenantOverride.Value;
         }
 
-        var systemOverride = await _systemSettingRepository.GetByKey(key);
+        var systemOverride = await _systemSettingRepository.GetByKey(key, cancellationToken);
         if (systemOverride is not null && !string.IsNullOrEmpty(systemOverride.Value))
         {
             return systemOverride.Value;

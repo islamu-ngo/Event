@@ -15,6 +15,29 @@ public sealed class ExternalIdentityDbContextFactory
             .AddEnvironmentVariables()
             .AddCommandLine(args)
             .Build();
+        if (new ConfigurationBuilder().AddCommandLine(args).Build()
+            .GetValue<bool>("DesignTime:ModelOnly"))
+        {
+            if (!SecretAuthorityConfiguration.IsDevelopmentOrTesting(
+                    SecretAuthorityConfiguration.GetEnvironmentName(bootstrap)))
+                throw new InvalidOperationException("Model-only scaffolding requires Development or Testing.");
+            string? selected = bootstrap["IdentityDatabase:Provider"] ?? bootstrap["IDENTITY_DATABASE_PROVIDER"];
+            if (!Enum.TryParse(selected, true, out PrimaryDatabaseProvider provider) || !Enum.IsDefined(provider))
+                throw new InvalidOperationException("Model-only scaffolding requires an explicit supported Identity provider.");
+            string? schema = bootstrap["IdentityDatabase:Schema"] ?? bootstrap["IDENTITY_DATABASE_SCHEMA"];
+            if (string.IsNullOrEmpty(schema) || schema.Length > 63
+                || !(char.IsAsciiLetter(schema[0]) || schema[0] == '_')
+                || schema.Any(character => !char.IsAsciiLetterOrDigit(character) && character != '_'))
+                throw new InvalidOperationException("Model-only scaffolding requires an explicit valid Identity schema.");
+            Version? version = null;
+            if (provider is PrimaryDatabaseProvider.MySql or PrimaryDatabaseProvider.MariaDb
+                && !Version.TryParse(bootstrap["IdentityDatabase:ServerVersion"]
+                    ?? bootstrap["IDENTITY_DATABASE_SERVER_VERSION"], out version))
+                throw new InvalidOperationException("Model-only Identity scaffolding requires an explicit MySQL or MariaDB server version.");
+            var modelBuilder = new DbContextOptionsBuilder<ExternalIdentityDbContext>();
+            IdentityDatabaseProviderComposition.ConfigureModel(modelBuilder, provider, schema, version);
+            return new ExternalIdentityDbContext(modelBuilder.Options);
+        }
         var configurationBuilder = new ConfigurationBuilder().AddConfiguration(
             SecretAuthorityConfiguration.Build(
                 bootstrap,

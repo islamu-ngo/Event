@@ -23,6 +23,13 @@ public sealed class OperationAuthorizationTests
         var policy = new Policy(AuthorizationDecision.Deny(AuthorizationProviderMetadata.Cerbos,
             unavailable ? AuthorizationDecisionReasonCodes.ProviderUnavailable : AuthorizationDecisionReasonCodes.Denied));
         var services = CreateServices(policy);
+        var member = Member();
+        services.AddSingleton<IOrganizationMemberRepository>(new MemberStore(member));
+        services.AddSingleton<ITenantContext>(new TenantContext(member.TenantId));
+        services.AddScoped<AuthorizationResourceContextResolver>();
+        services.AddScoped<IAuthorizationContextEnricher<ProtectedWrite>, Enricher<ProtectedWrite>>();
+        services.AddScoped<IAuthorizationContextEnricher<ProtectedResult>, Enricher<ProtectedResult>>();
+        services.AddScoped<IAuthorizationContextEnricher<ProtectedRead>, Enricher<ProtectedRead>>();
         await using var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
         var state = scope.ServiceProvider.GetRequiredService<ProtectedHandler>();
@@ -76,7 +83,7 @@ public sealed class OperationAuthorizationTests
         await using var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
         await Assert.That(() => Invoke(scope.ServiceProvider, shape)).Throws<AuthorizationException>();
-        await Assert.That(policy.Observed!.Facts).IsNull();
+        await Assert.That(policy.Observed).IsNull();
         await Assert.That(scope.ServiceProvider.GetRequiredService<ProtectedHandler>().Executions).IsEqualTo(0);
     }
 
@@ -199,9 +206,14 @@ public sealed class OperationAuthorizationTests
         UserId = Guid.Parse("01900000-0000-7000-8000-000000000003"),
         OrganizationTenant = new OrganizationTenant
         {
+            TenantId = Guid.Parse("01900000-0000-7000-8000-000000000002"),
             OrganizationId = Guid.Parse("01900000-0000-7000-8000-000000000004"),
             Tenant = null!,
-            Organization = null!,
+            Organization = new Organization
+            {
+                Id = Guid.Parse("01900000-0000-7000-8000-000000000004"),
+                Pii = new OrganizationPii { FullName = "Authority parent" }
+            },
             ApprovalStatus = null!
         },
         User = null!,
@@ -210,7 +222,7 @@ public sealed class OperationAuthorizationTests
     };
     private sealed class MemberStore(OrganizationMember member) : IOrganizationMemberRepository
     {
-        public Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id) => Task.FromResult(id == member.Id ? member : null);
+        public Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(id == member.Id ? member : null);
         public Task<OrganizationMember?> GetById(Guid id) => Task.FromResult(id == member.Id ? member : null);
         public Task<IReadOnlyList<OrganizationMember>> GetAll() => Task.FromResult<IReadOnlyList<OrganizationMember>>([member]);
         public Task<(IReadOnlyList<OrganizationMember> Items, int TotalCount)> GetAllPaged(int pageNumber, int pageSize) => throw new NotSupportedException();

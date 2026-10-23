@@ -57,7 +57,7 @@ internal static class AiAssistantConversationMapper
             ProposedActions = conversation.ProposedActions
                 .OrderBy(action => action.CreatedAt)
                 .ThenBy(action => action.Id)
-                .Select(ToProposedAction)
+                .Select(action => ToProposedAction(action, conversation.UserId))
                 .ToList()
         };
     }
@@ -98,10 +98,11 @@ internal static class AiAssistantConversationMapper
             CreatedAt = reference.CreatedAt
         };
 
-    private static AiProposedActionDto ToProposedAction(AiProposedAction action)
+    private static AiProposedActionDto ToProposedAction(AiProposedAction action, Guid principalUserId)
         => new()
         {
             Id = action.Id,
+            Version = action.ConsentVersionFor(principalUserId),
             MessageId = action.MessageId,
             Kind = action.Kind.ToString(),
             Status = action.Status.ToString(),

@@ -1,12 +1,11 @@
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Services;
 
 namespace Explore.Application.Services;
 
 public sealed class EventResourceAuditRetentionService(
-    IEventResourceAuditRetentionRepository repository,
-    IEventResourceGovernancePolicyReader governance,
-    IUnitOfWork unitOfWork,
+    IEventResourceAuditOwnerDiscoveryRepository owners,
+    IEventResourceAuditRetentionExecutionScopeFactory executionFactory,
     TimeProvider timeProvider)
 {
     public const int TenantPageSize = 100;
@@ -20,26 +19,27 @@ public sealed class EventResourceAuditRetentionService(
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var tenants = await repository.GetTenantsWithAuditAsync(afterTenantId, TenantPageSize, cancellationToken);
+            var tenants = await owners.GetTenantIdsWithAuditAsync(afterTenantId, TenantPageSize, cancellationToken);
             foreach (var tenant in tenants)
             {
                 int removed;
                 do
                 {
-                    removed = await unitOfWork.ExecuteSerializableAsync(async token =>
+                    await using var execution = await executionFactory.CreateAsync(tenant, cancellationToken);
+                    removed = await execution.UnitOfWork.ExecuteSerializableAsync(async token =>
                     {
-                        var policy = await governance.ReadAsync(tenant.Id, token)
+                        var policy = await execution.Governance.ReadAsync(tenant, token)
                             ?? throw new InvalidOperationException("Resource audit retention requires a valid current governance policy.");
                         DateTime? cutoff = policy.AuditRetentionDays == 0
                             ? null
                             : observedAtUtc.AddDays(-policy.AuditRetentionDays);
-                        return await repository.DeleteExpiredBatchAsync(tenant.Id, cutoff, DeleteBatchSize, token);
+                        return await execution.Repository.DeleteExpiredBatchAsync(tenant, cutoff, DeleteBatchSize, token);
                     }, cancellationToken);
                     deleted += removed;
                 } while (removed == DeleteBatchSize);
             }
             if (tenants.Count < TenantPageSize) return deleted;
-            afterTenantId = tenants[^1].Id;
+            afterTenantId = tenants[^1];
         }
     }
 }

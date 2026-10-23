@@ -29,6 +29,7 @@ public sealed partial class GroupMemberMutationBoundary
             || new[] { ids.GroupId, ids.ActorId, ids.ParticipationId, ids.MemberId }.Any(id => id == Guid.Empty)
             || new[] { ids.GroupId, ids.ActorId, ids.ParticipationId, ids.MemberId }.Distinct().Count() != 4) DenyCreation();
         CreationAttempt? attempted = null;
+        var admission = new NativeHumanMutationAdmission(context, finalizer);
         try
         {
             return await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(() =>
@@ -80,6 +81,7 @@ public sealed partial class GroupMemberMutationBoundary
                     return await privacy.ExecuteEnrollmentSerializedAsync(async privacyToken =>
                         await new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAttemptAsync(async inner =>
                         {
+                            admission.RegisterOwning(RecheckAsync);
                             result = null;
                             // Standalone hierarchy updates take this namespace before their Tenant source anchor.
                             await using var hierarchy = await RelationalNamedLock.AcquireTransactionAsync(

@@ -26,14 +26,18 @@ public class EventPublishedNotificationFanoutIntegrationTests(AuthenticatedApiTe
     [Test]
     public async Task InternalFanoutDispatch_WithActiveOrganizationSubscription_CreatesSingleNotificationAndCompletedRun()
     {
-        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var hosted = _fixture.Factory;
+        await using var context = _fixture.Factory.CreateMigratorContext();
         var scenario = await SeedFanoutScenarioAsync(context);
-        var dispatcher = scope.ServiceProvider.GetRequiredService<IOutboxMessageDispatcher>();
         var message = CreateFanoutOutboxMessage(scenario);
+        context.OutboxMessages.Add(message);
+        await context.SaveChangesAsync();
+        await using var execution = await NotificationOutboxExecutionFixture.ClaimAndBindAsync(hosted.Services, message.Id);
+        var dispatcher = execution.Services.GetRequiredService<IOutboxMessageDispatcher>();
 
-        await dispatcher.DispatchAsync(message);
-        await dispatcher.DispatchAsync(message);
+        await dispatcher.DispatchAsync(execution.Message);
+        await dispatcher.DispatchAsync(execution.Message);
+        context.ChangeTracker.Clear();
 
         var notifications = await context.Notifications
             .IgnoreQueryFilters()
@@ -71,13 +75,16 @@ public class EventPublishedNotificationFanoutIntegrationTests(AuthenticatedApiTe
     [Test]
     public async Task InternalFanoutDispatch_WithFencedAndActiveSubscribers_CreatesOnlyActiveNotificationAndWebPushDispatch()
     {
-        await using var scope = _fixture.Factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var hosted = _fixture.Factory;
+        await using var context = _fixture.Factory.CreateMigratorContext();
         var scenario = await SeedFanoutScenarioAsync(context, includeFencedSubscriber: true);
-        var dispatcher = scope.ServiceProvider.GetRequiredService<IOutboxMessageDispatcher>();
         var message = CreateFanoutOutboxMessage(scenario);
+        context.OutboxMessages.Add(message);
+        await context.SaveChangesAsync();
+        await using var execution = await NotificationOutboxExecutionFixture.ClaimAndBindAsync(hosted.Services, message.Id);
+        var dispatcher = execution.Services.GetRequiredService<IOutboxMessageDispatcher>();
 
-        await dispatcher.DispatchAsync(message);
+        await dispatcher.DispatchAsync(execution.Message);
         context.ChangeTracker.Clear();
 
         var notifications = await context.Notifications
@@ -105,6 +112,73 @@ public class EventPublishedNotificationFanoutIntegrationTests(AuthenticatedApiTe
         await Assert.That(fanoutRun.Status).IsEqualTo(EventPublishedNotificationFanoutService.StatusCompleted);
         await Assert.That(fanoutRun.ProcessedCount).IsEqualTo(2);
         await Assert.That(fanoutRun.CreatedNotificationCount).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments("envelope")]
+    [Arguments("actor")]
+    [Arguments("tenant")]
+    [Arguments("unpublished")]
+    [Arguments("content")]
+    public async Task PublicationDispatchRequiresNativeSourceAndDoesNotTrustPostedContent(string changed)
+    {
+        var hosted = _fixture.Factory;
+        await using var context = _fixture.Factory.CreateMigratorContext();
+        var scenario = await SeedFanoutScenarioAsync(context);
+        var message = CreateFanoutOutboxMessage(scenario);
+        var request = JsonSerializer.Deserialize<EventPublishedNotificationFanoutRequested>(message.Payload!)!;
+        string canary = Guid.CreateVersion7().ToString("N");
+        if (changed == "envelope")
+            message.AggregateId = Guid.CreateVersion7();
+        else if (changed == "actor")
+            request = request with { SourceActorId = Guid.CreateVersion7() };
+        else if (changed == "tenant")
+            request = request with { TenantId = Guid.CreateVersion7() };
+        else if (changed == "unpublished")
+            await context.Events.Where(value => value.Id == scenario.EventId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.EventStatusId, (int)EventStatusEnum.Draft));
+        else
+            request = request with { EventTitle = canary };
+        message.Payload = JsonSerializer.Serialize(request);
+        context.OutboxMessages.Add(message);
+        await context.SaveChangesAsync();
+        if (changed == "content")
+        {
+            await using var execution = await NotificationOutboxExecutionFixture.ClaimAndBindAsync(hosted.Services, message.Id);
+            await execution.Services.GetRequiredService<IOutboxMessageDispatcher>().DispatchAsync(execution.Message);
+            context.ChangeTracker.Clear();
+            var notification = await context.Notifications.IgnoreQueryFilters().SingleAsync(value =>
+                value.TenantId == scenario.TenantId && value.UserId == scenario.SubscriberUserId
+                && value.EntityId == scenario.EventId.ToString());
+            await Assert.That(notification.Title).Contains(scenario.EventTitle);
+            await Assert.That(notification.Title).DoesNotContain(canary);
+        }
+        else
+        {
+            if (changed is "envelope" or "tenant")
+            {
+                await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    await using var denied = await NotificationOutboxExecutionFixture.ClaimAndBindAsync(hosted.Services, message.Id);
+                });
+                var rejected = await context.OutboxMessages.AsNoTracking().SingleAsync(value => value.Id == message.Id);
+                await Assert.That(rejected.Status).IsEqualTo(OutboxMessageStatus.Failed);
+                await Assert.That(rejected.LastError).IsEqualTo("notification_source_not_admitted");
+            }
+            else
+            {
+                await using var execution = await NotificationOutboxExecutionFixture.ClaimAndBindAsync(hosted.Services, message.Id);
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    execution.Services.GetRequiredService<IOutboxMessageDispatcher>().DispatchAsync(execution.Message));
+            }
+            context.ChangeTracker.Clear();
+            await Assert.That(await context.NotificationFanoutRuns.IgnoreQueryFilters()
+                .AnyAsync(value => value.EntityId == scenario.EventId)).IsFalse();
+            await Assert.That(await context.Notifications.IgnoreQueryFilters()
+                .AnyAsync(value => value.EntityId == scenario.EventId.ToString())).IsFalse();
+            await Assert.That(await context.WebPushDispatchOutbox.IgnoreQueryFilters()
+                .AnyAsync(value => value.TenantId == scenario.TenantId && value.UserId == scenario.SubscriberUserId)).IsFalse();
+        }
     }
 
     private static OutboxMessage CreateFanoutOutboxMessage(FanoutScenario scenario)

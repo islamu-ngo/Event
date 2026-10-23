@@ -184,7 +184,8 @@ public sealed class ModerationMachineSubjectBindingPersistenceTests
             if (machineCaller)
                 machine.SetPrincipal(new ApiKeyPrincipalContext("initial-service-key", null,
                     ExternalApiKeyOwnerType.InstanceAdmin, AdministratorId, []));
-            return new(context, admin, machine, new ExternalApiKeyRepository(context),
+            return new(context, admin, machine,
+                new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 new UnconfiguredKeys(), TimeProvider.System);
         }
 

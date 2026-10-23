@@ -88,7 +88,7 @@ public sealed partial class ModerationCaseNativeProofTests
             ModerationOperation? operation = null)
         {
             var (admin, machine) = Identity(context);
-            var keys = new ExternalApiKeyRepository(context);
+            var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), Database.Clock);
             var activation = new ModerationNativeActivationQualification(context, Inventory, null,
@@ -130,7 +130,7 @@ public sealed partial class ModerationCaseNativeProofTests
                 new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
                 new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
             var machine = new MachinePrincipalAccessor(http);
-            var keys = new ExternalApiKeyRepository(context);
+            var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), Database.Clock);
             var activation = new ModerationNativeActivationQualification(context, Inventory, null,

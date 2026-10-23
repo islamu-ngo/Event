@@ -3,14 +3,52 @@ namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 using System.Text.Json;
 using Explore.Application.DTOs.PaidEventPolicies;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
+using Explore.Application.Features.ConfigurationManifest.Catalog;
 using Explore.Application.Features.ConfigurationManifest.Validation;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
+using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
 using Explore.Domain.Settings.Documents;
 
 public sealed class ConfigurationManifestValidatorTests
 {
+    [Test]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "true", ConfigurationManifestScope.Instance)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "false", ConfigurationManifestScope.Instance)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "true", ConfigurationManifestScope.Tenant)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "false", ConfigurationManifestScope.Tenant)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled, "true", ConfigurationManifestScope.Instance)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled, "false", ConfigurationManifestScope.Instance)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled, "true", ConfigurationManifestScope.Tenant)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled, "false", ConfigurationManifestScope.Tenant)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode, "\"downtime_only\"", ConfigurationManifestScope.Instance)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode, "\"full\"", ConfigurationManifestScope.Instance)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode, "\"downtime_only\"", ConfigurationManifestScope.Tenant)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode, "\"full\"", ConfigurationManifestScope.Tenant)]
+    public async Task Validate_DedicatedFederationSetting_RejectsClosedManifestScope(
+        string key, string value, ConfigurationManifestScope scope)
+    {
+        AtprotoFederationSettingPolicy.Validate(key, value,
+            scope == ConfigurationManifestScope.Instance ? SettingScope.Instance : SettingScope.Tenant);
+        var settings = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+        {
+            [key] = ConfigurationManifestTestData.Json(value)
+        };
+        var manifest = scope == ConfigurationManifestScope.Instance
+            ? ConfigurationManifestTestData.Valid(instanceSettings: settings)
+            : ConfigurationManifestTestData.Valid(settings: settings);
+
+        var result = ConfigurationManifestValidator.Validate(manifest);
+
+        await Assert.That(result.IsValid).IsFalse();
+        var error = result.Errors.Single();
+        await Assert.That(error.Code).IsEqualTo(ConfigurationManifestFailureCodes.KeyNotAllowed);
+        string path = scope == ConfigurationManifestScope.Instance
+            ? "$.spec.instance.settings" : "$.spec.tenants[0].spec.settings";
+        await Assert.That(error.Path).IsEqualTo($"{path}.{key}");
+    }
+
     [Test]
     public async Task Validate_MinimalManifest_IsValid()
     {

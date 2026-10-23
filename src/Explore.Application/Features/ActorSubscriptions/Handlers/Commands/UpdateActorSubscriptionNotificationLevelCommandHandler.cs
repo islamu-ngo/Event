@@ -47,7 +47,6 @@ public class UpdateActorSubscriptionNotificationLevelCommandHandler : ICommandHa
             _tenantContext.TenantId,
             tenantUser.Id,
             request.TargetActorId,
-            trackChanges: true,
             cancellationToken);
 
         if (subscription is null)

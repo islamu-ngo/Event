@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52SF11H490CBSV9QV0E947Y
+Title: "Enroll existing email mutation identities in native capability contracts"
+Type: feat
+Scope: access
+Summary: "Bind all five existing native database authorities and reject identity reuse across email mutation and primary roles."
+Group: complete-native-enrollment
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Email mutation authorities remain distinct from each other and from Migrator, Global and Runtime identities.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Existing email-role configuration and approved secret authorities supply enrollment without new configuration keys.

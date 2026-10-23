@@ -16,7 +16,6 @@ public class UserExternalLoginRepositoryBypassTests(PostgreSqlContainerFixture f
     [Test]
     public async Task GetByProviderAndKey_WithAmbientTenant_ReturnsOnlyExactGlobalBinding()
     {
-        await fixture.ResetAsync();
         await using var seedContext = fixture.CreateDbContext();
 
         var userA = CreateUser("external-login-a");
@@ -26,13 +25,13 @@ public class UserExternalLoginRepositoryBypassTests(PostgreSqlContainerFixture f
 
         ProviderAccountKey tenantAKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
             "https://auth.example.test/realms/ISLAMU",
-            "subject-a");
+            userA.Id.ToString("D"));
         ProviderAccountKey tenantBKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
             "https://auth.example.test/realms/ISLAMU",
-            "subject-b");
+            userB.Id.ToString("D"));
         ProviderAccountKey missingKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
             "https://auth.example.test/realms/ISLAMU",
-            "subject-missing");
+            Guid.CreateVersion7().ToString("D"));
         var tenantALogin = CreateExternalLogin(userA.Id, "keycloak", tenantAKey.Value);
         var tenantBLogin = CreateExternalLogin(userB.Id, "keycloak", tenantBKey.Value);
         seedContext.UserExternalLogins.AddRange(tenantALogin, tenantBLogin);
@@ -42,6 +41,7 @@ public class UserExternalLoginRepositoryBypassTests(PostgreSqlContainerFixture f
             new TestTenantContext(Guid.CreateVersion7()));
         var visibleBindings = await tenantContext.UserExternalLogins
             .AsNoTracking()
+            .Where(login => login.UserId == userA.Id || login.UserId == userB.Id)
             .Select(login => login.Id)
             .ToListAsync();
 

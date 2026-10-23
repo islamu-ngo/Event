@@ -1,9 +1,6 @@
-using Explore.Persistence;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
-using Microsoft.EntityFrameworkCore;
 using Explore.Secrets.Database;
-using Explore.Infrastructure.ConfigurationManifest;
 
 namespace Event.MigrationService;
 
@@ -29,21 +26,16 @@ public sealed class Worker(IServiceProvider serviceProvider, IHostApplicationLif
         if (externalIdentity is not null)
         {
             logger.LogInformation("Applying external Local Identity database migrations.");
-            await externalIdentity.Database.MigrateAsync(stoppingToken);
+            await ExternalIdentityDatabaseMigrator.MigrateAsync(
+                externalIdentity, configuration, stoppingToken);
         }
 
-        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var startupSequence = scope.ServiceProvider
-            .GetRequiredService<IConfigurationManifestPostMigrationSequence>();
-        await startupSequence.RunAsync(
-            cancellationToken => ExploreDatabaseMigrator.MigrateAndSeedAsync(
-                db,
+        await ExploreDatabaseMigrator.MigrateAndSeedAsync(
                 environment,
                 configuration,
                 migrationDatabaseOptions,
                 logger,
-                cancellationToken),
-            stoppingToken);
+                cancellationToken: stoppingToken);
 
         lifetime.StopApplication();
     }

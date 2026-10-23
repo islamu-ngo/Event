@@ -1,5 +1,7 @@
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Tenant;
+using Explore.Application.Features.TenantStorageSettings.Requests.Commands;
+using Explore.Application.Settings;
 
 namespace Explore.Application.Contracts.Services;
 
@@ -9,13 +11,12 @@ public interface ITenantStorageSettingService
         Guid tenantId,
         CancellationToken cancellationToken = default);
 
-    Task ApplyPatchAsync(
-        Guid tenantId,
-        Guid actorUserId,
-        PatchTenantStorageSettingsDto settings,
+    Task<StorageSettingsMutation> ObserveConfigurationAsync(
+        PatchTenantStorageSettingsCommand command,
         CancellationToken cancellationToken = default);
+    Task ApplyPatchAsync(StorageSettingsMutation observation, CancellationToken cancellationToken = default);
 
     Task<InstanceStorageProviderStatusDto> TestProviderAsync(
-        Guid tenantId,
+        TestTenantStorageProviderCommand command,
         CancellationToken cancellationToken = default);
 }

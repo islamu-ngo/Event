@@ -5,6 +5,22 @@ namespace Explore.Domain.Ai;
 
 public class AiProposedAction : ITenantEntity
 {
+    public static bool IsWithinLifetime(DateTime createdAt, DateTime utcNow) =>
+        createdAt != default && utcNow >= createdAt && utcNow - createdAt <= TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// Binds a displayed preview to its exact persisted effect and ownership.
+    /// Mutable status is excluded so the same consent can recover its confirmed effect.
+    /// This comparison token never grants authorization.
+    /// </summary>
+    public string ConsentVersionFor(Guid principalUserId)
+    {
+        string envelope = FormattableString.Invariant(
+            $"{Id:N}|{TenantId:N}|{ConversationId:N}|{principalUserId:N}|{ActingActorId:N}|{MessageId:N}|{CreatedAt.Ticks}|{(int)Kind}|{AiToolExecution.DigestPayload(PayloadJson)}");
+        return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(envelope)));
+    }
+
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
     public Guid ConversationId { get; set; }

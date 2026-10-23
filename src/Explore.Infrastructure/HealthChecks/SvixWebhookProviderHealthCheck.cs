@@ -27,12 +27,17 @@ public sealed class SvixWebhookProviderHealthCheck(
         var data = new Dictionary<string, object>
         {
             ["enabled"] = currentOptions.Enabled,
-            ["provider"] = currentOptions.Provider,
+            ["provider"] = currentOptions.IsDisabled ? WebhookOptions.ProviderDisabled
+                : currentOptions.IsProvider(WebhookOptions.ProviderLocal) ? WebhookOptions.ProviderLocal
+                : currentOptions.IsProvider(WebhookOptions.ProviderSvix) ? WebhookOptions.ProviderSvix
+                : currentOptions.IsProvider(WebhookOptions.ProviderComposite) ? WebhookOptions.ProviderComposite
+                : currentOptions.IsProvider(WebhookOptions.ProviderDryRun) ? WebhookOptions.ProviderDryRun
+                : "unknown",
             ["svixProviderSelected"] = svixSelected,
             ["baseUrlConfigured"] = !string.IsNullOrWhiteSpace(currentOptions.Svix.BaseUrl),
-            ["environment"] = currentOptions.Svix.Environment,
-            ["providerVersion"] = currentOptions.Svix.ProviderVersion,
-            ["capabilityPolicyVersion"] = currentOptions.Svix.CapabilityPolicyVersion,
+            ["environmentConfigured"] = !string.IsNullOrWhiteSpace(currentOptions.Svix.Environment),
+            ["providerVersionConfigured"] = !string.IsNullOrWhiteSpace(currentOptions.Svix.ProviderVersion),
+            ["capabilityPolicyVersionConfigured"] = !string.IsNullOrWhiteSpace(currentOptions.Svix.CapabilityPolicyVersion),
             ["appPortalEnabled"] = currentOptions.Svix.AppPortalEnabled,
             ["syncEventTypesOnStartup"] = currentOptions.Svix.SyncEventTypesOnStartup,
             ["processorEnabled"] = processorSettings.Value.Enabled,

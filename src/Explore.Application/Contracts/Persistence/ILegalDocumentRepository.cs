@@ -64,4 +64,12 @@ public interface ILegalDocumentRepository
     Task AddAsync(
         LegalDocument legalDocument,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Persists the imported aggregate inside the active import transaction so
+    /// fidelity can read it before commit. Does not publish or commit the draft.
+    /// </summary>
+    Task SaveImportedAsync(
+        LegalDocument legalDocument,
+        CancellationToken cancellationToken);
 }

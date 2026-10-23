@@ -28,24 +28,40 @@ public sealed class SetupSecretBindingAuthorityTests
 {
     [Test]
     [Arguments(SecretProviderType.Infisical, SecretSourceType.Infisical,
-        SetupSecretBindingWriteOutcome.Ready, 1)]
+        SetupSecretBindingWriteOutcome.Ready, 1, SecretDefinitionRegistry.Keys.SetupSigning)]
     [Arguments(SecretProviderType.Environment, SecretSourceType.EnvironmentVariable,
-        SetupSecretBindingWriteOutcome.Unavailable, 0)]
+        SetupSecretBindingWriteOutcome.Unavailable, 0, SecretDefinitionRegistry.Keys.SetupSigning)]
     [Arguments(SecretProviderType.UserSecrets, SecretSourceType.EnvironmentVariable,
-        SetupSecretBindingWriteOutcome.Unavailable, 0)]
+        SetupSecretBindingWriteOutcome.Unavailable, 0, SecretDefinitionRegistry.Keys.SetupSigning)]
     [Arguments(SecretProviderType.Infisical, SecretSourceType.EnvironmentVariable,
-        SetupSecretBindingWriteOutcome.Invalid, 0)]
+        SetupSecretBindingWriteOutcome.Invalid, 0, SecretDefinitionRegistry.Keys.SetupSigning)]
     [Arguments(SecretProviderType.Environment, SecretSourceType.Infisical,
-        SetupSecretBindingWriteOutcome.Invalid, 0)]
+        SetupSecretBindingWriteOutcome.Invalid, 0, SecretDefinitionRegistry.Keys.SetupSigning)]
     [Arguments(SecretProviderType.UserSecrets, SecretSourceType.Infisical,
-        SetupSecretBindingWriteOutcome.Invalid, 0)]
+        SetupSecretBindingWriteOutcome.Invalid, 0, SecretDefinitionRegistry.Keys.SetupSigning)]
+    [Arguments(SecretProviderType.Infisical, SecretSourceType.Infisical,
+        SetupSecretBindingWriteOutcome.Ready, 1, SecretDefinitionRegistry.Keys.SetupEncryption)]
+    [Arguments(SecretProviderType.Environment, SecretSourceType.EnvironmentVariable,
+        SetupSecretBindingWriteOutcome.Unavailable, 0, SecretDefinitionRegistry.Keys.SetupEncryption)]
+    [Arguments(SecretProviderType.UserSecrets, SecretSourceType.EnvironmentVariable,
+        SetupSecretBindingWriteOutcome.Unavailable, 0, SecretDefinitionRegistry.Keys.SetupEncryption)]
+    [Arguments(SecretProviderType.Infisical, SecretSourceType.EnvironmentVariable,
+        SetupSecretBindingWriteOutcome.Invalid, 0, SecretDefinitionRegistry.Keys.SetupEncryption)]
+    [Arguments(SecretProviderType.Environment, SecretSourceType.Infisical,
+        SetupSecretBindingWriteOutcome.Invalid, 0, SecretDefinitionRegistry.Keys.SetupEncryption)]
+    [Arguments(SecretProviderType.UserSecrets, SecretSourceType.Infisical,
+        SetupSecretBindingWriteOutcome.Invalid, 0, SecretDefinitionRegistry.Keys.SetupEncryption)]
     public async Task RegisteredWriterUsesOnlyTheSelectedStoredAuthority(
         SecretProviderType selectedProvider,
         SecretSourceType storedSource,
         SetupSecretBindingWriteOutcome expectedOutcome,
-        int expectedWrites)
+        int expectedWrites,
+        string purpose)
     {
         SecretBinding binding = Binding(storedSource);
+        binding.SettingKey = purpose;
+        if (storedSource == SecretSourceType.Infisical)
+            binding.InfisicalKey = SecretDefinitionRegistry.GetRequired(purpose).DefaultInfisicalKey;
         ISecretBindingRepository repository = Substitute.For<ISecretBindingRepository>();
         repository.GetById(binding.Id).Returns(binding);
         var client = new RecordingInfisicalClient();
@@ -68,13 +84,13 @@ public sealed class SetupSecretBindingAuthorityTests
                 1,
                 Guid.CreateVersion7(),
                 binding.Id,
-                "setup.signing",
+                purpose,
                 secret);
 
             SetupSecretBindingWriteOutcome readiness =
                 await readinessReader.GetReadinessAsync(
                     binding.Id,
-                    "setup.signing",
+                    purpose,
                     CancellationToken.None);
 
             SetupSecretBindingWriteOutcome outcome = await writer.WriteAsync(
@@ -114,7 +130,7 @@ public sealed class SetupSecretBindingAuthorityTests
     {
         SecretBinding binding = Binding(SecretSourceType.Infisical);
         string environmentCanary = $"environment-{Guid.CreateVersion7():N}";
-        string pathCanary = $"/path-{Guid.CreateVersion7():N}";
+        string pathCanary = "/setup";
         string keyCanary = $"KEY_{Guid.CreateVersion7():N}";
         string exceptionCanary = $"exception-{Guid.CreateVersion7():N}";
         binding.InfisicalEnvironment = environmentCanary;
@@ -142,7 +158,8 @@ public sealed class SetupSecretBindingAuthorityTests
             SecretProviderType.Infisical,
             repository,
             factory,
-            logs: logs)
+            logs: logs,
+            environment: environmentCanary)
             .BuildServiceProvider();
         ISetupSecretBindingWriter writer =
             provider.GetRequiredService<ISetupSecretBindingWriter>();
@@ -264,7 +281,7 @@ public sealed class SetupSecretBindingAuthorityTests
         {
             bool written = await facade.WriteSecretAsync(
                 "staging-canary",
-                "/setup-canary",
+                "/setup",
                 "SETUP_SIGNING_CANARY",
                 secret,
                 CancellationToken.None);
@@ -274,7 +291,7 @@ public sealed class SetupSecretBindingAuthorityTests
             await Assert.That(captured).IsNotNull();
             await Assert.That(captured!.ProjectId).IsEqualTo("project-canary");
             await Assert.That(captured.EnvironmentSlug).IsEqualTo("staging-canary");
-            await Assert.That(captured.SecretPath).IsEqualTo("/setup-canary");
+            await Assert.That(captured.SecretPath).IsEqualTo("/setup");
             await Assert.That(captured.SecretName).IsEqualTo("SETUP_SIGNING_CANARY");
             await Assert.That(captured.NewSecretValue).IsEqualTo(secretText);
 
@@ -282,7 +299,7 @@ public sealed class SetupSecretBindingAuthorityTests
             cancellation.Cancel();
             await Assert.That(async () => await facade.WriteSecretAsync(
                     "staging-canary",
-                    "/setup-canary",
+                    "/setup",
                     "SETUP_SIGNING_CANARY",
                     secret,
                     cancellation.Token))
@@ -630,7 +647,8 @@ public sealed class SetupSecretBindingAuthorityTests
         ISecretBindingRepository repository,
         IInfisicalClientFactory clientFactory,
         ISecretResolver? resolver = null,
-        ILoggerProvider? logs = null)
+        ILoggerProvider? logs = null,
+        string environment = "staging")
     {
         var services = new ServiceCollection();
         services.AddLogging(builder =>
@@ -641,7 +659,7 @@ public sealed class SetupSecretBindingAuthorityTests
         services.AddOptions<SecretProviderOptions>().Configure(options =>
         {
             options.Provider = provider;
-            options.Infisical.Environment = "staging";
+            options.Infisical.Environment = environment;
         });
         services.AddSingleton(repository);
         services.AddSingleton(clientFactory);
@@ -656,7 +674,7 @@ public sealed class SetupSecretBindingAuthorityTests
     {
         using var logs = new CaptureLoggerProvider();
         string environmentCanary = $"environment-{Guid.CreateVersion7():N}";
-        string pathCanary = $"/path-{Guid.CreateVersion7():N}";
+        string pathCanary = "/setup";
         string keyCanary = $"KEY_{Guid.CreateVersion7():N}";
         string exceptionCanary = $"exception-{Guid.CreateVersion7():N}";
         string secretCanary = $"secret-{Guid.CreateVersion7():N}";
@@ -681,7 +699,8 @@ public sealed class SetupSecretBindingAuthorityTests
             repository,
             new FixedInfisicalClientFactory(client),
             resolver,
-            logs)
+            logs,
+            environment: environmentCanary)
             .BuildServiceProvider();
         ISetupSecretBindingWriter writer =
             provider.GetRequiredService<ISetupSecretBindingWriter>();
@@ -741,7 +760,7 @@ public sealed class SetupSecretBindingAuthorityTests
         var binding = new SecretBinding
         {
             Id = Guid.CreateVersion7(),
-            SettingKey = "setup.signing",
+            SettingKey = SecretDefinitionRegistry.Keys.SetupSigning,
             Scope = SecretScope.Instance,
             SourceType = sourceType
         };
@@ -786,7 +805,7 @@ public sealed class SetupSecretBindingAuthorityTests
             1,
             Guid.CreateVersion7(),
             binding.Id,
-            "setup.signing",
+            SecretDefinitionRegistry.Keys.SetupSigning,
             secret);
 
     private static SetupSecretBindingCommitmentRequest CommitmentRequest(

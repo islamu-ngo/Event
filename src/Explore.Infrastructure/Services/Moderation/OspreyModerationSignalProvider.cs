@@ -100,13 +100,13 @@ public sealed class OspreyModerationSignalProvider(
                 isTransient: true,
                 "Osprey signal evaluation timed out.");
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException)
         {
-            logger.LogWarning(ex, "Osprey signal evaluation request failed with {FailureType}", ex.GetType().Name);
+            logger.LogWarning("osprey_signal_transport_failed");
             return EventSafetySignalProviderResult.Failure(
                 "osprey_unreachable",
                 isTransient: true,
-                ex.GetType().Name);
+                "Osprey signal transport is unavailable.");
         }
         catch (JsonException)
         {
@@ -172,7 +172,6 @@ public sealed class OspreyModerationSignalProvider(
         {
             var failure = MapGrpcFailure(ex.StatusCode);
             logger.LogWarning(
-                ex,
                 "Osprey gRPC signal evaluation failed with status {StatusCode} and category {FailureCategory}",
                 ex.StatusCode,
                 failure.Category);

@@ -9,7 +9,7 @@ namespace Explore.Application.Services.Moderation;
 
 /// <summary>Authenticates possession, not installation provenance. Maintenance authority proves the latter in the store.</summary>
 public sealed class ModerationReconciliationCredentialProvider(
-    IOptionsMonitor<ModerationReconciliationOptions> options, IExternalApiKeyRepository keys,
+    IOptionsMonitor<ModerationReconciliationOptions> options, IExternalApiKeyAuthenticationRepository keys,
     IModerationReconciliationSecretProvider secrets, TimeProvider clock)
 {
     public async Task<ApiKeyPrincipalContext?> AuthenticateAsync(Guid tenantId, CancellationToken cancellationToken)

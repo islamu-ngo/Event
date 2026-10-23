@@ -15,24 +15,31 @@ namespace Explore.Application.Specifications.Events;
 public sealed class AspectPresenceFilter : IFilterSpecification<Event>
 {
     public Expression<Func<Event, bool>> Predicate { get; }
+    public AspectPresenceFilterType FilterType { get; }
 
-    private AspectPresenceFilter(Expression<Func<Event, bool>> predicate) => Predicate = predicate;
+    private AspectPresenceFilter(AspectPresenceFilterType type, Expression<Func<Event, bool>> predicate)
+    {
+        FilterType = type;
+        Predicate = predicate;
+    }
 
     /// <summary>
     /// Filters events that have an Islamic aspect configured.
     /// </summary>
     public static AspectPresenceFilter HasIslamicAspect() =>
-        new(e => e.IslamicAspect != null);
+        new(AspectPresenceFilterType.Islamic, e => e.IslamicAspect != null);
 
     /// <summary>
     /// Filters events that have a Tech aspect configured.
     /// </summary>
     public static AspectPresenceFilter HasTechAspect() =>
-        new(e => e.TechAspect != null);
+        new(AspectPresenceFilterType.Tech, e => e.TechAspect != null);
 
     /// <summary>
     /// Filters events that have both Islamic and Tech aspects configured.
     /// </summary>
     public static AspectPresenceFilter HasBothAspects() =>
-        new(e => e.IslamicAspect != null && e.TechAspect != null);
+        new(AspectPresenceFilterType.Both, e => e.IslamicAspect != null && e.TechAspect != null);
 }
+
+public enum AspectPresenceFilterType { Islamic, Tech, Both }

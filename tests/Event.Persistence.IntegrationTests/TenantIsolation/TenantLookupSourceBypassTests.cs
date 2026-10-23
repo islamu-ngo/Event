@@ -38,7 +38,8 @@ public class TenantLookupSourceBypassTests(PostgreSqlContainerFixture fixture)
             .Select(setting => setting.TenantId)
             .ToListAsync();
 
-        var lookupSource = new TenantLookupSource(filteredContext);
+        await using var global = await PostgresTenantApplicationTableIsolationTests.GlobalLookupAuthority.CreateAsync(fixture);
+        var lookupSource = new TenantLookupSource(global.Factory);
         var lookups = await lookupSource.GetTenantLookupsAsync();
 
         await Assert.That(visibleSettingsWithoutBypass).IsEquivalentTo([tenantA.Id]);
@@ -54,6 +55,36 @@ public class TenantLookupSourceBypassTests(PostgreSqlContainerFixture fixture)
         await Assert.That(tenantBLookup.Slug).IsEqualTo(tenantB.Slug);
         await Assert.That(tenantBLookup.Subdomain).IsNull();
         await Assert.That(tenantBLookup.CustomDomain).IsEqualTo("bravo.example.com");
+    }
+
+    [Test]
+    public async Task CurrentDomainResolutionDoesNotRetainReplacedOrSuspendedReservations()
+    {
+        await fixture.ResetAsync();
+        await using var seed = fixture.CreateDbContext();
+        var tenant = CreateTenant("current-domain", TenantStatusEnum.Active);
+        seed.Tenants.Add(tenant);
+        await seed.SaveChangesAsync();
+        var domain = CreateTenantSetting(tenant.Id, GovernanceSettingKeys.Domains.TenantCustomDomain,
+            "current.example.test");
+        seed.TenantSettingOverrides.AddRange(domain,
+            CreateTenantSetting(tenant.Id, GovernanceSettingKeys.Domains.TenantSubdomain, "current"));
+        await seed.SaveChangesAsync();
+        await using var global = await PostgresTenantApplicationTableIsolationTests.GlobalLookupAuthority.CreateAsync(fixture);
+        var source = new TenantLookupSource(global.Factory);
+        await Assert.That(await source.GetCurrentDomainTenantAsync("CURRENT.example.test", true)).IsEqualTo<Guid?>(tenant.Id);
+        await Assert.That(await source.GetCurrentDomainTenantAsync("current", false)).IsEqualTo<Guid?>(tenant.Id);
+        await Assert.That(await source.GetCurrentDomainTenantAsync("unreserved.example.test", true)).IsNull();
+
+        domain.Value = SettingValueSerializer.Serialize("replacement.example.test");
+        await seed.SaveChangesAsync();
+        await Assert.That(await source.GetCurrentDomainTenantAsync("current.example.test", true)).IsNull();
+        await Assert.That(await source.GetCurrentDomainTenantAsync("replacement.example.test", true)).IsEqualTo<Guid?>(tenant.Id);
+
+        tenant.TenantStatusId = (int)TenantStatusEnum.Suspended;
+        await seed.SaveChangesAsync();
+        await Assert.That(await source.GetCurrentDomainTenantAsync("replacement.example.test", true)).IsNull();
+        await Assert.That(await source.GetCurrentDomainTenantAsync("current", false)).IsNull();
     }
 
     private static Tenant CreateTenant(string slugPrefix, TenantStatusEnum status)

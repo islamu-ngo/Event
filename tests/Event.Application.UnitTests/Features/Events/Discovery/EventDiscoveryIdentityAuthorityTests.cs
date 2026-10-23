@@ -581,8 +581,10 @@ public sealed class EventDiscoveryIdentityAuthorityTests
             return Task.FromResult<IReadOnlyList<OutboxMessage>>(messages.ToArray());
         }
         public Task<List<OutboxMessage>> GetPendingBatch(int size, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<OutboxMessage?> GetClaimedNotificationAsync(Guid id, DateTime lease, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<OutboxMessage?> GetClaimedGenericAsync(Guid id, DateTime lease, OutboxMessageStatus status, DateTime observedAtUtc, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<DateTime?> TryClaimForProcessing(Guid id, DateTime at, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<bool> TryReplaceProcessingPayloadAsync(Guid id, string expected, string replacement, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> TryReplaceProcessingPayloadAsync(Guid id, DateTime lease, string expected, string replacement, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> MarkAsCompleted(Guid id, DateTime at, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<OutboxFailureTransition> MarkAsFailed(Guid id, DateTime lease, string error, bool retry, int delay, DateTime at, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<DateTime?> TryClaimDeadLetterReconciliation(Guid id, DateTime at, CancellationToken ct = default) => throw new NotSupportedException();
@@ -628,7 +630,6 @@ public sealed class EventDiscoveryIdentityAuthorityTests
             Task.FromResult(tenant == fixture.TenantId && user == fixture.UserId && fixture.ActiveMembership);
         public Task<TenantUser?> GetByTenantAndUserAsync(Guid tenant, Guid user, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<TenantUser?> GetByTenantAndActorAsync(Guid tenant, Guid actor, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<List<TenantUser>> GetActiveTenantsForUserAsync(Guid user, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> TryRemoveMembershipAsync(Guid tenant, Guid user, Guid by, DateTime at, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
@@ -648,14 +649,23 @@ public sealed class EventDiscoveryIdentityAuthorityTests
             var eligible = specification.Apply(Items.Where(item => item.TenantId == tenantId && !item.IsDeleted).AsQueryable()).ToList();
             return Task.FromResult((eligible.Skip((page - 1) * size).Take(size).ToList(), eligible.Count));
         }
-        public Task<Event?> GetEventWithDetails(Guid id) => throw new NotSupportedException();
+        public Task<Event?> GetEventWithDetails(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Event?> GetEventWithDetailsAsync(Guid id, Guid tenant, CancellationToken ct) => throw new NotSupportedException();
+        public Task<Event?> GetPublicEventWithDetailsByIdAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
         public Task<Event?> GetPublicEventWithDetailsByCodeAsync(string code, CancellationToken ct) => throw new NotSupportedException();
         public Task<Event?> GetPublicEventForOpenGraphAsync(string code, CancellationToken ct) => throw new NotSupportedException();
         public Task<bool> IsPubliclyEligibleAsync(Guid tenant, Guid id, CancellationToken ct) => Task.FromResult(Items.Any(item =>
             item.TenantId == tenant && item.Id == id && !item.IsDeleted && item.VisibilityTypeId == (int)VisibilityTypeEnum.Public));
         public Task<Event?> GetScheduleGraphForUpdateAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task<Event?> GetAuthorizedForUpdateAsync(Guid tenant, Guid user, Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task<Event?> GetAuthorizedForDeleteAsync(Guid tenant, Guid user, Guid id, CancellationToken ct) => throw new NotSupportedException();
         public Task<Event?> GetAuthorizationTargetByIdAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task<Event?> GetAiProposalAuthorizationTargetByIdAsync(Guid id, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(Items.SingleOrDefault(item => item.TenantId == tenantId
+                && item.Id == id && !item.IsDeleted));
+        }
         public Task<Event?> GetRegistrationStatusEventForUpdateAsync(Guid id, Guid tenant, CancellationToken ct) => throw new NotSupportedException();
         public Task<AtprotoEventPublicationEntityGraph?> GetAtprotoPublicationGraphAsync(Guid tenant, Guid id, CancellationToken ct) => throw new NotSupportedException();
         public Task<Event?> GetAtprotoLifecycleStateAsync(Guid tenant, Guid id, CancellationToken ct) => throw new NotSupportedException();

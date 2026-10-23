@@ -303,7 +303,9 @@ public static class ApplicationServicesRegistration
         services.AddSingleton<KeycloakCredentialBindingRevision>();
         services.AddScoped<KeycloakConnectionResolver>();
         services.AddScoped<KeycloakOperationService>();
-        services.AddScoped<IAuthProviderConfigurationService, AuthProviderConfigurationService>();
+        services.AddScoped<AuthProviderConfigurationService>();
+        services.AddScoped<IAuthProviderConfigurationService>(provider =>
+            provider.GetRequiredService<AuthProviderConfigurationService>());
         services.AddScoped<IVisitorAccessProviderReader, VisitorAccessProviderReader>();
         services.AddScoped<IVisitorAccessCapabilityResolver, VisitorAccessCapabilityResolver>();
         services.AddScoped<IAccountAuthorityLifecycleEmailService, DefaultAccountAuthorityLifecycleEmailService>();
@@ -365,6 +367,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<Explore.Application.Features.Events.Discovery.EventDiscoveryTraversal>();
         services.AddScoped<AtprotoEventGovernanceResolver>();
         services.AddScoped<AtprotoEventPublicationPlanner>();
+        services.AddScoped<AtprotoModerationCompensationPlanner>();
         services.AddScoped<IAtprotoDeliveryGate>(provider =>
             provider.GetRequiredService<AtprotoEventPublicationPlanner>());
         services.AddScoped<IAtprotoLocationPrivacyCorrectionPlanner>(provider =>
@@ -443,7 +446,6 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IRegistrationOrderTransitionCoordinator, RegistrationOrderTransitionCoordinator>();
         services.AddScoped<RegistrationPaymentAttemptClaimService>();
         services.AddScoped<RegistrationPaymentContractService>();
-        services.AddScoped<RegistrationPaymentCheckoutDispatchService>();
         services.AddScoped<RegistrationPaymentReconciliationService>();
         services.AddScoped<RefundDispatchService>();
         services.AddScoped<RefundReconciliationService>();

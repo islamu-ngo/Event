@@ -7,6 +7,41 @@ namespace Event.Domain.UnitTests;
 public sealed class EventLocationPrivacyAuditTests
 {
     [Test]
+    public async Task GovernanceTighteningPreservesDisclosureSelectionsAndAdvancesReviewAuditOnce()
+    {
+        DateTime createdAt = new(2026, 10, 8, 12, 0, 0, DateTimeKind.Utc);
+        Guid actor = Guid.CreateVersion7();
+        var placement = EventLocation.CreatePhysical(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), actor, createdAt);
+        const EventLocationDisclosureFields fields = EventLocationDisclosureFields.City
+            | EventLocationDisclosureFields.StreetAddress | EventLocationDisclosureFields.Coordinates;
+        DateTime revealAt = createdAt.AddDays(2);
+        placement.ChangeDisclosurePolicy(fields, LocationDisclosureAudienceEnum.ConfirmedParticipant,
+            revealAt, 1, actor, EventLocationDisclosureAuditReasonEnum.OrganizerPolicyChange,
+            createdAt.AddMinutes(1), needsPrivacyReview: false);
+        EventLocationGovernanceState before = placement.CaptureGovernanceState();
+
+        EventLocationDisclosureAudit audit = placement.ApplyGovernanceTightening(
+            true, actor, createdAt.AddMinutes(2));
+
+        await Assert.That(placement.NeedsPrivacyReview).IsTrue();
+        await Assert.That(placement.PolicyVersion).IsEqualTo(3);
+        await Assert.That(before.PolicyVersion).IsEqualTo(2);
+        await Assert.That(placement.CaptureGovernanceState().Fields).IsEqualTo(fields);
+        await Assert.That(placement.FullDetailsAudienceId).IsEqualTo((int)LocationDisclosureAudienceEnum.ConfirmedParticipant);
+        await Assert.That(placement.RevealFullDetailsFromUtc).IsEqualTo(revealAt);
+        await Assert.That(placement.ConcurrencyStamp).IsNotEqualTo(before.ConcurrencyStamp);
+        await Assert.That(audit.PreviousFields).IsEqualTo(fields);
+        await Assert.That(audit.NewFields).IsEqualTo(fields);
+        await Assert.That(audit.PreviousPolicyVersion).IsEqualTo(2);
+        await Assert.That(audit.NewPolicyVersion).IsEqualTo(3);
+        await Assert.That(audit.Reason).IsEqualTo(EventLocationDisclosureAuditReasonEnum.GovernanceTightening);
+        placement.DetachFinalReference(actor, createdAt.AddMinutes(3));
+        await Assert.That(() => placement.CaptureGovernanceState().CreateTighteningAudit(actor, createdAt.AddMinutes(4)))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task DisclosureAuditCapturesOnlyPolicyDeltaFacts()
     {
         var occurredAt = new DateTime(2026, 7, 16, 12, 0, 0, DateTimeKind.Utc);

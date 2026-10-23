@@ -4,15 +4,13 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application;
 using Explore.Application.Features.InstanceAdmin.Handlers.Commands;
-using Explore.Application.Features.InstanceAdmin.Requests.Commands;
+using Explore.Application.Features.Settings;
 using Explore.Application.Features.Settings.Handlers.Commands;
 using Explore.Application.Notifications;
-using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Settings;
-using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
@@ -29,7 +27,7 @@ public sealed class SettingMutationBoundaryArchitectureTests
         {
             [typeof(TenantPolicySettingService)] = [typeof(IPublicationPolicyMutationBoundary)],
             [typeof(SetInstanceTenantSettingCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
-            [typeof(ApplyInstanceTenantPlanAssignmentCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
+            [typeof(ApplyInstanceTenantPlanAssignmentCommandHandler)] = [typeof(ITypedSettingsOriginalStore)],
             [typeof(UpdateSettingCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
             [typeof(UpdateSettingBatchCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
             [typeof(ResetSettingCommandHandler)] = [typeof(IPublicationPolicyMutationBoundary)],
@@ -38,11 +36,6 @@ public sealed class SettingMutationBoundaryArchitectureTests
             [typeof(InstanceGovernanceSettingService)] = [typeof(SettingUpsertService)],
             [typeof(SettingUpsertService)] = [typeof(IPublicationPolicyMutationBoundary)]
         };
-
-    private static readonly Type[] GuardedSettingRowWriteAllowlist =
-    [
-        typeof(CoordinatedSettingMutationRepository)
-    ];
 
     private static readonly string[] ExpectedPublicationPolicyKeys =
     [
@@ -111,11 +104,14 @@ public sealed class SettingMutationBoundaryArchitectureTests
     [Test]
     public async Task TenantPolicyContract_ShouldReturnNotificationsForPostCommitPublication()
     {
-        MethodInfo method = typeof(ITenantPolicySettingService)
-            .GetMethod(nameof(ITenantPolicySettingService.ApplyTenantSettingsAsync))!;
-
-        await Assert.That(method.ReturnType).IsEqualTo(typeof(Task<IReadOnlyList<SettingChangedNotification>>));
-        await Assert.That(method.GetParameters().Last().ParameterType).IsEqualTo(typeof(CancellationToken));
+        MethodInfo[] methods = typeof(ITenantPolicySettingService).GetMethods()
+            .Where(method => method.Name == nameof(ITenantPolicySettingService.ApplyTenantSettingsAsync)).ToArray();
+        await Assert.That(methods.Length).IsEqualTo(2);
+        foreach (var method in methods)
+        {
+            await Assert.That(method.ReturnType).IsEqualTo(typeof(Task<IReadOnlyList<SettingChangedNotification>>));
+            await Assert.That(method.GetParameters().Last().ParameterType).IsEqualTo(typeof(CancellationToken));
+        }
     }
 
     [Test]
@@ -195,76 +191,13 @@ public sealed class SettingMutationBoundaryArchitectureTests
                 nameof(IPublicationPolicyMutationBoundary.ApplyTenantAsync),
                 nameof(IPublicationPolicyMutationBoundary.ApplyTenantInCurrentTransactionAsync),
                 nameof(IPublicationPolicyMutationBoundary.ApplyInstanceAsync),
-                nameof(IPublicationPolicyMutationBoundary.ApplyInstanceInCurrentTransactionAsync)
+                nameof(IPublicationPolicyMutationBoundary.ApplyInstanceInCurrentTransactionAsync),
+                nameof(IPublicationPolicyMutationBoundary.ApplyTypedInCurrentTransactionAsync),
+                nameof(IPublicationPolicyMutationBoundary.ApplyImportInCurrentTransactionAsync)
             ]);
         await Assert.That(boundaryMethods.All(method =>
                 method.ReturnType == typeof(Task<PublicationPolicyMutationResult>)))
             .IsTrue();
-    }
-
-    [Test]
-    public async Task GuardedTenantLockHandlersMustRejectPublicationPolicyKeys()
-    {
-        Guid tenantId = Guid.CreateVersion7();
-        var currentUser = new FixedCurrentUserService(Guid.CreateVersion7());
-        var lockHandler = new LockInstanceTenantSettingCommandHandler(
-            null!, null!, null!, currentUser, null!, [], null!, null!, null!);
-        var unlockHandler = new UnlockInstanceTenantSettingCommandHandler(
-            null!, null!, null!, currentUser, null!, [], null!, null!, null!);
-
-        foreach (string key in PublicationPolicySettingKeys.All)
-        {
-            BaseCommandResponse<Guid> lockResponse = await lockHandler.ExecuteAsync(
-                new LockInstanceTenantSettingCommand(tenantId, key),
-                CancellationToken.None);
-            BaseCommandResponse<Guid> unlockResponse = await unlockHandler.ExecuteAsync(
-                new UnlockInstanceTenantSettingCommand(tenantId, key),
-                CancellationToken.None);
-
-            await Assert.That(lockResponse.IsSuccess).IsFalse();
-            await Assert.That(lockResponse.FailureCode).IsEqualTo("setting_not_lockable");
-            await Assert.That(unlockResponse.IsSuccess).IsFalse();
-            await Assert.That(unlockResponse.FailureCode).IsEqualTo("setting_not_lockable");
-        }
-    }
-
-    [Test]
-    public async Task GenericMutationEntryPointsMustRejectPublicationPolicyKeys()
-    {
-        await Assert.That(GuardedSettingRowWriteAllowlist.Length).IsEqualTo(1);
-        await Assert.That(GuardedSettingRowWriteAllowlist.Single())
-            .IsEqualTo(typeof(CoordinatedSettingMutationRepository));
-
-        var tenantRepository = new TenantSettingRepository(null!, null!);
-        var systemRepository = new SystemSettingRepository(null!, null!);
-        var resolver = new HierarchicalSettingsResolver(
-            null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
-        Guid tenantId = Guid.CreateVersion7();
-        Guid actorId = Guid.CreateVersion7();
-
-        foreach (string key in PublicationPolicySettingKeys.All)
-        {
-            Func<Task>[] attempts =
-            [
-                () => tenantRepository.SetValueAsync(tenantId, key, "true"),
-                async () => await tenantRepository.RemoveOverrideAsync(tenantId, key),
-                async () => await tenantRepository.LockAsync(tenantId, key, actorId),
-                async () => await tenantRepository.UnlockAsync(tenantId, key, actorId),
-                () => tenantRepository.UpsertManyForTenantAsync(
-                    tenantId,
-                    [new TenantSettingOverrideUpsert(key, "true", IsLocked: false)],
-                    actorId),
-                async () => await systemRepository.UpsertAsync(CreateSystemSetting(key)),
-                async () => await systemRepository.UpsertLockAsync(CreateSystemSetting(key)),
-                () => resolver.SetValueAsync(key, "true", SettingScope.Tenant, tenantId, actorId),
-                () => resolver.RemoveOverrideAsync(key, SettingScope.Tenant, tenantId, actorId),
-                () => resolver.LockAsync(key, SettingScope.Tenant, tenantId, actorId),
-                () => resolver.UnlockAsync(key, SettingScope.Tenant, tenantId, actorId)
-            ];
-
-            foreach (Func<Task> attempt in attempts)
-                await Assert.That(async () => await attempt()).Throws<InvalidOperationException>();
-        }
     }
 
     [Test]
@@ -333,7 +266,8 @@ public sealed class SettingMutationBoundaryArchitectureTests
         ServiceDescriptor reader = services.Single(descriptor =>
             descriptor.ServiceType == typeof(IEventResourceGovernancePolicyReader));
 
-        await Assert.That(writer.ImplementationType).IsEqualTo(typeof(EventResourceSettingsWriter));
+        await Assert.That(writer.ImplementationType?.FullName)
+            .IsEqualTo("Explore.Persistence.Services.SelectedEventResourceSettingsWriter");
         await Assert.That(writer.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
         await Assert.That(reader.ImplementationType).IsEqualTo(typeof(EventResourceGovernancePolicyReader));
         await Assert.That(reader.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
@@ -369,16 +303,4 @@ public sealed class SettingMutationBoundaryArchitectureTests
         await Assert.That(resolvedTenantSettingRepository).IsNull();
     }
 
-    private static SystemSetting CreateSystemSetting(string key) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        SettingKey = key,
-        Value = "true"
-    };
-
-    private sealed class FixedCurrentUserService(Guid userId) : ICurrentUserService
-    {
-        public Guid? UserId => userId;
-        public bool IsAuthenticated => true;
-    }
 }

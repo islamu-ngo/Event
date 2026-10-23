@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52NC99RQTGF2YX4775YENA1
+Title: "Define human commit identity and source-fence contracts"
+Type: feat
+Scope: access
+Summary: "Capture resolved human identity before awaiting and define immutable principal and route facts with transaction-bound source leases."
+Group: human-source-contracts
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Contracts distinguish identity observations and source facts from authorization grants and live commit-time admission.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: This foundation alone activates no native locks or mutation protection; provider and consumer adoption require separate assurance.

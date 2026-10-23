@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5ADRM3V1AZ09GBSW0T5QGDT
+Title: "Respect mapped bootstrap audit states"
+Type: fix
+Scope: self-hosting
+Summary: "Use EF-converted audit mode and status values consistently in bootstrap reads, snapshots and failed-history guards instead of casting string states to enum ordinals."
+Group: configuration-bootstrap-provider-values
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: The failed-history writer retains its exact Failed-only boundary and rejects an Applied receipt at its intended guard. Model-derived values correct representation drift without changing owners, grants, source inventories, transactions or native lock protocols.
+  Migration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: Failed-bootstrap history records acknowledged rollback, not application success. Preserve matching application and native capability definitions; do not bypass readiness or relabel operations to repair definition drift.

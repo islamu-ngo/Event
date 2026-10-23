@@ -21,6 +21,8 @@ public partial class ExploreDbContext
 {
     public DbSet<SetupTargetEnrollment> SetupTargetEnrollments { get; set; }
     public DbSet<KeycloakOperation> KeycloakOperations { get; set; }
+    public DbSet<AuthenticationCredentialCutover> AuthenticationCredentialCutovers { get; set; }
+    public DbSet<AuthenticationCredentialCutoverHead> AuthenticationCredentialCutoverHeads { get; set; }
     public DbSet<SetupEnrollmentIssuanceClaim> SetupEnrollmentIssuanceClaims { get; set; }
     public DbSet<SetupSecretBindingOperation> SetupSecretBindingOperations { get; set; }
 
@@ -415,6 +417,8 @@ public partial class ExploreDbContext
 
     // ===== Settings =====
     public DbSet<SystemSetting> SystemSettings { get; set; }
+    public DbSet<AtprotoFederationInstanceSetting> AtprotoFederationInstanceSettings { get; set; }
+    public DbSet<AtprotoFederationTenantSetting> AtprotoFederationTenantSettings { get; set; }
     public DbSet<SettingScopeLookup> SettingScopes { get; set; }
     public DbSet<SettingValueTypeLookup> SettingValueTypes { get; set; }
     public DbSet<TenantSetting> TenantSettingOverrides { get; set; }

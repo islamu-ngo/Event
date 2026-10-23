@@ -1,0 +1,32 @@
+Change-Id: CHG-01M57X9PSZWNQ67TDK6NZTBVGQ
+Title: "Read external identity bindings through EF Core"
+Type: feat
+Scope: access
+Summary: "Move exact provider/account lookup to shared EF Core logic and replace PostgreSQL business routines with fixed Global read permissions and fail-closed role admission."
+Group: external-login-ef
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: Existing development installations containing the former external-login function or roles are refused. Provision a fresh isolated development database with the matching application and schema installer; no automatic deletion or compatibility migration is supplied.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Exact account selection belongs to the application. All consumers sharing Global can read the nine declared binding columns; Runtime access, writes, grant options, indirect role escalation and delegation remain forbidden.
+  Migration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: PostgreSQL schema installation grants fixed mapped columns instead of creating a stored business routine. Obsolete installations fail closed and are never silently repaired or destructively cleaned up.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Existing role-specific Global and Migrator credentials remain authoritative. No new secret or login is introduced; operators must account for the documented shared-Global read authority.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Use a fresh isolated development database for this breaking cutover. Preserve any needed development data before an explicitly chosen reprovisioning operation; application startup never deletes it.

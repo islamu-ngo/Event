@@ -1,0 +1,29 @@
+Change-Id: CHG-01M534CVXHKH6GXJ5JTV2GD1XY
+Title: "Observe current policy inputs for the original signed human"
+Type: feat
+Scope: access
+Summary: "Require original signed account custody and authentic credential lifetime around persisted human source observation."
+Group: human-principal-source-reader
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Original request, account, tenant and credential lifetime remain current around persisted source observation.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Signed-out, deleted and mismatched humans are rejected; production scope-factory registration remains separate.

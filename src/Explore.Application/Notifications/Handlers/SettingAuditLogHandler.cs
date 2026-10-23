@@ -1,4 +1,3 @@
-using Explore.Domain.Settings;
 using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
@@ -15,23 +14,9 @@ public class SettingAuditLogHandler : INotificationHandler<SettingChangedNotific
 
     public Task HandleAsync(SettingChangedNotification notification, CancellationToken cancellationToken)
     {
-        bool isSensitive = notification.IsSensitive
-            || SettingRegistry.Get(notification.Key)?.IsSensitive == true;
-        string? oldValue = isSensitive && notification.OldValue is not null
-            ? SettingChangedNotification.RedactedValue
-            : notification.OldValue;
-        string? newValue = isSensitive && notification.NewValue is not null
-            ? SettingChangedNotification.RedactedValue
-            : notification.NewValue;
-
         _logger.LogInformation(
-            "Setting changed: {SettingKey} Scope={Scope} TenantId={TenantId} Actor={ActorUserId} OldValue={OldValue} NewValue={NewValue}",
-            notification.Key,
-            notification.Scope,
-            notification.TenantId,
-            notification.ActorUserId,
-            oldValue,
-            newValue);
+            "Setting changed at {Scope} scope",
+            Enum.IsDefined(notification.Scope) ? notification.Scope.ToString() : "unknown");
 
         return Task.CompletedTask;
     }

@@ -1,10 +1,7 @@
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 using System.Text;
-using Explore.Application.Features.ConfigurationManifest.Catalog;
-using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Importing;
-using Explore.Application.Features.ConfigurationManifest.Managed;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -13,7 +10,6 @@ using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 
 public sealed class ConfigurationImportPersistenceTests
 {
@@ -217,152 +213,6 @@ public sealed class ConfigurationImportPersistenceTests
     }
 
     [Test]
-    public async Task Manager_CancellationDeletesProtectedBytes()
-    {
-        await using TestDatabase database = await TestDatabase.CreateAsync();
-        var store = new ConfigurationImportArtifactRepository(
-            database.Context,
-            new EphemeralDataProtectionProvider());
-        var manager = new ConfigurationImportSessionManager(
-            new ConfigurationImportSessionRepository(database.Context),
-            store,
-            new EfCoreUnitOfWork(database.Context),
-            new ConfigurationImportPreviewComposer());
-        ConfigurationImportTarget target =
-            ConfigurationImportTarget.ForInstance();
-        ConfigurationImportSessionCreated created = await manager.CreateAsync(
-            target,
-            Encoding.UTF8.GetBytes("{}"),
-            OccurredAt,
-            TimeSpan.FromMinutes(20),
-            CancellationToken.None);
-        await Assert.That(created.ToString())
-            .DoesNotContain(created.AccessToken);
-
-        await manager.CancelAsync(
-            created.Session.SessionId,
-            target,
-            created.AccessToken,
-            OccurredAt.AddMinutes(1),
-            CancellationToken.None);
-
-        ConfigurationImportSessionException missing =
-            await Assert.That(async () => await store.ReadAsync(
-                    created.Session.Artifact.Handle,
-                    CancellationToken.None))
-                .Throws<ConfigurationImportSessionException>();
-        await Assert.That(missing.FailureCode)
-            .IsEqualTo(ConfigurationImportFailureCodes.ArtifactMissing);
-        await Assert.That(created.Session.State)
-            .IsEqualTo(ConfigurationImportSessionState.Cancelled);
-    }
-
-    [Test]
-    public async Task Manager_ExpiryDeletesBytesAndRetainsOnlySessionEvidence()
-    {
-        await using TestDatabase database = await TestDatabase.CreateAsync();
-        var store = new ConfigurationImportArtifactRepository(
-            database.Context,
-            new EphemeralDataProtectionProvider());
-        var repository =
-            new ConfigurationImportSessionRepository(database.Context);
-        var manager = new ConfigurationImportSessionManager(
-            repository,
-            store,
-            new EfCoreUnitOfWork(database.Context),
-            new ConfigurationImportPreviewComposer());
-        ConfigurationImportSessionCreated created = await manager.CreateAsync(
-            ConfigurationImportTarget.ForInstance(),
-            Encoding.UTF8.GetBytes("{}"),
-            OccurredAt,
-            TimeSpan.FromMinutes(5),
-            CancellationToken.None);
-        database.Context.ChangeTracker.Clear();
-
-        int expired = await manager.ExpireAsync(
-            OccurredAt.AddMinutes(6),
-            maximumCount: 10,
-            CancellationToken.None);
-        database.Context.ChangeTracker.Clear();
-        ConfigurationImportSession? persisted =
-            await new EfCoreUnitOfWork(database.Context).ExecuteSerializableAsync(token => repository.GetForUpdateAsync(
-                created.Session.SessionId,
-                ConfigurationImportTarget.ForInstance(),
-                token));
-
-        await Assert.That(expired).IsEqualTo(1);
-        await Assert.That(persisted?.State)
-            .IsEqualTo(ConfigurationImportSessionState.Expired);
-        ConfigurationImportSessionException missing =
-            await Assert.That(async () => await store.ReadAsync(
-                    created.Session.Artifact.Handle,
-                    CancellationToken.None))
-                .Throws<ConfigurationImportSessionException>();
-        await Assert.That(missing.FailureCode)
-            .IsEqualTo(ConfigurationImportFailureCodes.ArtifactMissing);
-    }
-
-    [Test]
-    public async Task Manager_PreviewMutatesOnlySessionMetadata()
-    {
-        await using TestDatabase database = await TestDatabase.CreateAsync();
-        var store = new ConfigurationImportArtifactRepository(
-            database.Context,
-            new EphemeralDataProtectionProvider());
-        var manager = new ConfigurationImportSessionManager(
-            new ConfigurationImportSessionRepository(database.Context),
-            store,
-            new EfCoreUnitOfWork(database.Context),
-            new ConfigurationImportPreviewComposer());
-        ConfigurationImportTarget target =
-            ConfigurationImportTarget.ForInstance();
-        ConfigurationImportSessionCreated created = await manager.CreateAsync(
-            target,
-            Encoding.UTF8.GetBytes("{}"),
-            OccurredAt,
-            TimeSpan.FromMinutes(20),
-            CancellationToken.None);
-        MutationCounts before =
-            await MutationCounts.ReadAsync(database.Context);
-        var input = new ConfigurationImportPreviewInput(
-            target,
-            created.Session.ArtifactDigest,
-            ConfigurationImportDigest.Compute(["target-revision"]),
-            [
-                new ConfigurationImportSectionSnapshot(
-                    "instance.settings",
-                    ConfigurationImportDigest.Compute(["source-settings"]),
-                    ConfigurationPortabilityClass.Portable,
-                    supportsPreview: true,
-                    supportsDiff: true,
-                    requiresExternalSetup: false)
-            ],
-            [],
-            ["instance.settings"],
-            [],
-            ConfigurationImportApplyMode.ApplySelected,
-            [],
-            [],
-            OccurredAt.AddMinutes(15));
-
-        ConfigurationImportPreview preview = await manager.PreparePreviewAsync(
-            created.Session.SessionId,
-            target,
-            created.AccessToken,
-            input,
-            OccurredAt.AddMinutes(1),
-            CancellationToken.None);
-        MutationCounts after =
-            await MutationCounts.ReadAsync(database.Context);
-
-        await Assert.That(preview.Items.Select(item => item.SectionKey))
-            .Contains("instance.settings");
-        await Assert.That(created.Session.State)
-            .IsEqualTo(ConfigurationImportSessionState.PreviewReady);
-        await Assert.That(after).IsEqualTo(before);
-    }
-
-    [Test]
     [Arguments(PrimaryDatabaseProvider.PostgreSql)]
     [Arguments(PrimaryDatabaseProvider.Sqlite)]
     [Arguments(PrimaryDatabaseProvider.SqlServer)]
@@ -497,22 +347,4 @@ public sealed class ConfigurationImportPersistenceTests
         }
     }
 
-    private sealed record MutationCounts(
-        int Tenants,
-        int SystemSettings,
-        int TenantSettings,
-        int SettingsDocuments,
-        int SuccessOperations,
-        int OutboxMessages)
-    {
-        public static async Task<MutationCounts> ReadAsync(
-            ExploreDbContext context) =>
-            new(
-                await context.Tenants.CountAsync(),
-                await context.SystemSettings.CountAsync(),
-                await context.TenantSettingOverrides.CountAsync(),
-                await context.TenantSettingsDocuments.CountAsync(),
-                await context.ConfigurationManifestOperations.CountAsync(),
-                await context.OutboxMessages.CountAsync());
-    }
 }

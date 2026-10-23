@@ -17,85 +17,23 @@ using NSubstitute;
 public sealed class ConfigurationManifestEventResourceRoutingTests
 {
     [Test]
-    public async Task Import_RoutesResourceSettingsOnlyThroughCoordinatedWriter()
+    public async Task InstanceSettings_UnchangedPolicyDoesNotRequireADeferredNotification()
     {
-        var ordinaryValues = new Dictionary<string, string>(StringComparer.Ordinal);
-        var resourceValues = new Dictionary<string, string>(StringComparer.Ordinal);
-        IConfigurationManifestInstanceSettingMutationBoundary instanceSettings =
-            Substitute.For<IConfigurationManifestInstanceSettingMutationBoundary>();
-        instanceSettings.ApplyInCurrentTransactionAsync(
-                Arg.Any<ConfigurationManifestInstanceSettingMutationInput>(),
+        var policy = Substitute.For<IPublicationPolicyMutationBoundary>();
+        policy.ApplyInstanceInCurrentTransactionAsync(
+                Arg.Any<PublicationPolicyInstanceMutationRequest>(),
                 Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                foreach (var mutation in call.Arg<ConfigurationManifestInstanceSettingMutationInput>().Mutations)
-                {
-                    EventResourceSettingMutationGuard.RejectGenericMutation(mutation.Key);
-                    ordinaryValues[mutation.Key] = mutation.SerializedValue;
-                }
-                return new ConfigurationManifestInstanceSettingMutationResult(true, null, "Applied.", []);
-            });
-        IEventResourceSettingsWriter resourceWriter =
-            Substitute.For<IEventResourceSettingsWriter>();
-        var notification = new SettingChangedNotification(
-            EventResourceSettingDefinitions.MaxActiveResources.Key,
-            "500",
-            "100",
-            SettingSource.SystemDefault,
-            tenantId: null,
-            actorUserId: Guid.CreateVersion7(),
-            DateTime.UtcNow);
-        resourceWriter.ApplyAsync(
-                Arg.Any<ImmutableArray<EventResourceSettingMutation>>(),
-                Arg.Any<Guid?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                foreach (var mutation in call.Arg<ImmutableArray<EventResourceSettingMutation>>())
-                {
-                    if (mutation.TenantId.HasValue || !EventResourceSettingMutationGuard.Handles(mutation.Key)
-                        || mutation.Kind != EventResourceSettingMutationKind.SetValue || mutation.Value is null)
-                        return new EventResourceSettingsWriteResult(false, "event_resource_policy_invalid", []);
-                    resourceValues[mutation.Key] = mutation.Value;
-                }
-                return new EventResourceSettingsWriteResult(true, null, [notification]);
-            });
-        ConfigurationImportSectionApplier applier = CreateApplier(
-            instanceSettings,
-            resourceWriter);
-        ConfigurationManifestV1Alpha2 manifest = ConfigurationManifestTestData.Valid(
-            instanceSettings: new Dictionary<string, JsonElement>(StringComparer.Ordinal)
-            {
-                [EventResourceSettingDefinitions.MaxActiveResources.Key] =
-                    ConfigurationManifestTestData.Json("100"),
-                [AppearanceSettingDefinitions.DefaultThemeMode.Key] =
-                    ConfigurationManifestTestData.Json("\"system\"")
-            });
-        byte[] artifact = ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(
-            manifest);
-        var request = new ConfigurationImportPreviewRequest
-        {
-            SelectedSectionKeys = ["instance.settings"],
-            Mappings = new Dictionary<string, string>(StringComparer.Ordinal),
-            ApplyMode = ConfigurationImportApplyMode.ApplySelected,
-            GrantedApprovalCodes = []
-        };
+            .Returns(new PublicationPolicyMutationResult(true, null, "Unchanged.", []));
+        var scalar = Substitute.For<ISystemSettingRepository>();
+        var boundary = new ConfigurationManifestInstanceSettingMutationBoundary(scalar, policy);
 
-        ImmutableArray<SettingChangedNotification> deferred = await applier.ApplyAsync(
-            ConfigurationImportTarget.ForInstance(),
-            artifact,
-            request,
-            Guid.CreateVersion7(),
-            DateTime.UtcNow,
-            new string('a', 64),
-            new ConfigurationImportArtifactParser(),
-            CancellationToken.None);
+        var result = await boundary.ApplyInCurrentTransactionAsync(
+            new ConfigurationManifestInstanceSettingMutationInput(
+                [new(EventSettingDefinitions.RequireApproval.Key, "false")],
+                Guid.CreateVersion7(), DateTime.UtcNow));
 
-        await Assert.That(EventResourceGovernancePolicyValues.Parse(resourceValues, long.MaxValue).MaxActiveResources)
-            .IsEqualTo(100);
-        await Assert.That(JsonSerializer.Deserialize<string>(ordinaryValues[AppearanceSettingDefinitions.DefaultThemeMode.Key]))
-            .IsEqualTo("system");
-        await Assert.That(deferred).IsEquivalentTo([notification]);
+        await Assert.That(result.Success).IsTrue();
+        await Assert.That(result.DeferredNotifications).IsEmpty();
     }
 
     [Test]

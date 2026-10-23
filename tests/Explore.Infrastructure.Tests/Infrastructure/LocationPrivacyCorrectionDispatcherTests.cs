@@ -1,19 +1,110 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Explore.Application.Caching;
 using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Services;
 using Explore.Domain;
+using Explore.Domain.Enums;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Repositories;
+using Explore.Secrets.Database;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Explore.Infrastructure.Messaging;
 using Explore.Tests.Shared.Telemetry;
 using Microsoft.Extensions.Caching.Hybrid;
 using NSubstitute;
-using TUnit.Core;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
 [Category("EventLocationPrivacy")]
-public sealed class LocationPrivacyCorrectionDispatcherTests
+public sealed class LocationPrivacyCorrectionDispatcherTests : IAsyncDisposable
 {
+    private static readonly DateTime Now = new(2026, 7, 19, 12, 0, 0, DateTimeKind.Utc);
+    private readonly Guid _tenantId = Guid.CreateVersion7();
+    private readonly string _databasePath = Path.Combine(
+        Path.GetTempPath(), $"location-correction-{Guid.CreateVersion7():N}.db");
+    private SqliteConnection _connection = null!;
+    private ExploreDbContext _context = null!;
+
+    [Before(Test)]
+    public async Task CreateNativeSourceStore()
+    {
+        _connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = _databasePath,
+            Pooling = false
+        }.ToString());
+        await _connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = _databasePath
+        });
+        _context = new ExploreDbContext(options.UseSqlite(_connection).UseSnakeCaseNamingConvention().Options)
+        {
+            TenantContext = new SelectedTenant(_tenantId)
+        };
+        await _context.Database.EnsureCreatedAsync();
+    }
+
+    [After(Test)]
+    public Task DisposeNativeSourceStore() => DisposeAsync().AsTask();
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_context is not null)
+        {
+            await _context.DisposeAsync();
+            _context = null!;
+        }
+        if (_connection is not null)
+        {
+            await _connection.DisposeAsync();
+            _connection = null!;
+        }
+        File.Delete(_databasePath);
+        File.Delete(_databasePath + "-wal");
+        File.Delete(_databasePath + "-shm");
+    }
+
+    private LocationPrivacyCorrectionReceiptRepository Receipts() => new(_context, new CorrectionClock());
+
+    private sealed record SelectedTenant(Guid TenantId) : ITenantContext;
+    private sealed class CorrectionClock : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(Now);
+    }
+
+    [Test]
+    [Arguments("IntentId")]
+    [Arguments("AuthoritySequence")]
+    [Arguments("TenantId")]
+    [Arguments("EventId")]
+    [Arguments("EventLocationId")]
+    [Arguments("LocationId")]
+    [Arguments("PolicyVersion")]
+    public async Task PersistedErasurePayloadReplacementCannotReplaceRetainedEffectOwnership(string field)
+    {
+        CorrectionIdentity identity = CreateIdentity();
+        OutboxMessage message = CreateCorrectionRequestedMessage(identity);
+        JsonObject payload = JsonNode.Parse(message.Payload!)!.AsObject();
+        if (field is "AuthoritySequence" or "PolicyVersion")
+            payload[field] = 2;
+        else
+            payload[field] = Guid.CreateVersion7();
+        message.Payload = payload.ToJsonString();
+        _context.SaveChanges();
+        var cache = new RecordingHybridCache();
+        await Assert.That(async () => await CreateDispatcher(cache).DispatchAsync(message))
+            .Throws<InvalidOperationException>();
+        await Assert.That(cache.Attempts).IsEmpty();
+    }
+
     [Test]
     public async Task DispatchAsync_WithLocationPiiErased_InvalidatesGlobalLocationSurfaces()
     {
@@ -56,7 +147,7 @@ public sealed class LocationPrivacyCorrectionDispatcherTests
         var cache = new RecordingHybridCache();
         var planner = Substitute.For<IAtprotoLocationPrivacyCorrectionPlanner>();
         OutboxMessage message = CreateCorrectionRequestedMessage(identity);
-        var dispatcher = new LocationPrivacyCorrectionDispatcher(cache, planner, EventLocationPrivacyMetricsFactory.Create());
+        var dispatcher = new LocationPrivacyCorrectionDispatcher(cache, planner, EventLocationPrivacyMetricsFactory.Create(), Receipts());
         planner.PlanLocationPrivacyCorrectionAsync(
                 Arg.Any<AtprotoLocationPrivacyCorrectionInput>(),
                 Arg.Any<CancellationToken>())
@@ -66,7 +157,7 @@ public sealed class LocationPrivacyCorrectionDispatcherTests
 
         await planner.Received(1).PlanLocationPrivacyCorrectionAsync(
             Arg.Is<AtprotoLocationPrivacyCorrectionInput>(input =>
-                input.TenantId == identity.TenantId
+                input != null && input.TenantId == identity.TenantId
                 && input.EventId == identity.EventId
                 && input.CorrectionId == message.Id
                 && input.CreatedAtUtc == message.CreatedAt),
@@ -83,7 +174,7 @@ public sealed class LocationPrivacyCorrectionDispatcherTests
                 Arg.Any<AtprotoLocationPrivacyCorrectionInput>(),
                 Arg.Any<CancellationToken>())
             .Returns(AtprotoPublicationPlanningResult.Skipped("session_missing"));
-        var dispatcher = new LocationPrivacyCorrectionDispatcher(cache, planner, EventLocationPrivacyMetricsFactory.Create());
+        var dispatcher = new LocationPrivacyCorrectionDispatcher(cache, planner, EventLocationPrivacyMetricsFactory.Create(), Receipts());
 
         await Assert.That(async () => await dispatcher.DispatchAsync(CreateCorrectionRequestedMessage(identity)))
             .Throws<InvalidOperationException>();
@@ -167,7 +258,8 @@ public sealed class LocationPrivacyCorrectionDispatcherTests
 
         InvalidOperationException exception = await Assert.That(
                 async () => await dispatcher.DispatchAsync(message))
-            .Throws<InvalidOperationException>();
+            .Throws<InvalidOperationException>()
+            ?? throw new InvalidOperationException("Expected malformed correction to be rejected.");
 
         await Assert.That(exception.Message).DoesNotContain(payloadCanary);
         await Assert.That(cache.Attempts).IsEmpty();
@@ -292,14 +384,14 @@ public sealed class LocationPrivacyCorrectionDispatcherTests
         CacheTags.EventDetails
     ];
 
-    private static LocationPrivacyCorrectionDispatcher CreateDispatcher(HybridCache cache)
+    private LocationPrivacyCorrectionDispatcher CreateDispatcher(HybridCache cache)
     {
         var planner = Substitute.For<IAtprotoLocationPrivacyCorrectionPlanner>();
         planner.PlanLocationPrivacyCorrectionAsync(
                 Arg.Any<AtprotoLocationPrivacyCorrectionInput>(),
                 Arg.Any<CancellationToken>())
             .Returns(AtprotoPublicationPlanningResult.Skipped("correction_already_planned"));
-        return new LocationPrivacyCorrectionDispatcher(cache, planner, EventLocationPrivacyMetricsFactory.Create());
+        return new LocationPrivacyCorrectionDispatcher(cache, planner, EventLocationPrivacyMetricsFactory.Create(), Receipts());
     }
 
     private static IReadOnlyList<string> ExpectedTags(CorrectionIdentity identity) =>
@@ -329,32 +421,41 @@ public sealed class LocationPrivacyCorrectionDispatcherTests
             nameof(Location));
     }
 
-    private static OutboxMessage CreateCorrectionRequestedMessage(CorrectionIdentity identity) => CreateMessage(
-        LocationPrivacyOutboxMessageFactory.LocationPrivacyCorrectionRequestedEventType,
-        JsonSerializer.Serialize(new
-        {
-            SchemaVersion = 1,
-            IntentId = Guid.CreateVersion7(),
-            AuthoritySequence = 1,
-            identity.TenantId,
-            identity.EventId,
-            identity.EventLocationId,
-            LocationId = (Guid?)null,
-            PolicyVersion = 1
-        }),
-        identity.EventLocationId);
+    private OutboxMessage CreateCorrectionRequestedMessage(CorrectionIdentity identity)
+    {
+        PrivacyErasureIntent intent = PrivacyErasureIntent.Record(Guid.CreateVersion7(), 1,
+            PrivacyErasureSubjectKind.User, Guid.CreateVersion7(), PrivacyErasureReasonCode.AccountDeletion,
+            1, Now, Now);
+        Guid locationId = Guid.CreateVersion7();
+        OutboxMessage message = LocationPrivacyOutboxMessageFactory.CreateCorrectionRequested(
+            Guid.CreateVersion7(), intent, identity.EventLocationId, identity.TenantId,
+            identity.EventId, locationId, 1, Now);
+        PersistClaim(message, LocationPrivacyCorrectionReceipt.ForErasure(
+            message.Id, intent, identity.TenantId, identity.EventId, identity.EventLocationId, locationId, 1, Now));
+        return message;
+    }
 
-    private static OutboxMessage CreateGovernanceCorrectionMessage(CorrectionIdentity identity) => CreateMessage(
-        "location.privacy.corrected",
-        JsonSerializer.Serialize(new
-        {
-            SchemaVersion = 1,
-            identity.TenantId,
-            identity.EventId,
-            identity.EventLocationId,
-            PolicyVersion = 2
-        }),
-        identity.EventLocationId);
+    private OutboxMessage CreateGovernanceCorrectionMessage(CorrectionIdentity identity)
+    {
+        EventLocationDisclosureAudit audit = EventLocationDisclosureAudit.Create(
+            identity.TenantId, identity.EventLocationId, Guid.CreateVersion7(),
+            EventLocationDisclosureFields.None, EventLocationDisclosureFields.None,
+            LocationDisclosureAudienceEnum.Never, LocationDisclosureAudienceEnum.Never,
+            null, null, 1, 2, EventLocationDisclosureAuditReasonEnum.GovernanceTightening, Now);
+        OutboxMessage message = LocationPrivacyOutboxMessageFactory.CreateProjectionCorrection(
+            Guid.CreateVersion7(), identity.EventLocationId, identity.TenantId, identity.EventId, 2, Now);
+        audit.BindCorrection(message.Id);
+        PersistClaim(message, LocationPrivacyCorrectionReceipt.ForGovernance(message.Id, identity.EventId, audit, Now));
+        return message;
+    }
+
+    private void PersistClaim(OutboxMessage message, LocationPrivacyCorrectionReceipt receipt)
+    {
+        message.Status = OutboxMessageStatus.Processing;
+        message.NextRetryAt = Now.AddMinutes(5);
+        _context.AddRange(message, receipt);
+        _context.SaveChanges();
+    }
 
     private static OutboxMessage CreateMessage(
         string eventType,
@@ -370,8 +471,8 @@ public sealed class LocationPrivacyCorrectionDispatcherTests
             CreatedAt = new DateTime(2026, 7, 19, 12, 0, 0, DateTimeKind.Utc)
         };
 
-    private static CorrectionIdentity CreateIdentity() => new(
-        Guid.CreateVersion7(),
+    private CorrectionIdentity CreateIdentity() => new(
+        _tenantId,
         Guid.CreateVersion7(),
         Guid.CreateVersion7());
 

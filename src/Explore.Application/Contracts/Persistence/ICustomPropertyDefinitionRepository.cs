@@ -24,6 +24,7 @@ public interface ICustomPropertyDefinitionRepository : IGenericRepository<Custom
         Guid? defaultOptionId,
         CancellationToken cancellationToken);
     Task<bool> DeleteDefinition(Guid id, CancellationToken cancellationToken);
+    Task<bool> FenceDefinitionForPurgeAsync(Guid id, CancellationToken cancellationToken);
     Task<CustomPropertyPurgeDependencySummary?> GetPurgeDependencies(Guid id, CancellationToken cancellationToken);
     Task<bool> PurgeDefinition(Guid id, CancellationToken cancellationToken);
 }

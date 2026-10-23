@@ -22,7 +22,8 @@ public sealed class StartSupportAccessSessionCommandHandler(
     ITenantUserRepository tenantUserRepository,
     ISupportAccessSessionRepository sessionRepository,
     ISupportAccessAuditEventRepository auditEventRepository,
-    IUnitOfWork unitOfWork,
+    IHumanSupportAdministrationPreparation preparation,
+    ISerializableAttemptOwner owner,
     BusinessMetrics metrics,
     ILogger<StartSupportAccessSessionCommandHandler> logger)
     : ICommandHandler<StartSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto>
@@ -44,7 +45,29 @@ public sealed class StartSupportAccessSessionCommandHandler(
                 validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var actorUserId = await adminContext.ResolveUserIdAsync(cancellationToken);
+        var prepared = await preparation.PrepareAsync(request, cancellationToken);
+        var result = await owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, token);
+            return await ExecuteBodyAsync(request, prepared, token);
+        }, cancellationToken);
+        if (result.IsSuccess)
+        {
+            metrics.RecordSupportAccessLifecycleEvent("started", request.Mode.ToString(), "succeeded");
+            if (request.Mode == SupportAccessModeEnum.Write)
+                logger.LogWarning("Write-capable support-access session started.");
+            else
+                logger.LogInformation("Support-access session started mode={Mode}", request.Mode);
+        }
+        return result;
+    }
+
+    private async Task<SupportAccessSessionCommandResponseDto> ExecuteBodyAsync(
+        StartSupportAccessSessionCommand request, IPreparedHumanSupportAdministration prepared,
+        CancellationToken cancellationToken)
+    {
+        var actorUserId = prepared.NativeData is not null
+            ? prepared.PrincipalId : await adminContext.ResolveUserIdAsync(cancellationToken);
         if (!actorUserId.HasValue)
         {
             return Failure(
@@ -56,7 +79,10 @@ public sealed class StartSupportAccessSessionCommandHandler(
                 ["Session expired. Please sign in again."]);
         }
 
-        var settings = await settingsResolver.ResolveGroupAsync<SupportAccessSettingGroup>(
+        if (actorUserId != prepared.PrincipalId)
+            throw new UnauthorizedAccessException("Support start actor differs from the original human.");
+
+        var settings = prepared.NativeData is not null ? prepared.Settings : await settingsResolver.ResolveGroupAsync<SupportAccessSettingGroup>(
             new SettingContext(),
             cancellationToken);
         if (!settings.Enabled)
@@ -105,8 +131,11 @@ public sealed class StartSupportAccessSessionCommandHandler(
                 ["A ticket or external reference is required before starting support access."]);
         }
 
-        var tenant = await tenantRepository.GetById(request.TargetTenantId);
-        if (tenant is null)
+        var nativeTargets = prepared.NativeData is { } targetData
+            ? await targetData.ReadStartTargetsAsync(prepared.TransitionAt, cancellationToken) : null;
+        bool tenantExists = nativeTargets?.TenantExists
+            ?? await tenantRepository.GetById(request.TargetTenantId) is not null;
+        if (!tenantExists)
         {
             return Failure(
                 request.Mode,
@@ -119,8 +148,11 @@ public sealed class StartSupportAccessSessionCommandHandler(
 
         if (request.TargetTenantUserId.HasValue)
         {
-            var targetTenantUser = await tenantUserRepository.GetById(request.TargetTenantUserId.Value);
-            if (targetTenantUser is null || targetTenantUser.TenantId != request.TargetTenantId)
+            var targetTenantUser = nativeTargets is null
+                ? await tenantUserRepository.GetById(request.TargetTenantUserId.Value) : null;
+            bool matches = nativeTargets?.TenantUserMatches
+                ?? (targetTenantUser is not null && targetTenantUser.TenantId == request.TargetTenantId);
+            if (!matches)
             {
                 return Failure(
                     request.Mode,
@@ -132,8 +164,9 @@ public sealed class StartSupportAccessSessionCommandHandler(
             }
         }
 
-        var nowUtc = DateTimeOffset.UtcNow;
-        if (await sessionRepository.HasActiveSessionForActorAsync(actorUserId.Value, nowUtc, cancellationToken))
+        var nowUtc = prepared.TransitionAt;
+        if (nativeTargets?.ActorHasActiveSession
+            ?? await sessionRepository.HasActiveSessionForActorAsync(actorUserId.Value, nowUtc, cancellationToken))
         {
             return Failure(
                 request.Mode,
@@ -144,58 +177,21 @@ public sealed class StartSupportAccessSessionCommandHandler(
                 ["Stop the existing support-access session before starting another one."]);
         }
 
-        var session = await unitOfWork.ExecuteInTransactionAsync(async ct =>
-        {
-            var startedAtUtc = DateTimeOffset.UtcNow;
-            var supportSession = SupportAccessSession.Start(
-                actorUserId.Value,
-                request.TargetTenantId,
-                request.Mode,
-                request.ReasonCode,
-                request.ReasonText,
-                request.TicketReference ?? string.Empty,
-                startedAtUtc,
-                startedAtUtc.AddMinutes(request.DurationMinutes),
-                request.TargetTenantUserId);
-
-            var persisted = await sessionRepository.CreateAsync(supportSession, ct);
-            var auditEvent = SupportAccessAuditEvent.CreateLifecycleEvent(
-                persisted,
-                SupportAccessAuditEventTypeEnum.Started,
-                "started",
-                startedAtUtc);
-            await auditEventRepository.CreateAsync(auditEvent, ct);
-
-            return persisted;
-        }, cancellationToken);
-
-        metrics.RecordSupportAccessLifecycleEvent("started", request.Mode.ToString(), "succeeded");
-        if (request.Mode == SupportAccessModeEnum.Write)
-        {
-            logger.LogWarning(
-                "Write-capable support-access session started sessionId={SupportAccessSessionId} actorUserId={ActorUserId} targetTenantId={TargetTenantId} targetTenantUserId={TargetTenantUserId} expiresAtUtc={ExpiresAtUtc}",
-                session.Id,
-                session.ActorUserId,
-                session.TargetTenantId,
-                session.TargetTenantUserId,
-                session.ExpiresAtUtc);
-        }
+        var session = prepared.StartSession();
+        if (prepared.NativeData is null)
+            session = await sessionRepository.CreateAsync(session, cancellationToken);
+        var auditEvent = SupportAccessAuditEvent.CreateLifecycleEvent(
+            session, SupportAccessAuditEventTypeEnum.Started, "started", prepared.TransitionAt);
+        if (prepared.NativeData is { } data)
+            await data.SaveStartedAsync(session, auditEvent, prepared.TransitionAt, cancellationToken);
         else
-        {
-            logger.LogInformation(
-                "Support-access session started sessionId={SupportAccessSessionId} actorUserId={ActorUserId} targetTenantId={TargetTenantId} targetTenantUserId={TargetTenantUserId} mode={Mode} expiresAtUtc={ExpiresAtUtc}",
-                session.Id,
-                session.ActorUserId,
-                session.TargetTenantId,
-                session.TargetTenantUserId,
-                request.Mode,
-                session.ExpiresAtUtc);
-        }
+            await auditEventRepository.CreateAsync(auditEvent, cancellationToken);
+        prepared.Complete(session, auditEvent);
 
         return SupportAccessSessionCommandResponseDto.Success(
             session.Id,
             "Support-access session started.",
-            SupportAccessMapper.ToDto(session, DateTimeOffset.UtcNow));
+            SupportAccessMapper.ToDto(session, prepared.TransitionAt));
     }
 
     private SupportAccessSessionCommandResponseDto Failure(
@@ -208,11 +204,9 @@ public sealed class StartSupportAccessSessionCommandHandler(
     {
         metrics.RecordSupportAccessLifecycleEvent("started", mode.ToString(), "failed", failureCode);
         logger.LogWarning(
-            "Support-access start denied failureCode={FailureCode} mode={Mode} actorUserId={ActorUserId} targetTenantId={TargetTenantId}",
+            "Support-access start denied failureCode={FailureCode} mode={Mode}",
             failureCode,
-            mode,
-            actorUserId,
-            targetTenantId);
+            Enum.IsDefined(mode) ? mode.ToString() : "unknown");
 
         return SupportAccessSessionCommandResponseDto.Failure(
             BaseCommandResponse.Failure<Guid>(failureCode, message, errors));

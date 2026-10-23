@@ -18,7 +18,7 @@ public sealed class EmailDeliveryDisableTokenService : IEmailDeliveryDisableToke
     {
     }
 
-    internal EmailDeliveryDisableTokenService(IDataProtectionProvider dataProtectionProvider, TimeProvider timeProvider)
+    public EmailDeliveryDisableTokenService(IDataProtectionProvider dataProtectionProvider, TimeProvider timeProvider)
     {
         _protector = dataProtectionProvider.CreateProtector("ISLAMU.Email.DeliveryDisable.v1")
             .ToTimeLimitedDataProtector();
@@ -46,9 +46,10 @@ public sealed class EmailDeliveryDisableTokenService : IEmailDeliveryDisableToke
 
         try
         {
-            var actual = Encoding.UTF8.GetBytes(_protector.Unprotect(token));
+            var actual = Encoding.UTF8.GetBytes(_protector.Unprotect(token, out var expiresAt));
             var expected = Encoding.UTF8.GetBytes(Convert.ToHexString(ComputeDigest(actorUserId, snapshot)));
-            return CryptographicOperations.FixedTimeEquals(actual, expected);
+            return _timeProvider.GetUtcNow() < expiresAt
+                && CryptographicOperations.FixedTimeEquals(actual, expected);
         }
         catch (CryptographicException)
         {

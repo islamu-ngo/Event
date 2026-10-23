@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5AH0HQFTX15JJPQNFY45621
+Title: "Resolve tenant navigation through a fixed EF projection"
+Type: fix
+Scope: access
+Summary: "Keep user and membership selection in C# and replace the navigation business routine with exactly three configured Global column reads, without Runtime or profile access."
+Group: user-tenant-navigation-ef
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: The former navigation business routine and its three cluster-global capability roles must be absent. Readiness rejects old installations without destructive cleanup or compatibility routines. Use a fresh isolated development cluster or a reviewed dependency-checked decommissioning; another database alone does not remove cluster-wide roles.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Configured Global receives only direct nondelegable SELECT on User.Id, IsDeleted and LastActiveTenantId. Runtime gains no User-table permission; profiles, audit columns and writes remain denied. Authenticated-current-user equality and active membership remain C# authority. A stolen Global credential can enumerate user and preferred-tenant associations, an explicitly accepted credential-compromise boundary.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Deploy matching fixed permission admission and EF readers; investigate identity or ACL drift rather than broadening grants. No new credentials, environment keys or entity migrations. Protect Global credentials and preserve retained data during a reviewed development transition.

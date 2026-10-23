@@ -10,7 +10,12 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
+using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
+using Explore.Secrets.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -1032,14 +1037,13 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         string targetTable = Phase21PersistenceSurface.DelimitedTableIdentifier(
             metadata,
             Phase21PersistenceSurface.RequireEntities(metadata.GetService<IDesignTimeModel>().Model).Target);
-        var stopLock = new HeldStateLockInterceptor(targetTable);
-        var scanAttempt = new StateLockAttemptInterceptor(targetTable);
+        var stopLock = new HeldStateLockInterceptor(targetTable, holdAfterRead: true);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         Task stop = StopAsync();
         await stopLock.LockAcquired.WaitAsync(timeout.Token);
         Task<AdmissionCheckInDecision?> scan = ScanAsync();
-        await scanAttempt.LockAttempted.WaitAsync(timeout.Token);
+        await WaitForTargetCoordinationAsync(metadata, tenantId, targetId, scan, timeout.Token);
         stopLock.Release();
         await stop;
         AdmissionCheckInDecision? outcome = await scan;
@@ -1053,7 +1057,8 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         async Task StopAsync()
         {
             await using ExploreDbContext context = TenantContext(tenantId, stopLock);
-            await new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(async token =>
+            await new AdmissionTargetTransaction(context, new EfCoreUnitOfWork(context))
+                .ExecuteAsync(tenantId, targetId, async token =>
             {
                 var repository = new AdmissionTargetOperationsRepository(context);
                 AdmissionTarget target = await repository.GetAsync(
@@ -1061,12 +1066,13 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
                 target.Stop();
                 await repository.UpdateAsync(target, token);
                 await context.SaveChangesAsync(token);
+                return true;
             }, timeout.Token);
         }
 
         async Task<AdmissionCheckInDecision?> ScanAsync()
         {
-            await using ExploreDbContext context = TenantContext(tenantId, scanAttempt);
+            await using ExploreDbContext context = TenantContext(tenantId);
             return await ExecuteCheckInAsync(
                 context, tenantId, eventId, targetId, digest,
                 AdmissionCheckInAction.CheckIn, null, UtcNow, timeout.Token);
@@ -1088,13 +1094,12 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
             metadata,
             Phase21PersistenceSurface.RequireEntities(metadata.GetService<IDesignTimeModel>().Model).Ticket);
         var firstLock = new HeldStateLockInterceptor(ticketTable);
-        var secondLock = new StateLockAttemptInterceptor(ticketTable);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         Task<AdmissionCheckInDecision?> first = CheckInAsync(firstLock);
         await firstLock.LockAcquired.WaitAsync(timeout.Token);
-        Task<AdmissionCheckInDecision?> second = CheckInAsync(secondLock);
-        await secondLock.LockAttempted.WaitAsync(timeout.Token);
+        Task<AdmissionCheckInDecision?> second = CheckInAsync();
+        await WaitForTargetCoordinationAsync(metadata, tenantId, targetId, second, timeout.Token);
         await Assert.That(second.IsCompleted).IsFalse();
         firstLock.Release();
         AdmissionCheckInDecision?[] outcomes = await Task.WhenAll(first, second);
@@ -1107,9 +1112,9 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         await Assert.That(await verification.AdmissionCheckInStates.CountAsync()).IsEqualTo(1);
         await Assert.That(await verification.AdmissionCheckInEvents.CountAsync()).IsEqualTo(1);
 
-        async Task<AdmissionCheckInDecision?> CheckInAsync(IInterceptor interceptor)
+        async Task<AdmissionCheckInDecision?> CheckInAsync(params IInterceptor[] interceptors)
         {
-            await using ExploreDbContext context = TenantContext(tenantId, interceptor);
+            await using ExploreDbContext context = TenantContext(tenantId, interceptors);
             return await ExecuteCheckInAsync(
                 context,
                 tenantId,
@@ -1154,14 +1159,12 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         Phase21Entities metadataEntities = Phase21PersistenceSurface.RequireEntities(
             metadata.GetService<IDesignTimeModel>().Model);
         string stateTable = Phase21PersistenceSurface.DelimitedTableIdentifier(metadata, metadataEntities.State);
-        string ticketTable = Phase21PersistenceSurface.DelimitedTableIdentifier(metadata, metadataEntities.Ticket);
         var undoLock = new HeldStateLockInterceptor(stateTable);
-        var checkInLock = new StateLockAttemptInterceptor(ticketTable);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         Task<AdmissionCheckInDecision?> undo = UndoAsync();
         await undoLock.LockAcquired.WaitAsync(timeout.Token);
         Task<AdmissionCheckInDecision?> checkIn = CheckInAsync();
-        await checkInLock.LockAttempted.WaitAsync(timeout.Token);
+        await WaitForTargetCoordinationAsync(metadata, tenantId, targetId, checkIn, timeout.Token);
         await Assert.That(checkIn.IsCompleted).IsFalse();
         undoLock.Release();
         AdmissionCheckInDecision?[] outcomes = await Task.WhenAll(undo, checkIn);
@@ -1190,7 +1193,7 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
 
         async Task<AdmissionCheckInDecision?> CheckInAsync()
         {
-            await using ExploreDbContext context = TenantContext(tenantId, checkInLock);
+            await using ExploreDbContext context = TenantContext(tenantId);
             return await ExecuteCheckInAsync(
                 context,
                 tenantId,
@@ -1205,35 +1208,48 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
     }
 
     [Test]
-    public async Task StopFencesTargetBeforeScannerIssuanceSoWaitingIssueIsRejected()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task StopFencesTargetBeforeScannerIssuanceSoWaitingIssueIsRejected(bool cancelWhileWaiting)
     {
         await fixture.ResetAsync();
         Guid tenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
         Guid targetId = Guid.CreateVersion7();
-        await SeedPlatformManagedTargetAsync(tenantId, eventId, targetId);
+        Guid actorId = await SeedPlatformManagedTargetAsync(tenantId, eventId, targetId);
         await using ExploreDbContext metadata = fixture.CreateDbContext();
         Phase21Entities metadataEntities = Phase21PersistenceSurface.RequireEntities(
             metadata.GetService<IDesignTimeModel>().Model);
         string targetTable = Phase21PersistenceSurface.DelimitedTableIdentifier(metadata, metadataEntities.Target);
-        var stopLock = new HeldStateLockInterceptor(targetTable);
-        var issueAttempt = new StateLockAttemptInterceptor(targetTable);
+        var stopLock = new HeldStateLockInterceptor(targetTable, holdAfterRead: true);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var waiter = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
+        ExploreDbContext? waitingContext = null;
         AdmissionScannerCapability capability = AdmissionScannerCapability.Issue(
             Guid.CreateVersion7(), tenantId, Guid.CreateVersion7(), eventId, targetId, 7,
             Phase21PersistenceSurface.Digest(0x50), "Waiting scanner",
-            AdmissionScannerCapabilityAction.CheckIn, UtcNow.AddHours(1), Guid.CreateVersion7(), UtcNow);
+            AdmissionScannerCapabilityAction.CheckIn, UtcNow.AddHours(1), actorId, UtcNow);
 
         Task stop = StopAsync();
         await stopLock.LockAcquired.WaitAsync(timeout.Token);
         Task<AdmissionScannerCapabilityStoreResult> issue = IssueAsync();
-        await issueAttempt.LockAttempted.WaitAsync(timeout.Token);
-        stopLock.Release();
-        await stop;
-        AdmissionScannerCapabilityStoreResult outcome = await issue;
-
-        await Assert.That(outcome.Rejected).IsTrue();
-        await Assert.That(outcome.Created).IsFalse();
+        await WaitForTargetCoordinationAsync(metadata, tenantId, targetId, issue, timeout.Token);
+        await Assert.That(waitingContext!.Database.CurrentTransaction).IsNull();
+        if (cancelWhileWaiting)
+        {
+            waiter.Cancel();
+            await Assert.ThrowsAsync<OperationCanceledException>(async () => await issue);
+            stopLock.Release();
+            await stop;
+        }
+        else
+        {
+            stopLock.Release();
+            await stop;
+            AdmissionScannerCapabilityStoreResult outcome = await issue;
+            await Assert.That(outcome.Rejected).IsTrue();
+            await Assert.That(outcome.Created).IsFalse();
+        }
         await using ExploreDbContext verification = TenantContext(tenantId);
         await Assert.That(await verification.AdmissionScannerCapabilities.CountAsync())
             .IsEqualTo(0);
@@ -1241,7 +1257,8 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         async Task StopAsync()
         {
             await using ExploreDbContext context = TenantContext(tenantId, stopLock);
-            await new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(async token =>
+            await new AdmissionTargetTransaction(context, new EfCoreUnitOfWork(context))
+                .ExecuteAsync(tenantId, targetId, async token =>
             {
                 var repository = new AdmissionTargetOperationsRepository(context);
                 AdmissionTarget target = await repository.GetAsync(
@@ -1249,15 +1266,18 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
                 target.Stop();
                 await repository.UpdateAsync(target, token);
                 await context.SaveChangesAsync(token);
+                return true;
             }, timeout.Token);
         }
 
         async Task<AdmissionScannerCapabilityStoreResult> IssueAsync()
         {
-            await using ExploreDbContext context = TenantContext(tenantId, issueAttempt);
-            return await new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(
+            await using ExploreDbContext context = TenantContext(tenantId);
+            waitingContext = context;
+            return await new AdmissionTargetTransaction(context, new EfCoreUnitOfWork(context)).ExecuteAsync(
+                tenantId, targetId,
                 token => new AdmissionScannerCapabilityRepository(context).StoreAsync(capability, token),
-                timeout.Token);
+                waiter.Token);
         }
     }
 
@@ -1325,7 +1345,7 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         Guid eventId = Guid.CreateVersion7();
         Guid targetId = Guid.CreateVersion7();
         Guid issueRequestId = Guid.CreateVersion7();
-        await SeedPlatformManagedTargetAsync(tenantId, eventId, targetId);
+        Guid actorId = await SeedPlatformManagedTargetAsync(tenantId, eventId, targetId);
         var barrier = new AsyncCommandBarrier(2);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
@@ -1360,12 +1380,7 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         {
             await barrier.ArriveAsync(timeout.Token);
             await using ExploreDbContext context = TenantContext(tenantId);
-            await context.Database.OpenConnectionAsync(timeout.Token);
-            await context.Database.ExecuteSqlRawAsync(
-                "SET session_replication_role = replica;", timeout.Token);
-            try
-            {
-                AdmissionScannerCapability capability = AdmissionScannerCapability.Issue(
+            AdmissionScannerCapability capability = AdmissionScannerCapability.Issue(
                     capabilityId,
                     tenantId,
                     issueRequestId,
@@ -1376,25 +1391,19 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
                     "Door scanner",
                     AdmissionScannerCapabilityAction.CheckIn,
                     UtcNow.AddHours(8),
-                    Guid.CreateVersion7(),
+                    actorId,
                     UtcNow);
-                var repository = new AdmissionScannerCapabilityRepository(context);
-                AdmissionScannerCapabilityStoreResult stored = await new EfCoreUnitOfWork(context)
-                    .ExecuteInTransactionAsync(
-                        token => repository.StoreAsync(capability, token),
-                        timeout.Token);
-                return new ScannerIssuanceAttempt(
+            var repository = new AdmissionScannerCapabilityRepository(context);
+            AdmissionScannerCapabilityStoreResult stored = await new AdmissionTargetTransaction(context, new EfCoreUnitOfWork(context))
+                .ExecuteAsync(tenantId, targetId,
+                    token => repository.StoreAsync(capability, token),
+                    timeout.Token);
+            return new ScannerIssuanceAttempt(
                     stored.Created,
                     stored.Created ? plaintextCapability : null,
                     lookupDigest,
                     stored.Capability.Id,
                     stored.Capability.LookupDigest);
-            }
-            finally
-            {
-                await context.Database.ExecuteSqlRawAsync(
-                    "SET session_replication_role = origin;", CancellationToken.None);
-            }
         }
     }
 
@@ -1563,36 +1572,77 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
         return ticketId;
     }
 
-    private async Task SeedPlatformManagedTargetAsync(
+    private async Task<Guid> SeedPlatformManagedTargetAsync(
         Guid tenantId,
         Guid eventId,
         Guid targetId)
     {
-        await using ExploreDbContext context = TenantContext(tenantId);
-        Phase21Entities entities = Phase21PersistenceSurface.RequireEntities(context.Model);
-        IEntityType participation = context.Model.FindEntityType(typeof(EventParticipationConfiguration))!;
-        await Phase21PersistenceSurface.InsertWithForeignKeysDisabledAsync(
-            context,
-            (entities.Target, new Dictionary<string, object?>
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Migrator));
+        await using var context = new ExploreDbContext(options.Options);
+        context.BindTenantLease();
+        await using var human = new HumanSecuritySourceGate(context);
+        await using var humanLease = await human.AcquireAsync();
+        await using var discovery = new EventDiscoveryEnrollmentGate(context);
+        await using var discoveryLease = await discovery.AcquireAsync();
+        context.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            FullName = "Admission coordination",
+            Slug = $"admission-{tenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = UtcNow
+        });
+        var user = new User
+        {
+            Id = Guid.CreateVersion7(),
+            CreatedAt = UtcNow,
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            Pii = new UserPii
             {
-                ["TenantId"] = tenantId,
-                ["Id"] = targetId,
-                ["EventId"] = eventId,
-                ["AdmissionTargetTypeId"] = (int)AdmissionTargetTypeEnum.Event,
-                ["AdmissionOperationalStatusId"] = (int)AdmissionOperationalStatusEnum.Active,
-                ["ScopeId"] = eventId,
-                ["EventDayId"] = null,
-                ["EventSessionId"] = null
-            }),
-            (participation, new Dictionary<string, object?>
-            {
-                ["TenantId"] = tenantId,
-                ["Id"] = eventId,
-                ["ParticipationHandlingModeId"] = (int)ParticipationHandlingModeEnum.PlatformManaged,
-                ["AdvanceRegistrationObligationId"] = (int)AdvanceRegistrationObligationEnum.Required,
-                ["CreatedAt"] = UtcNow,
-                ["IsDeleted"] = false
-            }));
+                Email = $"admission-{Guid.CreateVersion7():N}@example.test",
+                FirstName = "Admission",
+                LastName = "Coordinator"
+            }
+        };
+        var actor = new Actor
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            CreatedAt = UtcNow,
+            Pii = new ActorPii { DisplayName = "Admission coordinator" }
+        };
+        context.Actors.Add(actor);
+        context.Events.Add(new Explore.Domain.Event(EventStatusEnum.Published)
+        {
+            Id = eventId,
+            TenantId = tenantId,
+            Tenant = null!,
+            ActorId = actor.Id,
+            Actor = actor,
+            Title = "Admission coordination",
+            EventStatus = null!,
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Digital,
+            EventFormat = null!,
+            CreatedAt = UtcNow,
+            ConcurrencyStamp = Guid.CreateVersion7()
+        });
+        context.AdmissionTargets.Add(AdmissionTarget.Create(
+            targetId, tenantId, eventId, AdmissionTargetTypeEnum.Event, null, null));
+        context.EventParticipationConfigurations.Add(EventParticipationConfiguration.Create(
+            eventId, tenantId, (int)ParticipationHandlingModeEnum.PlatformManaged,
+            (int)AdvanceRegistrationObligationEnum.Required, (int)IdentityAccessModeEnum.GuestAllowed,
+            GuestRecoveryPolicyEnum.EmailOptional, UtcNow));
+        await context.SaveChangesAsync();
+        return actor.Id;
     }
 
     private async Task SeedCheckInPrerequisitesAsync(
@@ -1696,7 +1746,8 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
                 context,
                 timeProvider,
                 ReadyParticipantAdmissionReadinessAuthority.Instance);
-        return new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(
+        return new AdmissionTargetTransaction(context, new EfCoreUnitOfWork(context)).ExecuteAsync(
+            tenantId, targetId,
             token => repository.ExecuteAsync(
             new AdmissionCheckInTransactionRequest(
                 tenantId,
@@ -1729,7 +1780,7 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
             new FixedAdmissionCredentialDigestService(digest),
             new AllowAdmissionCheckInAuthority(),
             new NoOpAdmissionCheckInTelemetry(),
-            new EfCoreUnitOfWork(context),
+            new AdmissionTargetTransaction(context, new EfCoreUnitOfWork(context)),
             new FixedAdmissionTimeProvider(UtcNow));
         return service.ProcessAsync(
             new AdmissionCheckInRequest(
@@ -1744,6 +1795,33 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
             cancellationToken);
     }
 
+    private static async Task WaitForTargetCoordinationAsync(ExploreDbContext observer, Guid tenantId, Guid targetId,
+        Task operation, CancellationToken cancellationToken)
+    {
+        long key = RelationalNamedLock.ComputeStableKey($"admission-target:{tenantId:N}:{targetId:N}");
+        await observer.Database.OpenConnectionAsync(cancellationToken);
+        await using var command = observer.Database.GetDbConnection().CreateCommand();
+        command.CommandText = """
+            SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_locks waiting
+                WHERE waiting.locktype='advisory' AND NOT waiting.granted AND waiting.objsubid=1
+                    AND waiting.database=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())
+                    AND waiting.classid::bigint=((@key >> 32) & 4294967295)
+                    AND waiting.objid::bigint=(@key & 4294967295))
+            """;
+        command.Parameters.Add(new NpgsqlParameter { ParameterName = "key", Value = key });
+        while (true)
+        {
+            if (operation.IsCompleted)
+            {
+                await operation;
+                throw new InvalidOperationException("The operation completed before its exact target coordination wait.");
+            }
+            if (await command.ExecuteScalarAsync(cancellationToken) is true) return;
+            await Task.WhenAny(operation, Task.Delay(TimeSpan.FromMilliseconds(25), cancellationToken))
+                .WaitAsync(cancellationToken);
+        }
+    }
+
     private ExploreDbContext TenantContext(Guid tenantId, params IInterceptor[] interceptors)
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>()
@@ -1751,7 +1829,9 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
             .UseSnakeCaseNamingConvention();
         if (interceptors.Length > 0)
             options.AddInterceptors(interceptors);
-        return new ExploreDbContext(options.Options) { TenantContext = new TestTenantContext(tenantId) };
+        var context = new ExploreDbContext(options.Options) { TenantContext = new TestTenantContext(tenantId) };
+        context.BindTenantLease();
+        return context;
     }
 
     private sealed record ScannerIssuanceAttempt(
@@ -2144,7 +2224,7 @@ internal sealed class InsertBarrierInterceptor(AsyncCommandBarrier barrier, stri
             : ValueTask.CompletedTask;
 }
 
-internal sealed class HeldStateLockInterceptor(string tableIdentifier) : DbCommandInterceptor
+internal sealed class HeldStateLockInterceptor(string tableIdentifier, bool holdAfterRead = false) : DbCommandInterceptor
 {
     private readonly TaskCompletionSource lockAcquired = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -2182,40 +2262,6 @@ internal sealed class HeldStateLockInterceptor(string tableIdentifier) : DbComma
 
     private bool IsStateLock(DbCommand command) =>
         command.CommandText.Contains(tableIdentifier, StringComparison.OrdinalIgnoreCase) &&
-        command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase);
-}
-
-internal sealed class StateLockAttemptInterceptor(string tableIdentifier) : DbCommandInterceptor
-{
-    private readonly TaskCompletionSource lockAttempted = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    internal Task LockAttempted => lockAttempted.Task;
-
-    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
-        DbCommand command,
-        CommandEventData eventData,
-        InterceptionResult<DbDataReader> result,
-        CancellationToken cancellationToken = default)
-    {
-        SignalAttempt(command);
-        return ValueTask.FromResult(result);
-    }
-
-    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
-        DbCommand command,
-        CommandEventData eventData,
-        InterceptionResult<int> result,
-        CancellationToken cancellationToken = default)
-    {
-        SignalAttempt(command);
-        return ValueTask.FromResult(result);
-    }
-
-    private void SignalAttempt(DbCommand command)
-    {
-        if (command.CommandText.Contains(tableIdentifier, StringComparison.OrdinalIgnoreCase) &&
-            command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase))
-        {
-            lockAttempted.TrySetResult();
-        }
-    }
+        (command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase)
+            || holdAfterRead && command.CommandText.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase));
 }

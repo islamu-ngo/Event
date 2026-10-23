@@ -15,28 +15,25 @@ namespace Explore.Infrastructure.Identity;
 public class AdminContext : IAdminContext
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly IPlatformUserRoleRepository _platformUserRoleRepository;
-    private readonly ITenantUserRoleGrantRepository _tenantAdminRepo;
+    private readonly IAdministrativeAuthorityRepository _administrativeAuthorityRepository;
     private readonly IOrganizationMemberRepository _orgMemberRepo;
     private readonly IGroupMemberRepository _groupMemberRepo;
-    private readonly IUserExternalLoginRepository _userExternalLoginRepository;
+    private readonly IExternalLoginAuthenticationRepository _externalLoginAuthenticationRepository;
     private readonly ILogger<AdminContext> _logger;
 
     public AdminContext(
         IHttpContextAccessor httpContextAccessor,
-        IPlatformUserRoleRepository platformUserRoleRepository,
-        ITenantUserRoleGrantRepository tenantAdminRepo,
+        IAdministrativeAuthorityRepository administrativeAuthorityRepository,
         IOrganizationMemberRepository orgMemberRepo,
         IGroupMemberRepository groupMemberRepo,
-        IUserExternalLoginRepository userExternalLoginRepository,
+        IExternalLoginAuthenticationRepository externalLoginAuthenticationRepository,
         ILogger<AdminContext> logger)
     {
         _httpContextAccessor = httpContextAccessor;
-        _platformUserRoleRepository = platformUserRoleRepository;
-        _tenantAdminRepo = tenantAdminRepo;
+        _administrativeAuthorityRepository = administrativeAuthorityRepository;
         _orgMemberRepo = orgMemberRepo;
         _groupMemberRepo = groupMemberRepo;
-        _userExternalLoginRepository = userExternalLoginRepository;
+        _externalLoginAuthenticationRepository = externalLoginAuthenticationRepository;
         _logger = logger;
     }
 
@@ -68,8 +65,8 @@ public class AdminContext : IAdminContext
         if (providerIdentity is null)
             return user.GetPlatformUserId();
 
-        var externalLogin = await _userExternalLoginRepository.GetByProviderAndKey(
-            providerIdentity.AccountKey);
+        var externalLogin = await _externalLoginAuthenticationRepository.GetByProviderAndKey(
+            providerIdentity.AccountKey, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return externalLogin?.UserId;
     }
@@ -78,16 +75,16 @@ public class AdminContext : IAdminContext
     {
         try
         {
-            var isRoleAdmin = await _platformUserRoleRepository.IsUserPlatformAdmin(userId);
+            var isRoleAdmin = await _administrativeAuthorityRepository.IsInstanceAdminAsync(userId, cancellationToken);
             if (isRoleAdmin)
             {
                 _logger.LogInformation("AdminContext: IsInstanceAdmin=true (platform.admin role detected in database)");
                 return true;
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "AdminContext: failed role-based instance admin check");
+            _logger.LogWarning("AdminContext: failed role-based instance admin check");
         }
 
         _logger.LogWarning("AdminContext: IsInstanceAdmin=false (platform.admin role not found)");
@@ -100,7 +97,8 @@ public class AdminContext : IAdminContext
         if (uid == null)
             return false;
 
-        var isAdmin = await _tenantAdminRepo.IsTenantAdmin(tenantId, uid.Value);
+        var tenantIds = await _administrativeAuthorityRepository.GetAdminTenantIdsAsync(uid.Value, cancellationToken);
+        var isAdmin = tenantIds.Contains(tenantId);
 
         if (isAdmin)
         {
@@ -132,18 +130,8 @@ public class AdminContext : IAdminContext
             : await GetAdminTenantIdsAsync(uid.Value, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetAdminTenantIdsAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var admins = await _tenantAdminRepo.GetByUserId(userId);
-        return admins
-            .Where(a => a.RoleId == (int)RoleEnum.TenantAdmin
-                && a.TenantUser.StatusId == (int)TenantUserStatusEnum.Active
-                && !a.TenantUser.IsDeleted)
-            .Select(a => a.TenantId)
-            .Distinct()
-            .ToList()
-            .AsReadOnly();
-    }
+    public Task<IReadOnlyList<Guid>> GetAdminTenantIdsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        _administrativeAuthorityRepository.GetAdminTenantIdsAsync(userId, cancellationToken);
 
     public async Task<IReadOnlyList<Guid>> GetAdminOrganizationIdsAsync(CancellationToken cancellationToken = default)
     {
@@ -153,30 +141,14 @@ public class AdminContext : IAdminContext
             : await GetAdminOrganizationIdsAsync(uid.Value, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetAdminOrganizationIdsAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var memberships = await _orgMemberRepo.GetMembershipsByUser(userId, cancellationToken);
-        return memberships
-            .Where(m => IsOrganizationAdminRole(m.RoleId))
-            .Select(m => m.OrganizationTenant.OrganizationId)
-            .Distinct()
-            .ToList()
-            .AsReadOnly();
-    }
+    public Task<IReadOnlyList<Guid>> GetAdminOrganizationIdsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        _administrativeAuthorityRepository.GetAdminOrganizationIdsAsync(userId, cancellationToken);
 
-    public async Task<IReadOnlyList<Guid>> GetAdminOrganizationIdsAsync(
+    public Task<IReadOnlyList<Guid>> GetAdminOrganizationIdsAsync(
         Guid userId,
         Guid tenantId,
-        CancellationToken cancellationToken = default)
-    {
-        var memberships = await _orgMemberRepo.GetMembershipsByUser(userId, cancellationToken);
-        return memberships
-            .Where(membership => membership.TenantId == tenantId && IsOrganizationAdminRole(membership.RoleId))
-            .Select(membership => membership.OrganizationTenant.OrganizationId)
-            .Distinct()
-            .ToList()
-            .AsReadOnly();
-    }
+        CancellationToken cancellationToken = default) =>
+        _administrativeAuthorityRepository.GetAdminOrganizationIdsAsync(userId, tenantId, cancellationToken);
 
     public async Task<bool> IsGroupAdminAsync(Guid groupId, CancellationToken cancellationToken = default)
     {
@@ -196,30 +168,14 @@ public class AdminContext : IAdminContext
             : await GetAdminGroupIdsAsync(uid.Value, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetAdminGroupIdsAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var memberships = await _groupMemberRepo.GetMembershipsByUser(userId, cancellationToken);
-        return memberships
-            .Where(m => IsGroupAdminRole(m.RoleId))
-            .Select(m => m.GroupTenant.GroupId)
-            .Distinct()
-            .ToList()
-            .AsReadOnly();
-    }
+    public Task<IReadOnlyList<Guid>> GetAdminGroupIdsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        _administrativeAuthorityRepository.GetAdminGroupIdsAsync(userId, cancellationToken);
 
-    public async Task<IReadOnlyList<Guid>> GetAdminGroupIdsAsync(
+    public Task<IReadOnlyList<Guid>> GetAdminGroupIdsAsync(
         Guid userId,
         Guid tenantId,
-        CancellationToken cancellationToken = default)
-    {
-        var memberships = await _groupMemberRepo.GetMembershipsByUser(userId, cancellationToken);
-        return memberships
-            .Where(membership => membership.TenantId == tenantId && IsGroupAdminRole(membership.RoleId))
-            .Select(membership => membership.GroupTenant.GroupId)
-            .Distinct()
-            .ToList()
-            .AsReadOnly();
-    }
+        CancellationToken cancellationToken = default) =>
+        _administrativeAuthorityRepository.GetAdminGroupIdsAsync(userId, tenantId, cancellationToken);
 
     private static bool IsOrganizationAdminRole(int roleId)
     {

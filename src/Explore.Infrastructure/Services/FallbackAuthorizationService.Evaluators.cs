@@ -696,6 +696,10 @@ public partial class FallbackAuthorizationService
             return false;
         }
 
+        if (_originalHumanSources is not null && !_machinePrincipalAccessor.IsMachineCaller)
+            return OrganizerFromOriginalSources(
+                await _originalHumanSources.ReadAsync(currentUserId.Value, cancellationToken), resourceAttributes);
+
         if (TryResolveGuidAttribute(resourceAttributes, "organizerUserId", out var organizerUserId))
         {
             return organizerUserId == currentUserId.Value;
@@ -940,9 +944,10 @@ public partial class FallbackAuthorizationService
         IDictionary<string, object>? resourceAttributes,
         CancellationToken cancellationToken)
     {
-        if (action is "view" or "update" && _adminContext.UserId.HasValue
+        var currentUserId = _adminContext.UserId ?? await _adminContext.ResolveUserIdAsync(cancellationToken);
+        if (action is "view" or "update" or "delete" && currentUserId.HasValue
             && AttributeResolver.TryGetGuid(resourceId, out var targetUserId)
-            && targetUserId == _adminContext.UserId.Value)
+            && targetUserId == currentUserId.Value)
         {
             LogDecision("allow", "self_service", "islamuevent_user", action);
             return true;

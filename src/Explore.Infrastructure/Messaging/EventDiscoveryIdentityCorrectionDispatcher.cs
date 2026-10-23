@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Events.Discovery.Commands;
 using Explore.Domain;
 
@@ -8,7 +9,7 @@ namespace Explore.Infrastructure.Messaging;
 
 public sealed class EventDiscoveryIdentityCorrectionDispatcher(
     IEventDiscoveryIdentityCorrectionNotificationService notificationService,
-    ITenantContextAccessor tenantContextAccessor)
+    INotificationOutboxExecutionAuthority executionAuthority)
 {
     public const string EventType = EventDiscoveryIdentityCorrectionRequested.EventType;
 
@@ -21,6 +22,7 @@ public sealed class EventDiscoveryIdentityCorrectionDispatcher(
         OutboxMessage message,
         CancellationToken cancellationToken = default)
     {
+        await executionAuthority.RequireAsync(message, cancellationToken);
         if (message.EventType != EventType || string.IsNullOrWhiteSpace(message.Payload))
         {
             throw new InvalidOperationException("Discovery identity correction outbox message is invalid.");
@@ -36,22 +38,6 @@ public sealed class EventDiscoveryIdentityCorrectionDispatcher(
             throw new InvalidOperationException("Discovery identity correction aggregate does not match its payload.");
         }
 
-        Guid? previousTenantId = tenantContextAccessor.TenantId;
-        tenantContextAccessor.SetTenant(request.TenantId);
-        try
-        {
-            await notificationService.DeliverAsync(message.Id, request, cancellationToken);
-        }
-        finally
-        {
-            if (previousTenantId is { } tenantId)
-            {
-                tenantContextAccessor.SetTenant(tenantId);
-            }
-            else
-            {
-                tenantContextAccessor.Clear();
-            }
-        }
+        await notificationService.DeliverAsync(message.Id, request, cancellationToken);
     }
 }

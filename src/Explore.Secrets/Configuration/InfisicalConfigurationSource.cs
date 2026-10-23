@@ -34,10 +34,13 @@ public sealed class InfisicalConfigurationSource : IConfigurationSource
     public required string Environment { get; set; }
 
     /// <summary>
-    /// Secret paths to load (e.g., "/api", "/keycloak", "/postgresql").
-    /// If empty, loads from root path "/".
+    /// Exact consumer roots to load. Empty and broad roots are rejected before authentication.
     /// </summary>
-    public List<string> Paths { get; set; } = ["/"];
+    public List<string> Paths { get; set; } = [];
+
+    public SecretConsumer Consumer { get; set; } = SecretConsumer.Api;
+
+    internal Func<HttpMessageHandler>? MessageHandlerFactory { get; set; }
 
     /// <summary>
     /// Whether to throw on first load failure or continue with empty configuration.

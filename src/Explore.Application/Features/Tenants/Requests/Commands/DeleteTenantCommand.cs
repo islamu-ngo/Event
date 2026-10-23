@@ -8,7 +8,8 @@ namespace Explore.Application.Features.Tenants.Requests.Commands;
 /// Command to delete a tenant.
 /// Returns true if the tenant was successfully deleted, false if not found.
 /// </summary>
-[AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Delete)]
+// The handler prepares the exact selected-provider decision outside leases and
+// the repository reacquires it in its real single-attempt committing owner.
 public sealed record DeleteTenantCommand : ICommand<bool>, ISecureRequest
 {
     /// <summary>

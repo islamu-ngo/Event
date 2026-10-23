@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
+using System.Text;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
 using Explore.Application.Telemetry;
@@ -8,11 +8,15 @@ using Explore.Domain;
 using Explore.Infrastructure.Mail;
 using Explore.Infrastructure.Messaging;
 using Explore.Infrastructure.Tests.Fixtures;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
@@ -33,221 +37,135 @@ public sealed class RabbitMqEmailDispatchConsumerMailpitTests(
         await mailpit.ClearMessagesAsync();
         var settings = CreateSettings(rabbitMq);
         var subject = $"RabbitMQ registration confirmation {Guid.CreateVersion7():N}";
-        var dispatch = CreateDispatch(subject);
-        var repository = new InMemoryEmailDispatchOutboxRepository(dispatch);
-        var tenantAccessor = Substitute.For<ITenantContextAccessor>();
+        const string body = "Your registration was confirmed through the RabbitMQ consumer.";
+        await using var database = await new PersistedEmailDispatchScenario(mailpit).CreateDatabaseAsync(subject, body);
+        await using var provider = PersistedEmailDispatchScenario.CreateServiceProvider(
+            database, CreateSmtpEmailService(), settings.ConsumerId);
+        await using var context = database.CreateContext(database.TenantId);
+        var dispatch = await context.EmailDispatchOutbox.AsNoTracking().SingleAsync();
         var settingsMonitor = CreateOptionsMonitor(settings);
         await using var transport = CreateTransport(settingsMonitor);
-        await using var serviceProvider = CreateServiceProvider(repository, tenantAccessor, settings.ConsumerId);
+        var observer = new SettlementObserver();
+        Task settled = observer.Acknowledged.Task.WaitAsync(TimeSpan.FromSeconds(45));
         var consumer = new EmailDispatchRabbitMqConsumerService(
-            new ConfigurationBuilder().Build(),
-            settingsMonitor,
-            transport,
-            serviceProvider,
-            CreateMetrics(),
-            NullLogger<EmailDispatchRabbitMqConsumerService>.Instance);
+            new ConfigurationBuilder().Build(), settingsMonitor, transport, provider,
+            CreateMetrics(), observer);
 
         await consumer.StartAsync(CancellationToken.None);
         try
         {
-            EmailDispatchPublishResult publishResult = await transport.PublishDispatchPointerAsync(
-                EmailDispatchPointer.FromOutbox(dispatch),
-                CancellationToken.None);
-
-            await Assert.That(publishResult.Outcome).IsEqualTo(EmailDispatchPublishOutcome.Confirmed);
-
-            var summary = await mailpit.WaitForMessageAsync(
-                message => message.Subject == subject
-                    && message.To.Any(address => address.Address == dispatch.RecipientEmail),
-                TimeSpan.FromSeconds(20));
-            var detail = await mailpit.GetMessageAsync(summary.Id);
-            await WaitForQueueSettledAsync(settings.DispatchQueueName, TimeSpan.FromSeconds(10));
-
-            await Assert.That(dispatch.Status).IsEqualTo(EmailDispatchStatus.Sent);
-            await Assert.That(dispatch.SentAt).IsNotNull();
-            await Assert.That(dispatch.ProviderMessageId).IsNotNull();
-            await Assert.That(repository.Attempts.Count).IsEqualTo(1);
-            await Assert.That(repository.Attempts[0].Outcome).IsEqualTo(EmailDispatchAttemptOutcome.Succeeded);
-            await Assert.That(repository.Receipts.Count).IsEqualTo(1);
-            await Assert.That(repository.Receipts[0].Status).IsEqualTo(EmailDispatchReceiptStatus.Completed);
-            await Assert.That(repository.Receipts[0].ConsumerId).IsEqualTo(settings.ConsumerId);
-            tenantAccessor.Received(1).SetTenant(dispatch.TenantId);
-            tenantAccessor.Received(1).Clear();
-            await Assert.That(detail.Text).Contains(dispatch.PlainTextBody);
-            await Assert.That(detail.Html).Contains(dispatch.HtmlBody);
+            var published = await transport.PublishDispatchPointerAsync(
+                EmailDispatchPointer.FromOutbox(dispatch), CancellationToken.None);
+            await Assert.That(published.Outcome).IsEqualTo(EmailDispatchPublishOutcome.Confirmed);
+            await settled;
         }
         finally
         {
             await consumer.StopAsync(CancellationToken.None);
+            consumer.Dispose();
         }
+
+        await PersistedEmailDispatchScenario.AssertSentStateAsync(database);
+        var receipt = await context.EmailDispatchReceipts.AsNoTracking().SingleAsync();
+        await Assert.That(receipt.ConsumerId).IsEqualTo(settings.ConsumerId);
+        await using var broker = await new ConnectionFactory { Uri = new Uri(rabbitMq.AmqpConnectionString) }
+            .CreateConnectionAsync();
+        await using var channel = await broker.CreateChannelAsync();
+        await Assert.That(await channel.BasicGetAsync(settings.DispatchQueueName, autoAck: true)).IsNull();
+        var messages = await mailpit.GetMessagesAsync(CancellationToken.None);
+        var summary = messages.Single(message => message.Subject == subject);
+        await Assert.That(summary.To.Single().Address).IsEqualTo(dispatch.RecipientEmail);
+        var detail = await mailpit.GetMessageAsync(summary.Id);
+        await Assert.That(detail.Text).Contains(body);
+        await Assert.That(detail.Html).Contains($"<p>{body}</p>");
     }
 
     [Test]
+    [Arguments(true)]
+    [Arguments(false)]
     [Timeout(180_000)]
-    public async Task Consumer_WithMalformedPointer_RejectsToDeadLetterQueueWithoutSendingMail()
+    public async Task Consumer_WithMalformedOrMissingPointer_RejectsToDeadLetterWithoutSendingMail(bool malformed)
     {
         await mailpit.ClearMessagesAsync();
         var settings = CreateSettings(rabbitMq);
-        var repository = new InMemoryEmailDispatchOutboxRepository(CreateDispatch("unused malformed pointer"));
-        var tenantAccessor = Substitute.For<ITenantContextAccessor>();
+        await using var database = await new PersistedEmailDispatchScenario(mailpit).CreateDatabaseAsync(
+            "Unclaimed notification", "This notification must not be delivered.");
+        await using var provider = PersistedEmailDispatchScenario.CreateServiceProvider(
+            database, CreateSmtpEmailService(), settings.ConsumerId);
         var settingsMonitor = CreateOptionsMonitor(settings);
         await using var transport = CreateTransport(settingsMonitor);
         await transport.DeclareTopologyAsync(CancellationToken.None);
-        await using var serviceProvider = CreateServiceProvider(repository, tenantAccessor, settings.ConsumerId);
+        await using var broker = await new ConnectionFactory { Uri = new Uri(rabbitMq.AmqpConnectionString) }
+            .CreateConnectionAsync();
+        await using var channel = await broker.CreateChannelAsync();
+        var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deadLetters = new AsyncEventingBasicConsumer(channel);
+        deadLetters.ReceivedAsync += (_, args) =>
+        {
+            received.TrySetResult(Encoding.UTF8.GetString(args.Body.Span));
+            return Task.CompletedTask;
+        };
+        await channel.BasicConsumeAsync(settings.DeadLetterQueueName, autoAck: true,
+            consumerTag: "mailpit-dead-letter-observer", noLocal: false, exclusive: false,
+            arguments: null, consumer: deadLetters, cancellationToken: CancellationToken.None);
+        Task<string> delivered = received.Task.WaitAsync(TimeSpan.FromSeconds(45));
         var consumer = new EmailDispatchRabbitMqConsumerService(
-            new ConfigurationBuilder().Build(),
-            settingsMonitor,
-            transport,
-            serviceProvider,
-            CreateMetrics(),
-            NullLogger<EmailDispatchRabbitMqConsumerService>.Instance);
-        var malformedPayload = $"not-json-{Guid.CreateVersion7():N}";
+            new ConfigurationBuilder().Build(), settingsMonitor, transport, provider,
+            CreateMetrics(), NullLogger<EmailDispatchRabbitMqConsumerService>.Instance);
+        string malformedPayload = $"not-json-{Guid.CreateVersion7():N}";
+        var missing = new EmailDispatchPointer(Guid.CreateVersion7(), Guid.CreateVersion7(),
+            EmailDispatchKind.RegistrationConfirmation, "notification_intent", Guid.CreateVersion7(), null, null);
 
         await consumer.StartAsync(CancellationToken.None);
         try
         {
-            var routed = await rabbitMq.PublishStringAsync(
-                settings.ExchangeName,
-                settings.DispatchRoutingKey,
-                malformedPayload);
-            var deadLetterPayload = await WaitForDeadLetterPayloadAsync(
-                settings.DeadLetterQueueName,
-                TimeSpan.FromSeconds(20));
-            var messages = await mailpit.GetMessagesAsync(CancellationToken.None);
-
-            await Assert.That(routed).IsTrue();
-            await Assert.That(deadLetterPayload).IsEqualTo(malformedPayload);
-            await Assert.That(messages.Count).IsEqualTo(0);
-            await Assert.That(repository.Attempts.Count).IsEqualTo(0);
-            tenantAccessor.DidNotReceive().SetTenant(Arg.Any<Guid>());
-            await WaitForQueueSettledAsync(settings.DispatchQueueName, TimeSpan.FromSeconds(10));
+            if (malformed)
+            {
+                await Assert.That(await rabbitMq.PublishStringAsync(
+                    settings.ExchangeName, settings.DispatchRoutingKey, malformedPayload)).IsTrue();
+            }
+            else
+            {
+                var published = await transport.PublishDispatchPointerAsync(missing, CancellationToken.None);
+                await Assert.That(published.Outcome).IsEqualTo(EmailDispatchPublishOutcome.Confirmed);
+            }
+            string payload = await delivered;
+            if (malformed)
+                await Assert.That(payload).IsEqualTo(malformedPayload);
+            else
+                await Assert.That(payload).Contains(missing.PublishEventId.ToString());
         }
         finally
         {
             await consumer.StopAsync(CancellationToken.None);
+            consumer.Dispose();
         }
+
+        await using var context = database.CreateContext(database.TenantId);
+        var dispatch = await context.EmailDispatchOutbox.AsNoTracking().SingleAsync();
+        await Assert.That(dispatch.Status).IsEqualTo(EmailDispatchStatus.Pending);
+        await Assert.That(dispatch.AttemptCount).IsEqualTo(0);
+        await Assert.That(dispatch.ProcessingLeaseToken).IsNull();
+        await Assert.That(await context.EmailDispatchAttempts.CountAsync()).IsEqualTo(0);
+        await Assert.That(await context.EmailDispatchReceipts.CountAsync()).IsEqualTo(0);
+        await Assert.That((await mailpit.GetMessagesAsync(CancellationToken.None)).Count).IsEqualTo(0);
+        await Assert.That(await channel.BasicGetAsync(settings.DispatchQueueName, autoAck: true)).IsNull();
     }
 
-    [Test]
-    [Timeout(180_000)]
-    public async Task Consumer_WithMissingOutbox_RejectsToDeadLetterQueueWithoutSendingMail()
+    private sealed class SettlementObserver : ILogger<EmailDispatchRabbitMqConsumerService>
     {
-        await mailpit.ClearMessagesAsync();
-        var settings = CreateSettings(rabbitMq);
-        var repository = new InMemoryEmailDispatchOutboxRepository(CreateDispatch("unused missing outbox"));
-        var tenantAccessor = Substitute.For<ITenantContextAccessor>();
-        var settingsMonitor = CreateOptionsMonitor(settings);
-        await using var transport = CreateTransport(settingsMonitor);
-        await using var serviceProvider = CreateServiceProvider(repository, tenantAccessor, settings.ConsumerId);
-        var consumer = new EmailDispatchRabbitMqConsumerService(
-            new ConfigurationBuilder().Build(),
-            settingsMonitor,
-            transport,
-            serviceProvider,
-            CreateMetrics(),
-            NullLogger<EmailDispatchRabbitMqConsumerService>.Instance);
-        var missingPointer = new EmailDispatchPointer(
-            TenantId: Guid.CreateVersion7(),
-            PublishEventId: Guid.CreateVersion7(),
-            Kind: EmailDispatchKind.RegistrationConfirmation,
-            SourceType: "event-registration",
-            SourceId: Guid.CreateVersion7(),
-            EventId: Guid.CreateVersion7(),
-            RegistrationOrderId: Guid.CreateVersion7());
-
-        await consumer.StartAsync(CancellationToken.None);
-        try
+        internal TaskCompletionSource Acknowledged { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
         {
-            EmailDispatchPublishResult publishResult = await transport.PublishDispatchPointerAsync(
-                missingPointer,
-                CancellationToken.None);
-            var deadLetterPayload = await WaitForDeadLetterPayloadAsync(
-                settings.DeadLetterQueueName,
-                TimeSpan.FromSeconds(20));
-            var messages = await mailpit.GetMessagesAsync(CancellationToken.None);
-
-            await Assert.That(publishResult.Outcome).IsEqualTo(EmailDispatchPublishOutcome.Confirmed);
-            await Assert.That(deadLetterPayload).Contains(missingPointer.PublishEventId.ToString());
-            await Assert.That(messages.Count).IsEqualTo(0);
-            await Assert.That(repository.Dispatch.Status).IsEqualTo(EmailDispatchStatus.Pending);
-            await Assert.That(repository.Attempts.Count).IsEqualTo(0);
-            tenantAccessor.DidNotReceive().SetTenant(Arg.Any<Guid>());
-            await WaitForQueueSettledAsync(settings.DispatchQueueName, TimeSpan.FromSeconds(10));
+            if (state is not IEnumerable<KeyValuePair<string, object?>> fields) return;
+            var values = fields.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+            if (values.GetValueOrDefault("BrokerAction") is EmailDispatchRabbitMqSettlementAction.Ack
+                && values.GetValueOrDefault("DrainOutcome") is EmailDispatchDrainOutcome.Sent)
+                Acknowledged.TrySetResult();
         }
-        finally
-        {
-            await consumer.StopAsync(CancellationToken.None);
-        }
-    }
-
-    private async Task<string> WaitForDeadLetterPayloadAsync(string queueName, TimeSpan timeout)
-    {
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            var messages = await rabbitMq.GetQueueMessagesAsync(queueName, count: 1);
-            if (messages.Count > 0)
-            {
-                return messages[0].Payload;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
-        }
-
-        var finalQueue = await rabbitMq.GetQueueAsync(queueName);
-        throw new TimeoutException(
-            $"RabbitMQ dead-letter queue did not receive a message. Messages={finalQueue.Messages}, Ready={finalQueue.MessagesReady}, Unacknowledged={finalQueue.MessagesUnacknowledged}.");
-    }
-
-    private async Task WaitForQueueSettledAsync(string queueName, TimeSpan timeout)
-    {
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            var queue = await rabbitMq.GetQueueAsync(queueName);
-            if (queue.Messages == 0 && queue.MessagesReady == 0 && queue.MessagesUnacknowledged == 0)
-            {
-                return;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
-        }
-
-        var finalQueue = await rabbitMq.GetQueueAsync(queueName);
-        throw new TimeoutException(
-            $"RabbitMQ dispatch queue did not settle. Messages={finalQueue.Messages}, Ready={finalQueue.MessagesReady}, Unacknowledged={finalQueue.MessagesUnacknowledged}.");
-    }
-
-    private ServiceProvider CreateServiceProvider(
-        InMemoryEmailDispatchOutboxRepository repository,
-        ITenantContextAccessor tenantAccessor,
-        string consumerId)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IEmailDispatchOutboxRepository>(repository);
-        services.AddSingleton<IEmailService>(CreateSmtpEmailService());
-        services.AddSingleton(Substitute.For<IUserNotificationPreferenceRepository>());
-        services.AddSingleton(Substitute.For<IEmailUnsubscribeTokenService>());
-        services.AddSingleton(CreateEnabledNotificationPreferenceResolver());
-        services.AddSingleton(tenantAccessor);
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddSingleton<IEmailDispatchDrainService>(provider => new EmailDispatchDrainService(
-            provider.GetRequiredService<IServiceScopeFactory>(),
-            Options.Create(new EmailDispatchProcessorSettings
-            {
-                BatchSize = 10,
-                ConsumerId = consumerId
-            }),
-            CreateMetrics(),
-            NullLogger<EmailDispatchDrainService>.Instance));
-
-        return services.BuildServiceProvider(new ServiceProviderOptions
-        {
-            ValidateOnBuild = true,
-            ValidateScopes = true
-        });
     }
 
     private SmtpEmailService CreateSmtpEmailService()
@@ -264,27 +182,6 @@ public sealed class RabbitMqEmailDispatchConsumerMailpitTests(
         });
 
         return new SmtpEmailService(resolver, NullLogger<SmtpEmailService>.Instance);
-    }
-
-    private static INotificationPreferenceResolver CreateEnabledNotificationPreferenceResolver()
-    {
-        var resolver = Substitute.For<INotificationPreferenceResolver>();
-        resolver.ResolveAsync(Arg.Any<NotificationPreferenceResolveRequest>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                var request = call.Arg<NotificationPreferenceResolveRequest>();
-                return new NotificationPreferenceDecision(
-                    request.CategoryCode,
-                    request.ChannelCode,
-                    IsEnabled: true,
-                    IsRequired: false,
-                    IsLocked: false,
-                    IsMuted: false,
-                    EffectiveSourceScope: "Default",
-                    LockReason: null);
-            });
-
-        return resolver;
     }
 
     private static RabbitMqEmailDispatchTransport CreateTransport(
@@ -309,25 +206,6 @@ public sealed class RabbitMqEmailDispatchConsumerMailpitTests(
         meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
         return new BusinessMetrics(meterFactory);
     }
-
-    private static EmailDispatchOutbox CreateDispatch(string subject) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        TenantId = Guid.CreateVersion7(),
-        PublishEventId = Guid.CreateVersion7(),
-        Kind = EmailDispatchKind.RegistrationConfirmation,
-        SourceType = "event-registration",
-        SourceId = Guid.CreateVersion7(),
-        EventId = Guid.CreateVersion7(),
-        RegistrationOrderId = Guid.CreateVersion7(),
-        RecipientUserId = Guid.CreateVersion7(),
-        RecipientEmail = "attendee@example.test",
-        Subject = subject,
-        PlainTextBody = "Your registration was confirmed through the RabbitMQ consumer.",
-        HtmlBody = "<p>Your registration was confirmed through the RabbitMQ consumer.</p>",
-        Status = EmailDispatchStatus.Pending,
-        CorrelationId = $"corr-{Guid.CreateVersion7():N}"
-    };
 
     private static EmailDispatchRabbitMqSettings CreateSettings(RabbitMqContainerFixture rabbitMq)
     {

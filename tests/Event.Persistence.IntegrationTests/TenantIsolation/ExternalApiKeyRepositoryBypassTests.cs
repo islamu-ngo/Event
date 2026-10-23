@@ -3,6 +3,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using TUnit.Core;
 
@@ -13,10 +15,16 @@ namespace Event.Persistence.IntegrationTests.TenantIsolation;
 public class ExternalApiKeyRepositoryBypassTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
-    public async Task CredentialBypasses_WithAmbientTenant_ReturnOnlyExplicitApiKeyPredicates()
+    public async Task AuthenticationCapabilityDoesNotExpandOrdinaryTenantManagement()
     {
         await fixture.ResetAsync();
         await using var seedContext = fixture.CreateDbContext();
+        seedContext.ClearTenantFilterBypass();
+        seedContext.BindTenantLease();
+        await using var human = new HumanSecuritySourceGate(seedContext);
+        await using var humanLease = await human.AcquireAsync(default);
+        await using var enrollmentGate = new EventDiscoveryEnrollmentGate(seedContext);
+        await using var enrollmentLease = await enrollmentGate.AcquireAsync(default);
 
         var tenantA = CreateTenant("api-key-a");
         var tenantB = CreateTenant("api-key-b");
@@ -59,21 +67,25 @@ public class ExternalApiKeyRepositoryBypassTests(PostgreSqlContainerFixture fixt
             .ToListAsync();
 
         var repository = new ExternalApiKeyRepository(tenantBContext);
-        var tenantAAuthenticationKey = await repository.GetByKeyIdForAuthentication(tenantAKey.KeyId);
-        var usageTouched = await repository.TouchUsageMetadata(
+        await using var global = await PostgresAuthenticationLookupAuthorityTests.AuthenticationGlobalAuthority.CreateAsync(fixture);
+        var authentication = new ExternalApiKeyAuthenticationRepository(global.Factory, fixture.NativeQueueEnrollment);
+        var tenantAAuthenticationKey = await authentication.GetByKeyIdForAuthentication(tenantAKey.KeyId);
+        var usageTouched = await authentication.TouchUsageMetadata(
             tenantAKey.Id,
             new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
             "203.0.113.10",
             TimeSpan.Zero);
-        var platformKeyById = await repository.GetByIdIgnoringTenantFilter(platformKey.Id);
-        var platformKeys = await repository.GetByOwnerIgnoringTenantFilter(
+        var platformKeyById = await repository.GetForTenantAsync(platformKey.Id);
+        var foreignKeyById = await repository.GetForTenantAsync(tenantAKey.Id);
+        var tenantKeyById = await repository.GetForTenantAsync(tenantBKey.Id);
+        var platformKeys = await repository.GetByOwner(
             ExternalApiKeyOwnerType.InstanceAdmin,
             platformOwnerId);
-        var platformNameExists = await repository.ExistsByOwnerAndNameIgnoringTenantFilter(
+        var platformNameExists = await repository.ExistsByOwnerAndName(
             ExternalApiKeyOwnerType.InstanceAdmin,
             platformOwnerId,
             platformKey.Name);
-        var tenantNameDoesNotMatchPlatformOwner = await repository.ExistsByOwnerAndNameIgnoringTenantFilter(
+        var tenantNameDoesNotMatchPlatformOwner = await repository.ExistsByOwnerAndName(
             ExternalApiKeyOwnerType.InstanceAdmin,
             platformOwnerId,
             tenantAKey.Name);
@@ -96,12 +108,12 @@ public class ExternalApiKeyRepositoryBypassTests(PostgreSqlContainerFixture fixt
         await Assert.That(reloadedKeys[tenantAKey.Id].LastUsedIp).IsEqualTo("203.0.113.10");
         await Assert.That(reloadedKeys[tenantBKey.Id].LastUsedAt).IsNull();
 
-        await Assert.That(platformKeyById).IsNotNull();
-        await Assert.That(platformKeyById!.Id).IsEqualTo(platformKey.Id);
-        await Assert.That(platformKeyById.TenantId).IsNull();
+        await Assert.That(platformKeyById).IsNull();
+        await Assert.That(foreignKeyById).IsNull();
+        await Assert.That(tenantKeyById!.Id).IsEqualTo(tenantBKey.Id);
 
-        await Assert.That(platformKeys.Select(apiKey => apiKey.Id)).IsEquivalentTo([platformKey.Id]);
-        await Assert.That(platformNameExists).IsTrue();
+        await Assert.That(platformKeys).IsEmpty();
+        await Assert.That(platformNameExists).IsFalse();
         await Assert.That(tenantNameDoesNotMatchPlatformOwner).IsFalse();
     }
 

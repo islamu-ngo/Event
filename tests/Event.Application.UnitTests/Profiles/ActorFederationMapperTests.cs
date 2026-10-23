@@ -668,6 +668,7 @@ public sealed class ActorFederationMapperTests
     private sealed class ActorStore(List<Actor> items) : Store<Actor, Guid>, IActorRepository
     {
         public List<Actor> Items { get; } = items;
+        public Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public override Task<Actor> Create(Actor entity)
         {
             entity.Id = ActorId;
@@ -689,7 +690,6 @@ public sealed class ActorFederationMapperTests
         public Task<Actor?> GetActorByHandle(string handle, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<Actor>> SearchAiReferenceActorsAsync(string searchTerm, int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Actor?> GetTrackedActorByUserId(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<Actor?> GetActorByUserIdAndTenantId(Guid userId, Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Actor?> GetActorByGroupId(Guid groupId) => throw new NotSupportedException();
         public Task<int> ForgetPiiAsync(Guid actorId) => throw new NotSupportedException();
     }
@@ -746,6 +746,8 @@ public sealed class ActorFederationMapperTests
     private sealed class UserStore : Store<User, Guid>, IUserRepository
     {
         public override Task<bool> Exists(Guid id) => Task.FromResult(id == OwnerId);
+        public Task<User?> GetLocalIdentityBindingAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task SaveIdentityProfileAsync(User user, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<User?> GetUserWithDetails(Guid id) => throw new NotSupportedException();
         public Task<User?> GetUserWithDetails(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<User?> GetUserByEmail(string email) => throw new NotSupportedException();

@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53E0Z7YFRH71CX5E0XAXJSM
+Title: "Admit public tenant directory reads through Global"
+Type: fix
+Scope: access
+Summary: "Check public tenant eligibility through an independent active-only directory instead of Runtime table reads."
+Group: admitted-public-tenant-directory
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Global executes a bounded public projection without direct tenant table privileges.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Requires the selected Global account and installed native directory execution group.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose public directory failures without broadening Runtime privileges.

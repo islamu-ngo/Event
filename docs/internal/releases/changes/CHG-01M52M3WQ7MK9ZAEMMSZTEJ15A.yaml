@@ -1,0 +1,31 @@
+Change-Id: CHG-01M52M3WQ7MK9ZAEMMSZTEJ15A
+Title: "Require strict Keycloak resource audience and access purpose"
+Type: fix
+Scope: access
+Summary: "Require signed API resource audience and Bearer access purpose independently of optional originating client restrictions."
+Group: strict-keycloak-token-context
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Client-only audiences and retired ValidAudiences fallback no longer authenticate; API audience and Bearer purpose are required.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Token client identity cannot substitute for resource audience and malformed or duplicate context fails closed.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: .env.example
+    Disposition: documented
+    Detail: Configure Keycloak Audience and optional indexed PermittedClients independently.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Configure the realm resource audience mapper and optional permitted clients before rollout.

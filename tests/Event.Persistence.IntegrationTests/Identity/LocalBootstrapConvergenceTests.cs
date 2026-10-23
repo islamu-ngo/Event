@@ -18,6 +18,8 @@ using Explore.Application.Services;
 using Explore.Infrastructure.Identity;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authentication;
+using Explore.API.Authentication;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Explore.Application.Contracts.Secrets;
@@ -32,6 +34,7 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -41,7 +44,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Persistence.IntegrationTests.Identity;
 
-public sealed class LocalBootstrapConvergenceTests
+[Timeout(180_000)]
+public sealed partial class LocalBootstrapConvergenceTests
 {
     [Test]
     [Arguments(IdentityDatabaseTopology.Colocated)]
@@ -165,7 +169,7 @@ public sealed class LocalBootstrapConvergenceTests
         await using Fixture fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
         Guid operationId = Guid.CreateVersion7();
         await using var scope = fixture.Provider.CreateAsyncScope();
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(authenticationType: ApiAuthenticationSchemeNames.SetupSecret));
+        var principal = await fixture.AuthenticateSetupAsync(scope);
         var result = await fixture.Operation(scope).CompleteInteractiveAsync(operationId, "wizard-operator", fixture.OriginalPassword,
             null, null, null, await WizardSettingsAsync(fixture, scope), principal, fixture.Token);
         await Assert.That(result.IsSuccess).IsTrue();
@@ -230,14 +234,19 @@ public sealed class LocalBootstrapConvergenceTests
         await using Fixture fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
         await using var scope = fixture.Provider.CreateAsyncScope();
         var application = fixture.Application(scope);
-        var unitOfWork = new EfCoreUnitOfWork(application);
-        IVisitorAccessSettingsWriter settings = new VisitorAccessSettingsWriter(application,
-            new RelationalSettingMutationLock(application, unitOfWork), unitOfWork,
-            new EventParticipationConfigurationRepository(application), fixture.Configuration);
-        (await settings.ApplyAsync(
-            [new(null, GovernanceSettingKeys.Authentication.PrimaryProviderId,
-                VisitorAccessSettingMutationKind.SetValue, JsonSerializer.Serialize((int)AuthenticationProviderKind.Keycloak))],
-            actorUserId: null, fixture.Token)).EnsureAccepted();
+        var primary = await application.SystemSettings.SingleOrDefaultAsync(
+            row => row.SettingKey == GovernanceSettingKeys.Authentication.PrimaryProviderId, fixture.Token);
+        if (primary is null)
+        {
+            primary = new SystemSetting
+            {
+                SettingKey = GovernanceSettingKeys.Authentication.PrimaryProviderId,
+                Value = JsonSerializer.Serialize((int)AuthenticationProviderKind.Keycloak)
+            };
+            application.SystemSettings.Add(primary);
+        }
+        primary.Value = JsonSerializer.Serialize((int)AuthenticationProviderKind.Keycloak);
+        await application.SaveChangesAsync(fixture.Token);
         if (configured)
         {
             await fixture.PrepareAsync();
@@ -248,7 +257,7 @@ public sealed class LocalBootstrapConvergenceTests
         else
         {
             var result = await fixture.Operation(scope).CompleteInteractiveAsync(Guid.CreateVersion7(), "operator", fixture.OriginalPassword,
-                null, null, null, await WizardSettingsAsync(fixture, scope), SetupPrincipal(), fixture.Token);
+                null, null, null, await WizardSettingsAsync(fixture, scope), await fixture.AuthenticateSetupAsync(scope), fixture.Token);
             await Assert.That(result.IsSuccess).IsFalse();
         }
         await Assert.That((await fixture.Store(scope).ListAsync(new LocalIdentityListRequest(1, 10), fixture.Token)).TotalCount).IsEqualTo(0);
@@ -268,13 +277,13 @@ public sealed class LocalBootstrapConvergenceTests
         string password = invalidUsername ? fixture.OriginalPassword : Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
         var rejected = await fixture.Operation(scope).CompleteInteractiveAsync(Guid.CreateVersion7(),
             invalidUsername ? "operator name" : "operator", password,
-            null, null, null, await WizardSettingsAsync(fixture, scope), SetupPrincipal(), fixture.Token);
+            null, null, null, await WizardSettingsAsync(fixture, scope), await fixture.AuthenticateSetupAsync(scope), fixture.Token);
         await Assert.That(rejected.IsSuccess).IsFalse();
         await Assert.That(await new InstanceBootstrapStateRepository(fixture.Application(scope)).GetCurrent(fixture.Token)).IsNull();
         await Assert.That((await fixture.Store(scope).ListAsync(new LocalIdentityListRequest(1, 10), fixture.Token)).TotalCount).IsEqualTo(0);
         Guid freshOperation = Guid.CreateVersion7();
         var accepted = await fixture.Operation(scope).CompleteInteractiveAsync(freshOperation, "fresh-operator", fixture.OriginalPassword,
-            null, null, null, await WizardSettingsAsync(fixture, scope), SetupPrincipal(), fixture.Token);
+            null, null, null, await WizardSettingsAsync(fixture, scope), await fixture.AuthenticateSetupAsync(scope), fixture.Token);
         await Assert.That(accepted.IsSuccess).IsTrue();
         var receipt = await fixture.Store(scope).ReadOperationAsync(freshOperation, fixture.Token);
         await fixture.AssertCompletedAsync(receipt!.Receipt.LocalSubjectId);
@@ -310,8 +319,6 @@ public sealed class LocalBootstrapConvergenceTests
         await Assert.That((await fixture.Store(scope).ListAsync(new LocalIdentityListRequest(1, 10), fixture.Token)).TotalCount).IsEqualTo(0);
     }
 
-    private static ClaimsPrincipal SetupPrincipal() => new(new ClaimsIdentity(authenticationType: ApiAuthenticationSchemeNames.SetupSecret));
-
     private static async Task<CompleteInstanceOnboardingRequest> WizardSettingsAsync(Fixture fixture, AsyncServiceScope scope) => new()
     {
         ExpectedJourneyGeneration = await fixture.GenerationReader(scope).ReadAsync(
@@ -326,7 +333,6 @@ public sealed class LocalBootstrapConvergenceTests
     {
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"local-bootstrap-app-{Guid.CreateVersion7():N}.db");
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"local-bootstrap-identity-{Guid.CreateVersion7():N}.db");
-        private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
         private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private IdentityDatabaseTopology _topology;
         internal ServiceProvider Provider { get; private set; } = null!;
@@ -338,13 +344,41 @@ public sealed class LocalBootstrapConvergenceTests
         internal CommitFault ApplicationCommitFault { get; } = new();
         internal GrantWriteFault GrantFault { get; } = new();
         internal CreationConflictFault CreationFault { get; } = new();
-        internal CancellationToken Token => _timeout.Token;
+        internal CancellationToken Token => TestContext.Current!.Execution.CancellationToken;
 
-        internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology)
+        internal async Task<string> ReadSettingsAsync()
+        {
+            await using var scope = Provider.CreateAsyncScope();
+            return JsonSerializer.Serialize(await Application(scope).SystemSettings.AsNoTracking()
+                .OrderBy(row => row.SettingKey).ToListAsync(Token));
+        }
+
+        internal Task<ClaimsPrincipal> AuthenticateSetupAsync(AsyncServiceScope scope)
+        {
+            var request = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+            request.Request.Method = HttpMethods.Post;
+            request.Request.Path = "/api/instanceonboarding/complete-local";
+            request.Request.Headers["X-Setup-Secret"] = Configuration["SETUP_SECRET"];
+            scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext = request;
+            return AuthenticateAsync(request);
+
+            static async Task<ClaimsPrincipal> AuthenticateAsync(HttpContext request)
+            {
+                var result = await request.AuthenticateAsync();
+                if (!result.Succeeded || result.Principal is null)
+                    throw new InvalidOperationException("The original setup request was not authenticated.");
+                request.User = result.Principal;
+                return result.Principal;
+            }
+        }
+
+        internal static async Task<Fixture> CreateAsync(
+            IdentityDatabaseTopology topology, IInterceptor[]? applicationInterceptors = null,
+            IInterceptor[]? identityInterceptors = null)
         {
             await LocalIdentitySqliteTemplate.InitializeAsync();
             var fixture = new Fixture { _topology = topology };
-            try { await fixture.InitializeAsync(); return fixture; }
+            try { await fixture.InitializeAsync(applicationInterceptors ?? [], identityInterceptors ?? []); return fixture; }
             catch { await fixture.DisposeAsync(); throw; }
         }
 
@@ -352,7 +386,7 @@ public sealed class LocalBootstrapConvergenceTests
         internal LocalIdentityCredentialStateStore Store(AsyncServiceScope scope) => new(
             _topology == IdentityDatabaseTopology.External ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : Application(scope),
             Application(scope), scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System,
-            NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
+            identityFence: NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
 
         private IOptions<InstanceOperatorIdentityOptions> OperatorOptions => Options.Create(new InstanceOperatorIdentityOptions
         {
@@ -377,8 +411,11 @@ public sealed class LocalBootstrapConvergenceTests
         internal async Task PrepareAsync()
         {
             await using var scope = Provider.CreateAsyncScope();
+            var application = Application(scope);
+            application.BindTenantLease();
             await new ConfiguredAdministratorBootstrapStartupRunner(BootstrapProvider(scope),
-                new InstanceBootstrapStateRepository(Application(scope)), new EfCoreUnitOfWork(Application(scope)), TimeProvider.System)
+                new InstanceBootstrapStateRepository(application), new EfCoreUnitOfWork(application), TimeProvider.System,
+                new EventDiscoveryEnrollmentGate(application))
                 .PrepareAsync(Token);
         }
 
@@ -394,6 +431,9 @@ public sealed class LocalBootstrapConvergenceTests
         internal LocalAdministratorBootstrapOperation Operation(AsyncServiceScope scope)
         {
             var application = Application(scope);
+            application.BindTenantLease();
+            var receipts = scope.ServiceProvider.GetRequiredService<SetupReceiptCustody>().Source;
+            var enrollment = new EventDiscoveryEnrollmentGate(application);
             var unitOfWork = new EfCoreUnitOfWork(application);
             var bootstrap = new InstanceBootstrapStateRepository(application);
             var provider = BootstrapProvider(scope);
@@ -405,28 +445,35 @@ public sealed class LocalBootstrapConvergenceTests
             var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
             var setup = scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>();
             var deployment = scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>();
-            var systemSettings = new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork));
+            var mutationLock = new RelationalSettingMutationLock(application, unitOfWork);
+            var systemSettings = SystemSettingRepository.CreateReadOnly(application, mutationLock);
+            var dispatcher = new RuntimeAuthenticationProviderDispatcher(
+                systemSettings, cache, Options.Create(new AuthenticationProviderDeploymentOptions()));
+            var trustedAuthority = new Explore.Infrastructure.Services.TrustedSetupSettingsAuthority(
+                new Microsoft.AspNetCore.Http.HttpContextAccessor(), [], setup,
+                receipts, dispatcher,
+                [provider], TimeProvider.System);
+            var trustedWriter = new TrustedSetupSettingsWriter(
+                application, trustedAuthority, mutationLock, unitOfWork);
             var identityEmails = new UserIdentityEmailRepository(application);
             var privacyState = new PrivacyErasureStateRepository(application);
-            var completion = new InstanceOnboardingCompletionOperation(bootstrap, platformRoles, tenantRoles,
-                new TenantUserRepository(application), new RoleRepository(application), new UserRepository(application),
+            var completion = new InstanceOnboardingCompletionOperation(bootstrap, platformRoles,
+                new RoleRepository(application), new UserRepository(application),
                 new ActorRepository(application), logins, identityEmails, privacyState,
                 new IdentityAccountResolver(new UserRepository(application), logins, identityEmails,
                     privacyState, Options.Create(new IdentityCorrelationOptions())),
                 new IdentityEmailSynchronizationOperation(identityEmails),
-                tenants, new TenantCreationService(tenants, documents),
                 systemSettings,
                 [provider], setup, new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
                 deployment, new RuntimeMetadataRefresh(),
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork,
                 GenerationReader(scope), Configuration,
                 NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System),
-                OperatorOptions);
-            return new LocalAdministratorBootstrapOperation(bootstrap, provider, Store(scope), Secrets, completion,
+                enrollment, receipts,
+                OperatorOptions, trustedWriter);
+            return new LocalAdministratorBootstrapOperation(bootstrap, provider, new BootstrapLocalScopes(this), Secrets, completion,
                 setup, deployment, unitOfWork, TimeProvider.System,
-                new RuntimeAuthenticationProviderDispatcher(
-                    systemSettings,
-                    cache, Options.Create(new AuthenticationProviderDeploymentOptions())));
+                dispatcher, enrollment);
         }
 
         internal IInstanceOnboardingGenerationReader GenerationReader(AsyncServiceScope scope)
@@ -434,7 +481,7 @@ public sealed class LocalBootstrapConvergenceTests
             var application = Application(scope);
             var unitOfWork = new EfCoreUnitOfWork(application);
             return new InstanceOnboardingGenerationReader(
-                new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork)),
+                SystemSettingRepository.CreateReadOnly(application, new RelationalSettingMutationLock(application, unitOfWork)),
                 scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>(),
                 new InstanceBootstrapStateRepository(application), Configuration);
         }
@@ -461,7 +508,7 @@ public sealed class LocalBootstrapConvergenceTests
             await Assert.That(await manager.CheckPasswordAsync(user!, OriginalPassword)).IsTrue();
         }
 
-        private async Task InitializeAsync()
+        private async Task InitializeAsync(IInterceptor[] applicationInterceptors, IInterceptor[] identityInterceptors)
         {
             OriginalPassword = Secrets.Password;
             Configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -484,12 +531,26 @@ public sealed class LocalBootstrapConvergenceTests
             services.AddSingleton<IConfiguration>(Configuration);
             services.Configure<DeploymentSettings>(Configuration.GetSection("Deployment"));
             services.AddSingleton<ISetupSecretProvider, SetupSecretProvider>();
+            services.AddHttpContextAccessor();
+            services.AddAuthentication(ApiAuthenticationSchemeNames.SetupSecret)
+                .AddScheme<AuthenticationSchemeOptions, SetupSecretAuthenticationHandler>(
+                    ApiAuthenticationSchemeNames.SetupSecret, _ => { });
             services.AddSingleton<IDeploymentModeProvider, DeploymentModeProvider>();
             services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
+            services.AddScoped(provider => new SetupReceiptCustody(this, provider.GetRequiredService<ExploreDbContext>()));
+            services.AddScoped<IInstanceBootstrapStateReader, Explore.Persistence.Services.InstanceBootstrapStateReader>();
+            services.AddSingleton<IGlobalExploreDbContextFactory>(_ => new GlobalExploreDbContextFactory(
+                new PrimaryDatabaseConnectionOptions
+                {
+                    Provider = PrimaryDatabaseProvider.Sqlite,
+                    Role = PrimaryDatabaseRole.Global,
+                    Database = _applicationPath
+                }));
             services.AddDbContext<ExploreDbContext>(options =>
             {
                 Configure(options, _applicationPath, ApplicationCommitFault);
                 options.AddInterceptors(GrantFault);
+                options.AddInterceptors(applicationInterceptors);
             });
             var identity = services.AddIdentityCore<LocalIdentityUser>().AddRoles<LocalIdentityRole>()
                 .AddUserValidator<OptionalEmailLocalIdentityUserValidator>();
@@ -499,6 +560,7 @@ public sealed class LocalBootstrapConvergenceTests
                 {
                     Configure(options, _identityPath, IdentityCommitFault);
                     options.AddInterceptors(CreationFault);
+                    options.AddInterceptors(identityInterceptors);
                 });
                 identity.AddEntityFrameworkStores<ExternalIdentityDbContext>();
             }
@@ -519,7 +581,6 @@ public sealed class LocalBootstrapConvergenceTests
             _metadataCache.Dispose();
             foreach (string path in new[] { _applicationPath, _identityPath })
             { File.Delete(path); File.Delete(path + "-wal"); File.Delete(path + "-shm"); }
-            _timeout.Dispose();
         }
     }
 

@@ -8,10 +8,12 @@ public sealed class ConfiguredAdministratorBootstrapStartupRunner(
     ConfiguredAdministratorBootstrapProvider provider,
     IInstanceBootstrapStateRepository bootstrapRepository,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IEventDiscoveryEnrollmentGate enrollmentGate)
 {
     public async Task PrepareAsync(CancellationToken cancellationToken = default)
     {
+        await using var enrollment = await enrollmentGate.AcquireAsync(cancellationToken);
         _ = await unitOfWork.ExecuteBootstrapConvergenceAsync(
             async token =>
             {

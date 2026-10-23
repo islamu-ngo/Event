@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53GBEV9TFA65WHHJSX6KHS4
+Title: "Admit boolean-only localization secret binding status"
+Type: fix
+Scope: access
+Summary: "Read selected-tenant TMS binding existence and instance fallback without direct table privileges or secret references."
+Group: localization-secret-status-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Native status projection returns only boolean binding existence and excludes other tenants and qualified bindings.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Requires the native localization secret status contract with selected execution accounts.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Distinguish binding existence from external secret validation.

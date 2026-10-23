@@ -2,13 +2,14 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
+using Explore.Infrastructure.Http;
 using Microsoft.Extensions.Options;
-using Refit;
 
 namespace Explore.Infrastructure.Ai;
 
@@ -17,19 +18,17 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
     public const string HttpClientName = "AnthropicCompatibleAiClient";
 
     private const string CreateEventDraftToolName = "create_event_draft";
-    private static readonly RefitSettings RefitSettings = new()
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
-        ContentSerializer = new SystemTextJsonContentSerializer(new JsonSerializerOptions(JsonSerializerDefaults.Web)
-        {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNameCaseInsensitive = true
-        })
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNameCaseInsensitive = true
     };
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IOptions<AiProviderSettings> _options;
+    private readonly AiProviderConfigurationResolver _configuration;
     private readonly AiProviderSettingsValidator _validator;
     private readonly BusinessMetrics _metrics;
+    private readonly AiResponseLimits _responseLimits;
     private readonly int _providerId;
     private readonly string _providerName;
     private readonly string _httpClientName;
@@ -38,37 +37,41 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
 
     public AnthropicCompatibleChatProvider(
         IHttpClientFactory httpClientFactory,
-        IOptions<AiProviderSettings> options,
+        AiProviderConfigurationResolver configuration,
         AiProviderSettingsValidator validator,
-        BusinessMetrics metrics)
+        BusinessMetrics metrics,
+        IOptions<AiResponseLimits>? responseLimits = null)
         : this(
             httpClientFactory,
-            options,
+            configuration,
             validator,
             metrics,
             AiProviderSettings.ProviderAnthropicCompatible,
             AiProviderDefaults.ProviderAnthropicCompatible,
             HttpClientName,
             string.Empty,
-            "Anthropic-compatible provider is not enabled or configured.")
+            "Anthropic-compatible provider is not enabled or configured.",
+            responseLimits)
     {
     }
 
     protected AnthropicCompatibleChatProvider(
         IHttpClientFactory httpClientFactory,
-        IOptions<AiProviderSettings> options,
+        AiProviderConfigurationResolver configuration,
         AiProviderSettingsValidator validator,
         BusinessMetrics metrics,
         int providerId,
         string providerName,
         string httpClientName,
         string defaultEndpointUrl,
-        string notConfiguredMessage)
+        string notConfiguredMessage,
+        IOptions<AiResponseLimits>? responseLimits = null)
     {
         _httpClientFactory = httpClientFactory;
-        _options = options;
+        _configuration = configuration;
         _validator = validator;
         _metrics = metrics;
+        _responseLimits = responseLimits?.Value ?? new AiResponseLimits();
         _providerId = providerId;
         _providerName = providerName;
         _httpClientName = httpClientName;
@@ -79,10 +82,15 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
     public async Task<AiChatProviderResult> SendAsync(AiChatPayload request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var settings = ResolveSettings(request);
         var providerName = _providerName;
         var startedAt = Stopwatch.GetTimestamp();
         using var telemetryActivity = AiProviderTelemetry.StartRequest(providerName, request);
+        var resolved = await _configuration.ResolveAsync(request, cancellationToken);
+        if (resolved.Configuration is not { } configuration)
+            return CompleteFailure(
+                RecordFailure(resolved.FailureCode!, "AI provider configuration or credential is unavailable."),
+                startedAt, telemetryActivity);
+        var settings = configuration.Settings;
 
         if (!IsRunnableProvider(settings))
         {
@@ -136,18 +144,27 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
 
         try
         {
-            var api = CreateApiClient(settings);
-            using var providerResponse = await api.CreateMessageAsync(payload!, ResolveApiKey(settings), timeoutCts.Token);
+            var client = _httpClientFactory.CreateClient(_httpClientName
+                + (configuration.InstanceTransport ? AiTransportAuthority.InstanceClientSuffix : string.Empty));
+            var endpoint = BuildMessagesBaseUri(settings.EndpointUrl, _defaultEndpointUrl);
+            var messageUri = new UriBuilder(endpoint) { Path = endpoint.AbsolutePath.TrimEnd('/') + "/messages" }.Uri;
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, messageUri)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json")
+            };
+            httpRequest.Headers.Add("anthropic-version", "2023-06-01");
+            if (!string.IsNullOrWhiteSpace(configuration.ApiKey))
+                httpRequest.Headers.Add("x-api-key", configuration.ApiKey);
+            using var providerResponse = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
 
             if (!providerResponse.IsSuccessStatusCode)
             {
-                var failure = providerResponse.StatusCode is { } statusCode
-                    ? RecordHttpFailure(statusCode)
-                    : RecordFailure("provider_unreachable", "AI provider request failed before a response was received.", isTransient: true);
-                return CompleteFailure(failure, startedAt, telemetryActivity);
+                return CompleteFailure(RecordHttpFailure(providerResponse.StatusCode), startedAt, telemetryActivity);
             }
 
-            if (providerResponse.Content is null)
+            var bytes = await AiResponseReader.ReadAsync(providerResponse.Content, _responseLimits, discovery: false, timeoutCts.Token);
+            var message = JsonSerializer.Deserialize<AnthropicMessageResponse>(bytes, JsonOptions);
+            if (message is null)
             {
                 return CompleteFailure(
                     RecordFailure("invalid_response", "AI provider returned an invalid response."),
@@ -155,7 +172,7 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
                     telemetryActivity);
             }
 
-            if (!TryMapResponse(providerResponse.Content, GetProviderRequestId(providerResponse.Headers), request, out var chatResponse, out var responseFailure))
+            if (!TryMapResponse(message, GetProviderRequestId(providerResponse.Headers), request, out var chatResponse, out var responseFailure))
             {
                 return CompleteFailure(responseFailure!, startedAt, telemetryActivity);
             }
@@ -179,17 +196,22 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
                 startedAt,
                 telemetryActivity);
         }
+        catch (Exception exception) when (OutboundEndpointDeniedException.Find(exception) is not null)
+        {
+            return CompleteFailure(
+                RecordFailure("provider_endpoint_denied", "The AI provider endpoint is not permitted."),
+                startedAt, telemetryActivity);
+        }
+        catch (Exception exception) when (AiResponseReader.FindRejection(exception) is { })
+        {
+            return CompleteFailure(
+                RecordFailure(AiResponseReader.FindRejection(exception)!.Category, "AI provider response was rejected."),
+                startedAt, telemetryActivity);
+        }
         catch (HttpRequestException)
         {
             return CompleteFailure(
                 RecordFailure("provider_unreachable", "AI provider request failed before a response was received.", isTransient: true),
-                startedAt,
-                telemetryActivity);
-        }
-        catch (ApiException ex)
-        {
-            return CompleteFailure(
-                RecordHttpFailure(ex.StatusCode),
                 startedAt,
                 telemetryActivity);
         }
@@ -202,51 +224,9 @@ public class AnthropicCompatibleChatProvider : IAiChatProvider
         }
     }
 
-    private IAnthropicMessagesApi CreateApiClient(AiProviderSettings settings)
-    {
-        var client = _httpClientFactory.CreateClient(_httpClientName);
-        client.BaseAddress = BuildMessagesBaseUri(settings.EndpointUrl, _defaultEndpointUrl);
-        return RestService.For<IAnthropicMessagesApi>(client, RefitSettings);
-    }
-
-    private static string? ResolveApiKey(AiProviderSettings settings) =>
-        string.IsNullOrWhiteSpace(settings.ApiKey) ? null : settings.ApiKey;
-
     private bool IsRunnableProvider(AiProviderSettings settings) =>
         settings.Enabled
         && settings.Provider == _providerId;
-
-    private AiProviderSettings ResolveSettings(AiChatPayload request)
-    {
-        var defaults = _options.Value;
-        var providerConfiguration = request.ProviderConfiguration;
-
-        if (providerConfiguration is null
-            || providerConfiguration.Provider != _providerId)
-        {
-            return defaults;
-        }
-
-        return new AiProviderSettings
-        {
-            Enabled = true,
-            Provider = _providerId,
-            EndpointUrl = providerConfiguration.EndpointUrl.Trim(),
-            ApiKey = providerConfiguration.ApiKey.Trim(),
-            ModelId = providerConfiguration.ModelId.Trim(),
-            AzureCredentialMode = defaults.AzureCredentialMode,
-            AzureTenantId = defaults.AzureTenantId,
-            MaxInputTokens = request.Options.MaxInputTokens,
-            MaxOutputTokens = request.Options.MaxOutputTokens,
-            Temperature = request.Options.Temperature,
-            TimeoutSeconds = request.Options.TimeoutSeconds,
-            RetentionDays = defaults.RetentionDays,
-            DailyMessageLimit = defaults.DailyMessageLimit,
-            ToolProposalsEnabled = defaults.ToolProposalsEnabled,
-            StreamingEnabled = defaults.StreamingEnabled,
-            AllowLocalProviderEndpoints = defaults.AllowLocalProviderEndpoints
-        };
-    }
 
     private Microsoft.Extensions.Options.ValidateOptionsResult ValidateSettings(AiProviderSettings settings) =>
         _validator.Validate(null, settings);

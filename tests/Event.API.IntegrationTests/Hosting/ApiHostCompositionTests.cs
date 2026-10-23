@@ -51,16 +51,14 @@ public sealed class ApiHostCompositionTests
         var content = await response.Content.ReadAsByteArrayAsync();
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(content.Length).IsGreaterThan(0);
-        await Assert.That(content.Length).IsLessThanOrEqualTo(4096);
-        using var _ = JsonDocument.Parse(content);
+        await Assert.That(content).IsEmpty();
     }
 
     [Test]
     public async Task ProgramFactory_PublishesHealthyDisabledGeocodingReadiness()
     {
         await using var factory = new CustomWebApplicationFactory();
-        using var client = factory.CreateClient();
+        using var client = Event.Testing.Hosting.OperationalEndpointTestTransport.CreateClient(factory.Server);
 
         using var response = await client.GetAsync("/health");
         byte[] content = await response.Content.ReadAsByteArrayAsync();

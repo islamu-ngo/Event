@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52JZZWK210QP697KPFY71XV
+Title: "Omit private exceptions from support audit diagnostics"
+Type: fix
+Scope: privacy
+Summary: "Keep audit failure signals without exporting private provider exceptions."
+Group: support-audit-diagnostics
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Support audit persistence failures omit exception objects from diagnostic logs.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Monitor audit failure metrics and warnings; provider exception text is intentionally absent.

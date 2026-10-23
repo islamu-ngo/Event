@@ -72,7 +72,7 @@ public class DeploymentModeProviderTests
         settings.CurrentValue.Returns(new DeploymentSettings { Mode = DeploymentMode.SingleTenant });
 
         var services = new ServiceCollection();
-        services.AddSingleton(Substitute.For<IInstanceBootstrapStateRepository>());
+        services.AddSingleton(Substitute.For<IInstanceBootstrapStateReader>());
         var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
         return new DeploymentModeProvider(

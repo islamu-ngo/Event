@@ -1,4 +1,3 @@
-using System.Reflection;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 
@@ -8,12 +7,16 @@ namespace Event.Domain.UnitTests;
 public sealed class LocationCoordinateInvariantTests
 {
     [Test]
-    public async Task PiiFactoryAcceptsOnlyAnOptionalCompleteGeoCoordinate()
+    public async Task AddressTransitionsAcceptAbsentOrCompleteExactCoordinates()
     {
         GeoCoordinate coordinate = GeoCoordinate.Create(50.850_300_000_000_01, 4.351_700_000_000_001);
 
-        LocationPii absent = LocationPii.Create("Rue Manual 20", "1000", null);
-        LocationPii exact = LocationPii.Create("Rue Provider 30", "1000", coordinate);
+        Location manual = CreateLocation();
+        manual.SetManualAddress("Rue Manual 20", "1000");
+        Location provider = CreateLocation();
+        provider.SetProviderAddress("Rue Provider 30", "1000", coordinate);
+        LocationPii absent = manual.Pii!;
+        LocationPii exact = provider.Pii!;
 
         await Assert.That(absent.GetCoordinate()).IsNull();
         await Assert.That(absent.Latitude).IsNull();
@@ -21,11 +24,11 @@ public sealed class LocationCoordinateInvariantTests
         await Assert.That(exact.GetCoordinate()).IsEqualTo(coordinate);
         await Assert.That(exact.Latitude).IsEqualTo(coordinate.Latitude);
         await Assert.That(exact.Longitude).IsEqualTo(coordinate.Longitude);
-        await Assert.That(typeof(LocationPii).GetMethod(
-                    nameof(LocationPii.Create),
-                    BindingFlags.Static | BindingFlags.NonPublic)!
-                .GetParameters()[2].ParameterType)
-            .IsEqualTo(typeof(GeoCoordinate));
+        await Assert.That(() => provider.SetProviderAddress("Incomplete", "2000", null!))
+            .Throws<ArgumentNullException>();
+        await Assert.That(provider.Address).IsEqualTo("Rue Provider 30");
+        await Assert.That(provider.Postcode).IsEqualTo("1000");
+        await Assert.That(provider.GetCoordinate()).IsEqualTo(coordinate);
     }
 
     [Test]
@@ -87,12 +90,13 @@ public sealed class LocationCoordinateInvariantTests
     [Test]
     public async Task PiiFormattingRedactsAddressPostcodeAndCoordinate()
     {
-        LocationPii pii = LocationPii.Create(
+        Location location = CreateLocation();
+        location.SetProviderAddress(
             "17 Confidential Crescent",
             "SECRET-1040",
             GeoCoordinate.Create(50.84673, 4.35247));
 
-        string formatted = pii.ToString();
+        string formatted = location.Pii!.ToString();
 
         await Assert.That(formatted).IsEqualTo("LocationPii[redacted]");
         await Assert.That(formatted).DoesNotContain("Confidential");

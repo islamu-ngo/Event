@@ -7,6 +7,7 @@ using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Infrastructure.Identity;
 using Explore.Infrastructure.Messaging;
+using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.AspNetCore.Http;
@@ -178,11 +179,5 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         return services.BuildServiceProvider();
     }
 
-    private sealed class QuarantineDrainTenant : ITenantContextAccessor
-    {
-        public Guid? TenantId { get; private set; }
-        public bool IsResolved => TenantId is not null;
-        public void SetTenant(Guid tenantId) => TenantId = tenantId;
-        public void Clear() => TenantId = null;
-    }
+    private sealed class QuarantineDrainTenant() : TenantContextAccessor(new HttpContextAccessor());
 }

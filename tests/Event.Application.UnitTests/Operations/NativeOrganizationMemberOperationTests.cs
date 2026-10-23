@@ -23,9 +23,9 @@ public sealed class NativeOrganizationMemberOperationTests
     {
         var caller = new CallerContext(
             emptyId ? Guid.Empty : authenticated ? null : Guid.CreateVersion7(), authenticated);
-        var add = new AddOrganizationMemberCommandHandler(null!, null!, null!, null!, caller, null!);
-        var update = new UpdateOrganizationMemberRoleCommandHandler(null!, null!, caller, null!);
-        var delete = new DeleteOrganizationMemberCommandHandler(null!, null!, caller, null!);
+        var add = new AddOrganizationMemberCommandHandler(null!, null!, null!, null!, caller, null!, null!);
+        var update = new UpdateOrganizationMemberRoleCommandHandler(null!, null!, caller, null!, null!);
+        var delete = new DeleteOrganizationMemberCommandHandler(null!, null!, caller, null!, null!);
         var decline = new DeclineInvitationCommandHandler(null!, caller, null!);
 
         await Assert.That((await add.ExecuteAsync(new()

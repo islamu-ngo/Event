@@ -38,7 +38,7 @@ public sealed class ModerationClassificationMaterialServiceTests
         var displayed = (await service.ReadInventoryAsync(Query())).View!;
         var detached = displayed.Value;
         detached.ExpectedMaterialGeneration = 999;
-        detached.Components = [detached.Components.Single() with { Digest = "changed" }];
+        detached.Components.Single().Digest = "changed";
         var selections = Selections();
         selections.Single().AdditionalProperties["privateAge"] = 99;
         var mandate = Query().Mandate;

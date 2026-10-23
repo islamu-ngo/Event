@@ -328,7 +328,8 @@ internal sealed class OnboardingCompletionScenario
             SystemSettings, [new RejectionSource(this)], secret, audit, DeploymentModeProvider, jwt,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork, GenerationReader, HostConfiguration,
             new Explore.Application.Services.PrivacyIdentityFenceOperation(new Services.FenceTestAuthority(),
-                new Services.EmptyRecognitionInventory(), TimeProvider.System, logins), unitOfWork,
+                new Services.EmptyRecognitionInventory(), TimeProvider.System, logins,
+                () => throw new InvalidOperationException("Instance onboarding does not settle human enrollment.")), unitOfWork,
             new UnexpectedLocalReceiptSource());
     }
 

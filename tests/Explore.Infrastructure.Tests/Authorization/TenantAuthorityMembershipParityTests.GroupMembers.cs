@@ -1,6 +1,7 @@
 using Explore.Application.Authorization;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;

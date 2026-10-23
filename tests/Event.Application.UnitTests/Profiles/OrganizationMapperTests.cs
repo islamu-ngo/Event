@@ -344,7 +344,6 @@ public sealed class OrganizationMapperTests
             IsDeleted = true
         };
         var store = new OrganizationMappingHandlerTests.OrganizationMemberStore([member]);
-        var invites = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetMyInvitationsRequestHandler(store);
         // Formatting retained/deleted entities is separate from admitting a protected
         // member read; genuine detail/list admission is covered by the native API cohort.
         var dto = OrganizationMapper.ToOrganizationMember(member);
@@ -364,7 +363,8 @@ public sealed class OrganizationMapperTests
             .Select(OrganizationMapper.ToOrganizationMember).ToList();
         await Assert.That(items.Single()).IsEqualTo(dto);
         await Assert.That(await store.GetOrganizationMemberWithDetails(TenantId, default)).IsNull();
-        var invitations = await invites.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetMyInvitationsRequest { Email = "member@example.test" }, default);
+        var invitations = (await store.GetInvitesByUserId(ActorId))
+            .Select(OrganizationMapper.ToOrganizationInvitation).ToList();
         var invitation = invitations.Single();
         await Assert.That(invitation.Id).IsEqualTo(ActorId);
         await Assert.That(invitation.OrganizationId).IsEqualTo(Id);

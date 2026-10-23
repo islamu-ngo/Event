@@ -78,7 +78,8 @@ public sealed class PrivacyIdentityFenceOperationTests
 
     private static PrivacyIdentityFenceOperation Create(
         IPrivacyIdentityFenceAuthority authority) => new(authority, new EmptyRecognitionInventory(),
-            TimeProvider.System, NSubstitute.Substitute.For<IUserExternalLoginRepository>());
+            TimeProvider.System, NSubstitute.Substitute.For<IUserExternalLoginRepository>(),
+            () => throw new InvalidOperationException("This fixture does not settle human enrollment."));
 }
 
 internal sealed class EmptyRecognitionInventory : IModerationRecognitionContinuity

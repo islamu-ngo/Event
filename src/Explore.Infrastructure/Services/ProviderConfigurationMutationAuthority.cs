@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
@@ -94,7 +95,11 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
         protected readonly ProviderConfigurationMutationAuthority Owner;
         protected readonly HttpContext Request;
         protected readonly System.Security.Claims.ClaimsPrincipal Principal;
-        private readonly AuthenticationTicket ticket;
+        private readonly ClaimsIdentity[] ticketIdentities;
+        private readonly Claim[] ticketClaims;
+        private readonly string scheme;
+        private readonly DateTimeOffset? issuedAt;
+        private readonly DateTimeOffset? expiresAt;
         private readonly IServiceProvider requestServices;
         private readonly Guid ambientTenant;
         private readonly string requestShape;
@@ -121,7 +126,12 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
         protected Source(ProviderConfigurationMutationAuthority owner, object command, HttpContext request,
             System.Security.Claims.ClaimsPrincipal principal, AuthenticationTicket ticket)
         {
-            Owner = owner; OriginalCommand = command; Request = request; Principal = principal; this.ticket = ticket;
+            Owner = owner; OriginalCommand = command; Request = request; Principal = principal;
+            ticketIdentities = ticket.Principal.Identities.ToArray();
+            ticketClaims = ticket.Principal.Claims.ToArray();
+            scheme = ticket.AuthenticationScheme;
+            issuedAt = ticket.Properties.IssuedUtc;
+            expiresAt = ticket.Properties.ExpiresUtc;
             requestServices = request.RequestServices;
             ambientTenant = owner._tenants.TenantId;
             requestShape = RequestShape(request);
@@ -193,7 +203,10 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
         {
             RequireCustody();
             var current = await Request.AuthenticateAsync();
-            if (!current.Succeeded || !ReferenceEquals(current.Ticket, ticket)) throw Denied();
+            if (!current.Succeeded || current.Ticket?.AuthenticationScheme != scheme || current.Principal is null
+                || !ticketIdentities.SequenceEqual(current.Principal.Identities)
+                || !ticketClaims.SequenceEqual(current.Principal.Claims)
+                || current.Properties?.IssuedUtc != issuedAt || current.Properties?.ExpiresUtc != expiresAt) throw Denied();
             await RequireOriginalAuthorityAsync(token);
             RequireCustody();
         }

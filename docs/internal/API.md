@@ -688,6 +688,22 @@ the evidence after their final blocking operation; consumer adoption is separate
 from this capture mechanism. Serialization ignores evidence fields and ToString
 returns only the type name.
 
+### Configuration authentication sources
+
+Resolver, operator-identity and provider-configuration authorities retain the
+authenticated identity and claim objects, selected scheme and detached ticket
+issued/expiry values. Native authentication can return new result containers
+without changing those facts; container references do not establish authority.
+The original request principal remains retained throughout the operation.
+
+Human sources still require their original API-issued credential lifetime and
+resolved subject. Provider human sources additionally retain persisted principal
+and support snapshots. Resolver and operator-identity mutation coordinators own
+their persisted grant and binding checks. Setup sources instead keep the actual
+accepted setup secret and existing trusted setup lease where applicable; no
+human lifetime observation is manufactured for a setup-secret identity.
+Credential-source checks do not certify a completed mutation or its transaction.
+
 ## Diagnostic Scope Ownership
 
 Support-access request auditing preserves the completed HTTP response when

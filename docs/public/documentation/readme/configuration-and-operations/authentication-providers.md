@@ -55,6 +55,12 @@ activation follow successful settlement; endpoint connectivity checks run before
 the database operation. Reload current state and sign in again when authority
 has changed rather than retrying with another configuration route.
 
+Native authentication may create new wrappers around the same validated
+identity during provider, resolver or operator-identity editing. Those wrappers
+do not require another sign-in or renew the signed credential's deadline.
+Administrator credentials and accepted setup-secret authority remain separate;
+changing either source still rejects the operation.
+
 These source controls have authored regression coverage; executable programme
 and database-provider assurance remains pending.
 

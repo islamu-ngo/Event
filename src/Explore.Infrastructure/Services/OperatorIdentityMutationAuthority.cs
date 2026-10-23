@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Operations;
@@ -87,6 +88,12 @@ public sealed class OperatorIdentityMutationAuthority(
         bool isSetup, bool setupTicket, string? secret, HumanCommitSubject? subject,
         HumanAuthenticationLifetime? lifetime) : IOperatorIdentityMutationSource
     {
+        private readonly ClaimsIdentity[] ticketIdentities = ticket.Principal.Identities.ToArray();
+        private readonly Claim[] ticketClaims = ticket.Principal.Claims.ToArray();
+        private readonly string scheme = ticket.AuthenticationScheme;
+        private readonly DateTimeOffset? issuedAt = ticket.Properties.IssuedUtc;
+        private readonly DateTimeOffset? expiresAt = ticket.Properties.ExpiresUtc;
+
         internal OperatorIdentityMutationAuthority Owner => owner;
         public object OriginalCommand => command;
         public bool IsSetup => isSetup;
@@ -109,7 +116,10 @@ public sealed class OperatorIdentityMutationAuthority(
             cancellationToken.ThrowIfCancellationRequested();
             RequireCustody();
             var current = await request.AuthenticateAsync();
-            if (!current.Succeeded || !ReferenceEquals(current.Ticket, ticket))
+            if (!current.Succeeded || current.Ticket?.AuthenticationScheme != scheme || current.Principal is null
+                || !ticketIdentities.SequenceEqual(current.Principal.Identities)
+                || !ticketClaims.SequenceEqual(current.Principal.Claims)
+                || current.Properties?.IssuedUtc != issuedAt || current.Properties?.ExpiresUtc != expiresAt)
                 throw new UnauthorizedAccessException("The original operator identity authentication ticket changed.");
             if (lifetime is not null && !ReferenceEquals(
                 await owner.lifetimes.ObserveAsync(principal, cancellationToken), lifetime))

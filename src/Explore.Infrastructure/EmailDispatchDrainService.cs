@@ -355,7 +355,7 @@ public sealed class EmailDispatchDrainService(
             dispatch.RecipientEmail = eligibility.RecipientEmail
                 ?? throw new InvalidOperationException("Eligible email dispatch is missing its current authorized destination.");
             providerHandoffStarted = true;
-            var message = BuildEmailMessage(dispatch, unsubscribeTokenService, origin, preferenceCategory, now);
+            var message = BuildEmailMessage(dispatch, unsubscribeTokenService, origin, preferenceCategory, now, attemptNumber);
 
             var result = await emailService.SendAsync(message, cancellationToken);
             var completedAt = DateTime.UtcNow;
@@ -394,7 +394,10 @@ public sealed class EmailDispatchDrainService(
             }
 
             // Only an explicit proven-safe failure may release the durable handoff fence.
-            if (result.Outcome is not (SmtpDeliveryOutcome.TransientFailure or SmtpDeliveryOutcome.ConfigurationFailure))
+            var originalNoticeRejected = dispatch.Kind == EmailDispatchKind.AccountModerationOriginalNotice
+                && result.Outcome == SmtpDeliveryOutcome.AuthorityRejected;
+            if (!originalNoticeRejected
+                && result.Outcome is not (SmtpDeliveryOutcome.TransientFailure or SmtpDeliveryOutcome.ConfigurationFailure))
             {
                 return await ReconcileProviderAcceptedAsync(
                     new EmailDispatchAcceptedSettlement(
@@ -424,6 +427,9 @@ public sealed class EmailDispatchDrainService(
             {
                 return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.AlreadyClaimed, dispatch.Id);
             }
+
+            if (settlementOutcome == EmailDispatchFailureSettlementOutcome.Skipped)
+                return new EmailDispatchSingleDrainResult(EmailDispatchDrainOutcome.Skipped, dispatch.Id);
 
             if (settlementOutcome == EmailDispatchFailureSettlementOutcome.Parked)
             {
@@ -559,7 +565,8 @@ public sealed class EmailDispatchDrainService(
         IEmailUnsubscribeTokenService unsubscribeTokenService,
         Uri? publicAddress,
         string? preferenceCategory,
-        DateTime issuedAt)
+        DateTime issuedAt,
+        int attemptNumber)
     {
         var headers = new Dictionary<string, string>
         {
@@ -580,6 +587,8 @@ public sealed class EmailDispatchDrainService(
 
         return new EmailMessage
         {
+            ModerationNotice = dispatch.Kind == EmailDispatchKind.AccountModerationOriginalNotice
+                ? new(dispatch.TenantId, dispatch.Id, dispatch.ProcessingLeaseToken!.Value, attemptNumber) : null,
             To = dispatch.RecipientEmail,
             Subject = dispatch.Subject,
             PlainTextBody = plainTextBody,

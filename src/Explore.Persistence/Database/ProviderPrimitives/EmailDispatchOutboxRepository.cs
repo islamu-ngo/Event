@@ -3091,7 +3091,8 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
         EmailDispatchFailureSettlement settlement,
         CancellationToken cancellationToken)
     {
-        if (settlement.Outcome is not (SmtpDeliveryOutcome.TransientFailure or SmtpDeliveryOutcome.ConfigurationFailure))
+        if (settlement.Outcome is not (SmtpDeliveryOutcome.TransientFailure or SmtpDeliveryOutcome.ConfigurationFailure
+            or SmtpDeliveryOutcome.AuthorityRejected))
             throw new ArgumentOutOfRangeException(nameof(settlement), settlement.Outcome, "Only definite SMTP failures can be settled.");
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -3106,8 +3107,9 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
         CancellationToken cancellationToken)
     {
         var parked = settlement.Outcome == SmtpDeliveryOutcome.ConfigurationFailure;
-        var exhausted = !parked && settlement.AttemptNumber >= settlement.MaxAttempts;
-        var outcome = parked
+        var skipped = settlement.Outcome == SmtpDeliveryOutcome.AuthorityRejected;
+        var exhausted = !parked && !skipped && settlement.AttemptNumber >= settlement.MaxAttempts;
+        var outcome = skipped ? EmailDispatchFailureSettlementOutcome.Skipped : parked
             ? EmailDispatchFailureSettlementOutcome.Parked
             : exhausted
             ? EmailDispatchFailureSettlementOutcome.DeadLettered
@@ -3120,9 +3122,10 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 && outbox.Id == settlement.OutboxId
                 && outbox.Status == EmailDispatchStatus.Processing
                 && outbox.ProcessingLeaseToken == settlement.ProcessingLeaseToken
-                && outbox.AttemptCount == settlement.AttemptNumber)
+                && outbox.AttemptCount == settlement.AttemptNumber
+                && (!skipped || outbox.Kind == EmailDispatchKind.AccountModerationOriginalNotice))
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(outbox => outbox.Status, parked
+                .SetProperty(outbox => outbox.Status, skipped ? EmailDispatchStatus.Skipped : parked
                     ? EmailDispatchStatus.Parked
                     : exhausted
                     ? EmailDispatchStatus.DeadLettered
@@ -3131,7 +3134,7 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 .SetProperty(outbox => outbox.ParkReason, parked
                     ? EmailDispatchParkReason.CapabilityUnavailable : (EmailDispatchParkReason?)null)
                 .SetProperty(outbox => outbox.DeadLetteredAt, exhausted ? settlement.SettledAt : (DateTime?)null)
-                .SetProperty(outbox => outbox.NextAttemptAt, parked || exhausted
+                .SetProperty(outbox => outbox.NextAttemptAt, parked || exhausted || skipped
                     ? (DateTime?)null
                     : settlement.SettledAt.Add(settlement.RetryDelay))
                 .SetProperty(outbox => outbox.ProcessingStartedAt, (DateTime?)null)
@@ -3152,7 +3155,7 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 && attempt.EmailDispatchOutboxId == settlement.OutboxId
                 && attempt.AttemptNumber == settlement.AttemptNumber)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(attempt => attempt.Outcome, EmailDispatchAttemptOutcome.Failed)
+                .SetProperty(attempt => attempt.Outcome, skipped ? EmailDispatchAttemptOutcome.Skipped : EmailDispatchAttemptOutcome.Failed)
                 .SetProperty(attempt => attempt.CompletedAt, settlement.SettledAt)
                 .SetProperty(attempt => attempt.FailureCategory, Truncate(settlement.FailureCategory, 100))
                 .SetProperty(attempt => attempt.SanitizedErrorMessage, Truncate(settlement.FailureMessage, MaxErrorLength))
@@ -3166,7 +3169,7 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 && receipt.EmailDispatchOutboxId == settlement.OutboxId
                 && receipt.Status == EmailDispatchReceiptStatus.Processing)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(receipt => receipt.Status, EmailDispatchReceiptStatus.Failed)
+                .SetProperty(receipt => receipt.Status, skipped ? EmailDispatchReceiptStatus.Skipped : EmailDispatchReceiptStatus.Failed)
                 .SetProperty(receipt => receipt.CompletedAt, (DateTime?)null)
                 .SetProperty(receipt => receipt.FailedAt, settlement.SettledAt)
                 .SetProperty(receipt => receipt.FailureCode, Truncate(settlement.FailureCategory, 100))
@@ -3181,16 +3184,16 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 && delivery.EmailDispatchOutboxId == settlement.OutboxId
                 && delivery.ChannelId == (int)NotificationPreferenceChannelEnum.Email)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(delivery => delivery.StatusId, parked
+                .SetProperty(delivery => delivery.StatusId, skipped ? (int)NotificationDeliveryStatusEnum.Skipped : parked
                     ? (int)NotificationDeliveryStatusEnum.Parked
                     : exhausted
                     ? (int)NotificationDeliveryStatusEnum.DeadLettered
                     : (int)NotificationDeliveryStatusEnum.Queued)
                 .SetProperty(delivery => delivery.ProviderMessageId, (string?)null)
-                .SetProperty(delivery => delivery.ProviderStatus, parked ? "configuration_parked"
+                .SetProperty(delivery => delivery.ProviderStatus, skipped ? "skipped" : parked ? "configuration_parked"
                     : exhausted ? "dead_lettered" : "retry_scheduled")
                 .SetProperty(delivery => delivery.FailureCategory, Truncate(settlement.FailureCategory, 100))
-                .SetProperty(delivery => delivery.CompletedAt, exhausted ? settlement.SettledAt : (DateTime?)null)
+                .SetProperty(delivery => delivery.CompletedAt, exhausted || skipped ? settlement.SettledAt : (DateTime?)null)
                 .SetProperty(delivery => delivery.UpdatedAt, settlement.SettledAt), cancellationToken);
         EnsureExactlyOne(deliveryUpdated, "email notification delivery");
 

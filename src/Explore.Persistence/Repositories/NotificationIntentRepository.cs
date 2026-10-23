@@ -6,7 +6,6 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Services;
 using Explore.Persistence.Database;
-using Explore.Persistence.Extensions;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Schema.ProviderPrimitives;
 using Explore.Persistence.Services;
@@ -14,19 +13,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class NotificationIntentRepository : GenericRepository<NotificationIntent, Guid>,
+public sealed partial class NotificationIntentRepository : GenericRepository<NotificationIntent, Guid>,
     INotificationIntentRepository,
-    IRecipientNotificationGraphRepository
+    IRecipientNotificationGraphRepository,
+    IModerationNoticeNotificationCleanup
 {
     private const string UniqueViolationSqlState = "23505";
     private readonly ExploreDbContext _dbContext;
     private readonly ISettingMutationLock _mutationLock;
+    private readonly TimeProvider _clock;
     private readonly NotificationDeliveryPolicyResolver _deliveryPolicyResolver = new();
 
-    public NotificationIntentRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock) : base(dbContext)
+    public NotificationIntentRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock, TimeProvider clock) : base(dbContext)
     {
         _dbContext = dbContext;
         _mutationLock = mutationLock;
+        _clock = clock;
     }
 
     public async Task<NotificationIntent> CreateIntentAsync(NotificationIntent intent, CancellationToken cancellationToken = default)
@@ -41,6 +43,8 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
     private async Task<NotificationIntent> CreateGraphUnderPolicyLockAsync(
         NotificationIntent intent, CancellationToken cancellationToken)
     {
+        await RequirePreFindingNotificationAsync(intent, cancellationToken);
+        await RequireOriginalModerationNoticeAsync(intent, cancellationToken);
         var occurrence = await EnsureFanoutOccurrencePendingUnderEventLockAsync(intent, cancellationToken);
         var control = await ReadTenantControlAsync(intent.TenantId, cancellationToken);
         intent.EmailDeliveryPolicyRevision = occurrence?.EmailDeliveryPolicyRevision ?? control?.DeliveryPolicyRevision ?? 0;
@@ -167,6 +171,8 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
         IReadOnlyList<NotificationDelivery> expectedDeliveries, Notification? expectedNotification,
         EmailDispatchOutbox? expectedEmail, CancellationToken cancellationToken)
     {
+        await RequirePreFindingNotificationAsync(winningIntent, cancellationToken);
+        await RequireOriginalModerationNoticeAsync(winningIntent, cancellationToken);
         await EnsureFanoutOccurrencePendingUnderEventLockAsync(winningIntent, cancellationToken);
         var tracked = await _dbContext.NotificationIntents
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)

@@ -259,6 +259,8 @@ public sealed record EmailDispatchFailureSettlement(
             "smtp_send_failed", "SMTP send failed before provider acceptance was confirmed."),
         SmtpDeliveryOutcome.ConfigurationFailure => (
             "smtp_configuration_unavailable", "SMTP delivery is parked until transport configuration is restored."),
+        SmtpDeliveryOutcome.AuthorityRejected => (
+            "moderation_notice_authority_unavailable", "Original notice delivery was suppressed before SMTP send."),
         _ => throw new ArgumentOutOfRangeException(nameof(Outcome), Outcome, "Only definite SMTP failures can be settled.")
     };
 }
@@ -300,7 +302,8 @@ public enum EmailDispatchFailureSettlementOutcome
     RetryScheduled = 1,
     DeadLettered = 2,
     StaleClaim = 3,
-    Parked = 4
+    Parked = 4,
+    Skipped = 5
 }
 
 public enum EmailDispatchPreHandoffReleaseOutcome

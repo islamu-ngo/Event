@@ -602,6 +602,22 @@ remain refused. This limit concerns the new human administrative path, not
 bootstrap/worker or restricted replacement ownership. Twenty-six authentic
 controls are authored but unrun; installation/runtime acceptance remains open.
 
+### Account-creation PII writer manifests
+
+Managed-tenant worker creation and the Local identity writer explicitly include
+the mapped `_dateOfBirth`, `_birthDateCollectionReceiptId` and `_birthDateRevision`
+fields in their `UserPii` INSERT inventories. Fresh account graphs leave those
+fields null, null and zero; account creation does not collect a birth date.
+The worker still has no PII SELECT or UPDATE permission. The Local writer retains
+only its existing user-ID/name/email SELECT and name/email UPDATE columns, not
+birth-date SELECT or UPDATE authority. Exact model-shape validation remains
+fail-closed: an undeclared mapped field is not silently ignored.
+
+This aligns the reviewed manifests with the existing merged model; it changes no
+entity, schema or migration. Model-manifest, fresh-account and native permission
+regressions were authored but not locally built or executed. Product compilation
+does not establish provider permission or account-creation runtime acceptance.
+
 The separate PostgreSQL DATA contract is now authored in
 `PostgresLocalAdministrationContract`. Its reviewed inventory covers 90 scalars
 across eight lifecycle/binding relations, including PII. Fixed execute-only

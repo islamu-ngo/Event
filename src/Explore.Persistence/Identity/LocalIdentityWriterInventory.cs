@@ -49,7 +49,11 @@ internal static class LocalIdentityWriterInventory
             ["Id", "ConcurrencyStamp", "CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy", "EmailVerified",
                 "IsDeleted", "LastActiveTenantId", "UpdatedAt", "UpdatedBy"],
             ["ConcurrencyStamp", "EmailVerified", "UpdatedAt", "UpdatedBy"]),
-        Application<UserPii>(["UserId", "Email", "FirstName", "LastName"], ["Email", "FirstName", "LastName"]),
+        new(Store.Application, typeof(UserPii),
+            ["UserId", "Email", "FirstName", "LastName", "_dateOfBirth", "_birthDateCollectionReceiptId", "_birthDateRevision"],
+            ["UserId", "Email", "FirstName", "LastName"],
+            ["UserId", "Email", "FirstName", "LastName", "_dateOfBirth", "_birthDateCollectionReceiptId", "_birthDateRevision"],
+            ["Email", "FirstName", "LastName"]),
         Application<Actor>(
             ["Id", "ActorTypeId", "BackgroundColor", "BackgroundEffect", "BannerColor", "ConcurrencyStamp",
                 "CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy", "Description", "ExternalActorSubjectId",

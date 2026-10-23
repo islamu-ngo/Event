@@ -105,6 +105,9 @@ public sealed class ManagedTenantWorkerGraphPlanTests
         await Assert.That(graph.CreatedActor.Pii.DisplayName).IsEqualTo(original.DisplayName);
         await Assert.That(graph.CreatedUser.Pii.UserId).IsEqualTo(graph.CreatedUser.Id);
         await Assert.That(graph.CreatedUser.Pii.Email).IsEqualTo(original.Email);
+        await Assert.That(graph.CreatedUser.Pii.ReadDeclaredBirthDate()).IsNull();
+        await Assert.That(graph.CreatedUser.Pii.ReadBirthDateCollectionReceiptId()).IsNull();
+        await Assert.That(graph.CreatedUser.Pii.ReadBirthDateRevision()).IsEqualTo(0L);
         await Assert.That(graph.CreatedLogin!.UserId).IsEqualTo(graph.CreatedUser.Id);
         await Assert.That(graph.CreatedLogin.ProviderKey).IsEqualTo(ManagedTenantWorkerGraphPlan.Account(snapshot).Value);
         await Assert.That(graph.CreatedLogin.AuthenticationProviderId)

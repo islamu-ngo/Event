@@ -66,6 +66,38 @@ public sealed class RegistrationProviderFoundationTests
     }
 
     [Test]
+    public async Task Publication_identity_is_created_with_final_binding_hash_and_time()
+    {
+        RegistrationProviderBinding binding = Binding();
+        Guid originalId = binding.Id;
+        await Assert.That(binding.Publication).IsNull();
+
+        binding.Publish(Hash(), Now.AddMinutes(1));
+
+        await Assert.That(binding.Id).IsEqualTo(originalId);
+        await Assert.That(binding.Publication).IsNotNull();
+        await Assert.That(binding.Publication!.TenantId).IsEqualTo(binding.TenantId);
+        await Assert.That(binding.Publication.RegistrationProviderBindingId).IsEqualTo(originalId);
+        await Assert.That(binding.Publication.MappingRevisionHashKey).IsEqualTo(Hash().Value);
+        await Assert.That(binding.Publication.PublishedAt).IsEqualTo(binding.PublishedAt!.Value);
+        var original = binding.Publication;
+        await Assert.That(() => binding.Publish(Hash(), Now.AddMinutes(2))).Throws<InvalidOperationException>();
+        await Assert.That(ReferenceEquals(original, binding.Publication)).IsTrue();
+    }
+
+    [Test]
+    public async Task Invalid_publication_time_cannot_leave_a_partial_publication_identity()
+    {
+        RegistrationProviderBinding binding = Binding();
+        await Assert.That(() => binding.Publish(Hash(), DateTime.SpecifyKind(Now, DateTimeKind.Unspecified)))
+            .Throws<ArgumentException>();
+        await Assert.That(binding.Publication).IsNull();
+        await Assert.That(binding.PublishedMappingRevisionHash).IsNull();
+        await Assert.That(binding.PublishedAt).IsNull();
+        await Assert.That(binding.StateId).IsEqualTo((int)RegistrationProviderBindingStateEnum.Draft);
+    }
+
+    [Test]
     public async Task PublishedProviderBindingRejectsDirectMappingFactories()
     {
         RegistrationProviderBinding binding = Binding();

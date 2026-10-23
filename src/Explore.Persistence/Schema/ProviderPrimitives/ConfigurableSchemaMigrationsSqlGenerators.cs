@@ -27,6 +27,8 @@ internal sealed class ConfigurableNpgsqlMigrationsSqlGenerator(
         operations = ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
             operations,
             Dependencies.CurrentContext.Context);
+        operations = RegistrationProviderPublicationTransfer.Prepare(
+            operations, Dependencies.SqlGenerationHelper, Dependencies.CurrentContext.Context.Database.ProviderName!, model: model);
         operations = KeycloakReceiptDropGuard.Prepare(
             operations,
             Dependencies.SqlGenerationHelper,
@@ -55,6 +57,8 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
         operations = ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
             operations,
             Dependencies.CurrentContext.Context);
+        operations = RegistrationProviderPublicationTransfer.Prepare(
+            operations, Dependencies.SqlGenerationHelper, Dependencies.CurrentContext.Context.Database.ProviderName!, model: model);
         operations = KeycloakReceiptDropGuard.Prepare(
             operations,
             Dependencies.SqlGenerationHelper,
@@ -84,6 +88,17 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
                 operations,
                 Dependencies.CurrentContext.Context);
+        executableOperations = RegistrationProviderPublicationTransfer.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper, Dependencies.CurrentContext.Context.Database.ProviderName!,
+            sqlitePostRebuildDrop: true);
+        // SQLite queues owner-table rebuilds after input operations; their old FKs still need this principal.
+        var publicationDrops = executableOperations.OfType<DropTableOperation>().Where(operation =>
+            operation.Name.EndsWith("registration_provider_binding_publications", StringComparison.Ordinal)
+            && !executableOperations.OfType<DropTableOperation>().Any(drop =>
+                drop.Name == operation.Name[..^"registration_provider_binding_publications".Length] + "registration_provider_bindings"
+                && drop.Schema == operation.Schema)).ToArray();
+        if (publicationDrops.Length != 0)
+            executableOperations = executableOperations.Where(operation => !publicationDrops.Contains(operation)).ToArray();
         executableOperations = KeycloakReceiptDropGuard.Prepare(
             executableOperations,
             Dependencies.SqlGenerationHelper,
@@ -137,6 +152,8 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             commands,
             executableOperations,
             Dependencies);
+        if (publicationDrops.Length != 0)
+            commands = commands.Concat(base.Generate(publicationDrops, model, options)).ToArray();
         return ConfigurableSchemaMigrationOperations.AppendPromotionCodeBackfill(
             commands,
             executableOperations,
@@ -158,6 +175,8 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
         operations = ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
             operations,
             Dependencies.CurrentContext.Context);
+        operations = RegistrationProviderPublicationTransfer.Prepare(
+            operations, Dependencies.SqlGenerationHelper, Dependencies.CurrentContext.Context.Database.ProviderName!);
         operations = KeycloakReceiptDropGuard.Prepare(
             operations,
             Dependencies.SqlGenerationHelper,
@@ -337,7 +356,9 @@ internal static class ConfigurableSchemaMigrationOperations
         IReadOnlyList<MigrationOperation> operations,
         MigrationsSqlGeneratorDependencies dependencies)
     {
-        if (!operations.Any(operation => operation is DropTableOperation))
+        // An integer-only preflight guard has no dependents; rejection must precede FK-state changes.
+        if (!operations.Any(operation => operation is DropTableOperation drop
+            && drop[RegistrationProviderPublicationTransfer.GuardDropAnnotation] is not true))
         {
             return commands;
         }

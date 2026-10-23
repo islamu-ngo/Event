@@ -2,7 +2,12 @@ using ISLAMU.Moderation.Domain;
 
 namespace Explore.Domain;
 
-public enum ModerationCaseNarrativePurpose { ConfidentialAllegation = 1, ParticipantInvestigation = 2 }
+public enum ModerationCaseNarrativePurpose
+{
+    ConfidentialAllegation = 1,
+    ParticipantInvestigation = 2,
+    ProtectedContestation = 3
+}
 
 /// <summary>Explicit finite custody terms, never receipt lifetime, restriction authority or an erasure hold.</summary>
 public sealed record ModerationCaseNarrativeTerms(

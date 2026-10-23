@@ -55,6 +55,28 @@ public sealed class ModerationCaseNarrativePolicyTests
     }
 
     [Test]
+    [Arguments(ModerationCaseTargetKind.Service)]
+    [Arguments(ModerationCaseTargetKind.ParticipantIncident)]
+    public async Task ProtectedComplaintCustodyRequiresItsOwnFinitePurposeAndAdoption(ModerationCaseTargetKind targetKind)
+    {
+        var allegation = Source();
+        var allegationAdoption = ModerationCaseNarrativeAdoption.Adopt(Guid.CreateVersion7(), allegation,
+            allegation.PrivacyOwnerHumanId, 3, Now, Now.AddMinutes(30));
+        var complaint = ModerationCaseNarrativePolicySource.Record(
+            Guid.CreateVersion7(), allegation.HostBindingId, allegation.TrustDomainId, allegation.TenantId,
+            targetKind, new(ModerationCaseNarrativePurpose.ProtectedContestation, TimeSpan.FromMinutes(20), 2048),
+            allegation.Ownership, allegation.RecordedByHumanId, 4, Now, Now.AddHours(1));
+        await Assert.That(allegationAdoption.MatchesCurrent(complaint, Now)).IsFalse();
+        var adoption = ModerationCaseNarrativeAdoption.Adopt(Guid.CreateVersion7(), complaint,
+            complaint.PrivacyOwnerHumanId, 5, Now, Now.AddMinutes(20));
+        await Assert.That(adoption.MatchesCurrent(complaint, Now)).IsTrue();
+        await Assert.That(adoption.MatchesCurrent(allegation, Now)).IsFalse();
+        await Assert.That(adoption.MatchesCurrent(complaint, Now.AddMinutes(20))).IsFalse();
+        await Assert.That(complaint.Terms.MaximumRetention).IsEqualTo(TimeSpan.FromMinutes(20));
+        await Assert.That(complaint.Terms.MaximumMaterialBytes).IsEqualTo(2048);
+    }
+
+    [Test]
     public async Task EmptyMandateCannotBecomeAnAdministrativeCheckbox()
     {
         var ownership = Owners() with { PrivacyLegalMandateBasis = " " };

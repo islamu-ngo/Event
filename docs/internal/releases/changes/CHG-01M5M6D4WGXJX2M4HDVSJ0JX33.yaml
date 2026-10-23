@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5M6D4WGXJX2M4HDVSJ0JX33
+Title: "Reconcile leased moderation effects under explicit maintenance authority"
+Type: feat
+Scope: access
+Summary: "Bind durable effect replay and one-pass scheduled reconciliation to exact target, lease and selected maintenance credentials; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Durable replay, leases and one-pass scheduled reconciliation retain exact original target authority and explicitly selected maintenance credentials; scheduling cannot invent original permission. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned effect/lease/recovery receipt models plus cumulative generated schema history; no migration, replay or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: planned
+    Detail: "Validated reconciliation target/options and Quartz registration depend on the separately reviewed selected maintenance secret authority; no credential fallback or startup activation assurance is claimed."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete paired scheduling, bounded replay, recovery and selected-credential guidance with native source/composition checkpoints; provider and failure-recovery assurance remain pending."

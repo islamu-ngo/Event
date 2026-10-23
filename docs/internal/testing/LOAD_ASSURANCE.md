@@ -101,7 +101,7 @@ disables usage reporting, provides an empty owned configuration file, starts no
 k6 management listener, and permits no remote imports, cloud execution, metric
 export, or external target traffic.
 
-The owning project must copy the reviewed workload as content:
+The owning project copies the reviewed workload as content:
 
 ```xml
 <Content Include="../../eng/performance/k6/owned-runtime.js"

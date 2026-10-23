@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="ExternalDataProtectionTestAuthority.cs" />
+    <Content Include="../../eng/performance/k6/owned-runtime.js" Link="Workloads/owned-runtime.js" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../../src/Explore.AppHost/Explore.AppHost.csproj" />
     <ProjectReference Include="../../src/Explore.Persistence/Explore.Persistence.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj" IsAspireProjectResource="false" />

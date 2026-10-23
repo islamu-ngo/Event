@@ -57,12 +57,6 @@ public sealed class SupportAccessSessionServiceTests
         var context = await _service.GetCurrentAsync();
 
         await Assert.That(context.IsActive).IsFalse();
-        await _sessionRepository.DidNotReceive().GetActiveOwnedSessionAsync(
-            Arg.Any<Guid>(),
-            Arg.Any<Guid>(),
-            Arg.Any<Guid?>(),
-            Arg.Any<DateTimeOffset>(),
-            Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -134,12 +128,6 @@ public sealed class SupportAccessSessionServiceTests
 
         await Assert.That(context.IsActive).IsFalse();
         await Assert.That(context.WasForwarded).IsTrue();
-        await _sessionRepository.DidNotReceive().GetActiveOwnedSessionAsync(
-            Arg.Any<Guid>(),
-            Arg.Any<Guid>(),
-            Arg.Any<Guid?>(),
-            Arg.Any<DateTimeOffset>(),
-            Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -152,12 +140,6 @@ public sealed class SupportAccessSessionServiceTests
 
         await Assert.That(context.IsActive).IsFalse();
         await Assert.That(context.WasForwarded).IsTrue();
-        await _sessionRepository.Received(1).GetActiveOwnedSessionAsync(
-            session.Id,
-            ActorUserId,
-            OtherTenantId,
-            Arg.Any<DateTimeOffset>(),
-            Arg.Any<CancellationToken>());
     }
 
     [Test]

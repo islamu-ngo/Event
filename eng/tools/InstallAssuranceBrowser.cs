@@ -8,4 +8,4 @@ if (args.Length != 0)
     return 2;
 }
 
-return Microsoft.Playwright.Program.Main(["install", "chromium"]);
+return Microsoft.Playwright.Program.Main(["install", "chromium", "--only-shell"]);

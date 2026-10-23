@@ -12,11 +12,13 @@ dotnet build tests/Event.Distributed.IntegrationTests/Event.Distributed.Integrat
 Install the matching Chromium binary explicitly with the native .NET installer. The same cache path must be available when running the journeys:
 
 ```bash
-export PLAYWRIGHT_BROWSERS_PATH="$TMPDIR/islamu-assurance-browsers"
+export PLAYWRIGHT_BROWSERS_PATH="$TMPDIR/islamu-assurance-headless-browsers"
 dotnet run eng/tools/InstallAssuranceBrowser.cs
 ```
 
-The installer pins Microsoft.Playwright 1.64.1, accepts no arguments and returns the upstream install exit code. It only installs Chromium and its matching browser-cache dependencies; it does not install operating-system packages or launch a server. Test discovery never downloads or installs a browser. Install any required operating-system browser libraries using your runner's ordinary provisioning process. Keep browser binaries outside the repository and preserve their applicable licenses/notices if distributing them.
+The installer pins Microsoft.Playwright 1.64.1, accepts no arguments and returns the upstream install exit code. Its fixed `--only-shell` action installs the Chromium headless shell and matching browser-cache dependencies, avoiding full Chrome and its Widevine component. It does not install operating-system packages or launch a server. Test discovery never downloads or installs a browser. Install any required operating-system browser libraries using your runner's ordinary provisioning process.
+
+These binaries are separate developer tools in an external cache. They are not included in Event source, product images or release bundles. Microsoft.Playwright's MIT license does not cover the browser's assembled components: preserve the headless shell's `LICENSE.headless_shell`/`ABOUT` and FFmpeg's `COPYING.LGPLv2.1` in their cache. Browser or FFmpeg redistribution needs a separate license review and distribution decision; this setup does not authorize it.
 
 The artifact-safety checks do not launch a browser or containers:
 

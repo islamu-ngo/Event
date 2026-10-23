@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M643RS4HRHYZN5WBD6CACY
+Title: "Retain recognition recovery and canonical store coordinates"
+Type: feat
+Scope: privacy
+Summary: "Checkpoint continuity, disposition, escalation and recovery state with original-transaction coordinate acquisition; host recovery behavior and schema integration remain separate."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Recovery records retain accountable generations; canonical coordinate acquisition requalifies the original evidence transaction. Host recovery/key owners remain separate and no provider or security verification is claimed."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Continuity, disposition, key/capture and canonical recovery mappings require the cumulative generated history. No migration was applied or provider behavior verified."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Coordinate equality is metadata, not backup certification or a completed recovery verdict; deploy only with host evidence-session owners and shared save-boundary integration."

@@ -71,6 +71,10 @@ internal static partial class PortableRelationalModelPolicy
             {
                 ConfigureMySqlSecretBindingUniqueness(entityType);
             }
+            else if (providerName == MySqlProvider && entityType.ClrType == typeof(EventReportSignal))
+            {
+                ConfigureMySqlEventReportSignalUniqueness(entityType);
+            }
 
             NormalizeProperties(entityType, providerName);
             if (providerName == SqlServerProvider)
@@ -429,6 +433,33 @@ internal static partial class PortableRelationalModelPolicy
         index.SetDatabaseName("ix_secret_bindings_setting_key_instance_unique");
     }
 
+    private static void ConfigureMySqlEventReportSignalUniqueness(IMutableEntityType entityType)
+    {
+        // MySQL/MariaDB ignore index filters. Project non-advisory identity into nullable
+        // slots so one callback can retain several ordinals sharing its provider correlation.
+        foreach (var sourceName in new[] { nameof(EventReportSignal.ExternalSignalId), nameof(EventReportSignal.CorrelationId) })
+        {
+            var original = entityType.GetIndexes().Single(index => index.IsUnique
+                && index.Properties.Select(property => property.Name).SequenceEqual([
+                    nameof(EventReportSignal.TenantId), nameof(EventReportSignal.Provider),
+                    nameof(EventReportSignal.ProviderTargetScope), nameof(EventReportSignal.ProviderTargetId), sourceName]));
+            var name = original.GetDatabaseName();
+            var columns = original.Properties.Take(original.Properties.Count - 1).ToArray();
+            entityType.RemoveIndex(original);
+            var columnName = sourceName == nameof(EventReportSignal.ExternalSignalId) ? "external_signal_id" : "correlation_id";
+            var slot = entityType.AddProperty($"NonAdvisory{sourceName}", typeof(string));
+            slot.IsNullable = true;
+            slot.SetMaxLength(sourceName == nameof(EventReportSignal.ExternalSignalId) ? 200 : 100);
+            slot.SetColumnName($"non_advisory_{columnName}");
+            slot.SetComputedColumnSql($"CASE WHEN advisory_identity IS NULL THEN {columnName} ELSE NULL END");
+            slot.SetIsStored(true);
+            slot.ValueGenerated = ValueGenerated.OnAddOrUpdate;
+            var replacement = entityType.AddIndex([.. columns, slot]);
+            replacement.IsUnique = true;
+            replacement.SetDatabaseName(name);
+        }
+    }
+
     private static void ConfigureMySqlExternalBindingUniqueness(IMutableEntityType entityType)
     {
         var replacedIndexNames = new HashSet<string>(StringComparer.Ordinal)
@@ -645,6 +676,14 @@ internal static partial class PortableRelationalModelPolicy
                      .Where(foreignKey => foreignKey.DeleteBehavior is
                          DeleteBehavior.Cascade or DeleteBehavior.SetNull))
         {
+            // This isolated PII-owned leaf must disappear with its PII parent, not block erasure.
+            if (entityType.ClrType == typeof(UserBirthDateCollectionReceipt)
+                && foreignKey.PrincipalEntityType.ClrType == typeof(UserPii)
+                && foreignKey.DeleteBehavior == DeleteBehavior.Cascade
+                && foreignKey.Properties.Select(property => property.Name)
+                    .SequenceEqual([nameof(UserBirthDateCollectionReceipt.UserId)]))
+                continue;
+
             foreignKey.DeleteBehavior = DeleteBehavior.NoAction;
         }
     }

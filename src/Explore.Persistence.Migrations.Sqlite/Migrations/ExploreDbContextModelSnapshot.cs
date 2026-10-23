@@ -148,6 +148,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("expires_at");
 
+                    b.Property<string>("ModerationReservation")
+                        .HasMaxLength(1100000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("moderation_reservation");
+
                     b.Property<int?>("PreviewApplyMode")
                         .HasColumnType("INTEGER")
                         .HasColumnName("preview_apply_mode");
@@ -9839,6 +9844,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("CaseConcurrencyStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_concurrency_stamp");
+
                     b.Property<Guid?>("CaseId")
                         .HasColumnType("TEXT")
                         .HasColumnName("case_id");
@@ -9922,6 +9931,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ie_event_report_external_links");
 
+                    b.HasAlternateKey("TenantId", "ReportId", "Id")
+                        .HasName("ak_event_report_external_links_tenant_id_report_id_id");
+
                     b.HasIndex("TenantId", "ReportId", "CaseId")
                         .HasDatabaseName("ix_event_report_external_links_tenant_id_report_id_case_id");
 
@@ -9945,6 +9957,8 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_event_report_external_links", null, t =>
                         {
+                            t.HasCheckConstraint("ck_event_report_external_links_case_generation", "(case_id IS NULL AND case_concurrency_stamp IS NULL) OR (case_id IS NOT NULL AND case_concurrency_stamp IS NOT NULL AND case_concurrency_stamp <> '00000000-0000-0000-0000-000000000000')");
+
                             t.HasCheckConstraint("ck_event_report_external_links_correlation_id_not_blank", "trim(correlation_id) <> ''");
 
                             t.HasCheckConstraint("ck_event_report_external_links_last_error_category_not_blank", "last_error_category IS NULL OR trim(last_error_category) <> ''");
@@ -9974,6 +9988,24 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("id");
 
+                    b.Property<string>("AdvisoryIdentity")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("advisory_identity");
+
+                    b.Property<string>("AdvisoryMaterialSha256")
+                        .HasMaxLength(71)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("advisory_material_sha256");
+
+                    b.Property<int?>("AdvisoryOrdinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("advisory_ordinal");
+
+                    b.Property<Guid?>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
                     b.Property<string>("CorrelationId")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -9997,6 +10029,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("external_signal_id");
 
+                    b.Property<Guid?>("IncomingWebhookMessageId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("incoming_webhook_message_id");
+
                     b.Property<string>("PolicyCode")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -10006,6 +10042,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<int>("Provider")
                         .HasColumnType("INTEGER")
                         .HasColumnName("provider");
+
+                    b.Property<Guid?>("ProviderLinkId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_link_id");
 
                     b.Property<string>("ProviderTargetId")
                         .IsRequired()
@@ -10041,6 +10081,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("signal_type");
 
+                    b.Property<Guid?>("SourceCaseConcurrencyStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_case_concurrency_stamp");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("TEXT")
                         .HasColumnName("tenant_id");
@@ -10060,17 +10104,32 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ie_event_report_signals");
 
+                    b.HasIndex("TenantId", "IncomingWebhookMessageId")
+                        .HasDatabaseName("ix_event_report_signals_tenant_id_incoming_webhook_message_id");
+
                     b.HasIndex("TenantId", "EventId", "ReportId")
                         .HasDatabaseName("ix_event_report_signals_tenant_id_event_id_report_id");
 
+                    b.HasIndex("TenantId", "ReportId", "CaseId")
+                        .HasDatabaseName("ix_event_report_signals_tenant_id_report_id_case_id");
+
+                    b.HasIndex("TenantId", "ReportId", "ProviderLinkId")
+                        .HasDatabaseName("ix_event_report_signals_tenant_id_report_id_provider_link_id");
+
+                    b.HasIndex("TenantId", "Provider", "AdvisoryIdentity", "AdvisoryOrdinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_report_signals_tenant_id_provider_advisory_identity_advisory_ordinal")
+                        .HasFilter("advisory_identity IS NOT NULL");
+
                     b.HasIndex("TenantId", "Provider", "ProviderTargetScope", "ProviderTargetId", "CorrelationId")
                         .IsUnique()
-                        .HasDatabaseName("ix_event_report_signals_tenant_id_provider_provider_target_scope_provider_target_id_correlation_id");
+                        .HasDatabaseName("ix_event_report_signals_tenant_id_provider_provider_target_scope_provider_target_id_correlation_id")
+                        .HasFilter("advisory_identity IS NULL");
 
                     b.HasIndex("TenantId", "Provider", "ProviderTargetScope", "ProviderTargetId", "ExternalSignalId")
                         .IsUnique()
                         .HasDatabaseName("ix_event_report_signals_tenant_id_provider_provider_target_scope_provider_target_id_external_signal_id")
-                        .HasFilter("external_signal_id IS NOT NULL");
+                        .HasFilter("external_signal_id IS NOT NULL AND advisory_identity IS NULL");
 
                     b.HasIndex("TenantId", "EventId", "Provider", "ProviderTargetScope", "ProviderTargetId", "CreatedAt")
                         .IsDescending(false, false, false, false, false, true)
@@ -10083,6 +10142,8 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_event_report_signals", null, t =>
                         {
+                            t.HasCheckConstraint("ck_event_report_signals_advisory_source", "(advisory_identity IS NULL AND advisory_ordinal IS NULL AND advisory_material_sha256 IS NULL AND case_id IS NULL AND source_case_concurrency_stamp IS NULL AND provider_link_id IS NULL AND incoming_webhook_message_id IS NULL) OR (advisory_identity IS NOT NULL AND trim(advisory_identity) <> '' AND advisory_ordinal IS NOT NULL AND advisory_ordinal >= 0 AND advisory_material_sha256 IS NOT NULL AND length(advisory_material_sha256) = 71 AND report_id IS NOT NULL AND case_id IS NOT NULL AND source_case_concurrency_stamp IS NOT NULL AND source_case_concurrency_stamp <> '00000000-0000-0000-0000-000000000000' AND provider_link_id IS NOT NULL AND ((provider = 3 AND incoming_webhook_message_id IS NOT NULL) OR (provider = 2 AND incoming_webhook_message_id IS NULL)))");
+
                             t.HasCheckConstraint("ck_event_report_signals_correlation_id_not_blank", "trim(correlation_id) <> ''");
 
                             t.HasCheckConstraint("ck_event_report_signals_external_signal_id_not_blank", "external_signal_id IS NULL OR trim(external_signal_id) <> ''");
@@ -10269,6 +10330,15 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("language_code");
 
+                    b.Property<Guid?>("MaterialVersionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_version_id");
+
+                    b.Property<int>("ModerationQuarantineCount")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("moderation_quarantine_count");
+
                     b.Property<string>("PublicTitle")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT")
@@ -10358,7 +10428,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("ck_event_resources_identity", "sort_order >= 0 AND is_deleted IN (0, 1) AND TRIM(title) <> '' AND session_scope_id <> '00000000-0000-0000-0000-000000000000'");
 
+                            t.HasCheckConstraint("ck_event_resources_material", "material_version_id IS NULL OR material_version_id <> '00000000-0000-0000-0000-000000000000'");
+
                             t.HasCheckConstraint("ck_event_resources_payload", "(is_deleted = 1 AND (storage_object_id IS NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL)) OR (is_deleted = 0 AND ((publication_state_id IN (1, 4) AND ((storage_object_id IS NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL) OR (event_resource_delivery_type_id = 1 AND storage_object_id IS NOT NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL) OR (event_resource_delivery_type_id = 2 AND storage_object_id IS NULL AND external_destination_ciphertext IS NOT NULL AND TRIM(external_destination_ciphertext) <> '' AND external_destination_protection_version IS NOT NULL AND external_destination_protection_version > 0 AND external_destination_safe_origin IS NOT NULL AND TRIM(external_destination_safe_origin) <> ''))) OR (publication_state_id IN (2, 3) AND ((event_resource_delivery_type_id = 1 AND storage_object_id IS NOT NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL) OR (event_resource_delivery_type_id = 2 AND storage_object_id IS NULL AND external_destination_ciphertext IS NOT NULL AND TRIM(external_destination_ciphertext) <> '' AND external_destination_protection_version IS NOT NULL AND external_destination_protection_version > 0 AND external_destination_safe_origin IS NOT NULL AND TRIM(external_destination_safe_origin) <> '')))))");
+
+                            t.HasCheckConstraint("ck_event_resources_quarantine", "moderation_quarantine_count >= 0 AND (moderation_quarantine_count = 0 OR material_version_id IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_event_resources_session_scope", "(event_session_id IS NULL AND session_scope_id = event_id) OR (event_session_id IS NOT NULL AND session_scope_id = event_session_id)");
 
@@ -10586,6 +10660,432 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasDatabaseName("ix_event_resource_kinds_master_code");
 
                     b.ToTable("ie_event_resource_kinds", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationQuarantine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AppliedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("applied_at");
+
+                    b.Property<int>("BindingOrdinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("binding_ordinal");
+
+                    b.Property<Guid>("EffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_resource_id");
+
+                    b.Property<Guid>("MaterialVersionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_version_id");
+
+                    b.Property<Guid?>("ReleaseId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("release_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_resource_moderation_quarantines");
+
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ak_event_resource_moderation_quarantines_tenant_id_id");
+
+                    b.HasIndex("TenantId", "ReleaseId")
+                        .HasDatabaseName("ix_event_resource_moderation_quarantines_tenant_id_release_id");
+
+                    b.HasIndex("TenantId", "EventId", "EventResourceId")
+                        .HasDatabaseName("ix_event_resource_moderation_quarantines_tenant_id_event_id_event_resource_id");
+
+                    b.HasIndex("TenantId", "EventResourceId", "EffectId", "BindingOrdinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_resource_moderation_quarantines_tenant_id_event_resource_id_effect_id_binding_ordinal");
+
+                    b.ToTable("ie_event_resource_moderation_quarantines", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_event_resource_quarantines_cause", "effect_id <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("ck_event_resource_quarantines_material", "material_version_id <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("ck_event_resource_quarantines_ordinal", "binding_ordinal >= 0 AND binding_ordinal < 64");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationQuarantineRelease", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApprovalId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("approval_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_resource_id");
+
+                    b.Property<Guid>("MaterialVersionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_version_id");
+
+                    b.Property<int>("OriginalBindingOrdinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_binding_ordinal");
+
+                    b.Property<Guid>("OriginalEffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_effect_id");
+
+                    b.Property<DateTimeOffset>("OriginallyAppliedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("originally_applied_at");
+
+                    b.Property<Guid>("QuarantineId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("quarantine_id");
+
+                    b.Property<DateTimeOffset>("ReleasedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("released_at");
+
+                    b.Property<Guid>("ReleasedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("released_by_human_id");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_digest");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_resource_quarantine_releases");
+
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ak_event_resource_moderation_quarantine_release_tenant_id_id");
+
+                    b.HasIndex("QuarantineId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_resource_quarantine_releases_quarantine_id");
+
+                    b.HasIndex("TenantId", "ApprovalId")
+                        .HasDatabaseName("ix_event_resource_quarantine_releases_tenant_id_approval_id");
+
+                    b.HasIndex("TenantId", "QuarantineId")
+                        .HasDatabaseName("ix_event_resource_quarantine_releases_tenant_id_quarantine_id");
+
+                    b.ToTable("ie_event_resource_quarantine_releases", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationQuarantineReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<int?>("Attestation")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("attestation");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<Guid>("ControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("controller_human_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_resource_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("HumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("human_id");
+
+                    b.Property<Guid>("MaterialVersionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_version_id");
+
+                    b.Property<long>("MaximumEvidenceLifetimeTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_evidence_lifetime_ticks");
+
+                    b.Property<string>("NativeDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_digest");
+
+                    b.Property<Guid?>("PredecessorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("predecessor_id");
+
+                    b.Property<Guid>("PurposeId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("purpose_id");
+
+                    b.Property<long>("QualificationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("qualification_revision");
+
+                    b.Property<Guid>("QuarantineId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("quarantine_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_digest");
+
+                    b.Property<int>("RequiredApprovals")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("required_approvals");
+
+                    b.Property<Guid>("ResourceStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("resource_stamp");
+
+                    b.Property<Guid>("ReviewerAssignmentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_assignment_id");
+
+                    b.Property<long>("ReviewerRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reviewer_revision");
+
+                    b.Property<int>("Step")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("step");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_resource_quarantine_reviews");
+
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ak_event_resource_quarantine_reviews_tenant_id_id");
+
+                    b.HasIndex("TenantId", "QuarantineId", "PurposeId")
+                        .HasDatabaseName("ix_event_resource_quarantine_reviews_tenant_id_quarantine_id_purpose_id");
+
+                    b.ToTable("ie_event_resource_quarantine_reviews", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_resource_safety_lifetime", "maximum_evidence_lifetime_ticks > 0");
+
+                            t.HasCheckConstraint("ck_resource_safety_quorum", "required_approvals BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_resource_safety_step", "step BETWEEN 1 AND 6");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationReviewCompletion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApprovalId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("approval_id");
+
+                    b.Property<Guid>("AttestationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("attestation_id");
+
+                    b.Property<DateTimeOffset>("CompletedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("completed_at");
+
+                    b.Property<int>("Disposition")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("disposition");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_resource_id");
+
+                    b.Property<Guid>("MaterialVersionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_version_id");
+
+                    b.Property<Guid>("PurposeId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("purpose_id");
+
+                    b.Property<Guid>("QuarantineId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("quarantine_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_resource_moderation_review_completions");
+
+                    b.HasIndex("TenantId", "ApprovalId")
+                        .HasDatabaseName("ix_event_resource_moderation_review_completions_tenant_id_approval_id");
+
+                    b.HasIndex("TenantId", "AttestationId")
+                        .HasDatabaseName("ix_event_resource_moderation_review_completions_tenant_id_attestation_id");
+
+                    b.HasIndex("TenantId", "PurposeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_resource_moderation_review_completions_tenant_id_purpose_id");
+
+                    b.HasIndex("TenantId", "QuarantineId", "CompletedAt")
+                        .HasDatabaseName("ix_event_resource_moderation_review_completions_tenant_id_quarantine_id_completed_at");
+
+                    b.ToTable("ie_event_resource_moderation_review_completions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_resource_review_disposition", "disposition IN (1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationReviewDuty", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AppliedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("applied_at");
+
+                    b.Property<DateTimeOffset>("DueAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("due_at");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_resource_id");
+
+                    b.Property<Guid>("MaterialVersionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_version_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_resource_moderation_review_duties");
+
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ak_event_resource_moderation_review_duties_tenant_id_id");
+
+                    b.HasIndex("TenantId", "DueAt", "Id")
+                        .HasDatabaseName("ix_event_resource_moderation_review_duties_tenant_id_due_at_id");
+
+                    b.ToTable("ie_event_resource_moderation_review_duties", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationReviewEscalation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("EscalatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalated_at");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<DateTimeOffset>("PurposeUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("purpose_until");
+
+                    b.Property<long>("QualificationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("qualification_revision");
+
+                    b.Property<int>("RecipientCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("recipient_count");
+
+                    b.Property<Guid>("ServicePrincipalId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("service_principal_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_event_resource_moderation_review_escalations");
+
+                    b.HasIndex("TenantId", "Id")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_resource_moderation_review_escalations_tenant_id_id");
+
+                    b.ToTable("ie_event_resource_moderation_review_escalations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_resource_review_escalation_recipients", "recipient_count BETWEEN 1 AND 32");
+                        });
                 });
 
             modelBuilder.Entity("Explore.Domain.EventResourceProviderActivation", b =>
@@ -16738,6 +17238,161 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.ToTable("ie_integration_sync_outbox", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Domain.KeyObligation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("AuthoritySequence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("authority_sequence");
+
+                    b.Property<long>("BackupHorizonTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("backup_horizon_ticks");
+
+                    b.Property<long>("BackupSafetyMarginTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("backup_safety_margin_ticks");
+
+                    b.Property<string>("CaptureMaterialReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("capture_material_receipt");
+
+                    b.Property<Guid>("IntentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("intent_id");
+
+                    b.Property<long>("KeyGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("key_generation");
+
+                    b.Property<string>("KeyId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("key_id");
+
+                    b.Property<DateTimeOffset?>("MaterialPrunedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_pruned_at");
+
+                    b.Property<string>("MaterialReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_receipt");
+
+                    b.Property<DateTimeOffset>("OriginalCapturedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_captured_at");
+
+                    b.Property<DateTimeOffset>("OriginalRetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_retain_until");
+
+                    b.Property<DateTimeOffset>("ReadableUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("readable_until");
+
+                    b.Property<DateTimeOffset?>("ReceiptRetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("receipt_retain_until");
+
+                    b.Property<long>("ReceiptRetentionTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("receipt_retention_ticks");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<string>("VerificationTag")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("verification_tag");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_key_obligation");
+
+                    b.HasIndex("IntentId")
+                        .HasDatabaseName("ix_key_obligation_intent_id");
+
+                    b.HasIndex("TrustDomainId", "KeyId", "KeyGeneration")
+                        .HasDatabaseName("ix_key_obligation_trust_domain_id_key_id_key_generation");
+
+                    b.ToTable("ie_key_obligation", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.KeyReplica", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BindingRevision")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("binding_revision");
+
+                    b.Property<string>("RingCommitment")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ring_commitment");
+
+                    b.Property<long>("RingGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ring_generation");
+
+                    b.Property<Guid>("RuntimeReplicaId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("runtime_replica_id");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("sequence");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset>("VerifiedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("verified_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_key_replica");
+
+                    b.HasIndex("TrustDomainId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_key_replica_trust_domain_id_sequence");
+
+                    b.HasIndex("TrustDomainId", "RuntimeReplicaId", "RingGeneration")
+                        .HasDatabaseName("ix_key_replica_trust_domain_id_runtime_replica_id_ring_generation");
+
+                    b.ToTable("ie_key_replica", (string)null);
+                });
+
             modelBuilder.Entity("Explore.Domain.Keycloak.KeycloakOperation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -17990,6 +18645,4309 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.ModerationAdjudicatedCaseReadGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("IssuedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("issued_at");
+
+                    b.Property<bool>("IssuerPlatformGrant")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("issuer_platform_grant");
+
+                    b.Property<Guid>("IssuerRoleGrantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuer_role_grant_id");
+
+                    b.Property<Guid>("IssuerUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuer_user_id");
+
+                    b.Property<string>("OriginalEffectBindingHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_effect_binding_hash")
+                        .UseCollation("BINARY")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    b.Property<Guid>("OriginalEffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_effect_id");
+
+                    b.Property<long>("OriginalRetainUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_retain_until");
+
+                    b.Property<string>("OriginalSnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_snapshot_hash")
+                        .UseCollation("BINARY")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recipient_user_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid?>("RevocationOperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revocation_operation_id");
+
+                    b.Property<long?>("RevokedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<bool?>("RevokedByPlatformGrant")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revoked_by_platform_grant");
+
+                    b.Property<Guid?>("RevokedByRoleGrantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_by_role_grant_id");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_by_user_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_adjudicated_case_read_grants");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_adjudicated_case_read_grants_case_id");
+
+                    b.HasIndex("HostBindingId")
+                        .HasDatabaseName("ix_moderation_adjudicated_case_read_grants_host_binding_id");
+
+                    b.HasIndex("OriginalEffectId")
+                        .HasDatabaseName("ix_moderation_adjudicated_case_read_grants_original_effect_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_adjudicated_case_read_grants_tenant_id");
+
+                    b.HasIndex("TrustDomainId", "TenantId", "CaseId", "RecipientUserId")
+                        .HasDatabaseName("ix_moderation_adjudicated_case_read_grants_trust_domain_id_tenant_id_case_id_recipient_user_id");
+
+                    b.ToTable("ie_moderation_adjudicated_case_read_grants", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_adjudicated_read_grant_case_revision", "case_revision > 0 AND case_revision < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_adjudicated_read_grant_hashes", "length(original_snapshot_hash) = 64 AND length(original_effect_binding_hash) = 64");
+
+                            t.HasCheckConstraint("ck_adjudicated_read_grant_revocation", "(revision = 1 AND revoked_at IS NULL AND revocation_operation_id IS NULL AND revoked_by_user_id IS NULL AND revoked_by_role_grant_id IS NULL AND revoked_by_platform_grant IS NULL) OR (revision = 2 AND revoked_at IS NOT NULL AND revoked_at >= issued_at AND revoked_at < 3155378975999999999 AND revoked_at % 10 = 0 AND revocation_operation_id IS NOT NULL AND revocation_operation_id <> id AND revocation_operation_id <> '00000000-0000-0000-0000-000000000000' AND revoked_by_user_id IS NOT NULL AND revoked_by_user_id <> '00000000-0000-0000-0000-000000000000' AND revoked_by_role_grant_id IS NOT NULL AND revoked_by_role_grant_id <> '00000000-0000-0000-0000-000000000000' AND revoked_by_platform_grant IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_adjudicated_read_grant_window", "issued_at > 0 AND expires_at > issued_at AND expires_at <= original_retain_until AND original_retain_until < 3155378975999999999 AND issued_at % 10 = 0 AND expires_at % 10 = 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseAttributionHead", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("instance_id");
+
+                    b.Property<Guid>("OccurrenceCaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_case_id");
+
+                    b.Property<long>("OccurrenceEvidenceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("occurrence_evidence_revision");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_id");
+
+                    b.Property<Guid>("OpeningSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("opening_source_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("solution_id");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_attribution_heads");
+
+                    b.HasIndex("CaseId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_attribution_heads_case_id");
+
+                    b.HasIndex("HostBindingId")
+                        .HasDatabaseName("ix_moderation_case_attribution_heads_host_binding_id");
+
+                    b.HasIndex("OccurrenceCaseId")
+                        .HasDatabaseName("ix_moderation_case_attribution_heads_occurrence_case_id");
+
+                    b.HasIndex("OpeningSourceId")
+                        .HasDatabaseName("ix_moderation_case_attribution_heads_opening_source_id");
+
+                    b.HasIndex("SourceId")
+                        .HasDatabaseName("ix_moderation_case_attribution_heads_source_id");
+
+                    b.HasIndex("TenantId", "TrustDomainId", "OccurrenceCaseId", "SubjectKind", "SubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_attribution_heads_tenant_id_trust_domain_id_occurrence_case_id_subject_kind_subject_id");
+
+                    b.ToTable("ie_moderation_case_attribution_heads", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_attribution_head_generation", "generation > 0 AND revision = generation AND ((generation = 1 AND source_id = opening_source_id) OR (generation > 1 AND source_id <> opening_source_id))");
+
+                            t.HasCheckConstraint("ck_moderation_attribution_head_scope", "case_id <> occurrence_case_id AND occurrence_evidence_revision > 0 AND subject_kind IN (1, 2, 3, 4)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseAttributionRenewalReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("ExpectedCaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("expected_case_revision");
+
+                    b.Property<long>("ExpectedGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("expected_generation");
+
+                    b.Property<long>("ExpectedHeadRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("expected_head_revision");
+
+                    b.Property<Guid>("ExpectedSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expected_source_id");
+
+                    b.Property<Guid>("HeadId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("head_id");
+
+                    b.Property<DateTimeOffset>("QualifiedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualified_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_attribution_renewal_receipts");
+
+                    b.HasIndex("ExpectedSourceId")
+                        .HasDatabaseName("ix_moderation_case_attribution_renewal_receipts_expected_source_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_case_attribution_renewal_receipts_tenant_id");
+
+                    b.HasIndex("CaseId", "ExpectedGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_attribution_renewal_receipts_case_id_expected_generation");
+
+                    b.HasIndex("HeadId", "ExpectedGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_attribution_renewal_receipts_head_id_expected_generation");
+
+                    b.ToTable("ie_moderation_case_attribution_renewal_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_attribution_renewal_distinct_source", "id <> expected_source_id");
+
+                            t.HasCheckConstraint("ck_moderation_attribution_renewal_expected", "expected_case_revision > 0 AND expected_generation > 0 AND expected_head_revision > 0 AND expected_head_revision = expected_generation");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseAttributionSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Basis")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("basis");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("EvidenceCaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("evidence_case_revision");
+
+                    b.Property<Guid>("EvidenceSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("evidence_source_id");
+
+                    b.Property<Guid>("EvidenceSourceVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("evidence_source_version");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid?>("InvestigationSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("investigation_source_id");
+
+                    b.Property<long?>("InvestigationSourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("investigation_source_revision");
+
+                    b.Property<Guid>("LifetimePolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lifetime_policy_id");
+
+                    b.Property<long>("LifetimePolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("lifetime_policy_revision");
+
+                    b.Property<Guid>("MaterialFactId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_fact_id");
+
+                    b.Property<string>("NativeResponsibilityDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_responsibility_digest");
+
+                    b.Property<Guid>("OccurrenceCaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_case_id");
+
+                    b.Property<long>("OccurrenceCaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("occurrence_case_revision");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_id");
+
+                    b.Property<Guid>("QualificationEpochId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualification_epoch_id");
+
+                    b.Property<string>("QualificationFactsDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualification_facts_digest");
+
+                    b.Property<long>("QualificationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("qualification_revision");
+
+                    b.Property<DateTimeOffset>("QualifiedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualified_at");
+
+                    b.Property<Guid>("QualifiedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualified_by_human_id");
+
+                    b.Property<bool>("QualifierPlatformGrant")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("qualifier_platform_grant");
+
+                    b.Property<Guid>("QualifierRoleGrantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualifier_role_grant_id");
+
+                    b.Property<Guid>("ReadGrantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("read_grant_id");
+
+                    b.Property<long>("ReadGrantRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("read_grant_revision");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<Guid?>("WithdrawalOperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawal_operation_id");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_attribution_sources");
+
+                    b.HasIndex("EvidenceSourceId")
+                        .HasDatabaseName("ix_moderation_case_attribution_sources_evidence_source_id");
+
+                    b.HasIndex("OccurrenceCaseId")
+                        .HasDatabaseName("ix_moderation_case_attribution_sources_occurrence_case_id");
+
+                    b.HasIndex("ReadGrantId")
+                        .HasDatabaseName("ix_moderation_case_attribution_sources_read_grant_id");
+
+                    b.HasIndex("CaseId", "Generation")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_attribution_sources_case_id_generation");
+
+                    b.HasIndex("TenantId", "TrustDomainId", "OccurrenceCaseId", "SubjectKind", "SubjectId", "Generation")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_attribution_sources_tenant_id_trust_domain_id_occurrence_case_id_subject_kind_subject_id_generation");
+
+                    b.ToTable("ie_moderation_case_attribution_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_attribution_basis", "(investigation_source_id IS NULL AND investigation_source_revision IS NULL AND ((basis = 1 AND subject_kind = 1 AND subject_id <> qualified_by_human_id) OR (basis = 2 AND subject_kind = 4) OR (basis = 3 AND subject_kind = 3) OR (basis = 4 AND subject_kind = 2))) OR (basis = 5 AND subject_kind = 1 AND subject_id <> qualified_by_human_id AND investigation_source_id IS NOT NULL AND investigation_source_revision IS NOT NULL AND investigation_source_revision = 1)");
+
+                            t.HasCheckConstraint("ck_moderation_attribution_evidence", "generation > 0 AND case_id <> occurrence_case_id AND evidence_case_revision > 0 AND occurrence_case_revision >= evidence_case_revision AND qualification_revision > 0 AND read_grant_revision > 0 AND lifetime_policy_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_attribution_validity", "valid_until > qualified_at AND ((revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL AND withdrawal_operation_id IS NULL) OR (revision = 2 AND withdrawn_at >= qualified_at AND withdrawn_by_human_id IS NOT NULL AND withdrawal_operation_id IS NOT NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseIntakeAcknowledgement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcceptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<Guid>("BudgetAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("budget_adoption_id");
+
+                    b.Property<long>("BudgetAdoptionWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("budget_adoption_writer_generation");
+
+                    b.Property<Guid>("BudgetSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("budget_source_id");
+
+                    b.Property<long>("BudgetSourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("budget_source_writer_generation");
+
+                    b.Property<Guid>("CallerUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("caller_user_id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<long>("EvidenceCaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("evidence_case_revision");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("ReceiptId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("receipt_id");
+
+                    b.Property<long>("ReceiptRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("receipt_revision");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_digest");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_intake_acknowledgements");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_case_intake_acknowledgements_case_id");
+
+                    b.HasIndex("ReceiptId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_intake_acknowledgements_receipt_id");
+
+                    b.HasIndex("TenantId", "CallerUserId", "OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_intake_acknowledgements_tenant_id_caller_user_id_operation_id");
+
+                    b.HasIndex("BudgetAdoptionId", "TrustDomainId", "TenantId", "BudgetSourceId")
+                        .HasDatabaseName("ix_moderation_case_intake_acknowledgements_budget_adoption_id_trust_domain_id_tenant_id_budget_source_id");
+
+                    b.ToTable("ie_moderation_case_intake_acknowledgements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_case_acknowledgement_revisions", "case_revision > 0 AND receipt_revision = 2 AND evidence_case_revision > 0 AND evidence_case_revision <= case_revision AND budget_source_writer_generation > 0 AND budget_adoption_writer_generation > budget_source_writer_generation AND budget_adoption_writer_generation < 9223372036854775807 AND budget_source_id <> budget_adoption_id");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseNarrative", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adoption_id");
+
+                    b.Property<long>("AdoptionWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adoption_writer_generation");
+
+                    b.Property<DateTimeOffset>("CapturedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("captured_at");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("MaterialFactId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_fact_id");
+
+                    b.Property<Guid>("PolicySourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_source_id");
+
+                    b.Property<long>("PolicyWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_writer_generation");
+
+                    b.Property<DateTimeOffset>("PurgeAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("purge_at");
+
+                    b.Property<Guid>("QualificationEpochId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualification_epoch_id");
+
+                    b.Property<long>("QualificationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("qualification_revision");
+
+                    b.Property<Guid>("ReceiptId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("receipt_id");
+
+                    b.Property<Guid>("ReporterUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reporter_user_id");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid>("SourceVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<byte[]>("protectedMaterial")
+                        .IsRequired()
+                        .HasMaxLength(131072)
+                        .HasColumnType("BLOB")
+                        .HasColumnName("protected_material");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_narratives");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_case_narratives_case_id");
+
+                    b.HasIndex("QualificationEpochId")
+                        .HasDatabaseName("ix_moderation_case_narratives_qualification_epoch_id");
+
+                    b.HasIndex("ReceiptId")
+                        .HasDatabaseName("ix_moderation_case_narratives_receipt_id");
+
+                    b.HasIndex("ReporterUserId")
+                        .HasDatabaseName("ix_moderation_case_narratives_reporter_user_id");
+
+                    b.HasIndex("SourceId")
+                        .HasDatabaseName("ix_moderation_case_narratives_source_id");
+
+                    b.HasIndex("TenantId", "PurgeAt")
+                        .HasDatabaseName("ix_moderation_case_narratives_tenant_id_purge_at");
+
+                    b.HasIndex("AdoptionId", "HostBindingId", "TrustDomainId", "TenantId", "PolicySourceId")
+                        .HasDatabaseName("ix_moderation_case_narratives_adoption_id_host_binding_id_trust_domain_id_tenant_id_policy_source_id");
+
+                    b.HasIndex("TenantId", "TrustDomainId", "CaseId", "SourceId", "MaterialFactId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_narratives_tenant_id_trust_domain_id_case_id_source_id_material_fact_id");
+
+                    b.ToTable("ie_moderation_case_narratives", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_case_narrative_finite_custody", "purge_at > captured_at");
+
+                            t.HasCheckConstraint("ck_case_narrative_generations", "policy_writer_generation > 0 AND adoption_writer_generation > policy_writer_generation AND qualification_revision >= adoption_writer_generation");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseNarrativeAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_narrative_adoptions");
+
+                    b.HasAlternateKey("Id", "HostBindingId", "TrustDomainId", "TenantId", "SourceId")
+                        .HasName("ak_moderation_case_narrative_adoptions_id_host_binding_id_trust_domain_id_tenant_id_source_id");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_case_narrative_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_narrative_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_case_narrative_adoptions_withdrawn_by_human_id");
+
+                    b.HasIndex("SourceId", "HostBindingId", "TrustDomainId", "TenantId")
+                        .HasDatabaseName("ix_moderation_case_narrative_adoptions_source_id_host_binding_id_trust_domain_id_tenant_id");
+
+                    b.ToTable("ie_moderation_case_narrative_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_case_narrative_adoption_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_case_narrative_adoption_validity", "valid_until > adopted_at");
+
+                            t.HasCheckConstraint("ck_case_narrative_adoption_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at >= adopted_at AND withdrawn_by_human_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseNarrativePolicySource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("GovernanceControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("governance_controller_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<string>("IdentityAndIndependenceBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("identity_and_independence_basis");
+
+                    b.Property<int>("MaximumMaterialBytes")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_material_bytes");
+
+                    b.Property<long>("MaximumRetentionTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_retention_ticks");
+
+                    b.Property<Guid>("PrivacyControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_controller_human_id");
+
+                    b.Property<string>("PrivacyLegalMandateBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_legal_mandate_basis");
+
+                    b.Property<Guid>("PrivacyOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_owner_human_id");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("purpose");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<int>("TargetKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_narrative_policy_sources");
+
+                    b.HasAlternateKey("Id", "HostBindingId", "TrustDomainId", "TenantId")
+                        .HasName("ak_moderation_case_narrative_policy_sources_id_host_binding_id_trust_domain_id_tenant_id");
+
+                    b.HasIndex("GovernanceControllerHumanId")
+                        .HasDatabaseName("ix_moderation_case_narrative_policy_sources_governance_controller_human_id");
+
+                    b.HasIndex("PrivacyControllerHumanId")
+                        .HasDatabaseName("ix_moderation_case_narrative_policy_sources_privacy_controller_human_id");
+
+                    b.HasIndex("PrivacyOwnerHumanId")
+                        .HasDatabaseName("ix_moderation_case_narrative_policy_sources_privacy_owner_human_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_case_narrative_policy_sources_recorded_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_case_narrative_policy_sources_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "TargetKind", "Purpose", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_narrative_policy_sources_host_binding_id_tenant_id_target_kind_purpose_writer_generation");
+
+                    b.ToTable("ie_moderation_case_narrative_policy_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_case_narrative_policy_generation", "revision = 1 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_case_narrative_policy_independence", "privacy_owner_human_id <> recorded_by_human_id AND privacy_controller_human_id <> governance_controller_human_id AND privacy_controller_human_id <> recorded_by_human_id AND privacy_owner_human_id <> governance_controller_human_id");
+
+                            t.HasCheckConstraint("ck_case_narrative_policy_limits", "maximum_retention_ticks > 0 AND maximum_retention_ticks < 9223372036854775807 AND maximum_material_bytes > 0 AND maximum_material_bytes <= 65536 AND valid_until > recorded_at");
+
+                            t.HasCheckConstraint("ck_case_narrative_policy_purpose", "purpose IN (1, 3) OR (purpose = 2 AND target_kind = 2)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseReadGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CallerUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("caller_user_id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issued_at");
+
+                    b.Property<bool>("IssuerPlatformGrant")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("issuer_platform_grant");
+
+                    b.Property<Guid>("IssuerRoleGrantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuer_role_grant_id");
+
+                    b.Property<Guid>("IssuerUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuer_user_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_read_grants");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_case_read_grants_case_id");
+
+                    b.HasIndex("SourceId")
+                        .HasDatabaseName("ix_moderation_case_read_grants_source_id");
+
+                    b.HasIndex("TenantId", "CaseId", "CallerUserId")
+                        .HasDatabaseName("ix_moderation_case_read_grants_tenant_id_case_id_caller_user_id");
+
+                    b.ToTable("ie_moderation_case_read_grants", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_case_read_grant_validity", "expires_at > issued_at AND revision > 0 AND case_revision > 0 AND (revoked_at IS NULL OR revoked_at >= issued_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseReadGrantRevocationReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AdministratorPlatformGrant")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("administrator_platform_grant");
+
+                    b.Property<Guid>("AdministratorRoleGrantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("administrator_role_grant_id");
+
+                    b.Property<Guid>("AdministratorUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("administrator_user_id");
+
+                    b.Property<long>("ExpectedRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("expected_revision");
+
+                    b.Property<Guid>("GrantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("grant_id");
+
+                    b.Property<DateTimeOffset>("RevokedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_read_grant_revocation_receipts");
+
+                    b.HasIndex("AdministratorUserId")
+                        .HasDatabaseName("ix_moderation_case_read_grant_revocation_receipts_administrator_user_id");
+
+                    b.HasIndex("GrantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_read_grant_revocation_receipts_grant_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_case_read_grant_revocation_receipts_tenant_id");
+
+                    b.ToTable("ie_moderation_case_read_grant_revocation_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_read_grant_revocation_revision", "expected_revision = 1");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseTargetPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ChangedByUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("changed_by_user_id");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("enabled");
+
+                    b.Property<long>("ReadLifetimeTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("read_lifetime_ticks");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<long>("SubmissionLifetimeTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("submission_lifetime_ticks");
+
+                    b.Property<int>("TargetKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_target_policies");
+
+                    b.HasIndex("TenantId", "TrustDomainId", "TargetKind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_target_policies_tenant_id_trust_domain_id_target_kind");
+
+                    b.ToTable("ie_moderation_case_target_policies", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_target_policy_lifetime", "revision > 0 AND target_kind BETWEEN 1 AND 9 AND submission_lifetime_ticks > 0 AND submission_lifetime_ticks <= 864000000000 AND read_lifetime_ticks > 0 AND read_lifetime_ticks <= 864000000000");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseTargetReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CallerUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("caller_user_id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<Guid?>("ConsumedCaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consumed_case_id");
+
+                    b.Property<Guid?>("ConsumedOperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consumed_operation_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issued_at");
+
+                    b.Property<Guid>("LifetimePolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lifetime_policy_id");
+
+                    b.Property<long>("LifetimePolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("lifetime_policy_revision");
+
+                    b.Property<Guid>("MaterialFactId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_fact_id");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_id");
+
+                    b.Property<Guid>("QualificationEpochId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualification_epoch_id");
+
+                    b.Property<long>("QualificationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("qualification_revision");
+
+                    b.Property<Guid?>("RelationshipConcurrencyStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("relationship_concurrency_stamp");
+
+                    b.Property<string>("RelationshipFactsDigest")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("relationship_facts_digest");
+
+                    b.Property<int>("RelationshipKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("relationship_kind");
+
+                    b.Property<long?>("RelationshipRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("relationship_revision");
+
+                    b.Property<Guid>("RelationshipSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("relationship_source_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid?>("SourceOriginCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_origin_community_id");
+
+                    b.Property<Guid?>("SourceOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_origin_event_id");
+
+                    b.Property<Guid?>("SourceOriginInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_origin_instance_id");
+
+                    b.Property<int>("SourceOriginKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_origin_kind");
+
+                    b.Property<Guid?>("SourceOriginResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_origin_resource_id");
+
+                    b.Property<Guid?>("SourceOriginSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_origin_solution_id");
+
+                    b.Property<Guid?>("SourceOriginTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_origin_tenant_id");
+
+                    b.Property<Guid>("SourceOriginTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_origin_trust_domain_id");
+
+                    b.Property<Guid>("SourceVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_version");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_id");
+
+                    b.Property<int>("TargetKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_kind");
+
+                    b.Property<Guid?>("TargetOriginCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_community_id");
+
+                    b.Property<Guid?>("TargetOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_event_id");
+
+                    b.Property<Guid?>("TargetOriginInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_instance_id");
+
+                    b.Property<int>("TargetOriginKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_origin_kind");
+
+                    b.Property<Guid?>("TargetOriginResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_resource_id");
+
+                    b.Property<Guid?>("TargetOriginSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_solution_id");
+
+                    b.Property<Guid?>("TargetOriginTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_tenant_id");
+
+                    b.Property<Guid>("TargetOriginTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_trust_domain_id");
+
+                    b.Property<Guid>("TargetVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TokenDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("token_digest");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_target_receipts");
+
+                    b.HasIndex("ConsumedCaseId")
+                        .HasDatabaseName("ix_moderation_case_target_receipts_consumed_case_id");
+
+                    b.HasIndex("HostBindingId")
+                        .HasDatabaseName("ix_moderation_case_target_receipts_host_binding_id");
+
+                    b.HasIndex("QualificationEpochId")
+                        .HasDatabaseName("ix_moderation_case_target_receipts_qualification_epoch_id");
+
+                    b.HasIndex("TokenDigest")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_target_receipts_token_digest");
+
+                    b.HasIndex("TenantId", "CallerUserId", "ExpiresAt")
+                        .HasDatabaseName("ix_moderation_case_target_receipts_tenant_id_caller_user_id_expires_at");
+
+                    b.ToTable("ie_moderation_case_target_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_case_target_receipts_source_origin_scope", "source_origin_kind IS NOT NULL AND ((source_origin_kind = 1 AND source_origin_trust_domain_id IS NOT NULL AND source_origin_solution_id IS NULL AND source_origin_instance_id IS NULL AND source_origin_tenant_id IS NULL AND source_origin_community_id IS NULL AND source_origin_resource_id IS NULL AND source_origin_event_id IS NULL) OR (source_origin_kind = 2 AND source_origin_trust_domain_id IS NOT NULL AND source_origin_solution_id IS NOT NULL AND source_origin_instance_id IS NULL AND source_origin_tenant_id IS NULL AND source_origin_community_id IS NULL AND source_origin_resource_id IS NULL AND source_origin_event_id IS NULL) OR (source_origin_kind = 3 AND source_origin_trust_domain_id IS NOT NULL AND source_origin_solution_id IS NOT NULL AND source_origin_instance_id IS NOT NULL AND source_origin_tenant_id IS NULL AND source_origin_community_id IS NULL AND source_origin_resource_id IS NULL AND source_origin_event_id IS NULL) OR (source_origin_kind = 4 AND source_origin_trust_domain_id IS NOT NULL AND source_origin_solution_id IS NOT NULL AND source_origin_instance_id IS NOT NULL AND source_origin_tenant_id IS NOT NULL AND source_origin_community_id IS NULL AND source_origin_resource_id IS NULL AND source_origin_event_id IS NULL) OR (source_origin_kind = 5 AND source_origin_trust_domain_id IS NOT NULL AND source_origin_solution_id IS NOT NULL AND source_origin_instance_id IS NOT NULL AND source_origin_tenant_id IS NOT NULL AND source_origin_community_id IS NOT NULL AND source_origin_resource_id IS NULL AND source_origin_event_id IS NULL) OR (source_origin_kind = 6 AND source_origin_trust_domain_id IS NOT NULL AND source_origin_solution_id IS NOT NULL AND source_origin_instance_id IS NOT NULL AND source_origin_tenant_id IS NOT NULL AND source_origin_resource_id IS NOT NULL AND source_origin_event_id IS NULL) OR (source_origin_kind = 7 AND source_origin_trust_domain_id IS NOT NULL AND source_origin_solution_id IS NOT NULL AND source_origin_instance_id IS NOT NULL AND source_origin_tenant_id IS NOT NULL AND source_origin_community_id IS NULL AND source_origin_resource_id IS NULL AND source_origin_event_id IS NOT NULL AND source_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
+
+                            t.HasCheckConstraint("ck_moderation_case_target_receipts_target_origin_scope", "target_origin_kind IS NOT NULL AND ((target_origin_kind = 1 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NULL AND target_origin_instance_id IS NULL AND target_origin_tenant_id IS NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 2 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NULL AND target_origin_tenant_id IS NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 3 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 4 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NOT NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 5 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NOT NULL AND target_origin_community_id IS NOT NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 6 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NOT NULL AND target_origin_resource_id IS NOT NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 7 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NOT NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NOT NULL AND target_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
+
+                            t.HasCheckConstraint("ck_moderation_intake_receipt_consumption", "(revision = 1 AND consumed_case_id IS NULL AND consumed_operation_id IS NULL AND consumed_at IS NULL) OR (relationship_kind <> 5 AND revision = 2 AND consumed_case_id IS NOT NULL AND consumed_operation_id IS NOT NULL AND consumed_at IS NOT NULL AND consumed_at >= issued_at AND consumed_at < expires_at)");
+
+                            t.HasCheckConstraint("ck_moderation_intake_receipt_generations", "qualification_revision > 0 AND lifetime_policy_revision > 0 AND ((relationship_kind IN (2, 5) AND relationship_revision IS NOT NULL AND relationship_revision > 0 AND relationship_concurrency_stamp IS NULL AND relationship_facts_digest IS NULL) OR (relationship_kind IN (1, 3, 4, 6) AND relationship_revision IS NULL AND relationship_concurrency_stamp IS NOT NULL AND relationship_facts_digest IS NULL) OR (relationship_kind = 7 AND target_kind IN (3, 4) AND relationship_revision IS NULL AND relationship_concurrency_stamp IS NULL AND relationship_facts_digest IS NOT NULL AND length(relationship_facts_digest) = 64))");
+
+                            t.HasCheckConstraint("ck_moderation_intake_receipt_origin", "target_origin_trust_domain_id = source_origin_trust_domain_id AND target_origin_solution_id = source_origin_solution_id AND target_origin_instance_id = source_origin_instance_id AND source_origin_kind IN (3, 4) AND (source_origin_tenant_id IS NULL OR source_origin_tenant_id = tenant_id) AND ((target_kind IN (3, 4) AND target_origin_kind = 3) OR (target_kind IN (1, 2, 5, 6, 7, 8, 9) AND target_origin_kind = 4 AND target_origin_tenant_id = tenant_id))");
+
+                            t.HasCheckConstraint("ck_moderation_intake_receipt_validity", "expires_at > issued_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseTargetSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid?>("EventVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_version");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("MaterialDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_digest");
+
+                    b.Property<Guid>("MaterialFactId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_fact_id");
+
+                    b.Property<string>("NativeFactsDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_facts_digest");
+
+                    b.Property<int>("NativeKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("native_kind");
+
+                    b.Property<Guid>("NativeTargetId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_target_id");
+
+                    b.Property<Guid>("NativeTargetVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_target_version");
+
+                    b.Property<string>("OccurrenceDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_digest");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_id");
+
+                    b.Property<Guid>("OccurrenceVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_version");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_case_target_sources");
+
+                    b.HasIndex("EventId")
+                        .HasDatabaseName("ix_moderation_case_target_sources_event_id");
+
+                    b.HasIndex("TenantId", "TrustDomainId", "Kind", "NativeKind", "NativeTargetId", "NativeTargetVersion", "NativeFactsDigest", "OccurrenceDigest", "MaterialDigest")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_case_target_sources_tenant_id_trust_domain_id_kind_native_kind_native_target_id_native_target_version_1daa445d50ae");
+
+                    b.ToTable("ie_moderation_case_target_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_native_source_event", "(event_id IS NULL AND event_version IS NULL AND kind IN (3, 4)) OR (event_id IS NOT NULL AND event_version IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_native_source_kind", "kind BETWEEN 1 AND 9 AND native_kind BETWEEN 1 AND 7 AND (kind IN (8, 9) OR kind = native_kind) AND (kind <> 9 OR native_kind = 1)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationChildAgePolicyAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_child_age_policy_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_child_age_policy_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_child_age_policy_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_child_age_policy_adoptions_withdrawn_by_human_id");
+
+                    b.ToTable("ie_moderation_child_age_policy_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_child_age_adoption_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_moderation_child_age_adoption_validity", "valid_until > adopted_at");
+
+                            t.HasCheckConstraint("ck_moderation_child_age_adoption_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= adopted_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationChildAgePolicySource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Adulthood")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adulthood");
+
+                    b.Property<int>("AdulthoodAge")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adulthood_age");
+
+                    b.Property<int>("Assurance")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("assurance");
+
+                    b.Property<int>("Audience")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("audience");
+
+                    b.Property<int>("Calendar")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("calendar");
+
+                    b.Property<string>("CalendarJurisdictionGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("calendar_jurisdiction_grounds");
+
+                    b.Property<string>("ChildRiskGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_risk_grounds");
+
+                    b.Property<string>("ChildSafeguardingMandateBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_safeguarding_mandate_basis");
+
+                    b.Property<int>("Classification")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("classification");
+
+                    b.Property<string>("ClassificationRationale")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("classification_rationale");
+
+                    b.Property<int>("Collection")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("collection");
+
+                    b.Property<Guid>("CollectionControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("collection_controller_human_id");
+
+                    b.Property<string>("CollectionMandateBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("collection_mandate_basis");
+
+                    b.Property<Guid>("CollectionOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("collection_owner_human_id");
+
+                    b.Property<int>("Consent")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("consent");
+
+                    b.Property<string>("ConsentGuardianApplicabilityGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consent_guardian_applicability_grounds");
+
+                    b.Property<int>("Correction")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("correction");
+
+                    b.Property<int>("DebateMinimumAge")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("debate_minimum_age");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<int>("Evidence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("evidence");
+
+                    b.Property<Guid>("GovernanceControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("governance_controller_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<string>("IdentityAndIndependenceBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("identity_and_independence_basis");
+
+                    b.Property<string>("LawfulCollectionPurpose")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lawful_collection_purpose");
+
+                    b.Property<int>("LeapDay")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("leap_day");
+
+                    b.Property<string>("ManualAssuranceQualificationGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("manual_assurance_qualification_grounds");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<int>("Participant")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("participant");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<string>("PrivacyLegalGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_legal_grounds");
+
+                    b.Property<string>("PrivacyLegalMandateBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_legal_mandate_basis");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("ProhibitedInference")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("prohibited_inference");
+
+                    b.Property<string>("ProposedStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_state_digest");
+
+                    b.Property<int>("ProtectedAccess")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("protected_access");
+
+                    b.Property<int>("ProviderAssurance")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("provider_assurance");
+
+                    b.Property<string>("ProviderAssuranceReviewGrounds")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("provider_assurance_review_grounds");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<Guid>("ReviewerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_controller_human_id");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<int>("ScopeCeiling")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("scope_ceiling");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TimeZone")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("time_zone");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_child_age_policy_sources");
+
+                    b.HasIndex("CollectionControllerHumanId")
+                        .HasDatabaseName("ix_moderation_child_age_policy_sources_collection_controller_human_id");
+
+                    b.HasIndex("CollectionOwnerHumanId")
+                        .HasDatabaseName("ix_moderation_child_age_policy_sources_collection_owner_human_id");
+
+                    b.HasIndex("DefinitionId")
+                        .HasDatabaseName("ix_moderation_child_age_policy_sources_definition_id");
+
+                    b.HasIndex("GovernanceControllerHumanId")
+                        .HasDatabaseName("ix_moderation_child_age_policy_sources_governance_controller_human_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_child_age_policy_sources_recorded_by_human_id");
+
+                    b.HasIndex("ReviewerControllerHumanId")
+                        .HasDatabaseName("ix_moderation_child_age_policy_sources_reviewer_controller_human_id");
+
+                    b.HasIndex("ReviewerHumanId")
+                        .HasDatabaseName("ix_moderation_child_age_policy_sources_reviewer_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "PublicationId", "ProfileId", "ModeCode", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_child_age_policy_sources_host_binding_id_tenant_id_publication_id_profile_id_mode_code_writer_generation");
+
+                    b.ToTable("ie_moderation_child_age_policy_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_child_age_independence", "reviewer_human_id <> recorded_by_human_id AND collection_owner_human_id <> recorded_by_human_id AND reviewer_human_id <> collection_owner_human_id AND reviewer_controller_human_id <> collection_controller_human_id AND reviewer_controller_human_id <> governance_controller_human_id AND collection_controller_human_id <> governance_controller_human_id AND reviewer_human_id <> collection_controller_human_id AND reviewer_human_id <> governance_controller_human_id AND collection_owner_human_id <> reviewer_controller_human_id AND collection_owner_human_id <> governance_controller_human_id AND recorded_by_human_id <> reviewer_controller_human_id AND recorded_by_human_id <> collection_controller_human_id");
+
+                            t.HasCheckConstraint("ck_moderation_child_age_provider_review", "(provider_assurance = 1 AND provider_assurance_review_grounds IS NULL) OR (provider_assurance = 2 AND provider_assurance_review_grounds IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_child_age_source_generation", "revision = 1 AND policy_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_child_age_source_mode", "mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_moderation_child_age_source_validity", "valid_until > recorded_at");
+
+                            t.HasCheckConstraint("ck_moderation_child_age_terms", "collection = 1 AND consent = 1 AND assurance = 1 AND evidence = 1 AND classification = 1 AND debate_minimum_age = 18 AND audience = 1 AND participant = 1 AND correction = 1 AND protected_access = 1 AND prohibited_inference = 1 AND calendar = 1 AND time_zone = 1 AND leap_day = 1 AND adulthood = 1 AND adulthood_age BETWEEN 1 AND 130");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationControlBinding", b =>
+                {
+                    b.Property<Guid>("SelectionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_id");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<int?>("Capability")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("capability");
+
+                    b.Property<int?>("EffectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("effect_kind");
+
+                    b.Property<int?>("EffectMode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("effect_mode");
+
+                    b.Property<int?>("EffectTarget")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("effect_target");
+
+                    b.Property<int?>("Execution")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("execution");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("operation");
+
+                    b.Property<Guid?>("ScopeCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_community_id");
+
+                    b.Property<Guid?>("ScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_event_id");
+
+                    b.Property<Guid?>("ScopeInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_instance_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<Guid?>("ScopeResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_resource_id");
+
+                    b.Property<Guid?>("ScopeSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_solution_id");
+
+                    b.Property<Guid?>("ScopeTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_tenant_id");
+
+                    b.Property<Guid>("ScopeTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_trust_domain_id");
+
+                    b.Property<int?>("Strategy")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("strategy");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_id");
+
+                    b.Property<long>("TargetRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_revision");
+
+                    b.Property<DateTimeOffset?>("WindowEnd")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("window_end");
+
+                    b.HasKey("SelectionId", "Ordinal")
+                        .HasName("pk_ie_moderation_classification_control_bindings");
+
+                    b.ToTable("ie_moderation_classification_control_bindings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_classification_control_binding_event", "scope_kind = 7");
+
+                            t.HasCheckConstraint("ck_classification_control_binding_meaning", "(kind = 1 AND effect_kind BETWEEN 1 AND 26 AND effect_kind IS NOT NULL AND effect_mode BETWEEN 1 AND 8 AND effect_mode IS NOT NULL AND effect_target = 12 AND effect_target IS NOT NULL AND execution = 2 AND execution IS NOT NULL AND strategy IS NULL AND (capability IS NULL OR capability BETWEEN 1 AND 12)) OR (kind = 2 AND effect_kind IS NULL AND effect_mode IS NULL AND effect_target IS NULL AND capability IS NULL AND execution IS NULL AND (strategy IS NULL OR strategy IN (1, 2, 3)))");
+
+                            t.HasCheckConstraint("ck_classification_control_binding_partition", "ordinal >= 0 AND ordinal < 64 AND target_revision > 0 AND target_revision < 9223372036854775807 AND subject_kind = 4 AND subject_id = target_id AND target_id = scope_event_id AND window_end IS NULL");
+
+                            t.HasCheckConstraint("ck_moderation_classification_control_bindings_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL AND scope_event_id IS NULL) OR (scope_kind = 7 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NOT NULL AND scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationControlSelection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthoredByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("authored_by_human_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_stamp");
+
+                    b.Property<Guid>("GenerationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("generation_id");
+
+                    b.Property<DateTimeOffset>("GenerationObservedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("generation_observed_at");
+
+                    b.Property<long>("GenerationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation_revision");
+
+                    b.Property<DateTimeOffset>("GenerationValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("generation_valid_until");
+
+                    b.Property<long>("GenerationWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation_writer_generation");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<Guid>("OwnerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_controller_human_id");
+
+                    b.Property<Guid>("OwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_human_id");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("review_id");
+
+                    b.Property<long>("ReviewRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("review_revision");
+
+                    b.Property<DateTimeOffset>("ReviewValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("review_valid_until");
+
+                    b.Property<long>("ReviewWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("review_writer_generation");
+
+                    b.Property<Guid>("ReviewerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_controller_human_id");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("SelectionDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_digest");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<DateTimeOffset>("SourceRecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_recorded_at");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<DateTimeOffset>("SourceValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_valid_until");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("starts_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_classification_control_selections");
+
+                    b.HasIndex("AuthoredByHumanId")
+                        .HasDatabaseName("ix_moderation_classification_control_selections_authored_by_human_id");
+
+                    b.HasIndex("GenerationId")
+                        .HasDatabaseName("ix_moderation_classification_control_selections_generation_id");
+
+                    b.HasIndex("PublicationId")
+                        .HasDatabaseName("ix_moderation_classification_control_selections_publication_id");
+
+                    b.HasIndex("ReviewId")
+                        .HasDatabaseName("ix_moderation_classification_control_selections_review_id");
+
+                    b.HasIndex("SourceId")
+                        .HasDatabaseName("ix_moderation_classification_control_selections_source_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_classification_control_selections_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TrustDomainId", "TenantId", "EventId", "ReviewId")
+                        .HasDatabaseName("ix_moderation_classification_control_selections_host_binding_id_trust_domain_id_tenant_id_event_id_review_id");
+
+                    b.ToTable("ie_moderation_classification_control_selections", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_classification_control_digest", "length(selection_digest) = 64");
+
+                            t.HasCheckConstraint("ck_classification_control_generations", "revision = 1 AND source_revision = 1 AND review_revision = 1 AND generation_revision > 0 AND generation_revision < 9223372036854775807 AND generation_writer_generation > 0 AND source_writer_generation > generation_writer_generation AND review_writer_generation > source_writer_generation AND writer_generation > review_writer_generation AND writer_generation < 9223372036854775807 AND policy_revision > 0 AND policy_revision < 9223372036854775807 AND mode_code IN (1, 2)");
+
+                            t.HasCheckConstraint("ck_classification_control_identity", "id <> source_id AND id <> review_id AND id <> generation_id AND source_id <> review_id AND source_id <> generation_id AND review_id <> generation_id");
+
+                            t.HasCheckConstraint("ck_classification_control_independence", "reviewer_human_id <> owner_human_id AND reviewer_human_id <> owner_controller_human_id AND reviewer_controller_human_id <> owner_human_id AND reviewer_controller_human_id <> owner_controller_human_id AND authored_by_human_id <> owner_human_id AND authored_by_human_id <> owner_controller_human_id AND authored_by_human_id <> reviewer_human_id AND authored_by_human_id <> reviewer_controller_human_id");
+
+                            t.HasCheckConstraint("ck_classification_control_validity", "source_valid_until > source_recorded_at AND review_valid_until > starts_at AND generation_valid_until > generation_observed_at AND valid_until > recorded_at AND starts_at >= source_recorded_at AND starts_at >= generation_observed_at AND recorded_at >= starts_at AND source_valid_until <= generation_valid_until AND review_valid_until <= source_valid_until AND valid_until <= review_valid_until");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationEventTargetAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<int>("BindingOrdinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("binding_ordinal");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_stamp");
+
+                    b.Property<Guid>("GenerationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("generation_id");
+
+                    b.Property<DateTimeOffset>("GenerationObservedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("generation_observed_at");
+
+                    b.Property<long>("GenerationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation_revision");
+
+                    b.Property<DateTimeOffset>("GenerationValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("generation_valid_until");
+
+                    b.Property<long>("GenerationWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation_writer_generation");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("OwnerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_controller_human_id");
+
+                    b.Property<Guid>("OwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_human_id");
+
+                    b.Property<Guid>("ReviewerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_controller_human_id");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("RevocationGrounds")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revocation_grounds");
+
+                    b.Property<long?>("RevocationWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revocation_writer_generation");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_by_human_id");
+
+                    b.Property<Guid>("SelectionAuthoredByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_authored_by_human_id");
+
+                    b.Property<Guid>("SelectionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_id");
+
+                    b.Property<DateTimeOffset>("SelectionRecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_recorded_at");
+
+                    b.Property<long>("SelectionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("selection_revision");
+
+                    b.Property<DateTimeOffset>("SelectionValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_valid_until");
+
+                    b.Property<long>("SelectionWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("selection_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_classification_event_target_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_classification_event_target_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("GenerationId")
+                        .HasDatabaseName("ix_moderation_classification_event_target_adoptions_generation_id");
+
+                    b.HasIndex("HostBindingId")
+                        .HasDatabaseName("ix_moderation_classification_event_target_adoptions_host_binding_id");
+
+                    b.HasIndex("RevokedByHumanId")
+                        .HasDatabaseName("ix_moderation_classification_event_target_adoptions_revoked_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_classification_event_target_adoptions_tenant_id");
+
+                    b.HasIndex("SelectionId", "BindingOrdinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_event_target_adoptions_selection_id_binding_ordinal");
+
+                    b.ToTable("ie_moderation_classification_event_target_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_classification_event_adoption_generations", "selection_revision = 1 AND selection_writer_generation > 0 AND generation_revision > 0 AND generation_revision < 9223372036854775807 AND generation_writer_generation > 0 AND writer_generation > selection_writer_generation AND writer_generation > generation_writer_generation AND writer_generation < 9223372036854775807 AND binding_ordinal >= 0 AND binding_ordinal < 64");
+
+                            t.HasCheckConstraint("ck_classification_event_adoption_identity", "id <> selection_id AND id <> generation_id AND selection_id <> generation_id");
+
+                            t.HasCheckConstraint("ck_classification_event_adoption_independence", "adopted_by_human_id <> owner_human_id AND adopted_by_human_id <> owner_controller_human_id AND adopted_by_human_id <> reviewer_human_id AND adopted_by_human_id <> reviewer_controller_human_id AND adopted_by_human_id <> selection_authored_by_human_id");
+
+                            t.HasCheckConstraint("ck_classification_event_adoption_revocation", "(revision = 1 AND revoked_at IS NULL AND revoked_by_human_id IS NULL AND revocation_writer_generation IS NULL AND revocation_grounds IS NULL) OR (revision = 2 AND revoked_at IS NOT NULL AND revoked_by_human_id IS NOT NULL AND revocation_writer_generation IS NOT NULL AND revocation_writer_generation > writer_generation AND revocation_writer_generation < 9223372036854775807 AND revocation_grounds IS NOT NULL AND length(trim(revocation_grounds)) > 0 AND length(revocation_grounds) <= 2048 AND revoked_at >= adopted_at)");
+
+                            t.HasCheckConstraint("ck_classification_event_adoption_validity", "selection_valid_until > selection_recorded_at AND generation_valid_until > generation_observed_at AND valid_until > adopted_at AND adopted_at >= selection_recorded_at AND adopted_at >= generation_observed_at AND valid_until <= selection_valid_until AND valid_until <= generation_valid_until");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialCategory", b =>
+                {
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("entry_id");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("EntryId", "Ordinal")
+                        .HasName("pk_ie_moderation_classification_material_categories");
+
+                    b.HasIndex("VersionId")
+                        .HasDatabaseName("ix_moderation_classification_material_categories_version_id");
+
+                    b.HasIndex("EntryId", "VersionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_material_categories_entry_id_version_id");
+
+                    b.ToTable("ie_moderation_classification_material_categories", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_material_category_ordinal", "ordinal BETWEEN 0 AND 63");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialComponent", b =>
+                {
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("digest");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("NativeId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_id");
+
+                    b.Property<Guid?>("NativeStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_stamp");
+
+                    b.HasKey("SourceId", "Ordinal")
+                        .HasName("pk_ie_moderation_classification_material_components");
+
+                    b.HasIndex("SourceId", "Kind", "NativeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_material_components_source_id_kind_native_id");
+
+                    b.ToTable("ie_moderation_classification_material_components", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_material_component_kind", "kind BETWEEN 1 AND 41 AND ordinal BETWEEN 0 AND 4095");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_stamp");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<Guid?>("ResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("resource_id");
+
+                    b.Property<Guid?>("ResourceStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("resource_stamp");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("session_id");
+
+                    b.Property<Guid?>("SessionStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("session_stamp");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_classification_material_entries");
+
+                    b.HasIndex("SourceId", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_material_entries_source_id_ordinal");
+
+                    b.ToTable("ie_moderation_classification_material_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_material_entry_ancestry", "((session_id IS NULL AND session_stamp IS NULL) OR (session_id IS NOT NULL AND session_stamp IS NOT NULL)) AND ((resource_id IS NULL AND resource_stamp IS NULL) OR (resource_id IS NOT NULL AND resource_stamp IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_moderation_material_entry_ordinal", "ordinal BETWEEN 0 AND 4095");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcceptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<string>("EndGrounds")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("end_grounds");
+
+                    b.Property<int?>("EndKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("end_kind");
+
+                    b.Property<long?>("EndWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("end_writer_generation");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ended_at");
+
+                    b.Property<Guid?>("EndedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ended_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_classification_material_reviews");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_material_reviews_source_id");
+
+                    b.ToTable("ie_moderation_classification_material_reviews", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_material_review_ending", "(revision = 1 AND end_kind IS NULL AND ended_at IS NULL AND ended_by_human_id IS NULL AND end_writer_generation IS NULL AND end_grounds IS NULL) OR (revision = 2 AND end_kind BETWEEN 1 AND 2 AND ended_at IS NOT NULL AND ended_by_human_id IS NOT NULL AND end_writer_generation > writer_generation AND end_grounds IS NOT NULL AND ended_at >= accepted_at)");
+
+                            t.HasCheckConstraint("ck_moderation_material_review_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_moderation_material_review_validity", "valid_until > accepted_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("EventGenerationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_generation_id");
+
+                    b.Property<long>("EventGenerationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("event_generation_revision");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_stamp");
+
+                    b.Property<long>("EventWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("event_writer_generation");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<Guid>("OwnerAssignmentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_assignment_id");
+
+                    b.Property<long>("OwnerAssignmentRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("owner_assignment_revision");
+
+                    b.Property<Guid>("OwnerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_controller_human_id");
+
+                    b.Property<Guid>("OwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_human_id");
+
+                    b.Property<string>("OwnershipGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ownership_grounds");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<long>("PreviousGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("previous_generation");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("ReviewGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("review_grounds");
+
+                    b.Property<Guid>("ReviewerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_controller_human_id");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<long>("TaxonomyAdoptionGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("taxonomy_adoption_generation");
+
+                    b.Property<Guid>("TaxonomyAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("taxonomy_adoption_id");
+
+                    b.Property<long>("TaxonomyAdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("taxonomy_adoption_revision");
+
+                    b.Property<Guid>("TaxonomyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("taxonomy_id");
+
+                    b.Property<long>("TaxonomySourceGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("taxonomy_source_generation");
+
+                    b.Property<Guid>("TaxonomySourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("taxonomy_source_id");
+
+                    b.Property<long>("TaxonomySourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("taxonomy_source_revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_classification_material_sources");
+
+                    b.HasIndex("EventGenerationId")
+                        .HasDatabaseName("ix_moderation_classification_material_sources_event_generation_id");
+
+                    b.HasIndex("TaxonomyAdoptionId")
+                        .HasDatabaseName("ix_moderation_classification_material_sources_taxonomy_adoption_id");
+
+                    b.HasIndex("TaxonomySourceId")
+                        .HasDatabaseName("ix_moderation_classification_material_sources_taxonomy_source_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "EventId", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_material_sources_host_binding_id_tenant_id_event_id_writer_generation");
+
+                    b.ToTable("ie_moderation_classification_material_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_material_generation", "revision = 1 AND previous_generation >= 0 AND event_generation_revision > 0 AND event_writer_generation > 0 AND taxonomy_source_revision = 1 AND taxonomy_adoption_revision = 1 AND taxonomy_source_generation > 0 AND taxonomy_adoption_generation > taxonomy_source_generation AND writer_generation > taxonomy_adoption_generation AND writer_generation > event_writer_generation AND writer_generation > previous_generation AND owner_assignment_revision > 0 AND policy_revision > 0 AND mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_moderation_material_independence", "owner_human_id <> reviewer_human_id AND owner_controller_human_id <> reviewer_controller_human_id AND owner_human_id <> reviewer_controller_human_id AND reviewer_human_id <> owner_controller_human_id");
+
+                            t.HasCheckConstraint("ck_moderation_material_validity", "valid_until > recorded_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationTaxonomyAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_classification_taxonomy_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_adoptions_withdrawn_by_human_id");
+
+                    b.ToTable("ie_moderation_classification_taxonomy_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_taxonomy_adoption_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_moderation_taxonomy_adoption_validity", "valid_until > adopted_at");
+
+                            t.HasCheckConstraint("ck_moderation_taxonomy_adoption_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= adopted_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationTaxonomyCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("category_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("code");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Meaning")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("meaning");
+
+                    b.Property<int>("MinimumAge")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("minimum_age");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<string>("ReviewRationale")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("review_rationale");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_classification_taxonomy_categories");
+
+                    b.HasIndex("SourceId", "CategoryId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_categories_source_id_category_id");
+
+                    b.HasIndex("SourceId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_categories_source_id_code");
+
+                    b.HasIndex("SourceId", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_categories_source_id_ordinal");
+
+                    b.ToTable("ie_moderation_classification_taxonomy_categories", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_taxonomy_category", "category_id > 0 AND ordinal BETWEEN 0 AND 63 AND kind BETWEEN 1 AND 4 AND minimum_age BETWEEN 0 AND 130");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationTaxonomySource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AdoptedDebateMinimumAge")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adopted_debate_minimum_age");
+
+                    b.Property<long>("ChildAgeAdoptionGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("child_age_adoption_generation");
+
+                    b.Property<Guid>("ChildAgeAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_adoption_id");
+
+                    b.Property<long>("ChildAgeAdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("child_age_adoption_revision");
+
+                    b.Property<long>("ChildAgeSourceGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("child_age_source_generation");
+
+                    b.Property<Guid>("ChildAgeSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_source_id");
+
+                    b.Property<long>("ChildAgeSourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("child_age_source_revision");
+
+                    b.Property<long>("ConstitutionAdoptionGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("constitution_adoption_generation");
+
+                    b.Property<Guid>("ConstitutionAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("constitution_adoption_id");
+
+                    b.Property<long>("ConstitutionAdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("constitution_adoption_revision");
+
+                    b.Property<long>("ConstitutionSourceGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("constitution_source_generation");
+
+                    b.Property<Guid>("ConstitutionSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("constitution_source_id");
+
+                    b.Property<long>("ConstitutionSourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("constitution_source_revision");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<Guid>("OwnerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_controller_human_id");
+
+                    b.Property<Guid>("OwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_human_id");
+
+                    b.Property<string>("OwnershipGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ownership_grounds");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<long>("PreviousGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("previous_generation");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("ProposedStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_state_digest");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("ReviewMandateGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("review_mandate_grounds");
+
+                    b.Property<Guid>("ReviewerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_controller_human_id");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TaxonomyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("taxonomy_id");
+
+                    b.Property<long>("TaxonomyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("taxonomy_revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_classification_taxonomy_sources");
+
+                    b.HasIndex("ChildAgeAdoptionId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_child_age_adoption_id");
+
+                    b.HasIndex("ChildAgeSourceId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_child_age_source_id");
+
+                    b.HasIndex("ConstitutionAdoptionId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_constitution_adoption_id");
+
+                    b.HasIndex("ConstitutionSourceId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_constitution_source_id");
+
+                    b.HasIndex("DefinitionId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_definition_id");
+
+                    b.HasIndex("OwnerControllerHumanId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_owner_controller_human_id");
+
+                    b.HasIndex("OwnerHumanId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_owner_human_id");
+
+                    b.HasIndex("ReviewerControllerHumanId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_reviewer_controller_human_id");
+
+                    b.HasIndex("ReviewerHumanId")
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_reviewer_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "TaxonomyId", "TaxonomyRevision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_host_binding_id_tenant_id_taxonomy_id_taxonomy_revision");
+
+                    b.HasIndex("HostBindingId", "TenantId", "TaxonomyId", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_classification_taxonomy_sources_host_binding_id_tenant_id_taxonomy_id_writer_generation");
+
+                    b.ToTable("ie_moderation_classification_taxonomy_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_taxonomy_generation", "revision = 1 AND taxonomy_revision > 0 AND previous_generation >= 0 AND writer_generation > previous_generation AND child_age_source_revision = 1 AND child_age_adoption_revision = 1 AND constitution_source_revision = 1 AND constitution_adoption_revision = 1 AND child_age_source_generation > 0 AND child_age_adoption_generation > child_age_source_generation AND constitution_source_generation > 0 AND constitution_adoption_generation > constitution_source_generation AND writer_generation > child_age_adoption_generation AND writer_generation > constitution_adoption_generation");
+
+                            t.HasCheckConstraint("ck_moderation_taxonomy_independence", "owner_human_id <> reviewer_human_id AND owner_controller_human_id <> reviewer_controller_human_id AND owner_human_id <> reviewer_controller_human_id AND reviewer_human_id <> owner_controller_human_id");
+
+                            t.HasCheckConstraint("ck_moderation_taxonomy_mode", "mode_code BETWEEN 1 AND 2 AND policy_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_taxonomy_validity", "valid_until > recorded_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConstitutionAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_constitution_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_constitution_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_constitution_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_constitution_adoptions_withdrawn_by_human_id");
+
+                    b.ToTable("ie_moderation_constitution_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_constitution_adoption_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_moderation_constitution_adoption_validity", "valid_until > adopted_at");
+
+                            t.HasCheckConstraint("ck_moderation_constitution_adoption_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= adopted_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConstitutionAvailability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("MaximumCaseload")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_caseload");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_constitution_availability");
+
+                    b.HasIndex("ReviewerHumanId")
+                        .HasDatabaseName("ix_moderation_constitution_availability_reviewer_human_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_constitution_availability_withdrawn_by_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "ReviewerHumanId", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_constitution_availability_host_binding_id_tenant_id_reviewer_human_id_writer_generation");
+
+                    b.ToTable("ie_moderation_constitution_availability", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_constitution_availability_capacity", "maximum_caseload > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_constitution_availability_validity", "valid_until > recorded_at");
+
+                            t.HasCheckConstraint("ck_moderation_constitution_availability_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= recorded_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConstitutionReviewer", b =>
+                {
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<Guid>("AvailabilityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("availability_id");
+
+                    b.Property<long>("AvailabilityRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("availability_revision");
+
+                    b.Property<long>("AvailabilityWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("availability_writer_generation");
+
+                    b.Property<Guid>("ControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("controller_human_id");
+
+                    b.Property<string>("IdentityBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("identity_basis");
+
+                    b.Property<string>("IndependenceBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("independence_basis");
+
+                    b.Property<string>("QualificationBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualification_basis");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.HasKey("SourceId", "Ordinal")
+                        .HasName("pk_ie_moderation_constitution_reviewers");
+
+                    b.HasIndex("AvailabilityId")
+                        .HasDatabaseName("ix_moderation_constitution_reviewers_availability_id");
+
+                    b.HasIndex("ControllerHumanId")
+                        .HasDatabaseName("ix_moderation_constitution_reviewers_controller_human_id");
+
+                    b.HasIndex("ReviewerHumanId")
+                        .HasDatabaseName("ix_moderation_constitution_reviewers_reviewer_human_id");
+
+                    b.HasIndex("SourceId", "AvailabilityId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_constitution_reviewers_source_id_availability_id");
+
+                    b.HasIndex("SourceId", "ControllerHumanId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_constitution_reviewers_source_id_controller_human_id");
+
+                    b.HasIndex("SourceId", "ReviewerHumanId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_constitution_reviewers_source_id_reviewer_human_id");
+
+                    b.ToTable("ie_moderation_constitution_reviewers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_constitution_reviewer_generation", "ordinal >= 0 AND ordinal < 32 AND availability_revision = 1 AND availability_writer_generation > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConstitutionSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CoordinatorHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("coordinator_human_id");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<long>("EscalationAfterTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("escalation_after_ticks");
+
+                    b.Property<int>("Evidence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("evidence");
+
+                    b.Property<int>("Exposure")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("exposure");
+
+                    b.Property<Guid>("FallbackHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("fallback_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("Independence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("independence");
+
+                    b.Property<string>("IndependentRedressRoute")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("independent_redress_route");
+
+                    b.Property<long>("MaximumReviewIntervalTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_review_interval_ticks");
+
+                    b.Property<int>("MinimumIndependentReviewers")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("minimum_independent_reviewers");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<DateTimeOffset?>("OriginalCustodyUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_custody_until");
+
+                    b.Property<string>("OriginalEffectBindingHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_effect_binding_hash");
+
+                    b.Property<Guid?>("OriginalEffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_effect_id");
+
+                    b.Property<string>("OriginalSnapshotHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_snapshot_hash");
+
+                    b.Property<int>("Overload")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("overload");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("ProposedStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_state_digest");
+
+                    b.Property<int>("ProtectedComplaintCalendarMonths")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("protected_complaint_calendar_months");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<int>("Remedies")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("remedies");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<int>("ScopeCeiling")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("scope_ceiling");
+
+                    b.Property<string>("SupportRoute")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("support_route");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_constitution_sources");
+
+                    b.HasIndex("CoordinatorHumanId")
+                        .HasDatabaseName("ix_moderation_constitution_sources_coordinator_human_id");
+
+                    b.HasIndex("DefinitionId")
+                        .HasDatabaseName("ix_moderation_constitution_sources_definition_id");
+
+                    b.HasIndex("FallbackHumanId")
+                        .HasDatabaseName("ix_moderation_constitution_sources_fallback_human_id");
+
+                    b.HasIndex("OriginalEffectId")
+                        .HasDatabaseName("ix_moderation_constitution_sources_original_effect_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_constitution_sources_recorded_by_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "PublicationId", "ProfileId", "ModeCode", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_constitution_sources_host_binding_id_tenant_id_publication_id_profile_id_mode_code_writer_generation");
+
+                    b.ToTable("ie_moderation_constitution_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_constitution_original_purpose", "(original_effect_id IS NULL AND original_snapshot_hash IS NULL AND original_effect_binding_hash IS NULL AND original_custody_until IS NULL) OR (original_effect_id IS NOT NULL AND original_snapshot_hash IS NOT NULL AND original_effect_binding_hash IS NOT NULL AND original_custody_until IS NOT NULL AND valid_until <= original_custody_until)");
+
+                            t.HasCheckConstraint("ck_moderation_constitution_source_mode", "mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_moderation_constitution_source_revision", "revision = 1 AND policy_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_constitution_source_validity", "valid_until > recorded_at");
+
+                            t.HasCheckConstraint("ck_moderation_constitution_substance", "evidence = 1 AND remedies = 1 AND independence = 1 AND exposure = 1 AND overload = 1 AND minimum_independent_reviewers BETWEEN 1 AND 32 AND protected_complaint_calendar_months >= 6 AND maximum_review_interval_ticks > 0 AND escalation_after_ticks > 0 AND coordinator_human_id <> fallback_human_id");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConsumerInstallation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ConsumerId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consumer_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<DateTimeOffset>("InstalledAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("installed_at");
+
+                    b.Property<Guid>("InstalledByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("installed_by_human_id");
+
+                    b.Property<string>("InventoryFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("inventory_fingerprint");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("RuntimeGeneration")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("runtime_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_consumer_installations");
+
+                    b.HasIndex("InstalledByHumanId")
+                        .HasDatabaseName("ix_moderation_consumer_installations_installed_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_consumer_installations_tenant_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_consumer_installations_withdrawn_by_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "ConsumerId", "ModeCode", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_consumer_installations_host_binding_id_tenant_id_consumer_id_mode_code_writer_generation");
+
+                    b.ToTable("ie_moderation_consumer_installations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_consumer_installation_generation", "writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_consumer_installation_owner", "consumer_id <> '' AND mode_code = 1");
+
+                            t.HasCheckConstraint("ck_moderation_consumer_installation_validity", "valid_until > installed_at");
+
+                            t.HasCheckConstraint("ck_moderation_consumer_installation_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= installed_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConsumerMeasurementChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BindingDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("binding_digest");
+
+                    b.Property<string>("ConsumerContractDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consumer_contract_digest");
+
+                    b.Property<string>("ConsumerId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consumer_id");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("installation_id");
+
+                    b.Property<long>("InstallationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("installation_revision");
+
+                    b.Property<long>("InstallationWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("installation_writer_generation");
+
+                    b.Property<string>("InventoryFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("inventory_fingerprint");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<string>("Nonce")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("nonce");
+
+                    b.Property<string>("OriginalEffectBindingHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_effect_binding_hash");
+
+                    b.Property<Guid?>("OriginalEffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_effect_id");
+
+                    b.Property<string>("OriginalSnapshotHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_snapshot_hash");
+
+                    b.Property<DateTimeOffset>("PreparedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("prepared_at");
+
+                    b.Property<Guid>("PreparedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("prepared_by_human_id");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("RuntimeGeneration")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("runtime_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_consumer_measurement_challenges");
+
+                    b.HasIndex("DefinitionId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_challenges_definition_id");
+
+                    b.HasIndex("HostBindingId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_challenges_host_binding_id");
+
+                    b.HasIndex("InstallationId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_challenges_installation_id");
+
+                    b.HasIndex("Nonce")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_consumer_measurement_challenges_nonce");
+
+                    b.HasIndex("OriginalEffectId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_challenges_original_effect_id");
+
+                    b.HasIndex("PreparedByHumanId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_challenges_prepared_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_challenges_tenant_id");
+
+                    b.ToTable("ie_moderation_consumer_measurement_challenges", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_measurement_challenge_original", "(original_effect_id IS NULL AND original_snapshot_hash IS NULL AND original_effect_binding_hash IS NULL) OR (original_effect_id IS NOT NULL AND original_snapshot_hash IS NOT NULL AND original_effect_binding_hash IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_measurement_challenge_owner", "consumer_id <> '' AND mode_code = 1");
+
+                            t.HasCheckConstraint("ck_moderation_measurement_challenge_source", "installation_revision = 1 AND installation_writer_generation > 0 AND writer_generation > installation_writer_generation AND revision = 1");
+
+                            t.HasCheckConstraint("ck_moderation_measurement_challenge_validity", "valid_until > prepared_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConsumerMeasurementReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcceptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<Guid>("AcceptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_by_human_id");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("IssuerEnrollmentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuer_enrollment_id");
+
+                    b.Property<Guid>("IssuerKeyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuer_key_id");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("run_id");
+
+                    b.Property<string>("SignedToken")
+                        .IsRequired()
+                        .HasMaxLength(65536)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("signed_token");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TokenDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("token_digest");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_consumer_measurement_receipts");
+
+                    b.HasIndex("AcceptedByHumanId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_receipts_accepted_by_human_id");
+
+                    b.HasIndex("ChallengeId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_receipts_challenge_id");
+
+                    b.HasIndex("IssuerEnrollmentId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_receipts_issuer_enrollment_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_receipts_tenant_id");
+
+                    b.HasIndex("TokenDigest")
+                        .HasDatabaseName("ix_moderation_consumer_measurement_receipts_token_digest");
+
+                    b.HasIndex("HostBindingId", "TenantId", "ChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_consumer_measurement_receipts_host_binding_id_tenant_id_challenge_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "RunId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_consumer_measurement_receipts_host_binding_id_tenant_id_run_id");
+
+                    b.ToTable("ie_moderation_consumer_measurement_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_measurement_receipt_generation", "writer_generation > 0 AND writer_generation < 9223372036854775807 AND revision = 1");
+
+                            t.HasCheckConstraint("ck_moderation_measurement_receipt_validity", "valid_until > accepted_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationContentResponse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<long>("AssignmentRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("assignment_revision");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<Guid>("ContentSubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("content_subject_id");
+
+                    b.Property<Guid>("EffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("NoticeId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("notice_id");
+
+                    b.Property<Guid>("RepresentativeHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("representative_human_id");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_digest");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("snapshot_hash");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<byte[]>("protectedStatement")
+                        .IsRequired()
+                        .HasMaxLength(16384)
+                        .HasColumnType("BLOB")
+                        .HasColumnName("protected_statement");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_content_responses");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_content_responses_case_id");
+
+                    b.HasIndex("EffectId")
+                        .HasDatabaseName("ix_moderation_content_responses_effect_id");
+
+                    b.HasIndex("NoticeId")
+                        .HasDatabaseName("ix_moderation_content_responses_notice_id");
+
+                    b.HasIndex("RepresentativeHumanId")
+                        .HasDatabaseName("ix_moderation_content_responses_representative_human_id");
+
+                    b.HasIndex("TenantId", "EffectId")
+                        .HasDatabaseName("ix_moderation_content_responses_tenant_id_effect_id");
+
+                    b.HasIndex("TenantId", "RepresentativeHumanId")
+                        .HasDatabaseName("ix_moderation_content_responses_tenant_id_representative_human_id");
+
+                    b.ToTable("ie_moderation_content_responses", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_content_response_assignment", "assignment_revision > 0");
+
+                            t.HasCheckConstraint("ck_content_response_finite_purpose", "retain_until > submitted_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationContributionBinding", b =>
+                {
+                    b.Property<Guid>("SelectionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_id");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<int?>("Capability")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("capability");
+
+                    b.Property<int?>("EffectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("effect_kind");
+
+                    b.Property<int?>("EffectMode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("effect_mode");
+
+                    b.Property<int?>("EffectTarget")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("effect_target");
+
+                    b.Property<int?>("Execution")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("execution");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("operation");
+
+                    b.Property<Guid?>("ScopeCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_community_id");
+
+                    b.Property<Guid?>("ScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_event_id");
+
+                    b.Property<Guid?>("ScopeInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_instance_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<Guid?>("ScopeResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_resource_id");
+
+                    b.Property<Guid?>("ScopeSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_solution_id");
+
+                    b.Property<Guid?>("ScopeTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_tenant_id");
+
+                    b.Property<Guid>("ScopeTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_trust_domain_id");
+
+                    b.Property<int?>("Strategy")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("strategy");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_id");
+
+                    b.Property<long>("TargetRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_revision");
+
+                    b.Property<DateTimeOffset?>("WindowEnd")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("window_end");
+
+                    b.HasKey("SelectionId", "Ordinal")
+                        .HasName("pk_ie_moderation_contribution_bindings");
+
+                    b.ToTable("ie_moderation_contribution_bindings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_contribution_binding_meaning", "(kind = 1 AND effect_kind IS NOT NULL AND effect_mode IS NOT NULL AND effect_target IS NOT NULL AND execution IS NOT NULL AND strategy IS NULL) OR (kind = 2 AND effect_kind IS NULL AND effect_mode IS NULL AND effect_target IS NULL AND capability IS NULL AND execution IS NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_contribution_binding_partition", "ordinal >= 0 AND ordinal < 64 AND target_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_contribution_bindings_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL AND scope_event_id IS NULL) OR (scope_kind = 7 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NOT NULL AND scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationContributionSelection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthoredByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("authored_by_human_id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("decision_id");
+
+                    b.Property<long>("DecisionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("decision_revision");
+
+                    b.Property<Guid>("EffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_id");
+
+                    b.Property<DateTimeOffset?>("EventWindowEnd")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_window_end");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("SelectionDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_digest");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("starts_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_contribution_selections");
+
+                    b.HasIndex("AuthoredByHumanId")
+                        .HasDatabaseName("ix_moderation_contribution_selections_authored_by_human_id");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_contribution_selections_case_id");
+
+                    b.HasIndex("DecisionId")
+                        .HasDatabaseName("ix_moderation_contribution_selections_decision_id");
+
+                    b.HasIndex("PublicationId")
+                        .HasDatabaseName("ix_moderation_contribution_selections_publication_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_contribution_selections_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TrustDomainId", "TenantId", "EffectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_contribution_selections_host_binding_id_trust_domain_id_tenant_id_effect_id");
+
+                    b.ToTable("ie_moderation_contribution_selections", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_contribution_selection_generations", "revision = 1 AND decision_revision > 1 AND case_revision > 0 AND policy_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_contribution_selection_validity", "valid_until > recorded_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationDeploymentAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_deployment_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_deployment_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_deployment_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_deployment_adoptions_withdrawn_by_human_id");
+
+                    b.ToTable("ie_moderation_deployment_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_deployment_adoption_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_moderation_deployment_adoption_validity", "valid_until > adopted_at");
+
+                            t.HasCheckConstraint("ck_moderation_deployment_adoption_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= adopted_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationDeploymentConsumer", b =>
+                {
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<string>("BindingDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("binding_digest");
+
+                    b.Property<string>("ConsumerId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consumer_id");
+
+                    b.Property<string>("ContractDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("contract_digest");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("installation_id");
+
+                    b.Property<long>("InstallationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("installation_revision");
+
+                    b.Property<long>("InstallationWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("installation_writer_generation");
+
+                    b.Property<string>("ProductArtifactDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("product_artifact_digest");
+
+                    b.Property<string>("RuntimeGeneration")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("runtime_generation");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.HasKey("SourceId", "Ordinal")
+                        .HasName("pk_ie_moderation_deployment_consumers");
+
+                    b.HasIndex("InstallationId")
+                        .HasDatabaseName("ix_moderation_deployment_consumers_installation_id");
+
+                    b.HasIndex("SourceId", "BindingDigest", "ConsumerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_deployment_consumers_source_id_binding_digest_consumer_id");
+
+                    b.ToTable("ie_moderation_deployment_consumers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_deployment_consumer_revision", "ordinal >= 0 AND ordinal < 256 AND installation_revision = 1 AND installation_writer_generation > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationDeploymentSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("DatabaseConfigurationDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("database_configuration_digest");
+
+                    b.Property<string>("DatabaseProviderCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("database_provider_code");
+
+                    b.Property<string>("DatabaseProviderVersion")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("database_provider_version");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<string>("InventoryFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("inventory_fingerprint");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("ProposedStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_state_digest");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_deployment_sources");
+
+                    b.HasIndex("DefinitionId")
+                        .HasDatabaseName("ix_moderation_deployment_sources_definition_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_deployment_sources_recorded_by_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "PublicationId", "ProfileId", "ModeCode", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_deployment_sources_host_binding_id_tenant_id_publication_id_profile_id_mode_code_writer_generation");
+
+                    b.ToTable("ie_moderation_deployment_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_deployment_source_mode", "mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_moderation_deployment_source_revision", "revision = 1 AND policy_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_deployment_source_validity", "valid_until > recorded_at");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.ModerationEffectIntent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -18012,6 +22970,18 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("decision_revision");
 
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTimeOffset?>("LeaseStartedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lease_started_at");
+
                     b.Property<Guid>("OperationId")
                         .HasColumnType("TEXT")
                         .HasColumnName("operation_id");
@@ -18019,6 +22989,42 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<int>("OperationKind")
                         .HasColumnType("INTEGER")
                         .HasColumnName("operation_kind");
+
+                    b.Property<Guid?>("OriginalCompletionHostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_completion_host_binding_id");
+
+                    b.Property<Guid?>("OriginalCompletionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_completion_id");
+
+                    b.Property<long?>("OriginalCompletionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_completion_revision");
+
+                    b.Property<Guid?>("OriginalCompletionWriterTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_completion_writer_tenant_id");
+
+                    b.Property<Guid?>("OriginalNoticeCleanupId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_notice_cleanup_id");
+
+                    b.Property<Guid?>("OriginalNoticeHostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_notice_host_binding_id");
+
+                    b.Property<DateTimeOffset?>("OriginalNoticePurgedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_notice_purged_at");
+
+                    b.Property<DateTimeOffset?>("OriginalNoticeRetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_notice_retain_until");
+
+                    b.Property<Guid?>("OriginalNoticeWriterTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_notice_writer_tenant_id");
 
                     b.Property<long>("PolicyRevision")
                         .HasColumnType("INTEGER")
@@ -18085,8 +23091,23 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasIndex("CompletedAt", "CreatedAt")
                         .HasDatabaseName("ix_moderation_effect_intents_completed_at_created_at");
 
+                    b.HasIndex("CompletedAt", "LeaseExpiresAt", "Id")
+                        .HasDatabaseName("ix_moderation_effect_intents_completed_at_lease_expires_at_id");
+
                     b.ToTable("ie_moderation_effect_intents", null, t =>
                         {
+                            t.HasCheckConstraint("ck_moderation_effect_completed_lease", "completed_at IS NULL OR lease_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_moderation_effect_completion_window", "completed_at IS NULL OR (completed_at >= lease_started_at AND completed_at < lease_expires_at)");
+
+                            t.HasCheckConstraint("ck_moderation_effect_lease", "(lease_id IS NULL AND lease_started_at IS NULL AND lease_expires_at IS NULL) OR (lease_id IS NOT NULL AND lease_started_at IS NOT NULL AND lease_expires_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_effect_lease_window", "lease_id IS NULL OR (lease_started_at >= created_at AND lease_expires_at > lease_started_at)");
+
+                            t.HasCheckConstraint("ck_moderation_effect_notice_cleanup", "(original_notice_cleanup_id IS NULL AND original_notice_host_binding_id IS NULL AND original_notice_writer_tenant_id IS NULL AND original_notice_retain_until IS NULL AND original_notice_purged_at IS NULL) OR (original_notice_cleanup_id IS NOT NULL AND original_notice_host_binding_id IS NOT NULL AND original_notice_writer_tenant_id IS NOT NULL AND original_notice_retain_until IS NOT NULL AND original_notice_purged_at IS NOT NULL AND original_notice_retain_until > created_at AND original_notice_purged_at >= original_notice_retain_until AND revision > 1)");
+
+                            t.HasCheckConstraint("ck_moderation_effect_original_completion", "(original_completion_id IS NULL AND original_completion_host_binding_id IS NULL AND original_completion_writer_tenant_id IS NULL AND original_completion_revision IS NULL) OR (original_completion_id IS NOT NULL AND original_completion_host_binding_id IS NOT NULL AND original_completion_writer_tenant_id IS NOT NULL AND original_completion_revision IS NOT NULL AND completed_at IS NOT NULL AND original_completion_revision >= 3 AND original_completion_revision <= revision)");
+
                             t.HasCheckConstraint("ck_moderation_effect_qualification", "policy_revision > 0 AND qualification_revision > 0");
 
                             t.HasCheckConstraint("ck_moderation_effect_revision", "revision > 0 AND decision_revision > 0");
@@ -18094,6 +23115,515 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                             t.HasCheckConstraint("ck_moderation_effect_sanction_pair", "(sanction_id IS NULL AND sanction_revision IS NULL) OR (sanction_id IS NOT NULL AND sanction_revision IS NOT NULL AND sanction_revision > 0)");
 
                             t.HasCheckConstraint("ck_moderation_effect_supersession", "(operation_kind <> 10 AND superseded_sanction_id IS NULL AND superseded_sanction_revision IS NULL) OR (operation_kind = 10 AND sanction_id IS NOT NULL AND superseded_sanction_id IS NOT NULL AND superseded_sanction_revision IS NOT NULL AND superseded_sanction_revision > 0 AND superseded_sanction_id <> sanction_id)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationEventGeneration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("actor_id");
+
+                    b.Property<Guid>("ActorStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("actor_stamp");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_stamp");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<DateTimeOffset>("ObservedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observed_at");
+
+                    b.Property<Guid>("ObservedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observed_by_human_id");
+
+                    b.Property<Guid?>("OrganizerActorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("organizer_actor_id");
+
+                    b.Property<Guid?>("OrganizerActorStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("organizer_actor_stamp");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid?>("SubmittedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("submitted_by_human_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_event_generations");
+
+                    b.HasIndex("ObservedByHumanId")
+                        .HasDatabaseName("ix_moderation_event_generations_observed_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_event_generations_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "EventId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_event_generations_host_binding_id_tenant_id_event_id_revision");
+
+                    b.ToTable("ie_moderation_event_generations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_event_generation_organizer", "(organizer_actor_id IS NULL AND organizer_actor_stamp IS NULL) OR (organizer_actor_id IS NOT NULL AND organizer_actor_stamp IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_event_generation_revision", "revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_event_generation_validity", "valid_until > observed_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationEventRightsAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_event_rights_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_event_rights_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_adoptions_withdrawn_by_human_id");
+
+                    b.ToTable("ie_moderation_event_rights_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_event_rights_adoption_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_moderation_event_rights_adoption_validity", "valid_until > adopted_at");
+
+                            t.HasCheckConstraint("ck_moderation_event_rights_adoption_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= adopted_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationEventRightsSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Companions")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("companions");
+
+                    b.Property<int>("Consent")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("consent");
+
+                    b.Property<int>("Continuity")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("continuity");
+
+                    b.Property<string>("ContinuityGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("continuity_grounds");
+
+                    b.Property<Guid>("ContinuityMappingControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("continuity_mapping_controller_human_id");
+
+                    b.Property<string>("ContinuityMappingMandateGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("continuity_mapping_mandate_grounds");
+
+                    b.Property<Guid>("ContinuityMappingOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("continuity_mapping_owner_human_id");
+
+                    b.Property<string>("ControllerAndIndependenceGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("controller_and_independence_grounds");
+
+                    b.Property<int>("Correction")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("correction");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<string>("EventRightsGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_rights_grounds");
+
+                    b.Property<Guid>("GovernanceControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("governance_controller_human_id");
+
+                    b.Property<int>("HistoricalCommerce")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("historical_commerce");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("MissingSettlement")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("missing_settlement");
+
+                    b.Property<int>("MissingSteward")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("missing_steward");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<int>("PhysicalJurisdiction")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("physical_jurisdiction");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<string>("PremisesJurisdictionGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("premises_jurisdiction_grounds");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("ProposedStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_state_digest");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<Guid>("ReviewerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_controller_human_id");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("RightsReviewMandateGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("rights_review_mandate_grounds");
+
+                    b.Property<int>("ScopeCeiling")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("scope_ceiling");
+
+                    b.Property<int>("Settlement")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("settlement");
+
+                    b.Property<Guid>("SettlementMappingControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("settlement_mapping_controller_human_id");
+
+                    b.Property<string>("SettlementMappingGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("settlement_mapping_grounds");
+
+                    b.Property<string>("SettlementMappingMandateGrounds")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("settlement_mapping_mandate_grounds");
+
+                    b.Property<Guid>("SettlementMappingOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("settlement_mapping_owner_human_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_event_rights_sources");
+
+                    b.HasIndex("ContinuityMappingControllerHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_sources_continuity_mapping_controller_human_id");
+
+                    b.HasIndex("ContinuityMappingOwnerHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_sources_continuity_mapping_owner_human_id");
+
+                    b.HasIndex("DefinitionId")
+                        .HasDatabaseName("ix_moderation_event_rights_sources_definition_id");
+
+                    b.HasIndex("GovernanceControllerHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_sources_governance_controller_human_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_sources_recorded_by_human_id");
+
+                    b.HasIndex("ReviewerControllerHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_sources_reviewer_controller_human_id");
+
+                    b.HasIndex("ReviewerHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_sources_reviewer_human_id");
+
+                    b.HasIndex("SettlementMappingControllerHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_sources_settlement_mapping_controller_human_id");
+
+                    b.HasIndex("SettlementMappingOwnerHumanId")
+                        .HasDatabaseName("ix_moderation_event_rights_sources_settlement_mapping_owner_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "PublicationId", "ProfileId", "ModeCode", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_event_rights_sources_host_binding_id_tenant_id_publication_id_profile_id_mode_code_writer_generation");
+
+                    b.ToTable("ie_moderation_event_rights_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_event_rights_independence", "reviewer_human_id <> recorded_by_human_id AND reviewer_human_id <> continuity_mapping_owner_human_id AND reviewer_human_id <> settlement_mapping_owner_human_id AND reviewer_controller_human_id <> governance_controller_human_id AND reviewer_controller_human_id <> continuity_mapping_controller_human_id AND reviewer_controller_human_id <> settlement_mapping_controller_human_id");
+
+                            t.HasCheckConstraint("ck_moderation_event_rights_source_generation", "revision = 1 AND policy_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_event_rights_source_mode", "mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_moderation_event_rights_source_validity", "valid_until > recorded_at");
+
+                            t.HasCheckConstraint("ck_moderation_event_rights_terms", "continuity = 1 AND consent = 1 AND missing_steward = 1 AND physical_jurisdiction = 1 AND settlement = 1 AND missing_settlement = 1 AND companions = 1 AND historical_commerce = 1 AND correction = 1");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationEventTargetAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<int>("BindingOrdinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("binding_ordinal");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<Guid>("GenerationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("generation_id");
+
+                    b.Property<long>("GenerationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation_revision");
+
+                    b.Property<long>("GenerationWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation_writer_generation");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_by_human_id");
+
+                    b.Property<Guid>("SelectionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_id");
+
+                    b.Property<long>("SelectionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("selection_revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_event_target_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_event_target_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("GenerationId")
+                        .HasDatabaseName("ix_moderation_event_target_adoptions_generation_id");
+
+                    b.HasIndex("RevokedByHumanId")
+                        .HasDatabaseName("ix_moderation_event_target_adoptions_revoked_by_human_id");
+
+                    b.HasIndex("SelectionId", "BindingOrdinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_event_target_adoptions_selection_id_binding_ordinal");
+
+                    b.ToTable("ie_moderation_event_target_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_event_target_adoption_revision", "selection_revision = 1 AND generation_revision > 0 AND generation_writer_generation > 0 AND case_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_event_target_adoption_revocation", "(revision = 1 AND revoked_at IS NULL AND revoked_by_human_id IS NULL) OR (revision = 2 AND revoked_at IS NOT NULL AND revoked_by_human_id IS NOT NULL AND revoked_at >= adopted_at)");
+
+                            t.HasCheckConstraint("ck_moderation_event_target_adoption_validity", "valid_until > adopted_at");
                         });
                 });
 
@@ -18209,6 +23739,772 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.ModerationMeasuredOperationsAcceptance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcceptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<Guid>("AcceptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_measured_operations_acceptances");
+
+                    b.HasIndex("AcceptedByHumanId")
+                        .HasDatabaseName("ix_moderation_measured_operations_acceptances_accepted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_measured_operations_acceptances_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_measured_operations_acceptances_withdrawn_by_human_id");
+
+                    b.ToTable("ie_moderation_measured_operations_acceptances", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_measured_acceptance_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_moderation_measured_acceptance_validity", "valid_until > accepted_at");
+
+                            t.HasCheckConstraint("ck_moderation_measured_acceptance_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= accepted_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationMeasuredOperationsSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BindingDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("binding_digest");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<string>("EvidenceJson")
+                        .IsRequired()
+                        .HasMaxLength(65536)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("evidence_json");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<DateTimeOffset?>("OriginalCustodyUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_custody_until");
+
+                    b.Property<string>("OriginalEffectBindingHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_effect_binding_hash");
+
+                    b.Property<Guid?>("OriginalEffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_effect_id");
+
+                    b.Property<string>("OriginalSnapshotHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_snapshot_hash");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("ProposedStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_state_digest");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<Guid>("RecorderControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorder_controller_human_id");
+
+                    b.Property<Guid>("ReviewerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_controller_human_id");
+
+                    b.Property<Guid>("ReviewerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_measured_operations_sources");
+
+                    b.HasIndex("DefinitionId")
+                        .HasDatabaseName("ix_moderation_measured_operations_sources_definition_id");
+
+                    b.HasIndex("OriginalEffectId")
+                        .HasDatabaseName("ix_moderation_measured_operations_sources_original_effect_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_measured_operations_sources_recorded_by_human_id");
+
+                    b.HasIndex("RecorderControllerHumanId")
+                        .HasDatabaseName("ix_moderation_measured_operations_sources_recorder_controller_human_id");
+
+                    b.HasIndex("ReviewerControllerHumanId")
+                        .HasDatabaseName("ix_moderation_measured_operations_sources_reviewer_controller_human_id");
+
+                    b.HasIndex("ReviewerHumanId")
+                        .HasDatabaseName("ix_moderation_measured_operations_sources_reviewer_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "BindingDigest", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_measured_operations_sources_host_binding_id_tenant_id_binding_digest_writer_generation");
+
+                    b.ToTable("ie_moderation_measured_operations_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_measured_source_generation", "revision = 1 AND policy_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_measured_source_independence", "reviewer_human_id <> recorded_by_human_id AND reviewer_controller_human_id <> recorder_controller_human_id AND reviewer_human_id <> recorder_controller_human_id AND recorded_by_human_id <> reviewer_controller_human_id");
+
+                            t.HasCheckConstraint("ck_moderation_measured_source_mode", "mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_moderation_measured_source_original", "(original_effect_id IS NULL AND original_snapshot_hash IS NULL AND original_effect_binding_hash IS NULL AND original_custody_until IS NULL) OR (original_effect_id IS NOT NULL AND original_snapshot_hash IS NOT NULL AND original_effect_binding_hash IS NOT NULL AND original_custody_until IS NOT NULL AND original_custody_until > recorded_at AND valid_until <= original_custody_until)");
+
+                            t.HasCheckConstraint("ck_moderation_measured_source_validity", "valid_until > recorded_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationMeasurementIssuerEnrollment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ApprovedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid>("ApprovedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("approved_by_human_id");
+
+                    b.Property<string>("CatalogueDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("catalogue_digest");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<string>("Issuer")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuer");
+
+                    b.Property<Guid>("KeyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("key_id");
+
+                    b.Property<string>("PublicKeySpkiBase64")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("public_key_spki_base64");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_by_human_id");
+
+                    b.Property<string>("RunnerDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("runner_digest");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TestBundleDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("test_bundle_digest");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_measurement_issuer_enrollments");
+
+                    b.HasIndex("ApprovedByHumanId")
+                        .HasDatabaseName("ix_moderation_measurement_issuer_enrollments_approved_by_human_id");
+
+                    b.HasIndex("RevokedByHumanId")
+                        .HasDatabaseName("ix_moderation_measurement_issuer_enrollments_revoked_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_measurement_issuer_enrollments_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "KeyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_measurement_issuer_enrollments_host_binding_id_tenant_id_key_id");
+
+                    b.ToTable("ie_moderation_measurement_issuer_enrollments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_measurement_issuer_enrollment_generation", "writer_generation > 0 AND writer_generation < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_moderation_measurement_issuer_enrollment_key", "key_id <> id");
+
+                            t.HasCheckConstraint("ck_moderation_measurement_issuer_enrollment_revocation", "(revision = 1 AND revoked_at IS NULL AND revoked_by_human_id IS NULL) OR (revision = 2 AND revoked_at IS NOT NULL AND revoked_by_human_id IS NOT NULL AND revoked_at >= approved_at)");
+
+                            t.HasCheckConstraint("ck_moderation_measurement_issuer_enrollment_validity", "valid_until > approved_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationNotice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Audience")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("audience");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DeliveryDisposition")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("delivery_disposition");
+
+                    b.Property<Guid>("EffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_id");
+
+                    b.Property<Guid?>("NativeIntentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("native_intent_id");
+
+                    b.Property<Guid>("RecipientSubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recipient_subject_id");
+
+                    b.Property<int>("RecipientSubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("recipient_subject_kind");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_notices");
+
+                    b.HasIndex("NativeIntentId")
+                        .HasDatabaseName("ix_moderation_notices_native_intent_id");
+
+                    b.HasIndex("EffectId", "Audience", "RecipientSubjectKind", "RecipientSubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_notices_effect_id_audience_recipient_subject_kind_recipient_subject_id");
+
+                    b.HasIndex("TrustDomainId", "RecipientSubjectKind", "RecipientSubjectId", "CreatedAt")
+                        .HasDatabaseName("ix_moderation_notices_trust_domain_id_recipient_subject_kind_recipient_subject_id_created_at");
+
+                    b.ToTable("ie_moderation_notices", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_notice_native", "(native_intent_id IS NULL AND delivery_disposition BETWEEN 1 AND 4) OR (native_intent_id IS NOT NULL AND delivery_disposition IN (5, 6) AND tenant_id IS NOT NULL AND recipient_subject_kind = 1)");
+
+                            t.HasCheckConstraint("ck_moderation_notice_recipient", "recipient_subject_kind BETWEEN 1 AND 4 AND audience BETWEEN 1 AND 3 AND (audience <> 3 OR recipient_subject_kind = 1)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationNoticeDisclosureApproval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ApprovedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid>("ApprovedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("approved_by_human_id");
+
+                    b.Property<string>("Automation")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("automation");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<string>("ContentRepresentativesJson")
+                        .IsRequired()
+                        .HasMaxLength(8192)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("content_representatives_json");
+
+                    b.Property<Guid>("ContributionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("contribution_id");
+
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("decision_id");
+
+                    b.Property<long>("DecisionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("decision_revision");
+
+                    b.Property<Guid>("EffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_id");
+
+                    b.Property<string>("FactsJson")
+                        .IsRequired()
+                        .HasMaxLength(131072)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("facts_json");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<string>("ReasonMeaning")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reason_meaning");
+
+                    b.Property<string>("Recourse")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recourse");
+
+                    b.Property<string>("RemainingActions")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("remaining_actions");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<string>("Retention")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retention");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_by_human_id");
+
+                    b.Property<string>("RuleMeaning")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("rule_meaning");
+
+                    b.Property<string>("SelectionDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_digest");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_notice_disclosure_approvals");
+
+                    b.HasIndex("ApprovedByHumanId")
+                        .HasDatabaseName("ix_moderation_notice_disclosure_approvals_approved_by_human_id");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_notice_disclosure_approvals_case_id");
+
+                    b.HasIndex("DecisionId")
+                        .HasDatabaseName("ix_moderation_notice_disclosure_approvals_decision_id");
+
+                    b.HasIndex("PublicationId")
+                        .HasDatabaseName("ix_moderation_notice_disclosure_approvals_publication_id");
+
+                    b.HasIndex("RevokedByHumanId")
+                        .HasDatabaseName("ix_moderation_notice_disclosure_approvals_revoked_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_notice_disclosure_approvals_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TrustDomainId", "TenantId", "EffectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_notice_disclosure_approvals_host_binding_id_trust_domain_id_tenant_id_effect_id");
+
+                    b.ToTable("ie_moderation_notice_disclosure_approvals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_notice_disclosure_generations", "decision_revision > 1 AND case_revision > 0 AND policy_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_notice_disclosure_retention", "retain_until > approved_at");
+
+                            t.HasCheckConstraint("ck_moderation_notice_disclosure_revocation", "(revision = 1 AND revoked_at IS NULL AND revoked_by_human_id IS NULL) OR (revision = 2 AND revoked_at IS NOT NULL AND revoked_by_human_id IS NOT NULL AND revoked_at >= approved_at)");
+
+                            t.HasCheckConstraint("ck_moderation_notice_disclosure_validity", "valid_until > approved_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationNoticeNotificationReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AcknowledgedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("acknowledged_by_human_id");
+
+                    b.Property<int>("ContestationCalendarMonths")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("contestation_calendar_months");
+
+                    b.Property<Guid>("EffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_id");
+
+                    b.Property<Guid>("NoticeId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("notice_id");
+
+                    b.Property<DateTimeOffset>("NotifiedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("notified_at");
+
+                    b.Property<DateTimeOffset>("RemedyUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("remedy_until");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("snapshot_hash");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_notice_notification_receipts");
+
+                    b.HasIndex("EffectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_notice_notification_receipts_effect_id");
+
+                    b.HasIndex("NoticeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_notice_notification_receipts_notice_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_notice_notification_receipts_tenant_id");
+
+                    b.ToTable("ie_moderation_notice_notification_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_notice_notification_calendar", "contestation_calendar_months >= 0 AND contestation_calendar_months <= 120");
+
+                            t.HasCheckConstraint("ck_moderation_notice_notification_subject", "subject_kind IN (1, 4) AND (subject_kind <> 1 OR acknowledged_by_human_id = subject_id)");
+
+                            t.HasCheckConstraint("ck_moderation_notice_notification_time", "remedy_until >= notified_at AND retain_until >= remedy_until AND retain_until > notified_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationNoticeSource", b =>
+                {
+                    b.Property<Guid>("EffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_id");
+
+                    b.Property<DateTimeOffset>("CapturedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("captured_at");
+
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("decision_id");
+
+                    b.Property<long>("DecisionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("decision_revision");
+
+                    b.Property<string>("EffectBindingHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_binding_hash");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("operation_id");
+
+                    b.Property<DateTimeOffset?>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("snapshot_hash");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("snapshot_json");
+
+                    b.Property<string>("StatusMetadataHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status_metadata_hash");
+
+                    b.Property<string>("StatusMetadataJson")
+                        .HasMaxLength(8192)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("status_metadata_json");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("EffectId")
+                        .HasName("pk_ie_moderation_notice_sources");
+
+                    b.HasIndex("TrustDomainId", "RetainUntil", "EffectId")
+                        .HasDatabaseName("ix_moderation_notice_sources_trust_domain_id_retain_until_effect_id");
+
+                    b.HasIndex("TrustDomainId", "SubjectKind", "SubjectId", "CapturedAt")
+                        .HasDatabaseName("ix_moderation_notice_sources_trust_domain_id_subject_kind_subject_id_captured_at");
+
+                    b.ToTable("ie_moderation_notice_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_notice_source_retention", "retain_until IS NULL OR retain_until > captured_at");
+
+                            t.HasCheckConstraint("ck_moderation_notice_source_revision", "decision_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_notice_source_scope", "scope_kind BETWEEN 1 AND 7");
+
+                            t.HasCheckConstraint("ck_moderation_notice_source_status", "(status_metadata_json IS NULL AND status_metadata_hash IS NULL) OR (status_metadata_json IS NOT NULL AND status_metadata_hash IS NOT NULL AND retain_until IS NOT NULL AND subject_kind IN (1, 4))");
+
+                            t.HasCheckConstraint("ck_moderation_notice_source_subject", "subject_kind BETWEEN 1 AND 4");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.ModerationOperationReceipt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -18288,7 +24584,2622 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         {
                             t.HasCheckConstraint("ck_moderation_receipt_revision", "result_revision > 0 AND policy_revision > 0 AND qualification_revision > 0");
 
-                            t.HasCheckConstraint("ck_moderation_receipt_scope", "scope_kind BETWEEN 1 AND 6 AND subject_kind BETWEEN 1 AND 4");
+                            t.HasCheckConstraint("ck_moderation_receipt_scope", "scope_kind BETWEEN 1 AND 7 AND subject_kind BETWEEN 1 AND 4");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationOperationalBudgetAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AdoptedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<long>("ValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long?>("WithdrawnAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_operational_budget_adoptions");
+
+                    b.HasAlternateKey("Id", "TrustDomainId", "TenantId", "SourceId")
+                        .HasName("ak_moderation_operational_budget_adoption_id_trust_domain_id_tenant_id_source_id");
+
+                    b.HasAlternateKey("Id", "HostBindingId", "TrustDomainId", "TenantId", "SourceId")
+                        .HasName("ak_moderation_operational_budget_adoptions_id_host_binding_id_trust_domain_id_tenant_id_source_id");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_operational_budget_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_operational_budget_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_operational_budget_adoptions_withdrawn_by_human_id");
+
+                    b.HasIndex("SourceId", "HostBindingId", "TrustDomainId", "TenantId")
+                        .HasDatabaseName("ix_moderation_operational_budget_adoptions_source_id_host_binding_id_trust_domain_id_tenant_id");
+
+                    b.ToTable("ie_moderation_operational_budget_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_operational_budget_adoption_generation", "id <> source_id AND source_revision = 1 AND source_writer_generation > 0 AND source_writer_generation < 9223372036854775807 AND writer_generation > source_writer_generation AND writer_generation < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_operational_budget_adoption_validity", "adopted_at > 0 AND valid_until > adopted_at AND valid_until < 3155378975999999999");
+
+                            t.HasCheckConstraint("ck_operational_budget_adoption_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_at >= adopted_at AND withdrawn_at < 3155378975999999999 AND withdrawn_by_human_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationOperationalBudgetSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("MaximumOccurrences")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_occurrences");
+
+                    b.Property<Guid>("OperatorHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("operator_human_id");
+
+                    b.Property<long>("RecordedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<long>("ValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WindowTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("window_ticks");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_operational_budget_sources");
+
+                    b.HasAlternateKey("Id", "HostBindingId", "TrustDomainId", "TenantId")
+                        .HasName("ak_moderation_operational_budget_sources_id_host_binding_id_trust_domain_id_tenant_id");
+
+                    b.HasIndex("OperatorHumanId")
+                        .HasDatabaseName("ix_moderation_operational_budget_sources_operator_human_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_operational_budget_sources_recorded_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_operational_budget_sources_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "SubjectKind", "Action", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_operational_budget_sources_host_binding_id_tenant_id_subject_kind_action_writer_generation");
+
+                    b.ToTable("ie_moderation_operational_budget_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_operational_budget_source_generation", "revision = 1 AND writer_generation > 0 AND writer_generation < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_operational_budget_source_independence", "operator_human_id <> recorded_by_human_id");
+
+                            t.HasCheckConstraint("ck_operational_budget_source_terms", "subject_kind = 1 AND action IN (1, 2, 3, 4, 5, 6) AND maximum_occurrences > 0 AND window_ticks > 0 AND window_ticks < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_operational_budget_source_validity", "recorded_at > 0 AND valid_until > recorded_at AND valid_until < 3155378975999999999 AND window_ticks < recorded_at AND window_ticks < 3155378975999999999 - recorded_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationOriginalEffectCompletionReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CompletedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("EffectBindingHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_binding_hash");
+
+                    b.Property<Guid>("EffectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("effect_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<DateTimeOffset>("LeaseExpiresAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid>("LeaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lease_id");
+
+                    b.Property<long>("LeaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("lease_revision");
+
+                    b.Property<DateTimeOffset>("LeaseStartedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("lease_started_at");
+
+                    b.Property<int>("OriginalCauseCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_cause_count");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("ProofDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proof_digest");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("QualifiedUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualified_until");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<string>("SelectionDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_digest");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("snapshot_hash");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_original_effect_completion_receipts");
+
+                    b.HasIndex("EffectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_original_effect_completion_receipts_effect_id");
+
+                    b.ToTable("ie_moderation_original_effect_completion_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_original_completion_count", "original_cause_count >= 1 AND original_cause_count <= 64");
+
+                            t.HasCheckConstraint("ck_original_completion_revision", "lease_revision > 0");
+
+                            t.HasCheckConstraint("ck_original_completion_window", "completed_at >= lease_started_at AND completed_at < qualified_until AND qualified_until <= lease_expires_at AND qualified_until <= retain_until");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationParticipantIncidentResponsibilitySource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssessmentDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assessment_digest");
+
+                    b.Property<Guid>("AssessorHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assessor_human_id");
+
+                    b.Property<Guid>("AssessorRoleGrantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assessor_role_grant_id");
+
+                    b.Property<Guid>("CustodyAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("custody_adoption_id");
+
+                    b.Property<long>("CustodyAdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("custody_adoption_revision");
+
+                    b.Property<long>("CustodyAdoptionValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("custody_adoption_valid_until");
+
+                    b.Property<long>("CustodyAdoptionWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("custody_adoption_writer_generation");
+
+                    b.Property<Guid>("CustodySourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("custody_source_id");
+
+                    b.Property<long>("CustodySourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("custody_source_revision");
+
+                    b.Property<long>("CustodySourceValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("custody_source_valid_until");
+
+                    b.Property<long>("CustodySourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("custody_source_writer_generation");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_version");
+
+                    b.Property<long>("EvidenceCaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("evidence_case_revision");
+
+                    b.Property<Guid>("EvidenceSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("evidence_source_id");
+
+                    b.Property<Guid>("EvidenceSourceVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("evidence_source_version");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("IncidentWindowFrom")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("incident_window_from");
+
+                    b.Property<long>("IncidentWindowUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("incident_window_until");
+
+                    b.Property<Guid>("MaterialFactId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_fact_id");
+
+                    b.Property<long>("MaximumQualificationLifetimeTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_qualification_lifetime_ticks");
+
+                    b.Property<long>("MaximumRetentionTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_retention_ticks");
+
+                    b.Property<Guid>("OccurrenceCaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_case_id");
+
+                    b.Property<long>("OccurrenceCaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("occurrence_case_revision");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_id");
+
+                    b.Property<Guid>("OrderGeneration")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("order_generation");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("OriginalNarrativeId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_narrative_id");
+
+                    b.Property<long>("OriginalNarrativePurgeAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_narrative_purge_at");
+
+                    b.Property<Guid>("ParticipantGeneration")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("participant_generation");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("participant_id");
+
+                    b.Property<long>("PurgeAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("purge_at");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("purpose");
+
+                    b.Property<Guid>("QualificationPolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("qualification_policy_id");
+
+                    b.Property<long>("QualificationPolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("qualification_policy_revision");
+
+                    b.Property<long>("QualifiedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("qualified_at");
+
+                    b.Property<long>("ReadGrantExpiresAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("read_grant_expires_at");
+
+                    b.Property<Guid>("ReadGrantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("read_grant_id");
+
+                    b.Property<long>("ReadGrantRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("read_grant_revision");
+
+                    b.Property<Guid>("ReadIssuerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("read_issuer_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SessionGeneration")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("session_generation");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("session_id");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<int>("TargetKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<long>("ValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("valid_until");
+
+                    b.Property<Guid?>("WithdrawalOperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawal_operation_id");
+
+                    b.Property<long?>("WithdrawnAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<byte[]>("protectedAssessment")
+                        .IsRequired()
+                        .HasMaxLength(131072)
+                        .HasColumnType("BLOB")
+                        .HasColumnName("protected_assessment");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_participant_incident_responsibility_sources");
+
+                    b.HasIndex("AssessorHumanId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_assessor_human_id");
+
+                    b.HasIndex("EventId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_event_id");
+
+                    b.HasIndex("EvidenceSourceId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_evidence_source_id");
+
+                    b.HasIndex("HostBindingId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_host_binding_id");
+
+                    b.HasIndex("OccurrenceCaseId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_occurrence_case_id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_order_id");
+
+                    b.HasIndex("OriginalNarrativeId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_original_narrative_id");
+
+                    b.HasIndex("ParticipantId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_participant_id");
+
+                    b.HasIndex("QualificationPolicyId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_qualification_policy_id");
+
+                    b.HasIndex("ReadGrantId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_read_grant_id");
+
+                    b.HasIndex("ReadIssuerHumanId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_read_issuer_human_id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_session_id");
+
+                    b.HasIndex("SubjectId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_subject_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_withdrawn_by_human_id");
+
+                    b.HasIndex("TenantId", "TrustDomainId", "PurgeAt")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_tenant_id_trust_domain_id_purge_at");
+
+                    b.HasIndex("CustodySourceId", "HostBindingId", "TrustDomainId", "TenantId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_custody_source_id_host_binding_id_trust_domain_id_tenant_id");
+
+                    b.HasIndex("TenantId", "TrustDomainId", "OccurrenceCaseId", "SubjectId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_tenant_id_trust_domain_id_occurrence_case_id_subject_id");
+
+                    b.HasIndex("CustodyAdoptionId", "HostBindingId", "TrustDomainId", "TenantId", "CustodySourceId")
+                        .HasDatabaseName("ix_moderation_participant_incident_responsibility_sources_custody_adoption_id_host_binding_id_trust_domain_id_tenan_10036188741d");
+
+                    b.ToTable("ie_moderation_participant_incident_responsibility_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_incident_assessment_digest", "length(assessment_digest) = 64");
+
+                            t.HasCheckConstraint("ck_incident_assessment_finite_deadlines", "qualified_at > 0 AND valid_until > qualified_at AND valid_until <= purge_at AND purge_at <= original_narrative_purge_at AND original_narrative_purge_at < 3155378975999999999 AND purge_at <= read_grant_expires_at AND read_grant_expires_at < 3155378975999999999 AND purge_at <= custody_adoption_valid_until AND custody_adoption_valid_until <= custody_source_valid_until AND custody_source_valid_until < 3155378975999999999");
+
+                            t.HasCheckConstraint("ck_incident_assessment_generations", "custody_source_writer_generation > 0 AND custody_source_writer_generation < 9223372036854775807 AND custody_adoption_writer_generation > custody_source_writer_generation AND custody_adoption_writer_generation < 9223372036854775807 AND custody_adoption_id <> custody_source_id AND evidence_source_version <> '00000000-0000-0000-0000-000000000000' AND event_version <> '00000000-0000-0000-0000-000000000000' AND session_generation <> '00000000-0000-0000-0000-000000000000' AND order_generation <> '00000000-0000-0000-0000-000000000000' AND participant_generation <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("ck_incident_assessment_lifetime_limits", "maximum_qualification_lifetime_ticks > 0 AND maximum_qualification_lifetime_ticks < 9223372036854775807 AND maximum_retention_ticks > 0 AND maximum_retention_ticks < 9223372036854775807 AND valid_until - qualified_at <= maximum_qualification_lifetime_ticks AND purge_at - qualified_at <= maximum_retention_ticks");
+
+                            t.HasCheckConstraint("ck_incident_assessment_purpose", "target_kind = 2 AND purpose = 2 AND subject_kind = 1 AND subject_id <> assessor_human_id AND subject_id <> read_issuer_human_id");
+
+                            t.HasCheckConstraint("ck_incident_assessment_revisions", "evidence_case_revision > 0 AND occurrence_case_revision >= evidence_case_revision AND read_grant_revision = 1 AND qualification_policy_revision > 0 AND custody_source_revision = 1 AND custody_adoption_revision = 1");
+
+                            t.HasCheckConstraint("ck_incident_assessment_window", "incident_window_from > 0 AND incident_window_until > incident_window_from AND incident_window_until <= qualified_at");
+
+                            t.HasCheckConstraint("ck_incident_assessment_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL AND withdrawal_operation_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_at >= qualified_at AND withdrawn_at < 3155378975999999999 AND withdrawn_by_human_id IS NOT NULL AND withdrawal_operation_id IS NOT NULL AND withdrawal_operation_id <> '00000000-0000-0000-0000-000000000000')");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("AdoptedRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adopted_revision");
+
+                    b.Property<long>("AuthorityRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("authority_revision");
+
+                    b.Property<Guid>("AuthoritySourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("authority_source_id");
+
+                    b.Property<long>("CatalogueRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("catalogue_revision");
+
+                    b.Property<string>("DeclaredStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("declared_state_digest");
+
+                    b.Property<DateTimeOffset?>("EvidenceValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("evidence_valid_until");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("instance_id");
+
+                    b.Property<string>("InventoryFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("inventory_fingerprint");
+
+                    b.Property<long>("InventoryRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("inventory_revision");
+
+                    b.Property<Guid?>("JurisdictionTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("jurisdiction_tenant_id");
+
+                    b.Property<int>("MaximumApprovals")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_approvals");
+
+                    b.Property<long>("MaximumFiniteDurationTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_finite_duration_ticks");
+
+                    b.Property<long>("MaximumReviewDelayTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_review_delay_ticks");
+
+                    b.Property<int>("MinimumApprovals")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("minimum_approvals");
+
+                    b.Property<int>("MinimumContestationCalendarMonths")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("minimum_contestation_calendar_months");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<Guid?>("PreviousPublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("previous_publication_id");
+
+                    b.Property<Guid>("PrincipalId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("principal_id");
+
+                    b.Property<bool>("PublishedActive")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("published_active");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("published_at");
+
+                    b.Property<long>("QualificationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("qualification_revision");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_digest");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("solution_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<string>("WriterGeneration")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_policy_publications");
+
+                    b.HasAlternateKey("PolicyId", "Id")
+                        .HasName("ak_moderation_policy_publications_policy_id_id");
+
+                    b.HasIndex("AuthoritySourceId")
+                        .HasDatabaseName("ix_moderation_policy_publications_authority_source_id");
+
+                    b.HasIndex("HostBindingId")
+                        .HasDatabaseName("ix_moderation_policy_publications_host_binding_id");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_policy_publications_operation_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_policy_publications_tenant_id");
+
+                    b.HasIndex("PolicyId", "AdoptedRevision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_policy_publications_policy_id_adopted_revision");
+
+                    b.HasIndex("PolicyId", "PreviousPublicationId")
+                        .HasDatabaseName("ix_moderation_policy_publications_policy_id_previous_publication_id");
+
+                    b.ToTable("ie_moderation_policy_publications", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_publication_adoption", "(adopted_revision IS NOT NULL AND adopted_revision = revision) OR (adopted_revision IS NULL AND published_active = false AND evidence_valid_until IS NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_publication_duration", "maximum_finite_duration_ticks > 0 AND maximum_review_delay_ticks > 0");
+
+                            t.HasCheckConstraint("ck_moderation_publication_history", "(revision = 1 AND previous_publication_id IS NULL) OR (revision > 1 AND previous_publication_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_publication_revision", "revision > 0 AND authority_revision > 0 AND qualification_revision = authority_revision + 1");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationCandidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AuthorityRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("authority_revision");
+
+                    b.Property<Guid>("AuthoritySourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("authority_source_id");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<long>("ExpectedRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("expected_revision");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("instance_id");
+
+                    b.Property<Guid?>("JurisdictionTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("jurisdiction_tenant_id");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<DateTimeOffset>("PreparedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("prepared_at");
+
+                    b.Property<Guid>("PreparedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("prepared_by_human_id");
+
+                    b.Property<Guid?>("PreviousPublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("previous_publication_id");
+
+                    b.Property<string>("ProposedStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_state_digest");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_digest");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("solution_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_policy_publication_candidates");
+
+                    b.HasIndex("AuthoritySourceId")
+                        .HasDatabaseName("ix_moderation_policy_publication_candidates_authority_source_id");
+
+                    b.HasIndex("DefinitionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_policy_publication_candidates_definition_id");
+
+                    b.HasIndex("HostBindingId")
+                        .HasDatabaseName("ix_moderation_policy_publication_candidates_host_binding_id");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_policy_publication_candidates_operation_id");
+
+                    b.HasIndex("PreparedByHumanId")
+                        .HasDatabaseName("ix_moderation_policy_publication_candidates_prepared_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_policy_publication_candidates_tenant_id");
+
+                    b.HasIndex("PolicyId", "DefinitionId")
+                        .HasDatabaseName("ix_moderation_policy_publication_candidates_policy_id_definition_id");
+
+                    b.HasIndex("PolicyId", "PreviousPublicationId")
+                        .HasDatabaseName("ix_moderation_policy_publication_candidates_policy_id_previous_publication_id");
+
+                    b.ToTable("ie_moderation_policy_publication_candidates", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_publication_candidate_history", "(expected_revision = 0 AND previous_publication_id IS NULL) OR (expected_revision > 0 AND previous_publication_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_publication_candidate_identity", "id <> definition_id");
+
+                            t.HasCheckConstraint("ck_moderation_publication_candidate_revision", "expected_revision >= 0 AND expected_revision < 9223372036854775807 AND revision = 1");
+
+                            t.HasCheckConstraint("ck_moderation_publication_candidate_source", "authority_revision > 0 AND authority_revision < 9223372036854775806 AND writer_generation = authority_revision + 1");
+
+                            t.HasCheckConstraint("ck_moderation_publication_candidate_validity", "valid_until > prepared_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationClass", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("code");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<int>("Basis")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("basis");
+
+                    b.Property<int>("Ground")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ground");
+
+                    b.Property<string>("Meaning")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("meaning");
+
+                    b.HasKey("PublicationId", "Code", "Revision")
+                        .HasName("pk_ie_moderation_publication_classes");
+
+                    b.ToTable("ie_moderation_publication_classes", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationConsumer", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("Mode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode");
+
+                    b.Property<int>("Capability")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("capability");
+
+                    b.Property<string>("ConsumerId")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consumer_id");
+
+                    b.Property<string>("AuthorizationOwner")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("authorization_owner");
+
+                    b.Property<string>("ConformanceTest")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("conformance_test");
+
+                    b.Property<string>("EntryCheckpoint")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("entry_checkpoint");
+
+                    b.Property<int>("FreshnessClass")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("freshness_class");
+
+                    b.Property<string>("OwningPacket")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owning_packet");
+
+                    b.Property<string>("SubjectResolver")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_resolver");
+
+                    b.Property<string>("TargetResolver")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_resolver");
+
+                    b.Property<string>("TerminalCheckpoint")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("terminal_checkpoint");
+
+                    b.Property<string>("WriterFence")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("writer_fence");
+
+                    b.HasKey("PublicationId", "ProfileId", "Mode", "Capability", "ConsumerId")
+                        .HasName("pk_ie_moderation_publication_consumers");
+
+                    b.ToTable("ie_moderation_publication_consumers", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationEffect", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<int?>("Capability")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("capability");
+
+                    b.Property<int>("Execution")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("execution");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Mode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode");
+
+                    b.Property<int>("SemanticOwner")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("semantic_owner");
+
+                    b.Property<int>("Target")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target");
+
+                    b.HasKey("PublicationId", "ProfileId", "Ordinal")
+                        .HasName("pk_ie_moderation_publication_effects");
+
+                    b.ToTable("ie_moderation_publication_effects", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationEvidence", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<string>("RequirementDigest")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("requirement_digest");
+
+                    b.Property<Guid?>("ApprovalId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("approval_id");
+
+                    b.Property<long?>("ApprovalRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("approval_revision");
+
+                    b.Property<DateTimeOffset>("ObservedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observed_at");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<string>("WriterGeneration")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("PublicationId", "RequirementDigest")
+                        .HasName("pk_ie_moderation_publication_evidence");
+
+                    b.ToTable("ie_moderation_publication_evidence", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_publication_evidence", "source_revision > 0 AND ((approval_id IS NULL AND approval_revision IS NULL) OR (approval_id IS NOT NULL AND approval_revision > 0))");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationMode", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<int>("Mode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode");
+
+                    b.HasKey("PublicationId", "Mode")
+                        .HasName("pk_ie_moderation_publication_modes");
+
+                    b.ToTable("ie_moderation_publication_modes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_publication_mode", "mode BETWEEN 1 AND 2");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationPlan", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("Strategy")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("strategy");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("capacity");
+
+                    b.Property<int>("Content")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("content");
+
+                    b.Property<int>("Credentials")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("credentials");
+
+                    b.Property<int>("ExistingAdmission")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("existing_admission");
+
+                    b.Property<int>("Management")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("management");
+
+                    b.Property<int>("NewAdmission")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("new_admission");
+
+                    b.Property<int>("Notifications")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("notifications");
+
+                    b.Property<int>("PendingWork")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("pending_work");
+
+                    b.Property<int>("PrivateDisclosure")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("private_disclosure");
+
+                    b.Property<int>("Recognition")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("recognition");
+
+                    b.Property<int>("Resources")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("resources");
+
+                    b.Property<int>("Restoration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("restoration");
+
+                    b.Property<int>("Settlement")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("settlement");
+
+                    b.HasKey("PublicationId", "ProfileId", "Strategy")
+                        .HasName("pk_ie_moderation_publication_plans");
+
+                    b.ToTable("ie_moderation_publication_plans", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_publication_strategy", "strategy BETWEEN 0 AND 3");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationPrerequisite", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("Mode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinal");
+
+                    b.Property<int?>("ActivationGate")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("activation_gate");
+
+                    b.Property<int?>("NativePrerequisite")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("native_prerequisite");
+
+                    b.HasKey("PublicationId", "ProfileId", "Mode", "Ordinal")
+                        .HasName("pk_ie_moderation_publication_prerequisites");
+
+                    b.ToTable("ie_moderation_publication_prerequisites", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_publication_prerequisite", "(activation_gate BETWEEN 1 AND 5 AND native_prerequisite IS NULL) OR (activation_gate IS NULL AND native_prerequisite BETWEEN 1 AND 30)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationProfile", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("Bundle")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("bundle");
+
+                    b.Property<int>("ContestationCalendarMonths")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("contestation_calendar_months");
+
+                    b.Property<long>("DurationTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("duration_ticks");
+
+                    b.Property<int>("Grade")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("grade");
+
+                    b.Property<int?>("ProtectionPurpose")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("protection_purpose");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reason_code");
+
+                    b.Property<long>("ReasonRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reason_revision");
+
+                    b.Property<int>("Recognition")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("recognition");
+
+                    b.Property<int>("ReferenceProfile")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reference_profile");
+
+                    b.Property<long>("ReferenceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reference_revision");
+
+                    b.Property<int>("RequiredApprovals")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("required_approvals");
+
+                    b.Property<string>("RuleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("rule_code");
+
+                    b.Property<long>("RuleRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("rule_revision");
+
+                    b.Property<bool>("Supported")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("supported");
+
+                    b.Property<int>("TimingKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("timing_kind");
+
+                    b.HasKey("PublicationId", "ProfileId")
+                        .HasName("pk_ie_moderation_publication_profiles");
+
+                    b.HasIndex("PublicationId", "ReasonCode", "ReasonRevision")
+                        .HasDatabaseName("ix_moderation_publication_profiles_publication_id_reason_code_reason_revision");
+
+                    b.HasIndex("PublicationId", "RuleCode", "RuleRevision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_publication_profiles_publication_id_rule_code_rule_revision");
+
+                    b.ToTable("ie_moderation_publication_profiles", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_profile_purpose", "(bundle = 10 AND protection_purpose BETWEEN 1 AND 2) OR (bundle BETWEEN 1 AND 9 AND protection_purpose IS NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_profile_quorum", "required_approvals BETWEEN 0 AND 2");
+
+                            t.HasCheckConstraint("ck_moderation_profile_revision", "rule_revision > 0 AND reason_revision > 0 AND reference_revision > 0");
+
+                            t.HasCheckConstraint("ck_moderation_profile_timing", "duration_ticks >= 0 AND timing_kind BETWEEN 1 AND 9");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationReason", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("code");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("ClassCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("class_code");
+
+                    b.Property<long>("ClassRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("class_revision");
+
+                    b.Property<string>("Meaning")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("meaning");
+
+                    b.HasKey("PublicationId", "Code", "Revision")
+                        .HasName("pk_ie_moderation_publication_reasons");
+
+                    b.HasIndex("PublicationId", "ClassCode", "ClassRevision")
+                        .HasDatabaseName("ix_moderation_publication_reasons_publication_id_class_code_class_revision");
+
+                    b.ToTable("ie_moderation_publication_reasons", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationScope", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("kind");
+
+                    b.HasKey("PublicationId", "ProfileId", "Kind")
+                        .HasName("pk_ie_moderation_publication_scopes");
+
+                    b.ToTable("ie_moderation_publication_scopes", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationSubject", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("kind");
+
+                    b.HasKey("PublicationId", "ProfileId", "Kind")
+                        .HasName("pk_ie_moderation_publication_subjects");
+
+                    b.ToTable("ie_moderation_publication_subjects", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicySelection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActivePublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("active_publication_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("JurisdictionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("jurisdiction_id");
+
+                    b.Property<Guid?>("JurisdictionTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("jurisdiction_tenant_id");
+
+                    b.Property<Guid>("LatestPublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("latest_publication_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_policy_selections");
+
+                    b.HasIndex("HostBindingId", "JurisdictionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_policy_selections_host_binding_id_jurisdiction_id");
+
+                    b.HasIndex("Id", "ActivePublicationId")
+                        .HasDatabaseName("ix_moderation_policy_selections_id_active_publication_id");
+
+                    b.HasIndex("Id", "LatestPublicationId")
+                        .HasDatabaseName("ix_moderation_policy_selections_id_latest_publication_id");
+
+                    b.ToTable("ie_moderation_policy_selections", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_selection_revision", "revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPreFindingCustody", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcceptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<long>("AttributionGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("attribution_generation");
+
+                    b.Property<Guid>("AttributionSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("attribution_source_id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<long>("EvidenceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("evidence_revision");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("MaximumRetentionTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_retention_ticks");
+
+                    b.Property<int>("MaximumTextBytes")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_text_bytes");
+
+                    b.Property<string>("PrivacyLegalMandate")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_legal_mandate");
+
+                    b.Property<Guid>("PrivacyOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_owner_human_id");
+
+                    b.Property<DateTimeOffset>("ProposedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_at");
+
+                    b.Property<Guid>("ProposedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_by_human_id");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("purpose");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_pre_finding_custody");
+
+                    b.HasAlternateKey("Id", "HostBindingId", "TrustDomainId", "TenantId", "CaseId")
+                        .HasName("ak_moderation_pre_finding_custody_id_host_binding_id_trust_domain_id_tenant_id_case_id");
+
+                    b.HasIndex("AttributionSourceId")
+                        .HasDatabaseName("ix_moderation_pre_finding_custody_attribution_source_id");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_pre_finding_custody_case_id");
+
+                    b.HasIndex("PrivacyOwnerHumanId")
+                        .HasDatabaseName("ix_moderation_pre_finding_custody_privacy_owner_human_id");
+
+                    b.HasIndex("ProposedByHumanId")
+                        .HasDatabaseName("ix_moderation_pre_finding_custody_proposed_by_human_id");
+
+                    b.ToTable("ie_moderation_pre_finding_custody", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pre_finding_custody_attribution", "attribution_generation > 0 AND evidence_revision > 0");
+
+                            t.HasCheckConstraint("ck_pre_finding_custody_independence", "proposed_by_human_id <> privacy_owner_human_id");
+
+                            t.HasCheckConstraint("ck_pre_finding_custody_limits", "maximum_retention_ticks > 0 AND maximum_retention_ticks < 9223372036854775807 AND maximum_text_bytes > 0 AND maximum_text_bytes <= 65536 AND valid_until > proposed_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPreFindingErasureTombstone", b =>
+                {
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("CaseId")
+                        .HasName("pk_ie_moderation_pre_finding_erasure_tombstones");
+
+                    b.ToTable("ie_moderation_pre_finding_erasure_tombstones", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPreFindingNotice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("acknowledged_at");
+
+                    b.Property<long>("AttributionGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("attribution_generation");
+
+                    b.Property<Guid>("AttributionSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("attribution_source_id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<Guid>("CustodyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("custody_id");
+
+                    b.Property<long>("EvidenceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("evidence_revision");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issued_at");
+
+                    b.Property<Guid>("IssuedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issued_by_human_id");
+
+                    b.Property<Guid>("OccurrenceCaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_case_id");
+
+                    b.Property<DateTimeOffset?>("PurgedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("purged_at");
+
+                    b.Property<Guid>("RecipientAssignmentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recipient_assignment_id");
+
+                    b.Property<long>("RecipientAssignmentRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("recipient_assignment_revision");
+
+                    b.Property<Guid>("RecipientHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recipient_human_id");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("responded_at");
+
+                    b.Property<Guid?>("ResponseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("response_id");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<Guid>("ReviewerAssignmentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_assignment_id");
+
+                    b.Property<long>("ReviewerAssignmentRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reviewer_assignment_revision");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<bool>("Withdrawn")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("withdrawn");
+
+                    b.Property<byte[]>("protectedNotice")
+                        .IsRequired()
+                        .HasMaxLength(131072)
+                        .HasColumnType("BLOB")
+                        .HasColumnName("protected_notice");
+
+                    b.Property<byte[]>("protectedResponse")
+                        .IsRequired()
+                        .HasMaxLength(131072)
+                        .HasColumnType("BLOB")
+                        .HasColumnName("protected_response");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_pre_finding_notices");
+
+                    b.HasIndex("CaseId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_pre_finding_notices_case_id");
+
+                    b.HasIndex("OccurrenceCaseId")
+                        .HasDatabaseName("ix_moderation_pre_finding_notices_occurrence_case_id");
+
+                    b.HasIndex("RecipientHumanId")
+                        .HasDatabaseName("ix_moderation_pre_finding_notices_recipient_human_id");
+
+                    b.HasIndex("ReviewerAssignmentId")
+                        .HasDatabaseName("ix_moderation_pre_finding_notices_reviewer_assignment_id");
+
+                    b.HasIndex("TenantId", "RetainUntil")
+                        .HasDatabaseName("ix_moderation_pre_finding_notices_tenant_id_retain_until");
+
+                    b.HasIndex("CustodyId", "HostBindingId", "TrustDomainId", "TenantId", "CaseId")
+                        .HasDatabaseName("ix_moderation_pre_finding_notices_custody_id_host_binding_id_trust_domain_id_tenant_id_case_id");
+
+                    b.ToTable("ie_moderation_pre_finding_notices", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pre_finding_notice_finite", "retain_until > issued_at");
+
+                            t.HasCheckConstraint("ck_pre_finding_notice_link", "case_id <> occurrence_case_id AND case_revision > 0 AND evidence_revision > 0 AND attribution_generation > 0 AND revision > 0");
+
+                            t.HasCheckConstraint("ck_pre_finding_notice_response", "(response_id IS NULL AND responded_at IS NULL) OR (response_id IS NOT NULL AND responded_at >= acknowledged_at AND responded_at < retain_until)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPreFindingReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActorHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("actor_human_id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<DateTimeOffset>("CompletedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_digest");
+
+                    b.Property<Guid>("ResultId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("result_id");
+
+                    b.Property<long>("ResultRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("result_revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_pre_finding_receipts");
+
+                    b.HasIndex("ActorHumanId")
+                        .HasDatabaseName("ix_moderation_pre_finding_receipts_actor_human_id");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_pre_finding_receipts_case_id");
+
+                    b.HasIndex("ResultId", "ResultRevision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_pre_finding_receipts_result_id_result_revision");
+
+                    b.ToTable("ie_moderation_pre_finding_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<int>("PrerequisiteMask")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("prerequisite_mask");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_by_human_id");
+
+                    b.Property<Guid>("SelectionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_id");
+
+                    b.Property<long>("SelectionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("selection_revision");
+
+                    b.Property<long>("SelectionWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("selection_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_profile_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_profile_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("PublicationId")
+                        .HasDatabaseName("ix_moderation_profile_adoptions_publication_id");
+
+                    b.HasIndex("RevokedByHumanId")
+                        .HasDatabaseName("ix_moderation_profile_adoptions_revoked_by_human_id");
+
+                    b.HasIndex("SelectionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_profile_adoptions_selection_id");
+
+                    b.ToTable("ie_moderation_profile_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_profile_adoption_mode", "mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_moderation_profile_adoption_revision", "selection_revision = 1 AND selection_writer_generation > 0 AND case_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_profile_adoption_revocation", "(revision = 1 AND revoked_at IS NULL AND revoked_by_human_id IS NULL) OR (revision = 2 AND revoked_at IS NOT NULL AND revoked_by_human_id IS NOT NULL AND revoked_at >= adopted_at)");
+
+                            t.HasCheckConstraint("ck_moderation_profile_adoption_validity", "valid_until > adopted_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionAssessmentAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AdoptedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<long>("SourceGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_generation");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("ValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long?>("WithdrawnAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_profile_collection_assessment_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_adoptions_withdrawn_by_human_id");
+
+                    b.ToTable("ie_moderation_profile_collection_assessment_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_profile_assessment_adoption_generation", "source_revision = 1 AND source_generation > 0 AND source_generation < 9223372036854775807 AND generation > source_generation AND generation < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_profile_assessment_adoption_terminal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= adopted_at AND withdrawn_at < 3155378975999999999)");
+
+                            t.HasCheckConstraint("ck_profile_assessment_adoption_window", "adopted_at > 0 AND valid_until < 3155378975999999999 AND valid_until > adopted_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionAssessmentSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Binding")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("binding");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation");
+
+                    b.Property<Guid>("OwnerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_controller_human_id");
+
+                    b.Property<long>("ProcedureAdoptedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adopted_at");
+
+                    b.Property<Guid>("ProcedureAdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("procedure_adopted_by_human_id");
+
+                    b.Property<Guid>("ProcedureAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("procedure_adoption_id");
+
+                    b.Property<long>("ProcedureAdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adoption_revision");
+
+                    b.Property<long>("ProcedureAdoptionValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adoption_valid_until");
+
+                    b.Property<long>("ProcedureAdoptionWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adoption_writer_generation");
+
+                    b.Property<Guid>("ProcedureSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("procedure_source_id");
+
+                    b.Property<long>("RecordedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<int>("Required")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("required");
+
+                    b.Property<Guid>("ReviewerControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_controller_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SubjectHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_human_id");
+
+                    b.Property<long>("ValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("valid_until");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_profile_collection_assessment_sources");
+
+                    b.HasIndex("OwnerControllerHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_sources_owner_controller_human_id");
+
+                    b.HasIndex("ProcedureAdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_sources_procedure_adopted_by_human_id");
+
+                    b.HasIndex("ProcedureAdoptionId")
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_sources_procedure_adoption_id");
+
+                    b.HasIndex("ProcedureSourceId")
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_sources_procedure_source_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_sources_recorded_by_human_id");
+
+                    b.HasIndex("ReviewerControllerHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_sources_reviewer_controller_human_id");
+
+                    b.HasIndex("SubjectHumanId", "ProcedureSourceId", "Generation")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_profile_collection_assessment_sources_subject_human_id_procedure_source_id_generation");
+
+                    b.ToTable("ie_moderation_profile_collection_assessment_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_profile_assessment_source_generation", "revision = 1 AND generation > 0 AND generation < 9223372036854775807 AND procedure_adoption_revision = 1 AND procedure_adoption_writer_generation > 0 AND procedure_adoption_writer_generation < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_profile_assessment_source_independence", "recorded_by_human_id <> procedure_adopted_by_human_id AND procedure_adopted_by_human_id <> owner_controller_human_id AND owner_controller_human_id <> reviewer_controller_human_id");
+
+                            t.HasCheckConstraint("ck_profile_assessment_source_required", "required BETWEEN 0 AND 7");
+
+                            t.HasCheckConstraint("ck_profile_assessment_source_window", "recorded_at > 0 AND valid_until < 3155378975999999999 AND valid_until > recorded_at AND procedure_adopted_at > 0 AND procedure_adoption_valid_until < 3155378975999999999 AND procedure_adoption_valid_until > procedure_adopted_at AND recorded_at >= procedure_adopted_at AND valid_until <= procedure_adoption_valid_until");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionProcedureAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_profile_collection_procedure_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_procedure_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_profile_collection_procedure_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_procedure_adoptions_withdrawn_by_human_id");
+
+                    b.ToTable("ie_moderation_profile_collection_procedure_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_profile_collection_adoption_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_profile_collection_adoption_validity", "valid_until > adopted_at");
+
+                            t.HasCheckConstraint("ck_profile_collection_adoption_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= adopted_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionProcedureSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ChildAgeAdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_adopted_at");
+
+                    b.Property<Guid>("ChildAgeAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_adoption_id");
+
+                    b.Property<long>("ChildAgeAdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("child_age_adoption_revision");
+
+                    b.Property<DateTimeOffset>("ChildAgeAdoptionValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_adoption_valid_until");
+
+                    b.Property<long>("ChildAgeAdoptionWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("child_age_adoption_writer_generation");
+
+                    b.Property<string>("ChildAgeOwnership")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_ownership");
+
+                    b.Property<DateTimeOffset>("ChildAgeRecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_recorded_at");
+
+                    b.Property<Guid>("ChildAgeRecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_recorded_by_human_id");
+
+                    b.Property<Guid>("ChildAgeSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_source_id");
+
+                    b.Property<long>("ChildAgeSourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("child_age_source_revision");
+
+                    b.Property<long>("ChildAgeSourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("child_age_source_writer_generation");
+
+                    b.Property<string>("ChildAgeTerms")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_terms");
+
+                    b.Property<DateTimeOffset>("ChildAgeValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("child_age_valid_until");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<string>("Procedure")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("procedure");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("ProposedStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_state_digest");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_profile_collection_procedure_sources");
+
+                    b.HasIndex("ChildAgeAdoptionId")
+                        .HasDatabaseName("ix_moderation_profile_collection_procedure_sources_child_age_adoption_id");
+
+                    b.HasIndex("ChildAgeSourceId")
+                        .HasDatabaseName("ix_moderation_profile_collection_procedure_sources_child_age_source_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_procedure_sources_recorded_by_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "PublicationId", "ProfileId", "ModeCode", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_profile_collection_procedure_sources_host_binding_id_tenant_id_publication_id_profile_id_mode_code_wr_4e53d6921a1b");
+
+                    b.ToTable("ie_moderation_profile_collection_procedure_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_profile_collection_procedure_generation", "revision = 1 AND policy_revision > 0 AND child_age_source_revision = 1 AND child_age_source_writer_generation > 0 AND child_age_adoption_revision = 1 AND child_age_adoption_writer_generation > child_age_source_writer_generation AND writer_generation > child_age_adoption_writer_generation");
+
+                            t.HasCheckConstraint("ck_profile_collection_procedure_mode", "mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_profile_collection_procedure_validity", "valid_until > recorded_at AND recorded_at >= child_age_recorded_at AND recorded_at >= child_age_adopted_at AND valid_until <= child_age_valid_until AND valid_until <= child_age_adoption_valid_until");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionSubjectObservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<Guid>("EpochId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("epoch_id");
+
+                    b.Property<long>("EpochRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("epoch_revision");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("instance_id");
+
+                    b.Property<int>("JurisdictionKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("jurisdiction_kind");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<long>("ObservationSequence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("observation_sequence");
+
+                    b.Property<Guid>("ObservationStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observation_stamp");
+
+                    b.Property<long>("ObservedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("observed_at");
+
+                    b.Property<string>("OriginalPolicyDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_policy_digest");
+
+                    b.Property<string>("OriginalProcedureDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_procedure_digest");
+
+                    b.Property<string>("OriginalSelectionDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_selection_digest");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<long>("ProcedureAdoptedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adopted_at");
+
+                    b.Property<Guid>("ProcedureAdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("procedure_adopted_by_human_id");
+
+                    b.Property<Guid>("ProcedureAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("procedure_adoption_id");
+
+                    b.Property<long>("ProcedureAdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adoption_revision");
+
+                    b.Property<long>("ProcedureAdoptionValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adoption_valid_until");
+
+                    b.Property<long>("ProcedureAdoptionWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adoption_writer_generation");
+
+                    b.Property<Guid>("ProcedureSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("procedure_source_id");
+
+                    b.Property<long>("ProcedureSourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_source_revision");
+
+                    b.Property<long>("ProcedureSourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_source_writer_generation");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("solution_id");
+
+                    b.Property<Guid>("SubjectHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_human_id");
+
+                    b.Property<Guid?>("SubjectLoginId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_login_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<long>("ValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("valid_until");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_profile_collection_subject_observations");
+
+                    b.HasIndex("EpochId")
+                        .HasDatabaseName("ix_moderation_profile_collection_subject_observations_epoch_id");
+
+                    b.HasIndex("ObservationStamp")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_profile_collection_subject_observations_observation_stamp");
+
+                    b.HasIndex("ProcedureAdoptionId")
+                        .HasDatabaseName("ix_moderation_profile_collection_subject_observations_procedure_adoption_id");
+
+                    b.HasIndex("ProcedureSourceId")
+                        .HasDatabaseName("ix_moderation_profile_collection_subject_observations_procedure_source_id");
+
+                    b.HasIndex("SubjectHumanId")
+                        .HasDatabaseName("ix_moderation_profile_collection_subject_observations_subject_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "SubjectHumanId", "ProfileId", "ModeCode", "ObservationSequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_profile_collection_subject_observations_host_binding_id_tenant_id_subject_human_id_profile_id_mode_co_f5c61ce2f37a");
+
+                    b.ToTable("ie_moderation_profile_collection_subject_observations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_profile_subject_observation_generations", "revision = 1 AND generation > 0 AND generation < 9223372036854775807 AND observation_sequence = generation AND policy_revision > 0 AND policy_revision < 9223372036854775807 AND procedure_source_revision = 1 AND procedure_source_writer_generation > 0 AND procedure_adoption_revision = 1 AND procedure_adoption_writer_generation > procedure_source_writer_generation AND epoch_revision >= procedure_adoption_writer_generation AND epoch_revision < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_profile_subject_observation_identity", "id <> subject_human_id AND id <> observation_stamp AND id <> procedure_source_id AND id <> procedure_adoption_id AND observation_stamp <> subject_human_id");
+
+                            t.HasCheckConstraint("ck_profile_subject_observation_scope", "jurisdiction_kind IN (3, 4) AND mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_profile_subject_observation_window", "observed_at > 0 AND valid_until < 3155378975999999999 AND valid_until > observed_at AND procedure_adopted_at > 0 AND procedure_adoption_valid_until < 3155378975999999999 AND procedure_adoption_valid_until > procedure_adopted_at AND observed_at >= procedure_adopted_at AND valid_until <= procedure_adoption_valid_until");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileSubjectConsent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Assessment")
+                        .IsRequired()
+                        .HasMaxLength(8192)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assessment");
+
+                    b.Property<string>("Binding")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("binding");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation");
+
+                    b.Property<long>("GrantedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("granted_at");
+
+                    b.Property<long>("ProcedureAdoptedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adopted_at");
+
+                    b.Property<Guid>("ProcedureAdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("procedure_adopted_by_human_id");
+
+                    b.Property<Guid>("ProcedureAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("procedure_adoption_id");
+
+                    b.Property<long>("ProcedureAdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adoption_revision");
+
+                    b.Property<long>("ProcedureAdoptionValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adoption_valid_until");
+
+                    b.Property<long>("ProcedureAdoptionWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("procedure_adoption_writer_generation");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid>("SubjectHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_human_id");
+
+                    b.Property<long>("ValidUntil")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long?>("WithdrawnAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("withdrawn_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_profile_subject_consents");
+
+                    b.HasIndex("SourceId")
+                        .HasDatabaseName("ix_moderation_profile_subject_consents_source_id");
+
+                    b.HasIndex("SubjectHumanId", "SourceId", "Generation")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_profile_subject_consents_subject_human_id_source_id_generation");
+
+                    b.ToTable("ie_moderation_profile_subject_consents", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_profile_subject_consent_generation", "generation > 0 AND generation < 9223372036854775807 AND procedure_adoption_revision = 1 AND procedure_adoption_writer_generation > 0 AND procedure_adoption_writer_generation < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_profile_subject_consent_terminal", "(revision = 1 AND withdrawn_at IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_at >= granted_at AND withdrawn_at < 3155378975999999999)");
+
+                            t.HasCheckConstraint("ck_profile_subject_consent_validity", "granted_at > 0 AND valid_until < 3155378975999999999 AND valid_until > granted_at AND procedure_adopted_at > 0 AND procedure_adoption_valid_until < 3155378975999999999 AND procedure_adoption_valid_until > procedure_adopted_at AND granted_at >= procedure_adopted_at AND valid_until <= procedure_adoption_valid_until");
                         });
                 });
 
@@ -18468,7 +27379,1717 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_moderation_qualification_mutation_receipts", null, t =>
                         {
-                            t.HasCheckConstraint("ck_moderation_qualification_receipt_result", "source_kind BETWEEN 1 AND 5 AND result_revision > 0 AND qualification_revision > 0");
+                            t.HasCheckConstraint("ck_moderation_qualification_receipt_result", "source_kind BETWEEN 1 AND 44 AND result_revision > 0 AND qualification_revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationPolicyAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("MaximumReviewerLifetimeTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_reviewer_lifetime_ticks");
+
+                    b.Property<long>("MaximumUrgencyLifetimeTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_urgency_lifetime_ticks");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_by_human_id");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_qualification_policy_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_qualification_policy_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("RevokedByHumanId")
+                        .HasDatabaseName("ix_moderation_qualification_policy_adoptions_revoked_by_human_id");
+
+                    b.HasIndex("SourceId", "SourceRevision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_qualification_policy_adoptions_source_id_source_revision");
+
+                    b.HasIndex("SourceId", "HostBindingId", "TrustDomainId", "TenantId", "CaseId")
+                        .HasDatabaseName("ix_moderation_qualification_policy_adoptions_source_id_host_binding_id_trust_domain_id_tenant_id_case_id");
+
+                    b.ToTable("ie_moderation_qualification_policy_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_qualification_policy_adoption_generation", "id <> source_id AND source_revision > 0 AND case_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_qualification_policy_adoption_limits", "maximum_reviewer_lifetime_ticks > 0 AND maximum_reviewer_lifetime_ticks < 9223372036854775807 AND maximum_urgency_lifetime_ticks > 0 AND maximum_urgency_lifetime_ticks < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_moderation_qualification_policy_adoption_revocation", "(revision = 1 AND revoked_at IS NULL AND revoked_by_human_id IS NULL) OR (revision = 2 AND revoked_at IS NOT NULL AND revoked_by_human_id IS NOT NULL AND revoked_at >= adopted_at)");
+
+                            t.HasCheckConstraint("ck_moderation_qualification_policy_adoption_validity", "valid_until > adopted_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationPolicySource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("MaximumReviewerLifetimeTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_reviewer_lifetime_ticks");
+
+                    b.Property<long>("MaximumUrgencyLifetimeTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_urgency_lifetime_ticks");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid>("PublishedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("published_by_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_qualification_policy_sources");
+
+                    b.HasAlternateKey("Id", "HostBindingId", "TrustDomainId", "TenantId", "CaseId")
+                        .HasName("ak_moderation_qualification_policy_sources_id_host_binding_id_trust_domain_id_tenant_id_case_id");
+
+                    b.HasIndex("CaseId")
+                        .HasDatabaseName("ix_moderation_qualification_policy_sources_case_id");
+
+                    b.HasIndex("PublishedByHumanId")
+                        .HasDatabaseName("ix_moderation_qualification_policy_sources_published_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_qualification_policy_sources_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TrustDomainId", "TenantId", "CaseId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_qualification_policy_sources_host_binding_id_trust_domain_id_tenant_id_case_id");
+
+                    b.ToTable("ie_moderation_qualification_policy_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_qualification_policy_source_generation", "revision > 0 AND case_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_qualification_policy_source_limits", "maximum_reviewer_lifetime_ticks > 0 AND maximum_reviewer_lifetime_ticks < 9223372036854775807 AND maximum_urgency_lifetime_ticks > 0 AND maximum_urgency_lifetime_ticks < 9223372036854775807");
+
+                            t.HasCheckConstraint("ck_moderation_qualification_policy_source_validity", "valid_until > published_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionActionRecovery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CaptureItemId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("capture_item_id");
+
+                    b.Property<string>("CaptureMaterialReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("capture_material_receipt");
+
+                    b.Property<DateTimeOffset>("DispositionBy")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("disposition_by");
+
+                    b.Property<Guid>("FreshSubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("fresh_subject_id");
+
+                    b.Property<Guid>("OriginalIntentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_intent_id");
+
+                    b.Property<Guid>("PrivacyOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_owner_human_id");
+
+                    b.Property<int>("ProviderKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("provider_kind");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid>("RecoveryOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recovery_owner_human_id");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<Guid>("VerifiedBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("verified_binding_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recognition_action_recovery");
+
+                    b.HasIndex("CaptureItemId")
+                        .HasDatabaseName("ix_moderation_recognition_action_recovery_capture_item_id");
+
+                    b.HasIndex("ResolvedAt", "DispositionBy")
+                        .HasDatabaseName("ix_moderation_recognition_action_recovery_resolved_at_disposition_by");
+
+                    b.HasIndex("FreshSubjectId", "VerifiedBindingId", "CaptureItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_action_recovery_fresh_subject_id_verified_binding_id_capture_item_id");
+
+                    b.ToTable("ie_moderation_recognition_action_recovery", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionCaptureItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AdoptionGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adoption_generation");
+
+                    b.Property<Guid>("AdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adoption_id");
+
+                    b.Property<long>("AdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adoption_revision");
+
+                    b.Property<DateTimeOffset>("CapturedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("captured_at");
+
+                    b.Property<Guid?>("ContinuityBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("continuity_binding_id");
+
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("decision_id");
+
+                    b.Property<long>("DecisionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("decision_revision");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("digest");
+
+                    b.Property<DateTimeOffset?>("DroppedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("dropped_at");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ends_at");
+
+                    b.Property<Guid>("ErasureSubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("erasure_subject_id");
+
+                    b.Property<Guid>("FindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("finding_id");
+
+                    b.Property<Guid>("IntentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("intent_id");
+
+                    b.Property<long>("KeyGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("key_generation");
+
+                    b.Property<string>("KeyId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("key_id");
+
+                    b.Property<string>("KeyVerificationTag")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("key_verification_tag");
+
+                    b.Property<int>("OriginalCapabilityMask")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_capability_mask");
+
+                    b.Property<DateTimeOffset>("OriginalCapturedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_captured_at");
+
+                    b.Property<Guid?>("ParentCaptureItemId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("parent_capture_item_id");
+
+                    b.Property<int>("ProviderKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("provider_kind");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("purpose");
+
+                    b.Property<int>("PurposeCapabilityMask")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("purpose_capability_mask");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<DateTimeOffset?>("ReviewAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("review_at");
+
+                    b.Property<long>("RingGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ring_generation");
+
+                    b.Property<string>("RuleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("rule_code");
+
+                    b.Property<Guid>("RuleOwnerId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("rule_owner_id");
+
+                    b.Property<long>("RuleRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("rule_revision");
+
+                    b.Property<Guid>("SanctionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("sanction_id");
+
+                    b.Property<long>("SanctionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("sanction_revision");
+
+                    b.Property<Guid?>("ScopeCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_community_id");
+
+                    b.Property<Guid?>("ScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_event_id");
+
+                    b.Property<Guid?>("ScopeInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_instance_id");
+
+                    b.Property<int>("ScopeKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<Guid?>("ScopeResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_resource_id");
+
+                    b.Property<Guid?>("ScopeSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_solution_id");
+
+                    b.Property<Guid?>("ScopeTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_tenant_id");
+
+                    b.Property<int>("SerializationVersion")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("serialization_version");
+
+                    b.Property<long>("SourceGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_generation");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("starts_at");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<Guid>("SubjectInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_instance_id");
+
+                    b.Property<Guid>("SubjectSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_solution_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recognition_capture_item");
+
+                    b.HasIndex("ContinuityBindingId")
+                        .HasDatabaseName("ix_moderation_recognition_capture_item_continuity_binding_id");
+
+                    b.HasIndex("ParentCaptureItemId")
+                        .HasDatabaseName("ix_moderation_recognition_capture_item_parent_capture_item_id");
+
+                    b.HasIndex("IntentId", "ProviderKind", "Purpose", "Digest", "SanctionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_capture_item_intent_id_provider_kind_purpose_digest_sanction_id");
+
+                    b.HasIndex("TrustDomainId", "ProviderKind", "Purpose", "KeyId", "Digest")
+                        .HasDatabaseName("ix_moderation_recognition_capture_item_trust_domain_id_provider_kind_purpose_key_id_digest");
+
+                    b.ToTable("ie_moderation_recognition_capture_item", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_recognition_capture_item_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 2 AND trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 3 AND trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 4 AND trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 5 AND trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 6 AND trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL AND scope_event_id IS NULL) OR (scope_kind = 7 AND trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NOT NULL AND scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionContinuityBinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("BoundAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("bound_at");
+
+                    b.Property<Guid>("CaptureItemId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("capture_item_id");
+
+                    b.Property<string>("CaptureMaterialReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("capture_material_receipt");
+
+                    b.Property<Guid>("FindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("finding_id");
+
+                    b.Property<Guid>("FreshSubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("fresh_subject_id");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<Guid>("SanctionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("sanction_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recognition_continuity_binding");
+
+                    b.HasIndex("CaptureItemId")
+                        .HasDatabaseName("ix_moderation_recognition_continuity_binding_capture_item_id");
+
+                    b.HasIndex("RetainUntil")
+                        .HasDatabaseName("ix_moderation_recognition_continuity_binding_retain_until");
+
+                    b.HasIndex("FreshSubjectId", "SanctionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_continuity_binding_fresh_subject_id_sanction_id");
+
+                    b.ToTable("ie_moderation_recognition_continuity_binding", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionDisposition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AdoptionGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adoption_generation");
+
+                    b.Property<Guid>("AdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adoption_id");
+
+                    b.Property<long>("AdoptionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("adoption_revision");
+
+                    b.Property<DateTimeOffset>("AssessedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assessed_at");
+
+                    b.Property<long?>("AuthorityHighWaterBeforeAuthorization")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("authority_high_water_before_authorization");
+
+                    b.Property<DateTime?>("AuthorityRecordedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("authority_recorded_at_utc");
+
+                    b.Property<long?>("AuthoritySequence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("authority_sequence");
+
+                    b.Property<DateTimeOffset?>("AuthorizedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("authorized_at");
+
+                    b.Property<int>("CoverageCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("coverage_count");
+
+                    b.Property<string>("CoverageReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("coverage_receipt");
+
+                    b.Property<int>("Grounds")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("grounds");
+
+                    b.Property<string>("GroundsReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("grounds_receipt");
+
+                    b.Property<Guid>("IntentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("intent_id");
+
+                    b.Property<string>("LegalMandateReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("legal_mandate_receipt");
+
+                    b.Property<int>("ObservedFailure")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("observed_failure");
+
+                    b.Property<string>("ObservedMaterialCommitment")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observed_material_commitment");
+
+                    b.Property<DateTimeOffset>("OriginalDeadline")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_deadline");
+
+                    b.Property<int>("OriginalMaterialCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_material_count");
+
+                    b.Property<string>("OriginalMaterialReceipt")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_material_receipt");
+
+                    b.Property<long>("PendingRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("pending_revision");
+
+                    b.Property<int>("PolicyVersion")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_version");
+
+                    b.Property<Guid>("PrivacyOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_owner_human_id");
+
+                    b.Property<int>("ReasonCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reason_code");
+
+                    b.Property<Guid>("RecoveryOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recovery_owner_human_id");
+
+                    b.Property<DateTimeOffset>("ReplayUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("replay_until");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<long>("SourceGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_generation");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recognition_disposition");
+
+                    b.HasIndex("RetainUntil")
+                        .HasDatabaseName("ix_moderation_recognition_disposition_retain_until");
+
+                    b.HasIndex("IntentId", "PendingRevision", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_disposition_intent_id_pending_revision_source_id");
+
+                    b.ToTable("ie_moderation_recognition_disposition", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionDispositionAcceptance", b =>
+                {
+                    b.Property<Guid>("DispositionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("disposition_id");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("role");
+
+                    b.Property<DateTimeOffset>("AcceptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<long>("AcceptedRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("accepted_revision");
+
+                    b.Property<Guid>("HumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("human_id");
+
+                    b.Property<string>("RequestDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("request_digest");
+
+                    b.HasKey("DispositionId", "Role")
+                        .HasName("pk_ie_moderation_recognition_disposition_acceptance");
+
+                    b.ToTable("ie_moderation_recognition_disposition_acceptance", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionDispositionRemedy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CoverageReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("coverage_receipt");
+
+                    b.Property<int>("Grounds")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("grounds");
+
+                    b.Property<string>("GroundsReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("grounds_receipt");
+
+                    b.Property<Guid>("IntentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("intent_id");
+
+                    b.Property<string>("LegalMandateReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("legal_mandate_receipt");
+
+                    b.Property<string>("ObservedMaterialCommitment")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observed_material_commitment");
+
+                    b.Property<string>("OriginalMaterialReceipt")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_material_receipt");
+
+                    b.Property<long>("PendingRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("pending_revision");
+
+                    b.Property<Guid>("PrivacyOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_owner_human_id");
+
+                    b.Property<DateTimeOffset>("ProtectedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("protected_at");
+
+                    b.Property<byte[]>("ReceiptHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("BLOB")
+                        .HasColumnName("receipt_hash");
+
+                    b.Property<Guid>("RecoveryOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recovery_owner_human_id");
+
+                    b.Property<DateTimeOffset>("RemedyUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("remedy_until");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recognition_disposition_remedy");
+
+                    b.HasIndex("ReceiptHash")
+                        .HasDatabaseName("ix_moderation_recognition_disposition_remedy_receipt_hash");
+
+                    b.HasIndex("RetainUntil")
+                        .HasDatabaseName("ix_moderation_recognition_disposition_remedy_retain_until");
+
+                    b.ToTable("ie_moderation_recognition_disposition_remedy", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionEscalation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("acknowledged_at");
+
+                    b.Property<Guid?>("ActionRecoveryId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("action_recovery_id");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("delivered_at");
+
+                    b.Property<Guid>("IntentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("intent_id");
+
+                    b.Property<Guid?>("NotificationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("notification_id");
+
+                    b.Property<DateTimeOffset>("OriginalDeadline")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_deadline");
+
+                    b.Property<Guid>("OtherOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("other_owner_human_id");
+
+                    b.Property<long>("PendingRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("pending_revision");
+
+                    b.Property<Guid>("RecipientHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recipient_human_id");
+
+                    b.Property<DateTimeOffset>("RequiredAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("required_at");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("stage");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recognition_escalation");
+
+                    b.HasIndex("RetainUntil")
+                        .HasDatabaseName("ix_moderation_recognition_escalation_retain_until");
+
+                    b.HasIndex("RecipientHumanId", "AcknowledgedAt")
+                        .HasDatabaseName("ix_moderation_recognition_escalation_recipient_human_id_acknowledged_at");
+
+                    b.HasIndex("TargetId", "SourceId", "RecipientHumanId", "Stage")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_escalation_target_id_source_id_recipient_human_id_stage");
+
+                    b.ToTable("ie_moderation_recognition_escalation", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionKeyLifecycle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AcknowledgementSequence")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("acknowledgement_sequence");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("changed_at");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("InitialErasureHead")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("initial_erasure_head");
+
+                    b.Property<long>("InitialErasureRetainedFloor")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("initial_erasure_retained_floor");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<long>("RingGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ring_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recognition_key_lifecycle");
+
+                    b.ToTable("ie_moderation_recognition_key_lifecycle", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionKeyLifecycleKey", b =>
+                {
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<string>("KeyId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("key_id");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("changed_at");
+
+                    b.Property<long>("KeyGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("key_generation");
+
+                    b.Property<DateTimeOffset?>("OriginalObligationsUntil")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_obligations_until");
+
+                    b.Property<long>("RequiredErasureHead")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("required_erasure_head");
+
+                    b.Property<int>("State")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("state");
+
+                    b.Property<string>("VerificationTag")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("verification_tag");
+
+                    b.HasKey("TrustDomainId", "KeyId")
+                        .HasName("pk_ie_moderation_recognition_key_lifecycle_key");
+
+                    b.HasIndex("TrustDomainId", "KeyGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_key_lifecycle_key_trust_domain_id_key_generation");
+
+                    b.ToTable("ie_moderation_recognition_key_lifecycle_key", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionKeyLifecyclePurge", b =>
+                {
+                    b.Property<Guid>("IntentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("intent_id");
+
+                    b.Property<long>("AuthoritySequence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("authority_sequence");
+
+                    b.Property<DateTimeOffset>("BackupObligationUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("backup_obligation_until");
+
+                    b.Property<int>("MaterialCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("material_count");
+
+                    b.Property<string>("MaterialReceipt")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_receipt");
+
+                    b.Property<DateTimeOffset>("PurgedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("purged_at");
+
+                    b.Property<DateTimeOffset>("RetainUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("retain_until");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.HasKey("IntentId")
+                        .HasName("pk_ie_moderation_recognition_key_lifecycle_purge");
+
+                    b.HasIndex("AuthoritySequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_key_lifecycle_purge_authority_sequence");
+
+                    b.ToTable("ie_moderation_recognition_key_lifecycle_purge", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionPending", b =>
+                {
+                    b.Property<Guid>("IntentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("intent_id");
+
+                    b.Property<long?>("AuthoritySequence")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("authority_sequence");
+
+                    b.Property<DateTimeOffset?>("ComputedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("computed_at");
+
+                    b.Property<DateTimeOffset>("EscalateAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalate_at");
+
+                    b.Property<int>("Failure")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("failure");
+
+                    b.Property<int>("MaterialCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("material_count");
+
+                    b.Property<string>("MaterialReceipt")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_receipt");
+
+                    b.Property<int>("PolicyVersion")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_version");
+
+                    b.Property<Guid>("PrivacyOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_owner_human_id");
+
+                    b.Property<int>("ReasonCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reason_code");
+
+                    b.Property<DateTimeOffset>("ReceiptExpiresAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("receipt_expires_at");
+
+                    b.Property<byte[]>("ReceiptHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("BLOB")
+                        .HasColumnName("receipt_hash");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid>("RecoveryOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recovery_owner_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset>("SettleBy")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("settle_by");
+
+                    b.Property<int>("State")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.HasKey("IntentId")
+                        .HasName("pk_ie_moderation_recognition_pending");
+
+                    b.HasIndex("ReceiptHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_pending_receipt_hash");
+
+                    b.HasIndex("SubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_pending_subject_id");
+
+                    b.HasIndex("State", "EscalateAt")
+                        .HasDatabaseName("ix_moderation_recognition_pending_state_escalate_at");
+
+                    b.ToTable("ie_moderation_recognition_pending", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionPrivacyAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<long>("SourceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_revision");
+
+                    b.Property<long>("SourceWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_writer_generation");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recognition_privacy_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_recognition_privacy_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_privacy_adoptions_source_id");
+
+                    b.HasIndex("WithdrawnByHumanId")
+                        .HasDatabaseName("ix_moderation_recognition_privacy_adoptions_withdrawn_by_human_id");
+
+                    b.ToTable("ie_moderation_recognition_privacy_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_adoption_generation", "source_revision = 1 AND source_writer_generation > 0 AND writer_generation > source_writer_generation");
+
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_adoption_validity", "valid_until > adopted_at");
+
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_adoption_withdrawal", "(revision = 1 AND withdrawn_at IS NULL AND withdrawn_by_human_id IS NULL) OR (revision = 2 AND withdrawn_at IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_at >= adopted_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionPrivacyRetention", b =>
+                {
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_id");
+
+                    b.Property<int>("RecordClass")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("record_class");
+
+                    b.Property<int>("Hold")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("hold");
+
+                    b.Property<long>("HoldReviewWithinTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("hold_review_within_ticks");
+
+                    b.Property<long>("MaximumHoldTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_hold_ticks");
+
+                    b.Property<long>("MaximumRetentionTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_retention_ticks");
+
+                    b.HasKey("SourceId", "RecordClass")
+                        .HasName("pk_ie_moderation_recognition_privacy_retention");
+
+                    b.ToTable("ie_moderation_recognition_privacy_retention", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_hold", "(hold = 1 AND maximum_hold_ticks = 0 AND hold_review_within_ticks = 0) OR (hold = 2 AND record_class IN (3, 4) AND maximum_hold_ticks > 0 AND hold_review_within_ticks > 0 AND hold_review_within_ticks <= maximum_hold_ticks)");
+
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_retention", "record_class BETWEEN 1 AND 4 AND maximum_retention_ticks > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionPrivacySource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long>("BackupSafetyMarginTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("backup_safety_margin_ticks");
+
+                    b.Property<int>("CatastrophicDisposition")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("catastrophic_disposition");
+
+                    b.Property<int>("Correction")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("correction");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("definition_id");
+
+                    b.Property<long>("EscalationAfterTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("escalation_after_ticks");
+
+                    b.Property<Guid>("GovernanceControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("governance_controller_human_id");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<string>("IdentityAndIndependenceBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("identity_and_independence_basis");
+
+                    b.Property<int>("KeyObligations")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("key_obligations");
+
+                    b.Property<long>("LawfulRequestDeadlineTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("lawful_request_deadline_ticks");
+
+                    b.Property<int>("Linkage")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("linkage");
+
+                    b.Property<long>("MaximumBackupHorizonTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("maximum_backup_horizon_ticks");
+
+                    b.Property<int>("ModeCode")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mode_code");
+
+                    b.Property<int>("OrdinaryErasure")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ordinary_erasure");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<Guid>("PrivacyControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_controller_human_id");
+
+                    b.Property<string>("PrivacyLegalMandateBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_legal_mandate_basis");
+
+                    b.Property<Guid>("PrivacyOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("privacy_owner_human_id");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("ProposedStateDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("proposed_state_digest");
+
+                    b.Property<int>("ProtectedRemedyCalendarMonths")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("protected_remedy_calendar_months");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<int>("Purposes")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("purposes");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recorded_by_human_id");
+
+                    b.Property<Guid>("RecoveryControllerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recovery_controller_human_id");
+
+                    b.Property<string>("RecoveryMandateBasis")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recovery_mandate_basis");
+
+                    b.Property<Guid>("RecoveryOwnerHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recovery_owner_human_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<int>("ScopeCeiling")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("scope_ceiling");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recognition_privacy_sources");
+
+                    b.HasIndex("DefinitionId")
+                        .HasDatabaseName("ix_moderation_recognition_privacy_sources_definition_id");
+
+                    b.HasIndex("GovernanceControllerHumanId")
+                        .HasDatabaseName("ix_moderation_recognition_privacy_sources_governance_controller_human_id");
+
+                    b.HasIndex("PrivacyControllerHumanId")
+                        .HasDatabaseName("ix_moderation_recognition_privacy_sources_privacy_controller_human_id");
+
+                    b.HasIndex("PrivacyOwnerHumanId")
+                        .HasDatabaseName("ix_moderation_recognition_privacy_sources_privacy_owner_human_id");
+
+                    b.HasIndex("RecordedByHumanId")
+                        .HasDatabaseName("ix_moderation_recognition_privacy_sources_recorded_by_human_id");
+
+                    b.HasIndex("RecoveryControllerHumanId")
+                        .HasDatabaseName("ix_moderation_recognition_privacy_sources_recovery_controller_human_id");
+
+                    b.HasIndex("RecoveryOwnerHumanId")
+                        .HasDatabaseName("ix_moderation_recognition_privacy_sources_recovery_owner_human_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "PublicationId", "ProfileId", "ModeCode", "WriterGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recognition_privacy_sources_host_binding_id_tenant_id_publication_id_profile_id_mode_code_writer_generation");
+
+                    b.ToTable("ie_moderation_recognition_privacy_sources", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_independence", "privacy_owner_human_id <> recorded_by_human_id AND recovery_owner_human_id <> recorded_by_human_id AND privacy_owner_human_id <> recovery_owner_human_id AND privacy_controller_human_id <> recovery_controller_human_id AND privacy_controller_human_id <> governance_controller_human_id AND recovery_controller_human_id <> governance_controller_human_id");
+
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_source_generation", "revision = 1 AND policy_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_source_mode", "mode_code BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_source_validity", "valid_until > recorded_at");
+
+                            t.HasCheckConstraint("ck_moderation_recognition_privacy_terms", "purposes BETWEEN 1 AND 3 AND linkage = 1 AND ordinary_erasure = 1 AND correction = 1 AND catastrophic_disposition = 1 AND key_obligations = 1 AND protected_remedy_calendar_months BETWEEN 1 AND 1200 AND escalation_after_ticks > 0 AND lawful_request_deadline_ticks > escalation_after_ticks AND maximum_backup_horizon_ticks > 0 AND backup_safety_margin_ticks > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecoveryStoreState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Generation")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation");
+
+                    b.Property<int>("InstallationSlot")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1)
+                        .HasColumnName("installation_slot");
+
+                    b.Property<long>("Position")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("position");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_recovery_store_states");
+
+                    b.HasIndex("InstallationSlot")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_recovery_store_states_installation_slot");
+
+                    b.ToTable("ie_moderation_recovery_store_states", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_recovery_store_coordinates", "revision > 0 AND generation > 0 AND generation <= revision - position AND position >= 0 AND position < revision");
+
+                            t.HasCheckConstraint("ck_moderation_recovery_store_slot", "installation_slot = 1");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationResourceGeneration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("actor_id");
+
+                    b.Property<Guid>("ActorStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("actor_stamp");
+
+                    b.Property<int>("DeliveryType")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("delivery_type");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_stamp");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<Guid>("MaterialVersionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("material_version_id");
+
+                    b.Property<DateTimeOffset>("ObservedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observed_at");
+
+                    b.Property<Guid>("ObservedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observed_by_human_id");
+
+                    b.Property<Guid?>("OrganizerActorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("organizer_actor_id");
+
+                    b.Property<Guid?>("OrganizerActorStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("organizer_actor_stamp");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("resource_id");
+
+                    b.Property<Guid>("ResourceStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("resource_stamp");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid?>("StorageObjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("storage_object_id");
+
+                    b.Property<Guid?>("StorageObjectStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("storage_object_stamp");
+
+                    b.Property<string>("StorageProvider")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("storage_provider");
+
+                    b.Property<Guid?>("StorageProviderBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("storage_provider_binding_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_resource_generations");
+
+                    b.HasIndex("ObservedByHumanId")
+                        .HasDatabaseName("ix_moderation_resource_generations_observed_by_human_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_moderation_resource_generations_tenant_id");
+
+                    b.HasIndex("HostBindingId", "TenantId", "ResourceId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_resource_generations_host_binding_id_tenant_id_resource_id_revision");
+
+                    b.ToTable("ie_moderation_resource_generations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_resource_generation_material", "material_version_id <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("ck_moderation_resource_generation_revision", "revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_resource_generation_storage", "(delivery_type = 1 AND storage_object_id IS NOT NULL AND storage_object_stamp IS NOT NULL AND storage_provider_binding_id IS NOT NULL AND storage_provider IS NOT NULL) OR (delivery_type = 2 AND storage_object_id IS NULL AND storage_object_stamp IS NULL AND storage_provider_binding_id IS NULL AND storage_provider IS NULL)");
+
+                            t.HasCheckConstraint("ck_moderation_resource_generation_validity", "valid_until > observed_at");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationResourceTargetAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AdoptedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_at");
+
+                    b.Property<Guid>("AdoptedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adopted_by_human_id");
+
+                    b.Property<int>("BindingOrdinal")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("binding_ordinal");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("case_id");
+
+                    b.Property<long>("CaseRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("case_revision");
+
+                    b.Property<Guid>("GenerationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("generation_id");
+
+                    b.Property<long>("GenerationRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation_revision");
+
+                    b.Property<long>("GenerationWriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("generation_writer_generation");
+
+                    b.Property<Guid>("HostBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("host_binding_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("revoked_by_human_id");
+
+                    b.Property<Guid>("SelectionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("selection_id");
+
+                    b.Property<long>("SelectionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("selection_revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("trust_domain_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.Property<long>("WriterGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("writer_generation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_resource_target_adoptions");
+
+                    b.HasIndex("AdoptedByHumanId")
+                        .HasDatabaseName("ix_moderation_resource_target_adoptions_adopted_by_human_id");
+
+                    b.HasIndex("GenerationId")
+                        .HasDatabaseName("ix_moderation_resource_target_adoptions_generation_id");
+
+                    b.HasIndex("RevokedByHumanId")
+                        .HasDatabaseName("ix_moderation_resource_target_adoptions_revoked_by_human_id");
+
+                    b.HasIndex("SelectionId", "BindingOrdinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_resource_target_adoptions_selection_id_binding_ordinal");
+
+                    b.ToTable("ie_moderation_resource_target_adoptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_resource_target_adoption_revision", "selection_revision = 1 AND generation_revision > 0 AND generation_writer_generation > 0 AND case_revision > 0 AND writer_generation > 0");
+
+                            t.HasCheckConstraint("ck_moderation_resource_target_adoption_revocation", "(revision = 1 AND revoked_at IS NULL AND revoked_by_human_id IS NULL) OR (revision = 2 AND revoked_at IS NOT NULL AND revoked_by_human_id IS NOT NULL AND revoked_at >= adopted_at)");
+
+                            t.HasCheckConstraint("ck_moderation_resource_target_adoption_validity", "valid_until > adopted_at");
                         });
                 });
 
@@ -25356,7 +35977,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<string>("ProviderMappingRevisionHash")
                         .HasMaxLength(44)
                         .HasColumnType("TEXT")
-                        .HasColumnName("provider_mapping_revision_hash");
+                        .HasColumnName("provider_mapping_revision_hash")
+                        .UseCollation("BINARY")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<string>("ProviderMappingRevisionHashKey")
                         .IsRequired()
@@ -25364,7 +35987,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasMaxLength(44)
                         .HasColumnType("TEXT")
                         .HasColumnName("provider_mapping_revision_hash_key")
-                        .HasComputedColumnSql("COALESCE(provider_mapping_revision_hash, '')", true);
+                        .HasComputedColumnSql("COALESCE(provider_mapping_revision_hash, '')", true)
+                        .UseCollation("BINARY")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<Guid>("RegistrationChannelId")
                         .HasColumnType("TEXT")
@@ -28039,7 +38664,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<string>("PublishedMappingRevisionHash")
                         .HasMaxLength(44)
                         .HasColumnType("TEXT")
-                        .HasColumnName("published_mapping_revision_hash");
+                        .HasColumnName("published_mapping_revision_hash")
+                        .UseCollation("BINARY")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<string>("PublishedMappingRevisionHashKey")
                         .IsRequired()
@@ -28047,7 +38674,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasMaxLength(44)
                         .HasColumnType("TEXT")
                         .HasDefaultValue("")
-                        .HasColumnName("published_mapping_revision_hash_key");
+                        .HasColumnName("published_mapping_revision_hash_key")
+                        .UseCollation("BINARY")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<Guid>("RegistrationFormId")
                         .HasColumnType("TEXT")
@@ -28091,9 +38720,6 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasAlternateKey("TenantId", "Id")
                         .HasName("ak_registration_provider_bindings_tenant_id_id");
 
-                    b.HasAlternateKey("TenantId", "Id", "PublishedMappingRevisionHashKey")
-                        .HasName("ak_registration_provider_bindings_tenant_id_id_published_mapping_revision_hash_key");
-
                     b.HasIndex("CollectionModeId")
                         .HasDatabaseName("ix_registration_provider_bindings_collection_mode_id");
 
@@ -28122,10 +38748,56 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_registration_provider_bindings_tenant_id_registration_provider_connection_id_registration_form_version_id");
 
+                    b.HasIndex("TenantId", "Id", "PublishedMappingRevisionHashKey", "PublishedAt")
+                        .IsUnique()
+                        .HasDatabaseName("ix_registration_provider_bindings_tenant_id_id_published_mapping_revision_hash_key_published_at");
+
                     b.ToTable("ie_registration_provider_bindings", null, t =>
                         {
-                            t.HasCheckConstraint("ck_registration_provider_bindings_publication", "(state_id = 2 AND published_mapping_revision_hash IS NOT NULL AND published_at IS NOT NULL) OR (state_id <> 2)");
+                            t.HasCheckConstraint("ck_registration_provider_bindings_publication", "(state_id = 2 AND published_mapping_revision_hash IS NOT NULL AND published_at IS NOT NULL AND published_mapping_revision_hash_key = published_mapping_revision_hash) OR (state_id <> 2 AND published_mapping_revision_hash IS NULL AND published_at IS NULL AND published_mapping_revision_hash_key = '')");
                         });
+                });
+
+            modelBuilder.Entity("Explore.Domain.RegistrationProviderBindingPublication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("MappingRevisionHashKey")
+                        .IsRequired()
+                        .HasMaxLength(44)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("mapping_revision_hash_key")
+                        .UseCollation("BINARY")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    b.Property<DateTime>("PublishedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid>("RegistrationProviderBindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("registration_provider_binding_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_registration_provider_binding_publications");
+
+                    b.HasAlternateKey("TenantId", "RegistrationProviderBindingId", "MappingRevisionHashKey")
+                        .HasName("ak_registration_provider_binding_publications_tenant_id_registration_provider_binding_id_mapping_revision_hash_key");
+
+                    b.HasAlternateKey("TenantId", "RegistrationProviderBindingId", "MappingRevisionHashKey", "PublishedAt")
+                        .HasName("ak_registration_provider_binding_publications_tenant_id_registration_provider_binding_id_mapping_revision_hash_key_published_at");
+
+                    b.HasIndex("TenantId", "RegistrationProviderBindingId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_registration_provider_binding_publications_tenant_id_registration_provider_binding_id");
+
+                    b.ToTable("ie_registration_provider_binding_publications", (string)null);
                 });
 
             modelBuilder.Entity("Explore.Domain.RegistrationProviderBindingState", b =>
@@ -34707,6 +45379,66 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.UserBirthDateCollectionReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AssessmentAdoptionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assessment_adoption_id");
+
+                    b.Property<Guid>("AssessmentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assessment_id");
+
+                    b.Property<DateTimeOffset>("CollectedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("collected_at");
+
+                    b.Property<Guid?>("ConsentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consent_id");
+
+                    b.Property<Guid>("ObservationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("observation_id");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("profile_id");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("valid_until");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_user_birth_date_collection_receipts");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_birth_date_collection_receipts_user_id");
+
+                    b.ToTable("ie_user_birth_date_collection_receipts", (string)null);
+                });
+
             modelBuilder.Entity("Explore.Domain.UserExternalLogin", b =>
                 {
                     b.Property<Guid>("Id")
@@ -34922,6 +45654,19 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT")
                         .HasColumnName("last_name");
+
+                    b.Property<Guid?>("_birthDateCollectionReceiptId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("birth_date_collection_receipt_id");
+
+                    b.Property<long>("_birthDateRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("birth_date_revision");
+
+                    b.Property<DateOnly?>("_dateOfBirth")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("date_of_birth");
 
                     b.HasKey("UserId")
                         .HasName("pk_ie_user_pii");
@@ -38752,13 +49497,33 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("AttributionSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("attribution_source_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("TEXT")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("OccurrenceCaseId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_case_id");
+
+                    b.Property<long?>("OccurrenceEvidenceRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("occurrence_evidence_revision");
+
                     b.Property<Guid>("OccurrenceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("occurrence_id");
+
+                    b.Property<Guid>("OccurrenceOwnerId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("occurrence_owner_id");
+
+                    b.Property<int>("OccurrenceOwnerKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("occurrence_owner_kind");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
@@ -38768,6 +49533,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("ScopeCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("scope_community_id");
+
+                    b.Property<Guid?>("ScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_event_id");
 
                     b.Property<Guid?>("ScopeInstanceId")
                         .HasColumnType("TEXT")
@@ -38797,11 +49566,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("state");
 
-                    b.Property<Guid>("SubjectId")
+                    b.Property<Guid?>("SubjectId")
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_id");
 
-                    b.Property<int>("SubjectKind")
+                    b.Property<int?>("SubjectKind")
                         .HasColumnType("INTEGER")
                         .HasColumnName("subject_kind");
 
@@ -38809,11 +49578,15 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_community_id");
 
+                    b.Property<Guid?>("SubjectOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_event_id");
+
                     b.Property<Guid?>("SubjectOriginInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_instance_id");
 
-                    b.Property<int>("SubjectOriginKind")
+                    b.Property<int?>("SubjectOriginKind")
                         .HasColumnType("INTEGER")
                         .HasColumnName("subject_origin_kind");
 
@@ -38829,9 +49602,53 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_tenant_id");
 
-                    b.Property<Guid>("SubjectOriginTrustDomainId")
+                    b.Property<Guid?>("SubjectOriginTrustDomainId")
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_trust_domain_id");
+
+                    b.Property<Guid?>("TargetId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_id");
+
+                    b.Property<int?>("TargetKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_kind");
+
+                    b.Property<Guid?>("TargetOriginCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_community_id");
+
+                    b.Property<Guid?>("TargetOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_event_id");
+
+                    b.Property<Guid?>("TargetOriginInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_instance_id");
+
+                    b.Property<int?>("TargetOriginKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("target_origin_kind");
+
+                    b.Property<Guid?>("TargetOriginResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_resource_id");
+
+                    b.Property<Guid?>("TargetOriginSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_solution_id");
+
+                    b.Property<Guid?>("TargetOriginTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_tenant_id");
+
+                    b.Property<Guid?>("TargetOriginTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_origin_trust_domain_id");
+
+                    b.Property<Guid?>("TargetVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("target_version");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("TEXT")
@@ -38840,26 +49657,37 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ie_moderation_cases");
 
-                    b.HasIndex("ScopeTrustDomainId", "ScopeTenantId", "OccurrenceId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_moderation_cases_scope_trust_domain_id_scope_tenant_id_occurrence_id");
+                    b.HasIndex("OccurrenceCaseId")
+                        .HasDatabaseName("ix_moderation_cases_occurrence_case_id");
 
                     b.HasIndex("ScopeTrustDomainId", "SubjectKind", "SubjectId", "ScopeTenantId")
                         .HasDatabaseName("ix_moderation_cases_scope_trust_domain_id_subject_kind_subject_id_scope_tenant_id");
 
+                    b.HasIndex("ScopeTrustDomainId", "ScopeTenantId", "OccurrenceId", "OccurrenceOwnerKind", "OccurrenceOwnerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_cases_scope_trust_domain_id_scope_tenant_id_occurrence_id_occurrence_owner_kind_occurrence_owner_id");
+
                     b.ToTable("ie_moderation_cases", null, t =>
                         {
+                            t.HasCheckConstraint("ck_moderation_case_attribution", "(occurrence_case_id IS NULL AND occurrence_evidence_revision IS NULL AND attribution_source_id IS NULL) OR (occurrence_case_id IS NOT NULL AND occurrence_case_id <> id AND occurrence_evidence_revision > 0 AND attribution_source_id IS NOT NULL AND subject_id IS NOT NULL AND scope_kind = 4)");
+
+                            t.HasCheckConstraint("ck_moderation_case_occurrence_owner", "(subject_id IS NULL AND occurrence_owner_kind = 0 AND occurrence_owner_id = '00000000-0000-0000-0000-000000000000') OR (subject_id IS NOT NULL AND occurrence_owner_kind = subject_kind AND occurrence_owner_id = subject_id)");
+
+                            t.HasCheckConstraint("ck_moderation_case_ownership", "(subject_id IS NOT NULL AND target_kind IS NULL AND target_id IS NULL AND target_version IS NULL AND target_origin_kind IS NULL) OR (subject_id IS NULL AND target_kind IS NOT NULL AND target_kind BETWEEN 1 AND 9 AND target_id IS NOT NULL AND target_version IS NOT NULL AND target_origin_kind IS NOT NULL AND scope_kind = 4 AND scope_tenant_id IS NOT NULL AND target_origin_trust_domain_id = scope_trust_domain_id AND target_origin_solution_id = scope_solution_id AND target_origin_instance_id = scope_instance_id AND ((target_kind IN (3, 4) AND target_origin_kind = 3) OR (target_kind NOT IN (3, 4) AND target_origin_kind = 4 AND target_origin_tenant_id = scope_tenant_id)))");
+
                             t.HasCheckConstraint("ck_moderation_case_state", "state IN (1, 2)");
 
                             t.HasCheckConstraint("ck_moderation_cases_revision", "revision > 0");
 
-                            t.HasCheckConstraint("ck_moderation_cases_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_cases_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL AND scope_event_id IS NULL) OR (scope_kind = 7 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NOT NULL AND scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
-                            t.HasCheckConstraint("ck_moderation_cases_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_cases_subject_origin_scope", "(subject_origin_kind IS NULL AND subject_origin_trust_domain_id IS NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 7 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NOT NULL AND subject_origin_event_id <> '00000000-0000-0000-0000-000000000000')))");
 
-                            t.HasCheckConstraint("ck_moderation_cases_subject_subject", "subject_kind BETWEEN 1 AND 4");
+                            t.HasCheckConstraint("ck_moderation_cases_subject_subject", "(subject_kind IS NULL AND subject_id IS NULL AND subject_origin_kind IS NULL) OR (subject_kind IS NOT NULL AND subject_kind BETWEEN 1 AND 4 AND subject_id IS NOT NULL AND subject_origin_kind IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_moderation_cases_subject_trust", "subject_origin_trust_domain_id = scope_trust_domain_id");
+
+                            t.HasCheckConstraint("ck_moderation_cases_target_origin_scope", "(target_origin_kind IS NULL AND target_origin_trust_domain_id IS NULL AND target_origin_solution_id IS NULL AND target_origin_instance_id IS NULL AND target_origin_tenant_id IS NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind IS NOT NULL AND ((target_origin_kind = 1 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NULL AND target_origin_instance_id IS NULL AND target_origin_tenant_id IS NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 2 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NULL AND target_origin_tenant_id IS NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 3 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 4 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NOT NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 5 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NOT NULL AND target_origin_community_id IS NOT NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 6 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NOT NULL AND target_origin_resource_id IS NOT NULL AND target_origin_event_id IS NULL) OR (target_origin_kind = 7 AND target_origin_trust_domain_id IS NOT NULL AND target_origin_solution_id IS NOT NULL AND target_origin_instance_id IS NOT NULL AND target_origin_tenant_id IS NOT NULL AND target_origin_community_id IS NULL AND target_origin_resource_id IS NULL AND target_origin_event_id IS NOT NULL AND target_origin_event_id <> '00000000-0000-0000-0000-000000000000')))");
                         });
                 });
 
@@ -38880,6 +49708,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("Approval1OriginCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("approval1_origin_community_id");
+
+                    b.Property<Guid?>("Approval1OriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("approval1_origin_event_id");
 
                     b.Property<Guid?>("Approval1OriginInstanceId")
                         .HasColumnType("TEXT")
@@ -38916,6 +49748,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("Approval2OriginCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("approval2_origin_community_id");
+
+                    b.Property<Guid?>("Approval2OriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("approval2_origin_event_id");
 
                     b.Property<Guid?>("Approval2OriginInstanceId")
                         .HasColumnType("TEXT")
@@ -38973,6 +49809,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("issuer_origin_community_id");
 
+                    b.Property<Guid?>("IssuerOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuer_origin_event_id");
+
                     b.Property<Guid?>("IssuerOriginInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("issuer_origin_instance_id");
@@ -39000,6 +49840,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("IssuingScopeCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("issuing_scope_community_id");
+
+                    b.Property<Guid?>("IssuingScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuing_scope_event_id");
 
                     b.Property<Guid?>("IssuingScopeInstanceId")
                         .HasColumnType("TEXT")
@@ -39056,6 +49900,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("scope_community_id");
 
+                    b.Property<Guid?>("ScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_event_id");
+
                     b.Property<Guid?>("ScopeInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("scope_instance_id");
@@ -39099,6 +49947,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("SubjectOriginCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_community_id");
+
+                    b.Property<Guid?>("SubjectOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_event_id");
 
                     b.Property<Guid?>("SubjectOriginInstanceId")
                         .HasColumnType("TEXT")
@@ -39153,25 +50005,25 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("ck_moderation_decision_state", "state BETWEEN 1 AND 8");
 
-                            t.HasCheckConstraint("ck_moderation_decisions_approval1_origin_scope", "(approval1_origin_kind IS NULL AND approval1_origin_trust_domain_id IS NULL AND approval1_origin_solution_id IS NULL AND approval1_origin_instance_id IS NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind IS NOT NULL AND ((approval1_origin_kind = 1 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NULL AND approval1_origin_instance_id IS NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 2 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 3 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 4 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 5 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_community_id IS NOT NULL AND approval1_origin_resource_id IS NULL) OR (approval1_origin_kind = 6 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_resource_id IS NOT NULL)))");
+                            t.HasCheckConstraint("ck_moderation_decisions_approval1_origin_scope", "(approval1_origin_kind IS NULL AND approval1_origin_trust_domain_id IS NULL AND approval1_origin_solution_id IS NULL AND approval1_origin_instance_id IS NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL AND approval1_origin_event_id IS NULL) OR (approval1_origin_kind IS NOT NULL AND ((approval1_origin_kind = 1 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NULL AND approval1_origin_instance_id IS NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL AND approval1_origin_event_id IS NULL) OR (approval1_origin_kind = 2 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL AND approval1_origin_event_id IS NULL) OR (approval1_origin_kind = 3 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL AND approval1_origin_event_id IS NULL) OR (approval1_origin_kind = 4 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL AND approval1_origin_event_id IS NULL) OR (approval1_origin_kind = 5 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_community_id IS NOT NULL AND approval1_origin_resource_id IS NULL AND approval1_origin_event_id IS NULL) OR (approval1_origin_kind = 6 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_resource_id IS NOT NULL AND approval1_origin_event_id IS NULL) OR (approval1_origin_kind = 7 AND approval1_origin_trust_domain_id IS NOT NULL AND approval1_origin_solution_id IS NOT NULL AND approval1_origin_instance_id IS NOT NULL AND approval1_origin_tenant_id IS NOT NULL AND approval1_origin_community_id IS NULL AND approval1_origin_resource_id IS NULL AND approval1_origin_event_id IS NOT NULL AND approval1_origin_event_id <> '00000000-0000-0000-0000-000000000000')))");
 
                             t.HasCheckConstraint("ck_moderation_decisions_approval1_subject", "(approval1_kind IS NULL AND approval1_id IS NULL AND approval1_origin_kind IS NULL) OR (approval1_kind IS NOT NULL AND approval1_kind BETWEEN 1 AND 4 AND approval1_id IS NOT NULL AND approval1_origin_kind IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_moderation_decisions_approval2_origin_scope", "(approval2_origin_kind IS NULL AND approval2_origin_trust_domain_id IS NULL AND approval2_origin_solution_id IS NULL AND approval2_origin_instance_id IS NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind IS NOT NULL AND ((approval2_origin_kind = 1 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NULL AND approval2_origin_instance_id IS NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 2 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 3 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 4 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 5 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_community_id IS NOT NULL AND approval2_origin_resource_id IS NULL) OR (approval2_origin_kind = 6 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_resource_id IS NOT NULL)))");
+                            t.HasCheckConstraint("ck_moderation_decisions_approval2_origin_scope", "(approval2_origin_kind IS NULL AND approval2_origin_trust_domain_id IS NULL AND approval2_origin_solution_id IS NULL AND approval2_origin_instance_id IS NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL AND approval2_origin_event_id IS NULL) OR (approval2_origin_kind IS NOT NULL AND ((approval2_origin_kind = 1 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NULL AND approval2_origin_instance_id IS NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL AND approval2_origin_event_id IS NULL) OR (approval2_origin_kind = 2 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL AND approval2_origin_event_id IS NULL) OR (approval2_origin_kind = 3 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL AND approval2_origin_event_id IS NULL) OR (approval2_origin_kind = 4 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL AND approval2_origin_event_id IS NULL) OR (approval2_origin_kind = 5 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_community_id IS NOT NULL AND approval2_origin_resource_id IS NULL AND approval2_origin_event_id IS NULL) OR (approval2_origin_kind = 6 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_resource_id IS NOT NULL AND approval2_origin_event_id IS NULL) OR (approval2_origin_kind = 7 AND approval2_origin_trust_domain_id IS NOT NULL AND approval2_origin_solution_id IS NOT NULL AND approval2_origin_instance_id IS NOT NULL AND approval2_origin_tenant_id IS NOT NULL AND approval2_origin_community_id IS NULL AND approval2_origin_resource_id IS NULL AND approval2_origin_event_id IS NOT NULL AND approval2_origin_event_id <> '00000000-0000-0000-0000-000000000000')))");
 
                             t.HasCheckConstraint("ck_moderation_decisions_approval2_subject", "(approval2_kind IS NULL AND approval2_id IS NULL AND approval2_origin_kind IS NULL) OR (approval2_kind IS NOT NULL AND approval2_kind BETWEEN 1 AND 4 AND approval2_id IS NOT NULL AND approval2_origin_kind IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_moderation_decisions_issuer_origin_scope", "issuer_origin_kind IS NOT NULL AND ((issuer_origin_kind = 1 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NULL AND issuer_origin_instance_id IS NULL AND issuer_origin_tenant_id IS NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 2 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NULL AND issuer_origin_tenant_id IS NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 3 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 4 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 5 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_community_id IS NOT NULL AND issuer_origin_resource_id IS NULL) OR (issuer_origin_kind = 6 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_decisions_issuer_origin_scope", "issuer_origin_kind IS NOT NULL AND ((issuer_origin_kind = 1 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NULL AND issuer_origin_instance_id IS NULL AND issuer_origin_tenant_id IS NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL AND issuer_origin_event_id IS NULL) OR (issuer_origin_kind = 2 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NULL AND issuer_origin_tenant_id IS NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL AND issuer_origin_event_id IS NULL) OR (issuer_origin_kind = 3 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL AND issuer_origin_event_id IS NULL) OR (issuer_origin_kind = 4 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL AND issuer_origin_event_id IS NULL) OR (issuer_origin_kind = 5 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_community_id IS NOT NULL AND issuer_origin_resource_id IS NULL AND issuer_origin_event_id IS NULL) OR (issuer_origin_kind = 6 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_resource_id IS NOT NULL AND issuer_origin_event_id IS NULL) OR (issuer_origin_kind = 7 AND issuer_origin_trust_domain_id IS NOT NULL AND issuer_origin_solution_id IS NOT NULL AND issuer_origin_instance_id IS NOT NULL AND issuer_origin_tenant_id IS NOT NULL AND issuer_origin_community_id IS NULL AND issuer_origin_resource_id IS NULL AND issuer_origin_event_id IS NOT NULL AND issuer_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
                             t.HasCheckConstraint("ck_moderation_decisions_issuer_subject", "issuer_kind BETWEEN 1 AND 4");
 
-                            t.HasCheckConstraint("ck_moderation_decisions_issuing_scope_scope", "issuing_scope_kind IS NOT NULL AND ((issuing_scope_kind = 1 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 2 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 3 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 4 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 5 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NOT NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 6 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_decisions_issuing_scope_scope", "issuing_scope_kind IS NOT NULL AND ((issuing_scope_kind = 1 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 2 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 3 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 4 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 5 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NOT NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 6 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_resource_id IS NOT NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 7 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NOT NULL AND issuing_scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
                             t.HasCheckConstraint("ck_moderation_decisions_revision", "revision > 0");
 
-                            t.HasCheckConstraint("ck_moderation_decisions_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_decisions_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL AND scope_event_id IS NULL) OR (scope_kind = 7 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NOT NULL AND scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
-                            t.HasCheckConstraint("ck_moderation_decisions_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_decisions_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 7 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NOT NULL AND subject_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
                             t.HasCheckConstraint("ck_moderation_decisions_subject_subject", "subject_kind BETWEEN 1 AND 4");
 
@@ -39197,6 +50049,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("adjudicator_origin_community_id");
 
+                    b.Property<Guid?>("AdjudicatorOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("adjudicator_origin_event_id");
+
                     b.Property<Guid?>("AdjudicatorOriginInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("adjudicator_origin_instance_id");
@@ -39220,6 +50076,14 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid>("AdjudicatorOriginTrustDomainId")
                         .HasColumnType("TEXT")
                         .HasColumnName("adjudicator_origin_trust_domain_id");
+
+                    b.Property<long>("AttributionGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("attribution_generation");
+
+                    b.Property<Guid?>("AttributionSourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("attribution_source_id");
 
                     b.Property<DateTimeOffset>("CaseCreatedAt")
                         .HasColumnType("TEXT")
@@ -39259,6 +50123,20 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("justification");
 
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reason_code");
+
+                    b.Property<Guid>("ReasonOwnerId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reason_owner_id");
+
+                    b.Property<long>("ReasonRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("reason_revision");
+
                     b.Property<string>("ReversalJustification")
                         .HasMaxLength(4000)
                         .HasColumnType("TEXT")
@@ -39283,6 +50161,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("ReversedByOriginCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("reversed_by_origin_community_id");
+
+                    b.Property<Guid?>("ReversedByOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reversed_by_origin_event_id");
 
                     b.Property<Guid?>("ReversedByOriginInstanceId")
                         .HasColumnType("TEXT")
@@ -39331,6 +50213,14 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("scope_community_id");
 
+                    b.Property<Guid?>("ScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_event_id");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_id");
+
                     b.Property<Guid?>("ScopeInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("scope_instance_id");
@@ -39371,6 +50261,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_community_id");
 
+                    b.Property<Guid?>("SubjectOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_event_id");
+
                     b.Property<Guid?>("SubjectOriginInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_instance_id");
@@ -39406,34 +50300,36 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ie_moderation_findings");
 
-                    b.HasIndex("CaseId", "RuleOwnerId", "RuleCode", "RuleRevision")
-                        .IsUnique()
-                        .HasDatabaseName("ix_moderation_findings_case_id_rule_owner_id_rule_code_rule_revision");
-
                     b.HasIndex("ScopeTrustDomainId", "SubjectKind", "SubjectId", "ScopeTenantId")
                         .HasDatabaseName("ix_moderation_findings_scope_trust_domain_id_subject_kind_subject_id_scope_tenant_id");
+
+                    b.HasIndex("CaseId", "RuleOwnerId", "RuleCode", "RuleRevision", "ScopeKind", "ScopeId", "AttributionGeneration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_findings_case_id_rule_owner_id_rule_code_rule_revision_scope_kind_scope_id_attribution_generation");
 
                     b.ToTable("ie_moderation_findings", null, t =>
                         {
                             t.HasCheckConstraint("ck_moderation_finding_adjudicator", "adjudicator_kind = 1 AND adjudicator_id <> subject_id AND adjudicator_origin_trust_domain_id = scope_trust_domain_id");
 
-                            t.HasCheckConstraint("ck_moderation_finding_evidence", "case_revision = 1 AND rule_revision > 0 AND evidence_recorded_at >= case_created_at AND evidence_recorded_at <= finalized_at AND finalized_at >= case_created_at AND ((evidence_purpose = 1 AND urgency_qualification_id IS NULL) OR (evidence_purpose = 2 AND urgency_qualification_id IS NOT NULL AND urgency_qualification_id <> evidence_reference_id))");
+                            t.HasCheckConstraint("ck_moderation_finding_attribution", "(attribution_source_id IS NULL AND attribution_generation = 0) OR (attribution_source_id IS NOT NULL AND attribution_generation > 0)");
+
+                            t.HasCheckConstraint("ck_moderation_finding_evidence", "case_revision = 1 AND rule_revision > 0 AND reason_revision > 0 AND evidence_recorded_at >= case_created_at AND evidence_recorded_at <= finalized_at AND finalized_at >= case_created_at AND ((evidence_purpose = 1 AND urgency_qualification_id IS NULL) OR (evidence_purpose = 2 AND urgency_qualification_id IS NOT NULL AND urgency_qualification_id <> evidence_reference_id))");
 
                             t.HasCheckConstraint("ck_moderation_finding_state", "(state = 1 AND revision = 1 AND reversed_at IS NULL AND reversal_reference_id IS NULL AND reversed_by_id IS NULL AND reversal_justification IS NULL AND updated_at = finalized_at) OR (state = 2 AND revision = 2 AND reversed_at IS NOT NULL AND reversal_reference_id IS NOT NULL AND reversed_by_id IS NOT NULL AND reversal_justification IS NOT NULL AND reversed_at >= finalized_at AND updated_at = reversed_at)");
 
-                            t.HasCheckConstraint("ck_moderation_findings_adjudicator_origin_scope", "adjudicator_origin_kind IS NOT NULL AND ((adjudicator_origin_kind = 1 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NULL AND adjudicator_origin_instance_id IS NULL AND adjudicator_origin_tenant_id IS NULL AND adjudicator_origin_community_id IS NULL AND adjudicator_origin_resource_id IS NULL) OR (adjudicator_origin_kind = 2 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NULL AND adjudicator_origin_tenant_id IS NULL AND adjudicator_origin_community_id IS NULL AND adjudicator_origin_resource_id IS NULL) OR (adjudicator_origin_kind = 3 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NOT NULL AND adjudicator_origin_tenant_id IS NULL AND adjudicator_origin_community_id IS NULL AND adjudicator_origin_resource_id IS NULL) OR (adjudicator_origin_kind = 4 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NOT NULL AND adjudicator_origin_tenant_id IS NOT NULL AND adjudicator_origin_community_id IS NULL AND adjudicator_origin_resource_id IS NULL) OR (adjudicator_origin_kind = 5 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NOT NULL AND adjudicator_origin_tenant_id IS NOT NULL AND adjudicator_origin_community_id IS NOT NULL AND adjudicator_origin_resource_id IS NULL) OR (adjudicator_origin_kind = 6 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NOT NULL AND adjudicator_origin_tenant_id IS NOT NULL AND adjudicator_origin_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_findings_adjudicator_origin_scope", "adjudicator_origin_kind IS NOT NULL AND ((adjudicator_origin_kind = 1 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NULL AND adjudicator_origin_instance_id IS NULL AND adjudicator_origin_tenant_id IS NULL AND adjudicator_origin_community_id IS NULL AND adjudicator_origin_resource_id IS NULL AND adjudicator_origin_event_id IS NULL) OR (adjudicator_origin_kind = 2 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NULL AND adjudicator_origin_tenant_id IS NULL AND adjudicator_origin_community_id IS NULL AND adjudicator_origin_resource_id IS NULL AND adjudicator_origin_event_id IS NULL) OR (adjudicator_origin_kind = 3 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NOT NULL AND adjudicator_origin_tenant_id IS NULL AND adjudicator_origin_community_id IS NULL AND adjudicator_origin_resource_id IS NULL AND adjudicator_origin_event_id IS NULL) OR (adjudicator_origin_kind = 4 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NOT NULL AND adjudicator_origin_tenant_id IS NOT NULL AND adjudicator_origin_community_id IS NULL AND adjudicator_origin_resource_id IS NULL AND adjudicator_origin_event_id IS NULL) OR (adjudicator_origin_kind = 5 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NOT NULL AND adjudicator_origin_tenant_id IS NOT NULL AND adjudicator_origin_community_id IS NOT NULL AND adjudicator_origin_resource_id IS NULL AND adjudicator_origin_event_id IS NULL) OR (adjudicator_origin_kind = 6 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NOT NULL AND adjudicator_origin_tenant_id IS NOT NULL AND adjudicator_origin_resource_id IS NOT NULL AND adjudicator_origin_event_id IS NULL) OR (adjudicator_origin_kind = 7 AND adjudicator_origin_trust_domain_id IS NOT NULL AND adjudicator_origin_solution_id IS NOT NULL AND adjudicator_origin_instance_id IS NOT NULL AND adjudicator_origin_tenant_id IS NOT NULL AND adjudicator_origin_community_id IS NULL AND adjudicator_origin_resource_id IS NULL AND adjudicator_origin_event_id IS NOT NULL AND adjudicator_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
                             t.HasCheckConstraint("ck_moderation_findings_adjudicator_subject", "adjudicator_kind BETWEEN 1 AND 4");
 
-                            t.HasCheckConstraint("ck_moderation_findings_reversed_by_origin_scope", "(reversed_by_origin_kind IS NULL AND reversed_by_origin_trust_domain_id IS NULL AND reversed_by_origin_solution_id IS NULL AND reversed_by_origin_instance_id IS NULL AND reversed_by_origin_tenant_id IS NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL) OR (reversed_by_origin_kind IS NOT NULL AND ((reversed_by_origin_kind = 1 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NULL AND reversed_by_origin_instance_id IS NULL AND reversed_by_origin_tenant_id IS NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL) OR (reversed_by_origin_kind = 2 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NULL AND reversed_by_origin_tenant_id IS NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL) OR (reversed_by_origin_kind = 3 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NOT NULL AND reversed_by_origin_tenant_id IS NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL) OR (reversed_by_origin_kind = 4 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NOT NULL AND reversed_by_origin_tenant_id IS NOT NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL) OR (reversed_by_origin_kind = 5 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NOT NULL AND reversed_by_origin_tenant_id IS NOT NULL AND reversed_by_origin_community_id IS NOT NULL AND reversed_by_origin_resource_id IS NULL) OR (reversed_by_origin_kind = 6 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NOT NULL AND reversed_by_origin_tenant_id IS NOT NULL AND reversed_by_origin_resource_id IS NOT NULL)))");
+                            t.HasCheckConstraint("ck_moderation_findings_reversed_by_origin_scope", "(reversed_by_origin_kind IS NULL AND reversed_by_origin_trust_domain_id IS NULL AND reversed_by_origin_solution_id IS NULL AND reversed_by_origin_instance_id IS NULL AND reversed_by_origin_tenant_id IS NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL AND reversed_by_origin_event_id IS NULL) OR (reversed_by_origin_kind IS NOT NULL AND ((reversed_by_origin_kind = 1 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NULL AND reversed_by_origin_instance_id IS NULL AND reversed_by_origin_tenant_id IS NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL AND reversed_by_origin_event_id IS NULL) OR (reversed_by_origin_kind = 2 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NULL AND reversed_by_origin_tenant_id IS NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL AND reversed_by_origin_event_id IS NULL) OR (reversed_by_origin_kind = 3 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NOT NULL AND reversed_by_origin_tenant_id IS NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL AND reversed_by_origin_event_id IS NULL) OR (reversed_by_origin_kind = 4 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NOT NULL AND reversed_by_origin_tenant_id IS NOT NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL AND reversed_by_origin_event_id IS NULL) OR (reversed_by_origin_kind = 5 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NOT NULL AND reversed_by_origin_tenant_id IS NOT NULL AND reversed_by_origin_community_id IS NOT NULL AND reversed_by_origin_resource_id IS NULL AND reversed_by_origin_event_id IS NULL) OR (reversed_by_origin_kind = 6 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NOT NULL AND reversed_by_origin_tenant_id IS NOT NULL AND reversed_by_origin_resource_id IS NOT NULL AND reversed_by_origin_event_id IS NULL) OR (reversed_by_origin_kind = 7 AND reversed_by_origin_trust_domain_id IS NOT NULL AND reversed_by_origin_solution_id IS NOT NULL AND reversed_by_origin_instance_id IS NOT NULL AND reversed_by_origin_tenant_id IS NOT NULL AND reversed_by_origin_community_id IS NULL AND reversed_by_origin_resource_id IS NULL AND reversed_by_origin_event_id IS NOT NULL AND reversed_by_origin_event_id <> '00000000-0000-0000-0000-000000000000')))");
 
                             t.HasCheckConstraint("ck_moderation_findings_reversed_by_subject", "(reversed_by_kind IS NULL AND reversed_by_id IS NULL AND reversed_by_origin_kind IS NULL) OR (reversed_by_kind IS NOT NULL AND reversed_by_kind BETWEEN 1 AND 4 AND reversed_by_id IS NOT NULL AND reversed_by_origin_kind IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_moderation_findings_revision", "revision > 0");
 
-                            t.HasCheckConstraint("ck_moderation_findings_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_findings_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL AND scope_event_id IS NULL) OR (scope_kind = 7 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NOT NULL AND scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
-                            t.HasCheckConstraint("ck_moderation_findings_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_findings_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 7 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NOT NULL AND subject_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
                             t.HasCheckConstraint("ck_moderation_findings_subject_subject", "subject_kind BETWEEN 1 AND 4");
 
@@ -39454,6 +50350,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("JurisdictionCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("jurisdiction_community_id");
+
+                    b.Property<Guid?>("JurisdictionEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("jurisdiction_event_id");
 
                     b.Property<Guid>("JurisdictionId")
                         .HasColumnType("TEXT")
@@ -39509,9 +50409,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_moderation_policies", null, t =>
                         {
-                            t.HasCheckConstraint("ck_moderation_policies_jurisdiction_scope", "jurisdiction_kind IS NOT NULL AND ((jurisdiction_kind = 1 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NULL AND jurisdiction_instance_id IS NULL AND jurisdiction_tenant_id IS NULL AND jurisdiction_community_id IS NULL AND jurisdiction_resource_id IS NULL) OR (jurisdiction_kind = 2 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NULL AND jurisdiction_tenant_id IS NULL AND jurisdiction_community_id IS NULL AND jurisdiction_resource_id IS NULL) OR (jurisdiction_kind = 3 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NOT NULL AND jurisdiction_tenant_id IS NULL AND jurisdiction_community_id IS NULL AND jurisdiction_resource_id IS NULL) OR (jurisdiction_kind = 4 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NOT NULL AND jurisdiction_tenant_id IS NOT NULL AND jurisdiction_community_id IS NULL AND jurisdiction_resource_id IS NULL) OR (jurisdiction_kind = 5 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NOT NULL AND jurisdiction_tenant_id IS NOT NULL AND jurisdiction_community_id IS NOT NULL AND jurisdiction_resource_id IS NULL) OR (jurisdiction_kind = 6 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NOT NULL AND jurisdiction_tenant_id IS NOT NULL AND jurisdiction_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_policies_jurisdiction_scope", "jurisdiction_kind IS NOT NULL AND ((jurisdiction_kind = 1 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NULL AND jurisdiction_instance_id IS NULL AND jurisdiction_tenant_id IS NULL AND jurisdiction_community_id IS NULL AND jurisdiction_resource_id IS NULL AND jurisdiction_event_id IS NULL) OR (jurisdiction_kind = 2 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NULL AND jurisdiction_tenant_id IS NULL AND jurisdiction_community_id IS NULL AND jurisdiction_resource_id IS NULL AND jurisdiction_event_id IS NULL) OR (jurisdiction_kind = 3 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NOT NULL AND jurisdiction_tenant_id IS NULL AND jurisdiction_community_id IS NULL AND jurisdiction_resource_id IS NULL AND jurisdiction_event_id IS NULL) OR (jurisdiction_kind = 4 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NOT NULL AND jurisdiction_tenant_id IS NOT NULL AND jurisdiction_community_id IS NULL AND jurisdiction_resource_id IS NULL AND jurisdiction_event_id IS NULL) OR (jurisdiction_kind = 5 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NOT NULL AND jurisdiction_tenant_id IS NOT NULL AND jurisdiction_community_id IS NOT NULL AND jurisdiction_resource_id IS NULL AND jurisdiction_event_id IS NULL) OR (jurisdiction_kind = 6 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NOT NULL AND jurisdiction_tenant_id IS NOT NULL AND jurisdiction_resource_id IS NOT NULL AND jurisdiction_event_id IS NULL) OR (jurisdiction_kind = 7 AND jurisdiction_trust_domain_id IS NOT NULL AND jurisdiction_solution_id IS NOT NULL AND jurisdiction_instance_id IS NOT NULL AND jurisdiction_tenant_id IS NOT NULL AND jurisdiction_community_id IS NULL AND jurisdiction_resource_id IS NULL AND jurisdiction_event_id IS NOT NULL AND jurisdiction_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
-                            t.HasCheckConstraint("ck_moderation_policy_jurisdiction", "jurisdiction_id = CASE jurisdiction_kind WHEN 1 THEN jurisdiction_trust_domain_id WHEN 2 THEN jurisdiction_solution_id WHEN 3 THEN jurisdiction_instance_id WHEN 4 THEN jurisdiction_tenant_id WHEN 5 THEN jurisdiction_community_id WHEN 6 THEN jurisdiction_resource_id END");
+                            t.HasCheckConstraint("ck_moderation_policy_jurisdiction", "jurisdiction_id = CASE jurisdiction_kind WHEN 1 THEN jurisdiction_trust_domain_id WHEN 2 THEN jurisdiction_solution_id WHEN 3 THEN jurisdiction_instance_id WHEN 4 THEN jurisdiction_tenant_id WHEN 5 THEN jurisdiction_community_id WHEN 6 THEN jurisdiction_resource_id WHEN 7 THEN jurisdiction_event_id END");
 
                             t.HasCheckConstraint("ck_moderation_policy_revision", "revision > 0 AND rule_count > 0");
                         });
@@ -39626,6 +50526,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("issuing_scope_community_id");
 
+                    b.Property<Guid?>("IssuingScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("issuing_scope_event_id");
+
                     b.Property<Guid?>("IssuingScopeInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("issuing_scope_instance_id");
@@ -39661,6 +50565,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("ProtectorOriginCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("protector_origin_community_id");
+
+                    b.Property<Guid?>("ProtectorOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("protector_origin_event_id");
 
                     b.Property<Guid?>("ProtectorOriginInstanceId")
                         .HasColumnType("TEXT")
@@ -39706,6 +50614,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("reviewer_origin_community_id");
 
+                    b.Property<Guid?>("ReviewerOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reviewer_origin_event_id");
+
                     b.Property<Guid?>("ReviewerOriginInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("reviewer_origin_instance_id");
@@ -39742,6 +50654,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("ScopeCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("scope_community_id");
+
+                    b.Property<Guid?>("ScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_event_id");
 
                     b.Property<Guid?>("ScopeInstanceId")
                         .HasColumnType("TEXT")
@@ -39783,6 +50699,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_community_id");
 
+                    b.Property<Guid?>("SubjectOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_event_id");
+
                     b.Property<Guid?>("SubjectOriginInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_instance_id");
@@ -39819,21 +50739,21 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("ck_moderation_protection_interval", "ends_at > starts_at AND review_at > starts_at AND review_at <= ends_at AND ((reviewed_at IS NULL AND reviewer_id IS NULL) OR (reviewed_at IS NOT NULL AND reviewer_id IS NOT NULL AND reviewed_at >= starts_at AND reviewed_at < ends_at))");
 
-                            t.HasCheckConstraint("ck_moderation_protective_measures_issuing_scope_scope", "issuing_scope_kind IS NOT NULL AND ((issuing_scope_kind = 1 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 2 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 3 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 4 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 5 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NOT NULL AND issuing_scope_resource_id IS NULL) OR (issuing_scope_kind = 6 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_protective_measures_issuing_scope_scope", "issuing_scope_kind IS NOT NULL AND ((issuing_scope_kind = 1 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 2 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 3 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 4 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 5 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NOT NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 6 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_resource_id IS NOT NULL AND issuing_scope_event_id IS NULL) OR (issuing_scope_kind = 7 AND issuing_scope_trust_domain_id IS NOT NULL AND issuing_scope_solution_id IS NOT NULL AND issuing_scope_instance_id IS NOT NULL AND issuing_scope_tenant_id IS NOT NULL AND issuing_scope_community_id IS NULL AND issuing_scope_resource_id IS NULL AND issuing_scope_event_id IS NOT NULL AND issuing_scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
-                            t.HasCheckConstraint("ck_moderation_protective_measures_protector_origin_scope", "protector_origin_kind IS NOT NULL AND ((protector_origin_kind = 1 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NULL AND protector_origin_instance_id IS NULL AND protector_origin_tenant_id IS NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 2 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NULL AND protector_origin_tenant_id IS NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 3 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 4 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 5 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_community_id IS NOT NULL AND protector_origin_resource_id IS NULL) OR (protector_origin_kind = 6 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_protective_measures_protector_origin_scope", "protector_origin_kind IS NOT NULL AND ((protector_origin_kind = 1 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NULL AND protector_origin_instance_id IS NULL AND protector_origin_tenant_id IS NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL AND protector_origin_event_id IS NULL) OR (protector_origin_kind = 2 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NULL AND protector_origin_tenant_id IS NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL AND protector_origin_event_id IS NULL) OR (protector_origin_kind = 3 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL AND protector_origin_event_id IS NULL) OR (protector_origin_kind = 4 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL AND protector_origin_event_id IS NULL) OR (protector_origin_kind = 5 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_community_id IS NOT NULL AND protector_origin_resource_id IS NULL AND protector_origin_event_id IS NULL) OR (protector_origin_kind = 6 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_resource_id IS NOT NULL AND protector_origin_event_id IS NULL) OR (protector_origin_kind = 7 AND protector_origin_trust_domain_id IS NOT NULL AND protector_origin_solution_id IS NOT NULL AND protector_origin_instance_id IS NOT NULL AND protector_origin_tenant_id IS NOT NULL AND protector_origin_community_id IS NULL AND protector_origin_resource_id IS NULL AND protector_origin_event_id IS NOT NULL AND protector_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
                             t.HasCheckConstraint("ck_moderation_protective_measures_protector_subject", "protector_kind BETWEEN 1 AND 4");
 
-                            t.HasCheckConstraint("ck_moderation_protective_measures_reviewer_origin_scope", "(reviewer_origin_kind IS NULL AND reviewer_origin_trust_domain_id IS NULL AND reviewer_origin_solution_id IS NULL AND reviewer_origin_instance_id IS NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind IS NOT NULL AND ((reviewer_origin_kind = 1 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NULL AND reviewer_origin_instance_id IS NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 2 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 3 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 4 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 5 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_community_id IS NOT NULL AND reviewer_origin_resource_id IS NULL) OR (reviewer_origin_kind = 6 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_resource_id IS NOT NULL)))");
+                            t.HasCheckConstraint("ck_moderation_protective_measures_reviewer_origin_scope", "(reviewer_origin_kind IS NULL AND reviewer_origin_trust_domain_id IS NULL AND reviewer_origin_solution_id IS NULL AND reviewer_origin_instance_id IS NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL AND reviewer_origin_event_id IS NULL) OR (reviewer_origin_kind IS NOT NULL AND ((reviewer_origin_kind = 1 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NULL AND reviewer_origin_instance_id IS NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL AND reviewer_origin_event_id IS NULL) OR (reviewer_origin_kind = 2 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL AND reviewer_origin_event_id IS NULL) OR (reviewer_origin_kind = 3 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL AND reviewer_origin_event_id IS NULL) OR (reviewer_origin_kind = 4 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL AND reviewer_origin_event_id IS NULL) OR (reviewer_origin_kind = 5 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_community_id IS NOT NULL AND reviewer_origin_resource_id IS NULL AND reviewer_origin_event_id IS NULL) OR (reviewer_origin_kind = 6 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_resource_id IS NOT NULL AND reviewer_origin_event_id IS NULL) OR (reviewer_origin_kind = 7 AND reviewer_origin_trust_domain_id IS NOT NULL AND reviewer_origin_solution_id IS NOT NULL AND reviewer_origin_instance_id IS NOT NULL AND reviewer_origin_tenant_id IS NOT NULL AND reviewer_origin_community_id IS NULL AND reviewer_origin_resource_id IS NULL AND reviewer_origin_event_id IS NOT NULL AND reviewer_origin_event_id <> '00000000-0000-0000-0000-000000000000')))");
 
                             t.HasCheckConstraint("ck_moderation_protective_measures_reviewer_subject", "(reviewer_kind IS NULL AND reviewer_id IS NULL AND reviewer_origin_kind IS NULL) OR (reviewer_kind IS NOT NULL AND reviewer_kind BETWEEN 1 AND 4 AND reviewer_id IS NOT NULL AND reviewer_origin_kind IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_moderation_protective_measures_revision", "revision > 0");
 
-                            t.HasCheckConstraint("ck_moderation_protective_measures_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_protective_measures_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL AND scope_event_id IS NULL) OR (scope_kind = 7 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NOT NULL AND scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
-                            t.HasCheckConstraint("ck_moderation_protective_measures_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_protective_measures_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 7 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NOT NULL AND subject_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
                             t.HasCheckConstraint("ck_moderation_protective_measures_subject_subject", "subject_kind BETWEEN 1 AND 4");
 
@@ -39992,6 +50912,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("scope_community_id");
 
+                    b.Property<Guid?>("ScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("scope_event_id");
+
                     b.Property<Guid?>("ScopeInstanceId")
                         .HasColumnType("TEXT")
                         .HasColumnName("scope_instance_id");
@@ -40035,6 +50959,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("SubjectOriginCommunityId")
                         .HasColumnType("TEXT")
                         .HasColumnName("subject_origin_community_id");
+
+                    b.Property<Guid?>("SubjectOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_event_id");
 
                     b.Property<Guid?>("SubjectOriginInstanceId")
                         .HasColumnType("TEXT")
@@ -40091,13 +51019,398 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("ck_moderation_sanctions_revision", "revision > 0");
 
-                            t.HasCheckConstraint("ck_moderation_sanctions_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_sanctions_scope_scope", "scope_kind IS NOT NULL AND ((scope_kind = 1 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 2 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 3 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 4 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 5 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NOT NULL AND scope_resource_id IS NULL AND scope_event_id IS NULL) OR (scope_kind = 6 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_resource_id IS NOT NULL AND scope_event_id IS NULL) OR (scope_kind = 7 AND scope_trust_domain_id IS NOT NULL AND scope_solution_id IS NOT NULL AND scope_instance_id IS NOT NULL AND scope_tenant_id IS NOT NULL AND scope_community_id IS NULL AND scope_resource_id IS NULL AND scope_event_id IS NOT NULL AND scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
-                            t.HasCheckConstraint("ck_moderation_sanctions_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL))");
+                            t.HasCheckConstraint("ck_moderation_sanctions_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 7 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NOT NULL AND subject_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
 
                             t.HasCheckConstraint("ck_moderation_sanctions_subject_subject", "subject_kind BETWEEN 1 AND 4");
 
                             t.HasCheckConstraint("ck_moderation_sanctions_subject_trust", "subject_origin_trust_domain_id = scope_trust_domain_id");
+                        });
+                });
+
+            modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationScheduleRiskReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AcceptedFindingId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_finding_id");
+
+                    b.Property<long?>("AcceptedFindingRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("accepted_finding_revision");
+
+                    b.Property<Guid?>("AcceptedIntentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_intent_id");
+
+                    b.Property<Guid?>("AcceptedReviewerAssignmentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_reviewer_assignment_id");
+
+                    b.Property<long?>("AcceptedReviewerAssignmentRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("accepted_reviewer_assignment_revision");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("DueAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("due_at");
+
+                    b.Property<Guid>("EscalationOwnerId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalation_owner_id");
+
+                    b.Property<int>("EscalationOwnerKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("escalation_owner_kind");
+
+                    b.Property<Guid?>("EscalationOwnerOriginCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalation_owner_origin_community_id");
+
+                    b.Property<Guid?>("EscalationOwnerOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalation_owner_origin_event_id");
+
+                    b.Property<Guid?>("EscalationOwnerOriginInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalation_owner_origin_instance_id");
+
+                    b.Property<int>("EscalationOwnerOriginKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("escalation_owner_origin_kind");
+
+                    b.Property<Guid?>("EscalationOwnerOriginResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalation_owner_origin_resource_id");
+
+                    b.Property<Guid?>("EscalationOwnerOriginSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalation_owner_origin_solution_id");
+
+                    b.Property<Guid?>("EscalationOwnerOriginTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalation_owner_origin_tenant_id");
+
+                    b.Property<Guid>("EscalationOwnerOriginTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("escalation_owner_origin_trust_domain_id");
+
+                    b.Property<Guid?>("EventScopeCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_scope_community_id");
+
+                    b.Property<Guid?>("EventScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_scope_event_id");
+
+                    b.Property<Guid?>("EventScopeInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_scope_instance_id");
+
+                    b.Property<int>("EventScopeKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("event_scope_kind");
+
+                    b.Property<Guid?>("EventScopeResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_scope_resource_id");
+
+                    b.Property<Guid?>("EventScopeSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_scope_solution_id");
+
+                    b.Property<Guid?>("EventScopeTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_scope_tenant_id");
+
+                    b.Property<Guid>("EventScopeTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_scope_trust_domain_id");
+
+                    b.Property<DateTimeOffset>("OriginalDueAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_due_at");
+
+                    b.Property<Guid>("OriginalParticipantGeneration")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_participant_generation");
+
+                    b.Property<long>("OriginalPolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_policy_revision");
+
+                    b.Property<long>("OriginalPolicyRuleRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("original_policy_rule_revision");
+
+                    b.Property<Guid>("OriginalPublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_publication_id");
+
+                    b.Property<DateTimeOffset?>("OriginalSanctionEndsAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_sanction_ends_at");
+
+                    b.Property<DateTimeOffset>("OriginalSanctionStartsAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_sanction_starts_at");
+
+                    b.Property<Guid>("OriginalScheduleGeneration")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("original_schedule_generation");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_id");
+
+                    b.Property<int>("OwnerKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("owner_kind");
+
+                    b.Property<Guid?>("OwnerOriginCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_origin_community_id");
+
+                    b.Property<Guid?>("OwnerOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_origin_event_id");
+
+                    b.Property<Guid?>("OwnerOriginInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_origin_instance_id");
+
+                    b.Property<int>("OwnerOriginKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("owner_origin_kind");
+
+                    b.Property<Guid?>("OwnerOriginResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_origin_resource_id");
+
+                    b.Property<Guid?>("OwnerOriginSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_origin_solution_id");
+
+                    b.Property<Guid?>("OwnerOriginTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_origin_tenant_id");
+
+                    b.Property<Guid>("OwnerOriginTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("owner_origin_trust_domain_id");
+
+                    b.Property<Guid>("ParticipantGeneration")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("participant_generation");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("participant_id");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_id");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<string>("PolicyRuleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_rule_code");
+
+                    b.Property<Guid>("PolicyRuleOwnerId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("policy_rule_owner_id");
+
+                    b.Property<long>("PolicyRuleRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("policy_rule_revision");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("publication_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScheduleGeneration")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("schedule_generation");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("session_id");
+
+                    b.Property<Guid>("SourceDecisionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_decision_id");
+
+                    b.Property<string>("SourceRuleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_rule_code");
+
+                    b.Property<Guid>("SourceRuleOwnerId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_rule_owner_id");
+
+                    b.Property<long>("SourceRuleRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_rule_revision");
+
+                    b.Property<Guid>("SourceSanctionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_sanction_id");
+
+                    b.Property<long>("SourceSanctionRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_sanction_revision");
+
+                    b.Property<Guid?>("SourceScopeCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_scope_community_id");
+
+                    b.Property<Guid?>("SourceScopeEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_scope_event_id");
+
+                    b.Property<Guid?>("SourceScopeInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_scope_instance_id");
+
+                    b.Property<int>("SourceScopeKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("source_scope_kind");
+
+                    b.Property<Guid?>("SourceScopeResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_scope_resource_id");
+
+                    b.Property<Guid?>("SourceScopeSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_scope_solution_id");
+
+                    b.Property<Guid?>("SourceScopeTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_scope_tenant_id");
+
+                    b.Property<Guid>("SourceScopeTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("source_scope_trust_domain_id");
+
+                    b.Property<int>("State")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_id");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<Guid?>("SubjectOriginCommunityId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_community_id");
+
+                    b.Property<Guid?>("SubjectOriginEventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_event_id");
+
+                    b.Property<Guid?>("SubjectOriginInstanceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_instance_id");
+
+                    b.Property<int>("SubjectOriginKind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("subject_origin_kind");
+
+                    b.Property<Guid?>("SubjectOriginResourceId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_resource_id");
+
+                    b.Property<Guid?>("SubjectOriginSolutionId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_solution_id");
+
+                    b.Property<Guid?>("SubjectOriginTenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_tenant_id");
+
+                    b.Property<Guid>("SubjectOriginTrustDomainId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("subject_origin_trust_domain_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("WithdrawalIntentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawal_intent_id");
+
+                    b.Property<Guid?>("WithdrawnByHumanId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("withdrawn_by_human_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_moderation_schedule_risk_reviews");
+
+                    b.HasIndex("AcceptedFindingId")
+                        .HasDatabaseName("ix_moderation_schedule_risk_reviews_accepted_finding_id");
+
+                    b.HasIndex("AcceptedReviewerAssignmentId")
+                        .HasDatabaseName("ix_moderation_schedule_risk_reviews_accepted_reviewer_assignment_id");
+
+                    b.HasIndex("EventScopeTrustDomainId", "EventScopeTenantId", "State", "DueAt")
+                        .HasDatabaseName("ix_moderation_schedule_risk_reviews_event_scope_trust_domain_id_event_scope_tenant_id_state_due_at");
+
+                    b.HasIndex("SourceSanctionId", "EventScopeEventId", "SessionId", "ParticipantId", "OriginalScheduleGeneration", "OriginalParticipantGeneration", "OriginalPublicationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_moderation_schedule_risk_reviews_source_sanction_id_event_scope_event_id_session_id_participant_id_original_sche_c5b059e54123");
+
+                    b.ToTable("ie_moderation_schedule_risk_reviews", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_ancestry", "subject_kind = 1 AND owner_kind = 1 AND escalation_owner_kind = 1 AND event_scope_kind = 7 AND event_scope_tenant_id IS NOT NULL AND source_sanction_revision > 0 AND revision > 0 AND source_rule_revision > 0 AND original_policy_revision > 0 AND policy_revision >= original_policy_revision AND original_policy_rule_revision > 0 AND policy_rule_revision >= original_policy_rule_revision AND subject_origin_trust_domain_id = source_scope_trust_domain_id AND owner_origin_trust_domain_id = source_scope_trust_domain_id AND escalation_owner_origin_trust_domain_id = source_scope_trust_domain_id AND event_scope_trust_domain_id = source_scope_trust_domain_id AND (source_scope_solution_id IS NULL OR source_scope_solution_id = event_scope_solution_id) AND (source_scope_instance_id IS NULL OR source_scope_instance_id = event_scope_instance_id) AND (source_scope_tenant_id IS NULL OR source_scope_tenant_id = event_scope_tenant_id) AND source_scope_community_id IS NULL AND source_scope_resource_id IS NULL AND (source_scope_event_id IS NULL OR source_scope_event_id = event_scope_event_id)");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_identity", "source_sanction_id <> '00000000-0000-0000-0000-000000000000' AND source_decision_id <> '00000000-0000-0000-0000-000000000000' AND session_id <> '00000000-0000-0000-0000-000000000000' AND participant_id <> '00000000-0000-0000-0000-000000000000' AND policy_id <> '00000000-0000-0000-0000-000000000000' AND original_schedule_generation <> '00000000-0000-0000-0000-000000000000' AND schedule_generation <> '00000000-0000-0000-0000-000000000000' AND original_participant_generation <> '00000000-0000-0000-0000-000000000000' AND participant_generation <> '00000000-0000-0000-0000-000000000000' AND original_publication_id <> '00000000-0000-0000-0000-000000000000' AND publication_id <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_interval", "updated_at >= created_at AND original_due_at > created_at AND due_at > created_at AND (original_sanction_ends_at IS NULL OR original_sanction_ends_at > original_sanction_starts_at)");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_reviews_escalation_owner_origin_scope", "escalation_owner_origin_kind IS NOT NULL AND ((escalation_owner_origin_kind = 1 AND escalation_owner_origin_trust_domain_id IS NOT NULL AND escalation_owner_origin_solution_id IS NULL AND escalation_owner_origin_instance_id IS NULL AND escalation_owner_origin_tenant_id IS NULL AND escalation_owner_origin_community_id IS NULL AND escalation_owner_origin_resource_id IS NULL AND escalation_owner_origin_event_id IS NULL) OR (escalation_owner_origin_kind = 2 AND escalation_owner_origin_trust_domain_id IS NOT NULL AND escalation_owner_origin_solution_id IS NOT NULL AND escalation_owner_origin_instance_id IS NULL AND escalation_owner_origin_tenant_id IS NULL AND escalation_owner_origin_community_id IS NULL AND escalation_owner_origin_resource_id IS NULL AND escalation_owner_origin_event_id IS NULL) OR (escalation_owner_origin_kind = 3 AND escalation_owner_origin_trust_domain_id IS NOT NULL AND escalation_owner_origin_solution_id IS NOT NULL AND escalation_owner_origin_instance_id IS NOT NULL AND escalation_owner_origin_tenant_id IS NULL AND escalation_owner_origin_community_id IS NULL AND escalation_owner_origin_resource_id IS NULL AND escalation_owner_origin_event_id IS NULL) OR (escalation_owner_origin_kind = 4 AND escalation_owner_origin_trust_domain_id IS NOT NULL AND escalation_owner_origin_solution_id IS NOT NULL AND escalation_owner_origin_instance_id IS NOT NULL AND escalation_owner_origin_tenant_id IS NOT NULL AND escalation_owner_origin_community_id IS NULL AND escalation_owner_origin_resource_id IS NULL AND escalation_owner_origin_event_id IS NULL) OR (escalation_owner_origin_kind = 5 AND escalation_owner_origin_trust_domain_id IS NOT NULL AND escalation_owner_origin_solution_id IS NOT NULL AND escalation_owner_origin_instance_id IS NOT NULL AND escalation_owner_origin_tenant_id IS NOT NULL AND escalation_owner_origin_community_id IS NOT NULL AND escalation_owner_origin_resource_id IS NULL AND escalation_owner_origin_event_id IS NULL) OR (escalation_owner_origin_kind = 6 AND escalation_owner_origin_trust_domain_id IS NOT NULL AND escalation_owner_origin_solution_id IS NOT NULL AND escalation_owner_origin_instance_id IS NOT NULL AND escalation_owner_origin_tenant_id IS NOT NULL AND escalation_owner_origin_resource_id IS NOT NULL AND escalation_owner_origin_event_id IS NULL) OR (escalation_owner_origin_kind = 7 AND escalation_owner_origin_trust_domain_id IS NOT NULL AND escalation_owner_origin_solution_id IS NOT NULL AND escalation_owner_origin_instance_id IS NOT NULL AND escalation_owner_origin_tenant_id IS NOT NULL AND escalation_owner_origin_community_id IS NULL AND escalation_owner_origin_resource_id IS NULL AND escalation_owner_origin_event_id IS NOT NULL AND escalation_owner_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_reviews_escalation_owner_subject", "escalation_owner_kind BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_reviews_event_scope_scope", "event_scope_kind IS NOT NULL AND ((event_scope_kind = 1 AND event_scope_trust_domain_id IS NOT NULL AND event_scope_solution_id IS NULL AND event_scope_instance_id IS NULL AND event_scope_tenant_id IS NULL AND event_scope_community_id IS NULL AND event_scope_resource_id IS NULL AND event_scope_event_id IS NULL) OR (event_scope_kind = 2 AND event_scope_trust_domain_id IS NOT NULL AND event_scope_solution_id IS NOT NULL AND event_scope_instance_id IS NULL AND event_scope_tenant_id IS NULL AND event_scope_community_id IS NULL AND event_scope_resource_id IS NULL AND event_scope_event_id IS NULL) OR (event_scope_kind = 3 AND event_scope_trust_domain_id IS NOT NULL AND event_scope_solution_id IS NOT NULL AND event_scope_instance_id IS NOT NULL AND event_scope_tenant_id IS NULL AND event_scope_community_id IS NULL AND event_scope_resource_id IS NULL AND event_scope_event_id IS NULL) OR (event_scope_kind = 4 AND event_scope_trust_domain_id IS NOT NULL AND event_scope_solution_id IS NOT NULL AND event_scope_instance_id IS NOT NULL AND event_scope_tenant_id IS NOT NULL AND event_scope_community_id IS NULL AND event_scope_resource_id IS NULL AND event_scope_event_id IS NULL) OR (event_scope_kind = 5 AND event_scope_trust_domain_id IS NOT NULL AND event_scope_solution_id IS NOT NULL AND event_scope_instance_id IS NOT NULL AND event_scope_tenant_id IS NOT NULL AND event_scope_community_id IS NOT NULL AND event_scope_resource_id IS NULL AND event_scope_event_id IS NULL) OR (event_scope_kind = 6 AND event_scope_trust_domain_id IS NOT NULL AND event_scope_solution_id IS NOT NULL AND event_scope_instance_id IS NOT NULL AND event_scope_tenant_id IS NOT NULL AND event_scope_resource_id IS NOT NULL AND event_scope_event_id IS NULL) OR (event_scope_kind = 7 AND event_scope_trust_domain_id IS NOT NULL AND event_scope_solution_id IS NOT NULL AND event_scope_instance_id IS NOT NULL AND event_scope_tenant_id IS NOT NULL AND event_scope_community_id IS NULL AND event_scope_resource_id IS NULL AND event_scope_event_id IS NOT NULL AND event_scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_reviews_owner_origin_scope", "owner_origin_kind IS NOT NULL AND ((owner_origin_kind = 1 AND owner_origin_trust_domain_id IS NOT NULL AND owner_origin_solution_id IS NULL AND owner_origin_instance_id IS NULL AND owner_origin_tenant_id IS NULL AND owner_origin_community_id IS NULL AND owner_origin_resource_id IS NULL AND owner_origin_event_id IS NULL) OR (owner_origin_kind = 2 AND owner_origin_trust_domain_id IS NOT NULL AND owner_origin_solution_id IS NOT NULL AND owner_origin_instance_id IS NULL AND owner_origin_tenant_id IS NULL AND owner_origin_community_id IS NULL AND owner_origin_resource_id IS NULL AND owner_origin_event_id IS NULL) OR (owner_origin_kind = 3 AND owner_origin_trust_domain_id IS NOT NULL AND owner_origin_solution_id IS NOT NULL AND owner_origin_instance_id IS NOT NULL AND owner_origin_tenant_id IS NULL AND owner_origin_community_id IS NULL AND owner_origin_resource_id IS NULL AND owner_origin_event_id IS NULL) OR (owner_origin_kind = 4 AND owner_origin_trust_domain_id IS NOT NULL AND owner_origin_solution_id IS NOT NULL AND owner_origin_instance_id IS NOT NULL AND owner_origin_tenant_id IS NOT NULL AND owner_origin_community_id IS NULL AND owner_origin_resource_id IS NULL AND owner_origin_event_id IS NULL) OR (owner_origin_kind = 5 AND owner_origin_trust_domain_id IS NOT NULL AND owner_origin_solution_id IS NOT NULL AND owner_origin_instance_id IS NOT NULL AND owner_origin_tenant_id IS NOT NULL AND owner_origin_community_id IS NOT NULL AND owner_origin_resource_id IS NULL AND owner_origin_event_id IS NULL) OR (owner_origin_kind = 6 AND owner_origin_trust_domain_id IS NOT NULL AND owner_origin_solution_id IS NOT NULL AND owner_origin_instance_id IS NOT NULL AND owner_origin_tenant_id IS NOT NULL AND owner_origin_resource_id IS NOT NULL AND owner_origin_event_id IS NULL) OR (owner_origin_kind = 7 AND owner_origin_trust_domain_id IS NOT NULL AND owner_origin_solution_id IS NOT NULL AND owner_origin_instance_id IS NOT NULL AND owner_origin_tenant_id IS NOT NULL AND owner_origin_community_id IS NULL AND owner_origin_resource_id IS NULL AND owner_origin_event_id IS NOT NULL AND owner_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_reviews_owner_subject", "owner_kind BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_reviews_source_scope_scope", "source_scope_kind IS NOT NULL AND ((source_scope_kind = 1 AND source_scope_trust_domain_id IS NOT NULL AND source_scope_solution_id IS NULL AND source_scope_instance_id IS NULL AND source_scope_tenant_id IS NULL AND source_scope_community_id IS NULL AND source_scope_resource_id IS NULL AND source_scope_event_id IS NULL) OR (source_scope_kind = 2 AND source_scope_trust_domain_id IS NOT NULL AND source_scope_solution_id IS NOT NULL AND source_scope_instance_id IS NULL AND source_scope_tenant_id IS NULL AND source_scope_community_id IS NULL AND source_scope_resource_id IS NULL AND source_scope_event_id IS NULL) OR (source_scope_kind = 3 AND source_scope_trust_domain_id IS NOT NULL AND source_scope_solution_id IS NOT NULL AND source_scope_instance_id IS NOT NULL AND source_scope_tenant_id IS NULL AND source_scope_community_id IS NULL AND source_scope_resource_id IS NULL AND source_scope_event_id IS NULL) OR (source_scope_kind = 4 AND source_scope_trust_domain_id IS NOT NULL AND source_scope_solution_id IS NOT NULL AND source_scope_instance_id IS NOT NULL AND source_scope_tenant_id IS NOT NULL AND source_scope_community_id IS NULL AND source_scope_resource_id IS NULL AND source_scope_event_id IS NULL) OR (source_scope_kind = 5 AND source_scope_trust_domain_id IS NOT NULL AND source_scope_solution_id IS NOT NULL AND source_scope_instance_id IS NOT NULL AND source_scope_tenant_id IS NOT NULL AND source_scope_community_id IS NOT NULL AND source_scope_resource_id IS NULL AND source_scope_event_id IS NULL) OR (source_scope_kind = 6 AND source_scope_trust_domain_id IS NOT NULL AND source_scope_solution_id IS NOT NULL AND source_scope_instance_id IS NOT NULL AND source_scope_tenant_id IS NOT NULL AND source_scope_resource_id IS NOT NULL AND source_scope_event_id IS NULL) OR (source_scope_kind = 7 AND source_scope_trust_domain_id IS NOT NULL AND source_scope_solution_id IS NOT NULL AND source_scope_instance_id IS NOT NULL AND source_scope_tenant_id IS NOT NULL AND source_scope_community_id IS NULL AND source_scope_resource_id IS NULL AND source_scope_event_id IS NOT NULL AND source_scope_event_id <> '00000000-0000-0000-0000-000000000000'))");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_reviews_subject_origin_scope", "subject_origin_kind IS NOT NULL AND ((subject_origin_kind = 1 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 2 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 3 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 4 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 5 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NOT NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 6 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_resource_id IS NOT NULL AND subject_origin_event_id IS NULL) OR (subject_origin_kind = 7 AND subject_origin_trust_domain_id IS NOT NULL AND subject_origin_solution_id IS NOT NULL AND subject_origin_instance_id IS NOT NULL AND subject_origin_tenant_id IS NOT NULL AND subject_origin_community_id IS NULL AND subject_origin_resource_id IS NULL AND subject_origin_event_id IS NOT NULL AND subject_origin_event_id <> '00000000-0000-0000-0000-000000000000'))");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_reviews_subject_subject", "subject_kind BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_state", "state BETWEEN 1 AND 4 AND ((state = 4 AND updated_at >= due_at) OR (state <> 4 AND updated_at < due_at)) AND (revision <> 1 OR (state = 1 AND updated_at = created_at AND due_at = original_due_at AND schedule_generation = original_schedule_generation AND participant_generation = original_participant_generation AND policy_revision = original_policy_revision AND publication_id = original_publication_id AND policy_rule_revision = original_policy_rule_revision))");
+
+                            t.HasCheckConstraint("ck_moderation_schedule_risk_terminal", "((state = 2 AND accepted_intent_id IS NOT NULL AND accepted_finding_id IS NOT NULL AND accepted_finding_revision IS NOT NULL AND accepted_finding_revision > 0 AND accepted_reviewer_assignment_id IS NOT NULL AND accepted_reviewer_assignment_revision IS NOT NULL AND accepted_reviewer_assignment_revision > 0) OR (state <> 2 AND accepted_intent_id IS NULL AND accepted_finding_id IS NULL AND accepted_finding_revision IS NULL AND accepted_reviewer_assignment_id IS NULL AND accepted_reviewer_assignment_revision IS NULL)) AND ((state = 3 AND withdrawal_intent_id IS NOT NULL AND withdrawn_by_human_id IS NOT NULL AND withdrawn_by_human_id = owner_id) OR (state <> 3 AND withdrawal_intent_id IS NULL AND withdrawn_by_human_id IS NULL))");
                         });
                 });
 
@@ -42819,12 +54132,33 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_event_report_signals_events_tenant_id_event_id");
 
+                    b.HasOne("Explore.Domain.IncomingWebhookMessage", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "IncomingWebhookMessageId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_report_signals_incoming_webhook_messages_tenant_id_incoming_webhook_message_id");
+
                     b.HasOne("Explore.Domain.EventReport", "Report")
                         .WithMany("Signals")
                         .HasForeignKey("TenantId", "EventId", "ReportId")
                         .HasPrincipalKey("TenantId", "EventId", "Id")
                         .OnDelete(DeleteBehavior.ClientNoAction)
                         .HasConstraintName("fk_event_report_signals_event_reports_tenant_id_event_id_report_id");
+
+                    b.HasOne("Explore.Domain.EventReportCase", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ReportId", "CaseId")
+                        .HasPrincipalKey("TenantId", "ReportId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_report_signals_event_report_cases_tenant_id_report_id_case_id");
+
+                    b.HasOne("Explore.Domain.EventReportExternalLink", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ReportId", "ProviderLinkId")
+                        .HasPrincipalKey("TenantId", "ReportId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_report_signals_event_report_external_links_tenant_id_report_id_provider_link_id");
 
                     b.Navigation("Event");
 
@@ -42965,6 +54299,103 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_event_resource_audit_entries_event_resources_tenant_id_event_resource_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationQuarantine", b =>
+                {
+                    b.HasOne("Explore.Domain.EventResourceModerationQuarantineRelease", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ReleaseId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_resource_moderation_quarantines_event_resource_quarantine_releases_tenant_id_release_id");
+
+                    b.HasOne("Explore.Domain.EventResource", null)
+                        .WithMany("ModerationQuarantines")
+                        .HasForeignKey("TenantId", "EventId", "EventResourceId")
+                        .HasPrincipalKey("TenantId", "EventId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_moderation_quarantines_event_resources_tenant_id_event_id_event_resource_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationQuarantineRelease", b =>
+                {
+                    b.HasOne("Explore.Domain.EventResourceModerationQuarantineReview", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ApprovalId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_quarantine_releases_event_resource_quarantine_reviews_tenant_id_approval_id");
+
+                    b.HasOne("Explore.Domain.EventResourceModerationQuarantine", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "QuarantineId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_quarantine_releases_event_resource_moderation_quarantines_tenant_id_quarantine_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationQuarantineReview", b =>
+                {
+                    b.HasOne("Explore.Domain.EventResourceModerationQuarantine", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "QuarantineId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_quarantine_reviews_event_resource_moderation_quarantines_tenant_id_quarantine_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationReviewCompletion", b =>
+                {
+                    b.HasOne("Explore.Domain.EventResourceModerationQuarantineReview", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ApprovalId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_moderation_review_completions_event_resource_quarantine_reviews_tenant_id_approval_id");
+
+                    b.HasOne("Explore.Domain.EventResourceModerationQuarantineReview", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "AttestationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_moderation_review_completions_event_resource_quarantine_reviews_tenant_id_attestation_id");
+
+                    b.HasOne("Explore.Domain.EventResourceModerationQuarantine", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "QuarantineId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_moderation_review_completions_event_resource_moderation_quarantines_tenant_id_quarantine_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationReviewDuty", b =>
+                {
+                    b.HasOne("Explore.Domain.EventResourceModerationQuarantine", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "Id")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_moderation_review_duties_event_resource_moderation_quarantines_tenant_id_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceModerationReviewEscalation", b =>
+                {
+                    b.HasOne("Explore.Domain.EventResourceModerationReviewDuty", null)
+                        .WithOne()
+                        .HasForeignKey("Explore.Domain.EventResourceModerationReviewEscalation", "TenantId", "Id")
+                        .HasPrincipalKey("Explore.Domain.EventResourceModerationReviewDuty", "TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_moderation_review_escalations_event_resource_moderation_review_duties_tenant_id_id");
                 });
 
             modelBuilder.Entity("Explore.Domain.EventRoleAssignment", b =>
@@ -44664,6 +56095,1122 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasConstraintName("fk_managed_control_plane_registrations_secret_bindings_credential_secret_binding_id");
                 });
 
+            modelBuilder.Entity("Explore.Domain.ModerationAdjudicatedCaseReadGrant", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_adjudicated_case_read_grants_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_adjudicated_case_read_grants_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.ModerationEffectIntent", null)
+                        .WithMany()
+                        .HasForeignKey("OriginalEffectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_adjudicated_case_read_grants_moderation_effect_intents_original_effect_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_adjudicated_case_read_grants_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseAttributionHead", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_heads_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_heads_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("OccurrenceCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_heads_moderation_cases_occurrence_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseAttributionSource", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_heads_moderation_case_attribution_sources_opening_source_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseAttributionSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_heads_moderation_case_attribution_sources_source_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_heads_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseAttributionRenewalReceipt", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_renewal_receipts_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseAttributionSource", null)
+                        .WithMany()
+                        .HasForeignKey("ExpectedSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_renewal_receipts_moderation_case_attribution_sources_expected_source_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseAttributionHead", null)
+                        .WithMany()
+                        .HasForeignKey("HeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_renewal_receipts_moderation_case_attribution_heads_head_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseAttributionSource", null)
+                        .WithMany()
+                        .HasForeignKey("Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_renewal_receipts_moderation_case_attribution_sources_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_renewal_receipts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseAttributionSource", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_sources_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseTargetSource", null)
+                        .WithMany()
+                        .HasForeignKey("EvidenceSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_sources_moderation_case_target_sources_evidence_source_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("OccurrenceCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_sources_moderation_cases_occurrence_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseReadGrant", null)
+                        .WithMany()
+                        .HasForeignKey("ReadGrantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_sources_moderation_case_read_grants_read_grant_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_attribution_sources_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseIntakeAcknowledgement", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_intake_acknowledgements_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseTargetReceipt", null)
+                        .WithMany()
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_intake_acknowledgements_moderation_case_target_receipts_receipt_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_intake_acknowledgements_tenants_tenant_id");
+
+                    b.HasOne("Explore.Domain.ModerationOperationalBudgetAdoption", null)
+                        .WithMany()
+                        .HasForeignKey("BudgetAdoptionId", "TrustDomainId", "TenantId", "BudgetSourceId")
+                        .HasPrincipalKey("Id", "TrustDomainId", "TenantId", "SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_intake_acknowledgements_moderation_operational_budget_adoptions_budget_adoption_id_trust_domain__61df15e26135");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseNarrative", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narratives_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationQualificationEpoch", null)
+                        .WithMany()
+                        .HasForeignKey("QualificationEpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narratives_moderation_qualification_epochs_qualification_epoch_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseTargetReceipt", null)
+                        .WithMany()
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narratives_moderation_case_target_receipts_receipt_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReporterUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narratives_users_reporter_user_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseTargetSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narratives_moderation_case_target_sources_source_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseNarrativeAdoption", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptionId", "HostBindingId", "TrustDomainId", "TenantId", "PolicySourceId")
+                        .HasPrincipalKey("Id", "HostBindingId", "TrustDomainId", "TenantId", "SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narratives_moderation_case_narrative_adoptions_adoption_id_host_binding_id_trust_domain_id_tenan_514a35efa48d");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseNarrativeAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narrative_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_case_narrative_adoptions_users_withdrawn_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseNarrativePolicySource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId", "HostBindingId", "TrustDomainId", "TenantId")
+                        .HasPrincipalKey("Id", "HostBindingId", "TrustDomainId", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narrative_adoptions_moderation_case_narrative_policy_sources_source_id_host_binding_id_trust_dom_cef36ebfe3ff");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseNarrativePolicySource", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("GovernanceControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narrative_policy_sources_users_governance_controller_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narrative_policy_sources_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("PrivacyControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narrative_policy_sources_users_privacy_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("PrivacyOwnerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narrative_policy_sources_users_privacy_owner_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narrative_policy_sources_users_recorded_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_narrative_policy_sources_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseReadGrant", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_read_grants_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseTargetSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_read_grants_moderation_case_target_sources_source_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_read_grants_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseReadGrantRevocationReceipt", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdministratorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_read_grant_revocation_receipts_users_administrator_user_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseReadGrant", null)
+                        .WithMany()
+                        .HasForeignKey("GrantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_read_grant_revocation_receipts_moderation_case_read_grants_grant_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_read_grant_revocation_receipts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseTargetPolicy", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_target_policies_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseTargetReceipt", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("ConsumedCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_case_target_receipts_moderation_cases_consumed_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_target_receipts_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.ModerationQualificationEpoch", null)
+                        .WithMany()
+                        .HasForeignKey("QualificationEpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_target_receipts_moderation_qualification_epochs_qualification_epoch_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_target_receipts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationCaseTargetSource", b =>
+                {
+                    b.HasOne("Explore.Domain.Event", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_case_target_sources_events_event_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_case_target_sources_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationChildAgePolicyAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_child_age_policy_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationChildAgePolicySource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_child_age_policy_adoptions_moderation_child_age_policy_sources_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_child_age_policy_adoptions_users_withdrawn_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationChildAgePolicySource", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("CollectionControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_child_age_policy_sources_users_collection_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("CollectionOwnerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_child_age_policy_sources_users_collection_owner_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_child_age_policy_sources_moderation_policy_publications_definition_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("GovernanceControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_child_age_policy_sources_users_governance_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_child_age_policy_sources_users_recorded_by_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_child_age_policy_sources_users_reviewer_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_child_age_policy_sources_users_reviewer_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationControlBinding", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationClassificationControlSelection", null)
+                        .WithMany("Bindings")
+                        .HasForeignKey("SelectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_control_bindings_moderation_classification_control_selections_selection_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationControlSelection", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AuthoredByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_control_selections_users_authored_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationEventGeneration", null)
+                        .WithMany()
+                        .HasForeignKey("GenerationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_control_selections_moderation_event_generations_generation_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_control_selections_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_control_selections_moderation_policy_publications_publication_id");
+
+                    b.HasOne("Explore.Domain.ModerationClassificationMaterialReview", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_control_selections_moderation_classification_material_reviews_review_id");
+
+                    b.HasOne("Explore.Domain.ModerationClassificationMaterialSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_control_selections_moderation_classification_material_sources_source_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_control_selections_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationEventTargetAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_event_target_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationEventGeneration", null)
+                        .WithMany()
+                        .HasForeignKey("GenerationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_event_target_adoptions_moderation_event_generations_generation_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_event_target_adoptions_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_classification_event_target_adoptions_users_revoked_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_event_target_adoptions_tenants_tenant_id");
+
+                    b.HasOne("Explore.Domain.ModerationClassificationControlBinding", null)
+                        .WithMany()
+                        .HasForeignKey("SelectionId", "BindingOrdinal")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_event_target_adoptions_moderation_classification_control_bindings_selection_id_binding_ordinal");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialCategory", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationClassificationMaterialEntry", null)
+                        .WithMany("Categories")
+                        .HasForeignKey("EntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_material_categories_moderation_classification_material_entries_entry_id");
+
+                    b.HasOne("Explore.Domain.ModerationClassificationTaxonomyCategory", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_material_categories_moderation_classification_taxonomy_categories_version_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialComponent", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationClassificationMaterialSource", null)
+                        .WithMany("Components")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_material_components_moderation_classification_material_sources_source_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialEntry", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationClassificationMaterialSource", null)
+                        .WithMany("Materials")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_material_entries_moderation_classification_material_sources_source_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialReview", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationClassificationMaterialSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_material_reviews_moderation_classification_material_sources_source_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialSource", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationEventGeneration", null)
+                        .WithMany()
+                        .HasForeignKey("EventGenerationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_material_sources_moderation_event_generations_event_generation_id");
+
+                    b.HasOne("Explore.Domain.ModerationClassificationTaxonomyAdoption", null)
+                        .WithMany()
+                        .HasForeignKey("TaxonomyAdoptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_material_sources_moderation_classification_taxonomy_adoptions_taxonomy_adoption_id");
+
+                    b.HasOne("Explore.Domain.ModerationClassificationTaxonomySource", null)
+                        .WithMany()
+                        .HasForeignKey("TaxonomySourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_material_sources_moderation_classification_taxonomy_sources_taxonomy_source_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationTaxonomyAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationClassificationTaxonomySource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_adoptions_moderation_classification_taxonomy_sources_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_classification_taxonomy_adoptions_users_withdrawn_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationTaxonomyCategory", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationClassificationTaxonomySource", null)
+                        .WithMany("Categories")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_categories_moderation_classification_taxonomy_sources_source_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationTaxonomySource", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationChildAgePolicyAdoption", null)
+                        .WithMany()
+                        .HasForeignKey("ChildAgeAdoptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_sources_moderation_child_age_policy_adoptions_child_age_adoption_id");
+
+                    b.HasOne("Explore.Domain.ModerationChildAgePolicySource", null)
+                        .WithMany()
+                        .HasForeignKey("ChildAgeSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_sources_moderation_child_age_policy_sources_child_age_source_id");
+
+                    b.HasOne("Explore.Domain.ModerationConstitutionAdoption", null)
+                        .WithMany()
+                        .HasForeignKey("ConstitutionAdoptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_sources_moderation_constitution_adoptions_constitution_adoption_id");
+
+                    b.HasOne("Explore.Domain.ModerationConstitutionSource", null)
+                        .WithMany()
+                        .HasForeignKey("ConstitutionSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_sources_moderation_constitution_sources_constitution_source_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_sources_moderation_policy_publications_definition_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_sources_users_owner_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_sources_users_owner_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_sources_users_reviewer_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_classification_taxonomy_sources_users_reviewer_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConstitutionAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationConstitutionSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_adoptions_moderation_constitution_sources_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_constitution_adoptions_users_withdrawn_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConstitutionAvailability", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_availability_users_reviewer_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_constitution_availability_users_withdrawn_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConstitutionReviewer", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationConstitutionAvailability", null)
+                        .WithMany()
+                        .HasForeignKey("AvailabilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_reviewers_moderation_constitution_availability_availability_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_reviewers_users_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_reviewers_users_reviewer_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationConstitutionSource", null)
+                        .WithMany("Reviewers")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_reviewers_moderation_constitution_sources_source_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConstitutionSource", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("CoordinatorHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_sources_users_coordinator_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_sources_moderation_policy_publications_definition_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("FallbackHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_sources_users_fallback_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationEffectIntent", null)
+                        .WithMany()
+                        .HasForeignKey("OriginalEffectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_constitution_sources_moderation_effect_intents_original_effect_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_constitution_sources_users_recorded_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConsumerInstallation", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_installations_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("InstalledByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_installations_users_installed_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_installations_tenants_tenant_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_consumer_installations_users_withdrawn_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConsumerMeasurementChallenge", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_challenges_moderation_policy_publications_definition_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_challenges_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.ModerationConsumerInstallation", null)
+                        .WithMany()
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_challenges_moderation_consumer_installations_installation_id");
+
+                    b.HasOne("Explore.Domain.ModerationEffectIntent", null)
+                        .WithMany()
+                        .HasForeignKey("OriginalEffectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_consumer_measurement_challenges_moderation_effect_intents_original_effect_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("PreparedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_challenges_users_prepared_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_challenges_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConsumerMeasurementReceipt", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_receipts_users_accepted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationConsumerMeasurementChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_receipts_moderation_consumer_measurement_challenges_challenge_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_receipts_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.ModerationMeasurementIssuerEnrollment", null)
+                        .WithMany()
+                        .HasForeignKey("IssuerEnrollmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_receipts_moderation_measurement_issuer_enrollments_issuer_enrollment_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_consumer_measurement_receipts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationContentResponse", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_content_responses_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationNoticeSource", null)
+                        .WithMany()
+                        .HasForeignKey("EffectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_content_responses_moderation_notice_sources_effect_id");
+
+                    b.HasOne("Explore.Domain.ModerationNotice", null)
+                        .WithMany()
+                        .HasForeignKey("NoticeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_content_responses_moderation_notices_notice_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RepresentativeHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_content_responses_users_representative_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationContributionBinding", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationContributionSelection", null)
+                        .WithMany("Bindings")
+                        .HasForeignKey("SelectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_contribution_bindings_moderation_contribution_selections_selection_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationContributionSelection", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AuthoredByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_contribution_selections_users_authored_by_human_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_contribution_selections_moderation_cases_case_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationDecision", null)
+                        .WithMany()
+                        .HasForeignKey("DecisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_contribution_selections_moderation_decisions_decision_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_contribution_selections_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_contribution_selections_moderation_policy_publications_publication_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_contribution_selections_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationDeploymentAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_deployment_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationDeploymentSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_deployment_adoptions_moderation_deployment_sources_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_deployment_adoptions_users_withdrawn_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationDeploymentConsumer", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationConsumerInstallation", null)
+                        .WithMany()
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_deployment_consumers_moderation_consumer_installations_installation_id");
+
+                    b.HasOne("Explore.Domain.ModerationDeploymentSource", null)
+                        .WithMany("Consumers")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_deployment_consumers_moderation_deployment_sources_source_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationDeploymentSource", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_deployment_sources_moderation_policy_publications_definition_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_deployment_sources_users_recorded_by_human_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.ModerationEffectIntent", b =>
                 {
                     b.HasOne("ISLAMU.Moderation.Domain.ModerationDecision", null)
@@ -44685,6 +57232,149 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasForeignKey("SupersededSanctionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_moderation_effect_intents_moderation_sanctions_superseded_sanction_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationEventGeneration", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_generations_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ObservedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_generations_users_observed_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_generations_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationEventRightsAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationEventRightsSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_adoptions_moderation_event_rights_sources_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_event_rights_adoptions_users_withdrawn_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationEventRightsSource", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ContinuityMappingControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_sources_users_continuity_mapping_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ContinuityMappingOwnerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_sources_users_continuity_mapping_owner_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_sources_moderation_policy_publications_definition_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("GovernanceControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_sources_users_governance_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_sources_users_recorded_by_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_sources_users_reviewer_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_sources_users_reviewer_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("SettlementMappingControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_sources_users_settlement_mapping_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("SettlementMappingOwnerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_rights_sources_users_settlement_mapping_owner_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationEventTargetAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_target_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationEventGeneration", null)
+                        .WithMany()
+                        .HasForeignKey("GenerationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_target_adoptions_moderation_event_generations_generation_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_event_target_adoptions_users_revoked_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationContributionBinding", null)
+                        .WithMany()
+                        .HasForeignKey("SelectionId", "BindingOrdinal")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_event_target_adoptions_moderation_contribution_bindings_selection_id_binding_ordinal");
                 });
 
             modelBuilder.Entity("Explore.Domain.ModerationHostBinding", b =>
@@ -44720,6 +57410,204 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasConstraintName("fk_moderation_machine_subject_bindings_service_principals_service_principal_id");
                 });
 
+            modelBuilder.Entity("Explore.Domain.ModerationMeasuredOperationsAcceptance", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measured_operations_acceptances_users_accepted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationMeasuredOperationsSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measured_operations_acceptances_moderation_measured_operations_sources_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_measured_operations_acceptances_users_withdrawn_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationMeasuredOperationsSource", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measured_operations_sources_moderation_policy_publications_definition_id");
+
+                    b.HasOne("Explore.Domain.ModerationEffectIntent", null)
+                        .WithMany()
+                        .HasForeignKey("OriginalEffectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_measured_operations_sources_moderation_effect_intents_original_effect_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measured_operations_sources_users_recorded_by_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecorderControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measured_operations_sources_users_recorder_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measured_operations_sources_users_reviewer_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measured_operations_sources_users_reviewer_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationMeasurementIssuerEnrollment", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measurement_issuer_enrollments_users_approved_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measurement_issuer_enrollments_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_measurement_issuer_enrollments_users_revoked_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_measurement_issuer_enrollments_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationNotice", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationNoticeSource", null)
+                        .WithMany()
+                        .HasForeignKey("EffectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notices_moderation_notice_sources_effect_id");
+
+                    b.HasOne("Explore.Domain.NotificationIntent", null)
+                        .WithMany()
+                        .HasForeignKey("NativeIntentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_notices_notification_intents_native_intent_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationNoticeDisclosureApproval", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_disclosure_approvals_users_approved_by_human_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_disclosure_approvals_moderation_cases_case_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationDecision", null)
+                        .WithMany()
+                        .HasForeignKey("DecisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_disclosure_approvals_moderation_decisions_decision_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_disclosure_approvals_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_disclosure_approvals_moderation_policy_publications_publication_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_notice_disclosure_approvals_users_revoked_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_disclosure_approvals_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationNoticeNotificationReceipt", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationNoticeSource", null)
+                        .WithOne()
+                        .HasForeignKey("Explore.Domain.ModerationNoticeNotificationReceipt", "EffectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_notification_receipts_moderation_notice_sources_effect_id");
+
+                    b.HasOne("Explore.Domain.ModerationNotice", null)
+                        .WithOne()
+                        .HasForeignKey("Explore.Domain.ModerationNoticeNotificationReceipt", "NoticeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_notification_receipts_moderation_notices_notice_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_notification_receipts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationNoticeSource", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationEffectIntent", null)
+                        .WithOne()
+                        .HasForeignKey("Explore.Domain.ModerationNoticeSource", "EffectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_notice_sources_moderation_effect_intents_effect_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.ModerationOperationReceipt", b =>
                 {
                     b.HasOne("ISLAMU.Moderation.Domain.ModerationDecision", null)
@@ -44728,6 +57616,722 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_moderation_operation_receipts_moderation_decisions_decision_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationOperationalBudgetAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_operational_budget_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_operational_budget_adoptions_users_withdrawn_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationOperationalBudgetSource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId", "HostBindingId", "TrustDomainId", "TenantId")
+                        .HasPrincipalKey("Id", "HostBindingId", "TrustDomainId", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_operational_budget_adoptions_moderation_operational_budget_sources_source_id_host_binding_id_trust_do_ddb3af922f29");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationOperationalBudgetSource", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_operational_budget_sources_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("OperatorHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_operational_budget_sources_users_operator_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_operational_budget_sources_users_recorded_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_operational_budget_sources_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationOriginalEffectCompletionReceipt", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationNoticeSource", null)
+                        .WithMany()
+                        .HasForeignKey("EffectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_original_effect_completion_receipts_moderation_notice_sources_effect_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationParticipantIncidentResponsibilitySource", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AssessorHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_users_assessor_human_id");
+
+                    b.HasOne("Explore.Domain.Event", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_events_event_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseTargetSource", null)
+                        .WithMany()
+                        .HasForeignKey("EvidenceSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_moderation_case_target_sources_evidence_source_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("OccurrenceCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_moderation_cases_occurrence_case_id");
+
+                    b.HasOne("Explore.Domain.RegistrationOrder", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_registration_orders_order_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseNarrative", null)
+                        .WithMany()
+                        .HasForeignKey("OriginalNarrativeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_moderation_case_narratives_original_narrative_id");
+
+                    b.HasOne("Explore.Domain.RegistrationParticipant", null)
+                        .WithMany()
+                        .HasForeignKey("ParticipantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_registration_participants_participant_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseTargetPolicy", null)
+                        .WithMany()
+                        .HasForeignKey("QualificationPolicyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_moderation_case_target_policies_qualification_policy_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseReadGrant", null)
+                        .WithMany()
+                        .HasForeignKey("ReadGrantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_moderation_case_read_grants_read_grant_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReadIssuerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_users_read_issuer_human_id");
+
+                    b.HasOne("Explore.Domain.EventSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_event_sessions_session_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_users_subject_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_tenants_tenant_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_users_withdrawn_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationCaseNarrativePolicySource", null)
+                        .WithMany()
+                        .HasForeignKey("CustodySourceId", "HostBindingId", "TrustDomainId", "TenantId")
+                        .HasPrincipalKey("Id", "HostBindingId", "TrustDomainId", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_moderation_case_narrative_policy_sources_custody_source_i_60863fafd058");
+
+                    b.HasOne("Explore.Domain.ModerationCaseNarrativeAdoption", null)
+                        .WithMany()
+                        .HasForeignKey("CustodyAdoptionId", "HostBindingId", "TrustDomainId", "TenantId", "CustodySourceId")
+                        .HasPrincipalKey("Id", "HostBindingId", "TrustDomainId", "TenantId", "SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_participant_incident_responsibility_sources_moderation_case_narrative_adoptions_custody_adoption_id_h_be22aee0f8ae");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublication", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationQualificationEpoch", null)
+                        .WithMany()
+                        .HasForeignKey("AuthoritySourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_policy_publications_moderation_qualification_epochs_authority_source_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_policy_publications_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_policy_publications_tenants_tenant_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("PolicyId", "PreviousPublicationId")
+                        .HasPrincipalKey("PolicyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_policy_publications_moderation_policy_publications_policy_id_previous_publication_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationCandidate", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationQualificationEpoch", null)
+                        .WithMany()
+                        .HasForeignKey("AuthoritySourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_policy_publication_candidates_moderation_qualification_epochs_authority_source_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_policy_publication_candidates_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("PreparedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_policy_publication_candidates_users_prepared_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_policy_publication_candidates_tenants_tenant_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", "Definition")
+                        .WithMany()
+                        .HasForeignKey("PolicyId", "DefinitionId")
+                        .HasPrincipalKey("PolicyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_policy_publication_candidates_moderation_policy_publications_policy_id_definition_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("PolicyId", "PreviousPublicationId")
+                        .HasPrincipalKey("PolicyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_policy_publication_candidates_moderation_policy_publications_policy_id_previous_publication_id");
+
+                    b.Navigation("Definition");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationClass", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany("Classes")
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_classes_moderation_policy_publications_publication_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationConsumer", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublicationProfile", null)
+                        .WithMany("Consumers")
+                        .HasForeignKey("PublicationId", "ProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_consumers_moderation_publication_profiles_publication_id_profile_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationEffect", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublicationProfile", null)
+                        .WithMany("Effects")
+                        .HasForeignKey("PublicationId", "ProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_effects_moderation_publication_profiles_publication_id_profile_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationEvidence", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany("Evidence")
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_evidence_moderation_policy_publications_publication_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationMode", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany("Modes")
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_modes_moderation_policy_publications_publication_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationPlan", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublicationProfile", null)
+                        .WithMany("Plans")
+                        .HasForeignKey("PublicationId", "ProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_plans_moderation_publication_profiles_publication_id_profile_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationPrerequisite", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublicationProfile", null)
+                        .WithMany("Prerequisites")
+                        .HasForeignKey("PublicationId", "ProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_prerequisites_moderation_publication_profiles_publication_id_profile_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationProfile", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany("Profiles")
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_profiles_moderation_policy_publications_publication_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublicationReason", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId", "ReasonCode", "ReasonRevision")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_profiles_moderation_publication_reasons_publication_id_reason_code_reason_revision");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationReason", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany("Reasons")
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_reasons_moderation_policy_publications_publication_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublicationClass", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId", "ClassCode", "ClassRevision")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_reasons_moderation_publication_classes_publication_id_class_code_class_revision");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationScope", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublicationProfile", null)
+                        .WithMany("Scopes")
+                        .HasForeignKey("PublicationId", "ProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_scopes_moderation_publication_profiles_publication_id_profile_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationSubject", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublicationProfile", null)
+                        .WithMany("Subjects")
+                        .HasForeignKey("PublicationId", "ProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_publication_subjects_moderation_publication_profiles_publication_id_profile_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicySelection", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("Id", "ActivePublicationId")
+                        .HasPrincipalKey("PolicyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_policy_selections_moderation_policy_publications_id_active_publication_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("Id", "LatestPublicationId")
+                        .HasPrincipalKey("PolicyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_policy_selections_moderation_policy_publications_id_latest_publication_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPreFindingCustody", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationCaseAttributionSource", null)
+                        .WithMany()
+                        .HasForeignKey("AttributionSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_custody_moderation_case_attribution_sources_attribution_source_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_custody_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("PrivacyOwnerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_custody_users_privacy_owner_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ProposedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_custody_users_proposed_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPreFindingErasureTombstone", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_erasure_tombstones_moderation_cases_case_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPreFindingNotice", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_notices_moderation_cases_case_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("OccurrenceCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_notices_moderation_cases_occurrence_case_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_notices_users_recipient_human_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationReviewerAssignment", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerAssignmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_notices_moderation_reviewer_assignments_reviewer_assignment_id");
+
+                    b.HasOne("Explore.Domain.ModerationPreFindingCustody", null)
+                        .WithMany()
+                        .HasForeignKey("CustodyId", "HostBindingId", "TrustDomainId", "TenantId", "CaseId")
+                        .HasPrincipalKey("Id", "HostBindingId", "TrustDomainId", "TenantId", "CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_notices_moderation_pre_finding_custody_custody_id_host_binding_id_trust_domain_id_tenant_id_case_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPreFindingReceipt", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_receipts_users_actor_human_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_pre_finding_receipts_moderation_cases_case_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_adoptions_moderation_policy_publications_publication_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_profile_adoptions_users_revoked_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationContributionSelection", null)
+                        .WithMany()
+                        .HasForeignKey("SelectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_adoptions_moderation_contribution_selections_selection_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionAssessmentAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationProfileCollectionAssessmentSource", "Source")
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_adoptions_moderation_profile_collection_assessment_sources_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_adoptions_users_withdrawn_by_human_id");
+
+                    b.Navigation("Source");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionAssessmentSource", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_sources_users_owner_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ProcedureAdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_sources_users_procedure_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationProfileCollectionProcedureAdoption", null)
+                        .WithMany()
+                        .HasForeignKey("ProcedureAdoptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_sources_moderation_profile_collection_procedure_adoptions_procedure_adoption_id");
+
+                    b.HasOne("Explore.Domain.ModerationProfileCollectionProcedureSource", "ProcedureSource")
+                        .WithMany()
+                        .HasForeignKey("ProcedureSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_sources_moderation_profile_collection_procedure_sources_procedure_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_sources_users_recorded_by_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_sources_users_reviewer_controller_human_id");
+
+                    b.HasOne("Explore.Domain.UserPii", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectHumanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_assessment_sources_user_pii_subject_human_id");
+
+                    b.Navigation("ProcedureSource");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionProcedureAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_procedure_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationProfileCollectionProcedureSource", "Source")
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_procedure_adoptions_moderation_profile_collection_procedure_sources_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_profile_collection_procedure_adoptions_users_withdrawn_by_human_id");
+
+                    b.Navigation("Source");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionProcedureSource", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationChildAgePolicyAdoption", null)
+                        .WithMany()
+                        .HasForeignKey("ChildAgeAdoptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_procedure_sources_moderation_child_age_policy_adoptions_child_age_adoption_id");
+
+                    b.HasOne("Explore.Domain.ModerationChildAgePolicySource", null)
+                        .WithMany()
+                        .HasForeignKey("ChildAgeSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_procedure_sources_moderation_child_age_policy_sources_child_age_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_procedure_sources_users_recorded_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileCollectionSubjectObservation", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationQualificationEpoch", null)
+                        .WithMany()
+                        .HasForeignKey("EpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_subject_observations_moderation_qualification_epochs_epoch_id");
+
+                    b.HasOne("Explore.Domain.ModerationProfileCollectionProcedureAdoption", null)
+                        .WithMany()
+                        .HasForeignKey("ProcedureAdoptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_subject_observations_moderation_profile_collection_procedure_adoptions_procedure_adoption_id");
+
+                    b.HasOne("Explore.Domain.ModerationProfileCollectionProcedureSource", "ProcedureSource")
+                        .WithMany()
+                        .HasForeignKey("ProcedureSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_subject_observations_moderation_profile_collection_procedure_sources_procedure_source_id");
+
+                    b.HasOne("Explore.Domain.UserPii", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectHumanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_collection_subject_observations_user_pii_subject_human_id");
+
+                    b.Navigation("ProcedureSource");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationProfileSubjectConsent", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationProfileCollectionProcedureSource", "Source")
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_subject_consents_moderation_profile_collection_procedure_sources_source_id");
+
+                    b.HasOne("Explore.Domain.UserPii", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectHumanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_profile_subject_consents_user_pii_subject_human_id");
+
+                    b.Navigation("Source");
                 });
 
             modelBuilder.Entity("Explore.Domain.ModerationQualificationEpoch", b =>
@@ -44772,6 +58376,262 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_moderation_qualification_mutation_receipts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationPolicyAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_policy_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_qualification_policy_adoptions_users_revoked_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationQualificationPolicySource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId", "HostBindingId", "TrustDomainId", "TenantId", "CaseId")
+                        .HasPrincipalKey("Id", "HostBindingId", "TrustDomainId", "TenantId", "CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_policy_adoptions_moderation_qualification_policy_sources_source_id_host_binding_id_trus_cf4e4a3d694c");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationQualificationPolicySource", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_policy_sources_moderation_cases_case_id");
+
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_policy_sources_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("PublishedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_policy_sources_users_published_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_qualification_policy_sources_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionActionRecovery", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationRecognitionCaptureItem", null)
+                        .WithMany()
+                        .HasForeignKey("CaptureItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_action_recovery_moderation_recognition_capture_item_capture_item_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionCaptureItem", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationRecognitionContinuityBinding", null)
+                        .WithMany()
+                        .HasForeignKey("ContinuityBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_recognition_capture_item_moderation_recognition_continuity_binding_continuity_binding_id");
+
+                    b.HasOne("Explore.Domain.ModerationRecognitionPending", null)
+                        .WithMany("Material")
+                        .HasForeignKey("IntentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_capture_item_moderation_recognition_pending_intent_id");
+
+                    b.HasOne("Explore.Domain.ModerationRecognitionCaptureItem", null)
+                        .WithMany()
+                        .HasForeignKey("ParentCaptureItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_recognition_capture_item_moderation_recognition_capture_item_parent_capture_item_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionContinuityBinding", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationRecognitionCaptureItem", null)
+                        .WithMany()
+                        .HasForeignKey("CaptureItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_continuity_binding_moderation_recognition_capture_item_capture_item_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionDispositionAcceptance", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationRecognitionDisposition", null)
+                        .WithMany()
+                        .HasForeignKey("DispositionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_disposition_acceptance_moderation_recognition_disposition_disposition_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionKeyLifecycleKey", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationRecognitionKeyLifecycle", null)
+                        .WithMany("Keys")
+                        .HasForeignKey("TrustDomainId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_key_lifecycle_key_moderation_recognition_key_lifecycle_trust_domain_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionPrivacyAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationRecognitionPrivacySource", null)
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_adoptions_moderation_recognition_privacy_sources_source_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_recognition_privacy_adoptions_users_withdrawn_by_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionPrivacyRetention", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationRecognitionPrivacySource", null)
+                        .WithMany("Retention")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_retention_moderation_recognition_privacy_sources_source_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionPrivacySource", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationPolicyPublication", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_sources_moderation_policy_publications_definition_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("GovernanceControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_sources_users_governance_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("PrivacyControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_sources_users_privacy_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("PrivacyOwnerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_sources_users_privacy_owner_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_sources_users_recorded_by_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecoveryControllerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_sources_users_recovery_controller_human_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecoveryOwnerHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_recognition_privacy_sources_users_recovery_owner_human_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationResourceGeneration", b =>
+                {
+                    b.HasOne("Explore.Domain.ModerationHostBinding", null)
+                        .WithMany()
+                        .HasForeignKey("HostBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_resource_generations_moderation_host_bindings_host_binding_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ObservedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_resource_generations_users_observed_by_human_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_resource_generations_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationResourceTargetAdoption", b =>
+                {
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdoptedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_resource_target_adoptions_users_adopted_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationResourceGeneration", null)
+                        .WithMany()
+                        .HasForeignKey("GenerationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_resource_target_adoptions_moderation_resource_generations_generation_id");
+
+                    b.HasOne("Explore.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByHumanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_resource_target_adoptions_users_revoked_by_human_id");
+
+                    b.HasOne("Explore.Domain.ModerationContributionBinding", null)
+                        .WithMany()
+                        .HasForeignKey("SelectionId", "BindingOrdinal")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_resource_target_adoptions_moderation_contribution_bindings_selection_id_binding_ordinal");
                 });
 
             modelBuilder.Entity("Explore.Domain.Modules.TenantCapability", b =>
@@ -48706,12 +62566,12 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_registration_attempts_registration_workflows_tenant_id_event_id_registration_workflow_id");
 
-                    b.HasOne("Explore.Domain.RegistrationProviderBinding", null)
+                    b.HasOne("Explore.Domain.RegistrationProviderBindingPublication", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "RegistrationProviderBindingId", "ProviderMappingRevisionHashKey")
-                        .HasPrincipalKey("TenantId", "Id", "PublishedMappingRevisionHashKey")
+                        .HasPrincipalKey("TenantId", "RegistrationProviderBindingId", "MappingRevisionHashKey")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_registration_attempts_registration_provider_bindings_tenant_id_registration_provider_binding_id_provider_mapping_90454f848571");
+                        .HasConstraintName("fk_registration_attempts_registration_provider_binding_publications_tenant_id_registration_provider_binding_id_prov_8dc716109008");
 
                     b.HasOne("Explore.Domain.RegistrationFormVersion", null)
                         .WithMany()
@@ -49477,7 +63337,26 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_registration_provider_bindings_registration_form_versions_tenant_id_registration_form_id_registration_form_version_id");
 
+                    b.HasOne("Explore.Domain.RegistrationProviderBindingPublication", "Publication")
+                        .WithOne()
+                        .HasForeignKey("Explore.Domain.RegistrationProviderBinding", "TenantId", "Id", "PublishedMappingRevisionHashKey", "PublishedAt")
+                        .HasPrincipalKey("Explore.Domain.RegistrationProviderBindingPublication", "TenantId", "RegistrationProviderBindingId", "MappingRevisionHashKey", "PublishedAt")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_registration_provider_bindings_registration_provider_binding_publications_tenant_id_id_published_mapping_revisio_6cd1eac97312");
+
                     b.Navigation("Connection");
+
+                    b.Navigation("Publication");
+                });
+
+            modelBuilder.Entity("Explore.Domain.RegistrationProviderBindingPublication", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_registration_provider_binding_publications_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Explore.Domain.RegistrationProviderCapability", b =>
@@ -51705,6 +65584,16 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Explore.Domain.UserBirthDateCollectionReceipt", b =>
+                {
+                    b.HasOne("Explore.Domain.UserPii", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_birth_date_collection_receipts_user_pii_user_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.UserExternalLogin", b =>
                 {
                     b.HasOne("Explore.Domain.AuthenticationProvider", "AuthenticationProvider")
@@ -52550,6 +66439,90 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasConstraintName("fk_anonymous_challenge_tenant_quotas_tenants_tenant_id");
                 });
 
+            modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationCase", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
+                        .WithMany()
+                        .HasForeignKey("OccurrenceCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_cases_moderation_cases_occurrence_case_id");
+
+                    b.OwnsMany("ISLAMU.Moderation.Domain.ModerationCaseEvidence", "Evidence", b1 =>
+                        {
+                            b1.Property<Guid>("CaseId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("case_id");
+
+                            b1.Property<long>("CaseRevision")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("case_revision");
+
+                            b1.Property<Guid>("MaterialFactId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("material_fact_id");
+
+                            b1.Property<DateTimeOffset>("RecordedAt")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("recorded_at");
+
+                            b1.Property<Guid>("SourceId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("source_id");
+
+                            b1.Property<Guid?>("SourceOriginCommunityId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("source_origin_community_id");
+
+                            b1.Property<Guid?>("SourceOriginEventId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("source_origin_event_id");
+
+                            b1.Property<Guid?>("SourceOriginInstanceId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("source_origin_instance_id");
+
+                            b1.Property<int>("SourceOriginKind")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("source_origin_kind");
+
+                            b1.Property<Guid?>("SourceOriginResourceId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("source_origin_resource_id");
+
+                            b1.Property<Guid?>("SourceOriginSolutionId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("source_origin_solution_id");
+
+                            b1.Property<Guid?>("SourceOriginTenantId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("source_origin_tenant_id");
+
+                            b1.Property<Guid>("SourceOriginTrustDomainId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("source_origin_trust_domain_id");
+
+                            b1.Property<Guid>("SourceVersion")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("source_version");
+
+                            b1.HasKey("CaseId", "CaseRevision")
+                                .HasName("pk_ie_moderation_case_evidence");
+
+                            b1.ToTable("ie_moderation_case_evidence", null, t =>
+                                {
+                                    t.HasCheckConstraint("ck_moderation_case_evidence_origin", "source_origin_kind IN (3, 4) AND source_origin_solution_id IS NOT NULL AND source_origin_instance_id IS NOT NULL AND source_origin_community_id IS NULL AND source_origin_resource_id IS NULL AND source_origin_event_id IS NULL AND ((source_origin_kind = 3 AND source_origin_tenant_id IS NULL) OR (source_origin_kind = 4 AND source_origin_tenant_id IS NOT NULL))");
+
+                                    t.HasCheckConstraint("ck_moderation_case_evidence_revision", "case_revision > 0");
+                                });
+
+                            b1.WithOwner()
+                                .HasForeignKey("CaseId")
+                                .HasConstraintName("fk_moderation_case_evidence_moderation_cases_case_id");
+                        });
+
+                    b.Navigation("Evidence");
+                });
+
             modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationDecision", b =>
                 {
                     b.HasOne("ISLAMU.Moderation.Domain.ModerationCase", null)
@@ -52598,6 +66571,28 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_moderation_sanctions_moderation_decisions_decision_id");
+                });
+
+            modelBuilder.Entity("ISLAMU.Moderation.Domain.ModerationScheduleRiskReview", b =>
+                {
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationFinding", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptedFindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_schedule_risk_reviews_moderation_findings_accepted_finding_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationReviewerAssignment", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptedReviewerAssignmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_moderation_schedule_risk_reviews_moderation_reviewer_assignments_accepted_reviewer_assignment_id");
+
+                    b.HasOne("ISLAMU.Moderation.Domain.ModerationSanction", null)
+                        .WithMany()
+                        .HasForeignKey("SourceSanctionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_moderation_schedule_risk_reviews_moderation_sanctions_source_sanction_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -52792,6 +66787,8 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Explore.Domain.EventResource", b =>
                 {
                     b.Navigation("AudienceRules");
+
+                    b.Navigation("ModerationQuarantines");
                 });
 
             modelBuilder.Entity("Explore.Domain.EventSeries", b =>
@@ -52908,6 +66905,86 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Navigation("Pii");
 
                     b.Navigation("Rooms");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationControlSelection", b =>
+                {
+                    b.Navigation("Bindings");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialEntry", b =>
+                {
+                    b.Navigation("Categories");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationMaterialSource", b =>
+                {
+                    b.Navigation("Components");
+
+                    b.Navigation("Materials");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationClassificationTaxonomySource", b =>
+                {
+                    b.Navigation("Categories");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationConstitutionSource", b =>
+                {
+                    b.Navigation("Reviewers");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationContributionSelection", b =>
+                {
+                    b.Navigation("Bindings");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationDeploymentSource", b =>
+                {
+                    b.Navigation("Consumers");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublication", b =>
+                {
+                    b.Navigation("Classes");
+
+                    b.Navigation("Evidence");
+
+                    b.Navigation("Modes");
+
+                    b.Navigation("Profiles");
+
+                    b.Navigation("Reasons");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationPolicyPublicationProfile", b =>
+                {
+                    b.Navigation("Consumers");
+
+                    b.Navigation("Effects");
+
+                    b.Navigation("Plans");
+
+                    b.Navigation("Prerequisites");
+
+                    b.Navigation("Scopes");
+
+                    b.Navigation("Subjects");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionKeyLifecycle", b =>
+                {
+                    b.Navigation("Keys");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionPending", b =>
+                {
+                    b.Navigation("Material");
+                });
+
+            modelBuilder.Entity("Explore.Domain.ModerationRecognitionPrivacySource", b =>
+                {
+                    b.Navigation("Retention");
                 });
 
             modelBuilder.Entity("Explore.Domain.NotificationIntent", b =>

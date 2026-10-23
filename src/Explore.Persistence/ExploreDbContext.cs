@@ -110,5 +110,10 @@ public partial class ExploreDbContext : DbContext
         MySqlModelIdentifierPolicy.Apply(modelBuilder, Database.ProviderName);
         ApplyGlobalQueryFilters(modelBuilder);
         ApplyModerationQueryFilters(modelBuilder);
+        ApplyModerationPublicationQueryFilters(modelBuilder);
+        ApplyModerationNoticeQueryFilters(modelBuilder);
+        ApplyModerationCaseSourceQueryFilters(modelBuilder);
+        ApplyPreFindingQueryFilters(modelBuilder);
+        ApplyModerationRecognitionQueryFilters(modelBuilder);
     }
 }

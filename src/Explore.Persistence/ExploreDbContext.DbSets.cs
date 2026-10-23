@@ -153,6 +153,7 @@ public partial class ExploreDbContext
     public DbSet<EventResource> EventResources { get; set; }
     public DbSet<EventResourceAudienceRule> EventResourceAudienceRules { get; set; }
     public DbSet<EventResourceAuditEntry> EventResourceAuditEntries { get; set; }
+    public DbSet<EventResourceModerationQuarantine> EventResourceModerationQuarantines { get; set; }
     public DbSet<EventResourceKind> EventResourceKinds { get; set; }
     public DbSet<EventResourceDeliveryType> EventResourceDeliveryTypes { get; set; }
     public DbSet<EventResourceProviderActivation> EventResourceProviderActivations { get; set; }
@@ -228,6 +229,7 @@ public partial class ExploreDbContext
     public DbSet<RegistrationProviderConnection> RegistrationProviderConnections { get; set; }
     public DbSet<RegistrationProviderApprovedOrigin> RegistrationProviderApprovedOrigins { get; set; }
     public DbSet<RegistrationProviderBinding> RegistrationProviderBindings { get; set; }
+    public DbSet<RegistrationProviderBindingPublication> RegistrationProviderBindingPublications { get; set; }
     public DbSet<RegistrationProviderSubscriptionState> RegistrationProviderSubscriptionStates { get; set; }
     public DbSet<RegistrationProviderCapability> RegistrationProviderCapabilities { get; set; }
     public DbSet<RegistrationProviderFieldMapping> RegistrationProviderFieldMappings { get; set; }

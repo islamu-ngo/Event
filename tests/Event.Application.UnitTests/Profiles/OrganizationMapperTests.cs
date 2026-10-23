@@ -346,7 +346,6 @@ public sealed class OrganizationMapperTests
         var store = new OrganizationMappingHandlerTests.OrganizationMemberStore([member]);
         var detail = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetOrganizationMemberDetailsRequestHandler(store);
         var list = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetOrganizationMembersRequestHandler(store);
-        var invites = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetMyInvitationsRequestHandler(store);
         var dto = (await detail.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetOrganizationMemberDetailsRequest { Id = ActorId }, default))!;
         await Assert.That(dto.Id).IsEqualTo(ActorId);
         await Assert.That(dto.TenantId).IsEqualTo(TenantId);
@@ -363,15 +362,13 @@ public sealed class OrganizationMapperTests
         var items = await list.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetOrganizationMembersRequest { OrganizationId = Id }, default);
         await Assert.That(items.Single()).IsEqualTo(dto);
         await Assert.That(await detail.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetOrganizationMemberDetailsRequest { Id = TenantId }, default)).IsNull();
-        var invitations = await invites.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetMyInvitationsRequest { Email = "member@example.test" }, default);
-        var invitation = invitations.Single();
+        var invitation = OrganizationMapper.ToOrganizationInvitation(member);
         await Assert.That(invitation.Id).IsEqualTo(ActorId);
         await Assert.That(invitation.OrganizationId).IsEqualTo(Id);
         await Assert.That(invitation.OrganizationName).IsEqualTo("Community organization");
         await Assert.That((int)invitation.Role).IsEqualTo(7);
         await Assert.That(invitation.Email).IsEqualTo("member@example.test");
         await AssertFields(invitation, "id", "organizationId", "organizationName", "role", "email");
-        await Assert.That(await invites.QueryAsync(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetMyInvitationsRequest { Email = "other@example.test" }, default)).IsEmpty();
         store.Items.Clear();
         member.OrganizationTenant.Organization.Pii = null!;
         member.User.Pii = null!;

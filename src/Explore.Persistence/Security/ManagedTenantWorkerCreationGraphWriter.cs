@@ -3,7 +3,6 @@ using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
-using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Management;
 using Explore.Application.Features.Tenants;
@@ -39,7 +38,7 @@ internal sealed class ManagedTenantWorkerCreationGraphWriter(
     private bool attempted;
     private bool settled;
 
-    internal async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> CreateAsync(
+    internal async Task<BaseCommandResponse<ManagedTenantWorkerCreationResult>> CreateAsync(
         IManagedTenantWorkerCreationInvocation invocation,
         ExploreDbContext.ManagedWorkerCreationContextLease custody, CancellationToken cancellationToken)
     {
@@ -52,7 +51,7 @@ internal sealed class ManagedTenantWorkerCreationGraphWriter(
         }
     }
 
-    private async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> CreateOriginalAsync(
+    private async Task<BaseCommandResponse<ManagedTenantWorkerCreationResult>> CreateOriginalAsync(
         IManagedTenantWorkerCreationInvocation invocation,
         ExploreDbContext.ManagedWorkerCreationContextLease custody, CancellationToken cancellationToken)
     {
@@ -101,14 +100,14 @@ internal sealed class ManagedTenantWorkerCreationGraphWriter(
                     var snapshot = ManagedTenantWorkerCreationSnapshot.Capture(locked, invocation.OutboxMessageId);
                     var source = await ManagedTenantWorkerCreationSources.ReadAsync(context, snapshot,
                         local?.Eligibility, originalToken);
-                    async Task<OriginalOwnerDecision<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>> RefuseAsync(
+                    async Task<OriginalOwnerDecision<BaseCommandResponse<ManagedTenantWorkerCreationResult>>> RefuseAsync(
                         string code, string message)
                     {
                         await WriteFailureAsync(custody, source, snapshot, locked, code, local, fence,
                             enabled, maximum, originalToken);
                         RequireOwner();
-                        return OriginalOwnerDecision<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>.Commit(
-                            BaseCommandResponse.Failure<ManagedProviderClientProvisioningResultDto>(code, message));
+                        return OriginalOwnerDecision<BaseCommandResponse<ManagedTenantWorkerCreationResult>>.Commit(
+                            BaseCommandResponse.Failure<ManagedTenantWorkerCreationResult>(code, message));
                     }
                     if (!enabled) return await RefuseAsync("managed_mode_disabled", "Managed mode is disabled.");
                     DeploymentMode mode = source.Bootstrap?.Status == InstanceBootstrapStatus.Completed
@@ -148,7 +147,7 @@ internal sealed class ManagedTenantWorkerCreationGraphWriter(
                     await WriteAsync(invocation, custody, source, snapshot, locked, graph, local, fence,
                         enabled, maximum, originalToken);
                     RequireOwner();
-                    return OriginalOwnerDecision<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>.Commit(
+                    return OriginalOwnerDecision<BaseCommandResponse<ManagedTenantWorkerCreationResult>>.Commit(
                         BaseCommandResponse.Success(graph.Result));
                 }, token);
                 settled = true;

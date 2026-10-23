@@ -1,4 +1,3 @@
-using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.Responses;
 
 namespace Explore.Application.Contracts.Persistence;
@@ -9,7 +8,7 @@ namespace Explore.Application.Contracts.Persistence;
 /// </summary>
 public interface IManagedTenantWorkerCreationPort
 {
-    Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> CreateAsync(
+    Task<BaseCommandResponse<ManagedTenantWorkerCreationResult>> CreateAsync(
         Guid operationId, Guid outboxMessageId, CancellationToken cancellationToken = default);
 }
 
@@ -41,6 +40,6 @@ public interface IManagedTenantWorkerCreationOwnerFactory
 /// <summary>One complete durable request; no arbitrary entities, subject selectors or callbacks are accepted.</summary>
 public interface IManagedTenantWorkerCreationOwner : IAsyncDisposable
 {
-    Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> CreateAsync(
+    Task<BaseCommandResponse<ManagedTenantWorkerCreationResult>> CreateAsync(
         CancellationToken cancellationToken = default);
 }

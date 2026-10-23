@@ -1,5 +1,5 @@
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.DTOs.Management;
+using Explore.Domain;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Management;
 using Explore.Application.Features.Management.Requests.Commands;
@@ -19,7 +19,7 @@ internal sealed class ManagedTenantProvisioningSchedulingPort(
     PostgresNativeQueueEnrollment? enrollment, IdentityDatabaseTopology topology)
     : IManagedTenantProvisioningSchedulingPort
 {
-    public async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>> ScheduleAsync(
+    public async Task<BaseCommandResponse<ManagedTenantProvisioningOperation>> ScheduleAsync(
         ScheduleManagedTenantProvisioningCommand request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);

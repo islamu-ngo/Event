@@ -33,8 +33,9 @@ internal sealed partial class AuthenticatedSettingsFixture
         Guid managedInstance, ManagementTenantProvisioningRequestDto request, CancellationToken token)
     {
         await using var scope = host.Services.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<IManagedTenantProvisioningSchedulingPort>()
-            .ScheduleAsync(new(managedInstance, request), token);
+        var handler = new Explore.Application.Features.Management.Handlers.Commands.ScheduleManagedTenantProvisioningCommandHandler(
+            scope.ServiceProvider.GetRequiredService<IManagedTenantProvisioningSchedulingPort>());
+        return await handler.ExecuteAsync(new(managedInstance, request), token);
     }
 
     internal async Task<GenericOutboxClaim> ClaimManagedWorkerAsync(Guid operation, CancellationToken token)

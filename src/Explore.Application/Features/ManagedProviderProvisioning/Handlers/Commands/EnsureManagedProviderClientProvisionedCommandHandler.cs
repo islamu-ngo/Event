@@ -65,6 +65,24 @@ public sealed class EnsureManagedProviderClientProvisionedCommandHandler(
 
         // The port independently reloads the persisted full request. These IDs and
         // caller DTOs confer no authority without its concrete original delivery.
-        return await workerCreation.CreateAsync(operation, message, cancellationToken);
+        var response = await workerCreation.CreateAsync(operation, message, cancellationToken);
+        var result = response.Id;
+        return BaseCommandResponse.Restore(
+            result is null ? null : new ManagedProviderClientProvisioningResultDto
+            {
+                TenantId = result.TenantId,
+                UserId = result.UserId,
+                TenantUserId = result.TenantUserId,
+                TenantUserProfileId = result.TenantUserProfileId,
+                UserActorId = result.UserActorId,
+                UserExternalLoginId = result.UserExternalLoginId,
+                TenantUserRoleGrantId = result.TenantUserRoleGrantId,
+                TenantPlanAssignmentId = result.TenantPlanAssignmentId
+            },
+            response.IsSuccess,
+            response.Message,
+            response.Errors,
+            response.FailureCode,
+            response.QuotaExceeded);
     }
 }

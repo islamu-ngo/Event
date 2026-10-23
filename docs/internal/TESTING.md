@@ -144,11 +144,21 @@ Each project has a specific role. Run individually — never use solution-level 
 | `Explore.Diagnostic.UnitTests` | Diagnostic tooling | Doctor exit codes, bounded command evidence, and redaction | No |
 | `ISLAMU.AgentWorkflow.Tests` | Repository tooling | Intents YAML syntax and literal-file commit guard | No |
 | `Event.Standalone.IntegrationTests` | Standalone host | In-process transport, combined host graph, configuration, and API parity | No |
+| `Event.Distributed.IntegrationTests` | Real AppHost | Owned resources/authorities, Split/Standalone startup and lifecycle | None for Harness; Docker-compatible runtime for Distributed |
 | External `Configurator.Terminal.Tests` | Offline terminal (Configurator repository) | Definition workspace, localization and native secret/protected-save boundaries | No |
 | `ISLAMU.ReleaseEngineering.Tests` | Release engineering | Commit/scope policy, release artifact, Git trust, renderer, tag-anchored attestation, provider adapter plans | No (spawns `git`, `ssh-keygen`, and disposable repositories under the temp directory) |
 | `Event.Benchmarks` | Benchmarks | Advisory BenchmarkDotNet performance scenarios; build-only in PRs and executed by `performance-smoke.yml` | Optional PostgreSQL only for the dedicated provider benchmark |
 
 ### Run Commands
+
+The [owned distributed assurance guide](testing/DISTRIBUTED_ASSURANCE.md)
+defines the real AppHost profile, exact ownership inputs and current execution
+limits. The fixture exclusively supplies `ISLAMU_TEST_RUN_ID`,
+`ISLAMU_TEST_ROOT` and the browser-only `ISLAMU_TEST_REPLACEMENT_PASSWORD` through
+its selected Environment authority. Their commented `.env.example` entries
+document the interface; they are not interactive deployment settings. A passing
+Harness selection proves its admission/ownership/projection checks only, not
+healthy application startup or completed browser/load journeys.
 
 The seven bundled Event setup test roots are removed. Portable engine and
 packaging coverage belongs to Configurator. Event retains client adapter tests under

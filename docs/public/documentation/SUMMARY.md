@@ -60,5 +60,6 @@
     * [Local Development](readme/contributing/local-development.md)
     * [Clean Architecture](readme/contributing/clean-architecture.md)
     * [TUnit](readme/contributing/tunit.md)
+    * [Isolated Distributed Tests](readme/contributing/distributed-testing.md)
     * [Clean-Room IP & Licensing](readme/contributing/clean-room-ip-and-licensing.md)
     * [Sponsorship & Sustainability](readme/contributing/sponsorship.md)

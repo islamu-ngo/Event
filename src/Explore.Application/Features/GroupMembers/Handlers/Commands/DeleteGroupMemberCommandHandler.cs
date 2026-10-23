@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.GroupMembers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
@@ -18,30 +19,40 @@ public class DeleteGroupMemberCommandHandler : ICommandHandler<DeleteGroupMember
     private readonly IGroupMemberRepository _groupMemberRepository;
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
+    private readonly IGroupMemberMutationBoundary _boundary;
 
     public DeleteGroupMemberCommandHandler(
         IGroupMemberRepository groupMemberRepository,
         IUserContext userContext,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IGroupMemberMutationBoundary boundary)
     {
         _groupMemberRepository = groupMemberRepository;
         _userContext = userContext;
         _tenantContext = tenantContext;
+        _boundary = boundary;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteGroupMemberCommand request, CancellationToken cancellationToken)
     {
-        var memberToDelete = await _groupMemberRepository.GetById(request.MemberId);
-        if (memberToDelete == null)
-        {
-            return BaseCommandResponse.Validation<Guid>(["Member not found"], "Member not found");
-        }
-
-        if (!Guid.TryParse(request.RequesterUserId, out Guid requesterGuid))
+        if (!_userContext.IsAuthenticated || _userContext.UserId is not Guid requesterGuid || requesterGuid == Guid.Empty)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["Invalid requester User ID."],
                 "Invalid requester User ID.");
+        }
+
+        return await _boundary.ExecuteRemovalAsync(request.MemberId,
+            (actor, token) => DeleteAsync(request, actor, token), cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> DeleteAsync(DeleteGroupMemberCommand request,
+        Guid requesterGuid, CancellationToken cancellationToken)
+    {
+        var memberToDelete = await _groupMemberRepository.GetGroupMemberWithDetails(request.MemberId);
+        if (memberToDelete == null || memberToDelete.TenantId != _tenantContext.TenantId)
+        {
+            return BaseCommandResponse.Validation<Guid>(["Member not found"], "Member not found");
         }
 
         var hasPermission = await _groupMemberRepository.HasPermissionInGroup(

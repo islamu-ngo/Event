@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.GroupMembers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
@@ -22,6 +23,7 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
     private readonly IUserRepository _userRepository;
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
+    private readonly IGroupMemberMutationBoundary _boundary;
 
     public AddGroupMemberCommandHandler(
         IGroupRepository groupRepository,
@@ -29,7 +31,8 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
         IGroupMemberRepository groupMemberRepository,
         IUserRepository userRepository,
         IUserContext userContext,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IGroupMemberMutationBoundary boundary)
     {
         _groupRepository = groupRepository;
         _groupTenantRepository = groupTenantRepository;
@@ -37,9 +40,26 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
         _userRepository = userRepository;
         _userContext = userContext;
         _tenantContext = tenantContext;
+        _boundary = boundary;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddGroupMemberCommand request, CancellationToken cancellationToken)
+    {
+        if (!_userContext.IsAuthenticated || _userContext.UserId is not Guid requesterGuid || requesterGuid == Guid.Empty)
+        {
+            return BaseCommandResponse.Validation<Guid>(
+                ["Invalid requester User ID."],
+                "Invalid requester User ID.");
+        }
+
+        var id = Guid.CreateVersion7();
+        return await _boundary.ExecuteAddAsync(_tenantContext.TenantId, request.AddGroupMemberDto.GroupId, id,
+            request.AddGroupMemberDto.Email, (int)request.AddGroupMemberDto.Role,
+            (actor, target, token) => AddAsync(request, id, actor, target, token), cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> AddAsync(AddGroupMemberCommand request, Guid id,
+        Guid requesterGuid, Guid targetUserId, CancellationToken cancellationToken)
     {
         var dto = request.AddGroupMemberDto;
 
@@ -60,13 +80,6 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
                 "Group does not participate in the current tenant.");
         }
 
-        if (!Guid.TryParse(request.RequesterUserId, out Guid requesterGuid))
-        {
-            return BaseCommandResponse.Validation<Guid>(
-                ["Invalid requester User ID."],
-                "Invalid requester User ID.");
-        }
-
         var hasPermission = await _groupMemberRepository.HasPermissionInGroup(
             dto.GroupId, requesterGuid, PermissionCodes.GroupMemberCreate);
 
@@ -84,7 +97,7 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
         }
 
         var userToAdd = await _userRepository.GetUserByEmail(dto.Email);
-        if (userToAdd == null)
+        if (userToAdd == null || userToAdd.Id != targetUserId)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["User with this email not found."],
@@ -101,6 +114,7 @@ public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberComman
 
         var groupMember = new GroupMember
         {
+            Id = id,
             GroupTenantId = participation.Id,
             GroupTenant = participation,
             UserId = userToAdd.Id,

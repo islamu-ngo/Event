@@ -1,10 +1,17 @@
 using System.Data;
+using System.Collections.Immutable;
 using System.Security.Claims;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Event.Persistence.IntegrationTests.Moderation;
 using Explore.Application.Authentication;
+using Explore.Application.DTOs.StorageObject;
+using Explore.Application.Exceptions;
+using Explore.Application.Responses;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Features.Moderation.Policy;
+using Explore.Application.Services.Moderation;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -14,9 +21,11 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using ISLAMU.Moderation.Domain;
+using ISLAMU.Moderation.Domain.Policies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Event.Persistence.IntegrationTests;
@@ -38,14 +47,14 @@ public sealed class EventResourceModerationSnapshotReaderTests
         var facts = await database.ReadAsync(database.Request());
 
         await Assert.That(facts).IsEqualTo(EventResourceModerationFacts.NotAdopted);
-        await Assert.That(facts.PermitsNativeEvaluation).IsTrue();
+        await Assert.That(facts.PermitsNativeEvaluationAt(Now)).IsTrue();
     }
 
     [Test]
-    public async Task Inactive_adoption_still_requires_current_canonical_provenance()
+    public async Task Unsupported_declared_read_profile_still_requires_current_canonical_provenance()
     {
         await using var database = await ReaderDatabase.CreateAsync();
-        await database.StorePolicyAsync(database.TenantScope, active: false);
+        await database.StorePolicyAsync(database.TenantScope, supported: false);
 
         var facts = await database.ReadAsync(database.Request());
 
@@ -53,16 +62,16 @@ public sealed class EventResourceModerationSnapshotReaderTests
     }
 
     [Test]
-    public async Task Inactive_adoption_does_not_create_a_restrictive_effect_for_a_qualified_subject()
+    public async Task Draft_adoption_does_not_create_a_restrictive_effect_for_a_qualified_subject()
     {
         await using var database = await ReaderDatabase.CreateAsync();
         await database.EstablishBindingAsync();
-        await database.StorePolicyAsync(database.TenantScope, active: false);
+        await database.StorePolicyAsync(database.TenantScope, supported: false);
         var facts = await database.ReadAsync(database.Request());
         await Assert.That(facts.IsAdopted).IsTrue();
         await Assert.That(facts.Subject).IsEqualTo(database.ServiceSubject);
         await Assert.That(facts.Outcome).IsEqualTo(ModerationRestrictionOutcome.Unrestricted);
-        await Assert.That(facts.PermitsNativeEvaluation).IsTrue();
+        await Assert.That(facts.PermitsNativeEvaluationAt(Now)).IsTrue();
     }
 
     [Test]
@@ -105,7 +114,7 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await Assert.That(facts.BindingId).IsEqualTo((Guid?)binding.Id);
         await Assert.That(facts.BindingRevision).IsEqualTo((long?)1);
         await Assert.That(facts.Outcome).IsEqualTo(ModerationRestrictionOutcome.Unrestricted);
-        await Assert.That(facts.PermitsNativeEvaluation).IsTrue();
+        await Assert.That(facts.PermitsNativeEvaluationAt(Now)).IsTrue();
         await Assert.That(facts.Generation).IsNotEqualTo("not-adopted");
         await Assert.That(facts.Subject!.Id).IsNotEqualTo(database.AdministratorId);
         await Assert.That(facts.Subject!.Id).IsNotEqualTo(database.Host.MaintenanceServicePrincipalId);
@@ -127,7 +136,7 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await Assert.That(facts.BindingId).IsEqualTo((Guid?)binding.Id);
         await Assert.That(facts.BindingRevision).IsEqualTo((long?)1);
         await Assert.That(facts.Outcome).IsEqualTo(ModerationRestrictionOutcome.Denied);
-        await Assert.That(facts.PermitsNativeEvaluation).IsFalse();
+        await Assert.That(facts.PermitsNativeEvaluationAt(Now)).IsFalse();
         await Assert.That(facts.Generation).IsNotEqualTo(before.Generation);
     }
 
@@ -139,29 +148,48 @@ public sealed class EventResourceModerationSnapshotReaderTests
         var policy = await database.StorePolicyAsync(database.TenantScope);
         await database.StoreSanctionAsync(database.ServiceSubject, policy);
         var before = await database.ReadAsync(database.Request());
-        await using (var writer = database.Context())
-        {
-            await using var transaction = await writer.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-            // Update the persisted snapshot through its checked complete-state retirement transition.
-            // Setting current native publication readiness is outside this reader fixture.
-            writer.ModerationTrustDomainId = database.Host.TrustDomainId;
-            var current = await writer.ModerationPolicies.Include(row => row.Rules)
-                .SingleAsync(row => row.Id == policy.Id);
-            var retired = current.ReplaceAdoption(current.Jurisdiction, current.Revision,
-                current.Rules, Guid.CreateVersion7(), Now);
-            writer.Entry(current).CurrentValues.SetValues(retired);
-            foreach (var rule in current.Rules)
-                writer.Entry(rule).CurrentValues.SetValues(retired.Rules.Single(row => row.Id == rule.Id));
-            await writer.SaveChangesAsync();
-            await transaction.CommitAsync();
-        }
+        await database.RetireSupportAsync(policy);
         var after = await database.ReadAsync(database.Request());
         await Assert.That(before.Outcome).IsEqualTo(ModerationRestrictionOutcome.Denied);
         await Assert.That(after.IsAdopted).IsTrue();
         await Assert.That(after.Subject).IsEqualTo(database.ServiceSubject);
         await Assert.That(after.Outcome).IsEqualTo(ModerationRestrictionOutcome.Denied);
-        await Assert.That(after.PermitsNativeEvaluation).IsFalse();
+        await Assert.That(after.PermitsNativeEvaluationAt(Now)).IsFalse();
         await Assert.That(after.Generation).IsNotEqualTo(before.Generation);
+    }
+
+    [Test]
+    [Arguments("scope")]
+    [Arguments("effect")]
+    [Arguments("base-plan")]
+    public async Task Missing_selected_profile_children_fail_closed_instead_of_erasing_adoption(string child)
+    {
+        await using var database = await ReaderDatabase.CreateAsync();
+        await database.EstablishBindingAsync();
+        var policy = await database.StorePolicyAsync(database.TenantScope);
+        await using (var writer = database.Context())
+        {
+            await using var transaction = await writer.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            writer.ModerationTrustDomainId = database.Host.TrustDomainId;
+            switch (child)
+            {
+                case "scope":
+                    await writer.Set<ModerationPolicyPublicationScope>()
+                        .Where(row => row.PublicationId == policy.Id).ExecuteDeleteAsync();
+                    break;
+                case "effect":
+                    await writer.Set<ModerationPolicyPublicationEffect>()
+                        .Where(row => row.PublicationId == policy.Id).ExecuteDeleteAsync();
+                    break;
+                case "base-plan":
+                    await writer.Set<ModerationPolicyPublicationPlan>()
+                        .Where(row => row.PublicationId == policy.Id).ExecuteDeleteAsync();
+                    break;
+            }
+            await transaction.CommitAsync();
+        }
+
+        await AssertUnavailable(await database.ReadAsync(database.Request()));
     }
 
     [Test]
@@ -178,7 +206,7 @@ public sealed class EventResourceModerationSnapshotReaderTests
 
         await Assert.That(facts.Subject).IsEqualTo(database.ServiceSubject);
         await Assert.That(facts.Outcome).IsEqualTo(ModerationRestrictionOutcome.Unrestricted);
-        await Assert.That(facts.PermitsNativeEvaluation).IsTrue();
+        await Assert.That(facts.PermitsNativeEvaluationAt(Now)).IsTrue();
     }
 
     [Test]
@@ -244,7 +272,7 @@ public sealed class EventResourceModerationSnapshotReaderTests
     [Arguments("instance")]
     [Arguments("solution")]
     [Arguments("trust-domain")]
-    public async Task Policy_outside_target_jurisdiction_preserves_native_evaluation(string coordinate)
+    public async Task Rejected_foreign_or_resource_publication_does_not_adopt_local_reads(string coordinate)
     {
         await using var database = await ReaderDatabase.CreateAsync();
         // Deliberately leave the caller unbound: an unrelated active policy must not fail it closed.
@@ -257,20 +285,22 @@ public sealed class EventResourceModerationSnapshotReaderTests
         var tenant = AuthorityScope.Tenant(instance,
             coordinate == "tenant" ? Guid.CreateVersion7() : database.TenantId);
         var scope = coordinate == "resource" ? AuthorityScope.Resource(tenant, Guid.CreateVersion7()) : tenant;
-        await database.StorePolicyAsync(scope);
+        var publication = await database.PublishPolicyAsync(database.Proposed(scope));
+        await Assert.That(publication.Outcome).IsEqualTo(coordinate == "resource"
+            ? ModerationPolicyPublicationOutcome.Invalid : ModerationPolicyPublicationOutcome.Denied);
 
         var facts = await database.ReadAsync(database.Request());
 
         await Assert.That(facts).IsEqualTo(EventResourceModerationFacts.NotAdopted);
-        await Assert.That(facts.PermitsNativeEvaluation).IsTrue();
+        await Assert.That(facts.PermitsNativeEvaluationAt(Now)).IsTrue();
     }
 
     [Test]
-    public async Task Batch_preserves_unadopted_targets_beside_a_sanctioned_resource()
+    public async Task Batch_keeps_resource_sanctions_specific_within_a_declared_tenant_profile()
     {
         await using var database = await ReaderDatabase.CreateAsync();
         await database.EstablishBindingAsync();
-        var policy = await database.StorePolicyAsync(AuthorityScope.Resource(database.TenantScope, database.ResourceId));
+        var policy = await database.StorePolicyAsync(database.TenantScope);
         await database.StoreSanctionAsync(database.ServiceSubject, policy);
         var adopted = database.Request();
         var unrelated = adopted with { ResourceId = Guid.CreateVersion7() };
@@ -281,11 +311,267 @@ public sealed class EventResourceModerationSnapshotReaderTests
             [unrelated, adopted, unrelated], Now, CancellationToken.None);
 
         await Assert.That(facts.Count).IsEqualTo(3);
-        await Assert.That(facts[0]).IsEqualTo(EventResourceModerationFacts.NotAdopted);
+        await Assert.That(facts[0].IsAdopted).IsTrue();
+        await Assert.That(facts[0].Subject).IsEqualTo(database.ServiceSubject);
+        await Assert.That(facts[0].Outcome).IsEqualTo(ModerationRestrictionOutcome.Unrestricted);
         await Assert.That(facts[1].Subject).IsEqualTo(database.ServiceSubject);
         await Assert.That(facts[1].Outcome).IsEqualTo(ModerationRestrictionOutcome.Denied);
-        await Assert.That(facts[2]).IsEqualTo(EventResourceModerationFacts.NotAdopted);
+        await Assert.That(facts[2]).IsEqualTo(facts[0]);
         await transaction.CommitAsync();
+    }
+
+    [Test]
+    public async Task Upload_and_read_for_one_resource_keep_separate_adoption_and_effects()
+    {
+        await using var database = await ReaderDatabase.CreateAsync();
+        await database.EstablishBindingAsync();
+        var policy = await database.StorePolicyAsync(database.TenantScope,
+            referenceId: ModerationReferenceProfileId.CFG07);
+        await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload);
+        var upload = database.Request() with
+        {
+            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+        };
+        await using var context = database.Context();
+        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        var facts = await database.Reader(context).ReadBatchAsync(
+            [database.Request(), upload, upload with { IsUploadMutation = false }, upload], Now, default);
+
+        await Assert.That(facts[0]).IsEqualTo(EventResourceModerationFacts.NotAdopted);
+        await Assert.That(facts[1].Outcome).IsEqualTo(ModerationRestrictionOutcome.Denied);
+        await Assert.That(facts[2]).IsEqualTo(EventResourceModerationFacts.NotAdopted);
+        await Assert.That(facts[3]).IsEqualTo(facts[1]);
+    }
+
+    [Test]
+    public async Task Read_restriction_does_not_become_an_upload_restriction()
+    {
+        await using var database = await ReaderDatabase.CreateAsync();
+        await database.EstablishBindingAsync();
+        var policy = await database.StorePolicyAsync(database.TenantScope);
+        await database.StoreSanctionAsync(database.ServiceSubject, policy);
+        var upload = database.Request() with
+        {
+            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+        };
+        await Assert.That(await database.ReadAsync(upload)).IsEqualTo(EventResourceModerationFacts.NotAdopted);
+        await Assert.That((await database.ReadAsync(database.Request())).Outcome)
+            .IsEqualTo(ModerationRestrictionOutcome.Denied);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Retired_upload_support_does_not_remove_current_restrictions(bool establishBinding)
+    {
+        await using var database = await ReaderDatabase.CreateAsync();
+        if (establishBinding) await database.EstablishBindingAsync();
+        var policy = await database.StorePolicyAsync(database.TenantScope,
+            referenceId: ModerationReferenceProfileId.CFG07);
+        if (establishBinding)
+            await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload);
+        await database.RetireSupportAsync(policy);
+        var facts = await database.ReadAsync(database.Request() with
+        {
+            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+        });
+        if (establishBinding)
+            await Assert.That(facts.Outcome).IsEqualTo(ModerationRestrictionOutcome.Denied);
+        else
+            await AssertUnavailable(facts);
+    }
+
+    [Test]
+    [Arguments("download", false)]
+    [Arguments("update", true)]
+    public async Task Upload_purpose_cannot_be_relabelled_as_read_or_parent_collection(string action, bool collection)
+    {
+        await using var database = await ReaderDatabase.CreateAsync();
+        await AssertUnavailable(await database.ReadAsync(database.Request() with
+        {
+            Action = action, IsEventCollection = collection,
+            RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+        }));
+    }
+
+    [Test]
+    [Arguments(false, true)]
+    [Arguments(true, true)]
+    [Arguments(true, false)]
+    public async Task Upload_commit_boundary_rolls_back_denied_success_but_preserves_failure_cleanup(
+        bool restricted, bool successfulResult)
+    {
+        await using var database = await ReaderDatabase.CreateAsync();
+        await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
+        await database.EstablishBindingAsync();
+        if (restricted)
+        {
+            var policy = await database.StorePolicyAsync(database.TenantScope,
+                referenceId: ModerationReferenceProfileId.CFG07);
+            await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload);
+        }
+        var request = database.Request() with
+        {
+            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+        };
+        var original = await database.ReadAsync(request);
+        await using var context = database.Context();
+        var boundary = new EventResourceUploadMutationBoundary(context, privacy.Authority(context, new FixtureClock()),
+            database.Reader(context), new FixtureClock());
+        async Task ExecuteAsync() => _ = await boundary.ExecuteAsync(request, original, async token =>
+        {
+            var counter = await new StorageUsageCounterRepository(context)
+                .GetOrCreateAsync(database.TenantId, "boundary-fixture", token);
+            counter.Reserve(17, 100);
+            await context.SaveChangesAsync(token);
+            return successfulResult
+                ? BaseCommandResponse.Success(new StorageUploadSessionDto
+                {
+                    ContentType = "application/pdf", SafeDisplayName = "Resource document",
+                    Purpose = "event-resource", Visibility = "private-owner", Status = "reserved"
+                })
+                : BaseCommandResponse.Failure<StorageUploadSessionDto>("upload_denied");
+        }, CancellationToken.None);
+        if (restricted && successfulResult)
+            await Assert.ThrowsAsync<ConcurrencyConflictException>(ExecuteAsync);
+        else
+            await ExecuteAsync();
+        await using var verify = database.Context();
+        var saved = await verify.StorageUsageCounters.AsNoTracking().SingleOrDefaultAsync();
+        await Assert.That(saved?.ReservedBytes ?? 0).IsEqualTo(restricted && successfulResult ? 0L : 17L);
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Upload_cannot_commit_when_a_scheduled_restriction_starts_during_its_write(bool afterFlush)
+    {
+        await using var database = await ReaderDatabase.CreateAsync();
+        await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
+        await database.EstablishBindingAsync();
+        var startsAt = Now.AddMinutes(1);
+        var policy = await database.StorePolicyAsync(database.TenantScope,
+            referenceId: ModerationReferenceProfileId.CFG07);
+        await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload, startsAt);
+        var request = database.Request() with
+        {
+            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+        };
+        var original = await database.ReadAsync(request);
+        await Assert.That(original.Outcome).IsEqualTo(ModerationRestrictionOutcome.Unrestricted);
+        await Assert.That(original.CurrentUntil).IsEqualTo(startsAt);
+        var clock = new UploadClock();
+        var checkpoint = new StartRestrictionAfterFlush(clock, startsAt);
+        await using var context = database.Context(afterFlush ? checkpoint : null);
+        var boundary = new EventResourceUploadMutationBoundary(context, privacy.Authority(context, clock),
+            database.Reader(context), clock);
+
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(async () =>
+            _ = await boundary.ExecuteAsync(request, original, async token =>
+            {
+                var counter = await new StorageUsageCounterRepository(context)
+                    .GetOrCreateAsync(database.TenantId, "scheduled-upload-boundary", token);
+                counter.Reserve(17, 100);
+                if (!afterFlush) clock.Now = startsAt;
+                await context.SaveChangesAsync(token);
+                return BaseCommandResponse.Success(new StorageUploadSessionDto
+                {
+                    ContentType = "application/pdf", SafeDisplayName = "Resource document",
+                    Purpose = "event-resource", Visibility = "private-owner", Status = "reserved"
+                });
+            }, CancellationToken.None));
+
+        await using var verify = database.Context();
+        await Assert.That(await verify.StorageUsageCounters.AsNoTracking().AnyAsync()).IsFalse();
+        await Assert.That(checkpoint.Observed).IsEqualTo(afterFlush);
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+    }
+
+    [Test]
+    public async Task Upload_rechecks_expiry_after_the_final_authority_queries()
+    {
+        await using var database = await ReaderDatabase.CreateAsync();
+        await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
+        await database.EstablishBindingAsync();
+        var startsAt = Now.AddMinutes(1);
+        var policy = await database.StorePolicyAsync(database.TenantScope,
+            referenceId: ModerationReferenceProfileId.CFG07);
+        await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload, startsAt);
+        var request = database.Request() with
+        {
+            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+        };
+        var original = await database.ReadAsync(request);
+        var clock = new UploadClock();
+        var checkpoint = new StartRestrictionDuringRead(clock, startsAt);
+        await using var context = database.Context(checkpoint);
+        var boundary = new EventResourceUploadMutationBoundary(context, privacy.Authority(context, clock),
+            database.Reader(context), clock);
+
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(async () =>
+            _ = await boundary.ExecuteAsync(request, original, async token =>
+            {
+                var counter = await new StorageUsageCounterRepository(context)
+                    .GetOrCreateAsync(database.TenantId, "upload-final-read", token);
+                counter.Reserve(17, 100);
+                await context.SaveChangesAsync(token);
+                checkpoint.Armed = true;
+                return BaseCommandResponse.Success(new StorageUploadSessionDto
+                {
+                    ContentType = "application/pdf", SafeDisplayName = "Resource document",
+                    Purpose = "event-resource", Visibility = "private-owner", Status = "reserved"
+                });
+            }, CancellationToken.None));
+
+        await using var verify = database.Context();
+        await Assert.That(await verify.StorageUsageCounters.AsNoTracking().AnyAsync()).IsFalse();
+        await Assert.That(checkpoint.Observed).IsTrue();
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+    }
+
+    [Test]
+    public async Task Upload_colocated_privacy_commit_rechecks_authority_and_rolls_back_the_write()
+    {
+        await using var database = await ReaderDatabase.CreateAsync();
+        await database.EstablishBindingAsync();
+        var startsAt = Now.AddMinutes(1);
+        var policy = await database.StorePolicyAsync(database.TenantScope,
+            referenceId: ModerationReferenceProfileId.CFG07);
+        await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload, startsAt);
+        var request = database.Request() with
+        {
+            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+        };
+        var original = await database.ReadAsync(request);
+        var clock = new UploadClock();
+        await using var context = database.Context();
+        await using var privacy = await ModerationNoticePrivacyFixture.CreateColocatedAsync(context);
+        var boundary = new EventResourceUploadMutationBoundary(context, privacy.Authority(context, clock),
+            database.Reader(context), clock);
+        var observedPrivacyOwnedCommit = false;
+
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(async () =>
+            _ = await boundary.ExecuteAsync(request, original, async token =>
+            {
+                observedPrivacyOwnedCommit = context.IdentityFenceOwnsTransaction;
+                var counter = await new StorageUsageCounterRepository(context)
+                    .GetOrCreateAsync(database.TenantId, "colocated-upload-boundary", token);
+                counter.Reserve(17, 100);
+                await context.SaveChangesAsync(token);
+                clock.Now = startsAt;
+                return BaseCommandResponse.Success(new StorageUploadSessionDto
+                {
+                    ContentType = "application/pdf", SafeDisplayName = "Resource document",
+                    Purpose = "event-resource", Visibility = "private-owner", Status = "reserved"
+                });
+            }, CancellationToken.None));
+
+        await using var verify = database.Context();
+        await Assert.That(observedPrivacyOwnedCommit).IsTrue();
+        await Assert.That(await verify.StorageUsageCounters.AsNoTracking().AnyAsync()).IsFalse();
+        await Assert.That(context.IdentityFenceOwnsTransaction).IsFalse();
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
     }
 
     private static async Task AssertUnavailable(EventResourceModerationFacts facts)
@@ -295,7 +581,7 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await Assert.That(facts.Subject).IsNull();
         await Assert.That(facts.BindingId).IsNull();
         await Assert.That(facts.BindingRevision).IsNull();
-        await Assert.That(facts.PermitsNativeEvaluation).IsFalse();
+        await Assert.That(facts.PermitsNativeEvaluationAt(Now)).IsFalse();
         await Assert.That(facts.Generation).IsNotEqualTo("not-adopted");
     }
 
@@ -325,16 +611,19 @@ public sealed class EventResourceModerationSnapshotReaderTests
             AuthorityScope.Solution(AuthorityScope.TrustDomain(Host.TrustDomainId), Host.SolutionId), Host.InstanceId);
         public AuthorityScope TenantScope => AuthorityScope.Tenant(InstanceScope, TenantId);
         public SubjectReference ServiceSubject => SubjectReference.Create(ModerationSubjectKind.Service, ServiceId, InstanceScope);
-        public ExploreDbContext Context() => new(options) { TenantContext = this };
+        public ExploreDbContext Context(IInterceptor? interceptor = null) => new(interceptor is null ? options
+            : new DbContextOptionsBuilder<ExploreDbContext>(options).AddInterceptors(interceptor).Options)
+        { TenantContext = this };
         public EventResourceAuthorityRequest Request() => new(TenantId, ResourceId, null, true, "download")
         {
             MachinePrincipal = new(KeyId, null, ExternalApiKeyOwnerType.InstanceAdmin,
                 AdministratorId, ApiKeyCredentialSource.Persisted)
         };
 
-        public EventResourceModerationSnapshotReader Reader(ExploreDbContext context) => new(context, Repository(context));
+        public EventResourceModerationSnapshotReader Reader(ExploreDbContext context) =>
+            new(context, Repository(context), ModerationRecognitionResourceFixture.Reader(context));
 
-        private ModerationMachineSubjectBindingRepository Repository(ExploreDbContext context)
+        private (AdminContext Admin, MachinePrincipalAccessor Machine) Identity(ExploreDbContext context)
         {
             var http = new HttpContextAccessor
             {
@@ -347,7 +636,13 @@ public sealed class EventResourceModerationSnapshotReaderTests
             var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
                 new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
                 new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
-            return new(context, admin, new MachinePrincipalAccessor(http), new ExternalApiKeyRepository(context),
+            return (admin, new MachinePrincipalAccessor(http));
+        }
+
+        private ModerationMachineSubjectBindingRepository Repository(ExploreDbContext context)
+        {
+            var (admin, machine) = Identity(context);
+            return new(context, admin, machine, new ExternalApiKeyRepository(context),
                 new UnconfiguredKeys(), new FixtureClock());
         }
 
@@ -371,47 +666,75 @@ public sealed class EventResourceModerationSnapshotReaderTests
             return facts;
         }
 
-        public async Task<ModerationPolicy> StorePolicyAsync(AuthorityScope scope, bool active = true)
+        public ModerationPolicyProposedState Proposed(AuthorityScope scope, bool supported = true,
+            ModerationReferenceProfileId referenceId = ModerationReferenceProfileId.CFG08)
         {
-            var policyId = Guid.CreateVersion7();
-            var publicationId = Guid.CreateVersion7();
-            var terms = ModerationPolicyRule.Define(Guid.CreateVersion7(),
-                ModerationRuleReference.Create(scope.Id, "resource-read", 1), "Restricted resource disclosure.",
-                [ModerationPolicyOperationPurpose.Propose, ModerationPolicyOperationPurpose.Activate],
-                [ModerationCapability.ReadResource], TimeSpan.FromDays(1), false, TimeSpan.FromHours(1), 1, 2);
-            // These explicit fixture receipts satisfy the checked Domain publication structure only.
-            // They are not native consumer registrations, readiness evidence, or proof of conformance.
-            var evidence = new ModerationPolicyEffectEvidence(policyId, 1, scope, terms.Rule,
-                ModerationCapability.ReadResource, publicationId, Now,
-                ["fixture-adoption"],
-                [new ModerationPolicyNativeEvidence("fixture-adoption", Guid.CreateVersion7(), 1, scope, Now)],
-                ["fixture-persisted-reader"],
-                [new ModerationPolicyNativeEvidence("fixture-persisted-reader", Guid.CreateVersion7(), 1, scope, Now)]);
-            var policy = active
-                ? ModerationPolicy.Publish(policyId, scope, [terms], [evidence], publicationId, Now)
-                : ModerationPolicy.Adopt(policyId, scope, [terms], publicationId, Now);
-            policy.ValidatePersistedState();
-            await using var context = Context();
-            await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-            context.ModerationPolicies.Add(policy);
-            await context.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return policy;
+            var reference = ModerationReferenceCatalogue.GetProfile(referenceId);
+            var response = reference.Responses[0];
+            var inventory = ModerationCapabilityRegistry.Parse(ModerationCapabilityRegistry.ReadInventory());
+            ModerationRuleReference Rule(string code) => ModerationRuleReference.Create(scope.Id, code, 1);
+            var profile = new ModerationPolicyProfileDefinition(Guid.CreateVersion7(), Rule("resource-read"),
+                Rule("resource-read-reason"), reference.Id, reference.Revision, response.Grade,
+                [ModerationScopeKind.Resource], [ModerationSubjectKind.Human, ModerationSubjectKind.Service],
+                reference.Effects.ToImmutableArray(), reference.Bundle, reference.ProtectionPurpose, [],
+                new(response.Timing.Kind, response.Timing.Duration), response.RequiredApprovals, 6,
+                ModerationReferenceRecognition.Never);
+            return new(Guid.CreateVersion7(), 0, Guid.CreateVersion7(), scope,
+                ModerationReferenceCatalogue.Revision, inventory.Revision, inventory.Fingerprint,
+                ModerationPolicyRequestedState.Draft, [ModerationNativeMode.Embedded],
+                [new(Rule("resource-read-class"), "Restricted resource disclosure.", reference.Ground, reference.Basis)],
+                [new(profile.Reason, "Reason for selected resource disclosure restriction.", Rule("resource-read-class"))],
+                [profile], supported ? [profile.Rule] : []);
         }
 
-        public async Task StoreSanctionAsync(SubjectReference subject, ModerationPolicy policy)
+        public async Task<ModerationPolicyPublicationResult> PublishPolicyAsync(
+            ModerationPolicyProposedState proposed, Guid? expectedPublication = null)
         {
-            var scope = policy.Jurisdiction;
-            var rule = policy.Rules.Single().Rule;
+            await using var context = Context();
+            var epoch = await context.ModerationQualificationEpochs.AsNoTracking().SingleAsync();
+            var (admin, machine) = Identity(context);
+            var writer = new ModerationPolicyPublicationRepository(context, admin, machine,
+                ModerationCapabilityRegistry.Parse(ModerationCapabilityRegistry.ReadInventory()), null, new FixtureClock());
+            return await writer.PublishAsync(new(Guid.CreateVersion7(), Host.Id, epoch.Id, epoch.Revision,
+                ModerationPolicyPublicationProjection.WriterGeneration, expectedPublication, proposed));
+        }
+
+        public async Task<ModerationPolicyPublication> StorePolicyAsync(AuthorityScope scope, bool supported = true,
+            ModerationReferenceProfileId referenceId = ModerationReferenceProfileId.CFG08)
+        {
+            // Native draft publication establishes declarations, not measured activation readiness.
+            var result = await PublishPolicyAsync(Proposed(scope, supported, referenceId));
+            await Assert.That(result.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
+            return result.Publication!;
+        }
+
+        public async Task RetireSupportAsync(ModerationPolicyPublication publication)
+        {
+            var declared = ModerationPolicyPublicationProjection.RestoreHistory(publication)!.Proposed;
+            var result = await PublishPolicyAsync(declared with
+            {
+                PublicationId = Guid.CreateVersion7(), ExpectedRevision = publication.Revision, SupportedProfiles = []
+            }, publication.Id);
+            await Assert.That(result.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
+        }
+
+        public async Task StoreSanctionAsync(SubjectReference subject, ModerationPolicyPublication policy,
+            ModerationCapability capability = ModerationCapability.ReadResource, DateTimeOffset? startsAt = null)
+        {
+            var scope = AuthorityScope.Resource(TenantScope, ResourceId);
+            var profile = policy.Profiles.Single();
+            var rule = ModerationRuleReference.Create(policy.Jurisdiction.Id, profile.RuleCode, profile.RuleRevision);
+            var reason = ModerationRuleReference.Create(policy.Jurisdiction.Id, profile.ReasonCode, profile.ReasonRevision);
             var issuer = SubjectReference.Create(ModerationSubjectKind.Human, IssuerId, InstanceScope);
             var controller = SubjectReference.Create(ModerationSubjectKind.Human, ControllerId, InstanceScope);
             var allegation = ModerationCase.Open(Guid.CreateVersion7(), subject, scope, Guid.CreateVersion7(), Now);
             // Ledger fixture facts exercise persisted restrictions, not the native finding writer's authority.
-            var finding = ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 1, rule, rule, controller,
+            var finding = ModerationFinding.Finalize(Guid.CreateVersion7(), allegation, 1,
+                allegation.Scope, null, null, rule, rule, reason, reason, controller,
                 ModerationFindingEvidenceReference.Response(Guid.CreateVersion7(), allegation.Id, 1, Now),
                 "Fixture finding for persisted resource-read restriction.", Now);
             var decision = ModerationDecision.Propose(Guid.CreateVersion7(), allegation.Id, subject, issuer,
-                scope, scope, rule, [ModerationCapability.ReadResource], Now, Now.AddHours(1), null, 1, Now);
+                scope, scope, rule, [capability], startsAt ?? Now, Now.AddHours(1), null, 1, Now);
             decision.RecordResponse(decision.Revision, Now);
             decision.AcceptFinding(finding.Id, decision.Revision, Now);
             decision.Approve(controller, scope, decision.Revision, Now);
@@ -506,13 +829,57 @@ public sealed class EventResourceModerationSnapshotReaderTests
         public ValueTask DisposeAsync() => connection.DisposeAsync();
     }
 
+    private sealed class UploadClock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = EventResourceModerationSnapshotReaderTests.Now;
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    private sealed class StartRestrictionAfterFlush(UploadClock clock, DateTimeOffset startsAt) : SaveChangesInterceptor
+    {
+        public bool Observed { get; private set; }
+        public override ValueTask<int> SavedChangesAsync(
+            SaveChangesCompletedEventData eventData, int result, CancellationToken cancellationToken = default)
+        {
+            Observed = true;
+            clock.Now = startsAt;
+            return ValueTask.FromResult(result);
+        }
+    }
+
     private sealed class FixtureClock : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => Now;
     }
 
+    private sealed class StartRestrictionDuringRead(UploadClock clock, DateTimeOffset startsAt) : DbCommandInterceptor
+    {
+        public bool Armed { get; set; }
+        public bool Observed { get; private set; }
+        public override ValueTask<System.Data.Common.DbDataReader> ReaderExecutedAsync(
+            System.Data.Common.DbCommand command, CommandExecutedEventData eventData,
+            System.Data.Common.DbDataReader result, CancellationToken cancellationToken = default)
+        {
+            if (Armed)
+            {
+                Armed = false;
+                Observed = true;
+                clock.Now = startsAt;
+            }
+            return ValueTask.FromResult(result);
+        }
+    }
+
     private sealed class UnconfiguredKeys : IConfiguredApiKeyResourceAuthorityReader
     {
+        public ValueTask<IConfiguredApiKeyResourceAuthorityLease?> AcquireAuthenticatedAsync(
+            string keyId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IConfiguredApiKeyResourceAuthorityLease?>(null);
+
+        public ValueTask<IConfiguredApiKeyResourceAuthorityLease?> AcquireAsync(
+            string keyId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IConfiguredApiKeyResourceAuthorityLease?>(null);
+
         public ValueTask<ApiKeyPrincipalContext?> ReadAsync(
             string keyId, DateTimeOffset evaluationUtc, CancellationToken cancellationToken) =>
             ValueTask.FromResult<ApiKeyPrincipalContext?>(null);

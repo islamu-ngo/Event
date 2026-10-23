@@ -50,7 +50,8 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context), governance,
             new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
             new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
-                Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>()));
+                Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+                global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context)));
         EventResourceAuthorityRequest update = new(scope.TenantAId, resource.Id, userId, false, "update");
         EventResourceAuthorityRequest create = new(scope.TenantAId, scope.EventAId, userId, false, "create");
         EventResourceAuthorityRequest collection = new(scope.TenantAId, scope.EventAId, userId, false, "view-management")

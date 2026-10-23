@@ -154,7 +154,8 @@ public sealed partial class EventResourceDiscoveryQueryTests
             new EventAuthoritySnapshotService(context), governance, new ExternalApiKeyRepository(context),
             Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
             new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
-                Substitute.For<IModerationMachineSubjectBindingRepository>())), routes, provider ?? new Provider(), new Clock()),
+                Substitute.For<IModerationMachineSubjectBindingRepository>(),
+                global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))), routes, provider ?? new Provider(), new Clock()),
             tenant, user, machine, _cursors);
     }
 

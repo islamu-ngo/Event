@@ -28,6 +28,7 @@ public sealed class EventResourceFileUploadWorkflow(
     IStorageObjectRepository objects, IStorageUsageCounterRepository counters,
     IPrivacyErasureStateRepository privacy, IStoragePolicyResolver storagePolicy,
     IStorageProviderBindingService providers, IUnitOfWork unitOfWork,
+    IEventResourceUploadMutationBoundary uploadBoundary,
     EventResourceStorageLifecycleService lifecycle,
     EventResourceAuthorityOrchestrator authority, ITenantContext tenant,
     ICurrentUserService user, IMachinePrincipalAccessor machine, TimeProvider clock)
@@ -59,7 +60,10 @@ public sealed class EventResourceFileUploadWorkflow(
     {
         if (!response.IsSuccess) return StorageUploadSessionResult.Ordinary(response);
         var request = new EventResourceAuthorityRequest(tenant.TenantId, resourceId,
-            user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, "view-management");
+            user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, "view-management")
+        {
+            RequiresUnquarantinedMaterial = true
+        };
         var authorized = await authority.AuthorizeAsync(request,
             (facts, _) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation(facts.AttachmentGeneration)),
             cancellationToken);
@@ -86,13 +90,14 @@ public sealed class EventResourceFileUploadWorkflow(
         if (resourceId == Guid.Empty || !validation.IsValid)
             return BaseCommandResponse.Validation<StorageUploadSessionDto>(["The resource upload intent is invalid."]);
         if (await FencedAsync(cancellationToken)) return Fail("privacy_erasure_fenced");
-        await using var authorized = await AuthorizeAsync(resourceId, cancellationToken);
+        await using var authorized = await AuthorizeAsync(resourceId, true, cancellationToken);
         if (authorized.Lease is not { } lease) return Denied(authorized.Outcome);
         var policy = await PolicyAsync(resourceId, dto.ContentType, dto.ExpectedSizeBytes, cancellationToken);
         if (!Permitted(lease, dto.ContentType, dto.ExpectedSizeBytes, policy)) return Fail("resource_upload_policy_denied");
+        var sessionId = Guid.CreateVersion7();
         try
         {
-            return await unitOfWork.ExecuteSerializableAsync(async ct =>
+            return await uploadBoundary.ExecuteAsync(lease.Request, lease.Snapshot.Facts.Moderation, async ct =>
             {
                 var outcome = await authority.RecheckMutationAsync(lease, dto.ExpectedVersion, ct);
                 if (outcome != EventResourceAuthorityOutcome.Allowed) return Denied(outcome);
@@ -116,7 +121,7 @@ public sealed class EventResourceFileUploadWorkflow(
                 var binding = await providers.CaptureAsync(policy.Provider, tenant.TenantId, ct);
                 var session = new StorageUploadSession
                 {
-                    Id = Guid.CreateVersion7(),
+                    Id = sessionId,
                     TenantId = tenant.TenantId,
                     UserId = user.UserId,
                     Provider = policy.Provider,
@@ -151,7 +156,7 @@ public sealed class EventResourceFileUploadWorkflow(
         var session = await sessions.GetForAuthorizationAsync(request.UploadSessionId, cancellationToken);
         if (!Owned(session)) return Fail(FailureCodes.StorageUploadSessionNotFound);
         if (await FencedAsync(cancellationToken)) return Fail("privacy_erasure_fenced");
-        await using var authorized = await AuthorizeAsync(session!.OwningResourceId!.Value, cancellationToken);
+        await using var authorized = await AuthorizeAsync(session!.OwningResourceId!.Value, true, cancellationToken);
         if (authorized.Lease is not { } lease) return Denied(authorized.Outcome);
         var policy = await PolicyAsync(session.OwningResourceId.Value, session.ContentType, session.ExpectedSizeBytes, cancellationToken);
         if (!Permitted(lease, session.ContentType, session.ExpectedSizeBytes, policy))
@@ -172,9 +177,10 @@ public sealed class EventResourceFileUploadWorkflow(
         var inspected = inspection.Content;
         string checksum = Convert.ToHexStringLower(await SHA256.HashDataAsync(inspected, cancellationToken));
         inspected.Position = 0;
+        var stagedObjectId = Guid.CreateVersion7();
         try
         {
-            var staged = await unitOfWork.ExecuteSerializableAsync(async ct =>
+            var staged = await uploadBoundary.ExecuteAsync(lease.Request, lease.Snapshot.Facts.Moderation, async ct =>
             {
                 var current = await sessions.GetByIdForUpdateAsync(session.Id, ct);
                 if (!Owned(current)) return Fail(FailureCodes.StorageUploadSessionNotFound);
@@ -185,7 +191,7 @@ public sealed class EventResourceFileUploadWorkflow(
                 if (current.ExpiresAt <= clock.GetUtcNow().UtcDateTime) return Fail(FailureCodes.StorageUploadSessionExpired);
                 current.ReserveObjectKey($"tenants/{current.TenantId:N}/uploads/{current.Id:N}.{current.Extension}");
                 current.MarkUploading(clock.GetUtcNow().UtcDateTime);
-                var stagedObject = NewStagedObject(current);
+                var stagedObject = NewStagedObject(current, stagedObjectId);
                 await objects.Create(stagedObject);
                 current.StageEventResourceObject(stagedObject.Id);
                 await sessions.Update(current);
@@ -227,7 +233,7 @@ public sealed class EventResourceFileUploadWorkflow(
         // A required-success-audit failure cannot roll back the independently committed acknowledgement.
         try
         {
-            return await unitOfWork.ExecuteSerializableAsync(async ct =>
+            return await uploadBoundary.ExecuteAsync(lease.Request, lease.Snapshot.Facts.Moderation, async ct =>
             {
                 var current = await sessions.GetByIdForUpdateAsync(session.Id, ct);
                 if (!Owned(current)) return Fail(FailureCodes.StorageUploadSessionNotFound);
@@ -304,7 +310,7 @@ public sealed class EventResourceFileUploadWorkflow(
         var session = await sessions.GetForAuthorizationAsync(uploadSessionId, cancellationToken);
         if (!Owned(session)) return Fail(FailureCodes.StorageUploadSessionNotFound);
         if (await FencedAsync(cancellationToken)) return Fail("privacy_erasure_fenced");
-        await using var authorized = await AuthorizeAsync(session!.OwningResourceId!.Value, cancellationToken);
+        await using var authorized = await AuthorizeAsync(session!.OwningResourceId!.Value, false, cancellationToken);
         if (authorized.Lease is not { } lease) return Denied(authorized.Outcome);
         var policy = await PolicyAsync(session.OwningResourceId.Value, session.ContentType, session.ExpectedSizeBytes, cancellationToken);
         try
@@ -333,7 +339,8 @@ public sealed class EventResourceFileUploadWorkflow(
     }
 
     private Task<BaseCommandResponse<StorageUploadSessionDto>> ReplayAsync(Guid id, EventResourceAuthorityLease lease,
-        ResolvedStoragePolicy policy, CancellationToken cancellationToken) => unitOfWork.ExecuteSerializableAsync(async ct =>
+        ResolvedStoragePolicy policy, CancellationToken cancellationToken) => uploadBoundary.ExecuteAsync(
+            lease.Request, lease.Snapshot.Facts.Moderation, async ct =>
     {
         var current = await sessions.GetByIdForUpdateAsync(id, ct);
         if (!Owned(current) || current!.Status != StorageUploadSessionStates.Finalized || current.FinalizedResourceVersion is not { } version)
@@ -403,7 +410,7 @@ public sealed class EventResourceFileUploadWorkflow(
     private async Task<bool> FencedAsync(CancellationToken ct) => user.UserId is { } id
         && await privacy.GetBySubjectAsync(id, ct) is not null;
 
-    private Task<EventResourceAuthorityResult> AuthorizeAsync(Guid id, CancellationToken ct)
+    private Task<EventResourceAuthorityResult> AuthorizeAsync(Guid id, bool uploadMutation, CancellationToken ct)
     {
         var principal = machine.Current;
         return authority.AuthorizeAsync(
@@ -411,7 +418,9 @@ public sealed class EventResourceFileUploadWorkflow(
                 principal is null && !machine.IsMachineCaller && user.IsAuthenticated ? user.UserId : null,
                 machine.IsMachineCaller, "update")
             {
-                MachinePrincipal = principal is null ? null : EventResourceMachinePrincipal.Capture(principal)
+                MachinePrincipal = principal is null ? null : EventResourceMachinePrincipal.Capture(principal),
+                RequiresUnquarantinedMaterial = true,
+                IsUploadMutation = uploadMutation
             },
             (facts, token) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation(facts.AttachmentGeneration)), ct);
     }
@@ -422,9 +431,8 @@ public sealed class EventResourceFileUploadWorkflow(
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
-    private static StorageObject NewStagedObject(StorageUploadSession session)
+    private static StorageObject NewStagedObject(StorageUploadSession session, Guid id)
     {
-        var id = Guid.CreateVersion7();
         return new()
         {
             Id = id,

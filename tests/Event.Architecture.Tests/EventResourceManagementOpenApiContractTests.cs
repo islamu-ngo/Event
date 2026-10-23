@@ -69,8 +69,9 @@ public sealed class EventResourceManagementOpenApiContractTests
             ("EventResourceDestinationWriteDto", ["expectedVersion", "destination"]),
             ("EventResourceVersionRequestDto", ["expectedVersion"]),
             ("EventResourceManagementDto", ["id", "eventId", "version", "publicationState", "draft",
-                "createdAt", "updatedAt", "file", "externalDestinationSafeOrigin"]),
+                "createdAt", "updatedAt", "file", "externalDestinationSafeOrigin", "status", "materialVersionId"]),
             ("EventResourceAuditDto", ["id", "action", "outcome", "reason", "timestamp", "responsibleManagerUserId"]),
+            ("EventResourceAuditPageDto", ["items", "status", "materialVersionId"]),
             ("EventResourceDraftDto", ["title", "publicTitle", "description", "sensitiveNotes", "kind", "disclosureMode",
                 "deliveryType", "eventSessionId", "languageCode", "accessibilityNote", "sortOrder",
                 "accessibleAlternativeEventResourceId", "availability", "audienceRules"])

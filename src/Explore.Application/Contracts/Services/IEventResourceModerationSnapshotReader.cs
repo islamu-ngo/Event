@@ -27,7 +27,7 @@ public sealed record EventResourceModerationFacts
 {
     private EventResourceModerationFacts(
         bool isAdopted, SubjectReference? subject, ModerationRestrictionOutcome outcome,
-        string generation, Guid? bindingId, long? bindingRevision)
+        string generation, Guid? bindingId, long? bindingRevision, DateTimeOffset? currentUntil)
     {
         IsAdopted = isAdopted;
         Subject = subject;
@@ -35,6 +35,7 @@ public sealed record EventResourceModerationFacts
         Generation = generation;
         BindingId = bindingId;
         BindingRevision = bindingRevision;
+        CurrentUntil = currentUntil;
     }
 
     public bool IsAdopted { get; }
@@ -43,29 +44,39 @@ public sealed record EventResourceModerationFacts
     public string Generation { get; }
     public Guid? BindingId { get; }
     public long? BindingRevision { get; }
-    public bool PermitsNativeEvaluation => !IsAdopted
-        || Subject is not null && Outcome == ModerationRestrictionOutcome.Unrestricted;
+    public DateTimeOffset? CurrentUntil { get; }
+    public bool PermitsNativeEvaluationAt(DateTimeOffset now) => now.Offset == TimeSpan.Zero
+        && (!IsAdopted || Subject is not null && Outcome == ModerationRestrictionOutcome.Unrestricted
+            && (CurrentUntil is null || now < CurrentUntil));
 
     public static EventResourceModerationFacts NotAdopted { get; } =
-        new(false, null, ModerationRestrictionOutcome.Unrestricted, "not-adopted", null, null);
+        new(false, null, ModerationRestrictionOutcome.Unrestricted, "not-adopted", null, null, null);
+
+    public static EventResourceModerationFacts QualifiedNonadoption(string generation)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(generation);
+        return new(false, null, ModerationRestrictionOutcome.Unrestricted, generation, null, null, null);
+    }
 
     public static EventResourceModerationFacts Unavailable(string generation)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(generation);
-        return new(true, null, ModerationRestrictionOutcome.Unavailable, generation, null, null);
+        return new(true, null, ModerationRestrictionOutcome.Unavailable, generation, null, null, null);
     }
 
     public static EventResourceModerationFacts Qualified(
         SubjectReference subject, ModerationRestrictionOutcome outcome, string generation,
-        Guid? bindingId = null, long? bindingRevision = null)
+        Guid? bindingId = null, long? bindingRevision = null, DateTimeOffset? currentUntil = null)
     {
         ArgumentNullException.ThrowIfNull(subject);
         ArgumentException.ThrowIfNullOrWhiteSpace(generation);
         if (!Enum.IsDefined(outcome) || bindingId == Guid.Empty || bindingRevision < 1
             || bindingId.HasValue != bindingRevision.HasValue
             || subject.Kind == ModerationSubjectKind.Service && bindingId is null
-            || subject.Kind != ModerationSubjectKind.Service && bindingId is not null)
-            throw new ArgumentException("A service subject requires its exact current binding identity and revision.");
-        return new(true, subject, outcome, generation, bindingId, bindingRevision);
+            || subject.Kind != ModerationSubjectKind.Service && bindingId is not null
+            || currentUntil is { } boundary && (boundary.Offset != TimeSpan.Zero
+                || boundary == DateTimeOffset.MinValue || boundary == DateTimeOffset.MaxValue))
+            throw new ArgumentException("Qualified moderation requires exact subject binding and any lifetime boundary must be finite UTC.");
+        return new(true, subject, outcome, generation, bindingId, bindingRevision, currentUntil);
     }
 }

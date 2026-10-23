@@ -25,6 +25,13 @@ public sealed record EventResourceAuthorityRequest(
     public const int MaximumBatchChecks = MaximumBatchResources * 13;
 
     public EventResourceMachinePrincipal? MachinePrincipal { get; init; }
+
+    /// <summary>Server-selected upload boundary; quarantined material cannot be replaced or disclosed through upload responses.</summary>
+    public bool RequiresUnquarantinedMaterial { get; init; }
+    /// <summary>Server-selected upload mutation, never ordinary metadata editing or cleanup.</summary>
+    public bool IsUploadMutation { get; init; }
+    public bool HasConsistentUploadPurpose => !IsUploadMutation
+        || (Action == "update" && !TargetsParentEvent && ResourceId != Guid.Empty && RequiresUnquarantinedMaterial);
     public bool HasConsistentPrincipal => IsMachineCaller
         ? SubjectUserId is null && MachinePrincipal is not null
         : MachinePrincipal is null;

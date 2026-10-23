@@ -1,11 +1,14 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Repositories;
 using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -13,12 +16,13 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Explore.Persistence.Services;
 
 /// <summary>
-/// Reads the current resource-read overlay in the resource owner's transaction.
+/// Reads resource-read/upload overlays and the current Human's Tenant publication overlay.
 /// Installation is provenance only. Adoption retains read protection independently
 /// of support for activating new effects, so retiring support cannot erase sanctions.
 /// </summary>
 public sealed class EventResourceModerationSnapshotReader(
-    ExploreDbContext context, IModerationMachineSubjectBindingRepository bindings)
+    ExploreDbContext context, IModerationMachineSubjectBindingRepository bindings,
+    IModerationRecognitionContinuityReader continuity)
     : IEventResourceModerationSnapshotReader
 {
     public async Task<EventResourceModerationFacts> ReadAsync(
@@ -43,10 +47,36 @@ public sealed class EventResourceModerationSnapshotReader(
                 || request.SubjectUserId != first.SubjectUserId
                 || request.MachinePrincipal != first.MachinePrincipal
                 || request.IsMachineCaller != first.IsMachineCaller
-                || !request.HasConsistentPrincipal))
+                || !request.HasConsistentPrincipal || !request.HasConsistentUploadPurpose))
             return Enumerable.Repeat(EventResourceModerationFacts.Unavailable("invalid-request"), requests.Count).ToArray();
 
-        var readTargets = requests.Where(IsRead).Select(request => request.ResourceId)
+        if (requests.Any(request => request.Action == "publish"))
+        {
+            var publication = first.IsMachineCaller || first.SubjectUserId is not { } humanId
+                ? EventPublicationModerationFacts.Unavailable("publication-human-required")
+                : await new EventPublicationModerationSnapshotReader(context, continuity)
+                    .ReadAsync(humanId, evaluationUtc, cancellationToken);
+            // Resource leases bind the actual epoch revision; creation's own-epoch exception does not apply here.
+            var generation = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                Version = 1,
+                publication.Generation,
+                publication.QualificationEpochId,
+                publication.QualificationRevision
+            })));
+            var facts = publication.Outcome == ModerationRestrictionOutcome.Unavailable
+                ? EventResourceModerationFacts.Unavailable(generation)
+                : !publication.IsAdopted
+                    ? EventResourceModerationFacts.QualifiedNonadoption(generation)
+                    : publication.Subject is not { } subject
+                        ? EventResourceModerationFacts.Unavailable(generation)
+                        : EventResourceModerationFacts.Qualified(subject, publication.Outcome,
+                            generation, currentUntil: publication.CurrentUntil);
+            for (int index = 0; index < requests.Count; index++)
+                if (requests[index].Action == "publish") result[index] = facts;
+        }
+
+        var readTargets = requests.Where(request => Capability(request) is not null).Select(request => request.ResourceId)
             .Where(id => id != Guid.Empty).Distinct().ToArray();
         if (readTargets.Length > EventResourceAuthorityRequest.MaximumBatchResources)
             throw new ArgumentOutOfRangeException(nameof(requests));
@@ -56,7 +86,7 @@ public sealed class EventResourceModerationSnapshotReader(
         if (!await ProviderTenantMatchesAsync(first.TenantId, cancellationToken))
         {
             for (int index = 0; index < requests.Count; index++)
-                if (IsRead(requests[index]))
+                if (Capability(requests[index]) is not null)
                     result[index] = EventResourceModerationFacts.Unavailable("provider-tenant-unavailable");
             return result;
         }
@@ -68,16 +98,41 @@ public sealed class EventResourceModerationSnapshotReader(
         try
         {
             context.ModerationTrustDomainId = host.TrustDomainId;
-            var policies = await context.ModerationPolicies.AsNoTracking().Include(policy => policy.Rules)
-                .Where(policy => (policy.JurisdictionSolutionId == null || policy.JurisdictionSolutionId == host.SolutionId)
-                    && (policy.JurisdictionInstanceId == null || policy.JurisdictionInstanceId == host.InstanceId)
-                    && (policy.JurisdictionTenantId == null || policy.JurisdictionTenantId == first.TenantId)
-                    && policy.JurisdictionCommunityId == null
-                    && (policy.JurisdictionResourceId == null || readTargets.Contains(policy.JurisdictionResourceId.Value)))
+            var selections = await context.ModerationPolicySelections.AsNoTracking()
+                .Where(row => row.HostBindingId == host.Id
+                    && (row.JurisdictionId == host.InstanceId || row.JurisdictionId == first.TenantId))
                 .ToListAsync(cancellationToken);
-            foreach (var policy in policies) policy.ValidatePersistedState();
-            var adopted = policies.Where(policy => policy.Rules.Any(rule =>
-                rule.Capabilities.Contains(ModerationCapability.ReadResource))).ToArray();
+            if (selections.Count == 0) return result;
+            var selectedIds = selections.Select(row => row.LatestPublicationId).ToArray();
+            var publications = await ModerationPolicyPublicationGraph.Include(
+                context.ModerationPolicyPublications.AsNoTracking().Where(row => selectedIds.Contains(row.Id)))
+                .ToListAsync(cancellationToken);
+            var declarations = publications.Select(publication => new
+            {
+                Publication = publication,
+                // Read protection is retained declaration, not permission to activate new effects.
+                // A current inventory revision must not erase an already installed restriction.
+                Draft = ModerationPolicyPublicationProjection.RestoreHistory(publication)
+            }).ToArray();
+            if (selections.Any(selection => !declarations.Any(declared =>
+                declared.Draft is not null && declared.Publication.Id == selection.LatestPublicationId
+                && declared.Publication.PolicyId == selection.Id && declared.Publication.Revision == selection.Revision
+                && declared.Publication.HostBindingId == host.Id && declared.Publication.TrustDomainId == host.TrustDomainId
+                && declared.Publication.SolutionId == host.SolutionId && declared.Publication.InstanceId == host.InstanceId
+                && declared.Publication.Jurisdiction.Id == selection.JurisdictionId
+                && declared.Publication.JurisdictionTenantId == selection.JurisdictionTenantId
+                && (declared.Publication.Jurisdiction == instance || declared.Publication.Jurisdiction == tenant))))
+            {
+                for (int index = 0; index < requests.Count; index++)
+                    if (Capability(requests[index]) is not null)
+                        result[index] = EventResourceModerationFacts.Unavailable("selected-declaration-unavailable");
+                return result;
+            }
+            var adopted = declarations.Where(declared => declared.Draft!.Profiles.Any(profile =>
+                profile.Definition.Effects.Any(effect => requests.Any(request => Capability(request) == effect.Capability))
+                && profile.Definition.ScopeKinds.Contains(ModerationScopeKind.Resource)
+                && profile.Reference.AcceptsScope(declared.Publication.Jurisdiction,
+                    AuthorityScope.Resource(tenant, readTargets[0])))).ToArray();
             if (adopted.Length == 0) return result;
 
             bool qualifiedContext = context.Database.CurrentTransaction is not null
@@ -119,29 +174,86 @@ public sealed class EventResourceModerationSnapshotReader(
                 .ToListAsync(cancellationToken);
             foreach (var sanction in sanctions) sanction.ValidatePersistedState();
             foreach (var measure in protection) measure.ValidatePersistedState();
+            Dictionary<(ModerationCapability Capability, Guid ResourceId), ModerationRecognitionContinuityResult> recognized = [];
+            if (subject is { Kind: ModerationSubjectKind.Human })
+            {
+                // Repeated metadata/payload checks share one target qualification.
+                // Larger read families use bounded chunks, not resource-per-target queries.
+                foreach (var family in requests.Where(request => Capability(request) is not null)
+                    .GroupBy(request => Capability(request)!.Value))
+                    foreach (var ids in family.Select(request => request.ResourceId).Where(id => id != Guid.Empty)
+                        .Distinct().Chunk(EventResourceAuthorityRequest.MaximumBatchResources))
+                    {
+                        var targets = ids.Select(id => AuthorityScope.Resource(tenant, id)).ToImmutableArray();
+                        var current = await continuity.ReadResourcesInTransactionAsync(subject.Id,
+                            family.Key, targets, cancellationToken);
+                        if (current.Length != ids.Length)
+                            return Enumerable.Repeat(EventResourceModerationFacts.Unavailable("continuity-batch-unavailable"),
+                                requests.Count).ToArray();
+                        for (var index = 0; index < ids.Length; index++) recognized.Add((family.Key, ids[index]), current[index]);
+                    }
+            }
             for (int index = 0; index < requests.Count; index++)
             {
                 var request = requests[index];
-                if (!IsRead(request) || request.ResourceId == Guid.Empty) continue;
+                if (Capability(request) is not { } capability || request.ResourceId == Guid.Empty) continue;
                 var target = AuthorityScope.Resource(tenant, request.ResourceId);
-                var applicable = adopted.Where(policy => policy.Jurisdiction.Contains(target)).ToArray();
+                var applicable = adopted.Where(declared => declared.Publication.Jurisdiction.Contains(target)
+                    && declared.Draft!.Profiles.Any(profile => profile.Definition.ScopeKinds.Contains(ModerationScopeKind.Resource)
+                        && profile.Definition.Effects.Any(effect => effect.Capability == capability)
+                        && profile.Reference.AcceptsScope(declared.Publication.Jurisdiction, target))).ToArray();
                 if (applicable.Length == 0) continue;
+                var contribution = recognized.GetValueOrDefault((capability, request.ResourceId));
+                if (contribution is not null && (contribution.ActionFailure != ModerationRecognitionContinuityFailure.None
+                    || contribution.Generation is null
+                    || contribution.CurrentUntil is { } bound && evaluationUtc >= bound))
+                {
+                    result[index] = EventResourceModerationFacts.Unavailable("continuity-authority-unavailable");
+                    continue;
+                }
+                var outcome = subject is null ? ModerationRestrictionOutcome.Unavailable :
+                    EffectiveRestrictions.Evaluate(subject, target, capability,
+                        evaluationUtc, sanctions, protection, ModerationAuthorityState.Known).Outcome;
+                if (outcome == ModerationRestrictionOutcome.Unrestricted && contribution is { Actions.IsEmpty: false })
+                    outcome = ModerationRestrictionOutcome.Denied;
+                var currentUntil = contribution?.CurrentUntil;
+                var boundaries = sanctions.Where(row => row.Subject.Equals(subject) && row.Scope.Contains(target)
+                        && row.Capabilities.Contains(capability) && row.IsEffectiveAt(row.StartsAt))
+                    .SelectMany(row => new DateTimeOffset?[] { row.StartsAt, row.EndsAt })
+                    .Concat(protection.Where(row => row.Subject.Equals(subject) && row.Scope.Contains(target)
+                            && row.Capabilities.Contains(capability) && row.IsEffectiveAt(row.StartsAt))
+                        .SelectMany(row => new DateTimeOffset?[] { row.StartsAt, row.EndsAt }));
+                foreach (var boundary in boundaries)
+                    if (boundary is { } time && time > evaluationUtc && (currentUntil is null || time < currentUntil))
+                        currentUntil = time;
                 var generation = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Version = 1, Host = host.Id, Target = target, Subject = subject,
-                    Epoch = epoch?.Id, EpochRevision = epoch?.Revision,
-                    Binding = binding?.Id, BindingRevision = binding?.Revision,
-                    Policies = applicable.OrderBy(policy => policy.Id)
-                        .Select(policy => new { policy.Id, policy.Revision, policy.PublicationId }),
+                    Version = 3,
+                    Capability = capability,
+                    Host = host.Id,
+                    Target = target,
+                    Subject = subject,
+                    Epoch = epoch?.Id,
+                    EpochRevision = epoch?.Revision,
+                    Binding = binding?.Id,
+                    BindingRevision = binding?.Revision,
+                    Policies = applicable.OrderBy(declared => declared.Publication.PolicyId)
+                        .Select(declared => new
+                        {
+                            declared.Publication.PolicyId,
+                            declared.Publication.Revision,
+                            PublicationId = declared.Publication.Id,
+                            declared.Publication.DeclaredStateDigest
+                        }),
                     Sanctions = sanctions.OrderBy(row => row.Id).Select(row => new { row.Id, row.Revision }),
-                    Protection = protection.OrderBy(row => row.Id).Select(row => new { row.Id, row.Revision })
+                    Protection = protection.OrderBy(row => row.Id).Select(row => new { row.Id, row.Revision }),
+                    Continuity = contribution?.Generation,
+                    CurrentUntil = currentUntil
                 })));
                 result[index] = subject is null
                     ? EventResourceModerationFacts.Unavailable(generation)
                     : EventResourceModerationFacts.Qualified(subject,
-                        EffectiveRestrictions.Evaluate(subject, target, ModerationCapability.ReadResource,
-                            evaluationUtc, sanctions, protection, ModerationAuthorityState.Known).Outcome,
-                        generation, binding?.Id, binding?.Revision);
+                        outcome, generation, binding?.Id, binding?.Revision, currentUntil);
             }
             return result;
         }
@@ -151,8 +263,10 @@ public sealed class EventResourceModerationSnapshotReader(
         }
     }
 
-    private static bool IsRead(EventResourceAuthorityRequest request) =>
-        request.Action is "view" or "view-management" or "view-audit" or "access" or "download" or "export";
+    private static ModerationCapability? Capability(EventResourceAuthorityRequest request) =>
+        request.IsUploadMutation ? ModerationCapability.Upload
+        : request.Action is "view" or "view-management" or "view-audit" or "access" or "download" or "export"
+            ? ModerationCapability.ReadResource : null;
 
     private async Task<bool> ProviderTenantMatchesAsync(Guid tenantId, CancellationToken cancellationToken)
     {

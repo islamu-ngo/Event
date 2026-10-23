@@ -5,18 +5,24 @@ using System.Security.Cryptography;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Settings;
+using Explore.Application.Features.EventResources.Handlers.Queries;
+using Explore.Application.Features.EventResources.Requests.Queries;
 using Explore.Application.Models.Storage;
+using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Explore.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
@@ -38,9 +44,14 @@ public sealed partial class EventResourceContentTests
     [Arguments("cancel-result")]
     [Arguments("owner-after-hal")]
     [Arguments("window-boundaries")]
+    [Arguments("quarantine-before-access")]
+    [Arguments("quarantine-after-preparation")]
+    [Arguments("quarantine-before-final-read")]
+    [Arguments("quarantine-saved-action")]
     public async Task PreparedBytesStayPrivateUntilFinalAuthorityAndClockChecks(string change)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        bool measurement = Environment.GetEnvironmentVariable("ISLAMU_MODERATION_MEASUREMENT_JOURNAL") == "1";
         var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
         var clock = new ResourceClock(DateTimeOffset.UtcNow);
         Guid eventId = Guid.CreateVersion7(), resourceId = Guid.CreateVersion7(),
@@ -76,7 +87,7 @@ public sealed partial class EventResourceContentTests
                     GrantedAt = clock.GetUtcNow().UtcDateTime,
                     GrantedBy = userId
                 });
-            db.SystemSettings.Add(new SystemSetting
+            await AddFixtureSettingAsync(db, new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
                 Value = change == "owner-after-hal" ? "false" : "true",
@@ -84,13 +95,43 @@ public sealed partial class EventResourceContentTests
                 Category = "EventResources"
             });
             if (change is "owner-after-hal" or "tighten-audience")
-                db.SystemSettings.Add(new SystemSetting
+                await AddFixtureSettingAsync(db, new SystemSetting
                 {
                     SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
                     Value = "\"local\"",
                     ValueType = SettingValueType.String,
                     Category = "Security"
                 });
+            if (measurement)
+            {
+                // These exact fixture settings are tightened by other argument cases on the shared database.
+                SystemSetting[] settings =
+                [
+                    new()
+                    {
+                        SettingKey = GovernanceSettingKeys.EventResources.EnabledAudiences,
+                        Value = "[\"Public\",\"Organizer\"]",
+                        ValueType = SettingValueType.Json,
+                        Category = "EventResources"
+                    },
+                    new()
+                    {
+                        SettingKey = GovernanceSettingKeys.EventResources.PermittedFileTypes,
+                        Value = "[\"application/pdf\",\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\"]",
+                        ValueType = SettingValueType.Json,
+                        Category = "EventResources"
+                    },
+                    new()
+                    {
+                        SettingKey = GovernanceSettingKeys.EventResources.MaxUploadBytes,
+                        Value = EventResourceGovernancePolicy.DefaultMaxUploadBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        ValueType = SettingValueType.Long,
+                        Category = "EventResources"
+                    }
+                ];
+                foreach (var setting in settings)
+                    await AddFixtureSettingAsync(db, setting);
+            }
             var parent = new Explore.Domain.Event
             {
                 Id = eventId,
@@ -158,6 +199,8 @@ public sealed partial class EventResourceContentTests
         }
 
         bool opened = false, disposed = false;
+        bool terminalQuarantine = false, terminalCompleted = false;
+        Guid quarantineId = Guid.CreateVersion7(), effectId = Guid.CreateVersion7();
         HttpClient? administrator = null;
         var disposal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var provider = Substitute.For<IFileStorageProvider>();
@@ -198,7 +241,7 @@ public sealed partial class EventResourceContentTests
                     policy.Value = "false";
                 }
                 else
-                    mutate.SystemSettings.Add(new SystemSetting
+                    await AddFixtureSettingAsync(mutate, new SystemSetting
                     {
                         SettingKey = change == "tighten-filetype"
                             ? GovernanceSettingKeys.EventResources.PermittedFileTypes
@@ -213,12 +256,15 @@ public sealed partial class EventResourceContentTests
                     });
                 await mutate.SaveChangesAsync();
             }
-            return new FileStorageReadResult(new ObservedRead(bytes, () =>
+            var prepared = new FileStorageReadResult(new ObservedRead(bytes, () =>
                 {
                     disposed = true;
                     disposal.TrySetResult();
                 }),
                 EventResourceGovernancePolicy.PdfMediaType, bytes.Length, null);
+            if (change == "quarantine-after-preparation")
+                await QuarantineCurrentMaterialAsync();
+            return prepared;
         });
         using var hosted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
@@ -226,7 +272,30 @@ public sealed partial class EventResourceContentTests
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(clock);
             services.Configure<MvcOptions>(options =>
-                options.Filters.Add(new ResultBoundary(change, clock)));
+                options.Filters.Add(new ResultBoundary(change, clock, async () =>
+                {
+                    await Assert.That(opened).IsTrue();
+                    await Assert.That(disposed).IsFalse();
+                    await Assert.That(terminalCompleted).IsFalse();
+                    await QuarantineCurrentMaterialAsync();
+                    terminalQuarantine = true;
+                })));
+            if (change == "quarantine-before-final-read")
+            {
+                services.RemoveAll<IQueryHandler<GetEventResourceContentHeadersQuery, EventResourceHeaderResult>>();
+                services.AddScoped<IQueryHandler<GetEventResourceContentHeadersQuery, EventResourceHeaderResult>>(serviceProvider =>
+                    new ObservedHeaderCompletion(
+                        ActivatorUtilities.CreateInstance<GetEventResourceContentHeadersQueryHandler>(serviceProvider),
+                        async result =>
+                        {
+                            await Assert.That(terminalQuarantine).IsTrue();
+                            await Assert.That(terminalCompleted).IsFalse();
+                            await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.AuthenticationRequired);
+                            await Assert.That(result.Preparation).IsNull();
+                            await Assert.That(disposed).IsTrue();
+                            terminalCompleted = true;
+                        }));
+            }
             if (change == "owner-after-hal")
             {
                 services.RemoveAll<IEventResourceAuthorizationProvider>();
@@ -247,6 +316,29 @@ public sealed partial class EventResourceContentTests
             BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false
         });
+        if (measurement)
+        {
+            await using var observedScope = hosted.Services.CreateAsyncScope();
+            var observedDatabase = observedScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await observedDatabase.Database.OpenConnectionAsync();
+            var publicComposition = new Dictionary<string, string>();
+            foreach (var extension in observedDatabase.GetService<IDbContextOptions>().Extensions)
+                extension.Info.PopulateDebugInfo(publicComposition);
+            if (!publicComposition.TryGetValue("Explore:PrimaryPublicDatabaseIdentity", out var digest))
+                throw new InvalidOperationException("Resource content measurement requires actual native primary composition.");
+            var providerVersion = observedDatabase.Database.GetDbConnection().ServerVersion;
+            var providerCode = observedDatabase.Database.ProviderName switch
+            {
+                "Microsoft.EntityFrameworkCore.Sqlite" => "Sqlite",
+                "Npgsql.EntityFrameworkCore.PostgreSQL" => "PostgreSql",
+                "Microsoft.EntityFrameworkCore.SqlServer" => "SqlServer",
+                "Pomelo.EntityFrameworkCore.MySql" => providerVersion.Contains("MariaDB", StringComparison.OrdinalIgnoreCase)
+                    ? "MariaDb" : "MySql",
+                _ => throw new InvalidOperationException("Resource content measurement has no native provider observation.")
+            };
+            Event.Tests.Shared.Moderation.ModerationMeasurementJournalAttribute.RecordDatabaseObservation(
+                TUnit.Core.TestContext.Current!, providerCode, providerVersion, digest);
+        }
         if (change == "tighten-audience")
         {
             administrator = client;
@@ -264,6 +356,7 @@ public sealed partial class EventResourceContentTests
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
                 loginJson.RootElement.GetProperty("token").GetString());
         }
+        string? savedAction = null;
         using (var metadata = await client.GetAsync($"/api/eventresource/{resourceId}"))
         {
             if (change == "owner-after-hal")
@@ -275,6 +368,13 @@ public sealed partial class EventResourceContentTests
             }
             await Assert.That(metadata.StatusCode).IsEqualTo(HttpStatusCode.OK)
                 .Because(await metadata.Content.ReadAsStringAsync());
+            if (change == "quarantine-saved-action")
+            {
+                using var document = System.Text.Json.JsonDocument.Parse(await metadata.Content.ReadAsStringAsync());
+                savedAction = document.RootElement.GetProperty("_links").GetProperty("download")
+                    .GetProperty("href").GetString()!;
+                await Assert.That(savedAction).Contains($"/api/eventresource/{resourceId}/content");
+            }
             if (change == "allow")
             {
                 string json = await metadata.Content.ReadAsStringAsync();
@@ -289,6 +389,8 @@ public sealed partial class EventResourceContentTests
                 await Assert.That(json).DoesNotContain(checksum);
             }
         }
+        if (change is "quarantine-before-access" or "quarantine-saved-action")
+            await QuarantineCurrentMaterialAsync();
         if (change == "window-boundaries")
         {
             using (var before = await client.GetAsync($"/api/eventresource/{resourceId}/content"))
@@ -317,7 +419,7 @@ public sealed partial class EventResourceContentTests
             await AssertNoBrowseAuditAsync();
             return;
         }
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/eventresource/{resourceId}/content");
+        using var request = new HttpRequestMessage(HttpMethod.Get, savedAction ?? $"/api/eventresource/{resourceId}/content");
         request.Headers.TryAddWithoutValidation("If-None-Match", "*");
         request.Headers.TryAddWithoutValidation("Range", "bytes=0-4");
         using var response = await client.SendAsync(request);
@@ -342,10 +444,61 @@ public sealed partial class EventResourceContentTests
         }
         await Assert.That(response.Headers.CacheControl!.NoStore).IsTrue();
         await Assert.That(response.Headers.CacheControl.Private).IsTrue();
-        await Assert.That(opened).IsTrue();
-        await disposal.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await Assert.That(disposed).IsTrue();
+        if (change is "quarantine-before-access" or "quarantine-saved-action")
+        {
+            await Assert.That(opened).IsFalse();
+            await Assert.That(disposed).IsFalse();
+        }
+        else
+        {
+            await Assert.That(opened).IsTrue();
+            await disposal.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Assert.That(disposed).IsTrue();
+        }
         await Assert.That(System.Text.Encoding.UTF8.GetString(body)).DoesNotContain(objectKey);
+        if (change == "quarantine-before-final-read")
+        {
+            await Assert.That(terminalQuarantine).IsTrue();
+            await Assert.That(terminalCompleted).IsTrue()
+                .Because("the real native header handler must deny and dispose prepared bytes after the result-boundary quarantine");
+        }
+        if (change.StartsWith("quarantine-", StringComparison.Ordinal))
+        {
+            string deniedBody = System.Text.Encoding.UTF8.GetString(body);
+            await Assert.That(deniedBody).DoesNotContain("handout.pdf");
+            await Assert.That(deniedBody).DoesNotContain(checksum);
+            await Assert.That(deniedBody).DoesNotContain(storageId.ToString());
+            await Assert.That(response.Content.Headers.ContentType?.MediaType)
+                .IsNotEqualTo(EventResourceGovernancePolicy.PdfMediaType);
+            await Assert.That(response.Headers.ETag).IsNull();
+            await Assert.That(response.Content.Headers.LastModified).IsNull();
+            using var detail = await client.GetAsync($"/api/eventresource/{resourceId}");
+            await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK)
+                .Because(await detail.Content.ReadAsStringAsync());
+            string detailBody = await detail.Content.ReadAsStringAsync();
+            await Assert.That(detailBody).DoesNotContain("handout.pdf");
+            await Assert.That(detailBody).DoesNotContain("Public audience, private provider");
+            await Assert.That(detailBody).DoesNotContain("Public resource handout");
+            await Assert.That(detailBody).DoesNotContain(objectKey);
+            await Assert.That(detailBody).DoesNotContain(checksum);
+            await Assert.That(detailBody).DoesNotContain(storageId.ToString());
+            using var projection = System.Text.Json.JsonDocument.Parse(detailBody);
+            await Assert.That(projection.RootElement.GetProperty("_links").TryGetProperty("download", out _)).IsFalse();
+            await using var quarantined = factory.CreateDatabase();
+            quarantined.EnableTenantFilterBypass("Verify only this resource's persisted current unreleased cause.");
+            var resource = await quarantined.EventResources.Include(row => row.ModerationQuarantines)
+                .SingleAsync(row => row.TenantId == PlatformDefaults.DefaultTenantId && row.Id == resourceId);
+            await Assert.That(resource.ModerationQuarantineCount).IsEqualTo(1);
+            var cause = resource.ModerationQuarantines.Single();
+            cause.ValidatePersistedState();
+            await Assert.That(cause.Id).IsEqualTo(quarantineId);
+            await Assert.That(cause.EffectId).IsEqualTo(effectId);
+            await Assert.That(cause.TenantId).IsEqualTo(PlatformDefaults.DefaultTenantId);
+            await Assert.That(cause.EventId).IsEqualTo(eventId);
+            await Assert.That(cause.EventResourceId).IsEqualTo(resourceId);
+            await Assert.That(cause.MaterialVersionId).IsEqualTo(resource.MaterialVersionId!.Value);
+            await Assert.That(cause.ReleaseId).IsNull();
+        }
         if (change == "tighten")
         {
             using var detail = await client.GetAsync($"/api/eventresource/{resourceId}");
@@ -359,6 +512,32 @@ public sealed partial class EventResourceContentTests
         }
         if (change == "allow") await AssertNoBrowseAuditAsync();
 
+        async Task QuarantineCurrentMaterialAsync()
+        {
+            await using var db = factory.CreateDatabase();
+            db.EnableTenantFilterBypass("Quarantine only this exact aggregate's current resource material.");
+            var resource = await db.EventResources.Include(row => row.ModerationQuarantines)
+                .SingleAsync(row => row.TenantId == PlatformDefaults.DefaultTenantId && row.Id == resourceId);
+            resource.ApplyModerationQuarantine(quarantineId, effectId, 0,
+                resource.MaterialVersionId!.Value, resource.ConcurrencyStamp, clock.GetUtcNow());
+            await db.SaveChangesAsync();
+        }
+
+        async Task AddFixtureSettingAsync(ExploreDbContext db, SystemSetting setting)
+        {
+            var existing = measurement
+                ? await db.SystemSettings.SingleOrDefaultAsync(row => row.SettingKey == setting.SettingKey)
+                : null;
+            if (existing is null)
+                db.SystemSettings.Add(setting);
+            else
+            {
+                existing.Value = setting.Value;
+                existing.ValueType = setting.ValueType;
+                existing.Category = setting.Category;
+            }
+        }
+
         async Task AssertNoBrowseAuditAsync()
         {
             await using var audit = factory.CreateDatabase();
@@ -368,12 +547,14 @@ public sealed partial class EventResourceContentTests
         }
     }
 
-    private sealed class ResultBoundary(string change, ResourceClock clock) : IAsyncResultFilter
+    private sealed class ResultBoundary(string change, ResourceClock clock, Func<Task> quarantine) : IAsyncResultFilter
     {
         public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
         {
             if (context.Result is EventResourceFileResult)
             {
+                if (change == "quarantine-before-final-read")
+                    await quarantine();
                 if (change == "expire-before-headers")
                     clock.Advance(TimeSpan.FromMinutes(2));
                 if (change == "cancel-result")
@@ -384,6 +565,20 @@ public sealed partial class EventResourceContentTests
                 }
             }
             await next();
+        }
+    }
+
+    private sealed class ObservedHeaderCompletion(
+        IQueryHandler<GetEventResourceContentHeadersQuery, EventResourceHeaderResult> inner,
+        Func<EventResourceHeaderResult, Task> observe)
+        : IQueryHandler<GetEventResourceContentHeadersQuery, EventResourceHeaderResult>
+    {
+        public async Task<EventResourceHeaderResult> QueryAsync(GetEventResourceContentHeadersQuery query,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await inner.QueryAsync(query, cancellationToken);
+            await observe(result);
+            return result;
         }
     }
 

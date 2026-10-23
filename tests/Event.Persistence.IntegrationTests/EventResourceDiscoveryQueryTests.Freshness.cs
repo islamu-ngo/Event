@@ -133,7 +133,7 @@ public sealed partial class EventResourceDiscoveryQueryTests
         var rows = Enumerable.Range(0, 2).Select(index => Resource(scope, publisher, index,
             EventResourceAudienceKindEnum.Public)).ToArray();
         await SaveAsync(rows);
-        await using var context = database.CreateContext();
+        await using var context = database.CreateMeasurementContext();
         var provider = new Provider();
         var workflow = Workflow(context, scope.TenantAId, publisher, provider);
         var page = await workflow.ListAsync(scope.EventAId, 1, null, default);
@@ -149,6 +149,7 @@ public sealed partial class EventResourceDiscoveryQueryTests
         }, (_, _) => { released = true; return Task.CompletedTask; });
         await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
         await Assert.That(released).IsFalse();
+        await RecordAudienceDatabaseObservationAsync(context);
     }
 
     [Test]

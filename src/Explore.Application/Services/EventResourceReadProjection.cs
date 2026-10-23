@@ -35,6 +35,7 @@ public sealed class EventResourceReadProjection<T> : IAsyncDisposable where T : 
         token.ThrowIfCancellationRequested();
         if (outcome != EventResourceAuthorityOutcome.Allowed) return outcome;
         await deliver(representation, token);
+        token.ThrowIfCancellationRequested();
         return EventResourceAuthorityOutcome.Allowed;
     }
 

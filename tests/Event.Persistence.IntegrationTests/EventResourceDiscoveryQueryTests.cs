@@ -8,6 +8,8 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Explore.Persistence.Database;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -17,6 +19,36 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
 {
     private static readonly DateTime Now = new(2040, 1, 1, 12, 0, 0, DateTimeKind.Utc);
     private readonly EventResourceCursorProtector _cursors = new(new EphemeralDataProtectionProvider(), new Clock());
+
+    private static async Task RecordAudienceDatabaseObservationAsync(Explore.Persistence.ExploreDbContext context)
+    {
+        var identity = context.GetService<IDbContextOptions>()
+            .FindExtension<PrimaryDatabasePublicIdentityOptionsExtension>()
+            ?? throw new InvalidOperationException("Audience measurement requires native public database composition.");
+        var connection = context.Database.GetDbConnection();
+        var provider = identity.Provider switch
+        {
+            Explore.Secrets.Database.PrimaryDatabaseProvider.PostgreSql => "Npgsql.EntityFrameworkCore.PostgreSQL",
+            Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite => "Microsoft.EntityFrameworkCore.Sqlite",
+            Explore.Secrets.Database.PrimaryDatabaseProvider.SqlServer => "Microsoft.EntityFrameworkCore.SqlServer",
+            Explore.Secrets.Database.PrimaryDatabaseProvider.MariaDb or Explore.Secrets.Database.PrimaryDatabaseProvider.MySql
+                => "Pomelo.EntityFrameworkCore.MySql",
+            _ => null
+        };
+        if (provider is null || context.Database.ProviderName != provider)
+            throw new InvalidOperationException("Audience measurement must observe its actual composed provider.");
+        var alreadyOpen = connection.State == System.Data.ConnectionState.Open;
+        if (!alreadyOpen) await context.Database.OpenConnectionAsync();
+        try
+        {
+            Event.Tests.Shared.Moderation.ModerationMeasurementJournalAttribute.RecordDatabaseObservation(
+                TUnit.Core.TestContext.Current!, identity.Provider.ToString(), connection.ServerVersion, identity.PublicDigest);
+        }
+        finally
+        {
+            if (!alreadyOpen) await context.Database.CloseConnectionAsync();
+        }
+    }
 
     [Test]
     public async Task SparseFiveHundredEvaluatesDeniedEarlyRowsAndFindsLateVisibleResourceWithBoundedSql()
@@ -94,7 +126,7 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         var resource = Resource(scope, publisher, 0, EventResourceAudienceKindEnum.AuthenticatedTenantMember,
             EventResourceDisclosureModeEnum.Teaser);
         await SaveAsync(resource);
-        await using var context = database.CreateContext();
+        await using var context = database.CreateMeasurementContext();
         var workflow = Workflow(context, scope.TenantAId, subject,
             origins: ["https://resources.example.test"]);
         var detail = await new GetEventResourceAudienceDetailQueryHandler(workflow).QueryAsync(new(resource.Id));
@@ -121,6 +153,7 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         await Assert.That(teaserValue.Title).IsEqualTo(resource.PublicTitle);
         await Assert.That(teaserValue.IsTeaser).IsTrue();
         await Assert.That(teaserValue.ExternalDestinationSafeOrigin).IsNull();
+        await RecordAudienceDatabaseObservationAsync(context);
         await Assert.That(teaserValue.Description).IsNull();
         await Assert.That(teaserValue.AccessibilityNote).IsNull();
         await Assert.That(teaserValue.LanguageCode).IsNull();

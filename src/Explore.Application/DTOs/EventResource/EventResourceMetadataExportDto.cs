@@ -10,19 +10,21 @@ public sealed record EventResourceMetadataExportDto
     public required Guid Id { get; init; }
     public Guid? EventSessionId { get; init; }
     public required EventResourcePublicationStateEnum PublicationState { get; init; }
-    public required string Title { get; init; }
+    public string? Status { get; init; }
+    public Guid? MaterialVersionId { get; init; }
+    public string? Title { get; init; }
     public string? PublicTitle { get; init; }
     public string? Description { get; init; }
     public string? SensitiveNotes { get; init; }
-    public required EventResourceKindEnum Kind { get; init; }
-    public required EventResourceDisclosureModeEnum DisclosureMode { get; init; }
-    public required EventResourceDeliveryTypeEnum DeliveryType { get; init; }
+    public EventResourceKindEnum? Kind { get; init; }
+    public EventResourceDisclosureModeEnum? DisclosureMode { get; init; }
+    public EventResourceDeliveryTypeEnum? DeliveryType { get; init; }
     public string? LanguageCode { get; init; }
     public string? AccessibilityNote { get; init; }
-    public int SortOrder { get; init; }
+    public int? SortOrder { get; init; }
     public Guid? AccessibleAlternativeEventResourceId { get; init; }
-    public required EventResourceTimeIntentDto Availability { get; init; }
-    public required ImmutableArray<EventResourceAudienceDto> AudienceRules { get; init; }
+    public EventResourceTimeIntentDto? Availability { get; init; }
+    public ImmutableArray<EventResourceAudienceDto>? AudienceRules { get; init; }
     public EventResourceFileMetadataDto? File { get; init; }
     public EventResourceDownloadReferenceDto? Download { get; init; }
 

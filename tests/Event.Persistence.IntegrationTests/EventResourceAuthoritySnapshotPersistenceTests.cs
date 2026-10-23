@@ -675,7 +675,8 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         return new(resources, authority, governance, new ExternalApiKeyRepository(context),
             Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
             new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
-                Substitute.For<IModerationMachineSubjectBindingRepository>()));
+                Substitute.For<IModerationMachineSubjectBindingRepository>(),
+                global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context)));
     }
 
     private sealed class AuthorityClock : TimeProvider

@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Security.Claims;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Infrastructure;
@@ -8,11 +9,14 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Explore.Infrastructure.Identity;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
@@ -104,7 +108,7 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         return released!;
     }
 
-    private static EventResourceManagementWorkflow Workflow(ExploreDbContext context, Guid tenantId, Guid actor,
+    private EventResourceManagementWorkflow Workflow(ExploreDbContext context, Guid tenantId, Guid actor,
         EventResourceGovernancePolicy? policy = null, IEventResourceAuthorizationProvider? provider = null,
         IUnitOfWork? unitOfWork = null, TimeProvider? clock = null)
     {
@@ -127,17 +131,27 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         }
         var tenant = Substitute.For<ITenantContext>();
         tenant.TenantId.Returns(tenantId);
+        context.TenantContext = tenant;
         var user = Substitute.For<ICurrentUserService>();
         user.IsAuthenticated.Returns(true);
         user.UserId.Returns(actor);
-        var machine = Substitute.For<IMachinePrincipalAccessor>();
+        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
+            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, actor.ToString("D"))], "event-resource-native")) } };
+        var identity = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
+            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
+            NullLogger<AdminContext>.Instance);
+        var machine = new MachinePrincipalAccessor(http);
         return new(repository, unit, new EventResourceStorageLifecycleService(
             new EventResourceStorageLifecycleRepository(context), unit, clock), new(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
                 new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
-                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>())),
-            routes, provider, clock), tenant, user, machine, clock);
+                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+                    global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
+            routes, provider, clock), tenant, user, machine, clock,
+            new EventPublicationMutationBoundary(context, database.Privacy.Authority(context, clock),
+                new UserContext(http), identity, machine, clock,
+                global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context)));
     }
 
     private static EventResourceDraftDto Draft() => new()

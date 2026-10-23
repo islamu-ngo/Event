@@ -39,17 +39,19 @@ public sealed class EventResourceAudienceWorkflow(
             var row = await resources.GetAuthorityResourceAsync(tenant.TenantId, resourceId, ct);
             var storage = row?.StorageObjectId is { } storageId
                 ? await resources.GetStorageObjectAsync(tenant.TenantId, storageId, ct) : null;
-            return (Resource: row, File: row is null ? null : EventResourceFileSafety.Describe(row, storage));
+            EventResource? alternativeRow = null;
+            if (row?.AccessibleAlternativeEventResourceId is { } alternativeId && alternativeId != row.Id)
+            {
+                var candidate = await resources.GetAuthorityResourceAsync(tenant.TenantId, alternativeId, ct);
+                if (candidate?.EventId == row.EventId) alternativeRow = candidate;
+            }
+            return (Resource: row, Alternative: alternativeRow,
+                File: row is null ? null : EventResourceFileSafety.Describe(row, storage));
         }, cancellationToken);
         var resource = prepared.Resource;
         if (resource is null) return new(EventResourceAudienceFailure.NotFound);
         var rows = new List<EventResource> { resource };
-        if (resource.AccessibleAlternativeEventResourceId is { } alternativeId && alternativeId != resource.Id)
-        {
-            var alternative = await unitOfWork.ExecuteSerializableAsync(
-                ct => resources.GetAuthorityResourceAsync(tenant.TenantId, alternativeId, ct), cancellationToken);
-            if (alternative?.EventId == resource.EventId) rows.Add(alternative);
-        }
+        if (prepared.Alternative is { } alternative) rows.Add(alternative);
         var checks = rows.Select(row => BindVersion(row, principal)).ToArray();
         checks[0] = checks[0] with { ExpectedAttachmentGeneration = prepared.File?.AttachmentGeneration };
         var decisions = await authority.AuthorizeAudienceAsync(checks, cancellationToken);
@@ -186,6 +188,7 @@ public sealed class EventResourceAudienceWorkflow(
         var checks = new List<EventResourceAuthorityRequest>();
         foreach (var item in items)
         {
+            if (item.Availability == "quarantined") continue;
             var binding = accepted[item.Id] with { ExpectedDisclosure = null };
             if (!item.IsTeaser && item.Availability == "available")
             {
@@ -241,6 +244,9 @@ public sealed class EventResourceAudienceWorkflow(
         var check = accepted[row.Id];
         proof.Add(check);
         var disclosure = check.ExpectedDisclosure!;
+        if (row.HasModerationQuarantine)
+            return new(row.Id, row.EventId, null, null, false, "quarantined", null)
+            { MaterialVersionId = row.MaterialVersionId };
         bool privateMetadata = disclosure.DisclosePrivateMetadata;
         Guid? alternative = null;
         if (privateMetadata && row.AccessibleAlternativeEventResourceId is { } id

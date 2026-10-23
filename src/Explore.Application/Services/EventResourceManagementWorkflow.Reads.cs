@@ -18,7 +18,8 @@ public sealed partial class EventResourceManagementWorkflow
             if (resource is null) return null;
             var storage = resource.StorageObjectId is { } storageId
                 ? await resources.GetStorageObjectAsync(resource.TenantId, storageId, ct) : null;
-            return Map(resource) with { File = EventResourceFileSafety.Describe(resource, storage) };
+            return Map(resource) with
+            { File = resource.HasModerationQuarantine ? null : EventResourceFileSafety.Describe(resource, storage) };
         }, cancellationToken);
 
     public async Task<EventResourceManagementReadResult<EventResourceManagementPageDto>> ListAsync(
@@ -41,7 +42,8 @@ public sealed partial class EventResourceManagementWorkflow
                 .ToDictionary(item => item.Id);
             return new EventResourceManagementPageDto(rows.Select(row => Map(row) with
             {
-                File = EventResourceFileSafety.Describe(row, storage.GetValueOrDefault(row.StorageObjectId ?? Guid.Empty))
+                File = row.HasModerationQuarantine ? null
+                    : EventResourceFileSafety.Describe(row, storage.GetValueOrDefault(row.StorageObjectId ?? Guid.Empty))
             }).ToImmutableArray(), page, pageSize);
         }, cancellationToken);
         var denial = await AuthorizeDisclosureAsync(eventId, prepared.Items, cancellationToken);
@@ -77,6 +79,11 @@ public sealed partial class EventResourceManagementWorkflow
         return await ReadAsync(Request(resourceId, "view-audit"), async (facts, ct) =>
         {
             retention = facts.Access.GovernancePolicy?.AuditRetentionDays ?? 0;
+            var resource = await resources.GetByIdAsync(facts.Access.TenantId, facts.Access.Parent.EventId, resourceId, ct);
+            if (resource is null) return null;
+            if (resource.HasModerationQuarantine)
+                return new EventResourceAuditPageDto([])
+                { Status = "quarantined", MaterialVersionId = resource.MaterialVersionId };
             if (retention == 0) return new EventResourceAuditPageDto([]);
             var rows = await resources.GetUnexpiredAuditEntriesAsync(facts.Access.TenantId, resourceId,
                 clock.GetUtcNow().UtcDateTime.AddDays(-retention), limit, ct);
@@ -133,7 +140,11 @@ public sealed partial class EventResourceManagementWorkflow
             : EventResourceManagementReadResult.Denied<T>(EventResourceAuthorityOutcome.NotFound);
     }
 
-    private static EventResourceManagementDto Map(EventResource resource) => new(resource.Id, resource.EventId,
+    private static EventResourceManagementDto Map(EventResource resource) => resource.HasModerationQuarantine
+        ? new(resource.Id, resource.EventId, resource.ConcurrencyStamp,
+            (EventResourcePublicationStateEnum)resource.PublicationStateId, null, null, null)
+        { Status = "quarantined", MaterialVersionId = resource.MaterialVersionId }
+        : new(resource.Id, resource.EventId,
         resource.ConcurrencyStamp, (EventResourcePublicationStateEnum)resource.PublicationStateId, new()
         {
             Title = resource.Title,

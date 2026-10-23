@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Event.Persistence.IntegrationTests.Moderation;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -24,6 +25,7 @@ using Explore.Persistence.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using NSubstitute;
 using TUnit.Core.Interfaces;
 
@@ -31,7 +33,7 @@ namespace Event.Persistence.IntegrationTests;
 
 [NotInParallel("EventResourcePersistence")]
 [ClassDataSource<EventResourceFileUploadTests.Database>(Shared = SharedType.PerClass)]
-public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Database database)
+public sealed partial class EventResourceFileUploadTests(EventResourceFileUploadTests.Database database)
 {
     private static readonly DateTime Now = new(2040, 1, 1, 12, 0, 0, DateTimeKind.Utc);
     private static readonly byte[] Pdf = "%PDF-1.7\nresource test\n%%EOF"u8.ToArray();
@@ -102,6 +104,7 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             (_, _) => { delivered = true; return Task.CompletedTask; }))
             .IsEqualTo(EventResourceAuthorityOutcome.NotFound);
         await Assert.That(delivered).IsFalse();
+        await RecordUploadDatabaseObservationAsync(context);
     }
 
     [Test]
@@ -1130,14 +1133,19 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             return binding;
         });
         providers.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(provider);
+        var moderation = new EventResourceModerationSnapshotReader(context,
+            Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+            ModerationRecognitionResourceFixture.Reader(context));
         var authority = new EventResourceAuthorityOrchestrator(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
                 new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
-                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>())),
+                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+                    global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
             routes, authorityProvider, new Clock());
         return new(new EventResourceFileUploadWorkflow(repository, new StorageUploadSessionRepository(context), new StorageObjectRepository(context),
             new StorageUsageCounterRepository(context), new PrivacyErasureStateRepository(context), policy, providers, unit,
+            new EventResourceUploadMutationBoundary(context, database.Privacy.Authority(context, new Clock()), moderation, new Clock()),
             Lifecycle(context), authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new Clock()));
     }
 
@@ -1163,7 +1171,8 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
                 new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
-                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>())),
+                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+                    global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
             routes, provider, new Clock()), tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new Clock());
     }
 
@@ -1201,13 +1210,44 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         }
     }
 
-    /// <summary>Current-model SQLite schema until the parent generates forward migrations; existing seeds and context infrastructure.</summary>
+    /// <summary>
+    /// Owns isolated SQLite outside measurement; measurement borrows the launcher's selected
+    /// primary database without replacing or deleting it.
+    /// </summary>
     public sealed class Database : IAsyncInitializer, IAsyncDisposable
     {
-        private SqliteConnection _connection = null!;
+        private static readonly SemaphoreSlim MeasurementInitialization = new(1, 1);
+        private SqliteConnection? _connection;
         private DbContextOptions<ExploreDbContext> _options = null!;
+        internal ModerationNoticePrivacyFixture Privacy { get; private set; } = null!;
         public async Task InitializeAsync()
         {
+            Privacy = await ModerationNoticePrivacyFixture.CreateAsync();
+            if (Environment.GetEnvironmentVariable("ISLAMU_MODERATION_MEASUREMENT_JOURNAL") == "1")
+            {
+                if (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") != "Testing"
+                    || Environment.GetEnvironmentVariable("SECRET_PROVIDER") != "Environment")
+                    throw new InvalidOperationException("Upload measurement requires the launcher-selected testing environment.");
+                var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+                using var configurationOwner = (IDisposable)configuration;
+                var selected = Explore.Secrets.Database.PrimaryDatabaseConfiguration.BindRuntime(configuration);
+                var measured = TestDbContextOptions.Create<ExploreDbContext>();
+                PrimaryDatabaseProviderComposition.ConfigureApplication(measured, selected);
+                _options = measured.Options;
+                if (!await MeasurementInitialization.WaitAsync(TimeSpan.FromMinutes(1)))
+                    throw new TimeoutException("Upload measurement database initialization did not acquire its owner.");
+                try
+                {
+                    await using var initializer = CreateContext();
+                    await initializer.Database.EnsureCreatedAsync();
+                    await LookupTableSeeder.SeedAsync(initializer);
+                }
+                finally
+                {
+                    MeasurementInitialization.Release();
+                }
+                return;
+            }
             _connection = await SqliteTestDatabaseFactory.CreateOpenIsolatedConnectionAsync();
             _options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(_connection.ConnectionString)
                 .UseSnakeCaseNamingConvention()
@@ -1228,6 +1268,10 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             context.EnableTenantFilterBypass("Resource upload invariant test.");
             return context;
         }
-        public ValueTask DisposeAsync() => _connection.DisposeAsync();
+        public async ValueTask DisposeAsync()
+        {
+            if (_connection is not null) await _connection.DisposeAsync();
+            if (Privacy is not null) await Privacy.DisposeAsync();
+        }
     }
 }

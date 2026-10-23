@@ -33,7 +33,15 @@ public sealed partial class EventResourceManagementWorkflow
                     storage.GetValueOrDefault(row.StorageObjectId ?? Guid.Empty)));
                 var items = rows.Select(row =>
                 {
-                    var semantics = Map(row).Draft;
+                    if (row.HasModerationQuarantine)
+                        return new EventResourceMetadataExportDto
+                        {
+                            Id = row.Id,
+                            PublicationState = (EventResourcePublicationStateEnum)row.PublicationStateId,
+                            Status = "quarantined",
+                            MaterialVersionId = row.MaterialVersionId
+                        };
+                    var semantics = Map(row).Draft!;
                     return new EventResourceMetadataExportDto
                     {
                         Id = row.Id,
@@ -60,7 +68,7 @@ public sealed partial class EventResourceManagementWorkflow
                     ExpectedResourceVersion = row.ConcurrencyStamp,
                     ExpectedAttachmentGeneration = files[row.Id]?.AttachmentGeneration
                 }).ToArray();
-                var downloadChecks = rows.Where(row => files[row.Id] is not null).Select(row =>
+                var downloadChecks = rows.Where(row => !row.HasModerationQuarantine && files[row.Id] is not null).Select(row =>
                     Request(row.Id, "download") with
                     {
                         ExpectedResourceVersion = row.ConcurrencyStamp,

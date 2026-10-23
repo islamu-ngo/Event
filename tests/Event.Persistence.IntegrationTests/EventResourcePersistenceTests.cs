@@ -8,6 +8,7 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using TUnit.Assertions.Enums;
 using TUnit.Core;
 using TUnit.Core.Interfaces;
@@ -456,9 +457,12 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
     public sealed class TestDatabase : IAsyncInitializer, IAsyncDisposable
     {
+        private static readonly SemaphoreSlim MeasurementInitialization = new(1, 1);
         private SqliteConnection? _connection;
         private Func<ExploreDbContext> _contextFactory = null!;
         private DbContextOptions<ExploreDbContext>? _options;
+        private bool _measurementDatabase;
+        private Moderation.ModerationNoticePrivacyFixture? _privacy;
 
         public TestDatabase() { }
 
@@ -469,9 +473,60 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
         }
 
         internal ResourceScope? Scope { get; private set; }
+        internal Moderation.ModerationNoticePrivacyFixture Privacy => _privacy
+            ?? throw new InvalidOperationException("Publication requires the initialized privacy authority owner.");
 
         public async Task InitializeAsync()
         {
+            _privacy = await Moderation.ModerationNoticePrivacyFixture.CreateAsync();
+            try
+            {
+                await InitializePrimaryAsync();
+            }
+            catch
+            {
+                await DisposeAsync();
+                throw;
+            }
+        }
+
+        private async Task InitializePrimaryAsync()
+        {
+            if (Environment.GetEnvironmentVariable("ISLAMU_MODERATION_MEASUREMENT_JOURNAL") == "1")
+            {
+                if (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") != "Testing"
+                    || Environment.GetEnvironmentVariable("SECRET_PROVIDER") != "Environment")
+                    throw new InvalidOperationException("Audience measurement requires the launcher-selected testing environment.");
+                var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+                    .AddEnvironmentVariables().Build();
+                using var configurationOwner = (IDisposable)configuration;
+                var selected = Explore.Secrets.Database.PrimaryDatabaseConfiguration.BindRuntime(configuration);
+                var measured = TestDbContextOptions.Create<ExploreDbContext>();
+                Explore.Persistence.Database.PrimaryDatabaseProviderComposition.ConfigureApplication(measured, selected);
+                var measuredOptions = measured.Options;
+                _options = measuredOptions;
+                _measurementDatabase = true;
+                _contextFactory = () =>
+                {
+                    var context = new ExploreDbContext(measuredOptions);
+                    context.EnableTenantFilterBypass("Event resource measured relational invariant test.");
+                    return context;
+                };
+                if (!await MeasurementInitialization.WaitAsync(TimeSpan.FromMinutes(1)))
+                    throw new TimeoutException("Audience measurement database initialization did not acquire its owner.");
+                try
+                {
+                    await using var initializer = CreateContext();
+                    await initializer.Database.EnsureCreatedAsync();
+                    await LookupTableSeeder.SeedAsync(initializer);
+                }
+                finally
+                {
+                    MeasurementInitialization.Release();
+                }
+                return;
+            }
+
             var connection = new SqliteConnection(new SqliteConnectionStringBuilder
             {
                 DataSource = $"event-resources-{Guid.CreateVersion7():N}",
@@ -504,8 +559,28 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
         public ExploreDbContext CreateContext() => _contextFactory();
 
+        public ExploreDbContext CreateMeasurementContext()
+        {
+            if (_measurementDatabase) return CreateContext();
+            if (_options is null || _connection is null)
+                throw new InvalidOperationException("Audience measurement requires the initialized SQLite owner.");
+            var options = TestDbContextOptions.Create(_options);
+            Explore.Persistence.Database.PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+                new Explore.Secrets.Database.PrimaryDatabaseConnectionOptions
+                {
+                    Role = Explore.Secrets.Database.PrimaryDatabaseRole.Runtime,
+                    Provider = Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite,
+                    Database = _connection.DataSource
+                });
+            options.UseSqlite(_connection);
+            var context = new ExploreDbContext(options.Options);
+            context.EnableTenantFilterBypass("Event resource measured relational invariant test.");
+            return context;
+        }
+
         public ExploreDbContext CreateIndependentContext()
         {
+            if (_measurementDatabase) return CreateContext();
             if (_options is null || _connection is null)
                 throw new InvalidOperationException("Independent connections require the initialized SQLite fixture.");
             var options = TestDbContextOptions.Create(_options)
@@ -517,7 +592,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
         public ExploreDbContext CreateContext(params Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[] interceptors)
         {
-            if (_options is null) throw new InvalidOperationException("Interceptors require the initialized SQLite fixture.");
+            if (_options is null) throw new InvalidOperationException("Interceptors require the initialized relational fixture.");
             DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create(_options)
                 .AddInterceptors(interceptors).Options;
             var context = new ExploreDbContext(options);
@@ -593,9 +668,15 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
         public async ValueTask DisposeAsync()
         {
-            if (_connection is not null)
+            try
             {
-                await _connection.DisposeAsync();
+                if (_privacy is not null)
+                    await _privacy.DisposeAsync();
+            }
+            finally
+            {
+                if (_connection is not null)
+                    await _connection.DisposeAsync();
             }
         }
 

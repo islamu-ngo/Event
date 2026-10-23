@@ -103,6 +103,33 @@ public sealed class EventResourceReadProjectionTests
         await Assert.That(delivered).IsFalse();
     }
 
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task IgnoredTerminalCancellationCannotReturnAllowedOrRetainPreparation(bool origin)
+    {
+        using var original = new CancellationTokenSource();
+        using var consumer = new CancellationTokenSource();
+        var owner = new PreparationOwner();
+        var projection = new EventResourceReadProjection<string>("private metadata",
+            _ => Task.FromResult(EventResourceAuthorityOutcome.Allowed), original.Token, owner);
+        var delivered = false;
+        await Assert.That(async () => await projection.DiscloseAsync(
+            (value, _) => Task.FromResult(value),
+            (_, _) =>
+            {
+                delivered = true;
+                if (origin) original.Cancel();
+                else consumer.Cancel();
+                return Task.CompletedTask;
+            }, consumer.Token)).Throws<OperationCanceledException>();
+        await Assert.That(delivered).IsTrue();
+        await Assert.That(owner.Disposals).IsEqualTo(1);
+        await Assert.That(await projection.DiscloseAsync((value, _) => Task.FromResult(value),
+            (_, _) => throw new InvalidOperationException("Consumed metadata cannot be delivered again.")))
+            .IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+    }
+
     private sealed class PreparationOwner : IAsyncDisposable
     {
         internal int Disposals { get; private set; }

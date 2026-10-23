@@ -142,6 +142,7 @@ internal static class EventResourceFileProviderContractAssertions
     internal static async Task AssertAttachmentHasOneOwnerAsync(
         Func<ExploreDbContext> contextFactory)
     {
+        await using var privacy = await global::Event.Persistence.IntegrationTests.Moderation.ModerationNoticePrivacyFixture.CreateAsync();
         UploadSeed seed = await SeedUploadAsync(contextFactory);
         Guid firstSessionId;
         Guid secondSessionId;
@@ -153,7 +154,7 @@ internal static class EventResourceFileProviderContractAssertions
                 .Where(row => row.TenantId == seed.TenantId && row.Provider == StorageProviders.Local);
             existingBytes = await inventory.SumAsync(row => row.Size);
             existingObjects = await inventory.LongCountAsync();
-            EventResourceUploadTestConsumer workflow = UploadWorkflow(reserve, contextFactory, seed);
+            EventResourceUploadTestConsumer workflow = UploadWorkflow(reserve, contextFactory, seed, privacy);
             var firstReservation = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
             if (firstReservation.Id is null)
                 throw new InvalidOperationException($"First upload reservation failed: {firstReservation.FailureCode}.");
@@ -168,7 +169,7 @@ internal static class EventResourceFileProviderContractAssertions
         var releaseFirstProvider = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var deadline = new CancellationTokenSource(Timeout);
         await using var firstContext = contextFactory();
-        EventResourceUploadTestConsumer firstWorkflow = UploadWorkflow(firstContext, contextFactory, seed,
+        EventResourceUploadTestConsumer firstWorkflow = UploadWorkflow(firstContext, contextFactory, seed, privacy,
             async cancellationToken =>
             {
                 firstProviderEntered.TrySetResult();
@@ -180,7 +181,7 @@ internal static class EventResourceFileProviderContractAssertions
 
         Explore.Application.Responses.BaseCommandResponse<Explore.Application.DTOs.StorageObject.StorageUploadSessionDto> winner;
         await using (ExploreDbContext secondContext = contextFactory())
-            winner = await FinalizeAsync(UploadWorkflow(secondContext, contextFactory, seed), secondSessionId, deadline.Token);
+            winner = await FinalizeAsync(UploadWorkflow(secondContext, contextFactory, seed, privacy), secondSessionId, deadline.Token);
         releaseFirstProvider.TrySetResult();
         var loser = await first.WaitAsync(Timeout, deadline.Token);
 
@@ -440,7 +441,9 @@ internal static class EventResourceFileProviderContractAssertions
     }
 
     private static EventResourceUploadTestConsumer UploadWorkflow(ExploreDbContext context,
-        Func<ExploreDbContext> contextFactory, UploadSeed seed, Func<CancellationToken, Task>? beforeWrite = null)
+        Func<ExploreDbContext> contextFactory, UploadSeed seed,
+        global::Event.Persistence.IntegrationTests.Moderation.ModerationNoticePrivacyFixture privacy,
+        Func<CancellationToken, Task>? beforeWrite = null)
     {
         var repository = new EventResourceRepository(context);
         var unit = new EfCoreUnitOfWork(context);
@@ -487,11 +490,16 @@ internal static class EventResourceFileProviderContractAssertions
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
                 new ExternalApiKeyRepository(context), Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
-                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>())),
+                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+                    global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
             routes, authorization, new ContractClock());
         return new(new EventResourceFileUploadWorkflow(repository, new StorageUploadSessionRepository(context), new StorageObjectRepository(context),
             new StorageUsageCounterRepository(context), new PrivacyErasureStateRepository(context), storagePolicy,
-            providers, unit, new EventResourceStorageLifecycleService(new EventResourceStorageLifecycleRepository(context),
+            providers, unit, new Explore.Persistence.Services.EventResourceUploadMutationBoundary(context,
+                privacy.Authority(context, new ContractClock()), new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
+                    Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+                    global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context)), new ContractClock()),
+            new EventResourceStorageLifecycleService(new EventResourceStorageLifecycleRepository(context),
                 unit, new ContractClock()), authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new ContractClock()));
     }
 
@@ -532,7 +540,8 @@ internal static class EventResourceFileProviderContractAssertions
             new EventAuthoritySnapshotService(context), governance, new ExternalApiKeyRepository(context),
             Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
             new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
-                Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>())),
+                Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
+                global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
             routes, provider, new ContractClock());
     }
 

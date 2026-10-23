@@ -29,7 +29,7 @@ public sealed partial class EventResourceDiscoveryQueryTests
             Decide = input => input.Action == action && !actionAllowed
                 ? EventResourceProviderDecision.Deny : EventResourceProviderDecision.Allow
         };
-        await using var context = database.CreateContext();
+        await using var context = database.CreateMeasurementContext();
         var workflow = Workflow(context, scope.TenantAId, publisher, provider,
             origins: ["https://resources.example.test"], allowUnscanned: true);
         var detail = collection ? null : await workflow.GetAsync(resource.Id, default);
@@ -60,6 +60,7 @@ public sealed partial class EventResourceDiscoveryQueryTests
             .SingleAsync(row => row.Id == resource.Id)).ConcurrencyStamp).IsEqualTo(resource.ConcurrencyStamp);
         await Assert.That(provider.Sizes.All(size => size <=
             EventResourceAuthorityRequest.MaximumBatchChecks)).IsTrue();
+        await RecordAudienceDatabaseObservationAsync(context);
     }
 
     [Test]

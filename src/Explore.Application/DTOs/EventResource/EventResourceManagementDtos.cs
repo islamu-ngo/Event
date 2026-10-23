@@ -65,10 +65,13 @@ public sealed record EventResourceDraftDto
 }
 
 public sealed record EventResourceManagementDto(Guid Id, Guid EventId, Guid Version,
-    EventResourcePublicationStateEnum PublicationState, EventResourceDraftDto Draft,
-    DateTime CreatedAt, DateTime? UpdatedAt, EventResourceFileMetadataDto? File = null,
+    EventResourcePublicationStateEnum PublicationState, EventResourceDraftDto? Draft,
+    DateTime? CreatedAt, DateTime? UpdatedAt, EventResourceFileMetadataDto? File = null,
     string? ExternalDestinationSafeOrigin = null)
 {
+    public string? Status { get; init; }
+    public Guid? MaterialVersionId { get; init; }
+
     public override string ToString() => nameof(EventResourceManagementDto);
 }
 
@@ -87,4 +90,8 @@ public sealed record EventResourceAuditDto(Guid Id, EventResourceAuditAction Act
     EventResourceAuditOutcome Outcome, EventResourceAuditReason Reason, DateTime Timestamp,
     Guid? ResponsibleManagerUserId);
 
-public sealed record EventResourceAuditPageDto(ImmutableArray<EventResourceAuditDto> Items);
+public sealed record EventResourceAuditPageDto(ImmutableArray<EventResourceAuditDto> Items)
+{
+    public string? Status { get; init; }
+    public Guid? MaterialVersionId { get; init; }
+}

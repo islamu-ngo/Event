@@ -1,12 +1,12 @@
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Services;
-using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
 using Explore.Application.Features.ConfigurationManifest.LegalDocuments;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Managed;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Explore.Application.Services;
 using Explore.Application.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,6 +51,8 @@ public static class ConfigurationManifestApplicationServicesRegistration
             ConfigurationManifestPreflight>();
         services.TryAddScoped<IConfigurationManifestApplier, ConfigurationManifestApplier>();
         services.TryAddSingleton<LegalDocumentRenderingService>();
+        services.TryAddScoped<ModerationConfigurationImportAdapter>();
+        services.TryAddScoped<ModerationConfigurationExportService>();
 
         if (effectDeliveryMode == ConfigurationManifestEffectDeliveryMode.DeferredToRuntime)
         {

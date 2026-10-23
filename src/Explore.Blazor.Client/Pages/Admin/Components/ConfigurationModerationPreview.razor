@@ -1,0 +1,45 @@
+@using Explore.Blazor.Client.Clients
+@inject ITranslationService Translations
+
+@foreach (var target in Targets)
+{
+    <section>
+        <h5><bdi>@target.TargetName</bdi></h5>
+        <p><bdi>@target.SourceName</bdi> → <bdi>@target.TargetName</bdi> · <bdi>@target.SectionKey</bdi></p>
+        <dl>
+            <dt>@T("configurationPortability.moderation.currentRevision", "Current policy revision")</dt>
+            <dd>@target.CurrentPolicyRevision</dd>
+            <dt>@T("configurationPortability.moderation.baseline", "Historical baseline available")</dt>
+            <dd>@(target.HasBaseline ? T("common.yes", "Yes") : T("common.no", "No"))</dd>
+            <dt>@T("configurationPortability.moderation.destinationReady", "Destination ready for draft import")</dt>
+            <dd>@(target.CanApply ? T("common.yes", "Yes") : T("common.no", "No"))</dd>
+        </dl>
+        <h6>@T("configurationPortability.moderation.changes", "Definition changes")</h6>
+        <ul>
+            @foreach (var change in target.Changes ?? [])
+            {
+                <li>
+                    <bdi>@change.Section</bdi> · <bdi>@change.ReferenceCode</bdi> @change.ReferenceRevision · <bdi>@change.Kind</bdi>
+                    @if (change.Conflict)
+                    {
+                        <strong>@T("configurationPortability.moderation.conflict", "Conflict")</strong>
+                    }
+                </li>
+            }
+        </ul>
+        <h6>@T("configurationPortability.moderation.diagnostics", "Compiler diagnostics")</h6>
+        <ul>
+            @foreach (var diagnostic in target.Diagnostics ?? [])
+            {
+                <li><bdi>@diagnostic.Severity</bdi> · <bdi>@diagnostic.Kind</bdi> · <bdi>@diagnostic.RuleCode</bdi> @diagnostic.RuleRevision <bdi>@diagnostic.ConsumerId</bdi> <bdi>@diagnostic.Mode</bdi></li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ConfigurationImportModerationTargetPreview> Targets { get; set; } = [];
+
+    private string T(string key, string fallback) => Translations.T(key, fallback);
+}

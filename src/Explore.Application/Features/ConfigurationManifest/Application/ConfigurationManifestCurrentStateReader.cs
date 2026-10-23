@@ -7,6 +7,8 @@ using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Compilation;
+using Explore.Application.Features.ConfigurationManifest.Importing;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.ConfigurationManifest.Validation;
 using Explore.Application.Settings;
@@ -24,7 +26,10 @@ public sealed class ConfigurationManifestCurrentStateReader(
     IHierarchicalSettingsResolver settingsResolver,
     ITypedSettingsDocumentResolver typedDocuments,
     IPaidEventPolicyRepository paidEventPolicies,
-    IConfigurationManifestOperationRepository operations)
+    IConfigurationManifestOperationRepository operations,
+    ModerationConfigurationExportService moderation,
+    ILegalDocumentRepository legalDocuments,
+    IUnitOfWork unitOfWork)
 {
     private static readonly string[] InstanceSettingKeys = ConfigurationManifestCatalog
         .InstanceSettings.Keys.Order(StringComparer.Ordinal).ToArray();
@@ -41,13 +46,20 @@ public sealed class ConfigurationManifestCurrentStateReader(
 
     private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
 
-    public async Task<ConfigurationManifestExportResult> ReadAsync(
+    public Task<ConfigurationManifestExportResult> ReadAsync(
+        ConfigurationManifestExportView view, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteSerializableAsync(
+            token => ReadInCurrentTransactionAsync(view, token), cancellationToken);
+
+    public async Task<ConfigurationManifestExportResult> ReadInCurrentTransactionAsync(
         ConfigurationManifestExportView view,
         CancellationToken cancellationToken)
     {
         await new ExportConfigurationManifestQueryValidator()
             .ValidateAndThrowAsync(new ExportConfigurationManifestQuery(view), cancellationToken);
 
+        ModerationConfigurationExport definitions = await moderation.ReadInCurrentTransactionAsync(
+            ConfigurationImportTarget.ForInstance(), cancellationToken);
         IReadOnlyList<Tenant> activeTenants =
             await tenants.GetAllActiveForConfigurationManifestExportAsync(
                 ConfigurationManifestValidator.MaximumTenantCount + 1,
@@ -62,6 +74,8 @@ public sealed class ConfigurationManifestCurrentStateReader(
             throw new ConfigurationManifestExportTooLargeException();
         }
 
+        IReadOnlyList<LegalDocument> legal = await legalDocuments.GetForInstanceConfigurationExportAsync(
+            activeTenants.Select(tenant => tenant.Id).ToArray(), cancellationToken);
         PaidEventPolicyVersion instancePolicy = await ReadInstancePolicyAsync(cancellationToken);
         IReadOnlyDictionary<string, JsonElement> instanceValues = view switch
         {
@@ -92,6 +106,9 @@ public sealed class ConfigurationManifestCurrentStateReader(
                 tenant,
                 instancePolicy,
                 view,
+                definitions.Tenants.GetValueOrDefault(tenant.Id),
+                legal.Where(document => document.Scope == LegalDocumentScope.Tenant
+                    && document.TenantId == tenant.Id).ToArray(),
                 cancellationToken));
         }
 
@@ -129,7 +146,11 @@ public sealed class ConfigurationManifestCurrentStateReader(
                 Instance = new ConfigurationManifestInstanceV1Alpha2
                 {
                     Settings = instanceValues,
-                    Documents = instanceDocuments
+                    Documents = instanceDocuments,
+                    LegalDocuments = LegalConfigurationSnapshotProjection.Project(
+                        legal.Where(document => document.Scope == LegalDocumentScope.Instance).ToArray(),
+                        LegalDocumentScope.Instance, null),
+                    Moderation = definitions.Instance
                 },
                 Tenants = exportedTenants
             }
@@ -148,14 +169,81 @@ public sealed class ConfigurationManifestCurrentStateReader(
             FileName = view == ConfigurationManifestExportView.Portable
                 ? "configuration-manifest-portable.json"
                 : "configuration-manifest-overrides.json",
-            Utf8Json = ConfigurationManifestExportJsonSerializer.Serialize(manifest)
+            Utf8Json = ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(manifest)
         };
+    }
+
+    /// <summary>
+    /// Reads only the authorized tenant's package. It does not enumerate other tenants or borrow
+    /// instance-export authority to trim a complete manifest after disclosure has already occurred.
+    /// </summary>
+    public Task<TenantConfigurationPackageExportResult> ReadTenantAsync(
+        Guid tenantId, ConfigurationManifestExportView view, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteSerializableAsync(
+            token => ReadTenantInCurrentTransactionAsync(tenantId, view, token), cancellationToken);
+
+    public async Task<TenantConfigurationPackageExportResult> ReadTenantInCurrentTransactionAsync(
+        Guid tenantId, ConfigurationManifestExportView view, CancellationToken cancellationToken)
+    {
+        await new ExportConfigurationManifestQueryValidator()
+            .ValidateAndThrowAsync(new ExportConfigurationManifestQuery(view), cancellationToken);
+        ModerationConfigurationExport definitions = await moderation.ReadInCurrentTransactionAsync(
+            ConfigurationImportTarget.ForTenant(tenantId), cancellationToken);
+        Tenant tenant = await tenants.GetByIdAsNoTrackingAsync(tenantId, cancellationToken)
+            ?? throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.ArtifactMissing);
+        IReadOnlyList<LegalDocument> legal = await legalDocuments.GetForConfigurationExportAsync(
+            LegalDocumentScope.Tenant, tenantId, cancellationToken);
+        var policy = await ReadInstancePolicyAsync(cancellationToken);
+        var exportedTenant = await ExportTenantAsync(
+            tenant, policy, view, definitions.Tenants.GetValueOrDefault(tenant.Id), legal, cancellationToken);
+        var latest = await operations.GetLatestAppliedBootstrapAsync(cancellationToken);
+        var metadata = new ConfigurationManifestMetadataV1Alpha2
+        {
+            Name = string.IsNullOrWhiteSpace(latest?.ManifestName) ? "current-instance" : latest.ManifestName,
+            Export = new ConfigurationManifestExportMetadataV1Alpha2
+            {
+                View = view == ConfigurationManifestExportView.Portable
+                    ? ConfigurationManifestExportMetadataValues.PortableView
+                    : ConfigurationManifestExportMetadataValues.OverridesView,
+                EffectiveValuesFlattened = view == ConfigurationManifestExportView.Portable,
+                SensitiveValuesOmitted = true,
+                AuthorityScope = ConfigurationManifestExportMetadataValues.TenantAuthorityScope,
+                SovereignValuesOmitted = true,
+                SovereignLockedFields = PaidEventPolicyAuthorityMetadata.SovereignLockedFields
+            }
+        };
+        var package = TenantConfigurationPackageSerializer.Create(metadata, exportedTenant);
+        // Reuse the existing disclosure guard with only this tenant, never a globally read manifest.
+        ConfigurationManifestExportBrandingPolicy.EnsureSafeForExport(new ConfigurationManifestV1Alpha2
+        {
+            Schema = ConfigurationManifestContractMetadata.SchemaId,
+            ApiVersion = ConfigurationManifestContractMetadata.ApiVersion,
+            Kind = ConfigurationManifestContractMetadata.Kind,
+            Metadata = metadata,
+            Spec = new ConfigurationManifestSpecV1Alpha2
+            {
+                Instance = new ConfigurationManifestInstanceV1Alpha2
+                {
+                    Settings = new Dictionary<string, JsonElement>(),
+                    Documents = new Dictionary<string, ConfigurationManifestDocumentV1Alpha2>()
+                },
+                Tenants = [exportedTenant]
+            }
+        });
+        if (!ConfigurationManifestValidator.Validate(package).IsValid)
+            throw new InvalidOperationException(
+                "Current tenant configuration could not be represented by the configuration package contract.");
+        ReadOnlyMemory<byte> bytes = TenantConfigurationPackageSerializer.Serialize(package);
+        return new(view, $"tenant-configuration-package-{tenant.Slug}.json",
+            bytes, ConfigurationImportDigest.ComputeBytes(bytes.Span));
     }
 
     private async Task<ConfigurationManifestTenantV1Alpha2> ExportTenantAsync(
         Tenant tenant,
         PaidEventPolicyVersion instancePolicy,
         ConfigurationManifestExportView view,
+        ConfigurationModerationDocumentV1? definition,
+        IReadOnlyList<LegalDocument> legal,
         CancellationToken cancellationToken)
     {
         IReadOnlyDictionary<string, JsonElement> values = view switch
@@ -208,7 +296,10 @@ public sealed class ConfigurationManifestCurrentStateReader(
             {
                 DisplayName = tenant.FullName,
                 Settings = values,
-                Documents = documents
+                Documents = documents,
+                LegalDocuments = LegalConfigurationSnapshotProjection.Project(
+                    legal, LegalDocumentScope.Tenant, tenant.Id),
+                Moderation = definition
             }
         };
     }

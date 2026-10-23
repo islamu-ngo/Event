@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 public enum ConfigurationImportPreviewCategory
@@ -28,7 +29,8 @@ public sealed record ConfigurationImportPreviewBinding
         string mappingDigest,
         ConfigurationImportApplyMode applyMode,
         string requiredApprovalDigest,
-        DateTime expiresAt)
+        DateTime expiresAt,
+        string? moderationReservationDigest = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         ConfigurationImportContractGuard.ValidateDigest(
@@ -49,6 +51,8 @@ public sealed record ConfigurationImportPreviewBinding
         if (!Enum.IsDefined(applyMode))
             throw new ArgumentOutOfRangeException(nameof(applyMode));
         ConfigurationImportContractGuard.RequireUtc(expiresAt, nameof(expiresAt));
+        if (moderationReservationDigest is not null)
+            ConfigurationImportContractGuard.ValidateDigest(moderationReservationDigest, nameof(moderationReservationDigest));
 
         Target = target;
         ArtifactDigest = artifactDigest;
@@ -58,6 +62,7 @@ public sealed record ConfigurationImportPreviewBinding
         ApplyMode = applyMode;
         RequiredApprovalDigest = requiredApprovalDigest;
         ExpiresAt = expiresAt;
+        ModerationReservationDigest = moderationReservationDigest;
     }
 
     public ConfigurationImportTarget Target { get; }
@@ -68,6 +73,7 @@ public sealed record ConfigurationImportPreviewBinding
     public ConfigurationImportApplyMode ApplyMode { get; }
     public string RequiredApprovalDigest { get; }
     public DateTime ExpiresAt { get; }
+    public string? ModerationReservationDigest { get; }
 
     public bool Matches(ConfigurationImportPreviewBinding candidate)
     {
@@ -94,7 +100,8 @@ public sealed record ConfigurationImportPreviewBinding
                 RequiredApprovalDigest,
                 candidate.RequiredApprovalDigest,
                 StringComparison.Ordinal)
-            && ExpiresAt == candidate.ExpiresAt;
+            && ExpiresAt == candidate.ExpiresAt
+            && ModerationReservationDigest == candidate.ModerationReservationDigest;
     }
 }
 
@@ -174,7 +181,8 @@ public sealed record ConfigurationImportPreviewInput
         ConfigurationImportApplyMode applyMode,
         IEnumerable<string> requiredApprovalCodes,
         IEnumerable<string> grantedApprovalCodes,
-        DateTime expiresAt)
+        DateTime expiresAt,
+        ModerationConfigurationImportSetPreview? moderationPreview = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(sourceSections);
@@ -227,6 +235,7 @@ public sealed record ConfigurationImportPreviewInput
                 nameof(grantedApprovalCodes)))
             .ToImmutableHashSet(StringComparer.Ordinal);
         ExpiresAt = expiresAt;
+        ModerationPreview = moderationPreview;
 
         EnsureUniqueSections(SourceSections, nameof(sourceSections));
         EnsureUniqueSections(TargetSections, nameof(targetSections));
@@ -243,6 +252,7 @@ public sealed record ConfigurationImportPreviewInput
     public ImmutableHashSet<string> RequiredApprovalCodes { get; }
     public ImmutableHashSet<string> GrantedApprovalCodes { get; }
     public DateTime ExpiresAt { get; }
+    public ModerationConfigurationImportSetPreview? ModerationPreview { get; }
 
     private static void EnsureUniqueSections(
         ImmutableArray<ConfigurationImportSectionSnapshot> sections,
@@ -392,6 +402,21 @@ public sealed class ConfigurationImportPreviewComposer
             mappedTargets,
         ConfigurationImportPreviewInput input)
     {
+        if (ModerationConfigurationImportSections.IsModeration(source.SectionKey))
+        {
+            if (!input.SelectedSectionKeys.Contains(source.SectionKey))
+                return Item(source, ConfigurationImportPreviewCategory.Skipped,
+                    "configuration_import_section_not_selected");
+            if (input.ModerationPreview is not { CanApply: true }
+                || !input.ModerationPreview.Targets.Any(target => target.Target.SectionKey == source.SectionKey))
+                return Item(source, ConfigurationImportPreviewCategory.Blocking,
+                    "configuration_import_moderation_native_preview_required");
+            bool unchanged = targetBySection.TryGetValue(source.SectionKey, out var nativeTarget)
+                && nativeTarget.NormalizedDigest == source.NormalizedDigest;
+            return Item(source, unchanged ? ConfigurationImportPreviewCategory.Unchanged
+                : ConfigurationImportPreviewCategory.Changed,
+                unchanged ? "configuration_import_section_unchanged" : "configuration_import_section_changed");
+        }
         if (!ConfigurationPortabilityRegistry.Sections.TryGetValue(
                 source.SectionKey,
                 out ConfigurationPortabilitySectionDescriptor? descriptor))
@@ -548,7 +573,8 @@ public sealed class ConfigurationImportPreviewComposer
                 input.RequiredApprovalCodes.Select(code => $"required:{code}")
                     .Concat(input.GrantedApprovalCodes.Select(code =>
                         $"granted:{code}"))),
-            input.ExpiresAt);
+            input.ExpiresAt,
+            input.ModerationPreview?.Reservation.Digest);
 
     private static ConfigurationImportPreviewItem Item(
         ConfigurationImportSectionSnapshot source,

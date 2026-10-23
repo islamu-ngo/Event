@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M6449ECHA48W0MRCBRJMFN
+Title: "Apply mapped moderation drafts atomically with configuration imports"
+Type: feat
+Scope: self-hosting
+Summary: "Bind imports to current destination authority and reserved identities, coordinate legal and moderation drafts in one transaction, and disclose bounded previews; reservation migrations and complete runtime assurance remain pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: mitigated
+    Detail: "Source binds preview and apply to exact destinations, artifacts, reservations and current authority, requalifies response-time disclosure and rejects foreign pending legal graphs. All destinations share the original serializable transaction; provider, race and response-custody witnesses remain unrun."
+  Migration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: planned
+    Detail: "The configuration-import session mapping adds a bounded nullable moderation reservation. Generated provider migrations for that session field and complete provider/runtime/rollback assurance remain outstanding; this packet does not claim a deployable migration set."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Detail: "Instance and tenant sections export independently authorized neutral definitions and apply complete mapped drafts with coordinator-owned legal content. Publication participation flushes but never independently commits; rejected ownership or stale reservations roll back earlier sections."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Import previews gain bounded moderation changes and diagnostics under a response-time disclosure owner. The aggregate OpenAPI inventory and generated client are main-owned source-matched integration artifacts, excluded from this packet; final composition and verification remain pending."
+  Operator:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: planned
+    Detail: "Paired manifest guides explain source integration, all-or-nothing draft application, retained permissions and known limits. Imports do not activate a policy, rollback to an absent policy is unsupported, and complete deployment/provider assurance is unrun."

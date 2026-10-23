@@ -34,7 +34,8 @@ public sealed class ConfigurationImportSectionApplier(
         DateTime occurredAt,
         string artifactDigest,
         ConfigurationImportArtifactParser parser,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        List<LegalDocument>? ownedLegalDocuments = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(request);
@@ -52,6 +53,7 @@ public sealed class ConfigurationImportSectionApplier(
                 occurredAt,
                 artifactDigest,
                 deferredNotifications,
+                ownedLegalDocuments,
                 cancellationToken);
             await ApplyManifestTenantsAsync(
                 manifest.Spec.Tenants,
@@ -61,6 +63,7 @@ public sealed class ConfigurationImportSectionApplier(
                 occurredAt,
                 artifactDigest,
                 deferredNotifications,
+                ownedLegalDocuments,
                 cancellationToken);
             return deferredNotifications.ToImmutable();
         }
@@ -80,6 +83,7 @@ public sealed class ConfigurationImportSectionApplier(
             occurredAt,
             artifactDigest,
             deferredNotifications,
+            ownedLegalDocuments,
             cancellationToken);
         return deferredNotifications.ToImmutable();
     }
@@ -169,6 +173,7 @@ public sealed class ConfigurationImportSectionApplier(
         DateTime occurredAt,
         string artifactDigest,
         ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
+        List<LegalDocument>? ownedLegalDocuments,
         CancellationToken cancellationToken)
     {
         if (selected.Contains("instance.settings") && source.Settings.Count > 0)
@@ -241,6 +246,7 @@ public sealed class ConfigurationImportSectionApplier(
                 source.LegalDocuments,
                 artifactDigest,
                 occurredAt,
+                ownedLegalDocuments,
                 cancellationToken);
         }
     }
@@ -253,6 +259,7 @@ public sealed class ConfigurationImportSectionApplier(
         DateTime occurredAt,
         string artifactDigest,
         ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
+        List<LegalDocument>? ownedLegalDocuments,
         CancellationToken cancellationToken)
     {
         if (!selected.Any(section => section.StartsWith("tenant.", StringComparison.Ordinal)))
@@ -282,6 +289,7 @@ public sealed class ConfigurationImportSectionApplier(
                 occurredAt,
                 artifactDigest,
                 deferredNotifications,
+                ownedLegalDocuments,
                 cancellationToken);
         }
     }
@@ -297,6 +305,7 @@ public sealed class ConfigurationImportSectionApplier(
         DateTime occurredAt,
         string artifactDigest,
         ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
+        List<LegalDocument>? ownedLegalDocuments,
         CancellationToken cancellationToken)
     {
         if (selected.Contains("tenant.settings"))
@@ -386,6 +395,7 @@ public sealed class ConfigurationImportSectionApplier(
                 legal,
                 artifactDigest,
                 occurredAt,
+                ownedLegalDocuments,
                 cancellationToken);
         }
     }
@@ -460,16 +470,20 @@ public sealed class ConfigurationImportSectionApplier(
         IReadOnlyDictionary<string, ConfigurationManifestLegalDocumentV1Alpha2> source,
         string artifactDigest,
         DateTime occurredAt,
+        List<LegalDocument>? ownedLegalDocuments,
         CancellationToken cancellationToken)
     {
+        if (source.Values.Any(document => document.JurisdictionAssumptions.Count != 0
+                || document.ChangeSummary is not null))
+            throw Blocked("configuration_import_legal_metadata_not_supported");
+
         foreach ((string code, ConfigurationManifestLegalDocumentV1Alpha2 portable)
                  in source.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
-            if (!LegalDocumentKindCatalog.TryGet(
-                    code,
-                    out LegalDocumentKindDescriptor? descriptor)
-                || descriptor is null
-                || descriptor.Scope != scope
+            if (!Enum.TryParse<LegalDocumentKind>(portable.Kind, ignoreCase: false, out var kind)
+                || !Enum.IsDefined(kind)
+                || code != kind.ToString()
+                || LegalDocumentKindCatalog.Get(kind).Scope != scope
                 || !Enum.TryParse(
                     portable.Audience,
                     ignoreCase: false,
@@ -499,23 +513,22 @@ public sealed class ConfigurationImportSectionApplier(
             LegalDocument? current = await legalDocuments.GetForUpdateAsync(
                 scope,
                 tenantId,
-                descriptor.Kind,
+                kind,
                 cancellationToken);
             string sourceOrigin = $"sha256:{artifactDigest}";
             if (current is null)
             {
-                await legalDocuments.AddAsync(
-                    LegalDocument.CreateImportedDraft(
-                        scope,
-                        tenantId,
-                        descriptor.Kind,
-                        audience,
-                        localizations,
-                        provenance,
-                        sourceOrigin,
-                        portable.RequiresFreshAcceptance,
-                        occurredAt),
-                    cancellationToken);
+                current = LegalDocument.CreateImportedDraft(
+                    scope,
+                    tenantId,
+                    kind,
+                    audience,
+                    localizations,
+                    provenance,
+                    sourceOrigin,
+                    portable.RequiresFreshAcceptance,
+                    occurredAt);
+                await legalDocuments.AddAsync(current, cancellationToken);
             }
             else
             {
@@ -527,6 +540,7 @@ public sealed class ConfigurationImportSectionApplier(
                     portable.RequiresFreshAcceptance,
                     occurredAt);
             }
+            ownedLegalDocuments?.Add(current);
         }
     }
 

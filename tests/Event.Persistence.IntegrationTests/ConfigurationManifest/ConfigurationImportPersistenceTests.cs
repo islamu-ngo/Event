@@ -179,18 +179,41 @@ public sealed class ConfigurationImportPersistenceTests
         await repository.AddAsync(session, CancellationToken.None);
         database.Context.ChangeTracker.Clear();
 
-        ConfigurationImportSession? matching = await repository.GetForUpdateAsync(
+        var unit = new EfCoreUnitOfWork(database.Context);
+        ConfigurationImportSession? matching = await unit.ExecuteSerializableAsync(token => repository.GetForUpdateAsync(
             session.SessionId,
             firstTarget,
-            CancellationToken.None);
+            token));
         database.Context.ChangeTracker.Clear();
-        ConfigurationImportSession? crossTenant = await repository.GetForUpdateAsync(
+        ConfigurationImportSession? crossTenant = await unit.ExecuteSerializableAsync(token => repository.GetForUpdateAsync(
             session.SessionId,
             secondTarget,
-            CancellationToken.None);
+            token));
 
         await Assert.That(matching?.SessionId).IsEqualTo(session.SessionId);
         await Assert.That(crossTenant).IsNull();
+    }
+
+    [Test]
+    public async Task Session_acquisition_reloads_committed_cancellation_instead_of_returning_tracked_authority()
+    {
+        await using TestDatabase database = await TestDatabase.CreateAsync();
+        var repository = new ConfigurationImportSessionRepository(database.Context);
+        var target = ConfigurationImportTarget.ForInstance();
+        var session = CreateSession(target);
+        await repository.AddAsync(session, CancellationToken.None);
+        await database.Context.Set<ConfigurationImportSession>()
+            .Where(row => row.SessionId == session.SessionId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(row => row.State, ConfigurationImportSessionState.Cancelled)
+                .SetProperty(row => row.CancelledAt, OccurredAt.AddMinutes(1))
+                .SetProperty(row => row.UpdatedAt, OccurredAt.AddMinutes(1)));
+
+        await Assert.That(session.State).IsEqualTo(ConfigurationImportSessionState.Uploaded);
+        var acquired = await new EfCoreUnitOfWork(database.Context).ExecuteSerializableAsync(token =>
+            repository.GetForUpdateAsync(session.SessionId, target, token));
+        await Assert.That(acquired!.State).IsEqualTo(ConfigurationImportSessionState.Cancelled);
+        await Assert.That(acquired.CancelledAt).IsEqualTo(OccurredAt.AddMinutes(1));
     }
 
     [Test]
@@ -262,10 +285,10 @@ public sealed class ConfigurationImportPersistenceTests
             CancellationToken.None);
         database.Context.ChangeTracker.Clear();
         ConfigurationImportSession? persisted =
-            await repository.GetForUpdateAsync(
+            await new EfCoreUnitOfWork(database.Context).ExecuteSerializableAsync(token => repository.GetForUpdateAsync(
                 created.Session.SessionId,
                 ConfigurationImportTarget.ForInstance(),
-                CancellationToken.None);
+                token));
 
         await Assert.That(expired).IsEqualTo(1);
         await Assert.That(persisted?.State)

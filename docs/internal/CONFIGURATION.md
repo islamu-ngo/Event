@@ -2547,6 +2547,27 @@ capability. The ordinary reader's scope guard remains unchanged. Catalogue key
 validation, instance-lock precedence and non-secret manifest projection still
 apply; this dispatch grants no new database or request authority.
 
+Moderation definition export also recognizes that sealed import owner. Its
+repository requires the original `ConfigurationImport` execution lease, the
+same context/connection and Serializable transaction, and the original validated
+request credential. The existing `IInstanceAdministratorCommitAuthority` fences
+the current principal and persisted platform-administrator authority. Credential
+custody and expiry are checked again after that authority operation, including
+the final recheck before definitions are returned. After the remaining settings,
+legal-content and tenant reads have completed and the snapshot transaction has
+finished, `ConfigurationInstanceImportExecutor` revalidates the same original
+request credential and signed lifetime before returning the complete artifact.
+Credential replacement or expiry during a later read therefore prevents disclosure.
+
+This is not permission for an arbitrary Global context to export definitions.
+Machine callers, tenant-administrator-only callers, expired credentials and
+unselected Global owners remain denied. Ordinary tenant exports retain their
+immutable tenant and PostgreSQL tenant-session checks; host, service, source
+epoch and metadata ownership fences remain active. No grants, schema changes or
+tenant-filter bypass state are introduced. The new regression sources are
+unrun locally; provider behavior and the complete import lifecycle still require
+remote CI evidence.
+
 ## Related
 
 - [API.md](API.md)

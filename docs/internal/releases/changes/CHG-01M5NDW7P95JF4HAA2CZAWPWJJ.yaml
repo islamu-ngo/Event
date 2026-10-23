@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5NDW7P95JF4HAA2CZAWPWJJ
+Title: "Retain native instance authority when exporting moderation definitions"
+Type: fix
+Scope: access
+Summary: "Allow the selected configuration-import owner to export governed definitions only while its original human credential and persisted instance-administrator authority remain valid, without retargeting the request tenant or widening database permissions."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: mitigated
+    Detail: "Only a natively selected ConfigurationImport owner with original credential custody and current persisted instance-administrator authority can use tenant-neutral definition export. The complete snapshot return boundary rechecks original credential custody and expiry after all reads. Existing tenant, transaction, host and source fences remain active; regression sources are unrun locally and provider behavior is not certified."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: "Import comparison snapshots retain independent native ownership without retargeting the request tenant or adding grants. Remote CI and complete import/rollback verification remain required before deployment."

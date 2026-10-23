@@ -7,6 +7,7 @@ using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.Services;
 using ISLAMU.Moderation.Domain;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -25,6 +26,27 @@ public sealed partial class ModerationPolicyPublicationRepository(
     IModerationClassificationMaterialInventoryReadRepository, IModerationClassificationMaterialReviewReadRepository
 {
     private readonly ModerationPolicyDefinitionSourceOwner definitions = new(context, admin, machine, inventory, clock);
+
+    internal ModerationPolicyPublicationRepository(
+        ExploreDbContext context, IAdminContext admin, IMachinePrincipalAccessor machine,
+        ModerationCapabilityRegistry inventory, IModerationPolicyPublicationEvidenceOwner? evidenceOwner,
+        TimeProvider clock, ExploreDbContextExecutionLease executionLease, IHttpContextAccessor httpContext,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        IEnumerable<IModerationConsumerRuntimeSource>? consumerSources = null,
+        IModerationMeasurementReceiptVerifier? measurementReceipts = null)
+        : this(context, admin, machine, inventory, evidenceOwner, clock, consumerSources, measurementReceipts)
+    {
+        ArgumentNullException.ThrowIfNull(executionLease);
+        ArgumentNullException.ThrowIfNull(httpContext);
+        ArgumentNullException.ThrowIfNull(instanceAuthority);
+        instanceExportLease = executionLease;
+        instanceExportHttp = httpContext;
+        instanceExportAuthority = instanceAuthority;
+        instanceExportScope = executionLease.HumanScope
+            ?? throw new UnauthorizedAccessException("Instance export requires the original selected human.");
+        instanceExportLifetime = executionLease.HumanLifetime
+            ?? throw new UnauthorizedAccessException("Instance export requires original validated credential custody.");
+    }
 
     public async Task<ModerationPolicyPublicationResult> PublishAsync(
         ModerationPolicyPublicationRequest request, CancellationToken cancellationToken = default)

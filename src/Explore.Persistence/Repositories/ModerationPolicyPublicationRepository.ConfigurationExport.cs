@@ -1,3 +1,4 @@
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Moderation;
@@ -6,37 +7,54 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using ISLAMU.Moderation.Domain;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
 public sealed partial class ModerationPolicyPublicationRepository
 {
+    private readonly ExploreDbContextExecutionLease? instanceExportLease;
+    private readonly IHttpContextAccessor? instanceExportHttp;
+    private readonly IInstanceAdministratorCommitAuthority? instanceExportAuthority;
+    private readonly HumanAdministratorCommitScope? instanceExportScope;
+    private readonly HumanAuthenticationLifetime? instanceExportLifetime;
+
     public async Task<IReadOnlyList<ModerationPolicyPublication>> AcquireConfigurationExportAsync(
         ConfigurationImportTarget target, CancellationToken cancellationToken = default)
     {
         var transaction = context.Database.CurrentTransaction;
         var nativeAuthority = new ModerationQualificationAuthority(context, admin, machine);
+        var requestTenant = context.TenantFilterTenantId;
+        bool nativeInstanceOwner = context.IsConfigurationInstanceImportOwner;
         if (transaction is null || !CurrentTransaction(transaction.TransactionId)
             || machine.IsMachineCaller || target is null
             || target.Scope is not (ConfigurationImportScope.Instance or ConfigurationImportScope.Tenant)
-            || context.TenantFilterTenantId is not { } requestTenant
             || target.Scope == ConfigurationImportScope.Tenant && target.TenantId != requestTenant
-            || !await nativeAuthority.ProviderTenantMatchesAsync(requestTenant, cancellationToken))
+            || nativeInstanceOwner && (target.Scope != ConfigurationImportScope.Instance || requestTenant is not null)
+            || !nativeInstanceOwner && (requestTenant is not { } selectedTenant
+                || !await nativeAuthority.ProviderTenantMatchesAsync(selectedTenant, cancellationToken)))
             throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
         if (context.ChangeTracker.HasChanges())
             throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Conflict);
 
         // Definition export remains usable before moderation installation. Its read authority is
         // therefore acquired from native human/role rows, not a required installation epoch.
-        await AcquireExportPrincipalAsync(target.Scope, requestTenant, cancellationToken);
+        if (nativeInstanceOwner)
+            await RequireNativeInstanceExportAuthorityAsync(cancellationToken);
+        else
+            await AcquireExportPrincipalAsync(target.Scope, requestTenant!.Value, cancellationToken);
         var host = await context.ModerationHostBindings.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
         if (host is null)
         {
             if (!CurrentTransaction(transaction.TransactionId)
-                || !await nativeAuthority.ProviderTenantMatchesAsync(requestTenant, cancellationToken))
+                || context.TenantFilterTenantId != requestTenant
+                || !nativeInstanceOwner && !await nativeAuthority.ProviderTenantMatchesAsync(requestTenant!.Value, cancellationToken))
                 throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+            if (nativeInstanceOwner)
+                await RequireNativeInstanceExportAuthorityAsync(cancellationToken);
             return Array.Empty<ModerationPolicyPublication>();
         }
         await RelationalEntityRowFence.AcquireGlobalAsync<ModerationHostBinding>(context, host.Id, cancellationToken);
@@ -144,13 +162,57 @@ public sealed partial class ModerationPolicyPublicationRepository
             }
             if (!CurrentTransaction(transaction.TransactionId) || context.ChangeTracker.HasChanges()
                 || context.ModerationTrustDomainId != host.TrustDomainId
-                || !await nativeAuthority.ProviderTenantMatchesAsync(requestTenant, cancellationToken))
+                || context.TenantFilterTenantId != requestTenant
+                || !nativeInstanceOwner && !await nativeAuthority.ProviderTenantMatchesAsync(requestTenant!.Value, cancellationToken))
                 throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+            if (nativeInstanceOwner)
+                await RequireNativeInstanceExportAuthorityAsync(cancellationToken);
             return result.AsReadOnly();
         }
         finally
         {
             context.ModerationTrustDomainId = priorTrustDomain;
+        }
+    }
+
+    private async Task RequireNativeInstanceExportAuthorityAsync(CancellationToken token)
+    {
+        var lease = instanceExportLease
+            ?? throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+        var scope = instanceExportScope
+            ?? throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+        var lifetime = instanceExportLifetime
+            ?? throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+        var authority = instanceExportAuthority
+            ?? throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+        var transaction = context.Database.CurrentTransaction;
+        var trustDomain = context.ModerationTrustDomainId;
+
+        RequireOriginalOwner();
+        if (await admin.ResolveUserIdAsync(token) != scope.Subject.PrincipalId
+            || !await authority.IsInstanceAdministratorForCommitAsync(scope.Subject.PrincipalId, token))
+            throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+        RequireOriginalOwner();
+
+        void RequireOriginalOwner()
+        {
+            lease.RequireOriginalOwner(context);
+            scope.RequireOwner(context);
+            if (machine.IsMachineCaller || !context.IsConfigurationInstanceImportOwner
+                || scope.Purpose != HumanAdministratorCommitPurpose.ConfigurationImport
+                || scope.TenantId is not null || lease.SelectedTenantId is not null
+                || lease.PolicyPurpose is not (null or Explore.Application.Contracts.Operations.PolicyMutationPurpose.Standard)
+                || context.TenantFilterTenantId is not null || context.IsTenantFilterBypassed
+                || !ReferenceEquals(lease.HumanScope, scope) || !ReferenceEquals(lease.HumanLifetime, lifetime)
+                || !ReferenceEquals(context.HumanCommitAuditSubject, scope.Subject)
+                || context.HumanCommitContextLease != context.ContextId
+                || context.ChangeTracker.HasChanges() || context.ModerationTrustDomainId != trustDomain
+                || !ReferenceEquals(context.Database.CurrentTransaction, transaction)
+                || transaction is null || !CurrentTransaction(transaction.TransactionId))
+                throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+            lease.RequireOriginalCredential(instanceExportHttp?.HttpContext, lifetime);
+            if (!lifetime.IsValidAt(clock.GetUtcNow()))
+                throw new UnauthorizedAccessException("The original instance-export credential lifetime has ended.");
         }
     }
 

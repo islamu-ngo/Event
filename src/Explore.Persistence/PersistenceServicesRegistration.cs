@@ -436,7 +436,27 @@ public static class PersistenceServicesRegistration
         services.AddScoped<ModerationMeasuredOperationsSourceOwner>();
         services.AddScoped<IModerationActivationSourceOwner, ModerationActivationSourceOwner>();
         services.AddScoped<IModerationPolicyPublicationRepository>(provider =>
-            new ModerationPolicyPublicationRepository(
+        {
+            var context = provider.GetRequiredService<ExploreDbContext>();
+            if (context.IsConfigurationInstanceImportOwner)
+            {
+                var lease = provider.GetRequiredService<ExploreDbContextExecutionLease>();
+                if (lease.HumanScope is null || lease.HumanLifetime is null)
+                    throw new UnauthorizedAccessException("Instance export requires its original authenticated owner.");
+                return new ModerationPolicyPublicationRepository(
+                    context,
+                    provider.GetRequiredService<IAdminContext>(),
+                    provider.GetRequiredService<IMachinePrincipalAccessor>(),
+                    provider.GetRequiredService<Explore.Application.Services.Moderation.ModerationCapabilityRegistry>(),
+                    provider.GetServices<IModerationPolicyPublicationEvidenceOwner>().SingleOrDefault(),
+                    provider.GetRequiredService<TimeProvider>(),
+                    lease,
+                    provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+                    provider.GetRequiredService<IInstanceAdministratorCommitAuthority>(),
+                    provider.GetServices<IModerationConsumerRuntimeSource>(),
+                    provider.GetService<IModerationMeasurementReceiptVerifier>());
+            }
+            return new ModerationPolicyPublicationRepository(
                 provider.GetRequiredService<ExploreDbContext>(),
                 provider.GetRequiredService<IAdminContext>(),
                 provider.GetRequiredService<IMachinePrincipalAccessor>(),
@@ -444,7 +464,8 @@ public static class PersistenceServicesRegistration
                 provider.GetServices<IModerationPolicyPublicationEvidenceOwner>().SingleOrDefault(),
                 provider.GetRequiredService<TimeProvider>(),
                 provider.GetServices<IModerationConsumerRuntimeSource>(),
-                provider.GetService<IModerationMeasurementReceiptVerifier>()));
+                provider.GetService<IModerationMeasurementReceiptVerifier>());
+        });
         services.AddScoped<IModerationClassificationMaterialInventoryReadRepository>(provider =>
             (IModerationClassificationMaterialInventoryReadRepository)provider.GetRequiredService<IModerationPolicyPublicationRepository>());
         services.AddScoped<IModerationClassificationMaterialReviewReadRepository>(provider =>

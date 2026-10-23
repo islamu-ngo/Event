@@ -77,6 +77,17 @@ Manifests deliberately exclude:
 > [!NOTE]
 > Whole-instance export preserves governed configuration only. It does not replace full database backups (see [Backup, Restore & Upgrade](backup-restore-upgrade.md)) or privacy-erasure compliance obligations.
 
+Instance import comparison snapshots use a separately owned transaction and
+require the original, still-valid human credential and current instance-admin
+authority before returning moderation definitions. Selecting a tenant-neutral
+database context alone is not authorization. Tenant-only administrators and
+machine credentials cannot use this path, and the request's selected tenant is
+not changed. The original credential is checked again before the complete
+snapshot is returned; expiry or replacement during later reads prevents disclosure.
+No additional database permissions or deployment settings are
+required. This source correction has not yet been verified by remote CI and is
+not a claim that the complete import/rollback lifecycle is deployment-ready.
+
 ---
 
 ## Safe Ingestion & Trust Boundary

@@ -1,8 +1,39 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "workstream": "event-api-security-remediation",
   "planRevision": "event-api-security-remediation-r5-cto-20261007",
   "assurance": "source-inventory-not-runtime-certification",
+  "executionRequirements": [
+    {
+      "laneId": "security-integration",
+      "project": "tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj",
+      "hostProfile": "dedicated-api-test-host",
+      "requiredTests": [
+        {
+          "className": "Event.Api.IntegrationTests.Authentication.KeycloakNativeTokenContextHttpTests",
+          "methodName": "NativeMetadataAndMapperProduceAccessContextButNotIdTokenAuthority",
+          "testName": "NativeMetadataAndMapperProduceAccessContextButNotIdTokenAuthority"
+        }
+      ]
+    },
+    {
+      "laneId": "cerbos-policy-contract",
+      "project": "tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj",
+      "hostProfile": "dedicated-api-test-host",
+      "requiredTests": [
+        {
+          "className": "Event.Api.IntegrationTests.Features.CerbosPolicyContractTests",
+          "methodName": "RegularUser_ShouldBeDenied_UpdateInstanceSettings",
+          "testName": "RegularUser_ShouldBeDenied_UpdateInstanceSettings"
+        },
+        {
+          "className": "Event.Api.IntegrationTests.Features.CerbosPolicyContractTests",
+          "methodName": "TenantAdmin_ShouldBeDenied_ModifyInstanceSettings",
+          "testName": "TenantAdmin_ShouldBeDenied_ModifyInstanceSettings"
+        }
+      ]
+    }
+  ],
   "executionOwnerInventory": [
     {
       "id": "nullable-definition-options",

@@ -60,7 +60,7 @@ public static partial class SecurityExecutionEvidence
                 string relativeReport = Path.GetRelativePath(repositoryRoot, reports[0]).Replace('\\', '/');
                 byte[] reportBytes = ReadBoundedFile(ResolveArtifact(repositoryRoot, relativeReport), MaximumReportBytes);
                 diagnostic = "nonpassing_execution";
-                if (!TryReadReport(reportBytes, out ExecutionCounts counts))
+                if (!TryReadReport(reportBytes, out ExecutionReport report))
                 {
                     output.WriteLine("security_execution_rejected: nonpassing_execution");
                     return Program.ToolchainRejected;
@@ -101,11 +101,11 @@ public static partial class SecurityExecutionEvidence
                     exitCode = 0,
                     counts = new
                     {
-                        selected = counts.Selected,
-                        executed = counts.Executed,
-                        passed = counts.Passed,
-                        failed = counts.Failed,
-                        skipped = counts.Skipped
+                        selected = report.Counts.Selected,
+                        executed = report.Counts.Executed,
+                        passed = report.Counts.Passed,
+                        failed = report.Counts.Failed,
+                        skipped = report.Counts.Skipped
                     },
                     executionContext = new
                     {

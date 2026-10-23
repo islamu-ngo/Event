@@ -34,20 +34,36 @@ internal static class SecurityExecutionEvidenceFixture
             ("cerbos-policy-contract", "PolicyContract")
         })
         {
-            int count = string.Equals(corruption, "zero-tests", StringComparison.Ordinal) ? 0 : 1;
+            string className = id == "security-integration"
+                ? "Event.Api.IntegrationTests.Authentication.KeycloakNativeTokenContextHttpTests"
+                : "Event.Api.IntegrationTests.Features.CerbosPolicyContractTests";
+            string[] methods = id == "security-integration"
+                ? ["NativeMetadataAndMapperProduceAccessContextButNotIdTokenAuthority"]
+                : ["RegularUser_ShouldBeDenied_UpdateInstanceSettings", "TenantAdmin_ShouldBeDenied_ModifyInstanceSettings"];
+            int count = string.Equals(corruption, "zero-tests", StringComparison.Ordinal) ? 0 : methods.Length;
             string reportPath = Path.Combine(reportDirectory, id + ".trx");
             var results = new XElement(TrxNamespace + "Results");
-            if (count > 0)
+            var definitions = new XElement(TrxNamespace + "TestDefinitions");
+            foreach (string method in methods.Take(count))
             {
+                string testId = Guid.NewGuid().ToString("D");
+                string executionId = Guid.NewGuid().ToString("D");
                 results.Add(new XElement(TrxNamespace + "UnitTestResult",
-                    new XAttribute("testId", Guid.NewGuid().ToString("D")),
-                    new XAttribute("executionId", Guid.NewGuid().ToString("D")),
-                    new XAttribute("testName", id + "-protocol-input"),
+                    new XAttribute("testId", testId),
+                    new XAttribute("executionId", executionId),
+                    new XAttribute("testName", method),
                     new XAttribute("outcome", "Passed")));
+                definitions.Add(new XElement(TrxNamespace + "UnitTest",
+                    new XAttribute("id", testId), new XAttribute("name", method),
+                    new XElement(TrxNamespace + "Execution", new XAttribute("id", executionId)),
+                    new XElement(TrxNamespace + "TestMethod",
+                        new XAttribute("className", className), new XAttribute("name", method))));
             }
 
             var report = new XDocument(new XElement(TrxNamespace + "TestRun",
+                new XAttribute("id", Guid.NewGuid().ToString("D")),
                 results,
+                definitions,
                 new XElement(TrxNamespace + "ResultSummary",
                     new XAttribute("outcome", "Completed"),
                     new XElement(TrxNamespace + "Counters",
@@ -70,7 +86,9 @@ internal static class SecurityExecutionEvidenceFixture
                 selector,
                 command = "dotnet test --project " + project +
                     " --configuration Release --no-build --verbosity minimal -- --treenode-filter \"" + selector +
-                    "\" --minimum-expected-tests 1 --no-progress --report-trx --report-trx-filename " +
+                    "\" --minimum-expected-tests 1" +
+                    (id == "security-integration" ? " --maximum-parallel-tests 1" : string.Empty) +
+                    " --no-progress --report-trx --report-trx-filename " +
                     (id == "security-integration" ? "security-integration-tests.trx" : "cerbos-policy-contract-tests.trx"),
                 runId = "42",
                 runAttempt = 1,

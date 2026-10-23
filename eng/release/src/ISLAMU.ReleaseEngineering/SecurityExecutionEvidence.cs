@@ -69,6 +69,10 @@ public static partial class SecurityExecutionEvidence
 
             JsonElement lanes = packet.GetProperty("lanes");
             var laneIds = new HashSet<string>(StringComparer.Ordinal);
+            var artifactPaths = new HashSet<string>(StringComparer.Ordinal);
+            var reportDigests = new HashSet<string>(StringComparer.Ordinal);
+            var reportIds = new HashSet<Guid>();
+            var executionIds = new HashSet<Guid>();
             foreach (JsonElement lane in lanes.EnumerateArray())
             {
                 string id = Text(lane, "id");
@@ -85,7 +89,8 @@ public static partial class SecurityExecutionEvidence
                     _ => string.Empty
                 };
                 string selector = "/*/*/*/*[Category=" + category + "]";
-                if (category.Length == 0 || Text(lane, "project") != ProjectPath ||
+                if (!SecurityControlRegister.ExecutionRequirements.TryGetValue(id, out var requirement) ||
+                    category.Length == 0 || Text(lane, "project") != requirement.Project ||
                     Text(lane, "selector") != selector ||
                     Text(lane, "command") != Command(id, category) ||
                     Text(lane, "runId") != runId ||
@@ -106,10 +111,10 @@ public static partial class SecurityExecutionEvidence
 
                 JsonElement context = lane.GetProperty("executionContext");
                 if (Text(context, "kind") != "test-host" || Text(context, "environment") != "Testing" ||
-                    Text(context, "hostProfile") != "dedicated-api-test-host" ||
-                    Text(context, "databaseProvider").Length == 0 ||
-                    Text(context, "databaseRole").Length == 0 ||
-                    Text(context, "authenticationScheme").Length == 0)
+                    Text(context, "hostProfile") != requirement.HostProfile ||
+                    Text(context, "databaseProvider") != "not-attested" ||
+                    Text(context, "databaseRole") != "not-attested" ||
+                    Text(context, "authenticationScheme") != "not-attested")
                 {
                     diagnostic = "invalid_execution_context";
                     return false;
@@ -123,13 +128,13 @@ public static partial class SecurityExecutionEvidence
                     return false;
                 }
 
-                var paths = new HashSet<string>(StringComparer.Ordinal);
                 foreach (JsonElement artifact in artifacts.EnumerateArray())
                 {
                     string kind = Text(artifact, "kind");
                     string relativePath = Text(artifact, "path");
                     string expectedDigest = Text(artifact, "sha256");
-                    if (kind is not ("trx" or "log") || !paths.Add(relativePath) ||
+                    if (kind is not ("trx" or "log") || !artifactPaths.Add(relativePath) ||
+                        (kind == "trx" && !reportDigests.Add(expectedDigest)) ||
                         expectedDigest.Length != 64 || !LowerHex(expectedDigest))
                     {
                         diagnostic = "artifact_inventory_invalid";
@@ -147,9 +152,20 @@ public static partial class SecurityExecutionEvidence
                     if (kind == "trx")
                     {
                         reports++;
-                        if (!TryReadReport(bytes, out ExecutionCounts measured) || measured != counts)
+                        if (!TryReadReport(bytes, out ExecutionReport measured) || measured.Counts != counts)
                         {
                             diagnostic = "report_counts_mismatch";
+                            return false;
+                        }
+                        if (!reportIds.Add(measured.RunId) || executionIds.Overlaps(measured.Executions))
+                        {
+                            diagnostic = "replayed_report_execution";
+                            return false;
+                        }
+                        executionIds.UnionWith(measured.Executions);
+                        if (!requirement.Tests.IsSubsetOf(measured.Tests))
+                        {
+                            diagnostic = "required_test_missing";
                             return false;
                         }
                     }
@@ -174,7 +190,7 @@ public static partial class SecurityExecutionEvidence
             return true;
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or
-            JsonException or XmlException or InvalidOperationException or KeyNotFoundException or ArgumentException)
+            JsonException or XmlException or InvalidOperationException or KeyNotFoundException or ArgumentException or FormatException)
         {
             diagnostic = "invalid_packet";
             return false;
@@ -188,7 +204,9 @@ public static partial class SecurityExecutionEvidence
             : "cerbos-policy-contract-tests.trx";
         return "dotnet test --project " + ProjectPath +
             " --configuration Release --no-build --verbosity minimal -- --treenode-filter \"/*/*/*/*[Category=" +
-            category + "]\" --minimum-expected-tests 1 --no-progress --report-trx --report-trx-filename " + filename;
+            category + "]\" --minimum-expected-tests 1" +
+            (id == "security-integration" ? " --maximum-parallel-tests 1" : string.Empty) +
+            " --no-progress --report-trx --report-trx-filename " + filename;
     }
 
     private static string Text(JsonElement element, string name) =>
@@ -255,9 +273,9 @@ public static partial class SecurityExecutionEvidence
         return bytes;
     }
 
-    private static bool TryReadReport(byte[] bytes, out ExecutionCounts counts)
+    private static bool TryReadReport(byte[] bytes, out ExecutionReport report)
     {
-        counts = default;
+        report = default;
         using var stream = new MemoryStream(bytes, writable: false);
         using XmlReader reader = XmlReader.Create(stream, new XmlReaderSettings
         {
@@ -270,7 +288,13 @@ public static partial class SecurityExecutionEvidence
         XElement? summary = root?.Element(TrxNamespace + "ResultSummary");
         XElement? counters = summary?.Element(TrxNamespace + "Counters");
         XElement? results = root?.Element(TrxNamespace + "Results");
-        if (root?.Name != TrxNamespace + "TestRun" || counters is null || results is null ||
+        XElement? definitions = root?.Element(TrxNamespace + "TestDefinitions");
+        if (root?.Name != TrxNamespace + "TestRun" || counters is null || results is null || definitions is null ||
+            !Guid.TryParse((string?)root.Attribute("id"), out Guid runId) || runId == Guid.Empty ||
+            root.Elements(TrxNamespace + "ResultSummary").Count() != 1 ||
+            summary!.Elements(TrxNamespace + "Counters").Count() != 1 ||
+            root.Elements(TrxNamespace + "Results").Count() != 1 ||
+            root.Elements(TrxNamespace + "TestDefinitions").Count() != 1 ||
             (string?)summary?.Attribute("outcome") is not ("Completed" or "Passed"))
         {
             return false;
@@ -295,20 +319,44 @@ public static partial class SecurityExecutionEvidence
             if (OptionalCounter(counters, failure) != 0) return false;
         }
 
-        var executions = new HashSet<string>(StringComparer.Ordinal);
+        var definitionsById = new Dictionary<string, XElement>(StringComparer.Ordinal);
+        foreach (XElement definition in definitions.Elements())
+        {
+            string? id = (string?)definition.Attribute("id");
+            if (definition.Name != TrxNamespace + "UnitTest" || string.IsNullOrWhiteSpace(id) ||
+                !definitionsById.TryAdd(id, definition)) return false;
+        }
+
+        var executions = new HashSet<Guid>();
+        var tests = new HashSet<string>(StringComparer.Ordinal);
+        var namedTests = new HashSet<SecurityControlRegister.RequiredTest>();
         foreach (XElement result in results.Elements())
         {
             string? identity = (string?)result.Attribute("executionId");
+            string? testId = (string?)result.Attribute("testId");
             if (result.Name != TrxNamespace + "UnitTestResult" ||
                 (string?)result.Attribute("outcome") != "Passed" ||
-                string.IsNullOrEmpty(identity) || !executions.Add(identity))
+                !Guid.TryParse(identity, out Guid executionId) || executionId == Guid.Empty || !executions.Add(executionId) ||
+                string.IsNullOrWhiteSpace(testId) || !tests.Add(testId) ||
+                string.IsNullOrWhiteSpace((string?)result.Attribute("testName")))
             {
                 return false;
             }
+
+            if (!definitionsById.TryGetValue(testId, out XElement? definition) ||
+                (string?)definition.Attribute("name") != (string?)result.Attribute("testName") ||
+                (string?)definition.Elements(TrxNamespace + "Execution").SingleOrDefault()?.Attribute("id") != identity)
+                return false;
+            XElement? method = definition.Elements(TrxNamespace + "TestMethod").SingleOrDefault();
+            string? className = (string?)method?.Attribute("className");
+            string? methodName = (string?)method?.Attribute("name");
+            if (string.IsNullOrWhiteSpace(className) || string.IsNullOrWhiteSpace(methodName) ||
+                !namedTests.Add(new SecurityControlRegister.RequiredTest(className, methodName,
+                    (string)result.Attribute("testName")!))) return false;
         }
 
-        if (executions.Count != total) return false;
-        counts = new ExecutionCounts(total, executed, passed, failed, skipped);
+        if (executions.Count != total || definitionsById.Count != total) return false;
+        report = new ExecutionReport(new ExecutionCounts(total, executed, passed, failed, skipped), namedTests, runId, executions);
         return true;
     }
 
@@ -327,4 +375,6 @@ public static partial class SecurityExecutionEvidence
         counters.Attribute(name) is null ? 0 : Counter(counters, name);
 
     private readonly record struct ExecutionCounts(int Selected, int Executed, int Passed, int Failed, int Skipped);
+    private readonly record struct ExecutionReport(ExecutionCounts Counts,
+        HashSet<SecurityControlRegister.RequiredTest> Tests, Guid RunId, HashSet<Guid> Executions);
 }

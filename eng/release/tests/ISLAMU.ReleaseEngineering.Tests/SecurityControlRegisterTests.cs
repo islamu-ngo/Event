@@ -34,6 +34,12 @@ public sealed class SecurityControlRegisterTests
     [Arguments("missing-mitigation")]
     [Arguments("mixed-standard-version")]
     [Arguments("unearned-closure")]
+    [Arguments("missing-execution-requirements")]
+    [Arguments("duplicate-required-lane")]
+    [Arguments("empty-required-tests")]
+    [Arguments("duplicate-required-test")]
+    [Arguments("wrong-required-profile")]
+    [Arguments("wrong-required-project")]
     public async Task IncompleteOrMisleadingCatalogueIsRejected(string failure)
     {
         JsonObject register = JsonNode.Parse(File.ReadAllBytes(RegisterPath()))?.AsObject() ??
@@ -42,6 +48,25 @@ public sealed class SecurityControlRegisterTests
         JsonObject first = references[0]?.AsObject() ?? throw new InvalidDataException();
         switch (failure)
         {
+            case "missing-execution-requirements":
+                register.Remove("executionRequirements");
+                break;
+            case "duplicate-required-lane":
+                register["executionRequirements"]![1]!["laneId"] = "security-integration";
+                break;
+            case "empty-required-tests":
+                register["executionRequirements"]![0]!["requiredTests"] = new JsonArray();
+                break;
+            case "duplicate-required-test":
+                JsonArray requiredTests = register["executionRequirements"]![0]!["requiredTests"]!.AsArray();
+                requiredTests.Add(requiredTests[0]!.DeepClone());
+                break;
+            case "wrong-required-profile":
+                register["executionRequirements"]![0]!["hostProfile"] = "combined-standalone";
+                break;
+            case "wrong-required-project":
+                register["executionRequirements"]![0]!["project"] = "unrelated.csproj";
+                break;
             case "missing-reference":
                 references.RemoveAt(0);
                 break;

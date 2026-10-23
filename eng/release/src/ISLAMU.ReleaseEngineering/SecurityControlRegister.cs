@@ -6,6 +6,16 @@ public static class SecurityControlRegister
 {
     private const int MaximumBytes = 1_048_576;
     private static readonly JsonDocumentOptions DocumentOptions = new() { MaxDepth = 32 };
+    private static readonly Lazy<IReadOnlyDictionary<string, ExecutionRequirement>> EmbeddedRequirements = new(() =>
+    {
+        using Stream stream = typeof(SecurityControlRegister).Assembly.GetManifestResourceStream(
+            "ISLAMU.ReleaseEngineering.SecurityControlRegister.json") ?? throw new InvalidDataException();
+        using JsonDocument document = JsonDocument.Parse(stream, DocumentOptions);
+        if (!UniqueProperties(document.RootElement) || document.RootElement.GetProperty("schemaVersion").GetInt32() != 2)
+            throw new InvalidDataException();
+        return ReadExecutionRequirements(document.RootElement);
+    });
+    internal static IReadOnlyDictionary<string, ExecutionRequirement> ExecutionRequirements => EmbeddedRequirements.Value;
     private static readonly HashSet<string> PinnedRequirements = new(StringComparer.Ordinal)
     {
         "v5.0.0-6.1.1",
@@ -110,7 +120,7 @@ public static class SecurityControlRegister
             stream.ReadExactly(bytes);
             using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
             JsonElement root = document.RootElement;
-            if (!UniqueProperties(root) || root.GetProperty("schemaVersion").GetInt32() != 1 ||
+            if (!UniqueProperties(root) || root.GetProperty("schemaVersion").GetInt32() != 2 ||
                 root.GetProperty("workstream").GetString() != "event-api-security-remediation" ||
                 root.GetProperty("assurance").GetString() != "source-inventory-not-runtime-certification")
             {
@@ -118,6 +128,7 @@ public static class SecurityControlRegister
             }
 
             HashSet<string> scenarios = Identities(root.GetProperty("scenarios"), "S", 50, 2);
+            _ = ReadExecutionRequirements(root);
             HashSet<string> families = Identities(root.GetProperty("families"), "FAMILY-", 53, 3);
             JsonElement dimensions = root.GetProperty("executionDimensions");
             string[] hosts = dimensions.GetProperty("runtimeHosts").EnumerateArray()
@@ -380,6 +391,40 @@ public static class SecurityControlRegister
             return false;
         }
     }
+
+    private static IReadOnlyDictionary<string, ExecutionRequirement> ReadExecutionRequirements(JsonElement register)
+    {
+        var requirements = new Dictionary<string, ExecutionRequirement>(StringComparer.Ordinal);
+        foreach (JsonElement requirement in register.GetProperty("executionRequirements").EnumerateArray())
+        {
+            string lane = requirement.GetProperty("laneId").GetString() ?? string.Empty;
+            string project = requirement.GetProperty("project").GetString() ?? string.Empty;
+            string profile = requirement.GetProperty("hostProfile").GetString() ?? string.Empty;
+            if (lane is not ("security-integration" or "cerbos-policy-contract") ||
+                project != "tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj" ||
+                profile != "dedicated-api-test-host") throw new InvalidDataException();
+
+            var tests = new HashSet<RequiredTest>();
+            foreach (JsonElement test in requirement.GetProperty("requiredTests").EnumerateArray())
+            {
+                string className = test.GetProperty("className").GetString() ?? string.Empty;
+                string methodName = test.GetProperty("methodName").GetString() ?? string.Empty;
+                string testName = test.GetProperty("testName").GetString() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(className) || string.IsNullOrWhiteSpace(methodName) ||
+                    string.IsNullOrWhiteSpace(testName) || !tests.Add(new RequiredTest(className, methodName, testName)))
+                    throw new InvalidDataException();
+            }
+
+            if (tests.Count is < 1 or > 1024 || !requirements.TryAdd(lane, new ExecutionRequirement(project, profile, tests)))
+                throw new InvalidDataException();
+        }
+
+        if (requirements.Count != 2) throw new InvalidDataException();
+        return requirements;
+    }
+
+    internal sealed record ExecutionRequirement(string Project, string HostProfile, IReadOnlySet<RequiredTest> Tests);
+    internal readonly record struct RequiredTest(string ClassName, string MethodName, string TestName);
 
     private static HashSet<string> Identities(JsonElement entries, string prefix, int count, int digits)
     {

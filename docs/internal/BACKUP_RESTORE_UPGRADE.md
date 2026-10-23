@@ -11,6 +11,55 @@ ABOUTME: Grounds release operations in provider-native database tools, authority
 
 This runbook covers self-hosted deployments using the repository Docker Compose topology. Treat every upgrade as a data operation first and an image rollout second.
 
+## Native Moderation Recovery Coordinates
+
+The canonical moderation save boundary now owns a UUIDv7
+`ModerationRecoveryStoreState`, with revision, lineage generation and contiguous
+mutation position. Tracked moderation writes advance it in the same primary
+transaction; the two bulk-only narrative/pre-finding cleanup routes explicitly
+account for successful mutations. Source qualification, intake, effect leasing
+and original completion therefore do not rely on a counter updated only by
+`ModerationStore`. Failed transactions cannot publish their staged positions.
+The internal reader requires the original live consumer evidence session and
+retains the same native recovery writer fence.
+It refuses a head staged or flushed by that same transaction, even after EF's
+change tracker becomes clean. Current requirements must describe committed
+source state, not the transaction's own uncommitted mutation.
+
+SQLite authority row fences perform actual no-op SQL updates. The original
+evidence transaction therefore is a writing connection even if no canonical
+business mutation occurred. SQLite's backup API cannot step on that writing
+source connection. A native producer needs a separately owned committed-source
+read under the retained original authority/writer fences; replacing or ending
+the evidence transaction would invalidate the acquisition.
+`ReadSqliteCommittedModerationRecoveryStateAsync` now establishes the narrower
+metadata observation: it derives a separate read-only/private-cache/unpooled
+connection from the actual file-backed native connection, reads mapped store
+coordinates and compares them with the original fenced head before/after native
+requalification. Private in-memory sources, wrong/closed sessions, wrong
+transactions and the transaction's own uncommitted head remain unavailable.
+The reader is not substituted for the original authority and neither its
+connection nor private rows are returned. Artifact capture/restore and lawful
+artifact custody remain unimplemented; no completion flag substitutes for them.
+
+The retained authority separately extends its actual `PrivacyErasureCounter`
+with store identity, revision and recovery generation. Append, first identity-key
+binding and nonempty compaction advance the revision atomically. Releasing a
+held row changes the revision even if high-water and retained floor stay equal.
+`IPrivacyErasureRecoveryAuthority` resolves the existing authority instance; its
+read requires that owner's already acquired identity/counter gate and exact
+transaction. Newly initialized or mutated-but-uncommitted tuples are unavailable,
+and inherited execution contexts cannot reuse a disposed gate. External
+PostgreSQL retains function-only runtime access; CoLocated PostgreSQL/SQLite and
+dedicated EmbeddedSqlite retain their existing transaction ownership.
+
+These coordinates contain no narrative, secret bytes or completed recovery
+verdict. They are inputs for native recovery producers, not replacements for
+authenticated artifact capture, isolated restore, canonical replay and erasure
+reconciliation. Those completed producers, generated migrations and provider/race
+assurance remain open. No measured-recovery proof implementation is registered,
+and this source foundation does not open AG05 or qualify deployment readiness.
+
 ## Instance Onboarding State Across Restore
 
 The database is the authority for completed onboarding. Restore a completed

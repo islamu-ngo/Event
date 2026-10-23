@@ -11,6 +11,27 @@ application, identity, key and media state, but keep newer privacy-erasure facts
 independent of an older application recovery point. A persistent volume or a
 successful file copy alone is not evidence of crash safety or recovery.
 
+Moderation recovery now has native store coordinates: a stable store identity,
+revision, recovery generation and committed mutation position. Retained erasure
+authority has its own identity/revision/generation, plus its existing high-water,
+retained floor and key binding. An append, key binding or released retention hold
+can change these coordinates; they cannot be replaced with an operator-entered
+success flag or copied from another store.
+
+This is a source foundation, not a completed recovery certificate. Native
+authenticated backup/restore and replay/reconciliation producers, generated
+migrations and runtime assurance remain unfinished. Recovery measurement remains
+unavailable until those owners supply actual completed evidence. Continue using
+the procedures below; store counters do not authorize reopening a deployment.
+The native SQLite recovery producer also needs a separate committed-source
+capture boundary: its authority transaction performs SQL write fences and cannot
+serve directly as the SQLite backup API's source. No producer is advertised as
+working around that restriction.
+Committed store metadata can now be observed through a separate read-only
+file-backed connection while the original authority remains held. That
+metadata-only observation copies no private snapshot and is not a completed
+backup, restore or reconciliation.
+
 ---
 
 ## 1. What Must Be Backed Up

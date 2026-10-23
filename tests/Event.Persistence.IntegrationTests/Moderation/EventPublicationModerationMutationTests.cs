@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Data;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
@@ -21,6 +22,7 @@ using Explore.Domain.Federation;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.Settings;
 using Explore.Domain.ValueObjects;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using ISLAMU.Moderation.Domain;
@@ -40,8 +42,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await using var fixture = await CreateFixtureAsync(privacy, new PublicationClock());
         var parent = await ReadyDraftAsync(fixture);
         var originalTitle = parent.Title;
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
         parent.Title = "Unsaved external import caller change";
-        var handler = ActivatorUtilities.CreateInstance<Explore.Application.Features.RegistrationProviders.Commands.ImportExternalRegistrationProviderFormVersionCommandHandler>(fixture.Services);
+        var handler = ActivatorUtilities.CreateInstance<Explore.Application.Features.RegistrationProviders.Commands.ImportExternalRegistrationProviderFormVersionCommandHandler>(human.Services);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ExecuteAsync(
             new Explore.Application.Features.RegistrationProviders.Commands.ImportExternalRegistrationProviderFormVersionCommand(
@@ -67,8 +71,11 @@ public sealed partial class EventPublicationModerationMutationTests
         await using var fixture = await CreateFixtureAsync(privacy, new PublicationClock());
         var parent = await ReadyDraftAsync(fixture);
         var originalTitle = parent.Title;
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         parent.Title = "Unsaved form authoring caller change";
-        var service = fixture.Services.GetRequiredService<Explore.Application.Services.Registration.RegistrationFormAuthoringCommandService>();
+        var service = human.Services.GetRequiredService<Explore.Application.Services.Registration.RegistrationFormAuthoringCommandService>();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.PublishAsync(
             new Explore.Application.Features.RegistrationForms.Requests.Commands.PublishRegistrationFormVersionCommand(
@@ -88,8 +95,11 @@ public sealed partial class EventPublicationModerationMutationTests
         await using var fixture = await CreateFixtureAsync(privacy, new PublicationClock());
         var parent = await ReadyDraftAsync(fixture);
         var originalTitle = parent.Title;
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         parent.Title = "Unsaved add-on caller change";
-        var handler = ActivatorUtilities.CreateInstance<Explore.Application.Features.EventAddOns.Handlers.Commands.PublishEventAddOnCatalogCommandHandler>(fixture.Services);
+        var handler = ActivatorUtilities.CreateInstance<Explore.Application.Features.EventAddOns.Handlers.Commands.PublishEventAddOnCatalogCommandHandler>(human.Services);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ExecuteAsync(
             new Explore.Application.Features.EventAddOns.Requests.Commands.PublishEventAddOnCatalogCommand(
@@ -109,8 +119,11 @@ public sealed partial class EventPublicationModerationMutationTests
         await using var fixture = await CreateFixtureAsync(privacy, new PublicationClock());
         var parent = await ReadyDraftAsync(fixture);
         var originalTitle = parent.Title;
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         parent.Title = "Unsaved caller change";
-        var handler = ActivatorUtilities.CreateInstance<Explore.Application.Features.Promotions.Handlers.Commands.PublishPromotionCommandHandler>(fixture.Services);
+        var handler = ActivatorUtilities.CreateInstance<Explore.Application.Features.Promotions.Handlers.Commands.PublishPromotionCommandHandler>(human.Services);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ExecuteAsync(
             new Explore.Application.Features.Promotions.Requests.Commands.PublishPromotionCommand(
@@ -136,7 +149,10 @@ public sealed partial class EventPublicationModerationMutationTests
         var originalStamp = session.ConcurrencyStamp;
         var adoption = await AdoptAsync(fixture, clock);
         await StoreRestrictionAsync(fixture, adoption, fixture.UserId, clock.Now);
-        var handler = ActivatorUtilities.CreateInstance<Explore.Application.Features.EventSessions.Handlers.Commands.PublishEventSessionCommandHandler>(fixture.Services);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var handler = ActivatorUtilities.CreateInstance<Explore.Application.Features.EventSessions.Handlers.Commands.PublishEventSessionCommandHandler>(human.Services);
 
         var response = await handler.ExecuteAsync(new Explore.Application.Features.EventSessions.Requests.Commands.PublishEventSessionCommand
         {
@@ -164,7 +180,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await using var fixture = await CreateFixtureAsync(privacy, new PublicationClock());
         var draft = await ReadyDraftAsync(fixture);
 
-        var response = await PublishAsync(fixture, draft, mode);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishAsync(human, draft, mode);
 
         await Assert.That(response.IsSuccess).IsTrue().Because(response.Message);
         fixture.Context.ChangeTracker.Clear();
@@ -193,15 +212,18 @@ public sealed partial class EventPublicationModerationMutationTests
         var adoption = await AdoptAsync(fixture, clock, instanceScope);
         await StoreRestrictionAsync(fixture, adoption, fixture.UserId, clock.Now, protective);
         if (mode == EventPublicationMode.PrivilegedApproval) await RequireApprovalAsync(fixture);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         var entered = false;
-        var blocked = await fixture.Services.GetRequiredService<IEventPublicationMutationBoundary>()
+        var blocked = await human.Services.GetRequiredService<IEventPublicationMutationBoundary>()
             .ExecuteAsync(draft.Id, _ =>
             {
                 entered = true;
                 return Task.FromResult(BaseCommandResponse.Success(draft.Id));
             }, CancellationToken.None);
 
-        var response = await PublishAsync(fixture, draft, mode);
+        var response = await PublishAsync(human, draft, mode);
 
         await Assert.That(entered).IsFalse();
         await Assert.That(blocked.FailureCode).IsEqualTo("event_publish_restricted");
@@ -230,7 +252,10 @@ public sealed partial class EventPublicationModerationMutationTests
         }, adoption.Publication.Id);
         await Assert.That(retired.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
 
-        var response = await PublishAsync(fixture, draft, mode);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishAsync(human, draft, mode);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.FailureCode).IsEqualTo("event_publish_restricted");
@@ -248,15 +273,18 @@ public sealed partial class EventPublicationModerationMutationTests
         var draft = await ReadyDraftAsync(fixture);
         await AdoptAsync(fixture, clock);
         await fixture.Context.Set<ModerationPolicyPublicationEffect>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         var entered = false;
-        var boundary = fixture.Services.GetRequiredService<IEventPublicationMutationBoundary>();
+        var boundary = human.Services.GetRequiredService<IEventPublicationMutationBoundary>();
 
         var blocked = await boundary.ExecuteAsync(draft.Id, _ =>
         {
             entered = true;
             return Task.FromResult(BaseCommandResponse.Success(draft.Id));
         }, CancellationToken.None);
-        var response = await PublishAsync(fixture, draft, mode);
+        var response = await PublishAsync(human, draft, mode);
 
         await Assert.That(entered).IsFalse();
         await Assert.That(blocked.IsSuccess).IsFalse();
@@ -281,24 +309,27 @@ public sealed partial class EventPublicationModerationMutationTests
         fixture.Context.Events.Update(unready);
         await fixture.Context.SaveChangesAsync();
         fixture.Context.ChangeTracker.Clear();
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         foreach (var mode in new[] { EventPublicationMode.Ordinary, EventPublicationMode.PrivilegedApproval })
         {
-            var rejected = await PublishAsync(fixture, unready, mode);
+            var rejected = await PublishAsync(human, unready, mode);
             await Assert.That(rejected.IsSuccess).IsFalse();
             await Assert.That(rejected.FailureCode).IsEqualTo(EventPublicationExecutor.ReadinessFailedCode);
             await AssertUnpublishedAsync(fixture, unready);
         }
         await RequireApprovalAsync(fixture);
 
-        var ordinary = await PublishAsync(fixture, ready, EventPublicationMode.Ordinary);
+        var ordinary = await PublishAsync(human, ready, EventPublicationMode.Ordinary);
         await Assert.That(ordinary.IsSuccess).IsFalse();
         await Assert.That(ordinary.FailureCode).IsEqualTo(EventPublicationExecutor.ApprovalRequiredCode);
         await AssertUnpublishedAsync(fixture, ready);
 
-        var privileged = await PublishAsync(fixture, ready, EventPublicationMode.PrivilegedApproval);
+        var privileged = await PublishAsync(human, ready, EventPublicationMode.PrivilegedApproval);
         await Assert.That(privileged.IsSuccess).IsTrue().Because(privileged.Message);
 
-        var approvalReadiness = await PublishAsync(fixture, unready, EventPublicationMode.PrivilegedApproval);
+        var approvalReadiness = await PublishAsync(human, unready, EventPublicationMode.PrivilegedApproval);
         await Assert.That(approvalReadiness.IsSuccess).IsFalse();
         await Assert.That(approvalReadiness.FailureCode).IsEqualTo(EventPublicationExecutor.ReadinessFailedCode);
         await AssertUnpublishedAsync(fixture, unready);
@@ -334,7 +365,10 @@ public sealed partial class EventPublicationModerationMutationTests
         draft = await fixture.Context.Events.SingleAsync(row => row.Id == draft.Id);
         await StoreRestrictionAsync(fixture, adoption, publisher.Id, clock.Now);
 
-        var response = await PublishAsync(fixture, draft, mode);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishAsync(human, draft, mode);
 
         await Assert.That(response.IsSuccess).IsTrue().Because(response.Message);
         fixture.Context.ChangeTracker.Clear();
@@ -360,10 +394,13 @@ public sealed partial class EventPublicationModerationMutationTests
         if (!unavailable) await StoreRestrictionAsync(fixture, adoption, fixture.UserId, startsAt);
         checkpoint.EventId = draft.Id;
         checkpoint.Crossing = startsAt;
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         checkpoint.Armed = true;
 
         await Assert.ThrowsAsync<ConcurrencyConflictException>(async () =>
-            _ = await PublishAsync(fixture, draft, mode));
+            _ = await PublishAsync(human, draft, mode));
 
         await Assert.That(checkpoint.ObservedPublishedEventAndNotification).IsTrue();
         await AssertUnpublishedAsync(fixture, draft);
@@ -391,7 +428,10 @@ public sealed partial class EventPublicationModerationMutationTests
         var adoption = await AdoptAsync(fixture, clock);
         var startsAt = clock.Now.AddMinutes(1);
         if (!unavailable) await StoreRestrictionAsync(fixture, adoption, fixture.UserId, startsAt);
-        var boundary = fixture.Services.GetRequiredService<IEventPublicationMutationBoundary>();
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var boundary = human.Services.GetRequiredService<IEventPublicationMutationBoundary>();
         bool? observedPrivacyOwner = null;
         var observedBothOutboxes = false;
 
@@ -629,10 +669,20 @@ public sealed partial class EventPublicationModerationMutationTests
     }
 
     private static Task<BaseCommandResponse<Guid>> PublishAsync(
-        EventVisitorCapabilitySqliteFixture fixture, Explore.Domain.Event draft, EventPublicationMode mode) =>
-        fixture.Services.GetRequiredService<EventPublicationExecutor>().ExecuteAsync(draft.Id,
+        CurrentHumanPrincipalFixture human, Explore.Domain.Event draft, EventPublicationMode mode) =>
+        human.Services.GetRequiredService<EventPublicationExecutor>().ExecuteAsync(draft.Id,
             new PublishEventRequestDto { ExpectedConcurrencyStamp = draft.ConcurrencyStamp }, mode,
             CancellationToken.None);
+
+    private static CurrentHumanPrincipalFixture PublicationHuman(EventVisitorCapabilitySqliteFixture fixture) =>
+        new(fixture.UserId, fixture.TenantId, borrowedContext: fixture.Context,
+            timeProvider: fixture.Services.GetRequiredService<TimeProvider>(), configureServices: services =>
+            {
+                services.AddSingleton(fixture.Services.GetRequiredService<IPrivacyIdentityFenceAuthority>());
+                services.AddSingleton(fixture.Services.GetRequiredService<IModerationRecognitionContinuityReader>());
+                services.AddSingleton(fixture.Services.GetRequiredService<IEventResourceAuthorizationProvider>());
+                services.AddSingleton(fixture.Services.GetRequiredService<IEventResourceDestinationProtector>());
+            });
 
     private static async Task<Explore.Domain.Event> ReadyDraftAsync(EventVisitorCapabilitySqliteFixture fixture)
     {

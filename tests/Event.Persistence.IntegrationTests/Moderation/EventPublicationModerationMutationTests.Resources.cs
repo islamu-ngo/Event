@@ -2,13 +2,16 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventResource;
+using Explore.Application.Features.EventResources;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using ISLAMU.Moderation.Domain.Policies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -34,7 +37,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await StoreRestrictionAsync(fixture, adoption, fixture.UserId, clock.Now, protective);
         var original = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
 
-        var response = await PublishResourceAsync(fixture, original);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishResourceAsync(human, original);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.FailureCode).IsEqualTo(EventResourceManagementFailureCodes.Forbidden);
@@ -52,19 +58,22 @@ public sealed partial class EventPublicationModerationMutationTests
         await QualifyResourcePublicationAsync(fixture);
         var original = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
 
-        var published = await PublishResourceAsync(fixture, original);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var published = await PublishResourceAsync(human, original);
 
         await Assert.That(published.IsSuccess).IsTrue().Because(published.Message);
         await Assert.That(published.Id).IsEqualTo(draft.Id);
         var current = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
         await AssertResourcePublicationAsync(fixture, original, current, EventResourceAuditAction.Publish);
-        var withdrawn = await fixture.Services.GetRequiredService<EventResourceManagementWorkflow>()
+        var withdrawn = await human.Services.GetRequiredService<EventResourceManagementWorkflow>()
             .ChangeStateAsync(draft.Id, current.Stamp, EventResourceManagementAction.Unpublish, CancellationToken.None);
         await Assert.That(withdrawn.IsSuccess).IsTrue().Because(withdrawn.Message);
         var beforeRepublish = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
         await Assert.That(beforeRepublish.StateId).IsEqualTo((int)EventResourcePublicationStateEnum.Withdrawn);
 
-        var republished = await PublishResourceAsync(fixture, beforeRepublish);
+        var republished = await PublishResourceAsync(human, beforeRepublish);
 
         await Assert.That(republished.IsSuccess).IsTrue().Because(republished.Message);
         await AssertResourcePublicationAsync(fixture, beforeRepublish,
@@ -81,12 +90,15 @@ public sealed partial class EventPublicationModerationMutationTests
         await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
         await using var fixture = await CreateFixtureAsync(privacy, clock);
         var draft = await SeedResourcePublicationAsync(fixture, clock);
-        var published = await PublishResourceAsync(fixture, draft);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var published = await PublishResourceAsync(human, draft);
         await Assert.That(published.IsSuccess).IsTrue().Because(published.Message);
         var adoption = await AdoptAsync(fixture, clock);
         await StoreRestrictionAsync(fixture, adoption, fixture.UserId, clock.Now);
         var current = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
-        var workflow = fixture.Services.GetRequiredService<EventResourceManagementWorkflow>();
+        var workflow = human.Services.GetRequiredService<EventResourceManagementWorkflow>();
 
         var withdrawn = await workflow.ChangeStateAsync(draft.Id, current.Stamp,
             EventResourceManagementAction.Unpublish, CancellationToken.None);
@@ -94,7 +106,7 @@ public sealed partial class EventPublicationModerationMutationTests
         await Assert.That(withdrawn.IsSuccess).IsTrue().Because(withdrawn.Message);
         var original = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
         await Assert.That(original.StateId).IsEqualTo((int)EventResourcePublicationStateEnum.Withdrawn);
-        var rejected = await PublishResourceAsync(fixture, original);
+        var rejected = await PublishResourceAsync(human, original);
         await Assert.That(rejected.IsSuccess).IsFalse();
         await Assert.That(await ResourcePublicationSnapshotAsync(fixture, draft.Id)).IsEqualTo(original);
 
@@ -119,7 +131,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await fixture.Context.Set<ModerationPolicyPublicationEffect>().IgnoreQueryFilters().ExecuteDeleteAsync();
         var original = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
 
-        var response = await PublishResourceAsync(fixture, original);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishResourceAsync(human, original);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.FailureCode).IsEqualTo(EventResourceManagementFailureCodes.Unavailable);
@@ -146,7 +161,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await Assert.That(retired.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         var original = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
 
-        var response = await PublishResourceAsync(fixture, original);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishResourceAsync(human, original);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(await ResourcePublicationSnapshotAsync(fixture, draft.Id)).IsEqualTo(original);
@@ -169,7 +187,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await StoreRestrictionAsync(fixture, adoption, author.Id, clock.Now);
         var original = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
 
-        var response = await PublishResourceAsync(fixture, original);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishResourceAsync(human, original);
 
         await Assert.That(response.IsSuccess).IsTrue().Because(response.Message);
         await AssertResourcePublicationAsync(fixture, original,
@@ -218,7 +239,10 @@ public sealed partial class EventPublicationModerationMutationTests
         }
         var original = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
 
-        var response = await PublishResourceAsync(fixture, original);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishResourceAsync(human, original);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(await ResourcePublicationSnapshotAsync(fixture, draft.Id)).IsEqualTo(original);
@@ -249,9 +273,12 @@ public sealed partial class EventPublicationModerationMutationTests
         var original = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
         checkpoint.ResourceId = draft.Id;
         checkpoint.Crossing = crossing;
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         checkpoint.Armed = true;
 
-        var response = await PublishResourceAsync(fixture, original);
+        var response = await PublishResourceAsync(human, original);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
@@ -292,6 +319,7 @@ public sealed partial class EventPublicationModerationMutationTests
         {
             Id = Guid.CreateVersion7(),
             ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = await fixture.Context.ActorTypes.SingleAsync(row => row.Id == (int)ActorTypeEnum.User),
             UserId = otherHuman.Id,
             Pii = new ActorPii { DisplayName = "Independent timed publication organizer" }
         };
@@ -306,14 +334,17 @@ public sealed partial class EventPublicationModerationMutationTests
             clock.Now.AddMinutes(-1).UtcDateTime, expiresAt.UtcDateTime, fixture.UserId));
         await fixture.Context.SaveChangesAsync();
         var original = await ResourcePublicationSnapshotAsync(fixture, draft.Id);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         externalProvider.ExpiresAt = expiresAt;
         externalProvider.Armed = true;
 
-        var response = await PublishResourceAsync(fixture, original);
+        var response = await PublishResourceAsync(human, original);
 
         await Assert.That(externalProvider.ObservedLiveStaffAuthority).IsTrue();
         await Assert.That(response.IsSuccess).IsFalse();
-        await Assert.That(response.FailureCode).IsEqualTo(EventResourceManagementFailureCodes.NotFound);
+        await Assert.That(response.FailureCode).IsEqualTo(FailureCodes.NotFound);
         await Assert.That(await ResourcePublicationSnapshotAsync(fixture, draft.Id)).IsEqualTo(original);
         await Assert.That(fixture.Context.Database.CurrentTransaction).IsNull();
     }
@@ -349,7 +380,10 @@ public sealed partial class EventPublicationModerationMutationTests
     private static async Task<ResourcePublicationSnapshot> SeedResourcePublicationAsync(
         EventVisitorCapabilitySqliteFixture fixture, PublicationClock clock, bool publishedParent = true)
     {
-        var settings = await fixture.Services.GetRequiredService<IEventResourceSettingsWriter>().ApplyAsync([
+        var unitOfWork = new EfCoreUnitOfWork(fixture.Context);
+        var writer = new EventResourceSettingsWriter(fixture.Context,
+            new RelationalSettingMutationLock(fixture.Context, unitOfWork), unitOfWork);
+        var settings = await writer.ApplyInternalAsync([
             new(null, GovernanceSettingKeys.EventResources.ExternalOrigins,
                 EventResourceSettingMutationKind.SetValue, "[\"https://resources.example.invalid\"]")
         ], fixture.UserId);
@@ -361,7 +395,10 @@ public sealed partial class EventPublicationModerationMutationTests
             await fixture.Context.SaveChangesAsync();
             fixture.Context.ChangeTracker.Clear();
         }
-        var workflow = fixture.Services.GetRequiredService<EventResourceManagementWorkflow>();
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var workflow = human.Services.GetRequiredService<EventResourceManagementWorkflow>();
         var resourceId = Guid.CreateVersion7();
         var created = await workflow.CreateAsync(parent.Id, resourceId, new EventResourceDraftDto
         {
@@ -374,7 +411,7 @@ public sealed partial class EventPublicationModerationMutationTests
         await Assert.That(created.IsSuccess).IsTrue().Because(created.Message);
         var draft = await ResourcePublicationSnapshotAsync(fixture, resourceId);
         var configured = await workflow.ConfigureExternalDestinationAsync(resourceId, draft.Stamp,
-            "https://resources.example.invalid/material", fixture.Services.GetRequiredService<IEventResourceDestinationProtector>(),
+            "https://resources.example.invalid/material", human.Services.GetRequiredService<IEventResourceDestinationProtector>(),
             CancellationToken.None);
         await Assert.That(configured.IsSuccess).IsTrue().Because(configured.Message);
         return await ResourcePublicationSnapshotAsync(fixture, resourceId);
@@ -399,10 +436,10 @@ public sealed partial class EventPublicationModerationMutationTests
     }
 
     private static Task<BaseCommandResponse<Guid>> PublishResourceAsync(
-        EventVisitorCapabilitySqliteFixture fixture, ResourcePublicationSnapshot resource) =>
-        fixture.Services.GetRequiredService<EventResourceManagementWorkflow>().ChangeStateAsync(resource.Id,
+        CurrentHumanPrincipalFixture human, ResourcePublicationSnapshot resource) =>
+        human.Services.GetRequiredService<EventResourceManagementWorkflow>().ChangeStateAsync(resource.Id,
             resource.Stamp, EventResourceManagementAction.Publish, CancellationToken.None,
-            fixture.Services.GetRequiredService<IEventResourceDestinationProtector>());
+            human.Services.GetRequiredService<IEventResourceDestinationProtector>());
 
     private static async Task AssertResourcePublicationAsync(EventVisitorCapabilitySqliteFixture fixture,
         ResourcePublicationSnapshot before, ResourcePublicationSnapshot after, EventResourceAuditAction action)

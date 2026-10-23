@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Commands;
 using Explore.Application.Responses;
@@ -8,6 +9,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using ISLAMU.Moderation.Domain;
 using ISLAMU.Moderation.Domain.Policies;
@@ -50,7 +52,10 @@ public sealed partial class EventPublicationModerationMutationTests
         }
         var before = await SessionPublicationStateAsync(fixture, session.Id);
 
-        var response = await PublishSessionAsync(fixture, session);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishSessionAsync(human, session);
 
         await Assert.That(response.IsSuccess).IsTrue().Because(response.Message);
         await Assert.That(response.Id).IsEqualTo(session.Id);
@@ -81,7 +86,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await StoreRestrictionAsync(fixture, adoption, fixture.UserId, clock.Now, protective);
         var before = await SessionPublicationStateAsync(fixture, session.Id);
 
-        var response = await PublishSessionAsync(fixture, session);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishSessionAsync(human, session);
 
         await AssertSessionPublicationRejectedAsync(fixture, session, before, response, "event_session_publish_restricted");
     }
@@ -97,7 +105,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await fixture.Context.Set<ModerationPolicyPublicationEffect>().IgnoreQueryFilters().ExecuteDeleteAsync();
         var before = await SessionPublicationStateAsync(fixture, session.Id);
 
-        var response = await PublishSessionAsync(fixture, session);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishSessionAsync(human, session);
 
         await AssertSessionPublicationRejectedAsync(fixture, session, before, response,
             "event_session_publish_authority_unavailable");
@@ -122,7 +133,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await Assert.That(retired.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         var before = await SessionPublicationStateAsync(fixture, session.Id);
 
-        var response = await PublishSessionAsync(fixture, session);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishSessionAsync(human, session);
 
         await AssertSessionPublicationRejectedAsync(fixture, session, before, response, "event_session_publish_restricted");
     }
@@ -155,7 +169,10 @@ public sealed partial class EventPublicationModerationMutationTests
         await StoreRestrictionAsync(fixture, adoption, publisher.Id, clock.Now);
         var before = await SessionPublicationStateAsync(fixture, session.Id);
 
-        var response = await PublishSessionAsync(fixture, session);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishSessionAsync(human, session);
 
         await Assert.That(response.IsSuccess).IsTrue().Because(response.Message);
         await Assert.That(response.Id).IsEqualTo(session.Id);
@@ -177,7 +194,10 @@ public sealed partial class EventPublicationModerationMutationTests
         if (adopted) await AdoptAsync(fixture, clock);
         var before = await SessionPublicationStateAsync(fixture, session.Id);
 
-        var response = await PublishSessionAsync(fixture, session);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishSessionAsync(human, session);
 
         await AssertSessionPublicationRejectedAsync(fixture, session, before, response,
             "event_session_publish_readiness_failed");
@@ -208,9 +228,12 @@ public sealed partial class EventPublicationModerationMutationTests
         checkpoint.SessionId = session.Id;
         checkpoint.EventId = session.EventId;
         checkpoint.Crossing = startsAt;
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         checkpoint.Armed = true;
 
-        var response = await PublishSessionAsync(fixture, session);
+        var response = await PublishSessionAsync(human, session);
 
         await Assert.That(checkpoint.ObservedPublishedSessionAndSummary).IsTrue();
         await Assert.That(checkpoint.ObservedPrivacyOwner).IsEqualTo((bool?)colocated);
@@ -234,9 +257,12 @@ public sealed partial class EventPublicationModerationMutationTests
         var replacementBefore = await SessionPublicationStateAsync(fixture, replacementSession.Id);
         move.SessionId = session.Id;
         move.ReplacementEventId = replacementSession.EventId;
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
         move.Armed = true;
 
-        var response = await PublishSessionAsync(fixture, session);
+        var response = await PublishSessionAsync(human, session);
 
         await Assert.That(move.MovedAtAcquisition).IsTrue();
         await Assert.That(response.IsSuccess).IsFalse();
@@ -250,8 +276,8 @@ public sealed partial class EventPublicationModerationMutationTests
     }
 
     private static Task<BaseCommandResponse<Guid>> PublishSessionAsync(
-        EventVisitorCapabilitySqliteFixture fixture, EventSession session) =>
-        fixture.Services.GetRequiredService<ICommandHandler<PublishEventSessionCommand, BaseCommandResponse<Guid>>>()
+        CurrentHumanPrincipalFixture human, EventSession session) =>
+        human.Services.GetRequiredService<ICommandHandler<PublishEventSessionCommand, BaseCommandResponse<Guid>>>()
             .ExecuteAsync(new PublishEventSessionCommand
             {
                 Id = session.Id,

@@ -3,8 +3,10 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
+using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.RegistrationProviders.Commands;
 using Explore.Application.Responses;
@@ -14,6 +16,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Services.Registration.Providers.MicrosoftForms;
 using Explore.Persistence;
+using Explore.Infrastructure.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -45,8 +48,7 @@ public sealed partial class EventPublicationModerationMutationTests
         var published = await DelegatedBindingSnapshotAsync(fixture, draft);
         await AssertDelegatedBindingPublishedAsync(published, original, clock.Now.UtcDateTime);
         await Assert.That(published.UpdatedBy).IsEqualTo((Guid?)fixture.UserId);
-        var replacement = await fixture.ExecuteCommandAsync<ReplaceDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>>(
-            new(fixture.TenantId, draft.BindingId, [new("platform.registration.email", "different-question", true)], []));
+        var replacement = await ReplaceDelegatedMappingsAsync(fixture, draft, clock, "different-question");
         await Assert.That(replacement.IsSuccess).IsFalse();
         await Assert.That(replacement.FailureCode).IsEqualTo("registration_provider_binding_not_draft");
         await Assert.That(await DelegatedBindingSnapshotAsync(fixture, draft)).IsEqualTo(published);
@@ -80,7 +82,7 @@ public sealed partial class EventPublicationModerationMutationTests
     }
 
     [Test]
-    public async Task Delegated_binding_unknown_authority_denies_both_native_entrypoints_without_publishing()
+    public async Task Delegated_binding_unknown_authority_repeatedly_denies_publication_without_publishing()
     {
         var clock = new PublicationClock();
         await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
@@ -91,9 +93,9 @@ public sealed partial class EventPublicationModerationMutationTests
         await RemoveRegistrationPublisherAdminAsync(fixture);
         var original = await DelegatedBindingSnapshotAsync(fixture, draft);
 
-        foreach (var direct in new[] { false, true })
+        for (var attempt = 0; attempt < 2; attempt++)
         {
-            var response = await PublishDelegatedBindingAsync(fixture, draft, clock, direct);
+            var response = await PublishDelegatedBindingAsync(fixture, draft, clock);
             await Assert.That(response.IsSuccess).IsFalse();
             await Assert.That(response.Id).IsEqualTo(draft.BindingId);
             await Assert.That(response.FailureCode).IsEqualTo("registration_provider_binding_publish_authority_unavailable");
@@ -103,7 +105,7 @@ public sealed partial class EventPublicationModerationMutationTests
     }
 
     [Test]
-    public async Task Delegated_binding_native_low_writer_is_not_an_alias_around_current_human_restrictions()
+    public async Task Delegated_binding_public_operation_cannot_bypass_current_human_restrictions()
     {
         var clock = new PublicationClock();
         await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
@@ -114,7 +116,7 @@ public sealed partial class EventPublicationModerationMutationTests
         await RemoveRegistrationPublisherAdminAsync(fixture);
         var original = await DelegatedBindingSnapshotAsync(fixture, draft);
 
-        var response = await PublishDelegatedBindingAsync(fixture, draft, clock, direct: true);
+        var response = await PublishDelegatedBindingAsync(fixture, draft, clock);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.Id).IsEqualTo(draft.BindingId);
@@ -177,7 +179,7 @@ public sealed partial class EventPublicationModerationMutationTests
     }
 
     [Test]
-    public async Task Delegated_binding_high_level_readiness_and_low_level_drift_and_publication_time_keep_their_distinct_contracts()
+    public async Task Delegated_binding_requires_callback_and_current_drift_clearance_before_sampling_publication_time()
     {
         var clock = new PublicationClock();
         await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
@@ -193,24 +195,33 @@ public sealed partial class EventPublicationModerationMutationTests
         await Assert.That(high.Id).IsEqualTo(draft.BindingId);
         await Assert.That(high.FailureCode).IsEqualTo("registration_provider_test_callback_required");
         await Assert.That(await DelegatedBindingSnapshotAsync(fixture, draft)).IsEqualTo(original);
-        var suppliedPublicationTime = clock.Now.AddMinutes(-2).UtcDateTime;
-        var drift = await fixture.ExecuteCommandAsync<PublishRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>(
-            new(fixture.TenantId, draft.EventId, draft.BindingId, RegistrationProviderSchemaDriftClass.TypeChanged, suppliedPublicationTime));
+        SeedDelegatedTestCallback(fixture.Context, fixture.TenantId, draft.BindingId, clock.Now.UtcDateTime);
+        var binding = await fixture.Context.RegistrationProviderBindings.SingleAsync(row => row.Id == draft.BindingId);
+        binding.SetDriftClass(RegistrationProviderDriftClassEnum.TypeChanged);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+        var drifted = await DelegatedBindingSnapshotAsync(fixture, draft);
+        var drift = await PublishDelegatedBindingAsync(fixture, draft, clock);
         await Assert.That(drift.IsSuccess).IsFalse();
         await Assert.That(drift.Id).IsEqualTo(draft.BindingId);
         await Assert.That(drift.FailureCode).IsEqualTo("registration_provider_drift_blocks_publication");
-        await Assert.That(await DelegatedBindingSnapshotAsync(fixture, draft)).IsEqualTo(original);
-        var low = await fixture.ExecuteCommandAsync<PublishRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>(
-            new(fixture.TenantId, draft.EventId, draft.BindingId, RegistrationProviderSchemaDriftClass.NoDrift, suppliedPublicationTime));
-        await Assert.That(low.IsSuccess).IsTrue().Because(low.Message);
-        await AssertDelegatedBindingPublishedAsync(await DelegatedBindingSnapshotAsync(fixture, draft), original, suppliedPublicationTime);
+        await Assert.That(await DelegatedBindingSnapshotAsync(fixture, draft)).IsEqualTo(drifted);
+        binding = await fixture.Context.RegistrationProviderBindings.SingleAsync(row => row.Id == draft.BindingId);
+        binding.SetDriftClass(RegistrationProviderDriftClassEnum.NoDrift);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+        var cleared = await DelegatedBindingSnapshotAsync(fixture, draft);
+        clock.Now = clock.Now.AddMinutes(2);
+        var published = await PublishDelegatedBindingAsync(fixture, draft, clock);
+        await Assert.That(published.IsSuccess).IsTrue().Because(published.Message);
+        await AssertDelegatedBindingPublishedAsync(await DelegatedBindingSnapshotAsync(fixture, draft), cleared, clock.Now.UtcDateTime);
         await Assert.That(await fixture.Services.GetRequiredService<IRegistrationProviderRepository>()
-            .GetLastCallbackAtAsync(fixture.TenantId, draft.BindingId, CancellationToken.None)).IsNull();
+            .GetLastCallbackAtAsync(fixture.TenantId, draft.BindingId, CancellationToken.None)).IsNotNull();
         await Assert.That(fixture.Context.Database.CurrentTransaction).IsNull();
     }
 
     [Test]
-    public async Task Delegated_binding_low_writer_hash_is_independent_of_persisted_field_and_option_insertion_order()
+    public async Task Delegated_binding_publication_hash_is_independent_of_persisted_field_and_option_insertion_order()
     {
         var clock = new PublicationClock();
         await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
@@ -233,8 +244,8 @@ public sealed partial class EventPublicationModerationMutationTests
         var firstOriginal = await DelegatedBindingSnapshotAsync(fixture, first);
         var secondOriginal = await DelegatedBindingSnapshotAsync(fixture, second);
 
-        var firstResponse = await PublishDelegatedBindingAsync(fixture, first, clock, direct: true);
-        var secondResponse = await PublishDelegatedBindingAsync(fixture, second, clock, direct: true);
+        var firstResponse = await PublishDelegatedBindingAsync(fixture, first, clock);
+        var secondResponse = await PublishDelegatedBindingAsync(fixture, second, clock);
 
         await Assert.That(firstResponse.IsSuccess).IsTrue().Because(firstResponse.Message);
         await Assert.That(secondResponse.IsSuccess).IsTrue().Because(secondResponse.Message);
@@ -245,8 +256,7 @@ public sealed partial class EventPublicationModerationMutationTests
         await Assert.That(firstPublished.Hash).IsEqualTo(secondPublished.Hash);
         foreach (var draft in new[] { first, second })
         {
-            var rejected = await fixture.ExecuteCommandAsync<ReplaceDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>>(
-                new(fixture.TenantId, draft.BindingId, [new("platform.registration.email", "replacement", true)], []));
+            var rejected = await ReplaceDelegatedMappingsAsync(fixture, draft, clock, "replacement");
             await Assert.That(rejected.IsSuccess).IsFalse();
             await Assert.That(rejected.FailureCode).IsEqualTo("registration_provider_binding_not_draft");
         }
@@ -255,12 +265,12 @@ public sealed partial class EventPublicationModerationMutationTests
     }
 
     [Test]
-    [Arguments(false, false, false)]
-    [Arguments(false, true, true)]
-    [Arguments(true, false, true)]
-    [Arguments(true, true, false)]
+    [Arguments(false, false)]
+    [Arguments(true, true)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
     public async Task Delegated_binding_one_native_transaction_rolls_back_flushed_hash_state_and_mappings_if_commit_authority_changes(
-        bool direct, bool colocated, bool unavailable)
+        bool colocated, bool unavailable)
     {
         var clock = new PublicationClock();
         var transactions = new DelegatedBindingTransactions();
@@ -281,13 +291,15 @@ public sealed partial class EventPublicationModerationMutationTests
         var original = await DelegatedBindingSnapshotAsync(fixture, draft);
         checkpoint.Draft = draft;
         checkpoint.Crossing = crossing;
-        checkpoint.Armed = true;
-        transactions.Armed = true;
-        callbackReads.Armed = true;
         var publishedAt = clock.Now.UtcDateTime;
 
         await Assert.ThrowsAsync<ConcurrencyConflictException>(async () =>
-            _ = await PublishDelegatedBindingAsync(fixture, draft, clock, direct));
+            _ = await PublishDelegatedBindingAsync(fixture, draft, clock, () =>
+            {
+                checkpoint.Armed = true;
+                transactions.Armed = true;
+                callbackReads.Armed = true;
+            }));
 
         transactions.Armed = false;
         callbackReads.Armed = false;
@@ -296,22 +308,15 @@ public sealed partial class EventPublicationModerationMutationTests
         await Assert.That(checkpoint.ObservedPrivacyOwner).IsEqualTo((bool?)colocated);
         await Assert.That(transactions.Started.Count).IsEqualTo(1);
         await Assert.That(ReferenceEquals(transactions.Started.Single(), checkpoint.Transaction)).IsTrue();
-        if (direct)
-            await Assert.That(callbackReads.Transactions.Count).IsEqualTo(0);
-        else
-        {
-            await Assert.That(callbackReads.Transactions.Count).IsEqualTo(1);
-            await Assert.That(ReferenceEquals(callbackReads.Transactions.Single(), checkpoint.Transaction)).IsTrue();
-        }
+        await Assert.That(callbackReads.Transactions.Count).IsEqualTo(1);
+        await Assert.That(ReferenceEquals(callbackReads.Transactions.Single(), checkpoint.Transaction)).IsTrue();
         await Assert.That(await DelegatedBindingSnapshotAsync(fixture, draft)).IsEqualTo(original);
         await Assert.That(fixture.Context.Database.CurrentTransaction).IsNull();
         await Assert.That(fixture.Context.IdentityFenceOwnsTransaction).IsFalse();
     }
 
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task Delegated_binding_original_connection_tuple_retarget_at_native_fence_is_rejected_and_rolled_back(bool direct)
+    public async Task Delegated_binding_original_connection_tuple_retarget_at_native_fence_is_rejected_and_rolled_back()
     {
         var clock = new PublicationClock();
         var retarget = new RetargetDelegatedBindingConnection();
@@ -331,16 +336,18 @@ public sealed partial class EventPublicationModerationMutationTests
         fixture.Context.ChangeTracker.Clear();
         retarget.TenantId = fixture.TenantId;
         retarget.ConnectionId = draft.ConnectionId;
-        retarget.Armed = true;
-        callbackReads.Armed = true;
         flush.Draft = draft;
         flush.Crossing = clock.Now;
-        flush.Armed = true;
         ConcurrencyConflictException? rejected = null;
 
         try
         {
-            _ = await PublishDelegatedBindingAsync(fixture, draft, clock, direct);
+            _ = await PublishDelegatedBindingAsync(fixture, draft, clock, () =>
+            {
+                retarget.Armed = true;
+                callbackReads.Armed = true;
+                flush.Armed = true;
+            });
         }
         catch (ConcurrencyConflictException exception)
         {
@@ -464,12 +471,35 @@ public sealed partial class EventPublicationModerationMutationTests
         context.AddRange(message, effect);
     }
 
-    private static Task<BaseCommandResponse<Guid>> PublishDelegatedBindingAsync(EventVisitorCapabilitySqliteFixture fixture,
-        DelegatedBindingDraft draft, PublicationClock clock, bool direct = false) => direct
-        ? fixture.ExecuteCommandAsync<PublishRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>(
-            new(fixture.TenantId, draft.EventId, draft.BindingId, RegistrationProviderSchemaDriftClass.NoDrift, clock.Now.UtcDateTime))
-        : fixture.ExecuteCommandAsync<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>(
-            new(fixture.TenantId, draft.EventId, draft.BindingId));
+    private static async Task<BaseCommandResponse<Guid>> PublishDelegatedBindingAsync(EventVisitorCapabilitySqliteFixture fixture,
+        DelegatedBindingDraft draft, PublicationClock clock, Action? beforePublication = null)
+    {
+        await using var human = DelegatedBindingHuman(fixture, clock);
+        await human.InitializeAsync();
+        beforePublication?.Invoke();
+        return await human.Services.GetRequiredService<ICommandHandler<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(new(fixture.TenantId, draft.EventId, draft.BindingId));
+    }
+
+    private static async Task<BaseCommandResponse<Guid>> ReplaceDelegatedMappingsAsync(EventVisitorCapabilitySqliteFixture fixture,
+        DelegatedBindingDraft draft, PublicationClock clock, string providerFieldKey)
+    {
+        await using var human = DelegatedBindingHuman(fixture, clock);
+        await human.InitializeAsync();
+        return await human.Services.GetRequiredService<ICommandHandler<ReplaceEventDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(new(fixture.TenantId, draft.EventId, draft.BindingId, new ReplaceRegistrationProviderMappingsRequestDto
+            {
+                FieldMappings = [new() { PlatformFieldKey = "platform.registration.email", ProviderFieldKey = providerFieldKey, IsRequired = true }]
+            }));
+    }
+
+    private static CurrentHumanPrincipalFixture DelegatedBindingHuman(EventVisitorCapabilitySqliteFixture fixture, PublicationClock clock) =>
+        new(fixture.UserId, fixture.TenantId, borrowedContext: fixture.Context, timeProvider: clock,
+            configureServices: services =>
+            {
+                services.AddSingleton(fixture.Services.GetRequiredService<IPrivacyIdentityFenceAuthority>());
+                services.AddSingleton(fixture.Services.GetRequiredService<IModerationRecognitionContinuityReader>());
+            });
 
     private static async Task<DelegatedBindingPublicationSnapshot> DelegatedBindingSnapshotAsync(
         EventVisitorCapabilitySqliteFixture fixture, DelegatedBindingDraft draft)

@@ -2,6 +2,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Features.Events;
 using Explore.Application.Features.Moderation.Policy;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -52,7 +53,10 @@ public sealed partial class EventPublicationModerationMutationTests
             return true;
         });
 
-        var response = await PublishAsync(fixture, draft, EventPublicationMode.Ordinary);
+        await using var human = PublicationHuman(fixture);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var response = await PublishAsync(human, draft, EventPublicationMode.Ordinary);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.FailureCode).IsEqualTo("event_publish_restricted");

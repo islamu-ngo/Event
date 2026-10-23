@@ -668,6 +668,17 @@ authentication, the same selected scheme, the exact authenticated identity and
 the original provider account key. Replaced principals and unrelated requests
 cannot inherit the observation.
 
+Storage configuration retains the original request principal and authenticated
+identity and claim references, selected scheme, and independent issued/expiry
+property values. Repeated native authentication may return new ticket or
+principal containers; those wrappers' object identities are not credential
+evidence. Every source recheck still requires
+the original API-issued lifetime observation and unchanged persisted principal
+and support facts. Request custody also freezes the presence and typed UUID of
+the server-resolved tenant marker, separately from the immutable selected
+persistence tenant. Missing, replaced or malformed previously captured tenant
+markers fail closed without selecting another persistence owner.
+
 Expiry and optional not-before come from the authenticated raw token payload,
 not mutable claims or ticket properties. Duplicate, malformed or overflowing
 bounds produce no evidence. IsValidAt preserves the validating scheme's inclusive

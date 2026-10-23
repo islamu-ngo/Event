@@ -319,6 +319,11 @@ revoked grant, expired credential or newly restrictive policy rolls back the
 whole group. Tenant patches preserve existing locks; instance group writes keep
 their existing lock-clearing behavior.
 
+Storage authentication accepts a new ticket or principal wrapper containing the
+original validated identity. This does not renew the signed credential's deadline.
+Replacing the credential, identity, current grants or resolved request tenant
+still rejects the operation; the selected database tenant stays fixed.
+
 Validation and writing now use the same retained first configuration snapshot,
 including settings and binding winners that were absent when validation began.
 A row inserted or replaced between validation and writing cannot silently become

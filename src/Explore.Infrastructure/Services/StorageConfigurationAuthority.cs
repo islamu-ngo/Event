@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;
@@ -86,6 +87,9 @@ public sealed class StorageConfigurationAuthority(IServiceProvider services,
         private readonly QueryString query = request.Request.QueryString;
         private readonly string authorization = request.Request.Headers.Authorization.ToString();
         private readonly string cookie = request.Request.Headers.Cookie.ToString();
+        private readonly bool requestTenantPresent = request.Items.ContainsKey(TenantContextAccessor.TenantIdItemKey);
+        private readonly Guid? requestTenant = request.Items.TryGetValue(TenantContextAccessor.TenantIdItemKey, out var marker)
+            && marker is Guid selected && selected != Guid.Empty ? selected : null;
         private readonly Dictionary<string, string> support = request.Request.Headers
             .Where(header => SupportAccessHeaderNames.IsSupportAccessHeader(header.Key))
             .ToDictionary(header => header.Key, header => header.Value.ToString(), StringComparer.OrdinalIgnoreCase);
@@ -94,6 +98,11 @@ public sealed class StorageConfigurationAuthority(IServiceProvider services,
         private bool providerObserved;
         private readonly string originalPrincipal = JsonSerializer.Serialize(principalFacts);
         private readonly string originalSupport = JsonSerializer.Serialize(supportFacts);
+        private readonly ClaimsIdentity[] ticketIdentities = ticket.Principal.Identities.ToArray();
+        private readonly Claim[] ticketClaims = ticket.Principal.Claims.ToArray();
+        private readonly string scheme = ticket.AuthenticationScheme;
+        private readonly DateTimeOffset? issuedAt = ticket.Properties.IssuedUtc;
+        private readonly DateTimeOffset? expiresAt = ticket.Properties.ExpiresUtc;
 
         public object OriginalCommand => command;
         public Guid Actor => subject.PrincipalId;
@@ -107,6 +116,8 @@ public sealed class StorageConfigurationAuthority(IServiceProvider services,
             request.RequestAborted.ThrowIfCancellationRequested();
             if (!ReferenceEquals(owner._contexts.HttpContext, request) || !ReferenceEquals(request.User, principal)
                 || !ReferenceEquals(owner._human.Subject, subject) || owner._tenants.TenantId != ambient
+                || request.Items.TryGetValue(TenantContextAccessor.TenantIdItemKey, out var currentRequestTenant) != requestTenantPresent
+                || requestTenantPresent && (currentRequestTenant is not Guid currentTenant || currentTenant != requestTenant)
                 || !ReferenceEquals(request.RequestServices, requestServices)
                 || request.Request.Method != method || request.Request.Path != path
                 || request.Request.PathBase != pathBase || request.Request.QueryString != query
@@ -122,7 +133,11 @@ public sealed class StorageConfigurationAuthority(IServiceProvider services,
             token.ThrowIfCancellationRequested();
             RequireCustody();
             var current = await request.AuthenticateAsync();
-            if (!current.Succeeded || !ReferenceEquals(current.Ticket, ticket)
+            // Reauthentication may wrap the same native credential in a new ticket.
+            if (!current.Succeeded || current.Ticket?.AuthenticationScheme != scheme || current.Principal is null
+                || !ticketIdentities.SequenceEqual(current.Principal.Identities)
+                || !ticketClaims.SequenceEqual(current.Principal.Claims)
+                || current.Properties?.IssuedUtc != issuedAt || current.Properties?.ExpiresUtc != expiresAt
                 || !ReferenceEquals(await owner._lifetimes.ObserveAsync(principal, token), lifetime)) throw Denied();
             if (JsonSerializer.Serialize(await principalFence.ObserveAsync(token)) != originalPrincipal
                 || JsonSerializer.Serialize(await supportFence.ObserveAsync(token)) != originalSupport)

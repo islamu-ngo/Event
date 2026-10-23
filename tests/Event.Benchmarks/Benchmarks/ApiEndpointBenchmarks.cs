@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace Event.Benchmarks.Benchmarks;
 
 [Config(typeof(ExploreBenchmarkConfig))]
+[BenchmarkCategory("EFInMemory", "TestServer", "OutputCacheEnabled", "AllowAllAuthorization", "WorkersDisabled")]
 public class ApiEndpointBenchmarks : IAsyncDisposable
 {
     private ApiBenchmarkHostFactory _factory = null!;
@@ -32,7 +33,7 @@ public class ApiEndpointBenchmarks : IAsyncDisposable
         await ApiBenchmarkScenario.WarmUpAndValidateAsync(_client, _authenticatedHeader);
     }
 
-    [Benchmark]
+    [Benchmark(Description = "GET: EF InMemory / TestServer / output cache enabled")]
     public Task<ApiBenchmarkResult> Get_Endpoint()
     {
         return SendAsync(Scenario);

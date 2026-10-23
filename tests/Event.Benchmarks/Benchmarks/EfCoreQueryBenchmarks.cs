@@ -7,6 +7,7 @@ using DomainEvent = Explore.Domain.Event;
 namespace Event.Benchmarks.Benchmarks;
 
 [Config(typeof(ExploreBenchmarkConfig))]
+[BenchmarkCategory("QueryConstruction", "DeferredExecution", "NoSqlExecution", "NpgsqlModel")]
 public class EfCoreQueryBenchmarks : IDisposable
 {
     private static readonly Func<ExploreDbContext, Guid, IAsyncEnumerable<DomainEvent>> CompiledEventQuery =
@@ -34,7 +35,7 @@ public class EfCoreQueryBenchmarks : IDisposable
     [GlobalCleanup]
     public void GlobalCleanup() => _dbContext.Dispose();
 
-    [Benchmark(Baseline = true)]
+    [Benchmark(Baseline = true, Description = "Construct tracked query (no SQL)")]
     public void QueryConstruction_WithTracking()
     {
         GC.KeepAlive(_dbContext.Events
@@ -49,7 +50,7 @@ public class EfCoreQueryBenchmarks : IDisposable
             .Take(50));
     }
 
-    [Benchmark]
+    [Benchmark(Description = "Construct untracked query (no SQL)")]
     public void QueryConstruction_WithNoTracking()
     {
         GC.KeepAlive(_dbContext.Events
@@ -65,7 +66,7 @@ public class EfCoreQueryBenchmarks : IDisposable
             .Take(50));
     }
 
-    [Benchmark]
+    [Benchmark(Description = "Invoke compiled query without enumeration (no SQL)")]
     public void CompiledQuery_Invocation()
     {
         // Preserve deferred invocation without enumerating the result or executing SQL.

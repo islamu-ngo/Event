@@ -8,6 +8,7 @@ using Testcontainers.PostgreSql;
 namespace Event.Benchmarks.Benchmarks;
 
 [Config(typeof(ExploreBenchmarkConfig))]
+[BenchmarkCategory("PostgreSql18", "TestServer", "OutputCacheDisabled", "AllowAllAuthorization", "WorkersDisabled", "CurrentModelSchema", "NoMigrations", "PurposeIsolationNotMeasured")]
 public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
 {
     private PostgreSqlContainer? _container;
@@ -38,7 +39,7 @@ public class ApiEndpointPostgreSqlBenchmarks : IAsyncDisposable
         await ApiBenchmarkScenario.WarmUpAndValidateAsync(_client, _authenticatedHeader);
     }
 
-    [Benchmark]
+    [Benchmark(Description = "GET: PostgreSQL 18 / TestServer / output cache disabled")]
     public Task<ApiBenchmarkResult> Get_Endpoint_PostgreSql() => SendAsync(Scenario);
 
     [GlobalCleanup]

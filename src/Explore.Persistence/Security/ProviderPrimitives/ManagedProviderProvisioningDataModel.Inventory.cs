@@ -8,7 +8,10 @@ namespace Explore.Persistence.Security;
 
 internal static partial class ManagedProviderProvisioningDataModel
 {
-    internal sealed record Relation(Type Type, string Key, string[] Columns, bool Insert, string[] Update);
+    internal sealed record Relation(Type Type, string Key, string[] Columns, bool Insert, string[] Update)
+    {
+        internal string[] MappedProperties { get; init; } = Columns;
+    }
     private static string[] Audited(params string[] columns) =>
         [.. columns, "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy"];
     private static string[] Soft(params string[] columns) =>
@@ -21,7 +24,11 @@ internal static partial class ManagedProviderProvisioningDataModel
             "DefaultsVersion", "PayloadJson", "ConcurrencyStamp"), true, []),
         new(typeof(User), "Id", Soft("Id", "EmailVerified", "ConcurrencyStamp", "LastActiveTenantId"), true,
             ["Id", "EmailVerified", "ConcurrencyStamp", "UpdatedAt", "UpdatedBy"]),
-        new(typeof(UserPii), "UserId", ["UserId", "Email", "FirstName", "LastName"], true, []),
+        new(typeof(UserPii), "UserId", ["UserId", "Email", "FirstName", "LastName"], true, [])
+        {
+            MappedProperties = ["UserId", "Email", "FirstName", "LastName", "_dateOfBirth",
+                "_birthDateCollectionReceiptId", "_birthDateRevision"]
+        },
         new(typeof(Actor), "Id", Soft("Id", "ActorTypeId", "UserId", "OrganizationId", "GroupId", "ExternalActorSubjectId",
             "ServicePrincipalId", "IsSuspended", "SuspendedAt", "SuspendedBy", "ModerationReasonCode", "Description",
             "ProfilePictureCid", "BackgroundColor", "BackgroundEffect", "BannerColor", "ConcurrencyStamp"), true, ["Id"]),
@@ -75,15 +82,17 @@ internal static partial class ManagedProviderProvisioningDataModel
     internal static void RequireInventory(ExploreDbContext context)
     {
         foreach (var relation in Inventory)
-        {
-            var entity = context.Model.FindEntityType(relation.Type)
-                ?? throw new NotSupportedException("provisioning_data_colocated_model_required");
-            if (entity.GetTableName() is null || relation.Columns.Any(column => entity.FindProperty(column) is null)
-                || !entity.GetProperties().Select(property => property.Name).Order(StringComparer.Ordinal)
-                    .SequenceEqual(relation.Columns.Order(StringComparer.Ordinal), StringComparer.Ordinal)
-                || relation.Columns.Any(column => entity.FindProperty(column)!.IsShadowProperty()))
-                throw new InvalidOperationException("provisioning_data_inventory_drift");
-        }
+            RequireModel(context, relation);
     }
 
+    internal static void RequireModel(ExploreDbContext context, Relation relation)
+    {
+        var entity = context.Model.FindEntityType(relation.Type)
+            ?? throw new NotSupportedException("provisioning_data_colocated_model_required");
+        if (entity.GetTableName() is null || relation.Columns.Any(column => entity.FindProperty(column) is null)
+            || !entity.GetProperties().Select(property => property.Name).Order(StringComparer.Ordinal)
+                .SequenceEqual(relation.MappedProperties.Order(StringComparer.Ordinal), StringComparer.Ordinal)
+            || relation.MappedProperties.Any(column => entity.FindProperty(column)!.IsShadowProperty()))
+            throw new InvalidOperationException("provisioning_data_inventory_drift");
+    }
 }

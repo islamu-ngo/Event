@@ -613,6 +613,13 @@ only its existing user-ID/name/email SELECT and name/email UPDATE columns, not
 birth-date SELECT or UPDATE authority. Exact model-shape validation remains
 fail-closed: an undeclared mapped field is not silently ignored.
 
+Human managed-provider provisioning separately declares all seven mapped PII
+properties for that same strict model check, while its operational `Columns`
+inventory remains the original user-ID/name/email set. SQL row reads, inserts
+and privilege attestation continue to use only those four operational columns;
+the private fields remain database-defaulted and acquire no new SELECT, INSERT
+or UPDATE grant from this correction.
+
 This aligns the reviewed manifests with the existing merged model; it changes no
 entity, schema or migration. Model-manifest, fresh-account and native permission
 regressions were authored but not locally built or executed. Product compilation

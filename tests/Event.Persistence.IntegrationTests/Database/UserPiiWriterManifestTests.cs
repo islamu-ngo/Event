@@ -36,15 +36,47 @@ public sealed class UserPiiWriterManifestTests
     }
 
     [Test]
+    public async Task Human_provisioning_declares_private_fields_without_reading_or_writing_them()
+    {
+        using var context = ExploreDbContextModelProviderTests.CreateContext("SqlServer");
+        ManagedProviderProvisioningDataModel.RequireInventory(context);
+        var relation = ManagedProviderProvisioningDataModel.Inventory.Single(item => item.Type == typeof(UserPii));
+        var properties = context.Model.FindEntityType(typeof(UserPii))!.GetProperties()
+            .Select(property => property.Name).Order(StringComparer.Ordinal).ToArray();
+
+        await Assert.That(relation.MappedProperties.Order(StringComparer.Ordinal).SequenceEqual(properties)).IsTrue();
+        await Assert.That(relation.Columns.Order(StringComparer.Ordinal)
+            .SequenceEqual(new[] { "Email", "FirstName", "LastName", "UserId" })).IsTrue();
+        await Assert.That(relation.Insert).IsTrue();
+        await Assert.That(relation.Update.Length).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task Missing_private_field_declaration_still_rejects_the_local_writer_model()
     {
         using var context = ExploreDbContextModelProviderTests.CreateContext("SqlServer");
         var source = LocalIdentityWriterInventory.Sources.Single(item => item.EntityType == typeof(UserPii));
         var incomplete = source with { MappedProperties = source.MappedProperties.Remove("_birthDateRevision") };
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var exception = Assert.Throws<InvalidOperationException>(() =>
             LocalIdentityWriterInventory.RequireModel(context, incomplete));
 
         await Assert.That(exception.Message).IsEqualTo("local_identity_writer_source_model_drift");
+    }
+
+    [Test]
+    public async Task Missing_private_field_declaration_still_rejects_the_human_provisioning_model()
+    {
+        using var context = ExploreDbContextModelProviderTests.CreateContext("SqlServer");
+        var relation = ManagedProviderProvisioningDataModel.Inventory.Single(item => item.Type == typeof(UserPii));
+        var incomplete = relation with
+        {
+            MappedProperties = relation.MappedProperties.Where(property => property != "_birthDateRevision").ToArray()
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ManagedProviderProvisioningDataModel.RequireModel(context, incomplete));
+
+        await Assert.That(exception.Message).IsEqualTo("provisioning_data_inventory_drift");
     }
 }

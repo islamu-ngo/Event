@@ -262,6 +262,10 @@ needed to insert that row, but do not grant birth-date reads or updates. This
 manifest correction adds no configuration setting or database migration; provider
 runtime acceptance still requires the separately tracked verification gates.
 
+Human managed-provider provisioning also recognizes the complete PII model
+without expanding its existing user-ID/name/email storage permissions. The
+private birth-date fields remain defaulted rather than collected by that flow.
+
 Instance administrators can use the administrative API to create Local accounts,
 issue supervised reset credentials and inspect or reconcile interrupted operations.
 The Local accounts section provides the same server-authorized operations.

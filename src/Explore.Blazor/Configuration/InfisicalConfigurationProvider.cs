@@ -10,7 +10,8 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
     : ConfigurationProvider
 {
     private static readonly string[] FrontendRoots =
-        ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth"];
+        ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth",
+            "/runtime/bff/session"];
 
     public override void Load()
     {
@@ -205,6 +206,7 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
         ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_ID") => "Google:ClientId",
         ("/runtime/bff/oidc/google", "GOOGLE_CLIENT_SECRET") => "Google:ClientSecret",
         ("/runtime/bff/atproto/oauth", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS") => "Atproto:OauthClientPrivateJwks",
+        ("/runtime/bff/session", "BFF_SESSION_REDIS_PASSWORD") => "Bff:SessionAuthority:Password",
         _ => throw new InvalidOperationException("secret_authority_invalid"),
     };
 

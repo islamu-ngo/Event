@@ -1,11 +1,12 @@
 // Reads auth state from a custom request header (X-Test-Auth) to avoid shared mutable static state.
-// No header = anonymous (NoResult). Header present = authenticated with encoded claims.
+// Each header is a fresh synthetic credential, not evidence of cookie replay revocation.
 
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,6 +14,7 @@ namespace Explore.Blazor.IntegrationTests.Fixtures;
 
 public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
+    private readonly ITicketStore sessionAuthority;
     /// <summary>
     /// Custom header name that carries serialized claims for test authentication.
     /// </summary>
@@ -21,18 +23,19 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     public const string SchemeName = "TestScheme";
 
     public TestAuthHandler(IOptionsMonitor<AuthenticationSchemeOptions> options,
-        ILoggerFactory logger, UrlEncoder encoder)
+        ILoggerFactory logger, UrlEncoder encoder, ITicketStore sessionAuthority)
         : base(options, logger, encoder)
     {
+        this.sessionAuthority = sessionAuthority;
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         // No custom header = anonymous/unauthenticated request
         if (!Request.Headers.TryGetValue(AuthHeaderName, out var headerValue) ||
             string.IsNullOrEmpty(headerValue.ToString()))
         {
-            return Task.FromResult(AuthenticateResult.NoResult());
+            return AuthenticateResult.NoResult();
         }
 
         try
@@ -43,7 +46,7 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
 
             if (claimDtos is null or { Count: 0 })
             {
-                return Task.FromResult(AuthenticateResult.NoResult());
+                return AuthenticateResult.NoResult();
             }
 
             const string accessTokenClaim = "test:access_token";
@@ -53,7 +56,11 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
                 .ToList();
             var identity = new ClaimsIdentity(claims, "Cookies");
             var principal = new ClaimsPrincipal(identity);
-            var properties = new AuthenticationProperties();
+            var properties = new AuthenticationProperties
+            {
+                IssuedUtc = DateTimeOffset.UtcNow,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(1)
+            };
             var accessToken = claimDtos.FirstOrDefault(c =>
                 string.Equals(c.Type, accessTokenClaim, StringComparison.Ordinal))?.Value;
             if (!string.IsNullOrWhiteSpace(accessToken))
@@ -66,11 +73,12 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
             }
             var ticket = new AuthenticationTicket(principal, properties, SchemeName);
 
-            return Task.FromResult(AuthenticateResult.Success(ticket));
+            await sessionAuthority.StoreAsync(ticket);
+            return AuthenticateResult.Success(ticket);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Task.FromResult(AuthenticateResult.Fail($"Failed to parse test auth header: {ex.Message}"));
+            return AuthenticateResult.Fail("test_credential_rejected");
         }
     }
 

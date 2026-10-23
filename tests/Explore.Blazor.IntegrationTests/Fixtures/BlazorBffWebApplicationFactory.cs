@@ -79,8 +79,9 @@ public class BlazorBffWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
-            services.Replace(ServiceDescriptor.Singleton<IExternalDataProtectionSource>(
-                new ExternalDataProtectionTestAuthority("bff")));
+            services.AddTestBffSessionAuthority();
+            services.Replace(ServiceDescriptor.Singleton<IExternalDataProtectionSource>(provider =>
+                new ExternalDataProtectionTestAuthority("bff", provider.GetRequiredService<TimeProvider>())));
 
             services.AddAuthentication(TestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });

@@ -1,6 +1,7 @@
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Services;
-using Microsoft.AspNetCore.DataProtection;
+using Event.Testing.DataProtection;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -73,8 +74,9 @@ public class SecurityBlazorBffWebApplicationFactory : WebApplicationFactory<Prog
 
         builder.ConfigureTestServices(services =>
         {
-            services.RemoveAll<Microsoft.Extensions.Options.IConfigureOptions<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>>();
-            services.AddDataProtection().UseEphemeralDataProtectionProvider();
+            services.AddTestBffSessionAuthority();
+            services.Replace(ServiceDescriptor.Singleton<IExternalDataProtectionSource>(
+                new ExternalDataProtectionTestAuthority("bff")));
 
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();

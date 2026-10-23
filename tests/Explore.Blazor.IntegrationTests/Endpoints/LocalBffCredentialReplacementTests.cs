@@ -12,7 +12,10 @@ using System.Text.RegularExpressions;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.IntegrationTests.Fixtures;
+using Explore.Blazor.IntegrationTests.Services;
 using Explore.Blazor.Services;
+using Explore.Blazor.Services.Auth;
+using Explore.ServiceDefaults.DataProtection;
 using Event.Web.BffHosting.Security;
 using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Options;
@@ -78,7 +81,7 @@ public sealed class LocalBffCredentialReplacementTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         await Assert.That(body.RootElement.GetProperty("redirectUrl").GetString()).IsEqualTo(expectedDestination);
-        await Assert.That(fixture.ReadCookieTicket(response).Properties.RedirectUri).IsEqualTo(expectedDestination);
+        await Assert.That((await fixture.ReadCookieTicketAsync(response)).Properties.RedirectUri).IsEqualTo(expectedDestination);
     }
 
     [Test]
@@ -94,7 +97,7 @@ public sealed class LocalBffCredentialReplacementTests
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         await Assert.That(body.RootElement.GetProperty("redirectUrl").GetString())
             .IsEqualTo("/settings/instance");
-        await Assert.That(fixture.ReadCookieTicket(response).Properties.RedirectUri)
+        await Assert.That((await fixture.ReadCookieTicketAsync(response)).Properties.RedirectUri)
             .IsEqualTo("/settings/instance");
     }
 
@@ -108,19 +111,21 @@ public sealed class LocalBffCredentialReplacementTests
         using (HttpResponseMessage login = await fixture.LoginAsync())
         {
             await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
-            ticket = fixture.ReadCookieTicket(login);
+            ticket = await fixture.ReadCookieTicketAsync(login);
         }
         await using (AsyncServiceScope scope = fixture.Services.CreateAsyncScope())
             await Assert.That(await scope.ServiceProvider.GetRequiredService<BffAdminClaimsTransformation>().EnrichPrincipalAsync(
                 ticket.Principal, ticket.Properties, forceRefresh: true, cancellationToken: CancellationToken)).IsTrue();
         await Assert.That(ticket.Principal.TryGetAdminSubject(out var adminSubject)).IsTrue();
-        await Assert.That(ticket.Principal.TryGetCircuitSubject(out var subject)).IsTrue();
-        await Assert.That(ticket.Principal.TryGetSessionId(out var session)).IsTrue();
+        await Assert.That(ticket.Principal.TryGetCircuitSubject(out _)).IsTrue();
+        await Assert.That(ticket.Principal.TryGetSessionId(out _)).IsTrue();
+        await Assert.That(BffSessionIdentity.TryGetBinding(ticket.Principal, out var binding)).IsTrue();
         var cache = fixture.Services.GetRequiredService<IMemoryCache>();
         string cacheKey = $"BffAdminClaims_{adminSubject.PartitionKey}";
         await Assert.That(cache.TryGetValue(cacheKey, out object? originalAuthority)).IsTrue();
         var store = fixture.Services.GetRequiredService<ICircuitTokenStore>();
-        await Assert.That(store.Store(subject.PartitionKey, session.PartitionKey, fixture.Transport.AccessToken).Accepted).IsTrue();
+        await Assert.That(store.Store(binding.OwnerPartitionKey, binding.Handle, fixture.Transport.AccessToken).Accepted).IsTrue();
+        await Assert.That(store.Resolve(binding.OwnerPartitionKey, binding.Handle).Found).IsTrue();
         using var aborted = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         bool disposalObserved = false;
         fixture.Transport.CookieDefect = RevokedCookieAuthority.MismatchedUserId;
@@ -148,8 +153,8 @@ public sealed class LocalBffCredentialReplacementTests
         await Assert.That(cache.TryGetValue(cacheKey, out object? retainedAuthority)
             && ReferenceEquals(originalAuthority, retainedAuthority)).IsTrue();
         await Assert.That(canceledRequest).IsTrue();
-        await Assert.That(store.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsTrue();
-        await Assert.That(store.ResolveByUserId(subject.PartitionKey).Found).IsTrue();
+        await Assert.That(store.Resolve(binding.OwnerPartitionKey, binding.Handle).Found).IsTrue();
+        await Assert.That(store.ResolveByUserId(binding.OwnerPartitionKey).Found).IsTrue();
         fixture.Transport.CurrentUserResponseDisposed = null;
         fixture.Transport.CookieDefect = null;
         using HttpResponseMessage stillAccepted = await fixture.StatusWithTicketAsync(ticket);
@@ -164,7 +169,7 @@ public sealed class LocalBffCredentialReplacementTests
         fixture.Transport.OrdinaryLogin = true;
         using HttpResponseMessage login = await fixture.LoginAsync();
         await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await using LiveCircuit circuit = await fixture.OpenCircuitAsync(fixture.ReadCookieTicket(login));
+        await using LiveCircuit circuit = await fixture.OpenCircuitAsync(await fixture.ReadCookieTicketAsync(login));
         await Assert.That(circuit.Probe.StartupGap).IsNotNull();
         await Assert.That(circuit.Probe.StartupGap!.ObservedAuthenticatedLocalState).IsTrue();
         await Assert.That(circuit.Probe.StartupGap.SuppressedHttpContext).IsTrue();
@@ -188,7 +193,7 @@ public sealed class LocalBffCredentialReplacementTests
         fixture.Transport.OrdinaryLogin = true;
         using HttpResponseMessage login = await fixture.LoginAsync();
         await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await using LiveCircuit circuit = await fixture.OpenCircuitAsync(fixture.ReadCookieTicket(login));
+        await using LiveCircuit circuit = await fixture.OpenCircuitAsync(await fixture.ReadCookieTicketAsync(login));
         await circuit.NavigateAsync("before-provider-change");
         ClaimsPrincipal original = (await circuit.Probe.Authentication.GetAuthenticationStateAsync()).User;
         await Assert.That(original.TryGetCircuitSubject(out var subject)).IsTrue();
@@ -223,7 +228,7 @@ public sealed class LocalBffCredentialReplacementTests
         fixture.Transport.OrdinaryLogin = true;
         using HttpResponseMessage login = await fixture.LoginAsync();
         await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await using LiveCircuit circuit = await fixture.OpenCircuitAsync(fixture.ReadCookieTicket(login));
+        await using LiveCircuit circuit = await fixture.OpenCircuitAsync(await fixture.ReadCookieTicketAsync(login));
         await circuit.NavigateAsync("before-awaited-provider-change");
         ClaimsPrincipal original = (await circuit.Probe.Authentication.GetAuthenticationStateAsync()).User;
         await Assert.That(original.TryGetCircuitSubject(out var subject)).IsTrue();
@@ -298,7 +303,7 @@ public sealed class LocalBffCredentialReplacementTests
         fixture.Transport.OrdinaryLogin = true;
         using HttpResponseMessage login = await fixture.LoginAsync();
         await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await using LiveCircuit circuit = await fixture.OpenCircuitAsync(fixture.ReadCookieTicket(login));
+        await using LiveCircuit circuit = await fixture.OpenCircuitAsync(await fixture.ReadCookieTicketAsync(login));
         await Assert.That((await circuit.Probe.Authentication.GetAuthenticationStateAsync()).User.Identity?.IsAuthenticated == true).IsTrue();
         int before = circuit.Probe.Dispatches;
 
@@ -320,30 +325,38 @@ public sealed class LocalBffCredentialReplacementTests
         using (HttpResponseMessage login = await fixture.LoginAsync())
         {
             await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
-            firstTicket = fixture.ReadCookieTicket(login);
+            firstTicket = await fixture.ReadCookieTicketAsync(login);
         }
         await using LiveCircuit circuit = await fixture.OpenCircuitAsync(firstTicket);
         await circuit.NavigateAsync("before-revocation");
         await Assert.That((await circuit.Probe.Authentication.GetAuthenticationStateAsync()).User.Identity?.IsAuthenticated == true).IsTrue();
-        await Assert.That(firstTicket.Principal.TryGetCircuitSubject(out var subject)).IsTrue();
+        await Assert.That(firstTicket.Principal.TryGetCircuitSubject(out _)).IsTrue();
         await Assert.That(firstTicket.Principal.TryGetSessionId(out var firstSession)).IsTrue();
+        await Assert.That(BffSessionIdentity.TryGetBinding(firstTicket.Principal, out var firstBinding)).IsTrue();
         var store = fixture.Services.GetRequiredService<ICircuitTokenStore>();
+        await Assert.That(store.Store(firstBinding.OwnerPartitionKey, firstBinding.Handle, fixture.Transport.AccessToken).Accepted).IsTrue();
+        await Assert.That(store.Resolve(firstBinding.OwnerPartitionKey, firstBinding.Handle).Found).IsTrue();
         AuthenticationTicket? secondTicket = null;
-        string? secondSession = null;
+        BffSessionBinding? secondBinding = null;
         string? secondToken = null;
         if (newerSameUserSession)
         {
             secondToken = fixture.Transport.CreateFreshSameUserAccessToken();
             fixture.Transport.LoginAccessToken = secondToken;
-            using HttpResponseMessage secondLogin = await fixture.LoginAsync();
+            using HttpClient secondBrowser = fixture.CreateClient();
+            using HttpResponseMessage secondLogin = await fixture.LoginAsync(browserClient: secondBrowser);
             await Assert.That(secondLogin.StatusCode).IsEqualTo(HttpStatusCode.OK);
-            secondTicket = fixture.ReadCookieTicket(secondLogin);
+            secondTicket = await fixture.ReadCookieTicketAsync(secondLogin);
             await Assert.That(secondTicket.Principal.TryGetSessionId(out var resolvedSecondSession)).IsTrue();
-            secondSession = resolvedSecondSession.PartitionKey;
-            await Assert.That(secondSession == firstSession.PartitionKey).IsFalse();
-            await Assert.That(store.Store(subject.PartitionKey, secondSession, secondToken).Accepted).IsTrue();
-            store.ClearSession(subject.PartitionKey, firstSession.PartitionKey);
-            await Assert.That(string.Equals(store.ResolveByUserId(subject.PartitionKey).Token, secondToken, StringComparison.Ordinal)).IsTrue();
+            await Assert.That(resolvedSecondSession.PartitionKey == firstSession.PartitionKey).IsFalse();
+            await Assert.That(BffSessionIdentity.TryGetBinding(secondTicket.Principal, out var independentBinding)).IsTrue();
+            secondBinding = independentBinding;
+            await Assert.That(independentBinding.OwnerPartitionKey == firstBinding.OwnerPartitionKey).IsTrue();
+            await Assert.That(independentBinding.Handle == firstBinding.Handle).IsFalse();
+            await Assert.That(store.Store(independentBinding.OwnerPartitionKey, independentBinding.Handle, secondToken).Accepted).IsTrue();
+            await Assert.That(store.Resolve(independentBinding.OwnerPartitionKey, independentBinding.Handle).Found).IsTrue();
+            store.ClearSession(firstBinding.OwnerPartitionKey, firstBinding.Handle);
+            await Assert.That(string.Equals(store.ResolveByUserId(independentBinding.OwnerPartitionKey).Token, secondToken, StringComparison.Ordinal)).IsTrue();
         }
         fixture.Transport.RevokedAccessToken = fixture.Transport.AccessToken;
         int dispatchedBefore = circuit.Probe.Dispatches;
@@ -357,18 +370,18 @@ public sealed class LocalBffCredentialReplacementTests
         await Assert.That(circuit.Probe.User.UserId).IsNull();
         await Assert.That(circuit.Probe.User.SessionId).IsNull();
         await Assert.That(circuit.Probe.Cookies.CookieHeader).IsNull();
-        await Assert.That(store.Resolve(subject.PartitionKey, firstSession.PartitionKey).Found).IsFalse();
+        await Assert.That(store.Resolve(firstBinding.OwnerPartitionKey, firstBinding.Handle).Found).IsFalse();
         await circuit.NavigateAsync("repeat-revoked-activity");
         await Assert.That(circuit.Probe.Dispatches).IsEqualTo(dispatchedBefore);
         await Assert.That(string.IsNullOrEmpty(circuit.Probe.Tokens.AccessToken)).IsTrue();
-        if (secondTicket is not null)
+        if (secondTicket is not null && secondBinding is { } preservedBinding)
         {
-            await Assert.That(string.Equals(store.Resolve(subject.PartitionKey, secondSession).Token, secondToken, StringComparison.Ordinal)).IsTrue();
+            await Assert.That(string.Equals(store.Resolve(preservedBinding.OwnerPartitionKey, preservedBinding.Handle).Token, secondToken, StringComparison.Ordinal)).IsTrue();
             using HttpResponseMessage secondStillAccepted = await fixture.StatusWithTicketAsync(secondTicket);
             using JsonDocument status = JsonDocument.Parse(await secondStillAccepted.Content.ReadAsStringAsync(CancellationToken));
             await Assert.That(status.RootElement.GetProperty("isAuthenticated").GetBoolean()).IsTrue();
         }
-        else await Assert.That(store.ResolveByUserId(subject.PartitionKey).Found).IsFalse();
+        else await Assert.That(store.ResolveByUserId(firstBinding.OwnerPartitionKey).Found).IsFalse();
     }
 
     [Test]
@@ -378,10 +391,49 @@ public sealed class LocalBffCredentialReplacementTests
         fixture.Transport.OrdinaryLogin = true;
         using HttpResponseMessage login = await fixture.LoginAsync();
         await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        AuthenticationTicket ticket = fixture.ReadCookieTicket(login);
+        AuthenticationTicket ticket = await fixture.ReadCookieTicketAsync(login);
         await Assert.That(ticket.Properties.ExpiresUtc > DateTimeOffset.UtcNow).IsTrue();
         await Assert.That(await fixture.IsAuthenticatedAsync()).IsTrue();
         await Assert.That(ticket.Principal.IsInRole("Admin")).IsFalse();
+    }
+
+    [Test]
+    public async Task NativeLocalLogoutRejectsUnchangedSessionCookieReplay()
+    {
+        await using var authority = new RedisBffTicketStoreTests.Authority();
+        await authority.InitializeAsync();
+        await using var fixture = new Fixture(sessionAuthority: authority);
+        await Assert.That(ReferenceEquals(fixture.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(CookieAuthenticationDefaults.AuthenticationScheme).SessionStore,
+            fixture.Services.GetRequiredService<RedisBffTicketStore>())).IsTrue();
+        fixture.Transport.OrdinaryLogin = true;
+        using HttpResponseMessage login = await fixture.LoginAsync();
+        await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(await fixture.IsAuthenticatedAsync()).IsTrue();
+        string cookieName = fixture.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(CookieAuthenticationDefaults.AuthenticationScheme).Cookie.Name!;
+        var cookies = login.Headers.GetValues("Set-Cookie").Select(value => SetCookieHeaderValue.Parse(value))
+            .Where(cookie => cookie.Name == cookieName
+                || cookie.Name.ToString().StartsWith(cookieName + "C", StringComparison.Ordinal)).ToArray();
+        await Assert.That(cookies.Length > 0).IsTrue();
+        string captured = string.Join("; ", cookies.Select(cookie => $"{cookie.Name}={cookie.Value}"));
+
+        using HttpResponseMessage logout = await fixture.Client.GetAsync("/auth/signout?returnUrl=/login", CancellationToken);
+        await Assert.That(logout.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
+        await Assert.That(await fixture.IsAuthenticatedAsync()).IsFalse();
+        using HttpClient replay = fixture.CreateClient();
+        using (HttpResponseMessage baseline = await replay.GetAsync("/auth/status", CancellationToken))
+        {
+            await Assert.That(baseline.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            using JsonDocument anonymous = JsonDocument.Parse(await baseline.Content.ReadAsStringAsync(CancellationToken));
+            await Assert.That(anonymous.RootElement.GetProperty("isAuthenticated").GetBoolean()).IsFalse();
+        }
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/auth/status");
+        request.Headers.Add("Cookie", captured);
+        using HttpResponseMessage response = await replay.SendAsync(request, CancellationToken);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using JsonDocument status = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        await Assert.That(status.RootElement.GetProperty("isAuthenticated").GetBoolean()).IsFalse();
     }
 
     [Test]
@@ -405,16 +457,28 @@ public sealed class LocalBffCredentialReplacementTests
         using (HttpResponseMessage login = await fixture.LoginAsync())
         {
             await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
-            ticket = fixture.ReadCookieTicket(login);
+            ticket = await fixture.ReadCookieTicketAsync(login);
         }
         await Assert.That(await fixture.IsAuthenticatedAsync()).IsTrue();
         await Assert.That(ticket.Properties.ExpiresUtc > DateTimeOffset.UtcNow).IsTrue();
-        await Assert.That(ticket.Principal.TryGetCircuitSubject(out var subject)).IsTrue();
-        await Assert.That(ticket.Principal.TryGetSessionId(out var session)).IsTrue();
-        var store = fixture.Services.GetRequiredService<ICircuitTokenStore>();
-        await Assert.That(store.Store(subject.PartitionKey, session.PartitionKey, fixture.Transport.AccessToken).Accepted).IsTrue();
-        await Assert.That(store.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsTrue();
-        await Assert.That(store.ResolveByUserId(subject.PartitionKey).Found).IsTrue();
+        await Assert.That(ticket.Principal.TryGetCircuitSubject(out _)).IsTrue();
+        await Assert.That(ticket.Principal.TryGetSessionId(out _)).IsTrue();
+        bool freshSynthetic = defect is RevokedCookieAuthority.MissingToken
+            or RevokedCookieAuthority.OtherUserToken or RevokedCookieAuthority.SameUserExternalToken
+            or RevokedCookieAuthority.MissingPrincipalProvider or RevokedCookieAuthority.ConflictingProtectedProvider;
+        if (freshSynthetic)
+        {
+            await Assert.That(BffSessionIdentity.TryGetBinding(ticket.Principal, out var originalBinding)).IsTrue();
+            var originalStore = fixture.Services.GetRequiredService<ICircuitTokenStore>();
+            await Assert.That(originalStore.Store(originalBinding.OwnerPartitionKey, originalBinding.Handle, fixture.Transport.AccessToken).Accepted).IsTrue();
+            await Assert.That(originalStore.Resolve(originalBinding.OwnerPartitionKey, originalBinding.Handle).Found).IsTrue();
+            var authority = fixture.Services.GetRequiredService<IBffSessionAuthority>();
+            await Assert.That(await authority.IsActiveAsync(originalBinding, CancellationToken)).IsTrue();
+            using HttpResponseMessage logout = await fixture.Client.GetAsync("/auth/signout?returnUrl=/login", CancellationToken);
+            await Assert.That(logout.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
+            await Assert.That(await authority.IsActiveAsync(originalBinding, CancellationToken)).IsFalse();
+            await Assert.That(originalStore.Resolve(originalBinding.OwnerPartitionKey, originalBinding.Handle).Found).IsFalse();
+        }
         fixture.Transport.CookieDefect = defect;
         if (defect == RevokedCookieAuthority.MissingPrincipalProvider)
             foreach (ClaimsIdentity identity in ticket.Principal.Identities)
@@ -434,6 +498,14 @@ public sealed class LocalBffCredentialReplacementTests
             ticket.Properties.StoreTokens(tokens);
         }
 
+        if (freshSynthetic)
+            ticket = await fixture.IssueFreshSyntheticTicketAsync(ticket);
+        await Assert.That(BffSessionIdentity.TryGetBinding(ticket.Principal, out var binding)).IsTrue();
+        var store = fixture.Services.GetRequiredService<ICircuitTokenStore>();
+        await Assert.That(store.Store(binding.OwnerPartitionKey, binding.Handle, fixture.Transport.AccessToken).Accepted).IsTrue();
+        await Assert.That(store.Resolve(binding.OwnerPartitionKey, binding.Handle).Found).IsTrue();
+        await Assert.That(store.ResolveByUserId(binding.OwnerPartitionKey).Found).IsTrue();
+
         using HttpResponseMessage rejected = await fixture.StatusWithTicketAsync(ticket);
 
         using JsonDocument body = JsonDocument.Parse(await rejected.Content.ReadAsStringAsync(CancellationToken));
@@ -443,8 +515,8 @@ public sealed class LocalBffCredentialReplacementTests
         await Assert.That(rejected.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies)
             && cookies.Select(value => SetCookieHeaderValue.Parse(value)).Any(cookie => cookie.Name == cookieName
                 && cookie.Value.Length == 0 && cookie.Expires < DateTimeOffset.UtcNow)).IsTrue();
-        await Assert.That(store.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsFalse();
-        await Assert.That(store.ResolveByUserId(subject.PartitionKey).Found).IsFalse();
+        await Assert.That(store.Resolve(binding.OwnerPartitionKey, binding.Handle).Found).IsFalse();
+        await Assert.That(store.ResolveByUserId(binding.OwnerPartitionKey).Found).IsFalse();
     }
 
     [Test]
@@ -453,23 +525,38 @@ public sealed class LocalBffCredentialReplacementTests
         await using var fixture = new Fixture();
         fixture.Transport.OrdinaryLogin = true;
         AuthenticationTicket first;
-        using (HttpResponseMessage login = await fixture.LoginAsync()) first = fixture.ReadCookieTicket(login);
-        await Assert.That(first.Principal.TryGetCircuitSubject(out var subject)).IsTrue();
+        using (HttpResponseMessage login = await fixture.LoginAsync()) first = await fixture.ReadCookieTicketAsync(login);
+        await Assert.That(first.Principal.TryGetCircuitSubject(out _)).IsTrue();
         string secondToken = fixture.Transport.CreateFreshSameUserAccessToken();
         fixture.Transport.LoginAccessToken = secondToken;
         AuthenticationTicket second;
-        using (HttpResponseMessage login = await fixture.LoginAsync()) second = fixture.ReadCookieTicket(login);
-        await Assert.That(second.Principal.TryGetSessionId(out var session)).IsTrue();
-        var store = fixture.Services.GetRequiredService<ICircuitTokenStore>();
-        await Assert.That(store.Store(subject.PartitionKey, session.PartitionKey, secondToken).Accepted).IsTrue();
+        using HttpClient secondBrowser = fixture.CreateClient();
+        using (HttpResponseMessage login = await fixture.LoginAsync(browserClient: secondBrowser))
+        {
+            await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            second = await fixture.ReadCookieTicketAsync(login);
+        }
+        await Assert.That(second.Principal.TryGetSessionId(out _)).IsTrue();
+        await Assert.That(BffSessionIdentity.TryGetBinding(second.Principal, out var secondBinding)).IsTrue();
         foreach (ClaimsIdentity identity in first.Principal.Identities)
             foreach (Claim claim in identity.FindAll(JwtRegisteredClaimNames.Sid).ToArray()) identity.RemoveClaim(claim);
+
+        first = await fixture.IssueFreshSyntheticTicketAsync(first);
+        await Assert.That(BffSessionIdentity.TryGetBinding(first.Principal, out var firstBinding)).IsTrue();
+        await Assert.That(firstBinding.OwnerPartitionKey == secondBinding.OwnerPartitionKey).IsTrue();
+        await Assert.That(firstBinding.Handle == secondBinding.Handle).IsFalse();
+        var store = fixture.Services.GetRequiredService<ICircuitTokenStore>();
+        await Assert.That(store.Store(firstBinding.OwnerPartitionKey, firstBinding.Handle, fixture.Transport.AccessToken).Accepted).IsTrue();
+        await Assert.That(store.Resolve(firstBinding.OwnerPartitionKey, firstBinding.Handle).Found).IsTrue();
+        await Assert.That(store.Store(secondBinding.OwnerPartitionKey, secondBinding.Handle, secondToken).Accepted).IsTrue();
+        await Assert.That(store.Resolve(secondBinding.OwnerPartitionKey, secondBinding.Handle).Found).IsTrue();
 
         using HttpResponseMessage rejected = await fixture.StatusWithTicketAsync(first);
 
         using JsonDocument denied = JsonDocument.Parse(await rejected.Content.ReadAsStringAsync(CancellationToken));
         await Assert.That(denied.RootElement.GetProperty("isAuthenticated").GetBoolean()).IsFalse();
-        await Assert.That(string.Equals(store.Resolve(subject.PartitionKey, session.PartitionKey).Token, secondToken, StringComparison.Ordinal)).IsTrue();
+        await Assert.That(store.Resolve(firstBinding.OwnerPartitionKey, firstBinding.Handle).Found).IsFalse();
+        await Assert.That(string.Equals(store.Resolve(secondBinding.OwnerPartitionKey, secondBinding.Handle).Token, secondToken, StringComparison.Ordinal)).IsTrue();
         using HttpResponseMessage valid = await fixture.StatusWithTicketAsync(second);
         using JsonDocument accepted = JsonDocument.Parse(await valid.Content.ReadAsStringAsync(CancellationToken));
         await Assert.That(accepted.RootElement.GetProperty("isAuthenticated").GetBoolean()).IsTrue();
@@ -509,22 +596,29 @@ public sealed class LocalBffCredentialReplacementTests
         using (HttpResponseMessage ordinary = await fixture.LoginAsync())
         {
             await Assert.That(ordinary.StatusCode).IsEqualTo(HttpStatusCode.OK);
-            ticket = fixture.ReadCookieTicket(ordinary);
+            ticket = await fixture.ReadCookieTicketAsync(ordinary);
         }
         await Assert.That(await fixture.IsAuthenticatedAsync()).IsTrue();
-        await Assert.That(ticket.Principal.TryGetCircuitSubject(out var subject)).IsTrue();
-        await Assert.That(ticket.Principal.TryGetSessionId(out var session)).IsTrue();
+        await Assert.That(ticket.Principal.TryGetCircuitSubject(out _)).IsTrue();
+        await Assert.That(ticket.Principal.TryGetSessionId(out _)).IsTrue();
+        await Assert.That(BffSessionIdentity.TryGetBinding(ticket.Principal, out var binding)).IsTrue();
         var tokenStore = fixture.Services.GetRequiredService<ICircuitTokenStore>();
-        await Assert.That(tokenStore.Store(subject.PartitionKey, session.PartitionKey, fixture.Transport.AccessToken).Accepted).IsTrue();
-        await Assert.That(tokenStore.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsTrue();
+        await Assert.That(tokenStore.Store(binding.OwnerPartitionKey, binding.Handle, fixture.Transport.AccessToken).Accepted).IsTrue();
+        await Assert.That(tokenStore.Resolve(binding.OwnerPartitionKey, binding.Handle).Found).IsTrue();
+        var authority = fixture.Services.GetRequiredService<IBffSessionAuthority>();
+        await Assert.That(await authority.IsActiveAsync(binding, CancellationToken)).IsTrue();
         fixture.Transport.OrdinaryLogin = false;
 
         using HttpResponseMessage challenge = await fixture.LoginAsync();
 
         await Assert.That(challenge.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(await fixture.IsAuthenticatedAsync()).IsFalse();
-        await Assert.That(tokenStore.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsFalse();
-        await Assert.That(tokenStore.ResolveByUserId(subject.PartitionKey).Found).IsFalse();
+        await Assert.That(tokenStore.Resolve(binding.OwnerPartitionKey, binding.Handle).Found).IsFalse();
+        await Assert.That(tokenStore.ResolveByUserId(binding.OwnerPartitionKey).Found).IsFalse();
+        await Assert.That(await authority.IsActiveAsync(binding, CancellationToken)).IsFalse();
+        using HttpResponseMessage replay = await fixture.StatusWithTicketAsync(ticket);
+        using JsonDocument replayStatus = JsonDocument.Parse(await replay.Content.ReadAsStringAsync(CancellationToken));
+        await Assert.That(replayStatus.RootElement.GetProperty("isAuthenticated").GetBoolean()).IsFalse();
         await Assert.That(challenge.Headers.GetValues("Set-Cookie").Select(value => SetCookieHeaderValue.Parse(value))
             .Any(cookie => cookie.Name == LocalCredentialChallengeCookie.CookieName && cookie.Value.Length > 0)).IsTrue();
     }
@@ -576,7 +670,7 @@ public sealed class LocalBffCredentialReplacementTests
         await Assert.That(await fixture.IsAuthenticatedAsync()).IsFalse();
         using HttpResponseMessage fresh = await fixture.LoginAsync();
         await Assert.That(fresh.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        AuthenticationTicket ticket = fixture.ReadCookieTicket(fresh);
+        AuthenticationTicket ticket = await fixture.ReadCookieTicketAsync(fresh);
         await Assert.That(ticket.Principal.HasClaim(claim => claim.Type == ClaimTypes.Email || claim.Type == "email")).IsFalse();
         await Assert.That(await fixture.IsAuthenticatedAsync()).IsTrue();
     }
@@ -771,14 +865,23 @@ public sealed class LocalBffCredentialReplacementTests
         internal HttpClient Client { get; }
         internal IServiceProvider Services => _factory.Services;
         private readonly TaskCompletionSource<CircuitProbe> _openedCircuit = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly Dictionary<AuthenticationTicket, string> _originalCookies = new(ReferenceEqualityComparer.Instance);
 
-        internal Fixture(bool deploymentLocalOverride = true, bool suppressStartupHttpContext = false, bool observeCircuitLifetime = false)
+        internal Fixture(bool deploymentLocalOverride = true, bool suppressStartupHttpContext = false,
+            bool observeCircuitLifetime = false, RedisBffTicketStoreTests.Authority? sessionAuthority = null)
         {
             _factory = _root.WithWebHostBuilder(builder =>
             {
                 if (deploymentLocalOverride) builder.UseSetting("Authentication:Provider", "local");
                 builder.ConfigureTestServices(services =>
                 {
+                    if (sessionAuthority is not null)
+                    {
+                        services.Replace(ServiceDescriptor.Singleton(sessionAuthority.Options()));
+                        services.Replace(ServiceDescriptor.Singleton<IExternalDataProtectionSource>(sessionAuthority.Source));
+                        services.Replace(ServiceDescriptor.Singleton<ITicketStore>(provider => provider.GetRequiredService<RedisBffTicketStore>()));
+                        services.Replace(ServiceDescriptor.Singleton<IBffSessionAuthority>(provider => provider.GetRequiredService<RedisBffTicketStore>()));
+                    }
                     services.PostConfigure<AuthenticationOptions>(options =>
                     {
                         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -831,37 +934,49 @@ public sealed class LocalBffCredentialReplacementTests
             HandleCookies = true
         });
 
-        internal AuthenticationTicket ReadCookieTicket(HttpResponseMessage response)
+        internal async Task<AuthenticationTicket> ReadCookieTicketAsync(HttpResponseMessage response)
         {
             CookieAuthenticationOptions options = Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
                 .Get(CookieAuthenticationDefaults.AuthenticationScheme);
-            string value = response.Headers.GetValues("Set-Cookie").Select(cookie => SetCookieHeaderValue.Parse(cookie))
-                .Single(cookie => cookie.Name == options.Cookie.Name).Value.ToString();
-            return options.TicketDataFormat.Unprotect(value)
-                ?? throw new InvalidOperationException("The native cookie ticket was unavailable.");
+            string cookie = string.Join("; ", response.Headers.GetValues("Set-Cookie").Select(value => SetCookieHeaderValue.Parse(value))
+                .Where(value => value.Value.Length > 0 && (value.Name == options.Cookie.Name
+                    || value.Name.ToString().StartsWith(options.Cookie.Name + "C", StringComparison.Ordinal)))
+                .Select(value => $"{value.Name}={value.Value}"));
+            return await ReadReferenceTicketAsync(cookie);
+        }
+
+        private async Task<AuthenticationTicket> ReadReferenceTicketAsync(string cookie)
+        {
+            CookieAuthenticationOptions options = Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+                .Get(CookieAuthenticationDefaults.AuthenticationScheme);
+            var context = new DefaultHttpContext { RequestServices = Services };
+            context.Request.Headers.Cookie = cookie;
+            AuthenticationTicket ticket = await options.ReadStoredTicketAsync(context)
+                ?? throw new InvalidOperationException("The native session ticket was unavailable.");
+            _originalCookies.Add(ticket, cookie);
+            return ticket;
         }
 
         internal async Task<HttpResponseMessage> StatusWithTicketAsync(AuthenticationTicket ticket)
         {
-            CookieAuthenticationOptions options = Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
-                .Get(CookieAuthenticationDefaults.AuthenticationScheme);
             using HttpClient client = CreateClient();
             using var request = new HttpRequestMessage(HttpMethod.Get, "/auth/status");
-            request.Headers.Add("Cookie", options.Cookie.Name + "=" + options.TicketDataFormat.Protect(ticket));
+            request.Headers.Add("Cookie", _originalCookies[ticket]);
             return await client.SendAsync(request, CancellationToken);
         }
 
+        internal async Task<AuthenticationTicket> IssueFreshSyntheticTicketAsync(AuthenticationTicket ticket) =>
+            await ReadReferenceTicketAsync(await TestBffSessionAuthorityRegistration.IssueFreshCookieAsync(Services, ticket));
+
         internal Task<HttpContext> StatusWithRequestAbortAsync(AuthenticationTicket ticket, CancellationToken requestAborted, Action<HttpContext> observe)
         {
-            CookieAuthenticationOptions options = Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
-                .Get(CookieAuthenticationDefaults.AuthenticationScheme);
             return _factory.Server.SendAsync(context =>
             {
                 context.Request.Method = HttpMethods.Get;
                 context.Request.Scheme = "https";
                 context.Request.Host = new HostString("localhost");
                 context.Request.Path = "/auth/status";
-                context.Request.Headers.Cookie = options.Cookie.Name + "=" + options.TicketDataFormat.Protect(ticket);
+                context.Request.Headers.Cookie = _originalCookies[ticket];
                 context.RequestAborted = requestAborted;
                 observe(context);
             }, CancellationToken);
@@ -871,9 +986,7 @@ public sealed class LocalBffCredentialReplacementTests
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(15));
-            CookieAuthenticationOptions options = Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
-                .Get(CookieAuthenticationDefaults.AuthenticationScheme);
-            string? cookie = ticket is null ? null : options.Cookie.Name + "=" + options.TicketDataFormat.Protect(ticket);
+            string? cookie = ticket is null ? null : _originalCookies[ticket];
             using HttpClient client = CreateClient();
             if (cookie is not null) client.DefaultRequestHeaders.Add("Cookie", cookie);
             string html = await client.GetStringAsync("/", timeout.Token);
@@ -909,12 +1022,12 @@ public sealed class LocalBffCredentialReplacementTests
 
         internal async Task<HttpResponseMessage> LoginAsync(
             string returnUrl = "https://untrusted.example.test/redirect",
-            bool adminHost = false)
+            bool adminHost = false, HttpClient? browserClient = null)
         {
             using HttpClient? hostClient = adminHost ? CreateClient() : null;
             if (hostClient is not null)
                 hostClient.BaseAddress = new Uri("https://admin.localhost");
-            HttpClient client = hostClient ?? Client;
+            HttpClient client = browserClient ?? hostClient ?? Client;
             string csrf = await CsrfAsync(client);
             using var request = new HttpRequestMessage(HttpMethod.Post, "/bff/auth/local/login")
             {

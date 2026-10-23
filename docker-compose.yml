@@ -406,13 +406,35 @@ services:
         required: false
 
   redis:
-    image: redis:7-alpine
+    image: docker.io/library/redis:7.2.16-alpine@sha256:f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Optional authentication authority; availability-cache clients keep using redis.
+  bff-session-authority:
+    profiles: ["bff-session"]
+    image: docker.io/library/redis:7.2.16-alpine@sha256:f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a
+    restart: unless-stopped
+    environment:
+      BFF_SESSION_REDIS_PASSWORD: ${BFF_SESSION_REDIS_PASSWORD:-}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        test -n "$$BFF_SESSION_REDIS_PASSWORD"
+        exec docker-entrypoint.sh redis-server --appendonly yes --maxmemory-policy noeviction --requirepass "$$BFF_SESSION_REDIS_PASSWORD"
+    volumes:
+      - bff_session_authority_data:/data
+    networks:
+      - bff_session
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$BFF_SESSION_REDIS_PASSWORD\" redis-cli ping | grep -qx PONG"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -592,6 +614,21 @@ services:
       Keycloak__ClientSecret: ${KEYCLOAK_BLAZOR_CLIENT_SECRET:-}
       Bff__AdminHosts__0: ${INSTANCE_ADMIN_PUBLIC_ORIGIN:-http://admin.localhost:7002}
       ConnectionStrings__cache: ${REDIS_CONNECTION_STRING:-redis:6379}
+      BFF_SESSION_REDIS_ENDPOINT: ${BFF_SESSION_REDIS_ENDPOINT:-redis://bff-session-authority:6379}
+      BFF_SESSION_NAMESPACE: ${BFF_SESSION_NAMESPACE:-}
+      BFF_SESSION_REDIS_PASSWORD: ${BFF_SESSION_REDIS_PASSWORD:-}
+    # Minimize the launched process environment; privileged Docker metadata remains trusted.
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        case "$$SecretProvider__Provider" in
+          [Ee][Nn][Vv][Ii][Rr][Oo][Nn][Mm][Ee][Nn][Tt]) ;;
+          *) unset BFF_SESSION_REDIS_PASSWORD ;;
+        esac
+        exec dotnet Explore.Blazor.dll
+    networks:
+      - default
+      - bff_session
     ports:
       - "${UI_HTTP_PORT:-7002}:8080"
     extra_hosts:
@@ -1012,12 +1049,18 @@ services:
       - "${OSPREY_BIDI_STREAM_PORT:-19950}:19950"
       - "${OSPREY_SYNC_ACTION_PORT:-19951}:19951"
 
+networks:
+  default:
+  bff_session:
+    internal: true
+
 volumes:
   setup_data:
   postgres_data:
   privacy_erasure_authority_data:
   privacy_erasure_postgres_data:
   redis_data:
+  bff_session_authority_data:
   keycloak_data:
   mailpit_data:
   local_storage_data:

@@ -207,6 +207,13 @@ if (runMode != AspireRunMode.AgentBrowser && testingIsolation is null)
 IResourceBuilder<PostgresDatabaseResource>? database = null;
 IResourceBuilder<PostgresDatabaseResource>? privacyErasureDatabase = null;
 IResourceBuilder<RedisResource>? cache = null;
+IResourceBuilder<RedisResource>? bffSessionAuthority = null;
+string? bffSessionPassword = operatorInputs["BFF_SESSION_REDIS_PASSWORD"];
+var bffSessionPasswordParameter = string.IsNullOrWhiteSpace(bffSessionPassword)
+    ? null : builder.AddParameter("bff-session-password", () => bffSessionPassword,
+        publishValueAsDefault: false, secret: true);
+string bffSessionNamespace = builder.Configuration["BFF_SESSION_NAMESPACE"]
+    ?? builder.Configuration["Bff:SessionAuthority:Namespace"] ?? string.Empty;
 IResourceBuilder<RabbitMQServerResource>? messaging = null;
 LocalPlatformResources? localPlatformResources = null;
 var mailpit = AddMailpit(builder, agentBrowserProfile);
@@ -293,7 +300,19 @@ if (runMode.UsesLocalData())
             ? builder.AddRedis("cache")
             : builder.AddRedis("cache", password: agentRedisPassword!)
                 .WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit))
+        .WithImageTag("7.2.16-alpine@sha256:f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a")
         .WithDataVolume(agentBrowserProfile?.RedisVolumeName ?? "islamu-event-redis-data");
+
+    if (bffSessionPasswordParameter is not null)
+    {
+        bffSessionAuthority = builder.AddRedis("bff-session-authority", password: bffSessionPasswordParameter)
+            .WithImageRegistry("docker.io")
+            .WithImage("library/redis")
+            .WithImageTag("7.2.16-alpine@sha256:"
+                + "f8548b29a1f1cb358b5fcfec1e0126beab57ad15776c1e87623f865579f16c5a")
+            .WithDataVolume("islamu-event-bff-session-authority-data")
+            .WithArgs("--appendonly", "yes", "--maxmemory-policy", "noeviction");
+    }
 }
 
 if (runMode is AspireRunMode.FullLocal or AspireRunMode.DefaultLocal)
@@ -703,6 +722,11 @@ else
     }
 }
 
+object bffSessionEndpoint = builder.Configuration["BFF_SESSION_REDIS_ENDPOINT"]
+    ?? builder.Configuration["Bff:SessionAuthority:Endpoint"] ?? string.Empty;
+if (bffSessionAuthority is not null)
+    bffSessionEndpoint = ReferenceExpression.Create($"redis://{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Host)}:{bffSessionAuthority.Resource.PrimaryEndpoint.Property(EndpointProperty.Port)}");
+
 // Register last, after every explicit resource projection. Parent-process .env
 // inheritance must not reintroduce sibling or infrastructure authority.
 foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>())
@@ -854,8 +878,19 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 if (builder.Configuration[key] is { } value && !context.EnvironmentVariables.ContainsKey(key))
                     context.EnvironmentVariables[key] = value;
         }
+        SecretProviderType runtimeSecretProvider = agentBrowserProfile is not null
+            && consumer == SecretConsumer.Bff ? SecretProviderType.Environment : configuredSecretProvider;
         RuntimeSecretEnvironment.Apply(context.EnvironmentVariables, operatorInputs,
-            Environment.GetEnvironmentVariables().Keys.Cast<string>(), consumer, configuredSecretProvider);
+            Environment.GetEnvironmentVariables().Keys.Cast<string>(), consumer, runtimeSecretProvider);
+        bool ownsBrowserSessions = consumer is SecretConsumer.Bff or SecretConsumer.Combined;
+        context.EnvironmentVariables["BFF_SESSION_REDIS_ENDPOINT"] = ownsBrowserSessions
+            ? bffSessionEndpoint : string.Empty;
+        context.EnvironmentVariables["BFF_SESSION_NAMESPACE"] = ownsBrowserSessions
+            ? bffSessionNamespace : string.Empty;
+        context.EnvironmentVariables["BFF_SESSION_REDIS_PASSWORD"] = ownsBrowserSessions
+            && runtimeSecretProvider == SecretProviderType.Environment && bffSessionPasswordParameter is not null
+                ? bffSessionPasswordParameter.Resource : string.Empty;
+        context.EnvironmentVariables["Bff__SessionAuthority__Password"] = string.Empty;
         if (testingIsolation is not null)
         {
             string? partition = consumer switch

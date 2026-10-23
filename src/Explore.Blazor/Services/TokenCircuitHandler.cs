@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using System.Security.Claims;
+using Explore.Blazor.Services.Auth;
 
 namespace Explore.Blazor.Services;
 
@@ -18,6 +19,7 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
     private readonly AuthenticationStateProvider _authenticationStateProvider;
     private readonly IHostEnvironmentAuthenticationStateProvider _hostAuthenticationStateProvider;
     private readonly BffAdminClaimsTransformation _adminClaimsTransformation;
+    private readonly IBffSessionAuthority? _sessionAuthority;
     private readonly CancellationTokenSource _lifetimeCancellation;
     private readonly CancellationToken _lifetimeToken;
     private ClaimsPrincipal? _originalPrincipal;
@@ -25,6 +27,7 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
     private string? _originalAccessToken;
     private EventBffOpaqueIdentity? _originalSubject;
     private EventBffOpaqueIdentity? _originalSession;
+    private BffSessionBinding? _originalBinding;
     private int _revoked;
     private int _disposed;
     private int _openingCompleted;
@@ -36,7 +39,8 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
         IBffAuthCookieStore bffAuthCookieStore,
         ILogger<TokenCircuitHandler> logger,
         AuthenticationStateProvider authenticationStateProvider,
-        BffAdminClaimsTransformation adminClaimsTransformation)
+        BffAdminClaimsTransformation adminClaimsTransformation,
+        IBffSessionAuthority? sessionAuthority = null)
     {
         _httpContextAccessor = httpContextAccessor;
         _circuitAccessTokenService = circuitAccessTokenService;
@@ -47,6 +51,7 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
         _hostAuthenticationStateProvider = authenticationStateProvider as IHostEnvironmentAuthenticationStateProvider
             ?? throw new InvalidOperationException("The circuit authentication provider must support host state replacement.");
         _adminClaimsTransformation = adminClaimsTransformation;
+        _sessionAuthority = sessionAuthority;
         _lifetimeCancellation = new CancellationTokenSource();
         _lifetimeToken = _lifetimeCancellation.Token;
     }
@@ -59,7 +64,7 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
         {
             CaptureCookieHeader(httpContext);
             var state = await _authenticationStateProvider.GetAuthenticationStateAsync();
-            if (state.User.Identity?.IsAuthenticated != true)
+            if (!state.User.Identities.Any(identity => identity.IsAuthenticated))
             {
                 _logger.LogDebug("[TokenCircuitHandler] No authenticated user during circuit open - skipping identity/token capture");
                 return;
@@ -68,6 +73,17 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
             _originalPrincipal = new ClaimsPrincipal(state.User.Identities.Select(identity => new ClaimsIdentity(identity)));
             _originalSubject = _originalPrincipal.TryGetCircuitSubject(out var originalSubject) ? originalSubject : null;
             _originalSession = _originalPrincipal.TryGetSessionId(out var originalSession) ? originalSession : null;
+            if (!BffSessionIdentity.TryGetBinding(_originalPrincipal, out var binding)
+                || !await IsSessionActiveAsync(binding, cancellationToken))
+            {
+                RevokeCircuit();
+                return;
+            }
+
+            _originalBinding = binding;
+            _circuitUserContext.SetSessionBinding(binding);
+            _circuitUserContext.SetUserId(binding.OwnerPartitionKey);
+            _circuitUserContext.SetSessionId(_originalSession?.PartitionKey);
             if (httpContext is null)
             {
                 return;
@@ -183,10 +199,12 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
             try
             {
                 var current = await _authenticationStateProvider.GetAuthenticationStateAsync();
-                if (originalPrincipal is not null || current.User.Identity?.IsAuthenticated == true)
+                if (originalPrincipal is not null || current.User.Identities.Any(identity => identity.IsAuthenticated))
                 {
                     if (originalPrincipal is null
                         || !MatchesOriginalSession(current.User)
+                        || _originalBinding is not { } binding
+                        || !await IsSessionActiveAsync(binding, _lifetimeToken)
                         || !await _adminClaimsTransformation.ValidateLocalSessionAsync(
                             principal: current.User,
                             properties: originalProperties,
@@ -225,6 +243,13 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
 
     private bool MatchesOriginalSession(ClaimsPrincipal principal)
     {
+        if (_originalBinding is not { } binding
+            || !BffSessionIdentity.TryGetBinding(principal, out var currentBinding)
+            || currentBinding != binding)
+        {
+            return false;
+        }
+
         var originalPrincipal = _originalPrincipal;
         var originalProviders = originalPrincipal?.FindAll("auth_provider").Take(2).ToArray() ?? [];
         var currentProviders = principal.FindAll("auth_provider").Take(2).ToArray();
@@ -271,7 +296,7 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
             return;
         }
 
-        _circuitAccessTokenService.RevokeSession(originalSubject: _originalSubject, originalSession: _originalSession);
+        _circuitAccessTokenService.RevokeSession(_originalBinding);
         _circuitUserContext.Clear();
         _bffAuthCookieStore.Clear();
         _originalAccessToken = null;
@@ -285,6 +310,36 @@ public sealed class TokenCircuitHandler : CircuitHandler, IDisposable
     {
         Dispose();
         return Task.CompletedTask;
+    }
+
+    public override async Task OnConnectionUpAsync(Circuit circuit, CancellationToken cancellationToken)
+    {
+        if (_originalPrincipal is null || Volatile.Read(ref _revoked) != 0) return;
+        var state = await _authenticationStateProvider.GetAuthenticationStateAsync();
+        var requestPrincipal = _httpContextAccessor.HttpContext?.User;
+        if (!MatchesOriginalSession(state.User)
+            || requestPrincipal is not null && !MatchesOriginalSession(requestPrincipal)
+            || _originalBinding is not { } binding
+            || !await IsSessionActiveAsync(binding, cancellationToken))
+        {
+            RevokeCircuit();
+            return;
+        }
+
+        CaptureCookieHeader(_httpContextAccessor.HttpContext);
+    }
+
+    private async Task<bool> IsSessionActiveAsync(BffSessionBinding binding, CancellationToken cancellationToken)
+    {
+        if (_sessionAuthority is null) return false;
+        try
+        {
+            return await _sessionAuthority.IsActiveAsync(binding, cancellationToken);
+        }
+        catch (BffSessionAuthorityUnavailableException)
+        {
+            return false;
+        }
     }
 
     public void Dispose()

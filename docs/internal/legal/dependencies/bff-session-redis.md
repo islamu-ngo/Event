@@ -1,7 +1,8 @@
 # BFF Session Authority Redis Dependency Decision
 
 Reviewed: 2026-10-23. Owner: Platform/Security and distribution maintainers.
-Scope: the approved shared, fail-closed per-browser-session BFF authority.
+Scope: the approved shared, fail-closed per-browser-session BFF authority and the
+same admitted image pin for canonical local/Compose cache resources.
 
 ## Selected Components And Provenance
 
@@ -15,8 +16,19 @@ The exact server artifact controls this decision. Generic image-page wording
 about earlier patch versions does not override the selected version's legal
 artifact. Redis 7.4/7.8 and Redis 8 are outside this selection. The separate k6
 external-tool exception does not authorize a different Redis release or image.
-Existing availability-cache `redis:7-alpine` declarations are unrelated retained
-configuration; they are not the selected session-authority image.
+Canonical AppHost and Compose cache declarations now use this same exact admitted
+pin. Native annotation evidence found Aspire's previous default selected Redis
+8.6; Compose used mutable `redis:7-alpine`. Neither previous declaration supplies
+license admission for a different server release. The session and cache services
+remain separate authorities with unchanged credential, network and volume roles.
+
+This declaration does not downgrade, convert or delete an existing Redis volume.
+Use a fresh explicitly disposable development store or a separately reviewed,
+version-compatible export/restore when an existing store contains newer-format
+data. Do not start the older server over that data merely because configuration
+now names the admitted pin. Optional Svix 1.96.1, Weblate and Co-op compatibility
+is not established by image metadata or the native Microsoft cache-provider
+contract; do not claim those integrations passed without their own execution.
 
 The vendor's [version support table](https://redis.io/docs/latest/operate/oss_and_stack/install/version-mgmt/)
 lists the 7.2 line's end of support as 2029-12-01. Review security/support and

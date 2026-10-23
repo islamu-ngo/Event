@@ -331,6 +331,52 @@ Runtime secret binding remains authoritative in `Explore.Domain/Secrets/SecretDe
 a replacement for persisted governance. Optional integrations and advanced
 deployment inputs remain in the separate public reference.
 
+### Shared BFF session authority inputs
+
+`Bff:SessionAuthority:Endpoint`, `Namespace` and `Password` are populated from
+`BFF_SESSION_REDIS_ENDPOINT`, `BFF_SESSION_NAMESPACE` and the selected
+`BFF_SESSION_REDIS_PASSWORD` authority. The endpoint is an absolute `redis://`
+or `rediss://` URI with an explicit host/port, no user information, query or
+fragment, and no non-root path. The namespace is required and contains 1–64 ASCII
+letters, digits, underscores or hyphens. Intended peers and restarts use the same
+namespace; unrelated deployments must use different namespaces.
+
+The password comes from explicit Environment injection, the explicitly selected
+shared User Secrets store in Development/Testing, or the exact Infisical
+`/runtime/bff/session` key `BFF_SESSION_REDIS_PASSWORD`. Missing selected authority
+clears merged configuration; appsettings and another provider never supply a
+fallback. Browser sign-in requires this backend even when persistence is SQLite.
+The API and the ordinary cache do not acquire the BFF session password.
+
+Aspire and Compose declare a dedicated optional `bff-session-authority` resource
+using the admitted pinned image. Persistence of this service and the compatible
+Data Protection authority is necessary for restart continuity. The Compose
+bootstrap wrapper removes the provisioner password from the .NET process for a
+non-Environment selection; it does not remove the value from Docker container
+metadata. The Docker daemon/operator remains a trusted provisioning boundary.
+
+Compose starts this optional service with `--profile bff-session`; omitting it
+requires an independently provisioned selected endpoint or browser sign-in fails
+closed. AppHost does not fetch runtime vault credentials: backend provisioning
+uses explicit environment or the selected local shared User Secrets authority,
+while BFF acquires its own selected runtime source. Infisical deployments must
+provision matching backend and vault passwords; there is no automatic vault-to-
+backend password projection. A stale or unknown-freshness session restore requires
+a new deployment namespace and fresh sign-in so a restored entry cannot undo an
+acknowledged revocation.
+
+The canonical ordinary cache uses the same admitted image pin but remains a
+separate resource. Pinning does not convert or downgrade existing Redis data.
+Existing newer-format stores require a fresh disposable development volume or a
+reviewed version-compatible export/restore; never silently delete or reuse them
+with an older server. Optional third-party cache consumers need their own
+compatibility evidence.
+
+The [public input reference](../public/documentation/readme/configuration-and-operations/environment-variables.md#shared-browser-session-authority)
+owns operator setup. The [authentication contract](AUTHENTICATION.md#shared-bff-browser-session-authority)
+owns revocation and failure semantics; the
+[dependency record](legal/dependencies/bff-session-redis.md) owns provenance.
+
 ## Runtime Configuration Sources
 
 The system separates ordinary configuration from secret authority:

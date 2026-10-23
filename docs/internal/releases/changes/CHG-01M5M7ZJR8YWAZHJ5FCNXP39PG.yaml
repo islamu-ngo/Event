@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5M7ZJR8YWAZHJ5FCNXP39PG
+Title: "separate admitted private profile declarations from image updates"
+Type: feat
+Scope: privacy
+Summary: "Use current collection readiness and exact nominated assessments for names and private birth-date declarations while profile-image changes retain their independent HAL action and endpoint. Included tests are unrun."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Sensitive profile collection uses fresh HAL readiness and exact nominated assessments, keeps image authority separate and scrubs private date drafts; declared thresholds are not verified age or access grants. Included component/service tests are UNRUN."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Use dedicated completion/image API operations and complete shared JSON/service wiring plus the final generated client. The API replacement has its own prior source owner; main owns paired guides and final execution checks."

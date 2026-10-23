@@ -9,7 +9,7 @@ using NSubstitute;
 
 namespace Event.API.IntegrationTests.Authentication;
 
-public sealed class ConfiguredApiKeyResourceAuthorityTests
+public sealed partial class ConfiguredApiKeyResourceAuthorityTests
 {
     private static readonly DateTimeOffset Now = new(2040, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
@@ -109,7 +109,16 @@ public sealed class ConfiguredApiKeyResourceAuthorityTests
         var options = Substitute.For<IOptionsMonitor<ApiKeyAuthenticationOptions>>();
         options.CurrentValue.Returns(new ApiKeyAuthenticationOptions());
         options.Get(ApiAuthenticationSchemeNames.ApiKey).Returns(_ => current());
-        return new(options);
+        return SourceReader(options, new ReadClock());
+    }
+
+    private static ConfiguredApiKeyResourceAuthorityReader SourceReader(
+        IOptionsMonitor<ApiKeyAuthenticationOptions> options, TimeProvider clock) =>
+        new(options, clock, Substitute.For<Microsoft.AspNetCore.Http.IHttpContextAccessor>());
+
+    private sealed class ReadClock : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 
     private static ApiKeyClientDescriptor Client() => new()

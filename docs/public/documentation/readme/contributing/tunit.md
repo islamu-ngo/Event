@@ -51,6 +51,13 @@ Domain state test establishes deterministic transition/replay behaviour; real
 database races, authentication and external effects need their owning integration
 lanes. A test-only relocation does not require unrelated provider or browser suites.
 
+The security workflow also checks named execution witnesses declared in the
+repository's existing security register. A passing count cannot stand in for a
+missing method or variant. Those API test-host results do not attest a database
+provider, database role, authentication scheme or distributed hosting profile;
+their receipt records these dimensions as `not-attested`. Real provider, browser
+and load profiles retain their own results and resource ownership.
+
 ---
 
 ## 2. Invariant-Breaker Testing Strategy

@@ -58,11 +58,17 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
 - Candidate B MUST retain a `security-execution.v1.json` sidecar from actual
   selected execution at exactly B, together with its contained report/log
   artifacts. Both required lanes MUST be nonzero, completed and passing.
+  Their exact required methods and variant names MUST match the existing
+  security register's version-2 requirements embedded in the native tool;
+  aggregate counts cannot replace missing named witnesses. Ambiguous TRX
+  summaries or reused cross-lane report identities MUST be rejected.
   Initial source dispositions and unrelated CI no-ops MUST NOT satisfy this
   gate. The candidate manifest binds the exact validated packet SHA-256.
   The sidecar is post-commit execution input, not self-referential content of B.
   Full provider/host/operator/browser and authenticated-provenance assurance
   remains separately required; a digest is not producer authentication.
+  The dedicated test-host packet MUST retain `not-attested` provider, role and
+  authentication dimensions rather than asserting an unexecuted runtime profile.
 
 - `release.yaml` MUST contain the selected version, release line, fixed release date,
   range/base references, compatibility references, and impact dispositions.

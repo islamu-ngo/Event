@@ -654,9 +654,12 @@ Do not add Codecov, SonarCloud, or coverage-percentage badges until the correspo
 `Security Integration Tests` uses the native release-engine
 `select-security-changes` command instead of a second inline path predicate.
 Dedicated API hosting/authentication, Standalone and shared BFF ingress changes
-select actual execution. Existing security selections remain included. Missing
-or empty changed-file evidence selects execution fail-safe; unrelated changes
-retain an explicitly reported no-op.
+select actual execution. Selection defaults to execution for unknown paths,
+central build/package/lock inputs, shared fixtures, providers, generated
+contracts, AppHost resources and browser/load assets. Only normalized root
+`README.md` and `docs/public/**/*.md` changes may select the reported no-op.
+Mixed changes, malformed paths, invalid UTF-8 and missing, unreadable or empty
+changed-file evidence select execution fail-safe.
 
 The workflow sets up .NET and builds the classifier before making that decision.
 It also validates the complete source catalogue with the same native release
@@ -670,7 +673,20 @@ a passing security test run and does not establish candidate admission.
 After both selected lanes succeed, `produce-security-execution` validates their
 actual TRX, retains reports/logs and emits `security-execution.v1.json` for the
 exact tested GitHub SHA and invocation. No-op or failed execution emits no
-admissible packet. The upload retains diagnostic output on failure; human step
+admissible packet. The native tool embeds the existing security register's
+version-2 execution requirements: required fully qualified methods and exact
+variant names must join passing TRX definitions and execution results. Missing
+or renamed witnesses cannot be replaced by an unrelated nonzero passing total.
+Ambiguous summaries, duplicate identities and cross-lane report reuse are
+rejected independently of artifact-byte digests.
+
+These two lanes remain dedicated `Testing` API test hosts. Their database
+provider, database role and authentication scheme must remain `not-attested`;
+the packet cannot self-promote them into relational, distributed, browser or
+external-authority evidence. Source dispositions also remain distinct from
+execution requirements. A candidate-only consumer does not establish that an
+otherwise valid same-candidate packet is the latest invocation or authenticate
+its producer. The upload retains diagnostic output on failure; human step
 summaries are not evidence receipts. See [Security Verification](SECURITY_VERIFICATION.md)
 for sidecar admission and the separate final provider/operational/provenance gate.
 

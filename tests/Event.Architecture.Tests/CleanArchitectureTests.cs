@@ -1,6 +1,7 @@
 namespace Event.Architecture.Tests;
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using NetArchTest.Rules;
 
 /// <summary>
@@ -176,30 +177,47 @@ public class CleanArchitectureTests
     }
 
     [Test]
-    public async Task Persistence_ShouldNotHaveDependencyOn_ApplicationDtos()
+    public async Task Persistence_DeclaredStorageContracts_ShouldNotExpose_ApplicationDtos()
     {
-        var repositoryRoot = LocateRepositoryRoot();
-        var violations = Directory
-            .EnumerateFiles(Path.Combine(repositoryRoot, "src", "Explore.Persistence"), "*.cs", SearchOption.AllDirectories)
-            .Where(path => File.ReadAllText(path).Contains("Explore.Application.DTOs", StringComparison.Ordinal))
-            .Select(path => Path.GetRelativePath(repositoryRoot, path))
-            .ToList();
+        const BindingFlags declared = BindingFlags.Public | BindingFlags.NonPublic
+            | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+        var violations = PersistenceAssembly.GetTypes()
+            .Where(type => !IsCompilerGenerated(type))
+            .SelectMany(type => type.GetMembers(declared)
+                .SelectMany(member => DeclaredContractTypes(member)
+                    .Where(ContainsApplicationDto)
+                    .Select(contract => $"{type.FullName}.{member.Name}: {contract}")))
+            .Concat(ApplicationAssembly.GetTypes()
+                .Where(type => type.IsInterface && type.Namespace == "Explore.Application.Contracts.Persistence")
+                .SelectMany(type => type.GetMethods()
+                    .Where(method => ContainsApplicationDto(method.ReturnType))
+                    .Select(method => $"{type.FullName}.{method.Name}: {method.ReturnType}")))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
         await Assert.That(violations).IsEmpty()
-            .Because("repositories must return entities and accept persistence-neutral query contracts, not DTOs owned by Application presentation mapping.");
+            .Because("declared storage contracts use entities or persistence-neutral values; Application maps presentation DTO outputs. Immutable original command inputs retain their separate custody contracts.");
     }
 
-    private static string LocateRepositoryRoot()
+    private static IEnumerable<Type> DeclaredContractTypes(MemberInfo member) => member switch
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Explore.slnx")))
-        {
-            directory = directory.Parent;
-        }
+        FieldInfo field => [field.FieldType],
+        PropertyInfo property => [property.PropertyType, .. property.GetIndexParameters().Select(parameter => parameter.ParameterType)],
+        MethodInfo method => [method.ReturnType, .. method.GetParameters().Select(parameter => parameter.ParameterType)],
+        ConstructorInfo constructor => constructor.GetParameters().Select(parameter => parameter.ParameterType),
+        _ => []
+    };
 
-        return directory?.FullName
-            ?? throw new DirectoryNotFoundException("Could not locate repository root containing Explore.slnx.");
-    }
+    private static bool ContainsApplicationDto(Type type) =>
+        type.Namespace?.StartsWith("Explore.Application.DTOs.", StringComparison.Ordinal) == true
+        || type.Namespace == "Explore.Application.DTOs"
+        || type.HasElementType && ContainsApplicationDto(type.GetElementType()!)
+        || type.IsGenericType && type.GetGenericArguments().Any(ContainsApplicationDto);
+
+    private static bool IsCompilerGenerated(Type type) =>
+        type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false)
+        || type.DeclaringType is { } declaringType && IsCompilerGenerated(declaringType);
 
     [Test]
     public async Task GenericRepository_ShouldNotExpose_IrreversibleDeleteMethod()

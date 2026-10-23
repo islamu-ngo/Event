@@ -677,6 +677,17 @@ behavior, or parsed machine-consumed schemas. They must not freeze raw C#,
 Razor, CSS, Markdown prose, class-name inventories, line counts, or historical
 debt allowlists.
 
+`CleanArchitectureTests.Persistence_DeclaredStorageContracts_ShouldNotExpose_ApplicationDtos`
+checks declared Persistence fields, properties, method results/parameters and
+constructor parameters, plus Application persistence-port outputs. It traverses
+generic arguments and element types and excludes compiler-generated types and
+their nested implementation types. This protects the actual storage contract
+without treating a compiler's captured original command as a presentation result.
+Original immutable request inputs retain their existing custody checks; handlers
+map Domain operations or neutral completion facts to public DTOs only after the
+original storage owner completes. This test does not replace transaction,
+cleanup, authorization or real-provider execution evidence.
+
 Structured manifests are appropriate only when they are shipped
 machine-consumed contracts or generator inputs and the test derives the
 complete current surface independently. A stale historical exemption is not a

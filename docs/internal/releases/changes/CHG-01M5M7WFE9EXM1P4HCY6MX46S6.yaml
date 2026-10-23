@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M7WFE9EXM1P4HCY6MX46S6
+Title: "Discover reconciliation work under current maintenance authority"
+Type: fix
+Scope: access
+Summary: "Keep bounded due-sanction and orphan-effect discovery bound to the selected native tenant, maintenance credential and current retained policy coordinates."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: "Discovery authenticates the selected maintenance binding and preserves native tenant, subject, scope and policy provenance. Discovery is not completion; authored tests remain unrun."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Details: "The reconciliation sweep remains opt-in with an explicitly selected execution tenant and secret authority."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Details: "Bounded cursors advance discovery without stealing existing outbox retries or declaring effects complete. Runtime assurance remains pending."

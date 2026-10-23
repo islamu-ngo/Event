@@ -2200,6 +2200,7 @@ The scheduler job catalog is Application-owned through `IScheduledJobRegistry`. 
 | `fair-return-orchestration` | Cron `*/15 * * * * ?` (every 15 seconds) | Optional effect UUID only | Durable replacement-settlement and refund-intent effects |
 | `inventory-hold-expiry` | One-off time trigger, per order | Pointer-only IDs | The order's earliest `RegistrationInventoryHold.ExpiresAt` |
 | `inventory-hold-expiry-reconciliation` | Cron `0 */5 * * * ?` (every 5 minutes) | None | Expired active holds and hold-expiry recovery targets |
+| `moderation-reconciliation` | Interval, `Moderation:Reconciliation:IntervalSeconds` | None | Bounded due contributions and orphaned incomplete effect intents in the explicitly selected qualified tenant; separate persisted keyset cursors prevent denied leading work from starving later targets; existing outbox retries/dead letters remain untouched. Contribution reconciliation uses the closed native CQS handler; its structured `Outcome` is `Known` on acceptance or the command's `FailureCode`, without target or credential data. |
 | `registration-finalization-drain` | Cron `*/10 * * * * ?` (every 10 seconds) | None | Durable registration-finalization effect claims |
 | `integration-sync-drain` | Interval, `IntegrationSyncProcessor:PollingIntervalSeconds` | None | Tenant-bound integration synchronization and ambiguity parking |
 | `local-webhook-delivery-drain` | Interval, `WebhookDeliveryProcessor:PollingIntervalSeconds` | None | Stale recovery then Local-provider delivery |

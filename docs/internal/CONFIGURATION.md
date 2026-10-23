@@ -1325,6 +1325,38 @@ The HMAC material is not stored under this configuration section. It resolves th
 
 Changing `ActiveKeyVersion` changes only new code writes. Lookup reads inspect the key versions referenced by active code rows and resolve each matching qualifier, so operators must retain older qualified secrets until no active promotion code uses them. See [SECRETS.md](SECRETS.md#promotion-code-lookup-hmac-key) for value format and the rotation sequence.
 
+### Native Moderation Reconciliation
+
+`Moderation:Reconciliation` controls the opt-in maintenance sweep. `Enabled`
+defaults to false. `TenantId` selects an actual qualified execution tenant;
+no default or fleet-wide tenant enumeration is inferred. `BatchSize` defaults
+to 100 and permits 1-1000. `InitialDelaySeconds` and `IntervalSeconds` default
+to 60; delay permits 0-86400 and interval 1-86400.
+
+`ApiKey` must resolve through Infisical, documented environment injection, or
+explicitly selected shared User Secrets in Development/Testing only. Its
+environment form is `MODERATION__RECONCILIATION__APIKEY` (Infisical `/api`,
+or the same normalized configuration key in shared User Secrets).
+`ModerationReconciliationSecretProvider` builds only the selected authority,
+separately from ordinary options, and rereads it for each execution scope.
+An appsettings value cannot supply or override the credential; vault failure
+never falls back to environment or source configuration. It authenticates a
+live persisted credential explicitly bound to the installed maintenance service.
+A configured key, database binding alone or human owner's authority cannot
+substitute for possession or current transactional qualification. Neither
+credentials nor secret values belong in scheduler payloads or telemetry.
+
+Quartz persists only execution tenancy and independent last-scanned sanction,
+effect, notice-approval, resource-quarantine and schedule-risk-review identities
+as strings in the job's data map. Each cursor advances after its owning successful
+bounded pass even when a target is denied, then wraps after exhausting the
+ordered range. Tenant changes reset all five before any owner runs. A failing
+owner leaves its unfinished scan unacknowledged but does not block independent
+stages; the fire still reports failure after the remaining bounded stages.
+Requested cancellation stops the pass immediately. No target data, secret or case evidence
+is copied into the map. Logical expiry is independent of this materialization;
+scheduled activation still requires all current native qualification.
+
 ### Reporting Static Configuration
 
 `Reporting:*` controls local event-report intake and the moderation-provider runtime mode introduced by the event-reporting bounded context. Submission remains local-first: it creates the authoritative report, event target, encrypted reporter-text evidence, local case, and provider-sync outbox intent before any external integration can run.

@@ -54,12 +54,12 @@ public sealed class EventResourceExportController(
     }
 
     private ActionResult ReadFailure(EventResourceAuthorityOutcome outcome) => outcome switch
-        {
-            EventResourceAuthorityOutcome.NotFound => this.ToNotFoundProblem(
-                new("Resource not found", "The requested resource was not found.")),
-            EventResourceAuthorityOutcome.AuthenticationRequired => this.ToAuthenticationRequiredProblem(),
-            EventResourceAuthorityOutcome.Forbidden => this.ToForbiddenProblem(),
-            _ => this.ToServiceUnavailableProblem("Resource authority unavailable",
-                "Current resource authority could not be established.", EventResourceManagementFailureCodes.Unavailable)
-        };
+    {
+        EventResourceAuthorityOutcome.NotFound => this.ToNotFoundProblem(
+            new("Resource not found", "The requested resource was not found.")),
+        EventResourceAuthorityOutcome.AuthenticationRequired => this.ToAuthenticationRequiredProblem(),
+        EventResourceAuthorityOutcome.Forbidden => this.ToForbiddenProblem(),
+        _ => this.ToServiceUnavailableProblem("Resource authority unavailable",
+            "Current resource authority could not be established.", EventResourceManagementFailureCodes.Unavailable)
+    };
 }

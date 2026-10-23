@@ -23,8 +23,10 @@ public sealed class ModerationCaseNarrativeResult(ModerationCaseNarrativeReadRes
         if (!disclosed)
             await new ObjectResult(new ProblemDetails
             {
-                Status = StatusCodes.Status404NotFound, Title = "Allegation unavailable",
+                Status = StatusCodes.Status404NotFound,
+                Title = "Allegation unavailable",
                 Detail = "The requested allegation is unavailable."
-            }) { StatusCode = StatusCodes.Status404NotFound }.ExecuteResultAsync(context);
+            })
+            { StatusCode = StatusCodes.Status404NotFound }.ExecuteResultAsync(context);
     }
 }

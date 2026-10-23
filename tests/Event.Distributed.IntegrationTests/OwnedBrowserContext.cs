@@ -9,7 +9,11 @@ internal enum BrowserJourney
     ServerTokenExpiry,
     TenantBoundary,
     KeyboardLanguage,
-    FreeRegistration
+    FreeRegistration,
+    LocalRecovery,
+    ChallengeProof,
+    GuestStatus,
+    HostPrivacy
 }
 
 internal static class BrowserArtifactPolicy
@@ -36,6 +40,10 @@ internal static class BrowserArtifactPolicy
             BrowserJourney.TenantBoundary => "tenant_boundary",
             BrowserJourney.KeyboardLanguage => "keyboard_language",
             BrowserJourney.FreeRegistration => "free_registration",
+            BrowserJourney.LocalRecovery => "local_recovery",
+            BrowserJourney.ChallengeProof => "challenge_proof",
+            BrowserJourney.GuestStatus => "guest_status",
+            BrowserJourney.HostPrivacy => "host_privacy",
             _ => throw new InvalidOperationException("browser_journey_not_admitted")
         };
         return $"browser_{name}_{(passed ? "passed" : "failed")}";
@@ -65,7 +73,7 @@ internal sealed class OwnedBrowserContext : IAsyncDisposable
     public IBrowserContext Context { get; }
     public IPage Page { get; }
 
-    public static async Task<OwnedBrowserContext> CreateAsync(Uri origin)
+    public static async Task<OwnedBrowserContext> CreateAsync(Uri origin, bool acceptDownloads = false)
     {
         BrowserArtifactPolicy.AdmitDiagnostics(
             Environment.GetEnvironmentVariable("DEBUG"), Environment.GetEnvironmentVariable("PWDEBUG"));
@@ -82,7 +90,7 @@ internal sealed class OwnedBrowserContext : IAsyncDisposable
                 BaseURL = origin.AbsoluteUri,
                 Locale = "en-GB",
                 TimezoneId = "UTC",
-                AcceptDownloads = false
+                AcceptDownloads = acceptDownloads
             });
             context.SetDefaultTimeout(15_000);
             context.SetDefaultNavigationTimeout(30_000);

@@ -38,7 +38,7 @@ public sealed class BrowserJourneyTests
             var cookies = (await browser.Context.CookiesAsync()).Where(cookie =>
                 cookie.HttpOnly && cookie.Name.StartsWith(".AspNetCore.Cookies", StringComparison.Ordinal)).ToArray();
             await Assert.That(cookies.Length > 0).IsTrue();
-            await browser.Context.AddCookiesAsync(cookies.Select(cookie => new Cookie
+            await browser.Context.AddCookiesAsync(cookies.Select(cookie => new Microsoft.Playwright.Cookie
             {
                 Name = cookie.Name,
                 Value = cookie.Value,
@@ -217,7 +217,7 @@ public sealed class BrowserJourneyTests
         await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Create Event", Exact = true })).ToBeVisibleAsync();
     }
 
-    private static async Task ReplaceBootstrapCredentialAsync(OwnedAppHostFixture host, OwnedBrowserContext browser)
+    internal static async Task ReplaceBootstrapCredentialAsync(OwnedAppHostFixture host, OwnedBrowserContext browser)
     {
         IPage page = browser.Page;
         await page.GotoAsync("/login");
@@ -249,7 +249,7 @@ public sealed class BrowserJourneyTests
         }
     }
 
-    private static async Task<HttpClient> AuthenticatedApiAsync(OwnedAppHostFixture host, CancellationToken cancellationToken)
+    internal static async Task<HttpClient> AuthenticatedApiAsync(OwnedAppHostFixture host, CancellationToken cancellationToken)
     {
         HttpClient api = host.CreateHttpClient("explore-api");
         try
@@ -300,7 +300,7 @@ public sealed class BrowserJourneyTests
         return eventId;
     }
 
-    private static async Task CreateTenantAsync(HttpClient api, string slug, CancellationToken cancellationToken)
+    internal static async Task CreateTenantAsync(HttpClient api, string slug, CancellationToken cancellationToken)
     {
         using JsonDocument tenant = await PostAsync(api, "/api/Tenant", new
         {

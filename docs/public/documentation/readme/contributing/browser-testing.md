@@ -34,4 +34,12 @@ dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed
 
 The runtime must finish migration and become healthy before the browser can proceed. Startup failure is a failed run, not proof that the journeys passed. Report the candidate revision, named outcomes and any missing checks. Cookie expiry and server token expiry are separate scenarios. The latter deliberately waits for the product's valid five-minute minimum token lifetime and observes endpoint rejection through bounded polling; allow that duration in runtime jobs.
 
+Run the browser security vectors separately with the same cache and runtime prerequisites:
+
+```bash
+dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/BrowserSecurityVectorTests/*" --minimum-expected-tests 37 --no-progress --maximum-parallel-tests 1
+```
+
+These checks execute Event's actual browser modules for account recovery, registration proof-of-work and private guest-status links. Most use isolated Chromium documents and controlled network failures. A mandatory separate case starts a real Event host and verifies its first nonce-bearing privacy script, erasure before subsequent network requests, and private links under the actual tenant base path. Isolated module results alone do not prove the host case. The proof worker is real; C# independently checks its SHA-256 result. Private downloads are inspected in memory and deleted during the run.
+
 Failure reporting deliberately excludes traces, HAR files, screenshots, browser storage, raw page content and raw exception messages because these can contain passwords, cookies and personal data. Do not enable `DEBUG`/`PWDEBUG` or publish raw service logs while investigating. The test output identifies the journey using a fixed safe code. Preserve the fixture's cleanup ownership checks; never replace cleanup with broad container or volume deletion.

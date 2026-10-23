@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="ExternalDataProtectionTestAuthority.cs" />
+    <Compile Include="../Shared/ProviderContextOwners.cs" Link="ProviderContextOwners.cs" />
     <PackageReference Include="BenchmarkDotNet" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />

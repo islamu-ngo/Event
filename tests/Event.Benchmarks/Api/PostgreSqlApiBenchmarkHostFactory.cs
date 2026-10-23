@@ -1,4 +1,5 @@
 using Event.Testing.DataProtection;
+using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
@@ -54,12 +55,13 @@ internal sealed class PostgreSqlApiBenchmarkHostFactory(string connectionString)
         {
             // Only the benchmark request context uses PostgreSQL; production-purpose factories are outside this profile.
             services.RemoveExploreDbContextRegistrations();
-            services.AddDbContext<ExploreDbContext>(options =>
+            services.AddDbContextFactory<ExploreDbContext>(options =>
             {
                 options.UseNpgsql(connectionString);
                 options.UseSnakeCaseNamingConvention();
                 options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             });
+            services.AddTestContextOwners();
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
             services.RemoveAll<IOutputCacheStore>();

@@ -1,4 +1,5 @@
 using Event.Testing.DataProtection;
+using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
@@ -50,12 +51,13 @@ internal sealed class ApiBenchmarkHostFactory : WebApplicationFactory<global::Pr
         builder.ConfigureServices(services =>
         {
             services.RemoveExploreDbContextRegistrations();
-            services.AddDbContext<ExploreDbContext>(options =>
+            services.AddDbContextFactory<ExploreDbContext>(options =>
             {
                 options.UseInMemoryDatabase(_databaseName);
                 options.ConfigureWarnings(warnings => warnings.Ignore(
                     Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning));
             });
+            services.AddTestContextOwners();
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
             services.AddHostedService<BenchmarkSeedingHostedService>();

@@ -87,7 +87,8 @@ builder.Configuration.AddConfiguration(operatorInputs);
 if (testingIsolation is not null)
 {
     builder.Configuration.AddCommandLine(args);
-    TestingResourceIsolation.ValidateProfile(builder.Configuration);
+    if (TestingResourceIsolation.ValidateProfile(builder.Configuration) != testingIsolation.Profile)
+        throw new InvalidOperationException("test_resource_profile_changed");
 }
 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
@@ -515,64 +516,42 @@ if (hostingTopology == HostingTopology.Split)
 
     // Service discovery (via WithReference) automatically resolves the API URL at runtime.
     // Do NOT hardcode ExploreAPI__BaseUrl here — Aspire assigns dynamic ports.
-    var exploreBlazor = WithProfileSecretMode(
-            WithBffEndpoints(
-                builder.AddProject<Projects.Explore_Blazor>(
-                    "explore-blazor",
-                    ExcludeProjectLaunchProfile),
-                agentBrowserProfile),
-            runMode,
-            builder.Configuration,
-            allowAgentRuntimeSecrets: false)
-        .WithReference(exploreAPI)
-        .WaitFor(exploreAPI)
-        .WithEnvironment("Bff__AdminHosts__0", instanceAdminPublicOrigin)
-        .WithEnvironment("ForwardedHeadersTrust__ForwardLimit", ConfiguredValue(
-            builder.Configuration,
-            "BFF_FORWARDED_HEADERS_FORWARD_LIMIT",
-            "1"))
-        .WithEnvironment("ForwardedHeadersTrust__TrustLoopbackProxy", ConfiguredValue(
-            builder.Configuration,
-            "BFF_FORWARDED_HEADERS_TRUST_LOOPBACK",
-            "true"))
-        .WithEnvironment("ForwardedHeadersTrust__KnownProxies__0", ConfiguredValue(
-            builder.Configuration,
-            "BFF_FORWARDED_HEADERS_KNOWN_PROXY",
-            "127.0.0.1"))
-        .WithEnvironment("ForwardedHeadersTrust__KnownNetworks__0", ConfiguredValue(
-            builder.Configuration,
-            "BFF_FORWARDED_HEADERS_KNOWN_NETWORK",
-            "::1/128"))
-        .WithEnvironment("Payments__Stripe__AllowedCheckoutHosts__0", ConfiguredValue(
-            builder.Configuration,
-            "PAYMENTS_STRIPE_ALLOWED_CHECKOUT_HOST",
-            "checkout.stripe.com"))
-        .WithEnvironment("RateLimiting__RegistrationPaymentCheckoutIssue__PermitLimit", ConfiguredValue(
-            builder.Configuration,
-            "BFF_PAYMENT_CHECKOUT_PERMIT_LIMIT",
-            "10"))
-        .WithEnvironment("RateLimiting__RegistrationPaymentCheckoutIssue__WindowSeconds", ConfiguredValue(
-            builder.Configuration,
-            "BFF_PAYMENT_CHECKOUT_WINDOW_SECONDS",
-            "60"))
-        .WithEnvironment("Storage__Local__RootPath", localStorageRootPath);
-
-    exploreBlazor = exploreBlazor
-        .WithReference(migrations)
-        .WaitForCompletion(migrations);
-
-    if (cache is not null)
+    IResourceBuilder<ProjectResource> AddBff(string name)
     {
-        exploreBlazor = exploreBlazor
-            .WithReference(cache)
-            .WaitFor(cache);
+        var bff = WithProfileSecretMode(
+                WithBffEndpoints(builder.AddProject<Projects.Explore_Blazor>(name, ExcludeProjectLaunchProfile), agentBrowserProfile),
+                runMode, builder.Configuration, allowAgentRuntimeSecrets: false)
+            .WithReference(exploreAPI)
+            .WaitFor(exploreAPI)
+            .WithEnvironment("Bff__AdminHosts__0", instanceAdminPublicOrigin)
+            .WithEnvironment("ForwardedHeadersTrust__ForwardLimit", ConfiguredValue(
+                builder.Configuration, "BFF_FORWARDED_HEADERS_FORWARD_LIMIT", "1"))
+            .WithEnvironment("ForwardedHeadersTrust__TrustLoopbackProxy", ConfiguredValue(
+                builder.Configuration, "BFF_FORWARDED_HEADERS_TRUST_LOOPBACK", "true"))
+            .WithEnvironment("ForwardedHeadersTrust__KnownProxies__0", ConfiguredValue(
+                builder.Configuration, "BFF_FORWARDED_HEADERS_KNOWN_PROXY", "127.0.0.1"))
+            .WithEnvironment("ForwardedHeadersTrust__KnownNetworks__0", ConfiguredValue(
+                builder.Configuration, "BFF_FORWARDED_HEADERS_KNOWN_NETWORK", "::1/128"))
+            .WithEnvironment("Payments__Stripe__AllowedCheckoutHosts__0", ConfiguredValue(
+                builder.Configuration, "PAYMENTS_STRIPE_ALLOWED_CHECKOUT_HOST", "checkout.stripe.com"))
+            .WithEnvironment("RateLimiting__RegistrationPaymentCheckoutIssue__PermitLimit", ConfiguredValue(
+                builder.Configuration, "BFF_PAYMENT_CHECKOUT_PERMIT_LIMIT", "10"))
+            .WithEnvironment("RateLimiting__RegistrationPaymentCheckoutIssue__WindowSeconds", ConfiguredValue(
+                builder.Configuration, "BFF_PAYMENT_CHECKOUT_WINDOW_SECONDS", "60"))
+            .WithEnvironment("Storage__Local__RootPath", localStorageRootPath)
+            .WithReference(migrations)
+            .WaitForCompletion(migrations);
+        if (cache is not null)
+            bff = bff.WithReference(cache).WaitFor(cache);
+        if (localPlatformResources is not null)
+            bff = ConfigureLocalPlatformBlazor(bff, localPlatformResources, builder.Configuration)
+                .WaitFor(localPlatformResources.Keycloak);
+        return bff;
     }
 
-    if (localPlatformResources is not null)
-    {
-        exploreBlazor = ConfigureLocalPlatformBlazor(exploreBlazor, localPlatformResources, builder.Configuration)
-            .WaitFor(localPlatformResources.Keycloak);
-    }
+    _ = AddBff("explore-blazor");
+    if (testingIsolation?.Profile == OwnedAppHostProfile.ExternalIdentitySharedBff)
+        _ = AddBff("explore-blazor-peer");
 }
 else
 {
@@ -731,7 +710,7 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
     SecretConsumer consumer = resource.Name switch
     {
         "explore-api" => SecretConsumer.Api,
-        "explore-blazor" => SecretConsumer.Bff,
+        "explore-blazor" or "explore-blazor-peer" => SecretConsumer.Bff,
         "event-standalone" => SecretConsumer.Combined,
         "event-migrationservice" => SecretConsumer.Migration,
         _ => throw new InvalidOperationException("secret_consumer_invalid")

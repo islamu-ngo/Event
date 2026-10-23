@@ -27,9 +27,24 @@ Admission requires `DOTNET_ENVIRONMENT=Assurance`,
 `ASPNETCORE_ENVIRONMENT=Assurance` when supplied, `SECRET_PROVIDER=Environment`,
 `SecretProvider__Provider=Environment` when supplied,
 `ISLAMU_ASPIRE_MODE=local-default`, and `Hosting__Topology=Split` or `Standalone`.
-Identity remains CoLocated, erasure uses EmbeddedSqlite, webhook delivery is
-Local, the configuration manifest is Off, and AgentBrowser seeding is disabled.
-These are explicit fixture inputs, not new ordinary hosting defaults.
+The default `ISLAMU_TEST_PROFILE=Standard` retains CoLocated identity and the
+existing Split/Standalone graphs. `ExternalIdentitySharedBff` requires Split,
+External identity, Sqlite, and the exact derived `<owned-root>/identity.sqlite`
+filename. Flat identity coordinates are required; canonical aliases may only
+repeat those exact values. Other nonempty identity settings, including remote
+coordinates and credentials, are rejected. Symbolic stores and symbolic parents
+are rejected before resource construction. Explicit profile selection without
+ownership, unknown profiles, and undefined fixture enums are rejected.
+Erasure remains EmbeddedSqlite, webhook delivery Local, the configuration
+manifest Off, and AgentBrowser seeding disabled. These are explicit fixture
+inputs, not new ordinary hosting defaults.
+
+The immutable admitted profile is checked again after owned configuration is
+rebuilt. The existing BFF configuration is one local `AddBff` function; Standard
+calls it once, while the external profile calls it for `explore-blazor` and
+`explore-blazor-peer`. Both reference the same real API, migrations, cache, and
+selected platform resources. They are separate named project processes, with
+their own dynamic HTTP/HTTPS/operations endpoints. Readiness includes the peer.
 
 Before reading application settings, the owned builder discards ambient
 configuration providers. It retains the fixture's dedicated in-memory authority
@@ -98,6 +113,15 @@ values through resource environment projection. The test process environment
 is never mutated. Concurrent owners have different passwords, JWT keys, and
 Data Protection key rings. Nothing reads repository dotenv or shared User
 Secrets. Credential values are never files, command-line arguments, or evidence.
+Within the external profile only, the two BFFs receive the same generated BFF
+ring/admission; the API retains its independent partition. Neither BFF receives
+identity database coordinates. The closed `OwnedBffPeerProtection` fixture enum
+can select a wrong partition, generation below the admitted floor, expired
+admission, or revoked active key for the peer only. These are fixture fault
+inputs, not AppHost configuration hooks. Revocation imports the same owned ring
+into the existing ephemeral test repository, invokes real `IKeyManager.RevokeKey`,
+and refreshes native ring/admission hashes and inventory without generating a
+different active key. The shared authority's default constructor is unchanged.
 
 Existing documented environment keys used are:
 
@@ -141,6 +165,15 @@ owner; `StartAsync(cancellationToken)` waits for migration and HTTP readiness;
 Split resources are `explore-api` and `explore-blazor`; Standalone is
 `event-standalone`. `operations` is the private readiness endpoint and `http`
 is the public endpoint. Browser/load cases use this same project and fixture.
+The optional `profile` argument selects `OwnedAppHostProfile`; the external
+profile additionally exposes `explore-blazor-peer`. `peerProtection` defaults to
+Shared and is valid only with that external profile when selecting a fault.
+The new profile's initial Harness Red run was 10 intended failures and 40 passes;
+the expanded post-implementation Harness passes all 58 cases, including actual
+resource environment callbacks and native Data Protection admission for the
+shared and four rejected peer authorities. Actual cross-process/worker gates
+remain pending. A projection or provider check does not prove successful peer startup,
+cookie reuse, worker restart, or delivery recovery.
 
 Public Aspire API facts were checked against the official
 [testing](https://aspire.dev/testing/overview/),

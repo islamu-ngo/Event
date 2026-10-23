@@ -24,6 +24,17 @@ do not point them at existing storage. The directory basename must match the
 run ID, and `.islamu-test-owner` must contain that ID. Populated, foreign, and
 symbolic directories are rejected before any application builder runs.
 
+The default Standard profile keeps the existing Split or Standalone layout.
+The dedicated ExternalIdentitySharedBff profile starts Split with a separate
+SQLite identity file under its owned root and two named BFF processes:
+`explore-blazor` and `explore-blazor-peer`. Both use the same real API and share
+only their generated BFF cookie-protection authority; API protection remains
+separate. Both BFFs expose dynamic HTTP, HTTPS, and private readiness endpoints.
+The C# fixture selects this closed profile through `ISLAMU_TEST_PROFILE`.
+Do not select it in an interactive dotenv file or provide your own identity
+path, host, or credential values. Profile inputs without valid ownership, foreign
+coordinates, canonical/flat conflicts, and symbolic stores are rejected.
+
 Automated runs explicitly select the Environment secret authority and the
 `Assurance` environment. They ignore repository dotenv and shared User Secrets.
 Inherited application configuration is discarded; payment-provider mode, storage
@@ -61,3 +72,8 @@ observation checks pass. They prove cancellation and safe retention when executi
 cannot be established. The distributed lane is not yet green: fresh migrations
 currently stop at the discovery source-catalog guard. Passing ownership or discovery checks
 must not be reported as successful full application execution.
+The 58 ownership and profile checks pass, including resource input projection
+and native rejection of the four invalid peer authorities.
+The new two-BFF/external-identity scenarios are still pending actual runtime
+verification; compiling their fixture or checking their projected inputs is not
+proof of cookie compatibility or worker recovery.

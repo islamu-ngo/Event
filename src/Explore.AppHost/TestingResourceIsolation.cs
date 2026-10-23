@@ -5,7 +5,8 @@ using Microsoft.Extensions.Configuration.Memory;
 
 namespace Explore.AppHost;
 
-public sealed record TestingResourceIsolation(string RunId, string Root)
+public sealed record TestingResourceIsolation(string RunId, string Root,
+    OwnedAppHostProfile Profile = OwnedAppHostProfile.Standard)
 {
     public const string MarkerName = ".islamu-test-owner";
 
@@ -32,14 +33,18 @@ public sealed record TestingResourceIsolation(string RunId, string Root)
         string? runId = configuration["ISLAMU_TEST_RUN_ID"];
         string? root = configuration["ISLAMU_TEST_ROOT"];
         if (runId is null && root is null)
+        {
+            if (configuration["ISLAMU_TEST_PROFILE"] is not (null or ""))
+                throw new InvalidOperationException("test_resource_owner_invalid");
             return null;
+        }
         if (!Guid.TryParseExact(runId, "N", out _) || root is null
             || !Path.IsPathFullyQualified(root) || Path.GetFullPath(root) != root
             || Path.GetFileName(root) != runId)
             throw new InvalidOperationException("test_resource_owner_invalid");
-        ValidateProfile(configuration);
+        OwnedAppHostProfile profile = ValidateProfile(configuration);
         string marker = Path.Combine(root, MarkerName);
-        var owner = new TestingResourceIsolation(runId, root);
+        var owner = new TestingResourceIsolation(runId, root, profile);
         owner.VerifyOwnership();
         if (Directory.EnumerateFileSystemEntries(root).Any(path => path != marker))
             throw new InvalidOperationException("test_resource_root_not_empty");
@@ -55,8 +60,14 @@ public sealed record TestingResourceIsolation(string RunId, string Root)
             throw new InvalidOperationException("test_resource_marker_invalid");
     }
 
-    public static void ValidateProfile(IConfiguration configuration)
+    public static OwnedAppHostProfile ValidateProfile(IConfiguration configuration)
     {
+        OwnedAppHostProfile profile = configuration["ISLAMU_TEST_PROFILE"] switch
+        {
+            null or "" or "Standard" => OwnedAppHostProfile.Standard,
+            "ExternalIdentitySharedBff" => OwnedAppHostProfile.ExternalIdentitySharedBff,
+            _ => throw new InvalidOperationException("test_resource_profile_invalid")
+        };
         if (configuration["DOTNET_ENVIRONMENT"] != "Assurance"
             || configuration["ASPNETCORE_ENVIRONMENT"] is not (null or "Assurance")
             || configuration["ISLAMU_ASPIRE_MODE"] != "local-default"
@@ -67,9 +78,44 @@ public sealed record TestingResourceIsolation(string RunId, string Root)
             || configuration["CONFIGURATION_MANIFEST_MODE"] is not (null or "Off")
             || configuration["PrivacyErasure:Authority:Topology"] is not (null or "EmbeddedSqlite")
             || configuration["ERASURE_DATABASE_TOPOLOGY"] is not (null or "EmbeddedSqlite")
-            || configuration["IDENTITY_DATABASE_TOPOLOGY"] is not (null or "CoLocated")
+            || profile == OwnedAppHostProfile.Standard
+                && configuration["IDENTITY_DATABASE_TOPOLOGY"] is not (null or "CoLocated")
             || configuration["WEBHOOKS_PROVIDER"] is not (null or "Local"))
             throw new InvalidOperationException("test_resource_profile_invalid");
+        if (profile == OwnedAppHostProfile.ExternalIdentitySharedBff)
+            ValidateExternalIdentity(configuration);
+        return profile;
+    }
+
+    private static void ValidateExternalIdentity(IConfiguration configuration)
+    {
+        string? root = configuration["ISLAMU_TEST_ROOT"];
+        if (configuration["Hosting:Topology"] != "Split" || root is null || !Path.IsPathFullyQualified(root))
+            throw new InvalidOperationException("test_resource_profile_invalid");
+        string path = Path.Combine(root, "identity.sqlite");
+        if (configuration["IDENTITY_DATABASE_TOPOLOGY"] != "External"
+            || configuration["IDENTITY_DATABASE_PROVIDER"] != "Sqlite"
+            || configuration["IDENTITY_DATABASE_NAME"] != path)
+            throw new InvalidOperationException("test_resource_profile_invalid");
+        var expected = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["IDENTITY_DATABASE_TOPOLOGY"] = "External", ["IdentityDatabase:Topology"] = "External",
+            ["IDENTITY_DATABASE_PROVIDER"] = "Sqlite", ["IdentityDatabase:Provider"] = "Sqlite",
+            ["IDENTITY_DATABASE_NAME"] = path, ["IdentityDatabase:Name"] = path
+        };
+        foreach (var pair in configuration.AsEnumerable())
+        {
+            string key = pair.Key.Replace("__", ":", StringComparison.Ordinal);
+            if (pair.Value is null || !(key.StartsWith("IdentityDatabase:", StringComparison.OrdinalIgnoreCase)
+                || key.StartsWith("IDENTITY_DATABASE_", StringComparison.OrdinalIgnoreCase)))
+                continue;
+            if (expected.TryGetValue(key, out string? value)
+                ? pair.Value != value : pair.Value.Length != 0)
+                throw new InvalidOperationException("test_resource_profile_invalid");
+        }
+        EnsureNoLinks(root);
+        if (new FileInfo(path).LinkTarget is not null || Directory.Exists(path))
+            throw new InvalidOperationException("test_resource_symbolic_path");
     }
 
     public string VolumePrefix => $"islamu-test-{RunId}-";

@@ -1,4 +1,5 @@
 using Explore.AppHost;
+using Event.Testing.DataProtection;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
@@ -323,6 +324,229 @@ public sealed class AppHostOwnershipTests
         observer.Observe(Task.FromCanceled(cancelled.Token));
         await observer.WaitForCompletionAsync(TimeSpan.FromSeconds(1));
         await Assert.That(observer.IsSettled).IsTrue();
+    }
+
+    [Test]
+    [Arguments("Unsupported")]
+    [Arguments("99")]
+    public async Task UnknownOwnedProfileCannotConstructResources(string profile)
+    {
+        using var root = new OwnedRoot();
+        var values = root.Configuration();
+        values["ISLAMU_TEST_PROFILE"] = profile;
+        await Assert.That(() => TestingResourceIsolation.Admit(Build(values))).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task ExplicitProfileCannotRunWithoutOwnership()
+    {
+        var values = new Dictionary<string, string?> { ["ISLAMU_TEST_PROFILE"] = "ExternalIdentitySharedBff" };
+        await Assert.That(() => TestingResourceIsolation.Admit(Build(values))).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task ExternalIdentityProfileAdmitsItsDerivedStore()
+    {
+        using var root = new OwnedRoot();
+        var values = ExternalIdentityProfile(root);
+        values["IdentityDatabase:Topology"] = "External";
+        values["IdentityDatabase:Provider"] = "Sqlite";
+        values["IdentityDatabase:Name"] = values["IDENTITY_DATABASE_NAME"];
+        var admitted = TestingResourceIsolation.Admit(Build(values));
+        await Assert.That(admitted).IsNotNull();
+        await Assert.That(admitted!.Profile).IsEqualTo(OwnedAppHostProfile.ExternalIdentitySharedBff);
+    }
+
+    [Test]
+    [Arguments("IDENTITY_DATABASE_NAME", "../foreign.sqlite")]
+    [Arguments("IdentityDatabase:Name", "foreign.sqlite")]
+    [Arguments("IDENTITY_DATABASE_PROVIDER", "PostgreSql")]
+    [Arguments("IdentityDatabase:Provider", "PostgreSql")]
+    [Arguments("IdentityDatabase:Topology", "CoLocated")]
+    [Arguments("IdentityDatabase:Host", "foreign-host")]
+    [Arguments("IDENTITY_DATABASE_RUNTIME_USERNAME", "foreign-owner")]
+    public async Task ExternalIdentityProfileRejectsForeignCoordinates(string key, string value)
+    {
+        using var root = new OwnedRoot();
+        var values = ExternalIdentityProfile(root);
+        values[key] = value;
+        await Assert.That(() => TestingResourceIsolation.Admit(Build(values))).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task ExternalIdentityProfileRejectsCanonicalCredentialAuthority()
+    {
+        using var root = new OwnedRoot();
+        var values = ExternalIdentityProfile(root);
+        values["IdentityDatabase:Runtime:Password"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        await Assert.That(() => TestingResourceIsolation.Admit(Build(values))).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task ExternalIdentityProfileRejectsSymbolicStore()
+    {
+        using var root = new OwnedRoot();
+        string store = Path.Combine(root.Path, "identity.sqlite");
+        File.CreateSymbolicLink(store, Path.Combine(root.Path, "foreign.sqlite"));
+        await Assert.That(() => TestingResourceIsolation.ValidateProfile(Build(ExternalIdentityProfile(root))))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task RealExternalIdentityProfileProjectsTwoCanonicalBffOwners()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+        var failure = await Assert.That(async () => await OwnedAppHostFixture.CreateAsync("Split", false,
+            "MultiTenant", null, async builder =>
+            {
+                var resources = builder.Resources.OfType<ProjectResource>().ToArray();
+                _ = resources.Single(resource => resource.Name == "explore-blazor-peer");
+                string root = builder.Configuration["ISLAMU_TEST_ROOT"]!;
+                foreach (var resource in resources)
+                {
+                    var context = new EnvironmentCallbackContext(builder.ExecutionContext, resource);
+                    foreach (var callback in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
+                        await callback.Callback(context);
+                    if (resource.Name is "explore-api" or "event-migrationservice")
+                    {
+                        await Assert.That(context.EnvironmentVariables["IDENTITY_DATABASE_TOPOLOGY"] is "External").IsTrue();
+                        await Assert.That(context.EnvironmentVariables["IDENTITY_DATABASE_PROVIDER"] is "Sqlite").IsTrue();
+                        await Assert.That(context.EnvironmentVariables["IDENTITY_DATABASE_NAME"] is string path
+                            && path == Path.Combine(root, "identity.sqlite")).IsTrue();
+                    }
+                    if (resource.Name is "explore-blazor" or "explore-blazor-peer")
+                    {
+                        await Assert.That(context.EnvironmentVariables.Keys.Any(key =>
+                            key.StartsWith("EVENT_DP_API_", StringComparison.Ordinal)
+                            || key.StartsWith("EVENT_DP_COMBINED_", StringComparison.Ordinal))).IsFalse();
+                        await Assert.That(context.EnvironmentVariables.Keys.Any(key =>
+                            key.StartsWith("IDENTITY_DATABASE_", StringComparison.OrdinalIgnoreCase)
+                            || key.Replace("__", ":", StringComparison.Ordinal)
+                                .StartsWith("IdentityDatabase:", StringComparison.OrdinalIgnoreCase))).IsFalse();
+                        await Assert.That(resource.Annotations.OfType<EndpointAnnotation>().Any(endpoint => endpoint.Name == "https")).IsTrue();
+                    }
+                }
+                throw new InvalidOperationException("assurance_external_profile_projection_complete");
+            }, deadline.Token, OwnedAppHostProfile.ExternalIdentitySharedBff)).Throws<InvalidOperationException>();
+        await Assert.That(failure!.Message).IsEqualTo("assurance_external_profile_projection_complete");
+    }
+
+    [Test]
+    [Arguments("Standalone", OwnedAppHostProfile.ExternalIdentitySharedBff, OwnedBffPeerProtection.Shared)]
+    [Arguments("Split", (OwnedAppHostProfile)99, OwnedBffPeerProtection.Shared)]
+    [Arguments("Split", OwnedAppHostProfile.ExternalIdentitySharedBff, (OwnedBffPeerProtection)99)]
+    [Arguments("Split", OwnedAppHostProfile.Standard, OwnedBffPeerProtection.WrongPartition)]
+    public async Task InvalidProfileSelectionFailsBeforeBuilder(string topology, OwnedAppHostProfile profile,
+        OwnedBffPeerProtection protection)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+        bool builderReached = false;
+        await Assert.That(async () => await OwnedAppHostFixture.CreateAsync(topology, false,
+            "SingleTenant", null, _ =>
+            {
+                builderReached = true;
+                throw new InvalidOperationException("assurance_unexpected_profile_builder");
+            }, deadline.Token, profile, protection)).Throws<InvalidOperationException>();
+        await Assert.That(builderReached).IsFalse();
+    }
+
+    [Test]
+    public async Task RevokedPeerAuthorityRetainsItsOriginalKeyAndRejectsAdmission()
+    {
+        var input = new ExternalDataProtectionTestAuthority("bff").Input;
+        using var baseline = ExternalDataProtectionProvider.Create(input, "bff", TimeProvider.System);
+        var protector = baseline.CreateProtector("owned-peer-session");
+        string cookie = protector.Protect("owned-peer-session");
+        var revoked = ExternalDataProtectionTestAuthority.RevokeActiveKey(input);
+        var refusal = await Assert.That(() =>
+        {
+            using var refused = ExternalDataProtectionProvider.Create(revoked, "bff", TimeProvider.System);
+        }).Throws<InvalidOperationException>();
+        await Assert.That(refusal!.Message).IsEqualTo("data_protection_admission_rejected");
+        var originalAdmission = System.Text.Json.JsonSerializer.Deserialize<ExternalDataProtectionAdmission>(input.Admission)!;
+        var revokedAdmission = System.Text.Json.JsonSerializer.Deserialize<ExternalDataProtectionAdmission>(revoked.Admission)!;
+        await Assert.That(revokedAdmission.ActiveKeyId).IsEqualTo(originalAdmission.ActiveKeyId);
+        await Assert.That(revokedAdmission.Keys.Single(key => key.Id == originalAdmission.ActiveKeyId).Revoked).IsTrue();
+        await Assert.That(protector.Unprotect(cookie)).IsEqualTo("owned-peer-session");
+    }
+
+    [Test]
+    [Arguments(OwnedBffPeerProtection.Shared)]
+    [Arguments(OwnedBffPeerProtection.WrongPartition)]
+    [Arguments(OwnedBffPeerProtection.GenerationBelowFloor)]
+    [Arguments(OwnedBffPeerProtection.ExpiredAdmission)]
+    [Arguments(OwnedBffPeerProtection.RevokedActiveKey)]
+    public async Task RealPeerProjectionAcceptsOnlySharedBffAuthority(OwnedBffPeerProtection protection)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+        var failure = await Assert.That(async () => await OwnedAppHostFixture.CreateAsync("Split", false,
+            "SingleTenant", null, async builder =>
+            {
+                var contexts = new Dictionary<string, EnvironmentCallbackContext>(StringComparer.Ordinal);
+                foreach (var resource in builder.Resources.OfType<ProjectResource>()
+                    .Where(resource => resource.Name is "explore-api" or "explore-blazor" or "explore-blazor-peer"))
+                {
+                    var context = new EnvironmentCallbackContext(builder.ExecutionContext, resource);
+                    foreach (var callback in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
+                        await callback.Callback(context);
+                    contexts.Add(resource.Name, context);
+                }
+                var bff = ProjectedProtection(contexts["explore-blazor"], "BFF");
+                var peer = ProjectedProtection(contexts["explore-blazor-peer"], "BFF");
+                var api = ProjectedProtection(contexts["explore-api"], "API");
+                using var bffProvider = ExternalDataProtectionProvider.Create(bff, "bff", TimeProvider.System);
+                using var apiProvider = ExternalDataProtectionProvider.Create(api, "api", TimeProvider.System);
+                var bffProtector = bffProvider.CreateProtector("owned-peer-session");
+                string cookie = bffProtector.Protect("owned-peer-session");
+                await Assert.That(bff.Ring == api.Ring).IsFalse();
+                await Assert.That(() => bffProtector.Unprotect(apiProvider.CreateProtector("owned-peer-session")
+                    .Protect("owned-peer-session"))).Throws<CryptographicException>();
+                if (protection == OwnedBffPeerProtection.Shared)
+                {
+                    await Assert.That(peer.Ring == bff.Ring && peer.Admission == bff.Admission).IsTrue();
+                    using var peerProvider = ExternalDataProtectionProvider.Create(peer, "bff", TimeProvider.System);
+                    await Assert.That(peerProvider.CreateProtector("owned-peer-session").Unprotect(cookie)
+                        == "owned-peer-session").IsTrue();
+                }
+                else
+                {
+                    var refusal = await Assert.That(() =>
+                    {
+                        using var refused = ExternalDataProtectionProvider.Create(peer, "bff", TimeProvider.System);
+                    }).Throws<InvalidOperationException>();
+                    await Assert.That(refusal!.Message).IsEqualTo("data_protection_admission_rejected");
+                    if (protection == OwnedBffPeerProtection.WrongPartition)
+                        await Assert.That(peer.Ring == api.Ring).IsTrue();
+                    else
+                    {
+                        var original = System.Text.Json.JsonSerializer.Deserialize<ExternalDataProtectionAdmission>(bff.Admission)!;
+                        var candidate = System.Text.Json.JsonSerializer.Deserialize<ExternalDataProtectionAdmission>(peer.Admission)!;
+                        await Assert.That(candidate.ActiveKeyId == original.ActiveKeyId).IsTrue();
+                    }
+                }
+                throw new InvalidOperationException("assurance_peer_projection_complete");
+            }, deadline.Token, OwnedAppHostProfile.ExternalIdentitySharedBff, protection)).Throws<InvalidOperationException>();
+        await Assert.That(failure!.Message).IsEqualTo("assurance_peer_projection_complete");
+    }
+
+    private static ExternalDataProtectionInput ProjectedProtection(EnvironmentCallbackContext context, string partition)
+    {
+        string prefix = $"EVENT_DP_{partition}_";
+        return new((string)context.EnvironmentVariables[prefix + "RING"],
+            (string)context.EnvironmentVariables[prefix + "ADMISSION"],
+            (string)context.EnvironmentVariables[prefix + "ADMISSION_SHA256"],
+            long.Parse((string)context.EnvironmentVariables[prefix + "MINIMUM_GENERATION"],
+                System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static Dictionary<string, string?> ExternalIdentityProfile(OwnedRoot root)
+    {
+        var values = root.Configuration();
+        values["ISLAMU_TEST_PROFILE"] = "ExternalIdentitySharedBff";
+        values["IDENTITY_DATABASE_TOPOLOGY"] = "External";
+        values["IDENTITY_DATABASE_PROVIDER"] = "Sqlite";
+        values["IDENTITY_DATABASE_NAME"] = Path.Combine(root.Path, "identity.sqlite");
+        return values;
     }
 
     private static IConfiguration Build(Dictionary<string, string?> values) =>

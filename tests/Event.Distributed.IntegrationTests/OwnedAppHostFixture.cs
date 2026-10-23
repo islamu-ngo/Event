@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Collections.Frozen;
 using System.Security.Cryptography;
 using System.Runtime.ExceptionServices;
@@ -8,6 +9,7 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 using Event.Testing.DataProtection;
 using Explore.AppHost;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -22,6 +24,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         "INSTANCE_KEY_ISSUANCE", "PLATFORM_KEY_REPORT", "EMAIL_POLICY_INSTANCE_MUTATION", "EMAIL_POLICY_TENANT_MUTATION"
     ];
     private readonly string topology;
+    private readonly OwnedAppHostProfile profile;
     private string[] volumes = [];
     private readonly Lock disposalLock = new();
     private readonly CancellationTokenSource lifetime = new();
@@ -33,9 +36,10 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private Exception? startupFailure;
     internal IReadOnlyDictionary<string, string?> EnvironmentAuthority { get; } = CreateEnvironmentAuthority();
 
-    internal OwnedAppHostFixture(string topology)
+    internal OwnedAppHostFixture(string topology, OwnedAppHostProfile profile = OwnedAppHostProfile.Standard)
     {
         this.topology = topology;
+        this.profile = profile;
         RunId = Guid.NewGuid().ToString("N");
         Root = Path.Combine(Path.GetTempPath(), "islamu-assurance", RunId);
         Directory.CreateDirectory(Root);
@@ -55,27 +59,40 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     public DistributedApplication Application { get; private set; } = null!;
 
     public static Task<OwnedAppHostFixture> CreateAsync(string topology, CancellationToken cancellationToken,
-        bool configuredAdministrator = false, string deploymentMode = "SingleTenant") =>
-        CreateAsync(topology, configuredAdministrator, deploymentMode, null, null, cancellationToken);
+        bool configuredAdministrator = false, string deploymentMode = "SingleTenant",
+        OwnedAppHostProfile profile = OwnedAppHostProfile.Standard,
+        OwnedBffPeerProtection peerProtection = OwnedBffPeerProtection.Shared) =>
+        CreateAsync(topology, configuredAdministrator, deploymentMode, null, null, cancellationToken, profile, peerProtection);
 
     internal static async Task<OwnedAppHostFixture> CreateAsync(string topology,
         bool configuredAdministrator, string deploymentMode,
         IReadOnlyDictionary<string, string?>? untrustedInputs,
-        Func<IDistributedApplicationTestingBuilder, Task>? configureBuilder, CancellationToken cancellationToken)
+        Func<IDistributedApplicationTestingBuilder, Task>? configureBuilder, CancellationToken cancellationToken,
+        OwnedAppHostProfile profile = OwnedAppHostProfile.Standard,
+        OwnedBffPeerProtection peerProtection = OwnedBffPeerProtection.Shared)
     {
-        var owner = new OwnedAppHostFixture(topology);
+        if (!Enum.IsDefined(profile) || !Enum.IsDefined(peerProtection)
+            || profile == OwnedAppHostProfile.ExternalIdentitySharedBff && topology != "Split"
+            || profile == OwnedAppHostProfile.Standard && peerProtection != OwnedBffPeerProtection.Shared)
+            throw new InvalidOperationException("test_resource_profile_invalid");
+        var owner = new OwnedAppHostFixture(topology, profile);
         IDistributedApplicationTestingBuilder? builder = null;
         try
         {
             builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Explore_AppHost>(
                 [
                     $"ISLAMU_TEST_RUN_ID={owner.RunId}", $"ISLAMU_TEST_ROOT={owner.Root}",
+                    $"ISLAMU_TEST_PROFILE={profile}",
                     $"Aspire:Store:Path={Path.Combine(owner.Root, "aspire")}",
                     "DOTNET_ENVIRONMENT=Assurance", "ASPNETCORE_ENVIRONMENT=Assurance",
                     "ISLAMU_ASPIRE_MODE=local-default", $"Hosting:Topology={topology}",
                     "SECRET_PROVIDER=Environment", "SecretProvider:Provider=Environment",
                     "DATABASE_PROVIDER=PostgreSql", "DATABASE_NAME=islamu_assurance",
-                    "DATABASE_SCHEMA=assurance", "DATABASE_HOST=localhost", "IDENTITY_DATABASE_TOPOLOGY=CoLocated",
+                    "DATABASE_SCHEMA=assurance", "DATABASE_HOST=localhost",
+                    $"IDENTITY_DATABASE_TOPOLOGY={(profile == OwnedAppHostProfile.ExternalIdentitySharedBff ? "External" : "CoLocated")}",
+                    .. (profile == OwnedAppHostProfile.ExternalIdentitySharedBff
+                        ? new[] { "IDENTITY_DATABASE_PROVIDER=Sqlite", $"IDENTITY_DATABASE_NAME={Path.Combine(owner.Root, "identity.sqlite")}" }
+                        : []),
                     "PrivacyErasure:Authority:Topology=EmbeddedSqlite", "ERASURE_DATABASE_TOPOLOGY=EmbeddedSqlite",
                     "AUTHENTICATION_PROVIDER=Local", "AUTHORIZATION_PROVIDER=Local",
                     $"DEPLOYMENT_MODE={deploymentMode}",
@@ -98,6 +115,16 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 }, cancellationToken);
 
             builder.Services.AddSingleton(owner.execution);
+            if (profile == OwnedAppHostProfile.ExternalIdentitySharedBff)
+            {
+                var peer = builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "explore-blazor-peer");
+                var input = owner.CreatePeerProtection(peerProtection);
+                builder.CreateResourceBuilder(peer)
+                    .WithEnvironment("EVENT_DP_BFF_RING", input.Ring)
+                    .WithEnvironment("EVENT_DP_BFF_ADMISSION", input.Admission)
+                    .WithEnvironment("EVENT_DP_BFF_ADMISSION_SHA256", input.AdmissionSha256)
+                    .WithEnvironment("EVENT_DP_BFF_MINIMUM_GENERATION", input.MinimumGeneration.ToString(CultureInfo.InvariantCulture));
+            }
             string blocklist = Path.Combine(owner.Root, "password-blocklist.json");
             byte[] blocklistBytes = JsonSerializer.SerializeToUtf8Bytes(new
             {
@@ -226,7 +253,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     {
         await Application.ResourceNotifications.WaitForResourceAsync(
             "event-migrationservice", KnownResourceStates.Exited, cancellationToken);
-        string[] services = topology == "Split" ? ["explore-api", "explore-blazor"] : ["event-standalone"];
+        List<string> services = topology == "Split" ? ["explore-api", "explore-blazor"] : ["event-standalone"];
+        if (profile == OwnedAppHostProfile.ExternalIdentitySharedBff)
+            services.Add("explore-blazor-peer");
         foreach (string service in services)
         {
             await Application.ResourceNotifications.WaitForResourceHealthyAsync(service, cancellationToken);
@@ -370,6 +399,32 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             throw;
         }
         return (command.ExitCode, await output, await error);
+    }
+
+    private ExternalDataProtectionInput CreatePeerProtection(OwnedBffPeerProtection protection)
+    {
+        string partition = protection == OwnedBffPeerProtection.WrongPartition ? "API" : "BFF";
+        string prefix = $"EVENT_DP_{partition}_";
+        var input = new ExternalDataProtectionInput(EnvironmentAuthority[prefix + "RING"]!,
+            EnvironmentAuthority[prefix + "ADMISSION"]!, EnvironmentAuthority[prefix + "ADMISSION_SHA256"]!,
+            long.Parse(EnvironmentAuthority[prefix + "MINIMUM_GENERATION"]!, CultureInfo.InvariantCulture));
+        if (protection == OwnedBffPeerProtection.ExpiredAdmission)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var admission = JsonSerializer.Deserialize<ExternalDataProtectionAdmission>(input.Admission)!;
+            string expired = JsonSerializer.Serialize(admission with
+            {
+                NotBeforeUtc = now.AddHours(-2), NotAfterUtc = now.AddHours(-1)
+            });
+            return input with { Admission = expired, AdmissionSha256 = ExternalDataProtectionInput.Hash(expired) };
+        }
+        return protection switch
+        {
+            OwnedBffPeerProtection.Shared or OwnedBffPeerProtection.WrongPartition => input,
+            OwnedBffPeerProtection.GenerationBelowFloor => input with { MinimumGeneration = 2 },
+            OwnedBffPeerProtection.RevokedActiveKey => ExternalDataProtectionTestAuthority.RevokeActiveKey(input),
+            _ => throw new InvalidOperationException("test_resource_profile_invalid")
+        };
     }
 
     private static FrozenDictionary<string, string?> CreateEnvironmentAuthority()

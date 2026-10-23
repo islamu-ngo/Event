@@ -235,6 +235,16 @@ The second generation run must be byte-identical. The OpenAPI contract workflow
 treats the tool manifest, transformer source, mutable manifest, direct tests,
 MSBuild integration, and generated product as relevant inputs.
 
+For an explicitly restore-free execution, first build the installed generator
+with `dotnet build eng/tools/Explore.GeneratedContracts/Explore.GeneratedContracts.csproj --configuration Release --no-restore`.
+Pass its absolute `bin/Release/net10.0/Explore.GeneratedContracts.dll` path as
+`-p:GeneratedContractToolAssembly=<absolute-path>` to the owning API/client
+build or generation target. This uses the existing compiled tool instead of
+the default helper target's `Restore;Build`; it does not disable generation,
+schema/client capture, or contract validation. Build affected product dependencies
+first when using `BuildProjectReferences=false`, so native OpenAPI generation
+cannot load stale assemblies. Generated files remain tool-owned.
+
 ## Review Checklist
 
 - Does the type represent value data rather than entity or lifecycle identity?

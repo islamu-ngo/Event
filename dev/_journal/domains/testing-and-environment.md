@@ -230,3 +230,37 @@ All 38 cases, including the eight real process controls, passed with zero skips 
 - [x] The owned distributed guide already records the lifecycle contract; retain this observed failure and task-state distinction in the testing journal.
 
 ---
+
+[2026-10-23 Europe/Brussels] — Reauthentication containers are not credential identity
+
+**Context**: Native JWT/SQLite storage-configuration tests exercised the registered authentication pipeline and captured original-request authority through `StorageConfigurationAuthority`.
+
+**Symptom / Observation**: Two successful real `AuthenticateAsync` calls returned different ticket wrappers while retaining the native principal, scheme and lifetime receipt. The original storage source rejected the valid request with `UnauthorizedAccessException`. A separate genuine `IClaimsTransformation` decorator invoked the real `AdminClaimsTransformation` and returned a fresh `ClaimsPrincipal` container over the same native identity objects; that legitimate container also failed the initial guard. Its precondition proved distinct containers with identical identity references before source capture.
+
+**Root Cause**: The source treated authentication-result ticket/principal container reference equality as credential continuity. These wrappers can be recreated without changing the authenticated identities. The original request principal is a separate custody boundary and must still remain the captured object. Conversely, observing only the selected persistence tenant missed mutation of the distinct request tenant marker.
+
+**Resolution**: Preserve original request/principal/services/command custody and compare the exact native identity and claim sequences, authentication scheme, issued/expiry properties and human lifetime receipt across reauthentication. Retain the persisted principal/support authority checks. Capture request tenant-marker presence and its nonempty typed Guid separately from the selected persistence tenant. This does not permit cloned identities, rewritten claims or a different request principal. The normal/fresh-container selection first produced one pass and one failure against the old container guard, then both named cases passed with zero skips in 36.882 seconds after the correction. The separately observed HTTP writer transaction-ordering failure remains open; these cases do not certify the whole storage HTTP profile.
+
+The physically executed passing command was:
+
+```bash
+export TMPDIR="$HOME/.cache/agent-tmp"
+dotnet tests/Event.API.IntegrationTests/bin/Release/net10.0/Event.API.IntegrationTests.dll --treenode-filter "/*/*/StorageProbeOriginalActionTests/NativeStorageConfigurationAcceptsReauthenticationAndRejectsChangedOriginalSources" --minimum-expected-tests 2 --progress off --maximum-parallel-tests 1 --report-trx --report-trx-filename storage-auth-principal-green.trx --results-directory "$TMPDIR/testing-assurance-modernization/continuation/storage-auth-principal-green-results"
+```
+
+**Why This Matters for Future Work**: Native authority tests should challenge both legitimate framework reconstruction and actual source replacement. A recreated result container is different from a changed authenticated identity. Keep request custody, credential identity, lifetime and persisted authority as explicit boundaries rather than binding them all to a wrapper object's allocation.
+
+**References**:
+
+- `src/Explore.Infrastructure/Services/StorageConfigurationAuthority.cs`
+- `tests/Event.API.IntegrationTests/Authentication/StorageProbeOriginalActionTests.AuthenticationCustody.cs`
+- `docs/internal/API.md`, Validated Human Credential Lifetime.
+- `docs/public/documentation/readme/integrations-and-ai/storage.md`, Storage configuration authority.
+- Candidate source SHA-256 `6f6d4f1e9646e6f08031d2b48eca82b83b4bdc4b0aa7e18b05048ce95ca3bbba`; named Green TRX SHA-256 `5b863984f580fdec13fe3cc7d3ddd0a0d851ec53284c399bc377677375e9ef79`.
+- Storage-only correction commit `e324167a6eb68ad987923eddd81756fef758514a`; transaction-observation correction remains separate.
+
+**Promotion Consideration**:
+
+- [x] Retain this measured framework/container distinction and independent request-tenant custody lesson in the testing journal; the API/storage guides own the production contract.
+
+---

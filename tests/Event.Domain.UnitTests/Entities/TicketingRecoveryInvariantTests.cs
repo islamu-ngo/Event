@@ -1,8 +1,8 @@
 using Explore.Domain;
 
-namespace Explore.Domain.Recovery.MutationTests;
+namespace Event.Domain.UnitTests.Entities;
 
-public sealed class TicketingRecoveryMutationTests
+public sealed class TicketingRecoveryInvariantTests
 {
     private static readonly DateTime UtcNow =
         new(2026, 8, 29, 12, 0, 0, DateTimeKind.Utc);
@@ -119,15 +119,19 @@ public sealed class TicketingRecoveryMutationTests
         await Assert.That(Validate(checkpoint))
             .IsEqualTo(TicketingRecoveryValidationOutcome.Validated);
         Guid validatedStamp = checkpoint.ConcurrencyStamp;
+        var validatedState = State(checkpoint);
         await Assert.That(checkpoint.TryRotateBearerAuthority(
                 5, 9, 111, UtcNow.AddMinutes(2)))
             .IsFalse();
+        await Assert.That(State(checkpoint)).IsEqualTo(validatedState);
         await Assert.That(checkpoint.TryRotateBearerAuthority(
                 6, 8, 111, UtcNow.AddMinutes(2)))
             .IsFalse();
+        await Assert.That(State(checkpoint)).IsEqualTo(validatedState);
         await Assert.That(checkpoint.TryRotateBearerAuthority(
                 6, 9, 110, UtcNow.AddMinutes(2)))
             .IsFalse();
+        await Assert.That(State(checkpoint)).IsEqualTo(validatedState);
         await Assert.That(checkpoint.TryRotateBearerAuthority(
                 6, 9, 111, UtcNow.AddMinutes(2)))
             .IsTrue();
@@ -146,18 +150,23 @@ public sealed class TicketingRecoveryMutationTests
     public async Task WorkersAndSalesOpenInExactOrderAndFence()
     {
         TicketingRecoveryCheckpoint checkpoint = Rotated();
+        var rotatedState = State(checkpoint);
         await Assert.That(checkpoint.TryOpenWorkers(110, UtcNow.AddMinutes(3)))
             .IsFalse();
+        await Assert.That(State(checkpoint)).IsEqualTo(rotatedState);
         await Assert.That(checkpoint.TryOpenSales(UtcNow.AddMinutes(3)))
             .IsFalse();
+        await Assert.That(State(checkpoint)).IsEqualTo(rotatedState);
         await Assert.That(checkpoint.TryOpenWorkers(111, UtcNow.AddMinutes(3)))
             .IsTrue();
         await Assert.That(checkpoint.Status)
             .IsEqualTo(TicketingRecoveryStatus.WorkersOpen);
         await Assert.That(checkpoint.WorkersOpenedAt)
             .IsEqualTo(UtcNow.AddMinutes(3));
+        var workersState = State(checkpoint);
         await Assert.That(checkpoint.TryOpenWorkers(111, UtcNow.AddMinutes(4)))
             .IsFalse();
+        await Assert.That(State(checkpoint)).IsEqualTo(workersState);
         await Assert.That(checkpoint.TryOpenSales(UtcNow.AddMinutes(4)))
             .IsTrue();
         await Assert.That(checkpoint.Status)
@@ -178,10 +187,15 @@ public sealed class TicketingRecoveryMutationTests
             .IsTrue();
         await Assert.That(checkpoint.Status)
             .IsEqualTo(TicketingRecoveryStatus.AuthorityRotated);
+        await Assert.That(checkpoint.WorkersOpenedAt).IsNull();
+        await Assert.That(checkpoint.SalesOpenedAt).IsNull();
+        var pausedState = State(checkpoint);
         await Assert.That(checkpoint.PauseWorkers(UtcNow.AddMinutes(6)))
             .IsFalse();
+        await Assert.That(State(checkpoint)).IsEqualTo(pausedState);
         await Assert.That(checkpoint.StopSales(111, UtcNow.AddMinutes(6)))
             .IsFalse();
+        await Assert.That(State(checkpoint)).IsEqualTo(pausedState);
         await Assert.That(checkpoint.StopSales(112, UtcNow.AddMinutes(6)))
             .IsTrue();
         await Assert.That(checkpoint.Status)
@@ -201,9 +215,12 @@ public sealed class TicketingRecoveryMutationTests
         await Assert.That(checkpoint.Status).IsEqualTo(TicketingRecoveryStatus.Failed);
         await Assert.That(checkpoint.FailureCode).IsEqualTo("RESTORE_FAILED");
         await Assert.That(checkpoint.UpdatedAt).IsEqualTo(UtcNow.AddMinutes(1));
+        var failedState = State(checkpoint);
         await Assert.That(Validate(checkpoint))
             .IsEqualTo(TicketingRecoveryValidationOutcome.StaleAuthority);
+        await Assert.That(State(checkpoint)).IsEqualTo(failedState);
         await Assert.That(checkpoint.StopSales(111, UtcNow.AddMinutes(2))).IsFalse();
+        await Assert.That(State(checkpoint)).IsEqualTo(failedState);
         await Assert.That(() => Begin().Fail("", UtcNow.AddMinutes(1)))
             .Throws<ArgumentException>();
         await Assert.That(() => Begin().Fail(
@@ -239,11 +256,37 @@ public sealed class TicketingRecoveryMutationTests
         TicketingRecoveryValidationOutcome expected)
     {
         TicketingRecoveryCheckpoint checkpoint = Begin();
+        var closedState = State(checkpoint);
         await Assert.That(validate(checkpoint)).IsEqualTo(expected);
+        await Assert.That(State(checkpoint)).IsEqualTo(closedState);
         await Assert.That(checkpoint.Status)
             .IsEqualTo(TicketingRecoveryStatus.RecoveryOnly);
         await Assert.That(checkpoint.ValidatedAt).IsNull();
     }
+
+    private static (
+        TicketingRecoveryStatus Status,
+        int CapabilityGeneration,
+        int CredentialGeneration,
+        long WorkerFence,
+        Guid ConcurrencyStamp,
+        DateTime? UpdatedAt,
+        DateTime? ValidatedAt,
+        DateTime? AuthorityRotatedAt,
+        DateTime? WorkersOpenedAt,
+        DateTime? SalesOpenedAt,
+        string? FailureCode) State(TicketingRecoveryCheckpoint checkpoint) =>
+        (checkpoint.Status,
+            checkpoint.CapabilityGeneration,
+            checkpoint.CredentialGeneration,
+            checkpoint.WorkerFence,
+            checkpoint.ConcurrencyStamp,
+            checkpoint.UpdatedAt,
+            checkpoint.ValidatedAt,
+            checkpoint.AuthorityRotatedAt,
+            checkpoint.WorkersOpenedAt,
+            checkpoint.SalesOpenedAt,
+            checkpoint.FailureCode);
 
     private static TicketingRecoveryCheckpoint Begin() =>
         TicketingRecoveryCheckpoint.Begin(Manifest(), UtcNow);

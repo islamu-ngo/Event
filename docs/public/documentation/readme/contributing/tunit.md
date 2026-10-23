@@ -10,20 +10,46 @@ ISLAMU Event uses **TUnit** as its primary, modern test runner. We prioritize st
 
 ## 1. Focused Developer Loop
 
-During active development, never run full solution-level tests. Build the solution first, then run your target test class using a **TUnit tree-node filter**:
+During active development, build the affected test project after source changes,
+then run one target class using a **TUnit tree-node filter**. Keep pure Domain
+checks in memory, without containers or network services:
 
 ```bash
-# 1. Build product code
-dotnet build --configuration Release --verbosity quiet
+# 1. Build the affected project
+dotnet build tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --verbosity quiet
 
 # 2. Run target test class with tree-node filter
-dotnet test --project tests/Explore.Application.Tests/Explore.Application.Tests.csproj \
-  --configuration Release \
-  --treenode-filter "/*/*/*<TestClass>/*"
+dotnet run --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj \
+  --configuration Release --no-build -- \
+  --treenode-filter "/*/*/EventAddOnLifecycleTests/*" \
+  --minimum-expected-tests 12 --report-trx
 ```
 
 > [!NOTE]
-> `--treenode-filter` is the native TUnit test selector (~1.5s execution); VSTest `--filter` syntax is not interchangeable.
+> `--treenode-filter` uses assembly/namespace/class/method segments; VSTest
+> `--filter` syntax is not interchangeable. Measure execution time on your machine.
+
+The ordinary Domain suite includes `EventAddOnLifecycleTests` for catalog,
+inventory and refund invariants, and `TicketingRecoveryInvariantTests` for
+manifest validation, generation/fence advancement and worker-before-sales
+recovery. For the latter, substitute its class name and minimum of `7` in the
+command above. These cases replace the two standalone mutation projects and
+already run through the normal Domain CI lane.
+
+At the phase boundary, use the same selector with the repository test command:
+
+```bash
+dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj \
+  --configuration Release --no-build --verbosity quiet -- \
+  --treenode-filter "/*/*/EventAddOnLifecycleTests/*" \
+  --minimum-expected-tests 12 --report-trx
+```
+
+Check the required named results and unexpected skips as well as the count.
+Keep distinct runs with `--results-directory <unique-run-directory>`. A passing
+Domain state test establishes deterministic transition/replay behaviour; real
+database races, authentication and external effects need their owning integration
+lanes. A test-only relocation does not require unrelated provider or browser suites.
 
 ---
 

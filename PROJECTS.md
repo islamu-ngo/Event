@@ -112,10 +112,10 @@ All commands run from the repository root (`/home/amir/ISLAMU/Github/Event`) unl
 ### Inner Loop — Fast Subtask Slicing (Ring 1, < 2s)
 ```bash
 # Sliced Domain Unit Test (fastest inner loop):
-dotnet run --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --no-build -- --treenode-filter "/*/*/*<TestClassName>/*"
+dotnet run --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/<TestClassName>/*" --minimum-expected-tests 1
 
 # Sliced Application Unit Test:
-dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --no-build -- --treenode-filter "/*/*/*<TestClassName>/*"
+dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/<TestClassName>/*" --minimum-expected-tests 1
 ```
 
 ### Phase Exit — Target Project Build & Test (Ring 2, < 15s)
@@ -124,14 +124,22 @@ dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTes
 dotnet build <TargetProject.csproj> --configuration Release --verbosity quiet --nologo
 
 # 2. Run affected test project with Release configuration:
-dotnet test <TestProject.csproj> --configuration Release --verbosity quiet --nologo --no-build
+dotnet test --project <TestProject.csproj> --configuration Release --verbosity quiet --no-build -- --minimum-expected-tests 1
 
 # 3. Targeted test execution by method/class filter:
-dotnet test <TestProject.csproj> --configuration Release --verbosity quiet --nologo --no-build --filter "FullyQualifiedName~<TestClassName>"
+dotnet test --project <TestProject.csproj> --configuration Release --verbosity quiet --no-build -- --treenode-filter "/*/*/<TestClassName>/*" --minimum-expected-tests 1
 
 # 4. Architecture guardrail check:
-dotnet test tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet --nologo --no-build
+dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet --no-build -- --minimum-expected-tests 1
 ```
+
+`EventAddOnLifecycleTests` and `TicketingRecoveryInvariantTests` belong to
+`Event.Domain.UnitTests/Entities/` and execute in its existing normal CI lane.
+Their catalog, inventory/refund and recovery state assertions need no containers.
+The [scoped disposition](docs/internal/testing/TEST_COHORT_DISPOSITIONS.md)
+records exact retained cases and the limits of their evidence. Build the selected
+project after changing source before using `--no-build`; reconcile required named
+results and unexpected skips as well as the minimum-count floor.
 
 ### Plan Exit & PR Readiness (Ring 3 Gate)
 ```bash

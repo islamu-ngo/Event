@@ -75,6 +75,33 @@ Key TUnit features used:
 | `Assert.That(x).IsEqualTo(y)` | Fluent async assertions |
 | `Assert.Multiple()` | Group multiple assertions |
 
+### Ordinary Commercial And Recovery Domain Ownership
+
+`EventAddOnLifecycleTests` and `TicketingRecoveryInvariantTests` in
+`Event.Domain.UnitTests/Entities/` own the add-on catalog, checked commercial
+totals, inventory/refund replay and ticketing recovery state assertions. They
+run in the existing ordinary Domain CI lane. The former standalone mutation
+projects and their Stryker configurations are retired after named replacement
+proof; no mutation score or test-count target justifies removing an invariant.
+See the [scoped cohort dispositions](testing/TEST_COHORT_DISPOSITIONS.md) for the
+complete mapping and bounded evidence.
+
+Build after edits, then select one class at a time using the pinned runner:
+
+```bash
+dotnet build tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --verbosity quiet
+dotnet run --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/EventAddOnLifecycleTests/*" --minimum-expected-tests 12 --report-trx
+dotnet run --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/TicketingRecoveryInvariantTests/*" --minimum-expected-tests 7 --report-trx
+```
+
+The four filter segments are assembly, namespace, class and method. Use
+`--results-directory <unique-run-directory>` to preserve independent TRX artifacts.
+Require every mapped identity, passing outcomes and zero unexpected skips;
+`--minimum-expected-tests` only rejects an insufficient total. Immediate state
+comparisons after rejected/replayed operations prevent later valid transitions
+from hiding a partial mutation. These pure in-memory tests prove no real-provider
+race, distributed exactly-once effect or production authentication boundary.
+
 ## The 3-Ring Progressive Verification Model
 
 To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck during agentic and contributor workflows, the repository strictly enforces a **3-Ring Progressive Verification** hierarchy:

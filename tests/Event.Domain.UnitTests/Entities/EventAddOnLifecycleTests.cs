@@ -2,9 +2,9 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 
-namespace Explore.Domain.AddOns.MutationTests;
+namespace Event.Domain.UnitTests.Entities;
 
-public sealed class EventAddOnMutationTests
+public sealed class EventAddOnLifecycleTests
 {
     private static readonly DateTime UtcNow =
         new(2025, 8, 29, 12, 0, 0, DateTimeKind.Utc);
@@ -394,10 +394,13 @@ public sealed class EventAddOnMutationTests
         await Assert.That(allocation.ReleasedQuantity).IsEqualTo(1);
         await Assert.That(allocation.AllocatedQuantity).IsEqualTo(2);
         await Assert.That(allocation.ActiveUniquenessSlot).IsEqualTo(line.Id);
+        var partiallyReleasedState = InventoryState(allocation);
         await Assert.That(() => allocation.ReleaseQuantity(3, UtcNow.AddMinutes(2)))
             .Throws<InvalidOperationException>();
+        await Assert.That(InventoryState(allocation)).IsEqualTo(partiallyReleasedState);
         await Assert.That(() => allocation.ReleaseQuantity(1, UtcNow))
             .Throws<ArgumentException>();
+        await Assert.That(InventoryState(allocation)).IsEqualTo(partiallyReleasedState);
 
         allocation.ReleaseQuantity(2, UtcNow.AddMinutes(2));
         await Assert.That(allocation.AllocatedQuantity).IsEqualTo(0);
@@ -458,18 +461,24 @@ public sealed class EventAddOnMutationTests
         await Assert.That(confirmed.Status)
             .IsEqualTo(EventAddOnRefundAllocationStatus.PendingProvider);
         await Assert.That(confirmed.TryConfirm(UtcNow.AddMinutes(1))).IsTrue();
+        var confirmedState = RefundState(confirmed);
         await Assert.That(confirmed.TryConfirm(UtcNow.AddMinutes(2))).IsFalse();
+        await Assert.That(RefundState(confirmed)).IsEqualTo(confirmedState);
         await Assert.That(confirmed.ConfirmedAt).IsEqualTo(UtcNow.AddMinutes(1));
         await Assert.That(() => confirmed.TryFail(UtcNow.AddMinutes(2)))
             .Throws<InvalidOperationException>();
+        await Assert.That(RefundState(confirmed)).IsEqualTo(confirmedState);
 
         EventAddOnRefundAllocation failed =
             EventAddOnRefundAllocation.Create(NewId(), NewId(), line, 1, UtcNow);
         await Assert.That(failed.TryFail(UtcNow.AddMinutes(1))).IsTrue();
+        var failedState = RefundState(failed);
         await Assert.That(failed.TryFail(UtcNow.AddMinutes(2))).IsFalse();
+        await Assert.That(RefundState(failed)).IsEqualTo(failedState);
         await Assert.That(failed.FailedAt).IsEqualTo(UtcNow.AddMinutes(1));
         await Assert.That(() => failed.TryConfirm(UtcNow.AddMinutes(2)))
             .Throws<InvalidOperationException>();
+        await Assert.That(RefundState(failed)).IsEqualTo(failedState);
     }
 
     [Test]
@@ -543,17 +552,21 @@ public sealed class EventAddOnMutationTests
             .IsTrue();
         await Assert.That(allocation.Status)
             .IsEqualTo(EventAddOnRefundAllocationStatus.ConfirmedInventoryReleasePending);
+        var pendingReleaseState = RefundState(allocation);
         await Assert.That(
                 allocation.TryConfirmInventoryReleasePending(UtcNow.AddMinutes(2)))
             .IsFalse();
+        await Assert.That(RefundState(allocation)).IsEqualTo(pendingReleaseState);
         await Assert.That(
                 allocation.TryCompleteInventoryRelease(UtcNow.AddMinutes(2)))
             .IsTrue();
         await Assert.That(allocation.Status)
             .IsEqualTo(EventAddOnRefundAllocationStatus.Confirmed);
+        var completedState = RefundState(allocation);
         await Assert.That(
                 allocation.TryCompleteInventoryRelease(UtcNow.AddMinutes(3)))
             .IsFalse();
+        await Assert.That(RefundState(allocation)).IsEqualTo(completedState);
     }
 
     [Test]
@@ -631,6 +644,26 @@ public sealed class EventAddOnMutationTests
                 EventAddOnRefundResult.Failure(EventAddOnRefundOutcome.Allocated))
             .Throws<ArgumentOutOfRangeException>();
     }
+
+    private static (
+        int ReleasedQuantity,
+        Guid? ActiveUniquenessSlot,
+        DateTime? ReleasedAt,
+        Guid ConcurrencyStamp) InventoryState(EventAddOnInventoryAllocation allocation) =>
+        (allocation.ReleasedQuantity,
+            allocation.ActiveUniquenessSlot,
+            allocation.ReleasedAt,
+            allocation.ConcurrencyStamp);
+
+    private static (
+        EventAddOnRefundAllocationStatus Status,
+        DateTime? ConfirmedAt,
+        DateTime? FailedAt,
+        Guid ConcurrencyStamp) RefundState(EventAddOnRefundAllocation allocation) =>
+        (allocation.Status,
+            allocation.ConfirmedAt,
+            allocation.FailedAt,
+            allocation.ConcurrencyStamp);
 
     private static RegistrationOrderAddOnLine Line(
         int quantity,

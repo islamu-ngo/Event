@@ -129,6 +129,31 @@ public sealed class AssuranceAuditTests
     }
 
     [Test]
+    public async Task PortfolioInventory_HashesExactInputBytesWhileParsingBomEncodedSource()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"portfolio-{Guid.CreateVersion7():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllBytes(Path.Combine(root, "Cases.cs"),
+                [0xef, 0xbb, 0xbf, .. System.Text.Encoding.UTF8.GetBytes("class Cases { [Test] public void Runs() { } }")]);
+            const string metadata = """
+                {"Properties":{"MSBuildProjectFullPath":"Owner.csproj"},
+                 "Items":{"Compile":[{"FullPath":"Cases.cs"}]}}
+                """;
+
+            PortfolioInventory.Source source = PortfolioInventory.Create(root, [metadata]).Sources.Single();
+
+            await Assert.That(source.Sha256).IsEqualTo("4D2A5DA6EA010EA2483C74F752F68E4C9D8AB65EBA7A230D5145B955ABB73555");
+            await Assert.That(source.Declarations.Single().Tests.Single().Name).IsEqualTo("Runs");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     [Arguments("var value = Activator.CreateInstance(typeof(Service));", AssuranceAudit.ReflectiveBehaviorDispatch)]
     [Arguments("var value = Activator.CreateInstance(\"Product.Assembly\", \"Product.Service\");", AssuranceAudit.ReflectiveBehaviorDispatch)]
     [Arguments("var proxy = DispatchProxy.Create<IService, Proxy>();", AssuranceAudit.ReflectiveBehaviorDispatch)]

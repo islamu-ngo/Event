@@ -86,7 +86,9 @@ public static class PortfolioInventory
         foreach ((string path, List<Owner> compiledOwners) in owners)
         {
             string absolute = Path.Combine(root, path);
-            string source = File.ReadAllText(absolute);
+            byte[] sourceBytes = File.ReadAllBytes(absolute);
+            using var reader = new StreamReader(new MemoryStream(sourceBytes));
+            string source = reader.ReadToEnd();
             Declaration[] declarations = compiledOwners
                 .GroupBy(owner => projects.Single(project => project.Path == owner.Project).DefineConstants)
                 .SelectMany(profile =>
@@ -115,7 +117,7 @@ public static class PortfolioInventory
                             Attributes(method.AttributeLists))).ToArray()));
                 })
                 .ToArray();
-            sources.Add(new Source(path, Hash(absolute), compiledOwners
+            sources.Add(new Source(path, Convert.ToHexString(SHA256.HashData(sourceBytes)), compiledOwners
                 .OrderBy(owner => owner.Project, StringComparer.Ordinal).ToArray(), declarations));
         }
 

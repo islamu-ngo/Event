@@ -39,16 +39,16 @@ The closed model uses four concurrent virtual users for five seconds. Each
 iteration sleeps for 100 ms after its request. The open model offers eight
 iterations per second for five seconds, with four preallocated and maximum
 virtual users. Requests time out after two seconds and scenarios allow at most
-five seconds to finish in-flight iterations. The C# process deadline is thirty
-seconds, linked to test cancellation. Cancellation kills the process tree and
+five seconds to finish in-flight iterations. The C# process deadline is fifteen
+seconds for these five-second profiles, linked to test cancellation. Cancellation kills the process tree and
 drains both output streams without retaining or printing them.
 
 k6 thresholds require all response checks to pass, zero HTTP failures, at least
 one response, and zero dropped iterations in the open model. A failed `check()`
 alone would not fail k6; thresholds and process exit status make it enforceable.
-The independent C# parser also requires a recognized schema, all expected fields
-exactly once, finite latency, and matching attempted, received, correct, HTTP,
-and completed iteration counts. The open run must complete exactly forty
+The independent C# parser also requires schema 2, the exact admitted profile,
+all expected fields exactly once, finite ordered p50/p95/p99 latency, and matching attempted, received, correct, HTTP,
+and completed iteration counts. The open lookup run must complete exactly forty
 requests. Missing summaries, interrupted iterations, unknown fields, and drops
 invalidate the run.
 
@@ -67,7 +67,7 @@ Validated aggregate JSON survives fixture cleanup under
 Raw k6 summaries stay under the fixture-owned root and are removed by its
 cleanup. Persistent records contain tool version and executable digest,
 workload identity and digest, topology, provider, warmup durations, duration,
-concurrency or offered rate, counts, p95 latency, generator measurements, and
+concurrency or offered rate, counts, p50/p95/p99 latency, generator measurements, and
 the test assembly's informational build version (including source revision when
 supplied by the SDK).
 They exclude response bodies, application logs, target URLs, credentials,
@@ -83,11 +83,128 @@ generator pressure, runtime/provider change, or resource-budget change requires
 a new baseline. This implementation captures candidates; it does not implement
 baseline promotion or a latency regression gate.
 
-The remaining full programme acceptance requires a representative authenticated
-mutation journey, invariant validation and settled effects through public
-seams. Passing this read foundation must not close that outstanding work.
+The separate event programme below adds representative anonymous reads/searches
+and serial authenticated title updates with independent public-seam settlement.
+Its source and harness are separate from actual application execution evidence.
+Passing the lookup foundation must not close the full programme.
+
+## Native event control prerequisite
+
+`K6NativeControlTests` is a separate explicit `LoadControl` lane. It starts an
+owned MultiTenant host, completes first-use Local credential replacement and a
+fresh ordinary login, then creates a dedicated active tenant with real
+administrator membership. It creates three InformationOnly events with no
+registration workflow: one published search target, one draft write target,
+and an unchanged draft control.
+
+The scenario requires exact public discovery results, applies a grouped title
+PATCH using the write event's current quoted GUID `If-Match`, requires a stale
+stamp to fail with HTTP 409, and verifies the predetermined final title and a
+new stamp through a fresh management GET. Separate GETs must preserve the
+control title/stamp and the published read event. It launches no k6 process
+and runs only after the native startup prerequisite is healthy. Authoring or
+compiling this scenario does not establish passing runtime or load evidence.
 
 ## Execution and integration
+
+The broader programme has fixed envelopes, with no caller-supplied rate,
+duration or concurrency knobs:
+
+| Profile | Offered iterations/second | Duration | Maximum users | Exact offered iterations | Process deadline |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Low rate | 1 | 10 s | 4 | 10 | 20 s |
+| Steady | 4 | 30 s | 4 | 120 | 40 s |
+| Spike | 8 | 5 s | 4 | 40 | 15 s |
+| Recovery | 1 | 10 s | 4 | 10 | 20 s |
+| Soak | 2 | 120 s | 4 | 240 | 130 s |
+| Constrained write | 1 | 20 s | 1 | 20 | 30 s |
+
+The harness validates these envelopes and rejects a child deadline beyond its
+profile's duration plus ten seconds before starting the child. Spike and
+recovery must run as sequential children, named
+`spike_then_recovery_with_observed_gap`, with their actual monotonic transition
+gap recorded and pressure sampling continuous across that gap. They must not
+be described as an instantaneous rate change. `K6LoadTests` remains the cached
+lookup smoke profile. `K6EventProgrammeTests` first performs the native control,
+then runs each read/search regime separately, twenty serial write iterations,
+and three steady candidates per read/search journey. Its fixed twenty-minute
+outer cancellation budget covers startup and all finite child profiles; it is
+not a latency target. No event-programme execution is claimed by harness tests.
+
+Read/search requests carry the owned tenant slug and no Bearer token. The
+writer obtains a fresh real Local token immediately before its twenty-second
+profile; the configured five-minute lifetime is unchanged. Each iteration
+performs management GET, grouped title PATCH with the fresh quoted GUID stamp
+and unique idempotency key, then another GET. Thus twenty offered iterations
+require sixty completed HTTP requests and exactly twenty PATCH attempts. Any
+unexpected conflict fails correctness without retry. Percentiles cover these
+individual HTTP requests, not transaction latency. Independent C# reads require
+the predetermined twentieth title, the unchanged separate control title/stamp,
+and unchanged published event/search results. Setup/control requests and warmup
+are outside measured iteration counts; no order or payment flow is involved.
+
+The owned workload origin is obtained only from the fixture model, pinned to
+literal loopback and independently checked in C# and JavaScript against the
+verified event IDs and exact query. Native clients disable proxies and
+redirects, bound response buffering to four MiB, and use finite HTTP timeouts.
+The executable digest is checked again before each workload child starts.
+The workload rejects response strings longer than 4,194,304 UTF-16 code units
+before JSON parsing. This is an accepted-result size limit, not a transport
+receive-byte cap: the public k6 interface does not document such a cap. The
+parent samples working set every 100 ms and kills the child when an observed
+sample exceeds 512 MiB. Allocation can occur between samples; this is not a
+hard operating-system memory limit. The native C# warmup has a separate enforced
+four-MiB response-buffer bound.
+
+## Pressure observations and comparable candidates
+
+The existing private operations `/metrics` endpoint is the only API metrics
+source. Diagnostic capture reads headers first and bounds the body to four MiB
+under a separate three-second deadline. Only six finite candidate family names,
+finite metric kinds and admitted `seconds`/`bytes` units can survive projection;
+HELP, labels and samples are never retained. Unknown units remain unavailable.
+The candidate names are not proof that the live exporter emits them. Actual
+owned series, units and reset identity must be verified before replacing this
+temporary metadata inventory with a finite numeric reader.
+
+The event programme continuously observes its own primary database through the
+existing Global factory and original native login admission. One fixed
+read-only `pg_stat_database` query checks the expected current database and
+returns backend gauge, cumulative transaction/block/temp/deadlock counters and
+`stats_reset`. This provider statistics view has no EF entity equivalent.
+Queries never enumerate another database; observed counters include observer
+queries and have PostgreSQL statistics flush lag, so they are not per-request
+attribution. Counter deltas require an unchanged, present reset identity.
+Queue/email observations use the existing native health readers and retain
+only nineteen aggregate counts, excluding their bounded tenant sample and
+authority settings. Denial, timeout and missing values remain explicit and
+never become zero. Sampling remains active between load children; actual
+monotonic start/completion offsets expose collection spans, with at most 900
+samples. Each profile retains process start/exit offsets on that same origin,
+so observations can be assigned to the workload and transition windows.
+
+Candidate comparison digests bind the compiled harness, workload/executable,
+topology/provider profile, dataset-generation and warmup policies, journey,
+budget, runtime, OS, architecture and visible CPU/memory budget. The three
+repetitions must have matching keys. Moving seed-clock bounds are retained
+separately. Matching keys do not prove a quiet host or a valid capacity sample.
+API numeric CPU/working set/reset observations are still unpinned, so all
+programme records explicitly remain ineligible for capacity inference. Actual
+statistics privileges, metric availability and repeated quiescent-host timing
+remain runtime acceptance requirements.
+
+The explicit read-only owned-PostgreSQL outage profile remains unimplemented
+until native control establishes its precise opaque unavailability contract.
+No arbitrary 5xx acceptance or guessed error status is admitted. Owned-resource
+stop/start acknowledgement, health, native database query, public recovery and
+unchanged independent settlement must all be proven before closing that gate.
+
+## Tool execution
+
+Summary trends explicitly request `p(50)`, `p(95)` and `p(99)`; `med` is a
+separate selector. Missing dropped-iteration observations remain unavailable,
+never an assumed zero. The selected binary's actual summary shape and metric
+availability must pass the owned runtime check before any measurement claim.
 
 `ISLAMU_K6_PATH` must name an absolute, separately installed k6 **2.3.0**
 executable. It is not a secret. The test verifies the fixed admitted executable
@@ -114,7 +231,7 @@ parser/admission and owned child-process tests require no network, Docker,
 k6 executable or AppHost:
 
 ```bash
-dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter '/*/*/K6Load*HarnessTests/*' --minimum-expected-tests 38
+dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter '/*/*/K6Load*HarnessTests/*' --minimum-expected-tests 71
 ```
 
 The explicit runtime category requires the real owned environment and external
@@ -163,7 +280,9 @@ process ownership; no external structure, sequence or organization retained.
 Source register (functional facts only; checked 2026-10-23):
 
 - [k6 release v2.3.0](https://github.com/grafana/k6/releases/tag/v2.3.0): version and installation integrity supplied by the lead task.
+- [k6 response body handling](https://grafana.com/docs/k6/v2.3.x/using-k6/k6-options/reference/#discard-response-bodies): discarding bodies reduces retention; it does not document a receive-byte cap.
 - [Checks](https://grafana.com/docs/k6/latest/using-k6/checks/): checks need thresholds for failing process status; source-free handoff.
 - [Executors](https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/): closed concurrency and open arrival-rate semantics; source-free handoff.
 - [Dropped iterations](https://grafana.com/docs/k6/latest/using-k6/scenarios/concepts/dropped-iterations/): drops invalidate offered-load evidence; source-free handoff.
+- [k6 2.3 summary trend statistics](https://grafana.com/docs/k6/v2.3.x/using-k6/k6-options/reference/#summary-trend-stats) and [custom summary reference](https://grafana.com/docs/k6/v2.3.x/results-output/end-of-test/custom-summary/#summary-data-reference): exact percentile selectors and documented aggregate keys; source-free handoff. Actual selected-binary output still requires runtime verification.
 - Local `k6 run --help` and `k6 inspect --help`: CLI interface facts only; no external source inspected.

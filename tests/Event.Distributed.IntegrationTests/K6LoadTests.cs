@@ -9,7 +9,7 @@ namespace Event.Distributed.IntegrationTests;
 public sealed class K6LoadHarnessTests
 {
     internal const string CompleteSummary = """
-        {"schema":1,"mode":"open","attempts":40,"responses":40,"correct":40,"iterations":40,"httpRequests":40,"correctnessRate":1,"httpFailureRate":0,"dropped":0,"p95Milliseconds":12.5}
+        {"schema":2,"journey":"public-language","profile":"open-lookup","mode":"open","attempts":40,"responses":40,"correct":40,"iterations":40,"httpRequests":40,"correctnessRate":1,"httpFailureRate":0,"dropped":0,"p50Milliseconds":6,"p95Milliseconds":12.5,"p99Milliseconds":20}
         """;
 
     [Test]
@@ -36,12 +36,12 @@ public sealed class K6LoadHarnessTests
 
     [Test]
     [Arguments("{}")]
-    [Arguments("{\"schema\":2}")]
-    [Arguments("{\"schema\":1,\"schema\":1}")]
+    [Arguments("{\"schema\":3}")]
+    [Arguments("{\"schema\":2,\"schema\":2}")]
     [Arguments("[]")]
     public async Task MissingOrUnrecognizedSummariesFailClosed(string summary)
     {
-        await Assert.That(() => K6LoadRunner.ParseSummary(summary, "open"))
+        await Assert.That(() => K6LoadRunner.ParseSummary(summary, K6LoadProfile.OpenLookup))
             .Throws<InvalidOperationException>();
     }
 
@@ -55,6 +55,11 @@ public sealed class K6LoadHarnessTests
     [Arguments("dropped", "1")]
     [Arguments("attempts", "0")]
     [Arguments("p95Milliseconds", "-1")]
+    [Arguments("p50Milliseconds", "99")]
+    [Arguments("p99Milliseconds", "1")]
+    [Arguments("p50Milliseconds", "-1")]
+    [Arguments("p99Milliseconds", "-1")]
+    [Arguments("profile", "\"steady\"")]
     public async Task IncompleteOrIncorrectRunsCannotProduceCapacityEvidence(string field, string value)
     {
         using var document = JsonDocument.Parse(CompleteSummary);
@@ -63,24 +68,26 @@ public sealed class K6LoadHarnessTests
         using var replacement = JsonDocument.Parse(value);
         changed[field] = replacement.RootElement.Clone();
         string summary = JsonSerializer.Serialize(changed);
-        await Assert.That(() => K6LoadRunner.ParseSummary(summary, "open"))
+        await Assert.That(() => K6LoadRunner.ParseSummary(summary, K6LoadProfile.OpenLookup))
             .Throws<InvalidOperationException>();
     }
 
     [Test]
     public async Task ACompleteOpenRunMustMeetItsDeclaredOfferedCount()
     {
-        var summary = K6LoadRunner.ParseSummary(CompleteSummary, "open");
+        var summary = K6LoadRunner.ParseSummary(CompleteSummary, K6LoadProfile.OpenLookup);
         await Assert.That(summary.Attempts).IsEqualTo(40L);
         await Assert.That(summary.P95Milliseconds).IsEqualTo(12.5);
-        await Assert.That(() => K6LoadRunner.ParseSummary(CompleteSummary, "closed"))
+        await Assert.That(() => K6LoadRunner.ParseSummary(CompleteSummary, K6LoadProfile.ClosedLookup))
             .Throws<InvalidOperationException>();
     }
 
     [Test]
     public async Task ACompleteClosedRunHasNoFixedOfferedCount()
     {
-        var summary = K6LoadRunner.ParseSummary(CompleteSummary.Replace("\"open\"", "\"closed\"", StringComparison.Ordinal), "closed");
+        string json = CompleteSummary.Replace("\"open\"", "\"closed\"", StringComparison.Ordinal)
+            .Replace("\"open-lookup\"", "\"closed-lookup\"", StringComparison.Ordinal);
+        var summary = K6LoadRunner.ParseSummary(json, K6LoadProfile.ClosedLookup);
         await Assert.That(summary.Attempts).IsEqualTo(40L);
         await Assert.That(summary.Mode).IsEqualTo("closed");
     }
@@ -89,7 +96,7 @@ public sealed class K6LoadHarnessTests
     public async Task AnUnexpectedSummaryFieldCannotCarryUnreviewedArtifacts()
     {
         string summary = CompleteSummary.TrimEnd().TrimEnd('}') + ",\"responseBody\":\"unreviewed\"}";
-        await Assert.That(() => K6LoadRunner.ParseSummary(summary, "open"))
+        await Assert.That(() => K6LoadRunner.ParseSummary(summary, K6LoadProfile.OpenLookup))
             .Throws<InvalidOperationException>();
     }
 
@@ -118,9 +125,202 @@ public sealed class K6LoadHarnessTests
 }
 
 [Category("Harness")]
+public sealed class K6LoadProfileHarnessTests
+{
+    private const string CompleteWriteSummary = """
+        {"schema":2,"journey":"event-write","profile":"constrained-write","mode":"open","attempts":20,"responses":60,"correct":20,"iterations":20,"httpRequests":60,"correctnessRate":1,"httpFailureRate":0,"dropped":0,"p50Milliseconds":6,"p95Milliseconds":12.5,"p99Milliseconds":20}
+        """;
+
+    [Test]
+    public async Task SerialWriteEvidenceNeedsTwentyCompleteThreeRequestJourneys()
+    {
+        var summary = K6LoadRunner.ParseSummary(CompleteWriteSummary, K6LoadProfile.ConstrainedWrite, K6Journey.EventWrite);
+        await Assert.That(summary.Attempts).IsEqualTo(20L);
+        await Assert.That(summary.HttpRequests).IsEqualTo(60L);
+        await Assert.That(() => K6LoadRunner.ParseSummary(CompleteWriteSummary, K6LoadProfile.OpenLookup))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments("\"responses\":60", "\"responses\":59")]
+    [Arguments("\"httpRequests\":60", "\"httpRequests\":59")]
+    [Arguments("\"iterations\":20", "\"iterations\":19")]
+    [Arguments("\"attempts\":20", "\"attempts\":21")]
+    public async Task PartialOrExcessWriteWorkCannotBeReportedAsComplete(string original, string invalid)
+    {
+        await Assert.That(() => K6LoadRunner.ParseSummary(CompleteWriteSummary.Replace(original, invalid, StringComparison.Ordinal),
+            K6LoadProfile.ConstrainedWrite, K6Journey.EventWrite)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments(1, "/api/Event/01999999-9999-7999-8999-999999999991")]
+    [Arguments(2, "/api/Event?pageSize=20&searchTerm=owned-search")]
+    [Arguments(3, "/api/Event/01999999-9999-7999-8999-999999999992")]
+    public async Task OnlyTheIndependentlyVerifiedEventJourneyCanSelectItsTarget(int journey, string path)
+    {
+        var origin = new Uri("http://127.0.0.1:4321/");
+        var target = new Uri(origin, path);
+        await Assert.That(K6LoadRunner.ValidateEventTarget(origin, target,
+            Guid.Parse("01999999-9999-7999-8999-999999999991"), Guid.Parse("01999999-9999-7999-8999-999999999992"),
+            "owned-search", (K6Journey)journey)).IsEqualTo(target);
+    }
+
+    [Test]
+    [Arguments("http://127.0.0.1:4322/api/Event/01999999-9999-7999-8999-999999999991", 1)]
+    [Arguments("http://127.0.0.1:4321/api/Event/01999999-9999-7999-8999-999999999992", 1)]
+    [Arguments("http://127.0.0.1:4321/api/Event?pageSize=20&searchTerm=other", 2)]
+    [Arguments("http://127.0.0.1:4321/api/Event/01999999-9999-7999-8999-999999999991", 3)]
+    public async Task AForeignOriginOrDifferentEventJourneyCannotReceiveLoad(string target, int journey)
+    {
+        await Assert.That(() => K6LoadRunner.ValidateEventTarget(new Uri("http://127.0.0.1:4321/"), new Uri(target),
+            Guid.Parse("01999999-9999-7999-8999-999999999991"), Guid.Parse("01999999-9999-7999-8999-999999999992"),
+            "owned-search", (K6Journey)journey)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task AWriteJourneyCannotBorrowAReadBudgetOrReadTarget()
+    {
+        K6LoadRunner.ValidateJourneyBudget(K6Journey.EventWrite, K6LoadProfile.ConstrainedWrite);
+        await Assert.That(() => K6LoadRunner.ValidateJourneyBudget(K6Journey.EventWrite, K6LoadProfile.Steady))
+            .Throws<InvalidOperationException>();
+        await Assert.That(() => K6LoadRunner.ValidateJourneyBudget(K6Journey.EventRead, K6LoadProfile.ConstrainedWrite))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments(K6LoadProfile.LowRate, 10, 20)]
+    [Arguments(K6LoadProfile.Steady, 120, 40)]
+    [Arguments(K6LoadProfile.Spike, 40, 15)]
+    [Arguments(K6LoadProfile.Recovery, 10, 20)]
+    [Arguments(K6LoadProfile.Soak, 240, 130)]
+    [Arguments(K6LoadProfile.ConstrainedWrite, 20, 30)]
+    public async Task FixedProfilesHaveBoundedOfferedCountsAndDeadlines(K6LoadProfile profile, int attempts, int deadlineSeconds)
+    {
+        var budget = K6LoadRunner.BudgetFor(profile);
+        await Assert.That(budget.ExpectedAttempts).IsEqualTo(attempts);
+        await Assert.That(budget.ProcessDeadline.TotalSeconds).IsEqualTo((double)deadlineSeconds);
+        await Assert.That(budget.MaximumVirtualUsers).IsLessThanOrEqualTo(4);
+        await Assert.That(budget.OfferedRate).IsLessThanOrEqualTo(8);
+    }
+
+    [Test]
+    public async Task UnknownProfilesCannotSelectAnUnboundedWorkload()
+    {
+        await Assert.That(() => K6LoadRunner.BudgetFor((K6LoadProfile)int.MaxValue)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task ConstrainedWritesAreSerialAndCannotExceedTwentyAttempts()
+    {
+        var budget = K6LoadRunner.BudgetFor(K6LoadProfile.ConstrainedWrite);
+        await Assert.That(budget.MaximumVirtualUsers).IsEqualTo(1);
+        await Assert.That(budget.OfferedRate).IsEqualTo(1);
+        await Assert.That(budget.ExpectedAttempts).IsEqualTo(20);
+    }
+
+    [Test]
+    public async Task AllObservedPercentilesAreRetained()
+    {
+        var summary = K6LoadRunner.ParseSummary(K6LoadHarnessTests.CompleteSummary, K6LoadProfile.OpenLookup);
+        await Assert.That(summary.P50Milliseconds).IsEqualTo(6d);
+        await Assert.That(summary.P95Milliseconds).IsEqualTo(12.5);
+        await Assert.That(summary.P99Milliseconds).IsEqualTo(20d);
+    }
+
+    [Test]
+    public async Task RetainedRuntimeMetricMetadataExcludesLabelsHelpAndUnpinnedValues()
+    {
+        var root = Directory.CreateTempSubdirectory("islamu-load-metric-");
+        try
+        {
+            string canary = Guid.NewGuid().ToString("N");
+            string exposition = $$"""
+                # HELP dotnet_process_cpu_time_seconds_total {{canary}}
+                # TYPE dotnet_process_cpu_time_seconds_total counter
+                # UNIT dotnet_process_cpu_time_seconds_total seconds
+                dotnet_process_cpu_time_seconds_total{cpu_mode="user",customer="{{canary}}"} 123456789
+                # TYPE dotnet_process_memory_working_set_bytes gauge
+                dotnet_process_memory_working_set_bytes{customer="{{canary}}"} 987654321
+                # TYPE private_{{canary}} gauge
+                # TYPE dotnet_private_{{canary}} gauge
+                """;
+            var definitions = K6LoadRunner.ParseRuntimeMetricInventory(exposition);
+            string path = System.IO.Path.Combine(root.FullName, "metrics.json");
+            await K6LoadRunner.WriteRuntimeMetricInventoryAsync(path, K6MetricInventoryStatus.MetadataOnly,
+                definitions, TestContext.Current!.Execution.CancellationToken);
+            string retained = await File.ReadAllTextAsync(path);
+            await Assert.That(retained).DoesNotContain(canary);
+            await Assert.That(retained).DoesNotContain("123456789");
+            await Assert.That(retained).DoesNotContain("987654321");
+            using var artifact = JsonDocument.Parse(retained);
+            await Assert.That(artifact.RootElement.GetProperty("CapacityEvidenceEligible").GetBoolean()).IsFalse();
+            var metrics = artifact.RootElement.GetProperty("MetricDefinitions");
+            await Assert.That(metrics.GetArrayLength()).IsEqualTo(2);
+            await Assert.That(metrics[0].GetProperty("Unit").GetString()).IsEqualTo("seconds");
+            await Assert.That(metrics[1].GetProperty("Unit").ValueKind).IsEqualTo(JsonValueKind.Null);
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Arguments("# TYPE dotnet_process_cpu_time_seconds_total counter\n# TYPE dotnet_process_cpu_time_seconds_total gauge")]
+    [Arguments("# UNIT dotnet_process_cpu_time_seconds_total seconds\n# UNIT dotnet_process_cpu_time_seconds_total bytes")]
+    public async Task AmbiguousMetricMetadataCannotSupplyAnObservation(string exposition)
+    {
+        await Assert.That(() => K6LoadRunner.ParseRuntimeMetricInventory(exposition)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task MetricMetadataInventoryIsBounded()
+    {
+        string exposition = new('x', 4 * 1024 * 1024 + 1);
+        await Assert.That(() => K6LoadRunner.ParseRuntimeMetricInventory(exposition)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task UnadmittedMetricUnitsCannotEnterRetainedMetadata()
+    {
+        var root = Directory.CreateTempSubdirectory("islamu-load-metric-");
+        try
+        {
+            string canary = Guid.NewGuid().ToString("N");
+            var definitions = K6LoadRunner.ParseRuntimeMetricInventory(
+                "# TYPE dotnet_process_cpu_time_seconds_total counter\n# UNIT dotnet_process_cpu_time_seconds_total " + canary);
+            string path = System.IO.Path.Combine(root.FullName, "metrics.json");
+            await K6LoadRunner.WriteRuntimeMetricInventoryAsync(path, K6MetricInventoryStatus.MetadataOnly,
+                definitions, TestContext.Current!.Execution.CancellationToken);
+            string retained = await File.ReadAllTextAsync(path);
+            await Assert.That(retained).DoesNotContain(canary);
+            using var artifact = JsonDocument.Parse(retained);
+            await Assert.That(artifact.RootElement.GetProperty("MetricDefinitions")[0].GetProperty("Unit").ValueKind)
+                .IsEqualTo(JsonValueKind.Null);
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+}
+
+[Category("Harness")]
 [NotInParallel]
 public sealed class K6LoadProcessHarnessTests
 {
+    [Test]
+    public async Task AnUnboundedDeadlineCannotLaunchTheOwnedChild()
+    {
+        using var root = new OwnedProcessDirectory();
+        var failure = await Assert.That(async () => await K6LoadRunner.RunOwnedProcessAsync(
+            K6LoadHarnessChild.ChildStartInfo("version", root.Path), System.IO.Path.Combine(root.Path, "summary.json"),
+            K6LoadProfile.OpenLookup, TimeSpan.FromSeconds(16), TestContext.Current!.Execution.CancellationToken))
+            .Throws<InvalidOperationException>();
+        await Assert.That(failure!.Message).IsEqualTo("load_deadline_not_admitted");
+        await Assert.That(File.Exists(System.IO.Path.Combine(root.Path, "version-launched"))).IsFalse();
+    }
+
     [Test]
     public async Task AVersionCompatibleUnapprovedExecutableIsRejectedBeforeItStarts()
     {
@@ -218,7 +418,7 @@ public sealed class K6LoadProcessHarnessTests
             await Assert.That(startInfo.Environment.ContainsKey(K6LoadHarnessChild.CanaryName)).IsFalse();
             await Assert.That(string.Join(' ', startInfo.ArgumentList)).DoesNotContain(canary);
             var measurement = await K6LoadRunner.RunOwnedProcessAsync(startInfo,
-                System.IO.Path.Combine(root.Path, "summary.json"), "open", TimeSpan.FromSeconds(10), TestContext.Current!.Execution.CancellationToken);
+                System.IO.Path.Combine(root.Path, "summary.json"), K6LoadProfile.OpenLookup, TimeSpan.FromSeconds(10), TestContext.Current!.Execution.CancellationToken);
             await Assert.That(JsonSerializer.Serialize(measurement)).DoesNotContain(canary);
             foreach (string file in Directory.GetFiles(root.Path))
                 await Assert.That(await File.ReadAllTextAsync(file)).DoesNotContain(canary);
@@ -231,7 +431,7 @@ public sealed class K6LoadProcessHarnessTests
 
     private static Task<K6ProcessMeasurement> RunChildAsync(OwnedProcessDirectory root, string scenario, TimeSpan timeout,
         CancellationToken cancellationToken = default) => K6LoadRunner.RunOwnedProcessAsync(
-            K6LoadHarnessChild.ChildStartInfo(scenario, root.Path), System.IO.Path.Combine(root.Path, "summary.json"), "open", timeout,
+            K6LoadHarnessChild.ChildStartInfo(scenario, root.Path), System.IO.Path.Combine(root.Path, "summary.json"), K6LoadProfile.OpenLookup, timeout,
             cancellationToken == default ? TestContext.Current!.Execution.CancellationToken : cancellationToken);
 
     private static async Task WaitForAsync(Func<bool> condition, TimeSpan timeout)
@@ -390,5 +590,41 @@ public sealed class K6LoadTests
         await using var fixture = await OwnedAppHostFixture.CreateAsync(topology, deadline.Token);
         await fixture.StartAsync(deadline.Token);
         await K6LoadRunner.RunAsync(fixture, topology, deadline.Token);
+    }
+}
+
+[Category("LoadControl")]
+[NotInParallel]
+public sealed class K6NativeControlTests
+{
+    [Test]
+    [Arguments("Split")]
+    [Arguments("Standalone")]
+    public async Task OwnedPublicEventSearchAndGuardedWritesHaveIndependentSettledState(string topology)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromMinutes(8));
+        await using var fixture = await OwnedAppHostFixture.CreateAsync(topology, deadline.Token,
+            configuredAdministrator: true, deploymentMode: "MultiTenant");
+        await fixture.StartAsync(deadline.Token);
+        await K6LoadRunner.RunNativeControlAsync(fixture, topology, deadline.Token);
+    }
+}
+
+[Category("Load")]
+[NotInParallel]
+public sealed class K6EventProgrammeTests
+{
+    [Test]
+    [Arguments("Split")]
+    [Arguments("Standalone")]
+    public async Task OwnedEventWorkloadsPreserveSettledStateAcrossLoadAndRecovery(string topology)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromMinutes(20));
+        await using var fixture = await OwnedAppHostFixture.CreateAsync(topology, deadline.Token,
+            configuredAdministrator: true, deploymentMode: "MultiTenant");
+        await fixture.StartAsync(deadline.Token);
+        await K6LoadRunner.RunProgrammeAsync(fixture, topology, deadline.Token);
     }
 }

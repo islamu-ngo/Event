@@ -20,16 +20,44 @@ public class EventAuthoritySnapshotService : IEventAuthoritySnapshotService
     public async Task<EventAuthoritySnapshot> GetCommitBoundForUserAndEventsAsync(
         Guid tenantId, Guid userId, IReadOnlyCollection<Guid> eventIds,
         DateTime evaluationTimeUtc, CancellationToken cancellationToken)
+        => (await GetCommitBoundForUsersAndEventsAsync(
+            tenantId, [userId], eventIds, evaluationTimeUtc, cancellationToken))[userId];
+
+    internal async Task<IReadOnlyDictionary<Guid, EventAuthoritySnapshot>> GetCommitBoundForUsersAndEventsAsync(
+        Guid tenantId, IReadOnlyCollection<Guid> userIds, IReadOnlyCollection<Guid> eventIds,
+        DateTime evaluationTimeUtc, CancellationToken cancellationToken,
+        EventAuthorityProviderOperations.AuthorityPlan? acquiredPlan = null)
     {
+        var humans = userIds.Distinct().OrderBy(id => id.ToString("N"), StringComparer.Ordinal).ToArray();
         var ids = eventIds.Distinct().OrderBy(id => id.ToString("N"), StringComparer.Ordinal).ToArray();
-        var parents = await EventAuthorityProviderOperations.ReadOwnershipPlanAsync(
-            _dbContext, tenantId, ids, cancellationToken);
-        var actors = parents.Select(parent => parent.ActorId)
-            .Concat(parents.Where(parent => parent.OrganizerActorId.HasValue)
-                .Select(parent => parent.OrganizerActorId!.Value))
-            .Distinct().OrderBy(id => id.ToString("N"), StringComparer.Ordinal);
-        foreach (var actorId in actors)
-            await RelationalEntityRowFence.AcquireGlobalAsync<Actor>(_dbContext, actorId, cancellationToken);
+        var plan = acquiredPlan ?? await EventAuthorityProviderOperations.ReadPlanAsync(
+            _dbContext, tenantId, humans, ids, cancellationToken);
+        var parents = plan.Parents;
+        if (acquiredPlan is null)
+        {
+            var roleIds = plan.Assignments.Select(row => row.RoleId).Distinct().Order().ToArray();
+            foreach (int roleId in roleIds)
+                await RelationalEntityRowFence.AcquireLookupAsync<Role>(_dbContext, [roleId], cancellationToken);
+            await AcquirePermissionSourcesAsync(_dbContext, roleIds, cancellationToken);
+            var actors = parents.Select(parent => parent.ActorId)
+                .Concat(parents.Where(parent => parent.OrganizerActorId.HasValue)
+                    .Select(parent => parent.OrganizerActorId!.Value))
+                .Distinct().OrderBy(id => id.ToString("N"), StringComparer.Ordinal);
+            foreach (var actorId in actors)
+                await RelationalEntityRowFence.AcquireGlobalAsync<Actor>(_dbContext, actorId, cancellationToken);
+        }
+        else
+        {
+            // The parent acquisition already holds these early anchors. Never replan or add
+            // Role/Actor locks behind its Tenant, epoch or native-resource fences.
+            var currentParents = await EventAuthorityProviderOperations.ReadOwnershipAsync(_dbContext, tenantId, ids, cancellationToken);
+            var currentAssignments = await EventAuthorityProviderOperations.ReadAssignmentsAsync(_dbContext, tenantId, humans, ids, cancellationToken);
+            if (parents.Any(row => !ids.Contains(row.Id))
+                || plan.Assignments.Any(row => !ids.Contains(row.EventId) || !humans.Contains(row.UserId))
+                || !parents.OrderBy(row => row.Id).SequenceEqual(currentParents.OrderBy(row => row.Id))
+                || !plan.Assignments.OrderBy(row => row.Id).SequenceEqual(currentAssignments.OrderBy(row => row.Id)))
+                throw new DbUpdateConcurrencyException("Borrowed Event authority sources changed before native acquisition.");
+        }
         foreach (var id in ids)
             await RelationalEntityRowFence.AcquireAsync<Explore.Domain.Event>(
                 _dbContext, tenantId, row => row.Id, id, cancellationToken);
@@ -40,29 +68,53 @@ public class EventAuthoritySnapshotService : IEventAuthoritySnapshotService
         // read; a new attempt must plan and acquire its complete sorted set again.
         if (!parents.OrderBy(parent => parent.Id).SequenceEqual(heldParents.OrderBy(parent => parent.Id)))
             throw new DbUpdateConcurrencyException("Event authority ownership changed before its source fence.");
-        var assignments = await _dbContext.EventRoleAssignments.AsNoTracking()
-            .Where(assignment => assignment.TenantId == tenantId && assignment.UserId == userId
-                && ids.Contains(assignment.EventId))
-            .Select(assignment => new { assignment.Id, assignment.RoleId })
-            .ToListAsync(cancellationToken);
+        var assignments = await EventAuthorityProviderOperations.ReadAssignmentsAsync(
+            _dbContext, tenantId, humans, ids, cancellationToken);
+        if (!plan.Assignments.OrderBy(row => row.Id).SequenceEqual(assignments.OrderBy(row => row.Id)))
+            throw new DbUpdateConcurrencyException("Event authority role sources changed before their source fence.");
         foreach (var assignment in assignments.OrderBy(row => row.Id.ToString("N"), StringComparer.Ordinal))
             await RelationalEntityRowFence.AcquireAsync<EventRoleAssignment>(
                 _dbContext, tenantId, row => row.Id, assignment.Id, cancellationToken);
-        var roleIds = assignments.Select(row => row.RoleId).Distinct().Order().ToArray();
-        foreach (int roleId in roleIds)
-            await RelationalEntityRowFence.AcquireLookupAsync<Role>(_dbContext, [roleId], cancellationToken);
-        var pairs = await _dbContext.RolePermissions.AsNoTracking()
-            .Where(pair => roleIds.Contains(pair.RoleId))
-            .Select(pair => new { pair.RoleId, pair.PermissionId })
-            .ToListAsync(cancellationToken);
-        foreach (int permissionId in pairs.Select(pair => pair.PermissionId).Distinct().Order())
-            await RelationalEntityRowFence.AcquireLookupAsync<Permission>(
-                _dbContext, [permissionId], cancellationToken);
-        foreach (var pair in pairs.OrderBy(pair => pair.RoleId).ThenBy(pair => pair.PermissionId))
-            await RelationalEntityRowFence.AcquireLookupAsync<RolePermission>(
-                _dbContext, [pair.RoleId, pair.PermissionId], cancellationToken);
-        return await GetForUserAndEventsAsync(
-            tenantId, userId, ids, evaluationTimeUtc, cancellationToken);
+        var heldAssignments = await EventAuthorityProviderOperations.ReadAssignmentsAsync(
+            _dbContext, tenantId, humans, ids, cancellationToken);
+        // A newly discovered role needs a new whole attempt, never a late Role lock behind Event.
+        if (!plan.Assignments.OrderBy(row => row.Id).SequenceEqual(heldAssignments.OrderBy(row => row.Id)))
+            throw new DbUpdateConcurrencyException("Event authority role sources changed under their source fence.");
+        var snapshots = new Dictionary<Guid, EventAuthoritySnapshot>();
+        foreach (var human in humans)
+            snapshots.Add(human, await GetForUserAndEventsAsync(
+                tenantId, human, ids, evaluationTimeUtc, cancellationToken));
+        return snapshots;
+    }
+
+    internal static async Task AcquireHumanSourcesAsync(ExploreDbContext context, Guid tenantId,
+        Guid[] humans, int[] eventRoles, Guid? emailSubjectId, CancellationToken token)
+    {
+        foreach (var id in humans) await RelationalEntityRowFence.AcquireGlobalAsync<User>(context, id, token);
+        if (emailSubjectId is { } subjectId) await RelationalEntityRowFence.AcquireGlobalAsync<UserPii>(context, subjectId, token);
+        foreach (var id in await context.UserExternalLogins.AsNoTracking().Where(row => humans.Contains(row.UserId)).OrderBy(row => row.Id).Select(row => row.Id).ToArrayAsync(token))
+            await RelationalEntityRowFence.AcquireGlobalAsync<UserExternalLogin>(context, id, token);
+        var platform = await context.PlatformUserRoles.AsNoTracking().Where(row => humans.Contains(row.UserId)).OrderBy(row => row.Id).Select(row => new { row.Id, row.RoleId }).ToArrayAsync(token);
+        foreach (var row in platform) await RelationalEntityRowFence.AcquireGlobalAsync<PlatformUserRole>(context, row.Id, token);
+        var members = await context.TenantUsers.AsNoTracking().Where(row => row.TenantId == tenantId && humans.Contains(row.UserId)).OrderBy(row => row.Id).Select(row => row.Id).ToArrayAsync(token);
+        foreach (var id in members) await RelationalEntityRowFence.AcquireAsync<TenantUser>(context, tenantId, row => row.Id, id, token);
+        var grants = await context.TenantUserRoleGrants.AsNoTracking().Where(row => row.TenantId == tenantId && members.Contains(row.TenantUserId))
+            .OrderBy(row => row.Id).Select(row => new { row.Id, row.RoleId }).ToArrayAsync(token);
+        foreach (var row in grants) await RelationalEntityRowFence.AcquireAsync<TenantUserRoleGrant>(context, tenantId, row => row.Id, row.Id, token);
+        var roles = platform.Select(row => row.RoleId).Concat(grants.Select(row => row.RoleId)).Concat(eventRoles).Distinct().Order().ToArray();
+        foreach (int id in roles) await RelationalEntityRowFence.AcquireLookupAsync<Role>(context, [id], token);
+        await AcquirePermissionSourcesAsync(context, roles, token);
+    }
+
+    internal static async Task AcquirePermissionSourcesAsync(
+        ExploreDbContext context, int[] heldRoleIds, CancellationToken token)
+    {
+        var pairs = await context.RolePermissions.AsNoTracking().Where(row => heldRoleIds.Contains(row.RoleId))
+            .Select(row => new { row.RoleId, row.PermissionId }).ToArrayAsync(token);
+        foreach (var id in pairs.Select(row => row.PermissionId).Distinct().Order())
+            await RelationalEntityRowFence.AcquireLookupAsync<Permission>(context, [id], token);
+        foreach (var pair in pairs.OrderBy(row => row.RoleId).ThenBy(row => row.PermissionId))
+            await RelationalEntityRowFence.AcquireLookupAsync<RolePermission>(context, [pair.RoleId, pair.PermissionId], token);
     }
 
     public async Task<EventAuthoritySnapshot> GetForUserAndEventsAsync(

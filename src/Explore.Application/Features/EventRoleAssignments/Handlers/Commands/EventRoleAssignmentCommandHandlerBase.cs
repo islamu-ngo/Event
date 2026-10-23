@@ -1,7 +1,10 @@
 using System.Text.Json;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Exceptions;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -9,8 +12,32 @@ using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 
-public abstract class EventRoleAssignmentCommandHandlerBase
+public abstract class EventRoleAssignmentCommandHandlerBase(
+    IAdminContext identity,
+    IMachinePrincipalAccessor machine,
+    ITenantContext tenant,
+    IAuthorizationProvider authorization)
 {
+    protected async Task<Guid> RequireActorAsync(Guid tenantId, Guid eventId, string action, CancellationToken cancellationToken)
+    {
+        if (machine.IsMachineCaller || tenantId == Guid.Empty || eventId == Guid.Empty || tenant.TenantId != tenantId)
+            throw new AuthorizationException(ResourceKinds.Event, action);
+        var actor = await identity.ResolveUserIdAsync(cancellationToken);
+        if (actor is null || actor == Guid.Empty)
+            throw new AuthorizationException(ResourceKinds.Event, action);
+        var decision = await authorization.AuthorizeAsync(new AuthorizationRequest(
+            AuthorizationCapabilityCatalog.Require(ResourceKinds.Event, action), eventId.ToString("D"),
+            Facts: new EventScopedAuthorizationFacts(tenantId, eventId), Subject: new AuthorizationSubject(actor.Value),
+            Tenant: new AuthorizationTenant(tenantId)), cancellationToken);
+        if (!decision.IsAllowed)
+        {
+            if (decision.ReasonCode == AuthorizationDecisionReasonCodes.ProviderUnavailable)
+                throw new AuthorizationProviderUnavailableException(ResourceKinds.Event, action);
+            throw new AuthorizationException(ResourceKinds.Event, action);
+        }
+        return actor.Value;
+    }
+
     protected static BaseCommandResponse<Guid> Failure(string message, string failureCode, Guid? id = null) =>
         BaseCommandResponse.Failure(
             failureCode,
@@ -71,11 +98,12 @@ public abstract class EventRoleAssignmentCommandHandlerBase
         Guid actorUserId,
         object? oldValues,
         object? newValues,
-        IReadOnlyCollection<string>? affectedColumns = null)
+        IReadOnlyCollection<string>? affectedColumns = null,
+        Guid? auditId = null)
     {
         var audit = new AuditLog
         {
-            Id = Guid.CreateVersion7(),
+            Id = auditId ?? Guid.CreateVersion7(),
             TenantId = tenantId,
             Tenant = null!,
             EntityType = nameof(EventRoleAssignment),

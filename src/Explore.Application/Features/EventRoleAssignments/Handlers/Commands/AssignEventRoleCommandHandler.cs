@@ -1,6 +1,9 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
@@ -21,6 +24,7 @@ public sealed class AssignEventRoleCommandHandler
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly BusinessMetrics _metrics;
     private readonly ILogger<AssignEventRoleCommandHandler> _logger;
+    private readonly IEventRoleAssignmentCreationMutationBoundary _boundary;
 
     public AssignEventRoleCommandHandler(
         IEventRoleAssignmentRepository assignmentRepository,
@@ -29,7 +33,12 @@ public sealed class AssignEventRoleCommandHandler
         IEventRoleAuthorityCeilingService authorityCeilingService,
         IAuditLogRepository auditLogRepository,
         BusinessMetrics metrics,
-        ILogger<AssignEventRoleCommandHandler> logger)
+        ILogger<AssignEventRoleCommandHandler> logger,
+        IAdminContext identity,
+        IMachinePrincipalAccessor machine,
+        ITenantContext tenant,
+        IAuthorizationProvider authorization,
+        IEventRoleAssignmentCreationMutationBoundary boundary) : base(identity, machine, tenant, authorization)
     {
         _assignmentRepository = assignmentRepository;
         _eventRepository = eventRepository;
@@ -38,40 +47,67 @@ public sealed class AssignEventRoleCommandHandler
         _auditLogRepository = auditLogRepository;
         _metrics = metrics;
         _logger = logger;
+        _boundary = boundary;
     }
 
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AssignEventRoleCommand request, CancellationToken cancellationToken = default)
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(AssignEventRoleCommand request, CancellationToken cancellationToken = default) =>
+        ExecuteQualifiedAsync(request, null, cancellationToken);
+
+    internal async Task<BaseCommandResponse<Guid>> ExecuteQualifiedAsync(AssignEventRoleCommand request, string? expectedEmail,
+        CancellationToken cancellationToken)
+    {
+        var outcomeActor = await RequireActorAsync(request.TenantId, request.EventId, AuthorizationActions.Events.ManageTeam, cancellationToken);
+        Guid assignmentId = Guid.CreateVersion7();
+        Guid auditId = Guid.CreateVersion7();
+        string? denialReason = null;
+        var result = await _boundary.ExecuteAsync(request.TenantId, request.EventId, assignmentId, request.TargetUserId,
+            request.RoleId, request.Status, request.StartsAtUtc, request.ExpiresAtUtc, auditId, expectedEmail,
+            (actor, token) =>
+            {
+                outcomeActor = actor;
+                denialReason = null;
+                return AssignAsync(request, actor, assignmentId, auditId, reason => denialReason = reason, token);
+            }, cancellationToken);
+        if (result.IsSuccess)
+        {
+            _metrics.RecordEventRoleAssignmentChanged("assign", "allowed", RoleCodeFor(request.RoleId));
+            _logger.LogInformation("Event role assignment committed TenantId={TenantId} EventId={EventId} AssignmentId={AssignmentId} RoleId={RoleId} ActorUserId={ActorUserId}",
+                request.TenantId, request.EventId, result.Id, request.RoleId, outcomeActor);
+        }
+        else if (denialReason is not null && result.FailureCode == denialReason)
+        {
+            _metrics.RecordEventRoleAssignmentChanged("assign", "denied", RoleCodeFor(request.RoleId));
+            _logger.LogWarning("Event role assignment denied TenantId={TenantId} EventId={EventId} RoleId={RoleId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
+                request.TenantId, request.EventId, request.RoleId, outcomeActor, denialReason);
+        }
+        return result;
+    }
+
+    private async Task<BaseCommandResponse<Guid>> AssignAsync(AssignEventRoleCommand request, Guid actorUserId, Guid assignmentId,
+        Guid auditId, Action<string> observeDenial, CancellationToken cancellationToken)
     {
         if (request.RoleId == (int)RoleEnum.EventOwner)
         {
-            _metrics.RecordEventRoleAssignmentChanged("assign", "denied", RoleCodeFor(request.RoleId));
-            _logger.LogWarning(
-                "Event owner assignment denied TenantId={TenantId} EventId={EventId} TargetUserId={TargetUserId} RoleId={RoleId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
-                request.TenantId,
-                request.EventId,
-                request.TargetUserId,
-                request.RoleId,
-                request.ActorUserId,
-                "event_owner_transfer_required");
+            observeDenial("event_owner_transfer_required");
             await WriteAuditAsync(
                 _auditLogRepository,
                 request.TenantId,
                 request.EventId,
                 "EventRoleAssignmentDenied",
-                request.ActorUserId,
+                actorUserId,
                 oldValues: null,
                 newValues: new
                 {
                     request.EventId,
                     request.TargetUserId,
                     request.RoleId,
-                    request.ActorUserId,
+                    ActorUserId = actorUserId,
                     Operation = "assign",
                     DecisionEngine = "application_owner_invariant",
                     ResourceKind = ResourceKinds.Event,
                     Action = AuthorizationActions.Events.TransferOwnership,
                     DenyReason = "event_owner_transfer_required"
-                });
+                }, auditId: auditId);
             return Failure("Event ownership must be transferred with the ownership transfer command.", "event_owner_transfer_required");
         }
 
@@ -87,38 +123,30 @@ public sealed class AssignEventRoleCommandHandler
         }
 
         var authority = await _authorityCeilingService.CanAssignRoleAsync(
-            request.TenantId, request.EventId, request.ActorUserId, request.RoleId, cancellationToken);
+            request.TenantId, request.EventId, actorUserId, request.RoleId, cancellationToken);
 
         if (!authority.IsAllowed)
         {
-            _metrics.RecordEventRoleAssignmentChanged("assign", "denied", RoleCodeFor(request.RoleId));
-            _logger.LogWarning(
-                "Event role assignment denied TenantId={TenantId} EventId={EventId} TargetUserId={TargetUserId} RoleId={RoleId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
-                request.TenantId,
-                request.EventId,
-                request.TargetUserId,
-                request.RoleId,
-                request.ActorUserId,
-                authority.FailureCode ?? EventRoleAuthorityFailureCodes.AuthorityMissing);
+            observeDenial(authority.FailureCode ?? EventRoleAuthorityFailureCodes.AuthorityMissing);
             await WriteAuditAsync(
                 _auditLogRepository,
                 request.TenantId,
                 request.EventId,
                 "EventRoleAssignmentDenied",
-                request.ActorUserId,
+                actorUserId,
                 oldValues: null,
                 newValues: new
                 {
                     request.EventId,
                     request.TargetUserId,
                     request.RoleId,
-                    request.ActorUserId,
+                    ActorUserId = actorUserId,
                     Operation = "assign",
                     DecisionEngine = "application_authority_ceiling",
                     ResourceKind = ResourceKinds.Event,
                     Action = AuthorizationActions.Events.ManageTeam,
                     DenyReason = authority.FailureCode ?? EventRoleAuthorityFailureCodes.AuthorityMissing
-                });
+                }, auditId: auditId);
             return AuthorityFailure(authority);
         }
 
@@ -142,25 +170,16 @@ public sealed class AssignEventRoleCommandHandler
             request.Status,
             request.StartsAtUtc,
             request.ExpiresAtUtc,
-            request.ActorUserId);
+            actorUserId);
 
+        assignment.Id = assignmentId;
         assignment = await _assignmentRepository.Create(assignment);
-        _metrics.RecordEventRoleAssignmentChanged("assign", "allowed", RoleCodeFor(request.RoleId));
-        _logger.LogInformation(
-            "Event role assignment created TenantId={TenantId} EventId={EventId} AssignmentId={AssignmentId} TargetUserId={TargetUserId} RoleId={RoleId} ActorUserId={ActorUserId} Status={Status}",
-            assignment.TenantId,
-            assignment.EventId,
-            assignment.Id,
-            assignment.UserId,
-            assignment.RoleId,
-            request.ActorUserId,
-            assignment.Status);
         await WriteAuditAsync(
             _auditLogRepository,
             assignment.TenantId,
             assignment.Id,
             "EventRoleAssignmentCreated",
-            request.ActorUserId,
+            actorUserId,
             oldValues: null,
             newValues: new
             {
@@ -173,7 +192,7 @@ public sealed class AssignEventRoleCommandHandler
                 assignment.Version,
                 Operation = "assign"
             },
-            affectedColumns: new[] { nameof(EventRoleAssignment.Status), nameof(EventRoleAssignment.StartsAtUtc), nameof(EventRoleAssignment.ExpiresAtUtc) });
+            affectedColumns: new[] { nameof(EventRoleAssignment.Status), nameof(EventRoleAssignment.StartsAtUtc), nameof(EventRoleAssignment.ExpiresAtUtc) }, auditId: auditId);
 
         return Success(assignment.Id, "Event role assigned successfully.");
     }

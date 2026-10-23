@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Cryptography;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Services;
@@ -250,7 +251,8 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             await using var context = Database.Context();
             var fence = new PrivacyIdentityFenceOperation(Continuity.Fixture.Retained.Repository,
-                Continuity.Service(context), Clock, new UserExternalLoginRepository(context));
+                Continuity.Service(context), Clock, new UserExternalLoginRepository(context),
+                NativeIdentityRecognitionBoundary.RejectHumanSettlement);
             var login = Guid.CreateVersion7();
             await fence.ExecuteEnrollmentAsync(account, token =>
                 new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAsync(async ct =>

@@ -102,14 +102,17 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
         services.AddScoped(provider => new LocalIdentityCredentialStateStore(
             Identity(provider), provider.GetRequiredService<ExploreDbContext>(),
             provider.GetRequiredService<UserManager<LocalIdentityUser>>(), native.Clock,
+            NativeIdentityRecognitionBoundary.For(provider.GetRequiredService<ExploreDbContext>(), native.Clock),
             executionLease: provider.GetRequiredService<LocalIdentityExecutionLease>()));
         services.AddScoped<ILocalIdentityLifecycleStore>(provider => new LocalIdentityLifecycleStore(
             Identity(provider), provider.GetRequiredService<ExploreDbContext>(),
             provider.GetRequiredService<UserManager<LocalIdentityUser>>(), native.Clock,
-            provider.GetRequiredService<LocalIdentityCredentialStateStore>()));
+            provider.GetRequiredService<LocalIdentityCredentialStateStore>(),
+            NativeIdentityRecognitionBoundary.For(provider.GetRequiredService<ExploreDbContext>(), native.Clock)));
         services.AddScoped<ILocalIdentityLifecycleDeliveryStore>(provider => new LocalIdentityLifecycleDeliveryStore(
             Identity(provider), provider.GetRequiredService<ExploreDbContext>(),
-            provider.GetRequiredService<LocalIdentityCredentialStateStore>(), native.Clock));
+            provider.GetRequiredService<LocalIdentityCredentialStateStore>(), native.Clock,
+            NativeIdentityRecognitionBoundary.For(provider.GetRequiredService<ExploreDbContext>(), native.Clock)));
         return services.BuildIsolatedServiceProvider(validateScopes: true);
 
         DbContext Identity(IServiceProvider provider) => topology == IdentityDatabaseTopology.External

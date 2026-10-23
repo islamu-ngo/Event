@@ -1,16 +1,20 @@
 using System.Runtime.CompilerServices;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Moderation;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Services;
 using Explore.Application.Services.Moderation;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
+using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.Data.Sqlite;
+using Npgsql;
 
 namespace Event.Persistence.IntegrationTests.Fixtures;
 
@@ -28,7 +32,7 @@ internal static class NativeIdentityRecognitionBoundary
             await authorityContext.Database.EnsureCreatedAsync(token);
         var authority = new EmbeddedPrivacyErasureAuthorityRepository(new AuthorityFactory(options), clock,
             Options.Create(new PrivacyErasureOptions()), applicationContext: context);
-        Boundaries.Add(context, Create(context, authority, clock));
+        Boundaries.Add(context, Create(context, authority, clock, RejectHumanSettlement));
     }
 
     internal static async Task InitializeColocatedSchemaAsync(ExploreDbContext context, CancellationToken token)
@@ -39,6 +43,7 @@ internal static class NativeIdentityRecognitionBoundary
         await authority.Database.ExecuteSqlRawAsync(authority.Database.GenerateCreateScript(), token);
     }
 
+    // Ordinary Local lifecycle/bootstrap paths never enter settled-human enrollment; cache no scoped execution lease.
     internal static PrivacyIdentityFenceOperation For(ExploreDbContext context, TimeProvider clock) =>
         Boundaries.GetValue(context, primary =>
         {
@@ -46,11 +51,12 @@ internal static class NativeIdentityRecognitionBoundary
                 .UseSqlite(primary.Database.GetConnectionString()!).UseSnakeCaseNamingConvention().Options);
             var authority = new EmbeddedPrivacyErasureAuthorityRepository(factory, clock,
                 Options.Create(new PrivacyErasureOptions()), applicationContext: primary);
-            return Create(primary, authority, clock);
+            return Create(primary, authority, clock, RejectHumanSettlement);
         });
 
     internal static PrivacyIdentityFenceOperation Create(ExploreDbContext context,
-        IPrivacyIdentityFenceAuthority authority, TimeProvider clock)
+        IPrivacyIdentityFenceAuthority authority, TimeProvider clock,
+        Func<IHumanActionCommitFinalizer> commitFinalizer)
     {
         var repository = new ModerationRecognitionErasureRepository(context, new UnconfiguredKeys(), clock,
             authority, (IPrivacyErasureAuthority)authority,
@@ -58,7 +64,39 @@ internal static class NativeIdentityRecognitionBoundary
                 new ModerationRecognitionKeyLifecycleReplicaOwner(), clock));
         return new(authority, new ModerationRecognitionContinuity(repository,
             new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context))), clock,
-            new UserExternalLoginRepository(context));
+            new UserExternalLoginRepository(context), commitFinalizer);
+    }
+
+    // These fixtures enter ExecuteEnrollmentAsync/ExecuteIdentityMutationAsync, never ExecuteSettledEnrollmentAsync.
+    internal static IHumanActionCommitFinalizer RejectHumanSettlement() =>
+        throw new InvalidOperationException("This ordinary identity fixture cannot settle human enrollment.");
+
+    internal static async Task<CoLocatedPrivacyErasureAuthorityDbContext> CreatePostgresAuthorityAsync(
+        PostgreSqlContainerFixture fixture, CancellationToken token)
+    {
+        var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
+        string schema = $"identity_fence_{Guid.CreateVersion7():N}";
+        await using (var migrations = new CoLocatedPrivacyErasureAuthorityDbContext(OptionsFor(PrimaryDatabaseRole.Migrator)))
+            await migrations.Database.MigrateAsync(token);
+        return new CoLocatedPrivacyErasureAuthorityDbContext(OptionsFor(PrimaryDatabaseRole.Runtime));
+
+        DbContextOptions<CoLocatedPrivacyErasureAuthorityDbContext> OptionsFor(PrimaryDatabaseRole role)
+        {
+            var builder = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(builder, new PrimaryDatabaseConnectionOptions
+            {
+                Role = role,
+                Provider = PrimaryDatabaseProvider.PostgreSql,
+                Host = connection.Host,
+                Port = connection.Port,
+                Database = connection.Database,
+                Username = connection.Username,
+                Password = connection.Password,
+                Schema = schema,
+                TlsMode = PrimaryDatabaseTlsMode.Disabled
+            });
+            return builder.Options;
+        }
     }
 
     private sealed class AuthorityFactory(DbContextOptions<EmbeddedPrivacyErasureAuthorityDbContext> options)

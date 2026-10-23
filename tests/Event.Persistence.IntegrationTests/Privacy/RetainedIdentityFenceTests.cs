@@ -420,7 +420,8 @@ public sealed partial class RetainedIdentityFenceTests
             }
             fixture.Authority = new(fixture.AuthorityFactory, fixture.Clock,
                 Microsoft.Extensions.Options.Options.Create(fixture.Options), applicationContext: fixture.Primary);
-            fixture.Operation = NativeIdentityRecognitionBoundary.Create(fixture.Primary, fixture.Authority, fixture.Clock);
+            fixture.Operation = NativeIdentityRecognitionBoundary.Create(fixture.Primary, fixture.Authority, fixture.Clock,
+                NativeIdentityRecognitionBoundary.RejectHumanSettlement);
             return fixture;
         }
 
@@ -449,7 +450,8 @@ public sealed partial class RetainedIdentityFenceTests
 
         public PrivacyIdentityFenceOperation CreateOperation(ExploreDbContext primary,
             DbTransactionInterceptor? interceptor = null) =>
-            NativeIdentityRecognitionBoundary.Create(primary, CreateAuthority(primary, interceptor), Clock);
+            NativeIdentityRecognitionBoundary.Create(primary, CreateAuthority(primary, interceptor), Clock,
+                NativeIdentityRecognitionBoundary.RejectHumanSettlement);
 
         public async Task<PrivacyErasureIntent> AppendFingerprintAsync(PrivacyErasureRequest request)
         {

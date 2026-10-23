@@ -1,3 +1,4 @@
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Moderation;
 using Explore.Application.Services;
@@ -56,7 +57,8 @@ public sealed partial class ModerationPolicyPublicationTests
         var settings = new RelationalSettingMutationLock(context, unit);
         var continuity = new ModerationRecognitionContinuity(scenario.Repository(context), settings);
         var fence = new PrivacyIdentityFenceOperation(scenario.Fixture.Retained.Repository,
-            continuity, scenario.Fixture.Clock, new UserExternalLoginRepository(context));
+            continuity, scenario.Fixture.Clock, new UserExternalLoginRepository(context),
+            NativeIdentityRecognitionBoundary.RejectHumanSettlement);
         string[] keys = smtp ? EmailSettingGroup.SettingKeys.ToArray() : VisitorAccessCapabilityResolver.AuthoritySettingKeys.ToArray();
 
         bool committed = await settings.ExecuteOrderedGroupsAsync([keys], outer =>
@@ -84,7 +86,8 @@ public sealed partial class ModerationPolicyPublicationTests
         await using var scenario = await ContinuityScenario.CreateAsync();
         await using var context = scenario.Fixture.Database.Context();
         var fence = new PrivacyIdentityFenceOperation(scenario.Fixture.Retained.Repository,
-            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context));
+            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context),
+            NativeIdentityRecognitionBoundary.RejectHumanSettlement);
         Guid loginId = Guid.CreateVersion7();
 
         await fence.ExecuteEnrollmentAsync(scenario.Account, token =>
@@ -124,7 +127,8 @@ public sealed partial class ModerationPolicyPublicationTests
         await using var scenario = await ContinuityScenario.CreateAsync();
         await using var context = scenario.Fixture.Database.Context();
         var fence = new PrivacyIdentityFenceOperation(scenario.Fixture.Retained.Repository,
-            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context));
+            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context),
+            NativeIdentityRecognitionBoundary.RejectHumanSettlement);
         var account = new ProviderAccountKey(AuthenticationProviderKind.Local, scenario.FreshSubject.ToString("D"));
 
         bool completed = await fence.ExecuteIdentityMutationAsync(token =>
@@ -145,7 +149,8 @@ public sealed partial class ModerationPolicyPublicationTests
         await using var scenario = await ContinuityScenario.CreateAsync(settle: false);
         await using var context = scenario.Fixture.Database.Context();
         var fence = new PrivacyIdentityFenceOperation(scenario.Fixture.Retained.Repository,
-            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context));
+            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context),
+            NativeIdentityRecognitionBoundary.RejectHumanSettlement);
         bool changed = false;
 
         await Assert.That(() => fence.ExecuteIdentityMutationAsync(token =>
@@ -167,7 +172,8 @@ public sealed partial class ModerationPolicyPublicationTests
         await using var scenario = await ContinuityScenario.CreateAsync();
         await using var context = scenario.Fixture.Database.Context();
         var fence = new PrivacyIdentityFenceOperation(scenario.Fixture.Retained.Repository,
-            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context));
+            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context),
+            NativeIdentityRecognitionBoundary.RejectHumanSettlement);
         Guid loginId = Guid.CreateVersion7();
 
         await Assert.That(() => fence.ExecuteEnrollmentAsync(scenario.Account, token =>
@@ -206,7 +212,8 @@ public sealed partial class ModerationPolicyPublicationTests
         scenario.Keys.Available = false;
         await using var context = scenario.Fixture.Database.Context();
         var fence = new PrivacyIdentityFenceOperation(scenario.Fixture.Retained.Repository,
-            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context));
+            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context),
+            NativeIdentityRecognitionBoundary.RejectHumanSettlement);
         Guid loginId = Guid.CreateVersion7();
 
         await fence.ExecuteEnrollmentAsync(scenario.Account, token =>
@@ -260,7 +267,8 @@ public sealed partial class ModerationPolicyPublicationTests
         context.ChangeTracker.Clear();
         scenario.Keys.Available = false;
         var fence = new PrivacyIdentityFenceOperation(scenario.Fixture.Retained.Repository,
-            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context));
+            scenario.Service(context), scenario.Fixture.Clock, new UserExternalLoginRepository(context),
+            NativeIdentityRecognitionBoundary.RejectHumanSettlement);
 
         bool signedIn = await fence.ExecuteEnrollmentAsync(scenario.Account, token =>
             new EfCoreUnitOfWork(context).ExecuteRecognitionEnrollmentAsync(async ct =>

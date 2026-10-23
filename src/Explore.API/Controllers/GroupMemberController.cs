@@ -112,8 +112,7 @@ public class GroupMemberController : EventControllerBase
 
         var command = new AddGroupMemberCommand
         {
-            AddGroupMemberDto = dto,
-            RequesterUserId = userId
+            AddGroupMemberDto = dto
         };
 
         var response = await _addMember.ExecuteAsync(command, cancellationToken);
@@ -139,8 +138,7 @@ public class GroupMemberController : EventControllerBase
 
         var command = new UpdateGroupMemberRoleCommand
         {
-            UpdateGroupMemberRoleDto = dto,
-            RequesterUserId = userId
+            UpdateGroupMemberRoleDto = dto
         };
 
         var response = await _updateRole.ExecuteAsync(command, cancellationToken);
@@ -166,8 +164,7 @@ public class GroupMemberController : EventControllerBase
 
         var command = new DeleteGroupMemberCommand
         {
-            MemberId = id,
-            RequesterUserId = userId
+            MemberId = id
         };
 
         var response = await _deleteMember.ExecuteAsync(command, cancellationToken);

@@ -151,7 +151,6 @@ public class EventTeamController : ControllerBase
             EventId = eventId,
             TargetUserEmail = request.UserEmail,
             RoleId = request.RoleId,
-            ActorUserId = actorUserId.Value
         }, cancellationToken);
 
         return Ok(result);
@@ -178,7 +177,6 @@ public class EventTeamController : ControllerBase
             TenantId = _tenantContext.TenantId,
             EventId = eventId,
             AssignmentId = assignmentId,
-            ActorUserId = actorUserId.Value
         }, cancellationToken);
 
         return Ok(result);

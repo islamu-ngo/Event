@@ -2,11 +2,14 @@ using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Domain;
+using Explore.Domain.Enums;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
 
@@ -38,16 +41,12 @@ public sealed partial class ModerationPolicyPublicationTests
         var reader = CurrentExportReader(database, context);
         var artifact = await reader.ReadTenantAsync(database.TenantId,
             ConfigurationManifestExportView.Overrides, CancellationToken.None);
-        var unit = new EfCoreUnitOfWork(context);
-        var manager = new ConfigurationImportSessionManager(
-            new ConfigurationImportSessionRepository(context),
-            new ConfigurationImportArtifactRepository(context, new EphemeralDataProtectionProvider()), unit, new());
-        await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
         var clock = new ImportExportOwnerClock();
-        var service = new ConfigurationImportSessionApplicationService(
-            manager, new(), reader, new TenantRepository(context), clock,
-            new ModerationConfigurationImportAdapter(database.Writer(context), unit, database.Inventory),
-            privacy.Authority(context, clock), unit);
+        var protection = new EphemeralDataProtectionProvider();
+        await using var human = ImportHuman(database, context, protection, clock);
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var service = human.Services.GetRequiredService<ConfigurationImportSessionApplicationService>();
         var created = await service.CreateTenantAsync(database.TenantId, artifact.Utf8Json, CancellationToken.None);
         var preview = await service.PreviewTenantAsync(database.TenantId, created.SessionId, created.AccessToken,
             new ConfigurationImportPreviewRequest
@@ -62,15 +61,16 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That(preview.Items.Single(item => item.SectionKey == ModerationConfigurationImportSections.Tenant)
             .Category).IsEqualTo(ConfigurationImportPreviewCategory.Unchanged);
         await Assert.That(context.TenantFilterTenantId).IsEqualTo(database.TenantId);
-        var retained = await manager.ReadArtifactForPreviewAsync(created.SessionId,
-            ConfigurationImportTarget.ForTenant(database.TenantId), created.AccessToken, Now.UtcDateTime,
-            CancellationToken.None);
+        var retained = await ReadImportSessionAsync(context, created.SessionId,
+            ConfigurationImportTarget.ForTenant(database.TenantId));
         await Assert.That(retained.ModerationReservation).IsNotNull();
-        await Assert.That(retained.Bytes.ToArray()).IsEquivalentTo(artifact.Utf8Json.ToArray());
+        var retainedBytes = await new ConfigurationImportArtifactRepository(context, protection)
+            .ReadAsync(retained.Artifact.Handle, CancellationToken.None);
+        await Assert.That(retainedBytes.ToArray()).IsEquivalentTo(artifact.Utf8Json.ToArray());
         await Assert.That(preview.Moderation).IsEmpty();
         if (expiryPhase == 6)
-            await manager.CancelAsync(created.SessionId, ConfigurationImportTarget.ForTenant(database.TenantId),
-                created.AccessToken, clock.GetUtcNow().UtcDateTime, CancellationToken.None);
+            await service.CancelTenantAsync(database.TenantId, created.SessionId,
+                created.AccessToken, CancellationToken.None);
         await using var disclosure = preview.Disclosure!;
         bool prepared = false, delivered = false, completionAttempted = false;
         async Task DiscloseAsync() => await disclosure.DiscloseAsync(async (view, _) =>
@@ -136,6 +136,42 @@ public sealed partial class ModerationPolicyPublicationTests
                 .Single(row => row.Metadata.Name == $"publication-{database.TenantId:N}").Spec.Moderation;
         await Assert.That(definition).IsNotNull();
         await database.AssertCountsAsync(1, 1, 2);
+    }
+
+    private static CurrentHumanPrincipalFixture ImportHuman(Database database, ExploreDbContext context,
+        IDataProtectionProvider protection, TimeProvider clock,
+        Action<IServiceCollection>? configureServices = null) => new(database.AdminId, database.TenantId,
+        borrowedContext: context, configureServices: services =>
+        {
+            services.AddSingleton(database.Inventory);
+            services.AddSingleton(protection);
+            configureServices?.Invoke(services);
+        }, timeProvider: clock);
+
+    private static async Task<ConfigurationImportSession> ReadImportSessionAsync(
+        ExploreDbContext context, Guid sessionId, ConfigurationImportTarget target) =>
+        await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async token =>
+            await new ConfigurationImportSessionRepository(context).GetForUpdateAsync(sessionId, target, token)
+                ?? throw new InvalidOperationException("The original import session must be retained."));
+
+    private static async Task GrantImportTenantAdministratorAsync(Database database, ExploreDbContext context)
+    {
+        var membership = await context.TenantUsers.SingleAsync(row => row.UserId == database.AdminId);
+        var role = await context.Roles.SingleAsync(row => row.Id == (int)RoleEnum.TenantAdmin);
+        context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = role.Id,
+            Role = role,
+            RoleScopeId = (int)RoleScopeEnum.Tenant,
+            GrantedAt = Now.UtcDateTime
+        });
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
     }
 
     private sealed class ImportExportOwnerClock : TimeProvider

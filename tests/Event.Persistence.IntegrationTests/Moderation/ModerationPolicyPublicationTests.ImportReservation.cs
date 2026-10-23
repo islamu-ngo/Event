@@ -7,6 +7,7 @@ using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection;
 using Explore.Domain;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
 
@@ -80,18 +81,21 @@ public sealed partial class ModerationPolicyPublicationTests
         };
         var bytes = TenantConfigurationPackageSerializer.Serialize(package);
         var now = new DateTime(2026, 10, 12, 0, 0, 0, DateTimeKind.Utc);
+        var clock = new ImportExportOwnerClock { Current = new DateTimeOffset(now) };
         var protection = new EphemeralDataProtectionProvider();
         Guid sessionId;
         string accessToken;
         await using (var context = database.Context())
         {
-            var unit = new EfCoreUnitOfWork(context);
-            var manager = new ConfigurationImportSessionManager(new ConfigurationImportSessionRepository(context),
-                new ConfigurationImportArtifactRepository(context, protection), unit, new());
-            var created = await manager.CreateAsync(target, bytes, now, TimeSpan.FromMinutes(30), CancellationToken.None);
-            sessionId = created.Session.SessionId;
+            await SeedExportPaidPolicyAsync(context);
+            await GrantImportTenantAdministratorAsync(database, context);
+            await using var human = ImportHuman(database, context, protection, clock);
+            await human.InitializeAsync();
+            await human.PrepareAsync();
+            var service = human.Services.GetRequiredService<ConfigurationImportSessionApplicationService>();
+            var created = await service.CreateTenantAsync(database.TenantId, bytes, CancellationToken.None);
+            sessionId = created.SessionId;
             accessToken = created.AccessToken;
-            var stored = await manager.ReadArtifactForPreviewAsync(sessionId, target, accessToken, now, CancellationToken.None);
             var request = new ConfigurationImportPreviewRequest
             {
                 SelectedSectionKeys = [ModerationConfigurationImportSections.Tenant],
@@ -99,26 +103,22 @@ public sealed partial class ModerationPolicyPublicationTests
                 ApplyMode = ConfigurationImportApplyMode.PreviewOnly,
                 GrantedApprovalCodes = []
             };
-            var preview = await new ModerationConfigurationImportAdapter(database.Writer(context), unit, database.Inventory)
-                .PreviewSetAsync(target, stored.Bytes, request, stored.ModerationReservation, CancellationToken.None);
-            var source = ConfigurationImportArtifactSnapshotFactory.FromTenantPackage(new ConfigurationImportArtifactParser()
-                .ParseTenantPackage(stored.Bytes).Package);
-            var input = new ConfigurationImportPreviewInput(target, stored.Digest,
-                ConfigurationImportDigest.Compute([]), source, [], [ModerationConfigurationImportSections.Tenant],
-                [], ConfigurationImportApplyMode.PreviewOnly, [], [], stored.ExpiresAt, preview);
-            var result = await manager.PreparePreviewAsync(sessionId, target, accessToken, input, now, CancellationToken.None);
+            var result = await service.PreviewTenantAsync(database.TenantId, sessionId, accessToken,
+                request, CancellationToken.None);
+            var stored = await ReadImportSessionAsync(context, sessionId, target);
+            var preview = await human.Services.GetRequiredService<ModerationConfigurationImportAdapter>()
+                .PreviewSetAsync(target, bytes, request, stored.ModerationReservation, CancellationToken.None);
             await Assert.That(result.IsApplyReady).IsTrue();
-            await Assert.That(result.Binding.ModerationReservationDigest).IsEqualTo(preview.Reservation.Digest);
+            await Assert.That(stored.PreviewBinding!.ModerationReservationDigest).IsEqualTo(preview.Reservation.Digest);
         }
         await using var reader = database.Context();
         var restored = await new EfCoreUnitOfWork(reader).ExecuteSerializableAsync(token =>
             new ConfigurationImportSessionRepository(reader).GetForUpdateAsync(sessionId, target, token));
         await Assert.That(restored!.ModerationReservation).IsNotNull();
         await Assert.That(restored.PreviewApplyMode).IsEqualTo(ConfigurationImportApplyMode.PreviewOnly);
-        var readManager = new ConfigurationImportSessionManager(new ConfigurationImportSessionRepository(reader),
-            new ConfigurationImportArtifactRepository(reader, protection), new EfCoreUnitOfWork(reader), new());
-        var retained = await readManager.ReadArtifactForPreviewAsync(sessionId, target, accessToken, now, CancellationToken.None);
-        await Assert.That(retained.Bytes.ToArray()).IsEquivalentTo(bytes.ToArray());
+        var retained = await new ConfigurationImportArtifactRepository(reader, protection)
+            .ReadAsync(restored.Artifact.Handle, CancellationToken.None);
+        await Assert.That(retained.ToArray()).IsEquivalentTo(bytes.ToArray());
         await database.AssertCountsAsync(0, 0, 1);
     }
 

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Data;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Handlers.Queries;
@@ -12,10 +13,13 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using ISLAMU.Moderation.Domain;
 using ISLAMU.Moderation.Domain.Policies;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
 
@@ -294,13 +298,59 @@ public sealed partial class ModerationPolicyPublicationTests
     private static ConfigurationManifestCurrentStateReader CurrentExportReader(
         Database database, ExploreDbContext context)
     {
+        var moderation = Exporter(database, context);
+        return CurrentExportReader(context, moderation, new ExportTenantReadScopes(context, moderation));
+    }
+
+    private static ConfigurationManifestCurrentStateReader CurrentExportReader(ExploreDbContext context,
+        ModerationConfigurationExportService moderation, IConfigurationManifestTenantReadScopeFactory tenantReadScopes)
+    {
         var unit = new EfCoreUnitOfWork(context);
         var mutation = new RelationalSettingMutationLock(context, unit);
         // Overrides must read native stored values, not invoke either effective-value resolver.
-        return new(new TenantRepository(context), new SystemSettingRepository(context, mutation),
-            new TenantSettingRepository(context, mutation), new TenantSettingsDocumentRepository(context),
+        return new(new TenantRepository(context), SystemSettingRepository.CreateReadOnly(context, mutation),
+            TenantSettingRepository.CreateReadOnly(context, mutation), new TenantSettingsDocumentRepository(context),
             null!, null!, new PaidEventPolicyRepository(context), new ConfigurationManifestOperationRepository(context),
-            Exporter(database, context), new LegalDocumentRepository(context), unit);
+            moderation, new LegalDocumentRepository(context), unit, tenantReadScopes,
+            new ConfigurationImportLegalSourceReader(context));
+    }
+
+    private sealed class ExportTenantReadScopes(ExploreDbContext owner, ModerationConfigurationExportService moderation)
+        : IConfigurationManifestTenantReadScopeFactory
+    {
+        public ValueTask<IConfigurationManifestTenantReadScope> CreateAsync(Guid tenantId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ArgumentOutOfRangeException.ThrowIfEqual(tenantId, Guid.Empty);
+            var options = new DbContextOptionsBuilder<ExploreDbContext>(
+                (DbContextOptions<ExploreDbContext>)owner.GetService<IDbContextOptions>())
+                .UseSqlite(owner.Database.GetDbConnection().ConnectionString).Options;
+            var context = new ExploreDbContext(options) { TenantContext = new ExportTenantContext(tenantId) };
+            try
+            {
+                context.BindTenantLease();
+                var services = new ServiceCollection()
+                    .AddSingleton(CurrentExportReader(context, moderation, this)).BuildServiceProvider();
+                return ValueTask.FromResult<IConfigurationManifestTenantReadScope>(new ExportTenantReadScope(context, services));
+            }
+            catch
+            {
+                context.Dispose();
+                throw;
+            }
+        }
+    }
+
+    private sealed class ExportTenantReadScope(ExploreDbContext context, ServiceProvider services)
+        : IConfigurationManifestTenantReadScope
+    {
+        public IServiceProvider Services => services;
+        public async ValueTask DisposeAsync()
+        {
+            await services.DisposeAsync();
+            await context.DisposeAsync();
+        }
     }
 
     private static async Task SeedExportPaidPolicyAsync(ExploreDbContext context)

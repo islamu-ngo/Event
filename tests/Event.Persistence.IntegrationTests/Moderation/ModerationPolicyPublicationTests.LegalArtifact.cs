@@ -1,10 +1,13 @@
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.ConfigurationManifest.Importing;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
 
@@ -76,10 +79,13 @@ public sealed partial class ModerationPolicyPublicationTests
             .Single(section => section.SectionKey == "tenant.legal_documents");
         await Assert.That(preview.BlockingReasonCode)
             .IsEqualTo("configuration_import_legal_metadata_not_supported");
-        var repository = new LegalDocumentRepository(context);
-        var applier = new ConfigurationImportSectionApplier(
-            null!, null!, null!, null!, null!, null!, null!, new TenantRepository(context),
-            new TenantSettingsDocumentRepository(context), repository);
+        await using var human = ImportHuman(database, context, new EphemeralDataProtectionProvider(),
+            new ImportExportOwnerClock());
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var applier = human.Services.GetRequiredService<ConfigurationImportSectionApplier>();
+        var subject = human.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject
+            ?? throw new InvalidOperationException("Legal import requires the authenticated original human.");
         var tenant = await context.Tenants.SingleAsync(row => row.Id == database.TenantId);
         var originalName = tenant.FullName;
         async Task Apply() => await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async token =>
@@ -93,7 +99,7 @@ public sealed partial class ModerationPolicyPublicationTests
                     Mappings = new Dictionary<string, string>(),
                     ApplyMode = ConfigurationImportApplyMode.ApplySelected,
                     GrantedApprovalCodes = []
-                }, database.AdminId, Now.UtcDateTime, ConfigurationImportDigest.ComputeBytes(bytes), new(), token, []);
+                }, subject, database.AdminId, Now.UtcDateTime, ConfigurationImportDigest.ComputeBytes(bytes), new(), token);
         });
         await Assert.That(Apply).Throws<ConfigurationImportSessionException>();
         await using var actual = database.Context();
@@ -143,10 +149,13 @@ public sealed partial class ModerationPolicyPublicationTests
         };
         var bytes = ConfigurationPortabilityJsonCodec.SerializeTenantConfigurationPackage(package);
         var repository = new LegalDocumentRepository(context);
-        var applier = new ConfigurationImportSectionApplier(
-            null!, null!, null!, null!, null!, null!, null!, new TenantRepository(context),
-            new TenantSettingsDocumentRepository(context), repository);
-        var owned = new List<LegalDocument>();
+        await using var human = ImportHuman(database, context, new EphemeralDataProtectionProvider(),
+            new ImportExportOwnerClock());
+        await human.InitializeAsync();
+        await human.PrepareAsync();
+        var applier = human.Services.GetRequiredService<ConfigurationImportSectionApplier>();
+        var subject = human.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject
+            ?? throw new InvalidOperationException("Legal import requires the authenticated original human.");
         await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async token =>
         {
             var original = repository.CaptureConfigurationImportTransaction();
@@ -157,10 +166,8 @@ public sealed partial class ModerationPolicyPublicationTests
                     Mappings = new Dictionary<string, string>(),
                     ApplyMode = ConfigurationImportApplyMode.ApplySelected,
                     GrantedApprovalCodes = []
-                }, database.AdminId, Now.UtcDateTime, ConfigurationImportDigest.ComputeBytes(bytes),
-                new(), token, owned);
-            await repository.FlushConfigurationImportInCurrentTransactionAsync(original,
-                ConfigurationImportTarget.ForTenant(database.TenantId), [], owned, token);
+                }, subject, database.AdminId, Now.UtcDateTime, ConfigurationImportDigest.ComputeBytes(bytes),
+                new(), token);
             await Assert.That(repository.CaptureConfigurationImportTransaction()).IsEqualTo(original);
             var actual = await reader.ReadTenantInCurrentTransactionAsync(database.TenantId,
                 ConfigurationManifestExportView.Overrides, token);
@@ -177,7 +184,9 @@ public sealed partial class ModerationPolicyPublicationTests
             var actualSection = ConfigurationImportArtifactSnapshotFactory.FromTenantPackage(restored)
                 .Single(section => section.SectionKey == "tenant.legal_documents");
             await Assert.That(actualSection.NormalizedDigest).IsEqualTo(expectedSection.NormalizedDigest);
-            await Assert.That(owned.Single().State).IsEqualTo(LegalDocumentLifecycleState.ReviewRequired);
+            var owned = await repository.GetForUpdateAsync(LegalDocumentScope.Tenant, database.TenantId,
+                LegalDocumentKind.TenantTerms, token);
+            await Assert.That(owned!.State).IsEqualTo(LegalDocumentLifecycleState.ReviewRequired);
             return actual.Utf8Json;
         });
     }

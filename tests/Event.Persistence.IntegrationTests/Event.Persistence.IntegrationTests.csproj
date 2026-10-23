@@ -4,6 +4,7 @@
        privacy-instrumented services, so no lane invents its own meter root. -->
   <ItemGroup>
     <Compile Include="..\Shared\Telemetry\EventLocationPrivacyMetricsFactory.cs" Link="Telemetry\EventLocationPrivacyMetricsFactory.cs" />
+    <Compile Include="..\Shared\Moderation\ModerationMeasurementJournalAttribute.cs" Link="Moderation\ModerationMeasurementJournalAttribute.cs" />
   </ItemGroup>
 
   <ItemGroup>

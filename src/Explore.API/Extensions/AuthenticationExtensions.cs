@@ -36,6 +36,7 @@ public static class AuthenticationExtensions
         bool skipAuthorityWarmup = false)
     {
         services.AddScoped<IConfiguredApiKeyResourceAuthorityReader, ConfiguredApiKeyResourceAuthorityReader>();
+        ModerationEmbeddedConsumerRuntimeSource.AddSources(services);
         // Dynamic JWT authority: Authority / MetadataAddress / ValidIssuer are applied
         // by DynamicJwtBearerPostConfigureOptions from env + DB (IAuthProviderConfigurationService).
         // Handlers call IJwtAuthorityRefreshNotifier.ReloadAsync() after onboarding/save-config
@@ -304,6 +305,9 @@ public static class AuthenticationExtensions
                 _ => { })
             .AddScheme<AuthenticationSchemeOptions, PrivacyErasureReceiptAuthenticationHandler>(
                 ApiAuthenticationSchemeNames.PrivacyErasureReceipt,
+                _ => { })
+            .AddScheme<AuthenticationSchemeOptions, ModerationRecognitionCorrectionReceiptAuthenticationHandler>(
+                ModerationRecognitionCorrectionReceiptAuthenticationHandler.SchemeName,
                 _ => { })
             .AddScheme<AuthenticationSchemeOptions, AdmissionScannerAuthenticationHandler>(
                 ApiAuthenticationSchemeNames.AdmissionScanner,

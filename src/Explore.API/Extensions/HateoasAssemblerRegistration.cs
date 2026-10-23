@@ -6,8 +6,12 @@ using Explore.API.Hateoas.Policies;
 using Explore.API.Hateoas.Resources;
 using Explore.Application.Contracts.Hateoas;  // For ILinkPolicy, ICollectionLinkPolicy
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Events.Discovery;
+using Explore.Application.Features.Moderation.RecognitionRecovery;
+using Explore.Application.Features.Moderation.Notices;
+using Explore.Application.Features.Moderation.Requests.Queries;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.DTOs.Admissions;
@@ -83,6 +87,13 @@ public static class HateoasAssemblerRegistration
     /// </summary>
     public static IServiceCollection AddHateoasAssemblers(this IServiceCollection services)
     {
+        services.AddHalResource<RecognitionRecoveryEscalationDto, RecognitionRecoveryEscalationDetailLinkPolicy, RecognitionRecoveryEscalationCollectionLinkPolicy>();
+        services.AddHalResource<RecognitionRecoveryContextDto, RecognitionRecoveryContextDetailLinkPolicy, RecognitionRecoveryContextCollectionLinkPolicy>();
+        services.AddHalResource<RecognitionCorrectionProofDto, RecognitionCorrectionProofDetailLinkPolicy, RecognitionCorrectionProofCollectionLinkPolicy>();
+        services.AddHalResource<ModerationNoticeDto, ModerationNoticeDetailLinkPolicy, ModerationNoticeCollectionLinkPolicy>();
+        services.AddHalResource<ModerationNoticeStatusDto, ModerationNoticeStatusDetailLinkPolicy, ModerationNoticeStatusCollectionLinkPolicy>();
+        services.AddHalResource<ModerationContentResponseAvailability, ModerationContentResponseDetailLinkPolicy, ModerationContentResponseCollectionLinkPolicy>();
+        services.AddHalResource<ModerationContentResponseSummary, ModerationContentResponseSummaryDetailLinkPolicy, ModerationContentResponseSummaryCollectionLinkPolicy>();
         // Organization
         services.AddHalResourceWithAssembler<OrganizationDto, OrganizationListDto, OrganizationDetailLinkPolicy, OrganizationCollectionLinkPolicy, OrganizationResourceAssembler>();
         services.AddHalResource<OrganizationTenantEvidenceDto, OrganizationTenantEvidenceDetailLinkPolicy, OrganizationTenantEvidenceCollectionLinkPolicy>();
@@ -252,6 +263,12 @@ public static class HateoasAssemblerRegistration
         services.AddHalResource<TenantOnboardingStatusDto, TenantOnboardingStatusLinkPolicy, TenantOnboardingStatusCollectionLinkPolicy>();
         services.AddHalResource<InstanceOperatorIdentityDocumentDto, InstanceOperatorIdentityLinkPolicy, InstanceOperatorIdentityCollectionLinkPolicy>();
         services.AddHalResource<OperatorIdentityFormOptionsDto, OperatorIdentityFormOptionsLinkPolicy, OperatorIdentityFormOptionsCollectionLinkPolicy>();
+        services.AddHalResource<ModerationReferenceCatalogueView, ModerationReferenceCatalogueLinkPolicy, ModerationReferenceCatalogueCollectionLinkPolicy>();
+        services.AddHalResource<ModerationCurrentPolicyView, ModerationCurrentPolicyLinkPolicy, ModerationCurrentPolicyCollectionLinkPolicy>();
+        services.AddHalResource<ModerationClassificationMaterialInventoryView, ModerationClassificationMaterialInventoryLinkPolicy,
+            ModerationClassificationMaterialInventoryCollectionLinkPolicy>();
+        services.AddHalResource<ModerationClassificationMaterialReviewView, ModerationClassificationMaterialReviewLinkPolicy,
+            ModerationClassificationMaterialReviewCollectionLinkPolicy>();
 
         // Storage administration
         services.AddHalResourceWithAssembler<InstanceStorageSettingsDto, InstanceStorageSettingsLinkPolicy, InstanceStorageSettingsCollectionLinkPolicy, InstanceStorageSettingsResourceAssembler>();

@@ -1,3 +1,4 @@
+using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using ISLAMU.Moderation.Domain;
 
@@ -42,6 +43,52 @@ public sealed record OpenModerationCaseSource : ModerationQualificationMutation
     public required ModerationSubjectKind SubjectKind { get; init; }
     public required Guid SubjectId { get; init; }
     public required Guid OccurrenceId { get; init; }
+}
+
+/// <summary>Prepares measurements against native artifacts; contains no results or passing assertion.</summary>
+public sealed record PrepareModerationConsumerMeasurementSource : ModerationQualificationMutation
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ModerationOriginalEffectAnchor? OriginalEffect { get; init; }
+    public required Guid ChallengeId { get; init; }
+    public required Guid InstallationId { get; init; }
+    public required long ExpectedInstallationRevision { get; init; }
+    public required string ConsumerId { get; init; }
+    public required ModerationActivationBinding Binding { get; init; }
+    public required string ExpectedRuntimeGeneration { get; init; }
+    public required string ExpectedInventoryFingerprint { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
+}
+
+/// <summary>Retains an independently authenticated assertion without declaring conformance or permission.</summary>
+public sealed record AcceptModerationConsumerMeasurementSource : ModerationQualificationMutation
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ModerationOriginalEffectAnchor? OriginalEffect { get; init; }
+    public required Guid ReceiptId { get; init; }
+    public required Guid ChallengeId { get; init; }
+    public required Guid IssuerEnrollmentId { get; init; }
+    public required ModerationActivationBinding Binding { get; init; }
+    public required string SignedToken { get; init; }
+}
+
+/// <summary>Accountable deployment approval of public signer trust, never a conformance assertion.</summary>
+public sealed record EnrollModerationMeasurementIssuerSource : ModerationQualificationMutation
+{
+    public required Guid EnrollmentId { get; init; }
+    public required Guid KeyId { get; init; }
+    public required string Issuer { get; init; }
+    public required string PublicKeySpkiBase64 { get; init; }
+    public required string RunnerDigest { get; init; }
+    public required string CatalogueDigest { get; init; }
+    public required string TestBundleDigest { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
+}
+
+public sealed record RevokeModerationMeasurementIssuerSource : ModerationQualificationMutation
+{
+    public required Guid EnrollmentId { get; init; }
+    public required long ExpectedEnrollmentRevision { get; init; }
 }
 
 public sealed record RecordModerationCaseResponse : ModerationQualificationMutation
@@ -102,6 +149,7 @@ public sealed record FinalizeModerationFindingSource : ModerationQualificationMu
     public required Guid PolicyId { get; init; }
     public required long ExpectedPolicyRevision { get; init; }
     public required ModerationRuleReference Rule { get; init; }
+    public required ModerationRuleReference Reason { get; init; }
     public required Guid EvidenceId { get; init; }
     public required string Justification { get; init; }
 }
@@ -114,26 +162,157 @@ public sealed record ReverseModerationFindingSource : ModerationQualificationMut
     public required string Justification { get; init; }
 }
 
-/// <summary>Authorable meaning only. Native current effect evidence cannot be imported through this contract.</summary>
-public sealed record ModerationPolicyRuleDraft
+public sealed record PublishModerationQualificationPolicySource : ModerationQualificationMutation
 {
-    public required Guid Id { get; init; }
-    public required string Code { get; init; }
-    public required long Revision { get; init; }
-    public required string Meaning { get; init; }
-    public required IReadOnlyList<ModerationPolicyOperationPurpose> Purposes { get; init; }
-    public required IReadOnlyList<ModerationCapability> Capabilities { get; init; }
-    public required TimeSpan MaximumFiniteDuration { get; init; }
-    public required bool AllowsIndefinite { get; init; }
-    public required TimeSpan MaximumReviewDelay { get; init; }
-    public required int MinimumApprovals { get; init; }
-    public required int MaximumApprovals { get; init; }
+    public required Guid SourceId { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+    /// <summary>Zero creates the stable source; a positive revision replaces its current terms.</summary>
+    public required long ExpectedSourceRevision { get; init; }
+    public required TimeSpan MaximumReviewerLifetime { get; init; }
+    public required TimeSpan MaximumUrgencyLifetime { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
 }
 
-public sealed record AdoptModerationPolicySource : ModerationQualificationMutation
+public sealed record AdoptModerationQualificationPolicySource : ModerationQualificationMutation
 {
+    public required Guid SourceId { get; init; }
+    public required long ExpectedSourceRevision { get; init; }
+    public required long ExpectedWriterGeneration { get; init; }
+    public required Guid AdoptionId { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
+}
+
+public sealed record RevokeModerationQualificationPolicyAdoption : ModerationQualificationMutation
+{
+    public required Guid SourceId { get; init; }
+    public required long ExpectedSourceRevision { get; init; }
+    public required Guid AdoptionId { get; init; }
+    public required long ExpectedAdoptionRevision { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+}
+
+public sealed record ApproveModerationNoticeDisclosureSource : ModerationQualificationMutation
+{
+    public required ModerationNoticeDisclosureIntent Intent { get; init; }
+}
+
+public sealed record RevokeModerationNoticeDisclosureSource : ModerationQualificationMutation
+{
+    public required Guid ApprovalId { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+    public required long ExpectedApprovalRevision { get; init; }
+}
+
+/// <summary>Captures real fenced event ancestry; observation is not target adoption.</summary>
+public sealed record RecordModerationEventGenerationSource : ModerationQualificationMutation
+{
+    public required Guid SourceId { get; init; }
+    public required Guid EventId { get; init; }
+    public required long ExpectedEventRevision { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
+}
+
+/// <summary>Captures real fenced resource ancestry; observation is not target adoption.</summary>
+public sealed record RecordModerationResourceGenerationSource : ModerationQualificationMutation
+{
+    public required Guid SourceId { get; init; }
+    public required Guid ResourceId { get; init; }
+    public required long ExpectedResourceRevision { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
+}
+
+public sealed record AdoptModerationResourceTargetSource : ModerationQualificationMutation
+{
+    public required Guid AdoptionId { get; init; }
+    public required Guid SelectionId { get; init; }
+    public required int BindingOrdinal { get; init; }
+    public required Guid GenerationId { get; init; }
+    public required long ExpectedGenerationRevision { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
+}
+
+public sealed record InstallModerationConsumerSource : ModerationQualificationMutation
+{
+    public required Guid InstallationId { get; init; }
+    public required string ConsumerId { get; init; }
+    public required ModerationNativeMode Mode { get; init; }
+    public required string ExpectedRuntimeGeneration { get; init; }
+    public required string ExpectedInventoryFingerprint { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
+}
+
+public sealed record WithdrawModerationConsumerSource : ModerationQualificationMutation
+{
+    public required Guid InstallationId { get; init; }
+    public required long ExpectedInstallationRevision { get; init; }
+}
+
+public sealed record AdoptModerationProfileSource : ModerationQualificationMutation
+{
+    public required Guid AdoptionId { get; init; }
+    public required Guid SelectionId { get; init; }
+    public required ModerationNativeMode Mode { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
+}
+
+public sealed record RevokeModerationProfileSource : ModerationQualificationMutation
+{
+    public required Guid AdoptionId { get; init; }
+    public required long ExpectedAdoptionRevision { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+}
+
+public sealed record AdoptModerationEventTargetSource : ModerationQualificationMutation
+{
+    public required Guid AdoptionId { get; init; }
+    public required Guid SelectionId { get; init; }
+    public required int BindingOrdinal { get; init; }
+    public required Guid GenerationId { get; init; }
+    public required long ExpectedGenerationRevision { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
+}
+
+public sealed record RevokeModerationEventTargetSource : ModerationQualificationMutation
+{
+    public required Guid AdoptionId { get; init; }
+    public required long ExpectedAdoptionRevision { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+}
+
+public sealed record RevokeModerationResourceTargetSource : ModerationQualificationMutation
+{
+    public required Guid AdoptionId { get; init; }
+    public required long ExpectedAdoptionRevision { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+}
+
+/// <summary>Persists a complete draft selection; native target approval is a separate operation.</summary>
+public sealed record RecordModerationContributionSelectionSource : ModerationQualificationMutation
+{
+    public required Guid SelectionId { get; init; }
+    public required Guid EffectId { get; init; }
+    public required Guid CaseId { get; init; }
+    public required long ExpectedCaseRevision { get; init; }
+    public required Guid DecisionId { get; init; }
+    public required long ExpectedDecisionRevision { get; init; }
     public required Guid PolicyId { get; init; }
     public required long ExpectedPolicyRevision { get; init; }
     public required Guid PublicationId { get; init; }
-    public required IReadOnlyList<ModerationPolicyRuleDraft> Rules { get; init; }
+    public required Guid ProfileId { get; init; }
+    public required Explore.Application.Features.Moderation.Policy.ModerationPolicyContribution Contribution { get; init; }
+    public required DateTimeOffset ValidUntil { get; init; }
 }

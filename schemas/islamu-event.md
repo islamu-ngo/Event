@@ -6,11 +6,13 @@ Project islamu_event {
   Note: 'ISLAMU Event multi-tenant platform with ATProto federation and modular event composition. This is the logical unprefixed model: PostgreSQL and SQL Server place these names in the configured schema; SQLite, MariaDB, and MySQL materialize them with the fixed ie_ prefix.'
 }
 
-// Generated application lifecycle heads (2026-08-29):
-// PostgreSQL 20260829001843, SQLite 20260829002111,
-// SQL Server 20260829002119, MariaDB 20260829002127,
-// MySQL 20260829002134. Physical identifier shortening is provider-owned;
-// this DBML remains the logical unprefixed model.
+// Generated application source heads (2026-10-22; not applied or runtime-certified):
+// PostgreSQL 20261022194142, SQLite 20261022194303,
+// SQL Server 20261022194317 (after 20261020181307), MySQL 20261022194338.
+// MariaDB shares the MySQL migration assembly. The SQL Server corrective Down has
+// an unresolved case-evidence FK predecessor discrepancy; it is not an approved rollback.
+// Physical identifier shortening is provider-owned; this logical unprefixed reference
+// does not assert complete generated-model parity.
 
 // ============================================================
 // Lookup / Reference Tables (int PK, ValueGeneratedNever)
@@ -72,6 +74,35 @@ Table "moderation_cases" {
     (scope_trust_domain_id, subject_kind, subject_id, scope_tenant_id)
   }
   Note: 'Qualified allegation only; open/closed state and positive application-managed revision. Native checks reject partial ancestry and mismatched subject/scope trust domains. A case is not a restriction or accepted finding.'
+}
+
+Table "moderation_adjudicated_case_read_grants" {
+  "id" uuid [pk, not null]
+  "host_binding_id" uuid [not null, ref: > moderation_host_bindings.id]
+  "trust_domain_id" uuid [not null]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "case_id" uuid [not null, ref: > moderation_cases.id]
+  "case_revision" bigint [not null]
+  "recipient_user_id" uuid [not null]
+  "issuer_user_id" uuid [not null]
+  "issuer_role_grant_id" uuid [not null]
+  "issuer_platform_grant" boolean [not null]
+  "original_effect_id" uuid [not null, ref: > moderation_effect_intents.id]
+  "original_snapshot_hash" varchar(64) [not null]
+  "original_effect_binding_hash" varchar(64) [not null]
+  "original_retain_until" bigint [not null]
+  "issued_at" bigint [not null]
+  "expires_at" bigint [not null]
+  "revision" bigint [not null]
+  "revoked_at" bigint
+  "revocation_operation_id" uuid
+  "revoked_by_user_id" uuid
+  "revoked_by_role_grant_id" uuid
+  "revoked_by_platform_grant" boolean
+  indexes {
+    (trust_domain_id, tenant_id, case_id, recipient_user_id)
+  }
+  Note: 'Separate finite, revocable named-Human adjudicated-case permission; not an allegation receipt, case body or notice-delivery grant. The four relationships are Restrict. Case revision is a checked value, not a mutable FK principal. Time columns store UTC ticks: original retention preserves full precision; newly issued expiry/revocation instants are microsecond-aligned. Checks require issued < expires <= original retention and either revision 1 with all revocation fields null or revision 2 with complete accountable revocation fields. Hashes use provider-owned ordinal ASCII collation. Current issuer-role, recipient/privacy, custody tenant and authenticated original-effect authority are independently requalified by the native owner. Original-purpose cleanup and exact-saga erasure dispose permission metadata; generated source is not provider execution proof.'
 }
 
 Table "moderation_findings" {
@@ -247,6 +278,129 @@ Table "moderation_qualification_mutation_receipts" {
     tenant_id
   }
   Note: 'Exact retained native source mutation outcome, committed atomically with source change and qualification advancement. Current-authority replay binds digest, principal, host, tenant, source coordinates and accepted revisions; no private statement or reusable grant is retained here.'
+}
+
+Table "moderation_consumer_installations" {
+  "id" uuid [pk, not null]
+  "host_binding_id" uuid [not null, ref: > moderation_host_bindings.id]
+  "trust_domain_id" uuid [not null]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "consumer_id" varchar(64) [not null]
+  "mode_code" int [not null]
+  "runtime_generation" varchar(64) [not null]
+  "inventory_fingerprint" varchar(64) [not null]
+  "installed_by_human_id" uuid [not null, ref: > users.id]
+  "writer_generation" bigint [not null]
+  "revision" bigint [not null]
+  "installed_at" timestamptz [not null]
+  "valid_until" timestamptz [not null]
+  "withdrawn_by_human_id" uuid [ref: > users.id]
+  "withdrawn_at" timestamptz
+  indexes {
+    (host_binding_id, tenant_id, consumer_id, mode_code, writer_generation) [unique]
+  }
+  Note: 'Finite Embedded consumer artifact identity, not measured conformance. Native writer requires a canonical bounded consumer ID present in the exact current inventory and independently observed runtime; database owner checks reject empty IDs and non-Embedded modes. Original artifacts and accepted writer epoch are immutable; accountable terminal withdrawal advances revision 1 to 2. Latest-source lookup never falls back to an older installation. Original kind-15 receipt, native runtime and current installer authority must independently match. Provider migration regeneration/application remains part of final programme assurance.'
+}
+
+Table "moderation_consumer_measurement_challenges" {
+  "id" uuid [pk, not null]
+  "host_binding_id" uuid [not null, ref: > moderation_host_bindings.id]
+  "trust_domain_id" uuid [not null]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "installation_id" uuid [not null, ref: > moderation_consumer_installations.id]
+  "installation_revision" bigint [not null]
+  "installation_writer_generation" bigint [not null]
+  "consumer_id" varchar(64) [not null]
+  "mode_code" int [not null]
+  "runtime_generation" varchar(64) [not null]
+  "inventory_fingerprint" varchar(64) [not null]
+  "publication_id" uuid [not null]
+  "definition_id" uuid [not null, ref: > moderation_policy_publications.id]
+  "binding_digest" varchar(64) [not null]
+  "consumer_contract_digest" varchar(64) [not null]
+  "nonce" varchar(64) [not null, unique]
+  "prepared_by_human_id" uuid [not null, ref: > users.id]
+  "writer_generation" bigint [not null]
+  "revision" bigint [not null]
+  "prepared_at" timestamptz [not null]
+  "valid_until" timestamptz [not null]
+  "original_effect_id" uuid [ref: > moderation_effect_intents.id]
+  "original_snapshot_hash" varchar(64)
+  "original_effect_binding_hash" varchar(64)
+  Note: 'Immutable current-generation testing challenge, never a completed measurement or activation grant. Preparation binds the exact required publication/contract, latest live native artifacts, original kind-15 source receipt and finite installation deadline. Kind-16 preparation receipt and epoch advancement are atomic; exact retries preserve the original 256-bit nonce. Provider schema regeneration/application remains final programme assurance.'
+}
+
+Table "moderation_policy_publication_candidates" {
+  "id" uuid [pk, not null]
+  "definition_id" uuid [not null, unique, ref: > moderation_policy_publications.id]
+  "policy_id" uuid [not null]
+  "expected_revision" bigint [not null]
+  "previous_publication_id" uuid
+  "host_binding_id" uuid [not null, ref: > moderation_host_bindings.id]
+  "trust_domain_id" uuid [not null]
+  "solution_id" uuid [not null]
+  "instance_id" uuid [not null]
+  "jurisdiction_tenant_id" uuid
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "prepared_by_human_id" uuid [not null, ref: > users.id]
+  "operation_id" uuid [not null, unique]
+  "request_digest" varchar(64) [not null]
+  "proposed_state_digest" varchar(64) [not null]
+  "authority_source_id" uuid [not null, ref: > moderation_qualification_epochs.id]
+  "authority_revision" bigint [not null]
+  "writer_generation" bigint [not null]
+  "prepared_at" timestamptz [not null]
+  "valid_until" timestamptz [not null]
+  "revision" bigint [not null]
+  Note: 'Immutable non-authorizing future publication reservation. Definition is an inactive evidence-free normalized publication snapshot with adopted_revision NULL; adopted publications retain adopted_revision = revision under unique (policy_id, adopted_revision). Final publication uses the exact reserved id/revision/content after current source qualification. Preparation does not move either selection pointer. Provider migrations and real-engine uniqueness/rollback checks remain final programme assurance.'
+}
+
+Table "moderation_measurement_issuer_enrollments" {
+  "id" uuid [pk, not null]
+  "host_binding_id" uuid [not null, ref: > moderation_host_bindings.id]
+  "trust_domain_id" uuid [not null]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "key_id" uuid [not null]
+  "issuer" varchar(128) [not null]
+  "public_key_spki_base64" varchar(1024) [not null]
+  "runner_digest" varchar(64) [not null]
+  "catalogue_digest" varchar(64) [not null]
+  "test_bundle_digest" varchar(64) [not null]
+  "approved_by_human_id" uuid [not null, ref: > users.id]
+  "writer_generation" bigint [not null]
+  "revision" bigint [not null]
+  "approved_at" timestamptz [not null]
+  "valid_until" timestamptz [not null]
+  "revoked_by_human_id" uuid [ref: > users.id]
+  "revoked_at" timestamptz
+  indexes {
+    (host_binding_id, tenant_id, key_id) [unique]
+  }
+  Note: 'Accountable finite deployment-signer approval, not conformance or activation permission. Native current instance administration and canonical P-256 public SPKI verification precede atomic enrollment/kind-17 receipt/epoch commit. Original trust is immutable; terminal revision-2 revocation retains original receipt provenance and key identity cannot be reused. No signing secret is persisted. Provider migration regeneration/application remains final programme assurance.'
+}
+
+Table "moderation_consumer_measurement_receipts" {
+  "id" uuid [pk, not null]
+  "host_binding_id" uuid [not null, ref: > moderation_host_bindings.id]
+  "trust_domain_id" uuid [not null]
+  "tenant_id" uuid [not null, ref: > tenants.id]
+  "challenge_id" uuid [not null, ref: > moderation_consumer_measurement_challenges.id]
+  "issuer_enrollment_id" uuid [not null, ref: > moderation_measurement_issuer_enrollments.id]
+  "issuer_key_id" uuid [not null]
+  "run_id" uuid [not null]
+  "signed_token" varchar(65536) [not null]
+  "token_digest" varchar(64) [not null]
+  "accepted_by_human_id" uuid [not null, ref: > users.id]
+  "writer_generation" bigint [not null]
+  "revision" bigint [not null]
+  "accepted_at" timestamptz [not null]
+  "valid_until" timestamptz [not null]
+  indexes {
+    (host_binding_id, tenant_id, challenge_id) [unique]
+    (host_binding_id, tenant_id, run_id) [unique]
+    token_digest
+  }
+  Note: 'Immutable retained authenticated assertion, not a Passed verdict or continuing authority. Native acceptance authenticates exact signed coordinates against current challenge, installation, issuer and publication with original kind-15/16/17 receipts and actual fenced humans/roles. Exact signed bytes, kind-18 acceptance receipt and epoch commit atomically; one acceptance per challenge/run and finite source-bounded validity. Current conformance-source wiring and provider schema regeneration remain programme work.'
 }
 
 Table "moderation_decisions" {
@@ -3891,11 +4045,32 @@ Table "user_pii" {
   "email" varchar(320) [not null]
   "first_name" varchar(500) [not null]
   "last_name" varchar(500) [not null]
+  "date_of_birth" date [note: 'Private optional declaration, never verified age evidence or an ordinary user DTO field']
+  "birth_date_collection_receipt_id" uuid [note: 'Current provenance pointer, intentionally not a retention-preserving FK']
+  "birth_date_revision" bigint [not null, note: 'Application-managed correction/clear concurrency token']
 
   indexes {
     email [unique]
   }
 }
+
+Table "user_birth_date_collection_receipts" {
+  "id" uuid [pk, not null, note: 'Original invocation collection receipt identity']
+  "user_id" uuid [not null, unique]
+  "observation_id" uuid [not null]
+  "assessment_id" uuid [not null]
+  "assessment_adoption_id" uuid [not null]
+  "consent_id" uuid
+  "policy_id" uuid [not null]
+  "policy_revision" bigint [not null]
+  "publication_id" uuid [not null]
+  "profile_id" uuid [not null]
+  "collected_at" timestamptz [not null]
+  "valid_until" timestamptz [not null]
+  Note: 'At most one current PII-owned provenance row per Human. Correction replaces it; clearing or physical UserPii erasure removes it. No date value, historical DOB ledger, reusable collection permission or assured-age claim is stored here. Original source coordinates are scalar provenance, not FKs that extend those sources retention.'
+}
+
+Ref: user_birth_date_collection_receipts.user_id - user_pii.user_id [delete: cascade]
 
 Table "platform_user_roles" {
   "id" uuid [pk, not null, note: 'uuidv7 app-side']
@@ -6040,7 +6215,6 @@ Table "registration_provider_bindings" {
 
   indexes {
     (tenant_id, id) [unique, name: 'ak_registration_provider_bindings_tenant_id_id']
-    (tenant_id, id, published_mapping_revision_hash_key) [unique, name: 'ak_registration_provider_bindings_tenant_id_id_published_mappi']
     collection_mode_id [name: 'ix_registration_provider_bindings_collection_mode_id']
     completion_mode_id [name: 'ix_registration_provider_bindings_completion_mode_id']
     drift_class_id [name: 'ix_registration_provider_bindings_drift_class_id']
@@ -6051,7 +6225,22 @@ Table "registration_provider_bindings" {
     trust_level_id [name: 'ix_registration_provider_bindings_trust_level_id']
   }
 
-  Note: 'Provider binding pins one provider connection to one form version. Check ck_registration_provider_bindings_publication: published state requires published_mapping_revision_hash and published_at; non-published rows do not.'
+  Note: 'Provider binding IDs remain stable. Published rows require matching ordinal hash/hash-key and UTC publication time; non-published rows require null hash/time and an empty key. The nullable-time composite FK references immutable publication evidence, so a saved Draft changes no alternate key when published. Native writes enforce publication ownership and append-only evidence; no reverse FK cycle or direct-SQL orphan-prevention claim.'
+}
+
+Table "registration_provider_binding_publications" {
+  "id" uuid [pk, not null, note: 'uuidv7 app-side; historical evidence transfer may reuse its binding UUID']
+  "tenant_id" uuid [not null]
+  "registration_provider_binding_id" uuid [not null]
+  "mapping_revision_hash_key" varchar(44) [not null, note: 'final ordinal base64 SHA-256 mapping hash']
+  "published_at" timestamptz [not null]
+
+  indexes {
+    (tenant_id, registration_provider_binding_id) [unique]
+    (tenant_id, registration_provider_binding_id, mapping_revision_hash_key) [unique]
+    (tenant_id, registration_provider_binding_id, mapping_revision_hash_key, published_at) [unique]
+  }
+  Note: 'Binding-owned immutable publication principal born with final coordinates. Evidence is inserted before its binding publication FK is established. Attempts reference the exact tenant/binding/hash tuple; native append-only guards reject evidence mutation, replacement, deletion and orphan insertion.'
 }
 
 Table "registration_provider_subscription_states" {
@@ -6209,7 +6398,7 @@ Table "registration_attempts" {
     (tenant_id, status_id, expires_at) [name: 'ix_registration_attempts_tenant_id_status_id_expires_at']
   }
 
-  Note: 'Capability-token attempt. Checks: provider binding and mapping revision must be both null or both present; provider key mirrors binding or zero uuid; expires_at > created_at; consumed and superseded statuses require their lifecycle columns. Provider FK pins to registration_provider_bindings(tenant_id,id,published_mapping_revision_hash_key).'
+  Note: 'Capability-token attempt. Checks: provider binding and mapping revision must be both null or both present; provider key mirrors binding or zero uuid; expires_at > created_at; consumed and superseded statuses require their lifecycle columns. Provider FK pins to registration_provider_binding_publications(tenant_id,registration_provider_binding_id,mapping_revision_hash_key), preserving exact attempt provenance without a mutable Draft alternate key.'
 }
 
 Table "registration_submissions" {
@@ -8293,7 +8482,9 @@ Ref: "registration_attempts"."registration_requirement_id" > "registration_requi
 Ref: "registration_attempts"."registration_channel_id" > "registration_channels"."id" [delete: restrict]
 Ref: "registration_attempts"."registration_form_id" > "registration_forms"."id" [delete: restrict]
 Ref: "registration_attempts"."registration_form_version_id" > "registration_form_versions"."id" [delete: restrict]
-Ref: "registration_attempts"."registration_provider_binding_id" > "registration_provider_bindings"."id" [delete: restrict]
+Ref: "registration_provider_binding_publications"."tenant_id" > "tenants"."id" [delete: restrict]
+Ref: "registration_provider_bindings".("tenant_id", "id", "published_mapping_revision_hash_key", "published_at") > "registration_provider_binding_publications".("tenant_id", "registration_provider_binding_id", "mapping_revision_hash_key", "published_at") [delete: restrict]
+Ref: "registration_attempts".("tenant_id", "registration_provider_binding_id", "provider_mapping_revision_hash_key") > "registration_provider_binding_publications".("tenant_id", "registration_provider_binding_id", "mapping_revision_hash_key") [delete: restrict]
 Ref: "registration_attempts"."superseded_by_registration_attempt_id" > "registration_attempts"."id" [delete: restrict]
 Ref: "registration_attempts"."status_id" > "registration_attempt_statuses"."id" [delete: restrict]
 Ref: "registration_submissions"."tenant_id" > "tenants"."id" [delete: restrict]

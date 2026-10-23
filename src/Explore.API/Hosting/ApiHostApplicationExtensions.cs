@@ -111,6 +111,7 @@ public static class ApiHostApplicationExtensions
         pipeline.UseAuthorization();
         pipeline.UseWhen(context => !TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint()),
             branch => branch.UseMiddleware<TenantLifecycleAccessMiddleware>());
+        pipeline.UseMiddleware<ProfileCollectionAdmissionMiddleware>();
         pipeline.UseMiddleware<IdempotencyMiddleware>();
         pipeline.UseMiddleware<SupportAccessAuditMiddleware>();
     }

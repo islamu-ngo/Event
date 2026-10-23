@@ -17,6 +17,9 @@ public static class NotificationNavigationHelper
             "event" => $"/events/{notification.EntityId}",
             "organization" => $"/organization/profile/{notification.EntityId}",
             "group" => $"/group/profile/{notification.EntityId}",
+            "moderationprefindingnotice" when Guid.TryParseExact(notification.EntityId, "D", out var noticeId)
+                && noticeId.Version == 7 && noticeId.Variant is >= 8 and <= 11 =>
+                $"/moderation/pre-finding/notices/{noticeId:D}",
             _ => null
         };
     }

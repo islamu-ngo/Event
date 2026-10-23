@@ -1,1 +1,3 @@
 e2937d6ef122d7441e1165b1113a549c3602ef6c:tests/Event.Persistence.IntegrationTests/Repositories/PersistedResourceAuthorityTests.cs:generic-api-key:344
+# Public SHA-256 of the inert test string e30.e30.AA, not an authentication credential.
+1725b31f2b0aa158517495da5a07d7cd079b070b:tests/Event.Domain.UnitTests/Entities/ModerationConsumerMeasurementReceiptTests.cs:generic-api-key:11

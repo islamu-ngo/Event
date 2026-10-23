@@ -1,7 +1,7 @@
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
-using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Models.Storage;
 using Explore.Application.Models;
 using Explore.Domain;
 using OpenTelemetry;
@@ -14,7 +14,7 @@ namespace Explore.Infrastructure.Storage;
 /// </summary>
 internal static class StorageProbeTransport
 {
-    internal static async Task<InstanceStorageProviderStatusDto> TestAsync(string provider,
+    internal static async Task<FileStorageProviderStatus> TestAsync(string provider,
         S3Configuration? configuration, IStorageProbeClientFactory factory,
         Func<CancellationToken, Task> handoff, Action finalTime, CancellationToken token)
     {
@@ -97,16 +97,14 @@ internal static class StorageProbeTransport
         }
     }
 
-    private static InstanceStorageProviderStatusDto Result(string provider, string? code) => new()
-    {
-        Provider = provider,
-        IsAvailable = code is null,
-        SupportsServerSideStreaming = true,
-        SupportsBrowserDirectUpload = provider == StorageProviders.S3Compatible,
-        FailureCode = code,
-        Message = code is null ? "The original probe object was created and its exact version removed."
-            : "The storage probe could not confirm safe completion."
-    };
+    private static FileStorageProviderStatus Result(string provider, string? code) => new(
+        provider,
+        code is null,
+        true,
+        provider == StorageProviders.S3Compatible,
+        code,
+        code is null ? "The original probe object was created and its exact version removed."
+            : "The storage probe could not confirm safe completion.");
 }
 
 /// <summary>A probe-specific external boundary; ordinary storage clients retain their own retry policy.</summary>

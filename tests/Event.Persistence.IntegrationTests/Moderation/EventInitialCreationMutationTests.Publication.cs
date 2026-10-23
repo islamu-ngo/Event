@@ -1,4 +1,5 @@
 using System.Data;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
 using Explore.Domain;
@@ -24,7 +25,7 @@ public sealed partial class EventInitialCreationMutationTests
         var creation = (await PrepareAsync(database, context, "organization", absentHost: absentHost))
             with
         { RequestedStatus = EventStatusEnum.Published };
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
 
         var result = await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token),
@@ -56,7 +57,7 @@ public sealed partial class EventInitialCreationMutationTests
         await StoreInitialPublicationRestrictionAsync(database, publication, clock.Now, protective,
             scope: instanceScope ? database.Instance : database.Scope);
         var entered = false;
-        var session = Session(database, context, clock: clock);
+        await using var session = await Session(database, context, clock: clock);
 
         var result = await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token), (creator, token) =>
@@ -84,7 +85,7 @@ public sealed partial class EventInitialCreationMutationTests
         var publication = await AdoptInitialPublicationAsync(database);
         if (malformed) await RemoveInitialPublicationHistoryAsync(database, publication.Id, "effect");
         else await StoreInitialPublicationRestrictionAsync(database, publication, clock.Now);
-        var session = Session(database, context, clock: clock);
+        await using var session = await Session(database, context, clock: clock);
 
         var result = await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token),
@@ -106,7 +107,7 @@ public sealed partial class EventInitialCreationMutationTests
         var publication = await AdoptInitialPublicationAsync(database);
         await StoreInitialPublicationRestrictionAsync(database, publication, clock.Now,
             subjectId: database.AdministratorId);
-        var session = Session(database, context, clock: clock);
+        await using var session = await Session(database, context, clock: clock);
 
         var result = await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token),
@@ -148,7 +149,7 @@ public sealed partial class EventInitialCreationMutationTests
             await writer.ModerationPolicySelections.Where(row => row.Id == publication.PolicyId).ExecuteDeleteAsync();
             await transaction.CommitAsync();
         }
-        var session = Session(database, context, clock: clock);
+        await using var session = await Session(database, context, clock: clock);
         var entered = false;
 
         var result = await session.Boundary.ExecuteCreationAsync(creation,
@@ -177,7 +178,7 @@ public sealed partial class EventInitialCreationMutationTests
         var publication = await AdoptInitialPublicationAsync(database);
         await RemoveInitialPublicationHistoryAsync(database, publication.Id, missing);
         var entered = false;
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
 
         var result = await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token), (creator, token) =>
@@ -201,7 +202,7 @@ public sealed partial class EventInitialCreationMutationTests
         var creation = (await PrepareAsync(database, context, "organization")) with { CreatedAtUtc = clock.Now.UtcDateTime };
         var publication = await AdoptInitialPublicationAsync(database);
         await StoreInitialPublicationRestrictionAsync(database, publication, clock.Now);
-        var session = Session(database, context, clock: clock);
+        await using var session = await Session(database, context, clock: clock);
         var flushedPublished = false;
 
         await Assert.ThrowsAsync<ConcurrencyConflictException>(async () => await session.Boundary.ExecuteCreationAsync(creation,
@@ -235,7 +236,7 @@ public sealed partial class EventInitialCreationMutationTests
         var crossing = new InitialPublicationStartsOnEpochSave(creation.EventId, clock, startsAt);
         await using var context = database.Context(crossing);
         await using var retained = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = Session(database, context, retained?.Authority(context, clock), clock);
+        await using var session = await Session(database, context, retained?.Authority(context, clock), clock);
 
         await Assert.ThrowsAsync<ConcurrencyConflictException>(async () => await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token),

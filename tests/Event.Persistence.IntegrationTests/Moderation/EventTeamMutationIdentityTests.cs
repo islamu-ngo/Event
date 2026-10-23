@@ -1,14 +1,12 @@
-using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 using Explore.Application.Responses;
-using Explore.Infrastructure.Identity;
-using Explore.Persistence.Repositories;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging.Abstractions;
+using Explore.Infrastructure.Tests.Fixtures;
+using Microsoft.Extensions.DependencyInjection;
 using SourceDatabase = Event.Persistence.IntegrationTests.Moderation.ModerationQualificationWriterTests.SourceDatabase;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
@@ -24,41 +22,33 @@ public sealed class EventTeamMutationIdentityTests
     {
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
-        var http = new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, database.SubjectId.ToString("D"))],
-                failure == "anonymous" ? null : "event-team-native-witness"))
-            }
-        };
-        var identity = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
-            NullLogger<AdminContext>.Instance);
-        var machine = new MachinePrincipalAccessor(http);
         var provider = new DenyingProvider(failure == "unavailable");
         var tenantId = failure == "foreign-tenant" ? Guid.CreateVersion7() : database.TenantId;
         var eventId = Guid.CreateVersion7();
-        var assignment = new AssignEventRoleCommandHandler(null!, null!, null!, null!, null!, null!, null!,
-            identity, machine, database, provider, null!);
-        var email = new AssignEventRoleByEmailCommandHandler(null!, assignment, identity, machine, database, provider);
-        var revoke = new RevokeEventRoleAssignmentCommandHandler(null!, null!, null!, null!, null!, null!,
-            identity, machine, database, provider, null!);
-        var window = new UpdateEventRoleAssignmentWindowCommandHandler(null!, null!, null!, null!, null!, null!,
-            identity, machine, database, provider, null!);
-        var transfer = new TransferEventOwnershipCommandHandler(null!, null!, null!, null!, null!, null!, null!,
-            identity, machine, database, provider, null!);
-        Func<Task<BaseCommandResponse<Guid>>>[] operations =
-        [
-            () => assignment.ExecuteAsync(new() { TenantId = tenantId, EventId = eventId }),
-            () => email.ExecuteAsync(new() { TenantId = tenantId, EventId = eventId }),
-            () => revoke.ExecuteAsync(new() { TenantId = tenantId, EventId = eventId }),
-            () => window.ExecuteAsync(new() { TenantId = tenantId, EventId = eventId }),
-            () => transfer.ExecuteAsync(new() { TenantId = tenantId, EventId = eventId })
-        ];
-        foreach (var operation in operations)
+        foreach (string mutation in new[] { "assign", "email", "revoke", "window", "transfer" })
         {
+            await using var human = new CurrentHumanPrincipalFixture(database.SubjectId, database.TenantId, borrowedContext: context,
+                configureServices: services =>
+                {
+                    services.AddScoped<IAuthorizationProvider>(_ => provider);
+                    services.AddScoped<IPrivacyIdentityFenceAuthority>(_ => database.Privacy.Authority(context, TimeProvider.System));
+                });
+            await human.InitializeAsync();
+            if (failure == "anonymous") human.SignOut();
+            await human.PrepareAsync();
+            Func<Task<BaseCommandResponse<Guid>>> operation = mutation switch
+            {
+                "assign" => () => ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(human.Services)
+                    .ExecuteAsync(new() { TenantId = tenantId, EventId = eventId }),
+                "email" => () => ActivatorUtilities.CreateInstance<AssignEventRoleByEmailCommandHandler>(human.Services)
+                    .ExecuteAsync(new() { TenantId = tenantId, EventId = eventId }),
+                "revoke" => () => ActivatorUtilities.CreateInstance<RevokeEventRoleAssignmentCommandHandler>(human.Services)
+                    .ExecuteAsync(new() { TenantId = tenantId, EventId = eventId }),
+                "window" => () => ActivatorUtilities.CreateInstance<UpdateEventRoleAssignmentWindowCommandHandler>(human.Services)
+                    .ExecuteAsync(new() { TenantId = tenantId, EventId = eventId }),
+                _ => () => ActivatorUtilities.CreateInstance<TransferEventOwnershipCommandHandler>(human.Services)
+                    .ExecuteAsync(new() { TenantId = tenantId, EventId = eventId })
+            };
             if (failure == "unavailable")
                 await Assert.ThrowsAsync<AuthorizationProviderUnavailableException>(async () => { await operation(); });
             else

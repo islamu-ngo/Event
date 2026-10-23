@@ -1,4 +1,6 @@
-using System.Security.Claims;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Exceptions;
@@ -9,9 +11,9 @@ using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Identity;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -41,10 +43,10 @@ public sealed class EventOwnershipTransferMutationTests
             replacementId = pending.Id;
         }
         long revision = await context.ModerationQualificationEpochs.Select(row => row.Revision).SingleAsync();
-        var session = CreateSession(fixture);
+        await using var session = await CreateSession(fixture);
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context), new EventRepository(context),
+        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context, session.PrivateManagement), new EventRepository(context),
             new UserRepository(context), new EventAuthoritySnapshotService(context), new AuditLogRepository(context), metrics,
             NullLogger<TransferEventOwnershipCommandHandler>.Instance, session.Identity, session.Machine, fixture.Database,
             session.Provider, session.Boundary);
@@ -74,10 +76,10 @@ public sealed class EventOwnershipTransferMutationTests
         var context = fixture.Context;
         var old = await context.EventRoleAssignments.SingleAsync(row => row.EventId == fixture.EventId && row.RoleId == (int)RoleEnum.EventOwner);
         long revision = await context.ModerationQualificationEpochs.Select(row => row.Revision).SingleAsync();
-        var session = CreateSession(fixture);
+        await using var session = await CreateSession(fixture);
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context), new EventRepository(context),
+        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context, session.PrivateManagement), new EventRepository(context),
             new UserRepository(context), new EventAuthoritySnapshotService(context), new AuditLogRepository(context), metrics,
             NullLogger<TransferEventOwnershipCommandHandler>.Instance, session.Identity, session.Machine, fixture.Database,
             session.Provider, session.Boundary);
@@ -110,7 +112,7 @@ public sealed class EventOwnershipTransferMutationTests
         await context.SaveChangesAsync();
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
         var clock = new TransferClock { Now = new DateTimeOffset(until.AddSeconds(-1), TimeSpan.Zero) };
-        var session = CreateSession(fixture, clock, shared?.Authority(context, clock));
+        await using var session = await CreateSession(fixture, clock, shared?.Authority(context, clock));
         var auditId = Guid.CreateVersion7();
         bool privacyOwned = false;
         await Assert.ThrowsAsync<AuthorizationException>(async () =>
@@ -132,7 +134,7 @@ public sealed class EventOwnershipTransferMutationTests
         await Assert.That(context.Database.CurrentTransaction).IsNull();
     }
 
-    private static Session CreateSession(Fixture fixture, TimeProvider? clock = null, IPrivacyIdentityFenceAuthority? privacy = null)
+    private static Task<Session> CreateSession(Fixture fixture, TimeProvider? clock = null, IPrivacyIdentityFenceAuthority? privacy = null)
         => CreateSession(fixture, fixture.Context, clock, privacy);
 
     [Test]
@@ -150,10 +152,11 @@ public sealed class EventOwnershipTransferMutationTests
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
         var old = await context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.EventId == fixture.EventId && row.RoleId == (int)RoleEnum.EventOwner);
         long revision = await context.ModerationQualificationEpochs.Select(row => row.Revision).SingleAsync();
-        var session = CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        await using var session = await CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        checkpoint.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context), new EventRepository(context),
+        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context, session.PrivateManagement), new EventRepository(context),
             new UserRepository(context), new EventAuthoritySnapshotService(context), new AuditLogRepository(context), metrics,
             NullLogger<TransferEventOwnershipCommandHandler>.Instance, session.Identity, session.Machine, fixture.Database,
             session.Provider, session.Boundary);
@@ -189,16 +192,17 @@ public sealed class EventOwnershipTransferMutationTests
     {
         await using var fixture = await Fixture.CreateAsync();
         var old = await fixture.Context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.EventId == fixture.EventId && row.RoleId == (int)RoleEnum.EventOwner);
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollback);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollback) { Armed = false };
         var options = TestDbContextOptions.Create<Explore.Persistence.ExploreDbContext>()
             .UseSqlite(fixture.Context.Database.GetDbConnection()).UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new Explore.Persistence.ExploreDbContext(options.Options) { TenantContext = fixture.Database };
         long revision = await context.ModerationQualificationEpochs.AsNoTracking().Select(row => row.Revision).SingleAsync();
-        var session = CreateSession(fixture, context);
+        await using var session = await CreateSession(fixture, context);
+        fault.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context), new EventRepository(context),
+        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context, session.PrivateManagement), new EventRepository(context),
             new UserRepository(context), new EventAuthoritySnapshotService(context), new AuditLogRepository(context), metrics,
             NullLogger<TransferEventOwnershipCommandHandler>.Instance, session.Identity, session.Machine, fixture.Database,
             session.Provider, session.Boundary);
@@ -244,7 +248,7 @@ public sealed class EventOwnershipTransferMutationTests
         await fixture.Database.Privacy.Authority(context, TimeProvider.System).AppendAsync(PrivacyErasureRequest.Create(
             Guid.CreateVersion7(), PrivacyErasureSubjectKind.User, actorErased ? fixture.UserId : fixture.Database.SubjectId,
             PrivacyErasureReasonCode.SubjectErasureRequest, 1));
-        var session = CreateSession(fixture);
+        await using var session = await CreateSession(fixture);
         var entered = false;
         await Assert.ThrowsAsync<AuthorizationException>(async () =>
         {
@@ -267,10 +271,11 @@ public sealed class EventOwnershipTransferMutationTests
             .UseSqlite(fixture.Context.Database.GetDbConnection()).UseSnakeCaseNamingConvention().AddInterceptors(fault).Options;
         await using var context = new Explore.Persistence.ExploreDbContext(options) { TenantContext = fixture.Database };
         long revision = await context.ModerationQualificationEpochs.Select(row => row.Revision).SingleAsync();
-        var session = CreateSession(fixture, context);
+        await using var session = await CreateSession(fixture, context);
+        fault.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context), new EventRepository(context),
+        var handler = new TransferEventOwnershipCommandHandler(new EventRoleAssignmentRepository(context, session.PrivateManagement), new EventRepository(context),
             new UserRepository(context), new EventAuthoritySnapshotService(context), new AuditLogRepository(context), metrics,
             NullLogger<TransferEventOwnershipCommandHandler>.Instance, session.Identity, session.Machine, fixture.Database,
             session.Provider, session.Boundary);
@@ -297,11 +302,12 @@ public sealed class EventOwnershipTransferMutationTests
 
     private sealed class ConflictBeforeTransferCommit : DbTransactionInterceptor
     {
+        public bool Armed { get; set; }
         public bool Injected { get; private set; }
         public override ValueTask<InterceptionResult> TransactionCommittingAsync(System.Data.Common.DbTransaction transaction,
             TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
         {
-            if (!Injected && eventData.Context is Explore.Persistence.ExploreDbContext context
+            if (Armed && !Injected && eventData.Context is Explore.Persistence.ExploreDbContext context
                 && context.ChangeTracker.Entries<AuditLog>().Any(entry => entry.Entity.Action == "EventOwnershipTransferred"))
             {
                 Injected = true;
@@ -311,28 +317,48 @@ public sealed class EventOwnershipTransferMutationTests
         }
     }
 
-    internal static Session CreateSession(Fixture fixture, Explore.Persistence.ExploreDbContext context,
+    internal static Task<Session> CreateSession(Fixture fixture, Explore.Persistence.ExploreDbContext context,
         TimeProvider? clock = null, IPrivacyIdentityFenceAuthority? privacy = null,
         Func<CancellationToken, Task>? beforeAuthorize = null)
     {
         clock ??= TimeProvider.System;
-        var http = new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, fixture.UserId.ToString("D"))], "event-transfer-native"))
-            }
-        };
-        var identity = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
-        var machine = new MachinePrincipalAccessor(http);
         var provider = new Provider(context, beforeAuthorize);
-        return new(new EventRoleAssignmentMutationBoundary(context, privacy ?? fixture.Database.Privacy.Authority(context, clock),
-            new UserContext(http), identity, machine, provider, clock, ModerationRecognitionResourceFixture.Reader(context)), identity, machine, provider);
+        var human = new CurrentHumanPrincipalFixture(fixture.UserId, fixture.TenantId, borrowedContext: context,
+            configureServices: services => services.AddScoped<IPrivacyIdentityFenceAuthority>(_ =>
+                privacy ?? fixture.Database.Privacy.Authority(context, clock)), timeProvider: clock);
+        // Install ambient request custody synchronously before returning the initialization task.
+        var initialization = human.InitializeAsync();
+        return CompleteAsync();
+
+        async Task<Session> CompleteAsync()
+        {
+            try
+            {
+                await initialization;
+                await human.PrepareAsync();
+                return new(new EventRoleAssignmentMutationBoundary(context,
+                    human.Services.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
+                    human.Services.GetRequiredService<IUserContext>(), human.Admin, human.Machine, provider, clock,
+                    ModerationRecognitionResourceFixture.Reader(context), human.Services.GetRequiredService<IHumanActionCommitFinalizer>()),
+                    human, provider);
+            }
+            catch
+            {
+                await human.DisposeAsync();
+                throw;
+            }
+        }
     }
 
-    internal sealed record Session(EventRoleAssignmentMutationBoundary Boundary, AdminContext Identity, MachinePrincipalAccessor Machine, Provider Provider);
+    internal sealed record Session(EventRoleAssignmentMutationBoundary Boundary, CurrentHumanPrincipalFixture Human, Provider Provider) : IAsyncDisposable
+    {
+        internal IAdminContext Identity => Human.Admin;
+        internal MachinePrincipalAccessor Machine => Human.Machine;
+        internal IHumanEventTeamActionPreparation Preparation => Human.Services.GetRequiredService<IHumanEventTeamActionPreparation>();
+        internal Func<IPrivateEventManagementReader> PrivateManagement => () => Human.Services.GetRequiredService<IPrivateEventManagementReader>();
+        internal ISerializableAttemptOwner Owner => Human.Services.GetRequiredService<ISerializableAttemptOwner>();
+        public ValueTask DisposeAsync() => Human.DisposeAsync();
+    }
     private sealed class TransferClock : TimeProvider
     {
         public DateTimeOffset Now { get; set; }
@@ -341,12 +367,13 @@ public sealed class EventOwnershipTransferMutationTests
     private sealed class ExpireReplacementOnQualificationSave(TransferClock clock, DateTimeOffset until) : SaveChangesInterceptor
     {
         private bool _pending;
+        public bool Armed { get; set; }
         public bool Observed { get; private set; }
         public bool PrivacyOwned { get; private set; }
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
             InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (!Observed && eventData.Context is Explore.Persistence.ExploreDbContext context
+            if (Armed && !Observed && eventData.Context is Explore.Persistence.ExploreDbContext context
                 && context.ChangeTracker.Entries<ModerationQualificationEpoch>().Any(entry => entry.State == EntityState.Modified))
             {
                 _pending = true;

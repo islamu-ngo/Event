@@ -98,14 +98,14 @@ public sealed class EventRoleAssignmentCreationMutationTests
     {
         await using var fixture = await Fixture.CreateAsync();
         long revision = await EpochAsync(fixture.Context);
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false) { Armed = false };
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(fixture.Context.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new ExploreDbContext(options.Options) { TenantContext = fixture.Database };
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var result = await ExecuteAsync(fixture, context, metrics, Request(fixture), true);
+        var result = await ExecuteAsync(fixture, context, metrics, Request(fixture), true, armFault: () => fault.Armed = true);
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(fault.Injected).IsTrue();
         await Assert.That(await context.EventRoleAssignments.CountAsync(row => row.UserId == fixture.Database.SubjectId && row.Id == result.Id)).IsEqualTo(1);
@@ -150,7 +150,7 @@ public sealed class EventRoleAssignmentCreationMutationTests
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         await Assert.ThrowsAsync<AuthorizationException>(async () => await ExecuteAsync(fixture, context, metrics, Request(fixture), true,
-            privacy: retained?.Authority(context, TimeProvider.System)));
+            privacy: retained?.Authority(context, TimeProvider.System), armFault: () => checkpoint.Armed = true));
         await Assert.That(checkpoint.Observed).IsTrue();
         await Assert.That(await context.EventRoleAssignments.AnyAsync(row => row.UserId == fixture.Database.SubjectId)).IsFalse();
         await Assert.That(await context.AuditLogs.AnyAsync()).IsFalse();
@@ -187,7 +187,8 @@ public sealed class EventRoleAssignmentCreationMutationTests
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         await Assert.ThrowsAsync<AuthorizationException>(async () => await ExecuteAsync(fixture, context, metrics,
-            Request(fixture) with { TargetUserId = fixture.UserId }, false, clock, retained?.Authority(context, clock)));
+            Request(fixture) with { TargetUserId = fixture.UserId }, false, clock, retained?.Authority(context, clock),
+            armFault: () => checkpoint.Armed = true));
         await Assert.That(checkpoint.Observed).IsTrue();
         await Assert.That(checkpoint.PrivacyOwned).IsEqualTo(colocated);
         await Assert.That(await context.EventRoleAssignments.AnyAsync(row => row.UserId == fixture.UserId && row.RoleId == (int)RoleEnum.CheckInStaff)).IsFalse();
@@ -203,14 +204,15 @@ public sealed class EventRoleAssignmentCreationMutationTests
     {
         await using var fixture = await Fixture.CreateAsync();
         long revision = await EpochAsync(fixture.Context);
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false) { Armed = false };
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(fixture.Context.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new ExploreDbContext(options.Options) { TenantContext = fixture.Database };
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
-        var result = await ExecuteAsync(fixture, context, metrics, Request(fixture) with { RoleId = (int)RoleEnum.EventOwner }, true);
+        var result = await ExecuteAsync(fixture, context, metrics, Request(fixture) with { RoleId = (int)RoleEnum.EventOwner }, true,
+            armFault: () => fault.Armed = true);
         await Assert.That(result.FailureCode).IsEqualTo("event_owner_transfer_required");
         await Assert.That(fault.Injected).IsTrue();
         await Assert.That(await context.AuditLogs.CountAsync(row => row.Action == "EventRoleAssignmentDenied")).IsEqualTo(1);
@@ -231,17 +233,18 @@ public sealed class EventRoleAssignmentCreationMutationTests
 
     private static async Task<BaseCommandResponse<Guid>> ExecuteAsync(Fixture fixture, ExploreDbContext context,
         BusinessMetrics metrics, AssignEventRoleCommand request, bool email, TimeProvider? clock = null,
-        IPrivacyIdentityFenceAuthority? privacy = null)
+        IPrivacyIdentityFenceAuthority? privacy = null, Action? armFault = null)
     {
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, privacy);
-        var handler = new AssignEventRoleCommandHandler(new EventRoleAssignmentRepository(context), new EventRepository(context),
-            new UserRepository(context), new EventRoleAuthorityCeilingService(new EventAuthoritySnapshotService(context),
-                new RoleRepository(context), new PermissionRepository(context)), new AuditLogRepository(context), metrics,
+        // Independent commands get fresh authenticated custody; retries stay inside the original command.
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, privacy);
+        armFault?.Invoke();
+        var handler = new AssignEventRoleCommandHandler(new EventRoleAssignmentRepository(context, session.PrivateManagement), new EventRepository(context),
+            new UserRepository(context), session.Preparation, new AuditLogRepository(context), metrics,
             NullLogger<AssignEventRoleCommandHandler>.Instance, session.Identity, session.Machine, fixture.Database, session.Provider, session.Boundary);
         if (!email) return await handler.ExecuteAsync(request);
         var targetEmail = await context.UserPii.AsNoTracking().Where(row => row.UserId == request.TargetUserId).Select(row => row.Email!).SingleAsync();
         return await new AssignEventRoleByEmailCommandHandler(new UserRepository(context), handler, session.Identity,
-            session.Machine, fixture.Database, session.Provider).ExecuteAsync(new()
+            session.Machine, fixture.Database, session.Provider, session.Preparation, session.Owner).ExecuteAsync(new()
             {
                 TenantId = request.TenantId,
                 EventId = request.EventId,
@@ -258,11 +261,12 @@ public sealed class EventRoleAssignmentCreationMutationTests
     private sealed class ChangeEmailAtEpochSave(Guid target, Guid successor, string email, bool reassigned) : SaveChangesInterceptor
     {
         private bool _pending;
+        public bool Armed { get; set; }
         public bool Observed { get; private set; }
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
             InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (!Observed && eventData.Context is ExploreDbContext context
+            if (Armed && !Observed && eventData.Context is ExploreDbContext context
                 && context.ChangeTracker.Entries<ModerationQualificationEpoch>().Any(entry => entry.State == EntityState.Modified)) _pending = true;
             return ValueTask.FromResult(result);
         }

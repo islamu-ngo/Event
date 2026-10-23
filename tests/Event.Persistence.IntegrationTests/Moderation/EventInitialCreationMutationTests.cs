@@ -1,13 +1,14 @@
 using System.Data.Common;
-using System.Security.Claims;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Infrastructure.Identity;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
@@ -17,7 +18,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using SourceDatabase = Event.Persistence.IntegrationTests.Moderation.ModerationQualificationWriterTests.SourceDatabase;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
@@ -36,7 +37,7 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = await PrepareAsync(database, context, publisher, absentHost: absentHost);
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
 
         var result = await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token),
@@ -57,7 +58,7 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = await PrepareAsync(database, context, "user", community: true, absentHost: absentHost);
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
 
         var result = await session.Boundary.ExecuteCreationAsync(creation, (_, _) => Task.FromResult(true),
             (creator, token) => InsertAsync(context, creation, creator, token), default);
@@ -81,7 +82,8 @@ public sealed partial class EventInitialCreationMutationTests
         var checkpoint = new LosePublisherOnEpochSave(creation);
         await using var context = database.Context(checkpoint);
         await using var retained = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = Session(database, context, retained?.Authority(context, TimeProvider.System));
+        await using var session = await Session(database, context, retained?.Authority(context, TimeProvider.System));
+        checkpoint.Armed = true;
 
         await Assert.ThrowsAsync<AuthorizationException>(async () => await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token),
@@ -103,7 +105,7 @@ public sealed partial class EventInitialCreationMutationTests
         var creation = await PrepareAsync(database, context, "user");
         context.ModerationQualificationEpochs.RemoveRange(await context.ModerationQualificationEpochs.ToArrayAsync());
         await context.SaveChangesAsync();
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
 
         await Assert.ThrowsAsync<AuthorizationException>(async () => await session.Boundary.ExecuteCreationAsync(creation,
             (_, _) => Task.FromResult(true), (creator, token) => InsertAsync(context, creation, creator, token), default));
@@ -122,11 +124,10 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = await PrepareAsync(database, context, "user");
+        await using var session = await Session(database, context);
         var tenant = await context.Tenants.SingleAsync(row => row.Id == database.TenantId);
         var original = tenant.FullName;
         tenant.FullName = "Unrelated caller edit must survive";
-        var session = Session(database, context);
-
         await Assert.ThrowsAsync<InvalidOperationException>(async () => await session.Boundary.ExecuteCreationAsync(creation,
             (_, _) => Task.FromResult(true), (creator, token) => InsertAsync(context, creation, creator, token), default));
 
@@ -146,7 +147,7 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = await PrepareAsync(database, context, "group", absentHost: absentHost);
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
 
         await Assert.ThrowsAsync<InitialCreationFailure>(async () => await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token), async (creator, token) =>
@@ -171,12 +172,13 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var baseline = database.Context();
         var creation = await PrepareAsync(database, baseline, "organization");
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollback);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollback) { Armed = false };
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new ExploreDbContext(options.Options) { TenantContext = database };
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
+        fault.Armed = true;
 
         Task<BaseCommandResponse<Guid>> ExecuteAsync() => session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token),
@@ -209,7 +211,7 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = await PrepareAsync(database, context, "organization");
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
 
         await Assert.ThrowsAsync<ConcurrencyConflictException>(async () => await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token), async (creator, token) =>
@@ -246,7 +248,7 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = await PrepareAsync(database, context, "organization");
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
         var result = await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token),
             (_, _) => Task.FromResult(BaseCommandResponse.NotFound<Guid>()), default);
@@ -261,7 +263,7 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = (await PrepareAsync(database, context, "organization")) with { CreatorUserId = database.AdministratorId };
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
         await Assert.ThrowsAsync<AuthorizationException>(async () => await session.Boundary.ExecuteCreationAsync(creation,
             (_, _) => Task.FromResult(true), (creator, token) => InsertAsync(context, creation, creator, token), default));
         await using var inspect = database.Context();
@@ -283,7 +285,7 @@ public sealed partial class EventInitialCreationMutationTests
             context.ChangeTracker.Clear();
         }
         var before = await context.Set<EventDiscoveryRevision>().AsNoTracking().SingleAsync();
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
         await Assert.ThrowsAsync<ConcurrencyConflictException>(async () => await session.Boundary.ExecuteCreationAsync(creation,
             (_, token) => QualifyPublisherAsync(context, creation, token), async (_, token) =>
             {
@@ -337,7 +339,8 @@ public sealed partial class EventInitialCreationMutationTests
         creation = creation with { ImageIds = [image.Id] };
         var order = new ImageActorBeforeTenant(image.Id, creation.PublisherActorId, moveAfterPlan);
         await using var context = database.Context(order);
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
+        order.Armed = true;
         async Task<BaseCommandResponse<Guid>> CreateAsync(Guid creator, CancellationToken token)
         {
             var result = await InsertAsync(context, creation, creator, token);
@@ -363,11 +366,12 @@ public sealed partial class EventInitialCreationMutationTests
     {
         private readonly HashSet<Guid> _actors = [];
         private bool _tenant;
+        public bool Armed { get; set; }
         public Guid[] ActorsBeforeTenant { get; private set; } = [];
         public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (eventData.Context is not ExploreDbContext context) return result;
+            if (!Armed || eventData.Context is not ExploreDbContext context) return result;
             bool Updates<T>()
             {
                 var entity = context.Model.FindEntityType(typeof(T))!;
@@ -395,7 +399,7 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = await PrepareAsync(database, context, "organization");
-        var session = Session(database, context);
+        await using var session = await Session(database, context);
         await Assert.ThrowsAsync<ConcurrencyConflictException>(async () => await session.Boundary.ExecuteCreationAsync(
             creation, (_, token) => QualifyPublisherAsync(context, creation, token), async (creator, token) =>
             {
@@ -450,7 +454,7 @@ public sealed partial class EventInitialCreationMutationTests
                 OrganizationTenant = participation,
                 UserId = database.SubjectId,
                 User = null!,
-                RoleId = (int)RoleEnum.OrganizationAdmin,
+                RoleId = (int)RoleEnum.OrgAdmin,
                 Role = null!
             });
             actor.ActorTypeId = (int)ActorTypeEnum.Organization;
@@ -602,23 +606,41 @@ public sealed partial class EventInitialCreationMutationTests
             .IsEquivalentTo(absentHost ? Array.Empty<long>() : [1L]);
     }
 
-    private static (EventRoleAssignmentMutationBoundary Boundary, HttpContextAccessor Http) Session(SourceDatabase database,
+    private static Task<CreationSession> Session(SourceDatabase database,
         ExploreDbContext context, IPrivacyIdentityFenceAuthority? privacy = null, TimeProvider? clock = null)
     {
         clock ??= TimeProvider.System;
-        var http = new HttpContextAccessor
+        var human = new CurrentHumanPrincipalFixture(database.SubjectId, database.TenantId, borrowedContext: context,
+            configureServices: services => services.AddScoped<IPrivacyIdentityFenceAuthority>(_ =>
+                privacy ?? database.Privacy.Authority(context, clock)), timeProvider: clock);
+        // Ambient custody must be installed in the caller before asynchronous initialization.
+        var initialization = human.InitializeAsync();
+        return CompleteAsync();
+
+        async Task<CreationSession> CompleteAsync()
         {
-            HttpContext = new DefaultHttpContext
+            try
             {
-                User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, database.SubjectId.ToString("D"))], "initial-event-native"))
+                await initialization;
+                await human.PrepareAsync();
+                return new(new EventRoleAssignmentMutationBoundary(context,
+                    human.Services.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
+                    human.Services.GetRequiredService<IUserContext>(), human.Admin, human.Machine,
+                    new EventOwnershipTransferMutationTests.Provider(context), clock,
+                    ModerationRecognitionResourceFixture.Reader(context), human.Services.GetRequiredService<IHumanActionCommitFinalizer>()), human);
             }
-        };
-        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
-        return (new EventRoleAssignmentMutationBoundary(context, privacy ?? database.Privacy.Authority(context, clock),
-            new UserContext(http), admin, new MachinePrincipalAccessor(http),
-            new EventOwnershipTransferMutationTests.Provider(context), clock, ModerationRecognitionResourceFixture.Reader(context)), http);
+            catch
+            {
+                await human.DisposeAsync();
+                throw;
+            }
+        }
+    }
+
+    private sealed record CreationSession(EventRoleAssignmentMutationBoundary Boundary, CurrentHumanPrincipalFixture Human) : IAsyncDisposable
+    {
+        internal IHttpContextAccessor Http => Human.Services.GetRequiredService<IHttpContextAccessor>();
+        public ValueTask DisposeAsync() => Human.DisposeAsync();
     }
 
     private sealed class InitialCreationFailure : Exception;
@@ -626,13 +648,14 @@ public sealed partial class EventInitialCreationMutationTests
     private sealed class LosePublisherOnEpochSave(EventInitialCreation creation) : SaveChangesInterceptor
     {
         private bool _pending;
+        public bool Armed { get; set; }
         public bool Observed { get; private set; }
         public bool PrivacyOwned { get; private set; }
 
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
             InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (!Observed && eventData.Context is ExploreDbContext context
+            if (Armed && !Observed && eventData.Context is ExploreDbContext context
                 && context.ChangeTracker.Entries<ModerationQualificationEpoch>().Any(entry => entry.State == EntityState.Modified))
             {
                 _pending = true;

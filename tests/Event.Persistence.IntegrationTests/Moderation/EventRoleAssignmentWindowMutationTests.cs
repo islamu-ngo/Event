@@ -32,7 +32,7 @@ public sealed class EventRoleAssignmentWindowMutationTests
         long revision = await context.ModerationQualificationEpochs.Select(row => row.Revision).SingleAsync();
         var starts = DateTime.UtcNow.AddDays(2);
         var expires = starts.AddHours(4);
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context);
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
@@ -75,7 +75,8 @@ public sealed class EventRoleAssignmentWindowMutationTests
             .UseSqlite(baseline.Database.GetDbConnection()).UseSnakeCaseNamingConvention().AddInterceptors(checkpoint).Options;
         await using var context = new Explore.Persistence.ExploreDbContext(options) { TenantContext = fixture.Database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        checkpoint.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         await Assert.ThrowsAsync<AuthorizationException>(async () =>
@@ -111,12 +112,13 @@ public sealed class EventRoleAssignmentWindowMutationTests
         baseline.EventRoleAssignments.Add(assignment);
         await baseline.SaveChangesAsync();
         long revision = await baseline.ModerationQualificationEpochs.Select(row => row.Revision).SingleAsync();
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false) { Armed = false };
         var options = TestDbContextOptions.Create<Explore.Persistence.ExploreDbContext>()
             .UseSqlite(baseline.Database.GetDbConnection()).UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new Explore.Persistence.ExploreDbContext(options.Options) { TenantContext = fixture.Database };
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        fault.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var expires = DateTime.UtcNow.AddHours(3);
@@ -148,12 +150,13 @@ public sealed class EventRoleAssignmentWindowMutationTests
         var assignment = await fixture.Context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.EventId == fixture.EventId
             && row.RoleId == (int)RoleEnum.EventOwner);
         long revision = await fixture.Context.ModerationQualificationEpochs.Select(row => row.Revision).SingleAsync();
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false) { Armed = false };
         var options = TestDbContextOptions.Create<Explore.Persistence.ExploreDbContext>()
             .UseSqlite(fixture.Context.Database.GetDbConnection()).UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new Explore.Persistence.ExploreDbContext(options.Options) { TenantContext = fixture.Database };
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        fault.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
@@ -199,7 +202,8 @@ public sealed class EventRoleAssignmentWindowMutationTests
             .UseSqlite(baseline.Database.GetDbConnection()).UseSnakeCaseNamingConvention().AddInterceptors(checkpoint).Options;
         await using var context = new Explore.Persistence.ExploreDbContext(options) { TenantContext = fixture.Database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        checkpoint.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         await Assert.ThrowsAsync<AuthorizationException>(async () =>
@@ -224,7 +228,7 @@ public sealed class EventRoleAssignmentWindowMutationTests
 
     private static UpdateEventRoleAssignmentWindowCommandHandler Handler(Fixture fixture, Explore.Persistence.ExploreDbContext context,
         EventOwnershipTransferMutationTests.Session session, BusinessMetrics metrics) => new(
-            new EventRoleAssignmentRepository(context), new EventRepository(context),
+            new EventRoleAssignmentRepository(context, session.PrivateManagement), new EventRepository(context),
             new Explore.Application.Authorization.EventRoleAuthorityCeilingService(
                 new Explore.Persistence.Services.EventAuthoritySnapshotService(context), new RoleRepository(context), new PermissionRepository(context)),
             new AuditLogRepository(context), metrics, NullLogger<UpdateEventRoleAssignmentWindowCommandHandler>.Instance,
@@ -239,12 +243,13 @@ public sealed class EventRoleAssignmentWindowMutationTests
     internal sealed class ExpireAuthorityOnEpochSave(WindowClock clock, DateTimeOffset until) : SaveChangesInterceptor
     {
         private bool _pending;
+        public bool Armed { get; set; }
         public bool Observed { get; private set; }
         public bool PrivacyOwned { get; private set; }
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
             InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (!Observed && eventData.Context is Explore.Persistence.ExploreDbContext context
+            if (Armed && !Observed && eventData.Context is Explore.Persistence.ExploreDbContext context
                 && context.ChangeTracker.Entries<ModerationQualificationEpoch>().Any(entry => entry.State == EntityState.Modified))
             {
                 _pending = true;

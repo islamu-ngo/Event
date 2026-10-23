@@ -29,7 +29,7 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         var context = fixture.Context;
         var assignment = await AddTargetAsync(fixture, pending);
         long revision = await EpochAsync(context);
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context);
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
@@ -61,12 +61,13 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         await baseline.SaveChangesAsync();
         var manager = await baseline.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.EventId == fixture.EventId && row.RoleId == (int)RoleEnum.EventManager);
         long revision = await EpochAsync(baseline);
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false) { Armed = false };
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new ExploreDbContext(options.Options) { TenantContext = fixture.Database };
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        fault.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
@@ -95,12 +96,13 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         var baseline = fixture.Context;
         var owner = await baseline.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.EventId == fixture.EventId && row.RoleId == (int)RoleEnum.EventOwner);
         long revision = await EpochAsync(baseline);
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, false) { Armed = false };
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new ExploreDbContext(options.Options) { TenantContext = fixture.Database };
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        fault.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
@@ -131,7 +133,7 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         await fixture.Database.Privacy.Authority(context, TimeProvider.System).AppendAsync(PrivacyErasureRequest.Create(
             Guid.CreateVersion7(), PrivacyErasureSubjectKind.User, actorErased ? fixture.UserId : fixture.Database.SubjectId,
             PrivacyErasureReasonCode.SubjectErasureRequest, 1));
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context);
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         async Task RevokeAsync()
@@ -172,7 +174,8 @@ public sealed class EventRoleAssignmentRevocationMutationTests
             .UseSnakeCaseNamingConvention().AddInterceptors(checkpoint).Options;
         await using var context = new ExploreDbContext(options) { TenantContext = fixture.Database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        checkpoint.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         await Assert.ThrowsAsync<AuthorizationException>(async () =>
@@ -204,7 +207,7 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         owner.Revoke(fixture.UserId, DateTime.UtcNow);
         await baseline.SaveChangesAsync();
         int management = await baseline.Permissions.Where(row => row.MasterCode == PermissionCodes.EventManageTeam).Select(row => row.Id).SingleAsync();
-        await new RoleRepository(baseline).ReplacePermissions((int)RoleEnum.EventManager, [management], fixture.UserId);
+        await new RoleRepository(baseline).ReplacePermissionsAsync((int)RoleEnum.EventManager, [management], fixture.UserId);
         var until = DateTime.UtcNow.AddMinutes(1);
         var target = EventRoleAssignment.Create(fixture.TenantId, fixture.EventId, fixture.UserId,
             (int)RoleEnum.CheckInStaff, EventRoleAssignmentStatus.Active, until.AddHours(-1), until, fixture.UserId);
@@ -217,7 +220,8 @@ public sealed class EventRoleAssignmentRevocationMutationTests
             .UseSnakeCaseNamingConvention().AddInterceptors(checkpoint).Options;
         await using var context = new ExploreDbContext(options) { TenantContext = fixture.Database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context, clock, shared?.Authority(context, clock));
+        checkpoint.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         await Assert.ThrowsAsync<AuthorizationException>(async () =>
@@ -245,12 +249,13 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         var baseline = fixture.Context;
         var owner = await baseline.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.EventId == fixture.EventId && row.RoleId == (int)RoleEnum.EventOwner);
         long revision = await EpochAsync(baseline);
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(true, true);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(true, true) { Armed = false };
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault)
             .ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>().Options;
         await using var context = new ExploreDbContext(options) { TenantContext = fixture.Database };
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context);
+        fault.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var log = new DenialLog();
@@ -280,7 +285,7 @@ public sealed class EventRoleAssignmentRevocationMutationTests
             .UseSnakeCaseNamingConvention().AddInterceptors(fault).Options;
         await using var context = new ExploreDbContext(options) { TenantContext = fixture.Database };
         bool removed = false;
-        var session = EventOwnershipTransferMutationTests.CreateSession(fixture, context,
+        await using var session = await EventOwnershipTransferMutationTests.CreateSession(fixture, context,
             beforeAuthorize: async token =>
             {
                 if (fault.Injected && !removed)
@@ -289,6 +294,7 @@ public sealed class EventRoleAssignmentRevocationMutationTests
                     await context.EventRoleAssignments.Where(row => row.Id == owner.Id).ExecuteDeleteAsync(token);
                 }
             });
+        fault.Armed = true;
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var log = new DenialLog();
@@ -308,11 +314,12 @@ public sealed class EventRoleAssignmentRevocationMutationTests
 
     private sealed class ConflictBeforeDenialSave : SaveChangesInterceptor
     {
+        public bool Armed { get; set; }
         public bool Injected { get; private set; }
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
             InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (!Injected && eventData.Context is ExploreDbContext context && context.ChangeTracker.Entries<AuditLog>()
+            if (Armed && !Injected && eventData.Context is ExploreDbContext context && context.ChangeTracker.Entries<AuditLog>()
                 .Any(entry => entry.State == EntityState.Added && entry.Entity.Action == "EventRoleAssignmentRevokeDenied"))
             {
                 Injected = true;
@@ -346,9 +353,8 @@ public sealed class EventRoleAssignmentRevocationMutationTests
     private static RevokeEventRoleAssignmentCommandHandler Handler(Fixture fixture, ExploreDbContext context,
         EventOwnershipTransferMutationTests.Session session, BusinessMetrics metrics,
         ILogger<RevokeEventRoleAssignmentCommandHandler>? logger = null) => new(
-            new EventRoleAssignmentRepository(context), new EventRepository(context),
-            new EventRoleAuthorityCeilingService(new Explore.Persistence.Services.EventAuthoritySnapshotService(context),
-                new RoleRepository(context), new PermissionRepository(context)), new AuditLogRepository(context), metrics,
+            new EventRoleAssignmentRepository(context, session.PrivateManagement), new EventRepository(context),
+            session.Preparation, new AuditLogRepository(context), metrics,
             logger ?? NullLogger<RevokeEventRoleAssignmentCommandHandler>.Instance, session.Identity, session.Machine,
             fixture.Database, session.Provider, session.Boundary);
 }

@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -32,7 +33,7 @@ public sealed partial class EventInitialCreationMutationTests
         var crossing = new ExpireInitialPublicationDuringSnapshot(clock, originalUntil);
         await using var context = database.Context(crossing);
         await using var retained = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = Session(database, context, retained?.Authority(context, clock), clock);
+        await using var session = await Session(database, context, retained?.Authority(context, clock), clock);
 
         await Assert.ThrowsAsync<ConcurrencyConflictException>(async () => await session.Boundary.ExecuteCreationAsync(
             creation, (_, token) => QualifyPublisherAsync(context, creation, token),

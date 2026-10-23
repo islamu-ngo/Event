@@ -64,6 +64,19 @@ changing either source still rejects the operation.
 These source controls have authored regression coverage; executable programme
 and database-provider assurance remains pending.
 
+### Provider configuration transaction settlement
+
+Administrator provider changes remain tied to the original configuration image
+and identity binding through completion. A denial before commit restores the
+previous configuration and prevents activation. If authority changes during a
+write, reload current state and begin a new observation; an attempted observation
+cannot be replayed.
+
+Native SQLite verification covers administrator authorization-provider writes:
+unchanged authority commits, while grant removal or binding-key drift after the
+write rejects settlement. Setup writes and other database/provider configurations
+have separate verification gates.
+
 ## Supported Provider States
 
 | Primary provider | AT Protocol login | Result |

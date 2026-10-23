@@ -487,12 +487,15 @@ public sealed partial class HumanSettingsMutationPreparationTests
         }
     }
 
-    private static async Task<Request> ProviderRequestAsync(IServiceProvider services, string? bearer, string? secret)
+    private static async Task<Request> ProviderRequestAsync(IServiceProvider services, string? bearer, string? secret,
+        string requestPath = "/api/instance/settings/auth-provider")
     {
         var scope = services.CreateAsyncScope();
         var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
         var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
         accessor.HttpContext = context;
+        context.Request.Method = HttpMethods.Patch;
+        context.Request.Path = requestPath;
         if (bearer is not null) context.Request.Headers.Authorization = "Bearer " + bearer;
         if (secret is not null) context.Request.Headers["X-Setup-Secret"] = secret;
         var authentication = await context.AuthenticateAsync();

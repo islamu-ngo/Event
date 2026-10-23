@@ -250,7 +250,8 @@ public sealed partial class HumanSettingsMutationPreparation(
     {
         mutation.RequireActive();
         services.GetRequiredService<IProviderConfigurationMutationAuthority>().RequireIssued(mutation.Source);
-        if (!ReferenceEquals(command, mutation.OriginalCommand) || mutation.IsSetup || actor == Guid.Empty)
+        if (!ReferenceEquals(command, mutation.OriginalCommand) || mutation.IsSetup || actor == Guid.Empty
+            || mutation.Source is not IProviderConfigurationHumanSource source)
             throw new UnauthorizedAccessException("Provider effects require their actual original administrator command.");
         // These actual commands are administrator-only, not ISecureRequest/PDP actions.
         // Their fixed paired lock effects do not select a replacement lock policy.
@@ -258,20 +259,20 @@ public sealed partial class HumanSettingsMutationPreparation(
             (_, _) => mutation.Effects.Select(effect => new HumanSettingsMutation(
                 HumanSettingsOperation.InstanceSettings, SettingScope.Instance, null, null,
                 effect.Key, HumanSettingsMutationKind.SetValue, effect.Value)).ToImmutableArray(),
-            CoordinatedKeys(mutation.Effects.Select(effect => effect.Key)), token);
+            CoordinatedKeys(mutation.Effects.Select(effect => effect.Key)), token,
+            requireOriginalRequest: source.RequireRequestAsync, requireOriginalFacts: source.RequireAcquiredFacts);
         try
         {
             var writer = services.GetRequiredService<IProviderConfigurationSettingsWriter>();
             var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
             return new Prepared(this, mutation, issued.Effects, issued.CoordinatedReadKeys, issued.Owner, async ct =>
             {
-                var validate = await issued.Acquire(ct);
                 finalizer.Register(final => writer.RequireAppliedAsync(mutation, final), _ =>
                 {
                     mutation.RequireActive();
                     mutation.Source.RequireTime();
                 });
-                return validate;
+                return await issued.Acquire(ct);
             }).TakeCoordinationFrom(issued);
         }
         catch (Exception failure)

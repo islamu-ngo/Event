@@ -201,13 +201,19 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
 
         public async Task RequireSourcesAsync(CancellationToken token)
         {
+            await RequireAuthenticationAsync();
+            await RequireOriginalAuthorityAsync(token);
+            RequireCustody();
+        }
+
+        protected async Task RequireAuthenticationAsync()
+        {
             RequireCustody();
             var current = await Request.AuthenticateAsync();
             if (!current.Succeeded || current.Ticket?.AuthenticationScheme != scheme || current.Principal is null
                 || !ticketIdentities.SequenceEqual(current.Principal.Identities)
                 || !ticketClaims.SequenceEqual(current.Principal.Claims)
                 || current.Properties?.IssuedUtc != issuedAt || current.Properties?.ExpiresUtc != expiresAt) throw Denied();
-            await RequireOriginalAuthorityAsync(token);
             RequireCustody();
         }
 
@@ -353,10 +359,28 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
 
         protected override async Task RequireOriginalAuthorityAsync(CancellationToken token)
         {
+            await RequireCredentialAsync(token);
+            RequireAcquiredFacts(await principalFence.ObserveAsync(token), await supportFence.ObserveAsync(token));
+        }
+
+        private async Task RequireCredentialAsync(CancellationToken token)
+        {
             if (!ReferenceEquals(Owner._human.Subject, subject)
-                || !ReferenceEquals(await Owner._lifetimes.ObserveAsync(Principal, token), lifetime)
-                || JsonSerializer.Serialize(await principalFence.ObserveAsync(token)) != originalPrincipal
-                || JsonSerializer.Serialize(await supportFence.ObserveAsync(token)) != originalSupport) throw Denied();
+                || !ReferenceEquals(await Owner._lifetimes.ObserveAsync(Principal, token), lifetime)) throw Denied();
+        }
+
+        public async Task RequireRequestAsync(CancellationToken token)
+        {
+            await RequireAuthenticationAsync();
+            await RequireCredentialAsync(token);
+            RequireCustody();
+        }
+
+        public void RequireAcquiredFacts(HumanPrincipalSourceFacts currentPrincipal, HumanSupportAccessSourceFacts currentSupport)
+        {
+            RequireCustody();
+            if (JsonSerializer.Serialize(currentPrincipal) != originalPrincipal
+                || JsonSerializer.Serialize(currentSupport) != originalSupport) throw Denied();
         }
 
         public override void RequireTime()

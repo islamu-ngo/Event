@@ -31,6 +31,10 @@ public interface IProviderConfigurationHumanSource : IProviderConfigurationMutat
 {
     HumanCommitSubject Subject { get; }
     HumanAuthenticationLifetime Lifetime { get; }
+    /// <summary>Checks the original human request without observing idle-only database sources.</summary>
+    Task RequireRequestAsync(CancellationToken token);
+    /// <summary>Compares fresh facts supplied by the original Settings coordinator.</summary>
+    void RequireAcquiredFacts(HumanPrincipalSourceFacts principal, HumanSupportAccessSourceFacts support);
 }
 
 public interface IProviderConfigurationSetupSource : IProviderConfigurationMutationSource

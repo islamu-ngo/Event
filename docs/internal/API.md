@@ -735,6 +735,39 @@ accepted setup secret and existing trusted setup lease where applicable; no
 human lifetime observation is manufactured for a setup-secret identity.
 Credential-source checks do not certify a completed mutation or its transaction.
 
+### Provider human transaction settlement
+
+Provider human mutations reuse the original `HumanSettingsMutationPreparation`
+coordinator's sole transaction-bound source-set, principal and support leases.
+The three active `ProviderConfigurationSettingsWriter` checks use the native
+source's request-only authentication and API-issued lifetime checks, without
+calling idle-only database observation. The coordinator supplies freshly read
+held-source facts to the stateless comparison with the original principal and
+support snapshots. It does not reacquire leases or cache an authorization result.
+
+The fixed writer completion callback is registered before coordinator acquisition.
+Its complete data-image check precedes the final request/authentication cycle,
+fresh held-source reads, current administrator predicate and terminal deadline
+sample. The original physical owner, connection and transaction, and complete
+source/effect snapshots remain mandatory. Activation follows acknowledged
+settlement. Denial before commit rolls back the attempt; unknown commit outcomes
+and cleanup failures after commit retain their existing unit-of-work distinctions.
+An attempted observation cannot replay, and a retry must observe current state
+again.
+
+Executed native SQLite Release evidence comprises all three
+`ProviderHumanCommit_RechecksAuthorityAfterOriginalWriterCompletion` cases:
+3 passed with zero skips. The unchanged authorization-provider write activates
+only after both canonical rows are independently visible and the transaction has
+ended. Real grant removal and binding-key drift occur after both rows have been
+written in the original Serializable transaction, with an affected-row witness.
+Denial restores the original setting rows, grant identity and binding key and
+prevents authorization-provider activation. Binding drift can be rejected by the
+writer's original-login data-image check before the final held-source callback;
+the grant case verifies current authority beyond that data image. These controls
+do not certify setup writes, other provider families, PostgreSQL or cross-server
+cache propagation.
+
 ## Diagnostic Scope Ownership
 
 Support-access request auditing preserves the completed HTTP response when

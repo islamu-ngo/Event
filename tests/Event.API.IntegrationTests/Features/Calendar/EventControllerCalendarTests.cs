@@ -6,12 +6,19 @@ using Explore.API.Hateoas;
 using Explore.API.Services.Calendar;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.LocationPrivacy;
+using Explore.Application.Contracts.Services;
+using Explore.Application.Features.Events.Handlers.Queries;
+using Explore.Domain;
+using Explore.Domain.Enums;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.Events.Requests.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
 using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features.Calendar;
@@ -24,8 +31,8 @@ public sealed class EventControllerCalendarTests
     private const string CoordinateCanary = "50.84673,4.35247";
     private const string RoomCanary = "FAMILY-ROOM-CANARY";
 
-    private readonly IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?> _calendarQuery =
-        Substitute.For<IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?>>();
+    private readonly IQueryHandler<GetEventCalendarExportRequest, PublicEventCalendarProjection?> _calendarQuery =
+        Substitute.For<IQueryHandler<GetEventCalendarExportRequest, PublicEventCalendarProjection?>>();
     private readonly IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?> _attendeeCalendarQuery =
         Substitute.For<IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?>>();
     private readonly IPublicUrlBuilder _publicUrlBuilder = Substitute.For<IPublicUrlBuilder>();
@@ -38,6 +45,7 @@ public sealed class EventControllerCalendarTests
             TraceIdentifier = "trace-calendar-test"
         };
         httpContext.Request.Path = "/api/event/22222222-3333-4444-5555-666666666666/calendar";
+        httpContext.Response.Body = new MemoryStream();
 
         _controller = new EventCalendarController(
             _calendarQuery,
@@ -66,18 +74,17 @@ public sealed class EventControllerCalendarTests
         _calendarQuery.QueryAsync(
                 Arg.Is<GetEventCalendarExportRequest>(request => request.EventId == eventId),
                 Arg.Any<CancellationToken>())
-            .Returns(export);
+            .Returns(await Projection(export));
         _publicUrlBuilder.GetEventUrl(eventId)
             .Returns("https://events.example.org/events/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
         IActionResult result = await _controller.GetCalendar(eventId, CancellationToken.None);
 
-        var file = result as FileContentResult;
-        await Assert.That(file).IsNotNull();
-        await Assert.That(file!.ContentType).IsEqualTo("text/calendar; charset=utf-8");
-        await Assert.That(file.FileDownloadName).IsEqualTo("pinned-public-calendar.ics");
-
-        string calendar = Encoding.UTF8.GetString(file.FileContents);
+        await result.ExecuteResultAsync(_controller.ControllerContext);
+        await Assert.That(_controller.Response.ContentType).IsEqualTo("text/calendar; charset=utf-8");
+        await Assert.That(ContentDispositionHeaderValue.Parse(_controller.Response.Headers.ContentDisposition.ToString())
+            .FileNameStar.Value).IsEqualTo("pinned-public-calendar.ics");
+        string calendar = Encoding.UTF8.GetString(((MemoryStream)_controller.Response.Body).ToArray());
         await Assert.That(calendar).Contains("BEGIN:VCALENDAR");
         await Assert.That(calendar).Contains("END:VCALENDAR");
         await Assert.That(calendar).DoesNotContain(PrivateHomeCanary);
@@ -172,18 +179,17 @@ public sealed class EventControllerCalendarTests
             "Main Hall, Brussels");
 
         _calendarQuery.QueryAsync(Arg.Is<GetEventCalendarExportRequest>(request => request.EventId == eventId), Arg.Any<CancellationToken>())
-            .Returns(export);
+            .Returns(await Projection(export));
         _publicUrlBuilder.GetEventUrl(eventId)
             .Returns("https://events.example.org/events/11111111-2222-3333-4444-555555555555");
 
         IActionResult result = await _controller.GetCalendar(eventId, CancellationToken.None);
 
-        var file = result as FileContentResult;
-        await Assert.That(file).IsNotNull();
-        await Assert.That(file!.ContentType).IsEqualTo("text/calendar; charset=utf-8");
-        await Assert.That(file.FileDownloadName).IsEqualTo("community-iftar-2026.ics");
-
-        string calendar = Encoding.UTF8.GetString(file.FileContents);
+        await result.ExecuteResultAsync(_controller.ControllerContext);
+        await Assert.That(_controller.Response.ContentType).IsEqualTo("text/calendar; charset=utf-8");
+        await Assert.That(ContentDispositionHeaderValue.Parse(_controller.Response.Headers.ContentDisposition.ToString())
+            .FileNameStar.Value).IsEqualTo("community-iftar-2026.ics");
+        string calendar = Encoding.UTF8.GetString(((MemoryStream)_controller.Response.Body).ToArray());
         await Assert.That(calendar).Contains("BEGIN:VCALENDAR");
         await Assert.That(calendar).Contains("BEGIN:VEVENT");
         await Assert.That(calendar).Contains($"UID:{eventId:D}");
@@ -199,12 +205,77 @@ public sealed class EventControllerCalendarTests
     {
         var eventId = Guid.Parse("22222222-3333-4444-5555-666666666666");
         _calendarQuery.QueryAsync(Arg.Is<GetEventCalendarExportRequest>(request => request.EventId == eventId), Arg.Any<CancellationToken>())
-            .Returns((EventCalendarExportDto?)null);
+            .Returns((PublicEventCalendarProjection?)null);
 
         IActionResult result = await _controller.GetCalendar(eventId, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<ObjectResult>();
         var objectResult = (ObjectResult)result;
         await Assert.That(objectResult.StatusCode).IsEqualTo(404);
+    }
+
+    private static async Task<PublicEventCalendarProjection?> Projection(EventCalendarExportDto export)
+    {
+        var owner = new CalendarOwner(export);
+        var tenant = Substitute.For<ITenantContext>();
+        tenant.TenantId.Returns(owner.Lease.Event.TenantId);
+        var locations = Substitute.For<IEventLocationDisclosureService>();
+        locations.ResolveManyAsync(Arg.Any<IReadOnlyCollection<EventLocationDisclosureRequest>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var request = (call.Arg<IReadOnlyCollection<EventLocationDisclosureRequest>>()
+                    ?? throw new InvalidOperationException("Public location intent is required.")).Single();
+                IReadOnlyDictionary<Guid, EventLocationDisclosureResult> result =
+                    new Dictionary<Guid, EventLocationDisclosureResult>
+                    {
+                        [request.EventLocationId] = EventLocationDisclosureResult.Public(request.EventLocationId,
+                            EventLocationDisclosureState.Available, new(VenueName: export.Location))
+                    };
+                return result;
+            });
+        return await new GetEventCalendarExportRequestHandler(owner, tenant, locations, new CalendarClock())
+            .QueryAsync(new(export.EventId), CancellationToken.None);
+    }
+
+    private sealed class CalendarClock : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class CalendarOwner(EventCalendarExportDto export) : IModerationPublicEventCalendarRepository
+    {
+        public CalendarLease Lease { get; } = new(export);
+        public Task<T> ExecuteSerializedAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken) =>
+            operation(cancellationToken);
+        public Task<ModerationPublicEventCalendarAcquisition> AcquireAsync(
+            ModerationPublicEventCalendarRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new ModerationPublicEventCalendarAcquisition(ModerationPublicEventCalendarOutcome.Allowed, Lease));
+    }
+
+    private sealed class CalendarLease : IModerationPublicEventCalendarLease
+    {
+        public Explore.Domain.Event Event { get; }
+        public EventSession PrimarySession { get; }
+        public DateTimeOffset ValidUntil => new(2026, 10, 14, 12, 1, 0, TimeSpan.Zero);
+        public CancellationToken ValidityCancellation => CancellationToken.None;
+        public CalendarLease(EventCalendarExportDto export)
+        {
+            Event = new(EventStatusEnum.Published)
+            {
+                Id = export.EventId, TenantId = Guid.NewGuid(), Title = export.Title, Content = export.Description,
+                Slug = export.Slug, Actor = null!, Tenant = null!, VisibilityType = null!, EventStatus = null!,
+                EventFormat = null!, VisibilityTypeId = (int)VisibilityTypeEnum.Public
+            };
+            PrimarySession = new(EventSessionStatusEnum.Published)
+            {
+                Id = Guid.NewGuid(), EventId = Event.Id, Event = Event, TenantId = Event.TenantId, Tenant = null!,
+                StartTime = export.StartsAtUtc, EndTime = export.EndsAtUtc
+            };
+            PrimarySession.AssignEventLocation(EventLocation.CreateToBeAnnounced(
+                Event.TenantId, Event.Id, Guid.NewGuid(), new CalendarClock().GetUtcNow().UtcDateTime));
+        }
+        public Task<ModerationPublicEventCalendarOutcome> RevalidateAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(ModerationPublicEventCalendarOutcome.Allowed);
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

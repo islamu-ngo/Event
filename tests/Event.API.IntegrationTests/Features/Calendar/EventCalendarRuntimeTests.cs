@@ -9,8 +9,16 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
+using Explore.Secrets.Database;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
@@ -34,6 +42,29 @@ public sealed class EventCalendarRuntimeTests(CalendarRouteRuntimeFixture fixtur
     public async Task CalendarRoutes_EnforcePurposeAuthorizationCacheAndRetentionContracts()
     {
         CalendarRouteScenario scenario = await SeedScenarioAsync();
+        if (Environment.GetEnvironmentVariable("ISLAMU_MODERATION_MEASUREMENT_JOURNAL") == "1")
+        {
+            await using var observedScope = fixture.Factory.Services.CreateAsyncScope();
+            var observedDatabase = observedScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await observedDatabase.Database.OpenConnectionAsync();
+            var composition = new Dictionary<string, string>();
+            foreach (var extension in observedDatabase.GetService<IDbContextOptions>().Extensions)
+                extension.Info.PopulateDebugInfo(composition);
+            if (!composition.TryGetValue("Explore:PrimaryPublicDatabaseIdentity", out var digest))
+                throw new InvalidOperationException("Calendar measurement requires native primary composition.");
+            var version = observedDatabase.Database.GetDbConnection().ServerVersion;
+            var provider = observedDatabase.Database.ProviderName switch
+            {
+                "Microsoft.EntityFrameworkCore.Sqlite" => "Sqlite",
+                "Npgsql.EntityFrameworkCore.PostgreSQL" => "PostgreSql",
+                "Microsoft.EntityFrameworkCore.SqlServer" => "SqlServer",
+                "Pomelo.EntityFrameworkCore.MySql" => version.Contains("MariaDB", StringComparison.OrdinalIgnoreCase)
+                    ? "MariaDb" : "MySql",
+                _ => throw new InvalidOperationException("Calendar measurement requires a native provider.")
+            };
+            Event.Tests.Shared.Moderation.ModerationMeasurementJournalAttribute.RecordDatabaseObservation(
+                TUnit.Core.TestContext.Current!, provider, version, digest);
+        }
         string publicRoute = $"/api/Event/{scenario.EventId}/calendar";
         string attendeeRoute = $"/api/Event/{scenario.EventId}/calendar/my-access";
         string publicCurl = Unfold(await InvokeCurlAsync(
@@ -323,18 +354,28 @@ public sealed class EventCalendarRuntimeTests(CalendarRouteRuntimeFixture fixtur
 
 public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDisposable
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:18-alpine")
-        .WithDatabase("calendar_routes")
-        .WithUsername("postgres")
-        .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
-        .Build();
+    private PostgreSqlContainer? _container;
 
-    public PostgreSqlApiWebApplicationFactory Factory { get; private set; } = null!;
+    public WebApplicationFactory<Program> Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
+        if (Environment.GetEnvironmentVariable("ISLAMU_MODERATION_MEASUREMENT_JOURNAL") == "1")
+        {
+            var factory = new CalendarMeasurementWebApplicationFactory();
+            await factory.InitializeDatabaseAsync();
+            Factory = factory;
+            Factory.UseKestrel(0);
+            Client = Factory.CreateClient();
+            return;
+        }
+
+        _container = new PostgreSqlBuilder("postgres:18-alpine")
+            .WithDatabase("calendar_routes")
+            .WithUsername("postgres")
+            .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
+            .Build();
         await _container.StartAsync();
         var options = new DbContextOptionsBuilder<ExploreDbContext>()
             .UseNpgsql(_container.GetConnectionString())
@@ -381,8 +422,83 @@ public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDispo
             await Factory.DisposeAsync();
         }
 
-        await _container.DisposeAsync();
+        if (_container is not null)
+            await _container.DisposeAsync();
         GC.SuppressFinalize(this);
+    }
+
+    private sealed class CalendarMeasurementWebApplicationFactory : WebApplicationFactory<Program>
+    {
+        private readonly PrimaryDatabaseConnectionOptions _database;
+        private readonly Dictionary<string, string?> _settings;
+
+        public CalendarMeasurementWebApplicationFactory()
+        {
+            if (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") != "Testing"
+                || Environment.GetEnvironmentVariable("SECRET_PROVIDER") != "Environment")
+                throw new InvalidOperationException("Calendar measurement requires the launcher-selected testing authority.");
+            var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+            using var owner = (IDisposable)configuration;
+            _database = PrimaryDatabaseConfiguration.BindRuntime(configuration);
+            _settings = configuration.GetSection("Database").AsEnumerable()
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+            _settings["Testing:HostProfile"] = TestHostProfile.RealRuntime;
+            _settings["Testing:UseRealDatabase"] = "true";
+            _settings["Testing:ApplyMigrations"] = "false";
+            _settings["RateLimiting:DisableInTesting"] = "true";
+        }
+
+        public async Task InitializeDatabaseAsync()
+        {
+            var options = new DbContextOptionsBuilder<ExploreDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options, _database);
+            await using var context = new ExploreDbContext(options.Options);
+            await context.Database.EnsureCreatedAsync();
+            await LookupTableSeeder.SeedAsync(context);
+        }
+
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Testing:HostProfile", TestHostProfile.RealRuntime);
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(_settings));
+            builder.ConfigureTestServices(services =>
+            {
+                TestHostServicePruner.RemoveNoisyHostedServices(services);
+                services.RemoveExploreDbContextRegistrations();
+                services.AddDbContextFactory<ExploreDbContext>(options =>
+                    PrimaryDatabaseProviderComposition.ConfigureApplication(options, _database));
+                services.AddScoped(provider =>
+                {
+                    var context = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>()
+                        .CreateDbContext();
+                    context.TenantContext = provider.GetService<ITenantContext>();
+                    context.CurrentUserService = provider.GetService<ICurrentUserService>();
+                    context.ClearTenantFilterBypass();
+                    return context;
+                });
+                services.AddAuthentication(options =>
+                {
+                    options.DefaultScheme = TestAuthHandler.SchemeName;
+                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+                }).AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
+                services.PostConfigure<AuthenticationOptions>(options =>
+                {
+                    options.DefaultScheme = TestAuthHandler.SchemeName;
+                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+                    options.DefaultForbidScheme = TestAuthHandler.SchemeName;
+                    options.DefaultSignInScheme = TestAuthHandler.SchemeName;
+                    options.DefaultSignOutScheme = TestAuthHandler.SchemeName;
+                });
+                services.RemoveAll<IAuthorizationProvider>();
+                services.AddScoped<IAuthorizationProvider, FallbackAuthorizationService>();
+                services.RemoveAll<ILocationPrivacyGovernanceService>();
+                services.AddSingleton<ILocationPrivacyGovernanceService, CalendarPrivacyGovernance>();
+            });
+        }
     }
 
     private sealed class CalendarPrivacyGovernance : ILocationPrivacyGovernanceService

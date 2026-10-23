@@ -8,11 +8,13 @@ using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;
 using Microsoft.Extensions.Configuration;
 
-if (args.Length != 2 || args[1].Length == 0 || !Enum.TryParse<PrimaryDatabaseProvider>(args[0], true, out var provider)
+bool script = args.Length == 4 && args[2] == "--script-from";
+if (args.Length != 2 && !script || args[1].Length == 0 || !Enum.TryParse<PrimaryDatabaseProvider>(args[0], true, out var provider)
     || !Enum.IsDefined(provider) || !char.IsAsciiLetter(args[1][0])
-    || args[1].Any(character => !char.IsAsciiLetterOrDigit(character)))
+    || args[1].Any(character => !char.IsAsciiLetterOrDigit(character))
+    || script && (args[3].Length == 0 || args[3].Any(character => !char.IsAsciiLetterOrDigit(character))))
 {
-    Console.Error.WriteLine("Usage: dotnet run eng/tools/ScaffoldPrimaryMigration.cs -- <provider> <migration-name>");
+    Console.Error.WriteLine("Usage: dotnet run eng/tools/ScaffoldPrimaryMigration.cs -- <provider> <migration-name> [--script-from <previous-migration>]");
     return 64;
 }
 
@@ -68,17 +70,9 @@ PrimaryDatabaseConfiguration.Validate(options);
 Directory.CreateDirectory(Path.Combine(root, ".artifacts"));
 
 // Credentials originate in the selected authority and exist only in this child process.
-// Scaffold does not connect to or update a database; provider-specific fields select its model.
+// Build the selected product project with --no-restore first; scaffolding must not restore implicitly.
+// Scaffolding and bounded SQL generation never connect to or update a database.
 var start = new ProcessStartInfo("dotnet") { WorkingDirectory = root };
-foreach (var argument in new[]
-{
-    "ef", "migrations", "add", args[1], "--context", "ExploreDbContext",
-    "--project", project, "--startup-project", project,
-    "--configuration", "Release", "--output-dir", "Migrations"
-})
-{
-    start.ArgumentList.Add(argument);
-}
 start.Environment["SecretProvider__Provider"] = "Environment";
 start.Environment["SECRET_PROVIDER"] = "Environment";
 foreach (var field in new KeyValuePair<string, string?>[]
@@ -102,6 +96,31 @@ foreach (var field in new KeyValuePair<string, string?>[]
 }
 start.Environment["Database__Schema"] = options.Schema;
 start.Environment["DATABASE_NAME"] = string.Empty;
-using var child = Process.Start(start) ?? throw new InvalidOperationException("Unable to start native EF scaffolding.");
-await child.WaitForExitAsync();
-return child.ExitCode;
+string[] shared = ["--context", "ExploreDbContext", "--project", project, "--startup-project", project,
+    "--configuration", "Release", "--no-build"];
+string[][] commands;
+if (script)
+{
+    string directory = Path.Combine(root, ".artifacts", "migrations", args[1]);
+    string up = Path.Combine(directory, $"{provider}.up.sql");
+    string down = Path.Combine(directory, $"{provider}.down.sql");
+    if (File.Exists(up) || File.Exists(down))
+        throw new InvalidOperationException("Migration SQL output already exists; preserve it before choosing another generation.");
+    Directory.CreateDirectory(directory);
+    commands =
+    [
+        ["ef", "migrations", "script", args[3], args[1], "--output", up, .. shared],
+        ["ef", "migrations", "script", args[1], args[3], "--output", down, .. shared]
+    ];
+}
+else
+    commands = [["ef", "migrations", "add", args[1], "--output-dir", "Migrations", .. shared]];
+foreach (string[] command in commands)
+{
+    start.ArgumentList.Clear();
+    foreach (string argument in command) start.ArgumentList.Add(argument);
+    using var child = Process.Start(start) ?? throw new InvalidOperationException("Unable to start native EF artifact generation.");
+    await child.WaitForExitAsync();
+    if (child.ExitCode != 0) return child.ExitCode;
+}
+return 0;

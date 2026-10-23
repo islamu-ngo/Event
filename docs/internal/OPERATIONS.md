@@ -919,8 +919,10 @@ The repository-native C# scaffolder reads that selected authority, chooses the
 provider model, and injects its credentials only into the native EF child process:
 
 ```bash
-DOTNET_ENVIRONMENT=Development dotnet run eng/tools/ScaffoldPrimaryMigration.cs -- SqlServer <MigrationName>
-DOTNET_ENVIRONMENT=Development dotnet run eng/tools/ScaffoldPrimaryMigration.cs -- MySql <MigrationName>
+dotnet build src/Explore.Persistence.Migrations.SqlServer/Explore.Persistence.Migrations.SqlServer.csproj --configuration Release --no-restore
+DOTNET_ENVIRONMENT=Development dotnet run --no-restore eng/tools/ScaffoldPrimaryMigration.cs -- SqlServer <MigrationName>
+dotnet build src/Explore.Persistence.Migrations.MySql/Explore.Persistence.Migrations.MySql.csproj --configuration Release --no-restore
+DOTNET_ENVIRONMENT=Development dotnet run --no-restore eng/tools/ScaffoldPrimaryMigration.cs -- MySql <MigrationName>
 ```
 
 Run from the repository root. The tool also accepts `PostgreSql` and `Sqlite`;
@@ -928,6 +930,20 @@ SQLite uses a task-local `.artifacts/islamu-event-migrations.db` model path.
 It never prints credentials, writes a dotenv file, changes the selected shared
 secret authority, or connects to, migrates or resets a database. The requested
 migration and its snapshot remain native EF-generated artifacts.
+The selected migration project must be built first: the EF child uses `--no-build`
+so scaffolding cannot trigger an implicit package restore or consume a stale model.
+
+To generate bounded Up and Down SQL without connecting to a database, build the
+selected migration project first, then use the same authority-preserving tool:
+
+```bash
+DOTNET_ENVIRONMENT=Development dotnet run eng/tools/ScaffoldPrimaryMigration.cs --configuration Release --no-build --no-restore -- Sqlite ImmutableRegistrationProviderBindingPublication --script-from AddNativeModerationSourceOwners
+```
+
+SQL is written to `.artifacts/migrations/<MigrationName>/<Provider>.up.sql` and
+`<Provider>.down.sql`; existing outputs are refused rather than overwritten.
+Generation exercises native SQL generators, not migration execution or data-transfer
+correctness on an engine. Do not apply a script with unresolved migration gates.
 
 MySQL and MariaDB share the owning migration project. Generate each migration
 once with the MySQL model, then verify its behavior on both supported engines.

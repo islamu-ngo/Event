@@ -135,11 +135,15 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
 
     private static JsonObject ModerationRevision() => new()
     {
-        ["type"] = "integer", ["minimum"] = 1, ["maximum"] = long.MaxValue
+        ["type"] = "integer",
+        ["minimum"] = 1,
+        ["maximum"] = long.MaxValue
     };
 
     private static JsonObject ModerationNonnegativeInteger() => new()
     {
-        ["type"] = "integer", ["minimum"] = 0, ["maximum"] = int.MaxValue
+        ["type"] = "integer",
+        ["minimum"] = 0,
+        ["maximum"] = int.MaxValue
     };
 }

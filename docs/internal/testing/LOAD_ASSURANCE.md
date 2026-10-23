@@ -73,6 +73,23 @@ supplied by the SDK).
 They exclude response bodies, application logs, target URLs, credentials,
 tokens, stdout, stderr, user identifiers, and hostname.
 
+Rejected runs still fail the test, but their safe numeric observations can
+survive cleanup in `rejected-*.json`. The failure wrapper runs after the
+runner completes its bounded cleanup attempt and reads at most 4,097 bytes to enforce a
+4,096-byte summary ceiling. It retains only the exact expected schema, journey,
+profile and numeric fields, with finite bounded counters/rates/percentiles.
+Unknown fields, unavailable files and oversized/malformed summaries produce a
+finite status and a null summary; no missing metric becomes zero. Every such
+record has `Admission="Rejected"` and `CapacityEvidenceEligible=false`.
+
+The independent three-second capture budget also applies when the original run
+was cancelled. The failure returned by the runner is rethrown; a capture failure
+preserves both causes. A provided observation of 38 completed attempts and two drops can
+therefore explain a rejected forty-offered run, while the normal parser still
+rejects drops, errors, count mismatches or nonzero child exits. This diagnostic
+projection does not validate the selected k6 binary's unobserved runtime shape
+or turn a failed run into a baseline.
+
 Every record is explicitly a **candidate**. No guessed absolute latency
 threshold is applied. Promote a baseline only after repeatable clean runs on a
 quiet host, with a recorded revision and hardware identity. Compare like for
@@ -231,7 +248,7 @@ parser/admission and owned child-process tests require no network, Docker,
 k6 executable or AppHost:
 
 ```bash
-dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter '/*/*/K6Load*HarnessTests/*' --minimum-expected-tests 71
+dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter '/*/*/K6Load*HarnessTests/*' --minimum-expected-tests 73
 ```
 
 The explicit runtime category requires the real owned environment and external

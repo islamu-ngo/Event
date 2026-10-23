@@ -42,6 +42,11 @@ provider, runtime and resource measurements. It excludes response bodies,
 credentials and application/process logs. Disposable application resources and
 raw summaries are removed by the fixture after execution.
 
+A failed profile may retain a `rejected-*.json` diagnostic with safe numeric
+observations, including reported drops. It remains rejected and ineligible for
+capacity or baseline use. Missing, oversized or malformed summaries remain
+explicitly unavailable; raw output and unreviewed fields are not retained.
+
 These results describe a warmed public lookup and its output cache. They do not
 prove application capacity, a production latency promise, write correctness or
 completed registration effects. Latencies are baseline candidates only. Review

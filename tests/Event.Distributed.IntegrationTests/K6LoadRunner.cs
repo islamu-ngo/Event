@@ -594,7 +594,8 @@ internal static class K6LoadRunner
             try
             {
                 await ValidateExecutableAsync(executable, cancellationToken);
-                measurement = await RunOwnedProcessAsync(startInfo, summary, profile, budget.ProcessDeadline, cancellationToken, journey);
+                measurement = await RunWithRejectedEvidenceAsync(startInfo, summary,
+                    Path.Combine(EvidenceDirectory(fixture), $"rejected-{topology}-{name}.json"), profile, journey, budget.ProcessDeadline, cancellationToken);
             }
             finally
             {
@@ -781,7 +782,8 @@ internal static class K6LoadRunner
             startInfo.Environment["LOAD_JOURNEY"] = JourneyName(K6Journey.LanguageLookup);
             startInfo.Environment["LOAD_SUMMARY"] = summaryPath;
             await ValidateExecutableAsync(executable, cancellationToken);
-            var measurement = await RunOwnedProcessAsync(startInfo, summaryPath, profile, budget.ProcessDeadline, cancellationToken);
+            var measurement = await RunWithRejectedEvidenceAsync(startInfo, summaryPath,
+                Path.Combine(EvidenceDirectory(fixture), $"rejected-{topology}-{mode}.json"), profile, K6Journey.LanguageLookup, budget.ProcessDeadline, cancellationToken);
             ValidateGenerator(measurement.GeneratorSamples, measurement.GeneratorPeakCpuRatio, measurement.GeneratorPeakRssBytes);
             string evidenceDirectory = EvidenceDirectory(fixture);
             var evidence = new
@@ -901,6 +903,28 @@ internal static class K6LoadRunner
         }
     }
 
+    internal static async Task<K6ProcessMeasurement> RunWithRejectedEvidenceAsync(ProcessStartInfo startInfo,
+        string summaryPath, string evidencePath, K6LoadProfile profile, K6Journey journey, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await RunOwnedProcessAsync(startInfo, summaryPath, profile, timeout, cancellationToken, journey);
+        }
+        catch (Exception failure)
+        {
+            try
+            {
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                await RetainRejectedSummaryAsync(summaryPath, evidencePath, profile, journey, deadline.Token);
+            }
+            catch (Exception evidenceFailure)
+            {
+                throw new AggregateException("load_rejected_evidence_failed", failure, evidenceFailure);
+            }
+            throw;
+        }
+    }
+
     internal static K6Summary ParseSummary(string json, K6LoadProfile expectedProfile,
         K6Journey expectedJourney = K6Journey.LanguageLookup)
     {
@@ -908,37 +932,86 @@ internal static class K6LoadRunner
         var budget = BudgetFor(expectedProfile);
         try
         {
-            using var document = JsonDocument.Parse(json);
-            var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
-                throw new InvalidOperationException("load_summary_invalid");
-            string[] names = root.EnumerateObject().Select(property => property.Name).ToArray();
-            if (names.Length != SummaryFields.Length || !names.Order().SequenceEqual(SummaryFields.Order()) ||
-                root.GetProperty("schema").GetInt32() != 2 || root.GetProperty("mode").GetString() != budget.Mode ||
-                root.GetProperty("profile").GetString() != budget.Name ||
-                root.GetProperty("journey").GetString() != JourneyName(expectedJourney))
-                throw new InvalidOperationException("load_summary_invalid");
-            long attempts = root.GetProperty("attempts").GetInt64();
+            var summary = ReadSummaryProjection(json, expectedProfile, expectedJourney);
+            long attempts = summary.Attempts;
             long requests = attempts * (expectedJourney == K6Journey.EventWrite ? 3 : 1);
-            double p50 = root.GetProperty("p50Milliseconds").GetDouble();
-            double p95 = root.GetProperty("p95Milliseconds").GetDouble();
-            double p99 = root.GetProperty("p99Milliseconds").GetDouble();
             if (attempts <= 0 || attempts > 1000 ||
                 (budget.OfferedRate > 0 && attempts != budget.ExpectedAttempts) ||
-                new[] { "correct", "iterations" }.Any(name => root.GetProperty(name).GetInt64() != attempts) ||
-                root.GetProperty("responses").GetInt64() != requests || root.GetProperty("httpRequests").GetInt64() != requests ||
-                root.GetProperty("correctnessRate").GetDouble() != 1 || root.GetProperty("httpFailureRate").GetDouble() != 0 ||
-                root.GetProperty("dropped").GetInt64() != 0 ||
-                !double.IsFinite(p50) || !double.IsFinite(p95) || !double.IsFinite(p99) ||
-                p50 < 0 || p50 > p95 || p95 > p99)
+                summary.Correct != attempts || summary.Iterations != attempts || summary.Responses != requests || summary.HttpRequests != requests ||
+                summary.CorrectnessRate != 1 || summary.HttpFailureRate != 0 || summary.DroppedIterations != 0 ||
+                summary.P50Milliseconds > summary.P95Milliseconds || summary.P95Milliseconds > summary.P99Milliseconds)
                 throw new InvalidOperationException("load_measurement_invalid");
-            return new K6Summary(JourneyName(expectedJourney), budget.Name, budget.Mode, attempts, requests,
-                attempts, attempts, requests, 1, 0, 0, p50, p95, p99);
+            return summary;
         }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
         {
             throw new InvalidOperationException("load_summary_invalid");
         }
+    }
+
+    private static K6Summary ReadSummaryProjection(string json, K6LoadProfile profile, K6Journey journey)
+    {
+        ValidateJourneyBudget(journey, profile);
+        var budget = BudgetFor(profile);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException("load_summary_invalid");
+        string[] names = root.EnumerateObject().Select(property => property.Name).ToArray();
+        if (names.Length != SummaryFields.Length || !names.Order().SequenceEqual(SummaryFields.Order()) ||
+            root.GetProperty("schema").GetInt32() != 2 || root.GetProperty("mode").GetString() != budget.Mode ||
+            root.GetProperty("profile").GetString() != budget.Name || root.GetProperty("journey").GetString() != JourneyName(journey))
+            throw new InvalidOperationException("load_summary_invalid");
+        long[] counts = new[] { "attempts", "responses", "correct", "iterations", "httpRequests", "dropped" }
+            .Select(name => root.GetProperty(name).GetInt64()).ToArray();
+        double[] values = new[] { "correctnessRate", "httpFailureRate", "p50Milliseconds", "p95Milliseconds", "p99Milliseconds" }
+            .Select(name => root.GetProperty(name).GetDouble()).ToArray();
+        if (counts.Any(value => value < 0 || value > 10000) || values.Any(value => !double.IsFinite(value) || value < 0) ||
+            values[0] > 1 || values[1] > 1)
+            throw new InvalidOperationException("load_summary_invalid");
+        return new K6Summary(JourneyName(journey), budget.Name, budget.Mode, counts[0], counts[1], counts[2], counts[3], counts[4],
+            values[0], values[1], counts[5], values[2], values[3], values[4]);
+    }
+
+    internal static async Task RetainRejectedSummaryAsync(string summaryPath, string evidencePath, K6LoadProfile profile,
+        K6Journey journey, CancellationToken cancellationToken)
+    {
+        string status = "Missing";
+        K6Summary? summary = null;
+        try
+        {
+            using var stream = File.OpenRead(summaryPath);
+            byte[] buffer = new byte[4097];
+            int length = 0;
+            while (length < buffer.Length)
+            {
+                int read = await stream.ReadAsync(buffer.AsMemory(length), cancellationToken);
+                if (read == 0) break;
+                length += read;
+            }
+            status = length > 4096 ? "Oversized" : "Invalid";
+            if (length <= 4096)
+            {
+                summary = ReadSummaryProjection(Encoding.UTF8.GetString(buffer, 0, length), profile, journey);
+                status = "Available";
+            }
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            status = "Missing";
+        }
+        catch (IOException)
+        {
+            status = "Unreadable";
+        }
+        catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
+        {
+            status = "Invalid";
+        }
+        await File.WriteAllTextAsync(evidencePath, JsonSerializer.Serialize(new
+        {
+            Schema = 1, Admission = "Rejected", CapacityEvidenceEligible = false, SummaryStatus = status, Summary = summary
+        }, EvidenceJsonOptions), cancellationToken);
     }
 
     internal static void ValidateGenerator(int samples, double peakCpuRatio, long peakRss)

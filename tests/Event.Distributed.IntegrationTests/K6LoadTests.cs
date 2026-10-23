@@ -127,6 +127,53 @@ public sealed class K6LoadHarnessTests
 [Category("Harness")]
 public sealed class K6LoadProfileHarnessTests
 {
+    [Test]
+    public async Task RejectedDroppedWorkRemainsVisibleWithoutBecomingAccepted()
+    {
+        var root = Directory.CreateTempSubdirectory("islamu-load-rejected-");
+        try
+        {
+            const string summary = """
+                {"schema":2,"journey":"public-language","profile":"open-lookup","mode":"open","attempts":38,"responses":38,"correct":38,"iterations":38,"httpRequests":38,"correctnessRate":1,"httpFailureRate":0,"dropped":2,"p50Milliseconds":6,"p95Milliseconds":12.5,"p99Milliseconds":20}
+                """;
+            string input = System.IO.Path.Combine(root.FullName, "summary.json");
+            string output = System.IO.Path.Combine(root.FullName, "rejected.json");
+            await File.WriteAllTextAsync(input, summary);
+            await K6LoadRunner.RetainRejectedSummaryAsync(input, output, K6LoadProfile.OpenLookup, K6Journey.LanguageLookup,
+                TestContext.Current!.Execution.CancellationToken);
+            using var retained = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+            await Assert.That(retained.RootElement.GetProperty("Admission").GetString()).IsEqualTo("Rejected");
+            await Assert.That(retained.RootElement.GetProperty("CapacityEvidenceEligible").GetBoolean()).IsFalse();
+            await Assert.That(retained.RootElement.GetProperty("Summary").GetProperty("DroppedIterations").GetInt64()).IsEqualTo(2L);
+            await Assert.That(retained.RootElement.GetProperty("Summary").GetProperty("Attempts").GetInt64()).IsEqualTo(38L);
+            await Assert.That(() => K6LoadRunner.ParseSummary(summary, K6LoadProfile.OpenLookup)).Throws<InvalidOperationException>();
+        }
+        finally { root.Delete(recursive: true); }
+    }
+
+    [Test]
+    public async Task RejectedSummaryCannotRetainAnUnreviewedStringField()
+    {
+        var root = Directory.CreateTempSubdirectory("islamu-load-rejected-");
+        try
+        {
+            string canary = Guid.NewGuid().ToString("N");
+            string summary = K6LoadHarnessTests.CompleteSummary.TrimEnd().TrimEnd('}') + ",\"responseBody\":\"" + canary + "\"}";
+            string input = System.IO.Path.Combine(root.FullName, "summary.json");
+            string output = System.IO.Path.Combine(root.FullName, "rejected.json");
+            await File.WriteAllTextAsync(input, summary);
+            await K6LoadRunner.RetainRejectedSummaryAsync(input, output, K6LoadProfile.OpenLookup, K6Journey.LanguageLookup,
+                TestContext.Current!.Execution.CancellationToken);
+            string retained = await File.ReadAllTextAsync(output);
+            await Assert.That(retained).DoesNotContain(canary);
+            await Assert.That(retained).DoesNotContain("responseBody");
+            using var artifact = JsonDocument.Parse(retained);
+            await Assert.That(artifact.RootElement.GetProperty("SummaryStatus").GetString()).IsEqualTo("Invalid");
+            await Assert.That(artifact.RootElement.GetProperty("Summary").ValueKind).IsEqualTo(JsonValueKind.Null);
+        }
+        finally { root.Delete(recursive: true); }
+    }
+
     private const string CompleteWriteSummary = """
         {"schema":2,"journey":"event-write","profile":"constrained-write","mode":"open","attempts":20,"responses":60,"correct":20,"iterations":20,"httpRequests":60,"correctnessRate":1,"httpFailureRate":0,"dropped":0,"p50Milliseconds":6,"p95Milliseconds":12.5,"p99Milliseconds":20}
         """;
@@ -367,14 +414,21 @@ public sealed class K6LoadProcessHarnessTests
     }
 
     [Test]
-    [Arguments("nonzero")]
-    [Arguments("missing")]
-    [Arguments("oversized")]
-    public async Task FailedChildCannotSupplyAValidMeasurement(string scenario)
+    [Arguments("nonzero", "Available")]
+    [Arguments("missing", "Missing")]
+    [Arguments("oversized", "Oversized")]
+    public async Task FailedChildCannotSupplyAValidMeasurement(string scenario, string expectedSummaryStatus)
     {
         using var root = new OwnedProcessDirectory();
-        await Assert.That(async () => await RunChildAsync(root, scenario, TimeSpan.FromSeconds(10)))
+        string evidence = System.IO.Path.Combine(root.Path, "rejected.json");
+        await Assert.That(async () => await K6LoadRunner.RunWithRejectedEvidenceAsync(
+            K6LoadHarnessChild.ChildStartInfo(scenario, root.Path), System.IO.Path.Combine(root.Path, "summary.json"), evidence,
+            K6LoadProfile.OpenLookup, K6Journey.LanguageLookup, TimeSpan.FromSeconds(10), TestContext.Current!.Execution.CancellationToken))
             .Throws<InvalidOperationException>();
+        using var retained = JsonDocument.Parse(await File.ReadAllTextAsync(evidence));
+        await Assert.That(retained.RootElement.GetProperty("Admission").GetString()).IsEqualTo("Rejected");
+        await Assert.That(retained.RootElement.GetProperty("CapacityEvidenceEligible").GetBoolean()).IsFalse();
+        await Assert.That(retained.RootElement.GetProperty("SummaryStatus").GetString()).IsEqualTo(expectedSummaryStatus);
     }
 
     [Test]

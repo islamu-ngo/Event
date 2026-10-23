@@ -668,16 +668,47 @@ authentication, the same selected scheme, the exact authenticated identity and
 the original provider account key. Replaced principals and unrelated requests
 cannot inherit the observation.
 
-Storage configuration retains the original request principal and authenticated
-identity and claim references, selected scheme, and independent issued/expiry
-property values. Repeated native authentication may return new ticket or
-principal containers; those wrappers' object identities are not credential
-evidence. Every source recheck still requires
-the original API-issued lifetime observation and unchanged persisted principal
-and support facts. Request custody also freezes the presence and typed UUID of
-the server-resolved tenant marker, separately from the immutable selected
-persistence tenant. Missing, replaced or malformed previously captured tenant
-markers fail closed without selecting another persistence owner.
+Storage configuration retains the original request principal and independently
+snapshots its identity and claim collections and the authenticated identity and
+claim references, selected scheme, and detached issued/expiry property values.
+Repeated native authentication may return new ticket or principal containers;
+those wrappers' object identities are not credential evidence. Changing the
+original request's collections, including adding an unauthenticated identity,
+still fails custody. The original API-issued lifetime observation remains
+mandatory. Request custody also freezes the presence and typed UUID of the
+server-resolved tenant marker, separately from the immutable selected persistence
+tenant. Missing, replaced or malformed captured tenant markers fail closed
+without selecting another persistence owner.
+
+`StorageConfigurationAuthority` captures principal and support facts while the
+selected owner is idle. External storage-credential resolution finishes before
+the database transaction. `HumanSettingsMutationPreparation` then acquires the
+existing source-set, principal and support leases in its one Serializable
+attempt. Active checks reuse those actual transaction-bound leases and compare
+fresh facts with the original snapshots; they never call idle-only observation
+or cache an authorization success. The stateless source comparison grants no
+authority, and `StorageConfigurationWriter` still requires its original physical
+owner and exact complete effects.
+
+Terminal admission runs the fixed writer's completion and data-image check first.
+The coordinator then performs its final request/authentication recheck, fresh
+held-source reads, current administrator predicate and original-facts comparison.
+Credential and support deadlines are sampled after the blocking work. Denial
+before commit rolls back its effects. The unit of work distinguishes unknown
+commit outcomes and cleanup failures after acknowledged commit from rollback;
+callers must retain those settlement distinctions when retrying. Cache activation
+follows acknowledged settlement. The prepared observation cannot replay, so a
+retry starts observation and preparation again.
+
+Executed Release evidence comprises all 16 `NativeTenantStorageHttpTests` cases
+and both principal-container variants of
+`StorageProbeOriginalActionTests.NativeStorageConfigurationAcceptsReauthenticationAndRejectsChangedOriginalSources`:
+18 passed with zero skips. These native SQLite controls use validated credentials
+and the real coordinator, leases and finalizer, with controlled external secret
+and S3 boundaries. They cover late binding/grant/support-source changes, complete
+rollback and warm-cache retention, consumed-observation rejection, a fresh
+transaction on retry, and original-request membership drift. They do not certify
+PostgreSQL, other configuration families, live S3 or cross-server cache refresh.
 
 Expiry and optional not-before come from the authenticated raw token payload,
 not mutable claims or ticket properties. Duplicate, malformed or overflowing

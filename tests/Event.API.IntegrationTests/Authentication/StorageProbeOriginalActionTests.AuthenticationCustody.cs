@@ -56,14 +56,14 @@ public sealed partial class StorageProbeOriginalActionTests
             services.AddTransient<AdminClaimsTransformation>();
             services.AddTransient<IClaimsTransformation, RenewingPrincipalTransformation>();
         }));
-        await using var request = await ProbeRequest.CreateAsync(host.Services,
-            native.CreateExternalProviderToken(
+        string bearer = native.CreateExternalProviderToken(
             [
                 new Claim("sub", providerSubject.ToString("D")),
                 new Claim("typ", "Bearer"),
                 new Claim("azp", "islamu-event-blazor"),
                 new Claim("auth_provider", "keycloak")
-            ], native.ExternalIssuer));
+            ], native.ExternalIssuer);
+        await using var request = await ProbeRequest.CreateAsync(host.Services, bearer);
         request.Context.Request.Method = HttpMethods.Patch;
         request.Context.Request.Path = "/api/instance/settings/storage";
         await using var selected = await request.Services.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
@@ -155,6 +155,20 @@ public sealed partial class StorageProbeOriginalActionTests
         await source.RequireSourcesAsync(default);
         principal.AddIdentity(new ClaimsIdentity(identity));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => source.RequireSourcesAsync(default));
+
+        await using var driftRequest = await ProbeRequest.CreateAsync(host.Services, bearer);
+        driftRequest.Context.Request.Method = HttpMethods.Patch;
+        driftRequest.Context.Request.Path = "/api/instance/settings/storage";
+        await using var driftSelection = await driftRequest.Services.GetRequiredService<IPolicyMutationExecutionScopeFactory>()
+            .CreateAsync(PolicyMutationScope.Instance, CancellationToken.None);
+        var driftSource = await driftSelection.Services.GetRequiredService<IStorageConfigurationAuthority>()
+            .CaptureAsync(new UpdateInstanceStorageSettingsCommand { UserId = actor, Patch = new() }, null, default);
+        await driftSource.RequireSourcesAsync(default);
+        driftSource.RequireTime();
+        driftRequest.Context.User.AddIdentity(new ClaimsIdentity(
+            [new Claim(ClaimTypes.Role, "request-membership-drift")]));
+        await Assert.That(async () => await driftSource.RequireSourcesAsync(default))
+            .Throws<UnauthorizedAccessException>().Because("the original request gained an unauthenticated identity after capture");
     }
 
     private sealed class RenewingPrincipalTransformation(AdminClaimsTransformation original) : IClaimsTransformation

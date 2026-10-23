@@ -98,6 +98,8 @@ public sealed class StorageConfigurationAuthority(IServiceProvider services,
         private bool providerObserved;
         private readonly string originalPrincipal = JsonSerializer.Serialize(principalFacts);
         private readonly string originalSupport = JsonSerializer.Serialize(supportFacts);
+        private readonly ClaimsIdentity[] requestIdentities = principal.Identities.ToArray();
+        private readonly Claim[] requestClaims = principal.Claims.ToArray();
         private readonly ClaimsIdentity[] ticketIdentities = ticket.Principal.Identities.ToArray();
         private readonly Claim[] ticketClaims = ticket.Principal.Claims.ToArray();
         private readonly string scheme = ticket.AuthenticationScheme;
@@ -115,6 +117,7 @@ public sealed class StorageConfigurationAuthority(IServiceProvider services,
         {
             request.RequestAborted.ThrowIfCancellationRequested();
             if (!ReferenceEquals(owner._contexts.HttpContext, request) || !ReferenceEquals(request.User, principal)
+                || !requestIdentities.SequenceEqual(principal.Identities) || !requestClaims.SequenceEqual(principal.Claims)
                 || !ReferenceEquals(owner._human.Subject, subject) || owner._tenants.TenantId != ambient
                 || request.Items.TryGetValue(TenantContextAccessor.TenantIdItemKey, out var currentRequestTenant) != requestTenantPresent
                 || requestTenantPresent && (currentRequestTenant is not Guid currentTenant || currentTenant != requestTenant)
@@ -130,6 +133,12 @@ public sealed class StorageConfigurationAuthority(IServiceProvider services,
 
         public async Task RequireSourcesAsync(CancellationToken token)
         {
+            await RequireRequestAsync(token);
+            RequireAcquiredFacts(await principalFence.ObserveAsync(token), await supportFence.ObserveAsync(token));
+        }
+
+        public async Task RequireRequestAsync(CancellationToken token)
+        {
             token.ThrowIfCancellationRequested();
             RequireCustody();
             var current = await request.AuthenticateAsync();
@@ -139,10 +148,14 @@ public sealed class StorageConfigurationAuthority(IServiceProvider services,
                 || !ticketClaims.SequenceEqual(current.Principal.Claims)
                 || current.Properties?.IssuedUtc != issuedAt || current.Properties?.ExpiresUtc != expiresAt
                 || !ReferenceEquals(await owner._lifetimes.ObserveAsync(principal, token), lifetime)) throw Denied();
-            if (JsonSerializer.Serialize(await principalFence.ObserveAsync(token)) != originalPrincipal
-                || JsonSerializer.Serialize(await supportFence.ObserveAsync(token)) != originalSupport)
-                throw Denied();
             RequireCustody();
+        }
+
+        public void RequireAcquiredFacts(HumanPrincipalSourceFacts currentPrincipal, HumanSupportAccessSourceFacts currentSupport)
+        {
+            RequireCustody();
+            if (JsonSerializer.Serialize(currentPrincipal) != originalPrincipal
+                || JsonSerializer.Serialize(currentSupport) != originalSupport) throw Denied();
         }
 
         public void RequireTime()

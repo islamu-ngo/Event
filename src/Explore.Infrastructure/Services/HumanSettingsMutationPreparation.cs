@@ -191,14 +191,14 @@ public sealed partial class HumanSettingsMutationPreparation(
             mutation.TenantId.HasValue ? Authority.TenantOrInstance : Authority.Instance, actor,
             (_, _) => mutation.Values.Select(pair => new HumanSettingsMutation(OperationFor(scope), scope,
                 mutation.TenantId, null, pair.Key, HumanSettingsMutationKind.SetValue, pair.Value)).ToImmutableArray(),
-            [], token);
+            [], token, requireOriginalRequest: mutation.Source.RequireRequestAsync,
+            requireOriginalFacts: mutation.Source.RequireAcquiredFacts);
         try
         {
             var writer = services.GetRequiredService<IStorageConfigurationWriter>();
             var finalizer = services.GetRequiredService<IHumanActionCommitFinalizer>();
             return new Prepared(this, mutation, issued.Effects, issued.CoordinatedReadKeys, issued.Owner, async ct =>
             {
-                var validate = await issued.Acquire(ct);
                 // Mandatory before any caller callback can escape. An equal generic/native
                 // scalar write cannot mark this private selected writer complete.
                 finalizer.Register(final => writer.RequireAppliedAsync(mutation, final), _ =>
@@ -206,7 +206,7 @@ public sealed partial class HumanSettingsMutationPreparation(
                     mutation.RequireActive();
                     mutation.Source.RequireTime();
                 });
-                return validate;
+                return await issued.Acquire(ct);
             }).TakeCoordinationFrom(issued);
         }
         catch (Exception failure)
@@ -467,7 +467,8 @@ public sealed partial class HumanSettingsMutationPreparation(
         Guid? explicitTenant, Authority? explicitAuthority, Guid? auditActor,
         Func<Guid?, Guid, ImmutableArray<HumanSettingsMutation>> capture,
         ImmutableArray<string> coordinatedReadKeys, CancellationToken token, AuthorizationRequest? selectedCheck = null,
-        bool observeRouteOnly = false)
+        bool observeRouteOnly = false, Func<CancellationToken, Task>? requireOriginalRequest = null,
+        Action<HumanPrincipalSourceFacts, HumanSupportAccessSourceFacts>? requireOriginalFacts = null)
     {
         ArgumentNullException.ThrowIfNull(original);
         var authority = explicitAuthority ?? scope switch
@@ -676,6 +677,7 @@ public sealed partial class HumanSettingsMutationPreparation(
             return new Prepared(this, original, effects, coordinatedReadKeys, owner, async cancellationToken =>
             {
                 RequireCustody();
+                if (requireOriginalRequest is not null) await requireOriginalRequest(cancellationToken);
                 var exclusion = await sourceSet.AcquireAsync(cancellationToken);
                 if (ordinarySource is not null)
                     await ordinaryStore!.AcquireAsync(ordinarySource, cancellationToken);
@@ -686,6 +688,7 @@ public sealed partial class HumanSettingsMutationPreparation(
                 var support = await supportSource.AcquireAsync(exclusion, principal, cancellationToken: cancellationToken);
                 Compare(principal.Facts, currentRoute?.Facts);
                 await RequireAuthorityAsync(cancellationToken);
+                requireOriginalFacts?.Invoke(principal.Facts, support.Facts);
                 RequireTimeAndSupport(support.Facts, clock.GetUtcNow());
                 HumanSupportAccessSourceFacts? finalSupport = null;
 
@@ -710,12 +713,14 @@ public sealed partial class HumanSettingsMutationPreparation(
                     }
                     // All of these leases are acquired here, never supplied by the caller. Each
                     // reentry enforces the original context/pool/connection/transaction identity.
+                    if (requireOriginalRequest is not null) await requireOriginalRequest(finalToken);
                     await exclusion.ValidateAsync(finalToken);
                     var currentPrincipal = await principal.ValidateAsync(finalToken);
                     var finalRoute = currentRoute is null ? null : await currentRoute.ValidateAsync(finalToken);
                     finalSupport = await support.ValidateAsync(finalToken);
                     Compare(currentPrincipal, finalRoute);
                     await RequireAuthorityAsync(finalToken);
+                    requireOriginalFacts?.Invoke(currentPrincipal, finalSupport);
                 }
                 finalizer.Register(token => ReadSourcesAsync(token, terminal: true), now => RequireTimeAndSupport(finalSupport
                     ?? throw new InvalidOperationException("Final Settings sources were not read."), now));

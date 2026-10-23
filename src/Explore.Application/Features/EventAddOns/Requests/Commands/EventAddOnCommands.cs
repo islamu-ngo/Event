@@ -20,7 +20,7 @@ public sealed record AddEventAddOnCatalogItemCommand(
 
 public sealed record PublishEventAddOnCatalogCommand(
     Guid EventId,
-    DateTime PublishedAtUtc) : ICommand<EventAddOnCatalogDto?>;
+    DateTime PublishedAtUtc) : ICommand<EventAddOnPublicationResponse>;
 
 public sealed record RetireEventAddOnCatalogCommand(
     Guid EventId,

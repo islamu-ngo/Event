@@ -161,7 +161,7 @@ public sealed partial class ModerationCaseNativeProofTests
         await Assert.That(await inspect.ModerationCaseTargetReceipts.CountAsync(
             row => row.RelationshipKind == ModerationCaseRelationshipKind.CaseReadGrant)).IsEqualTo(swapRoles ? 0 : 1);
         var grantAfter = await inspect.ModerationCaseReadGrants.AsNoTracking().SingleAsync(row => row.Id == grantId);
-        await Assert.That(grantAfter.Generation).IsEqualTo(grantBefore.Generation);
+        await Assert.That(grantAfter.Revision).IsEqualTo(grantBefore.Revision);
         await Assert.That(grantAfter.ExpiresAt).IsEqualTo(grantBefore.ExpiresAt);
         await Assert.That(grantAfter.RevokedAt).IsEqualTo(grantBefore.RevokedAt);
         await Assert.That(grantAfter.SourceId).IsEqualTo(grantBefore.SourceId);

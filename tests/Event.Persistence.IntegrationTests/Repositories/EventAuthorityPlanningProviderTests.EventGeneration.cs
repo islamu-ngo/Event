@@ -9,6 +9,7 @@ using Explore.Application.Features.Moderation.Requests.Commands;
 using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Identity;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;

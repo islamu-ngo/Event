@@ -4,10 +4,10 @@ using Explore.Persistence;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.EntityFrameworkCore.Storage;
-using System.Reflection;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -237,7 +237,7 @@ public sealed class RegistrationProviderPublicationTransferTests
         using var context = CreateContext(provider);
         var sql = context.GetService<ISqlGenerationHelper>();
         var assembly = provider == "PostgreSql" ? typeof(ExploreDbContext).Assembly
-            : Assembly.Load("Explore.Persistence.Migrations.SqlServer");
+            : System.Reflection.Assembly.Load("Explore.Persistence.Migrations.SqlServer");
         Migration ReadMigration(string suffix)
         {
             Type type = assembly.GetTypes().Single(candidate =>
@@ -320,7 +320,7 @@ public sealed class RegistrationProviderPublicationTransferTests
     public async Task Sqlite_downgrade_restores_the_legacy_parent_key_before_copying_attempts()
     {
         using var context = CreateContext("Sqlite");
-        var assembly = Assembly.Load("Explore.Persistence.Migrations.Sqlite");
+        var assembly = System.Reflection.Assembly.Load("Explore.Persistence.Migrations.Sqlite");
         Migration ReadMigration(string suffix)
         {
             Type type = assembly.GetTypes().Single(candidate =>

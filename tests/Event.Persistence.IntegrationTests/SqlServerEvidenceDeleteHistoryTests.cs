@@ -1,3 +1,4 @@
+using Event.Persistence.IntegrationTests.Database;
 using Explore.Persistence;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Moderation.Policy;
+using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Persistence.Repositories;
 using Explore.Application.Authentication;
@@ -54,13 +55,15 @@ public sealed class ModerationNativeTargetCompositionTests
             var eventResource = await ModerationResourceGenerationWriterTests.SeedAsync(database);
             await using var writer = database.Context();
             eventId = await writer.Set<EventResource>().Where(row => row.Id == eventResource).Select(row => row.EventId).SingleAsync();
+            var userActorType = await writer.Set<ActorType>().SingleAsync(row => row.Id == (int)ActorTypeEnum.User);
             foreach (var (id, human) in new[] { (storageActorId, database.ReviewerId), (replacementActorId, database.UrgencyAssessorId) })
                 writer.Actors.Add(new Actor
                 {
                     Id = id,
                     ActorTypeId = (int)Explore.Domain.Enums.ActorTypeEnum.User,
+                    ActorType = userActorType,
                     UserId = human,
-                    Pii = new ActorPii { FullName = "Native target ancestry" }
+                    Pii = new ActorPii { DisplayName = "Native target ancestry" }
                 });
             await writer.SaveChangesAsync();
             var storageId = await writer.Set<EventResource>().Where(row => row.Id == resourceId).Select(row => row.StorageObjectId).SingleAsync();
@@ -223,8 +226,9 @@ public sealed class ModerationNativeTargetCompositionTests
             {
                 Id = serviceActorId,
                 ActorTypeId = (int)ActorTypeEnum.System,
+                ActorType = await writer.Set<ActorType>().SingleAsync(row => row.Id == (int)ActorTypeEnum.System),
                 ServicePrincipalId = host.MaintenanceServicePrincipalId,
-                Pii = new ActorPii { FullName = "Installed maintenance actor" }
+                Pii = new ActorPii { DisplayName = "Installed maintenance actor" }
             });
             writer.ExternalApiKeys.Add(new ExternalApiKey
             {

@@ -26,8 +26,9 @@ public sealed partial class ModerationNoticeEmailTests
             {
                 Id = replacement,
                 ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = await setup.Set<ActorType>().SingleAsync(row => row.Id == (int)ActorTypeEnum.User),
                 UserId = fixture.Notice.Database.ReviewerId,
-                Pii = new ActorPii()
+                Pii = new ActorPii { DisplayName = "Replacement notice representative" }
             });
             await setup.SaveChangesAsync();
         }

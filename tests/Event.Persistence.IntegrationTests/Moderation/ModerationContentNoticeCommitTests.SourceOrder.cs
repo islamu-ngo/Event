@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -48,10 +49,10 @@ public sealed partial class ModerationContentNoticeCommitTests
             var authority = await AuthorityAsync(context, checkpoint);
             var writer = Writer(database, context, authority);
             if (replay)
-                await Assert.That((await writer.ExecuteAsync(source)).IsSuccess).IsTrue();
+                await Assert.That((await writer.ExecuteAsync(source)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
             order.Armed = true;
             var result = await writer.ExecuteAsync(source);
-            await Assert.That(result.IsSuccess).IsEqualTo(change == 0);
+            await Assert.That(result.Outcome == ModerationQualificationWriteOutcome.Known).IsEqualTo(change == 0);
             await Assert.That(order.ObservedTenant).IsTrue();
             await Assert.That(order.ActorsBeforeTenant.Contains(originalActor)).IsTrue();
             await Assert.That(order.RolesBeforeTenant.Contains((int)RoleEnum.EventOwner)).IsTrue();

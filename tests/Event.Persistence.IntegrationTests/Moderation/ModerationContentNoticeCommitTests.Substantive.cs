@@ -5,6 +5,8 @@ using Explore.Application.Configuration;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Moderation.Policy;
+using Explore.Application.Notifications;
+using Explore.Application.Services;
 using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -149,7 +151,7 @@ public sealed partial class ModerationContentNoticeCommitTests
             ValidUntil = Now.AddMinutes(2)
         };
         var outcome = await ExecuteContentSourceAsync(database, database.UrgencyAssessorId, request);
-        await Assert.That(outcome.IsSuccess).IsFalse();
+        await Assert.That(outcome.Outcome == ModerationQualificationWriteOutcome.Known).IsFalse();
         await using var inspect = Read(database);
         await Assert.That(await inspect.ModerationQualificationEvidence.CountAsync()).IsEqualTo(0);
         await Assert.That(await inspect.ModerationQualificationMutationReceipts.AnyAsync(row => row.Id == request.OperationId)).IsFalse();

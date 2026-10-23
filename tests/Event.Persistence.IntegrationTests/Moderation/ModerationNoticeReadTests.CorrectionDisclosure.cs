@@ -2,6 +2,7 @@ using System.Data;
 using System.Data.Common;
 using System.Text.Json;
 using Explore.Application.Contracts.Moderation;
+using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;

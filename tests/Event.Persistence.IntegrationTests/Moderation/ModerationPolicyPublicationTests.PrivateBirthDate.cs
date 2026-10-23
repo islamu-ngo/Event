@@ -74,8 +74,8 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That(await owner.ExecuteAsync(nomination.Assessment, null, async (_, token) =>
             await owner.RecordBirthDateAsync(fixture.SubjectId, new(2001, 1, 1), 0, token))).IsTrue();
         await fixture.Privacy.AppendAsync(Explore.Application.Contracts.PrivacyErasure.PrivacyErasureRequest.Create(
-            Guid.CreateVersion7(), Explore.Application.Contracts.PrivacyErasure.PrivacyErasureSubjectKind.User,
-            fixture.SubjectId, Explore.Application.Contracts.PrivacyErasure.PrivacyErasureReasonCode.SubjectErasureRequest, 1));
+            Guid.CreateVersion7(), PrivacyErasureSubjectKind.User,
+            fixture.SubjectId, PrivacyErasureReasonCode.SubjectErasureRequest, 1));
         await Assert.That(async () => await owner.ReadBirthDateStatusAsync(fixture.SubjectId))
             .Throws<Explore.Application.Exceptions.AuthorizationException>();
         await Assert.That(async () => await owner.ClearBirthDateAsync(fixture.SubjectId, 1))

@@ -1,23 +1,26 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventResource;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
 
 public sealed partial class EventResourceDiscoveryQueryTests
 {
-    private static EventResourceManagementWorkflow ManagementWorkflow(
+    private ManagementRequest ManagementWorkflow(
         ExploreDbContext context, Guid tenantId, Guid actor)
     {
         var repository = new EventResourceRepository(context);
@@ -37,13 +40,20 @@ public sealed partial class EventResourceDiscoveryQueryTests
         provider.CheckBatchAsync(Arg.Any<IReadOnlyList<EventResourceProviderInput>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<IReadOnlyList<EventResourceProviderInput>>()!
                 .Select(_ => EventResourceProviderDecision.Allow).ToArray());
-        var tenant = Substitute.For<ITenantContext>();
-        tenant.TenantId.Returns(tenantId);
-        var user = Substitute.For<ICurrentUserService>();
-        user.IsAuthenticated.Returns(true);
-        user.UserId.Returns(actor);
-        var machine = Substitute.For<IMachinePrincipalAccessor>();
-        return new(repository, unit, new EventResourceStorageLifecycleService(
+        var tenant = context.TenantContext;
+        if (tenant is null)
+        {
+            tenant = Substitute.For<ITenantContext>();
+            tenant.TenantId.Returns(tenantId);
+            context.TenantContext = tenant;
+        }
+        else if (tenant.TenantId != tenantId)
+            throw new InvalidOperationException("The management request must retain its original tenant.");
+        var human = new CurrentHumanPrincipalFixture(actor, tenantId, borrowedContext: context,
+            configureServices: collection => collection.AddSingleton<IPrivacyIdentityFenceAuthority>(
+                database.Privacy.Authority(context, clock)), timeProvider: clock);
+        var services = human.Services;
+        var workflow = new EventResourceManagementWorkflow(repository, unit, new EventResourceStorageLifecycleService(
             new EventResourceStorageLifecycleRepository(context), unit, clock), new(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
                 new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
@@ -51,7 +61,21 @@ public sealed partial class EventResourceDiscoveryQueryTests
                 new EventResourceModerationSnapshotReader(context,
                     Substitute.For<IModerationMachineSubjectBindingRepository>(),
                     global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
-            routes, provider, clock), tenant, user, machine, clock);
+            routes, provider, clock), tenant, services.GetRequiredService<ICurrentUserService>(), human.Machine, clock,
+            new EventPublicationMutationBoundary(context, services.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
+                services.GetRequiredService<IUserContext>(), human.Admin, human.Machine, clock,
+                global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context),
+                services.GetRequiredService<IHumanActionCommitFinalizer>()));
+        return new(human, workflow);
+    }
+
+    private sealed class ManagementRequest(CurrentHumanPrincipalFixture human, EventResourceManagementWorkflow workflow)
+        : IAsyncDisposable
+    {
+        public EventResourceManagementWorkflow Workflow => workflow;
+        public Task InitializeAsync() => human.InitializeAsync();
+        public Task PrepareAsync() => human.PrepareAsync();
+        public ValueTask DisposeAsync() => human.DisposeAsync();
     }
 
     private async Task<EventResourceAuditEntry> ManagementAuditAsync(EventResource resource, Guid actor)

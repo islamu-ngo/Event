@@ -21,7 +21,10 @@ public sealed partial class EventResourceManagementPersistenceTests
     {
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, actor);
+        await using var request = Workflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var id = Guid.CreateVersion7();
         var create = await new CreateEventResourceCommandHandler(workflow).ExecuteAsync(new(scope.EventAId, id, Draft()));
         await Assert.That(create.IsSuccess).IsTrue();
@@ -50,7 +53,10 @@ public sealed partial class EventResourceManagementPersistenceTests
         Guid id = Guid.CreateVersion7(), version;
         await using (var seed = database.CreateContext())
         {
-            await Assert.That((await Workflow(seed, scope.TenantAId, actor)
+            await using var request = Workflow(seed, scope.TenantAId, actor);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            await Assert.That((await request.Workflow
                 .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
             version = (await seed.EventResources.SingleAsync(value => value.Id == id)).ConcurrencyStamp;
         }
@@ -60,8 +66,13 @@ public sealed partial class EventResourceManagementPersistenceTests
             AudienceRules = [new(EventResourceAudienceKindEnum.Organizer)]
         };
         await using (var failing = database.CreateContext(new AuditFailure()))
-            await Assert.That(async () => await Workflow(failing, scope.TenantAId, actor)
+        {
+            await using var request = Workflow(failing, scope.TenantAId, actor);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            await Assert.That(async () => await request.Workflow
                 .UpdateAsync(id, version, revised, default)).Throws<DbUpdateException>();
+        }
         await using (var rolledBack = database.CreateContext())
         {
             var previous = await rolledBack.EventResources.Include(value => value.AudienceRules)
@@ -74,7 +85,10 @@ public sealed partial class EventResourceManagementPersistenceTests
         }
         await using (var resumed = database.CreateContext())
         {
-            var workflow = Workflow(resumed, scope.TenantAId, actor);
+            await using var request = Workflow(resumed, scope.TenantAId, actor);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            var workflow = request.Workflow;
             await Assert.That((await workflow.UpdateAsync(id, version, revised, default)).IsSuccess).IsTrue();
             await Assert.That((await workflow.UpdateAsync(id, version, revised, default)).IsSuccess).IsFalse();
         }
@@ -100,7 +114,10 @@ public sealed partial class EventResourceManagementPersistenceTests
             await writer.SaveChangesAsync();
         });
         var id = Guid.CreateVersion7();
-        var result = await Workflow(context, scope.TenantAId, actor, unitOfWork: unit)
+        await using var request = Workflow(context, scope.TenantAId, actor, unitOfWork: unit);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow
             .CreateAsync(scope.EventAId, id, Draft(), default);
         await Assert.That(result.IsSuccess).IsFalse();
         await using var verify = database.CreateContext();
@@ -138,8 +155,11 @@ public sealed partial class EventResourceManagementPersistenceTests
             resource.Withdraw(resource.ConcurrencyStamp, actor, Now);
             await writer.SaveChangesAsync();
         });
-        var result = await Workflow(context, scope.TenantAId, actor,
-            Policy(origins: ["https://resource.example.org"]), unitOfWork: unit)
+        await using var request = Workflow(context, scope.TenantAId, actor,
+            Policy(origins: ["https://resource.example.org"]), unitOfWork: unit);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow
             .UpdateAsync(id, version, Draft() with
             {
                 Title = "Stale audience revision",
@@ -186,8 +206,11 @@ public sealed partial class EventResourceManagementPersistenceTests
         var protector = Substitute.For<IEventResourceDestinationProtector>();
         protector.Unprotect(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<int>())
             .Returns("https://resource.example.org/handout");
-        var result = await Workflow(context, scope.TenantAId, actor,
-            Policy(origins: ["https://resource.example.org"]), unitOfWork: unit)
+        await using var request = Workflow(context, scope.TenantAId, actor,
+            Policy(origins: ["https://resource.example.org"]), unitOfWork: unit);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow
             .ChangeStateAsync(id, version, EventResourceManagementAction.Publish, default, protector);
         await Assert.That(result.IsSuccess).IsFalse();
         await using var verify = database.CreateContext();
@@ -221,7 +244,10 @@ public sealed partial class EventResourceManagementPersistenceTests
         async Task<BaseCommandResponse<Guid>> Create()
         {
             await using var context = database.CreateIndependentContext();
-            return await Workflow(context, scope.TenantAId, actor, Policy(), provider)
+            await using var request = Workflow(context, scope.TenantAId, actor, Policy(), provider);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            return await request.Workflow
                 .CreateAsync(scope.EventAId, Guid.CreateVersion7(), Draft(), timeout.Token);
         }
         var results = await Task.WhenAll(Task.Run(Create, timeout.Token), Task.Run(Create, timeout.Token))
@@ -238,7 +264,10 @@ public sealed partial class EventResourceManagementPersistenceTests
     {
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, actor);
+        await using var request = Workflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var hiddenAlternative = EventResourcePersistenceTests.CreateDraft(scope.TenantAId, scope.EventCId);
         context.EventResources.Add(hiddenAlternative);
         await context.SaveChangesAsync();
@@ -270,21 +299,35 @@ public sealed partial class EventResourceManagementPersistenceTests
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext();
         var id = Guid.CreateVersion7();
-        var workflow = Workflow(context, scope.TenantAId, actor);
-        await Assert.That((await workflow.CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
-        var expired = EventResourceAuditEntry.Create(scope.TenantAId, id, actor, EventResourceAuditAction.UpdateMetadata,
-            EventResourceAuditOutcome.Succeeded, EventResourceAuditReason.OrganizerMutation, Now.AddDays(-30));
-        context.EventResourceAuditEntries.Add(expired);
-        await context.SaveChangesAsync();
-        var audit = await workflow.GetAuditAsync(id, 100, default);
-        var auditPage = await DiscloseAsync(audit);
-        await Assert.That(auditPage.Items.Length).IsEqualTo(1);
-        await Assert.That(auditPage.Items.Any(value => value.Id == expired.Id)).IsFalse();
-        var zero = await Workflow(context, scope.TenantAId, actor, Policy(retention: 0)).GetAuditAsync(id, 100, default);
-        await Assert.That((await DiscloseAsync(zero)).Items.Length).IsEqualTo(0);
-        var collection = await Workflow(context, scope.TenantAId, actor, Policy(capacity: 0))
-            .ListAsync(scope.EventAId, 1, 20, default);
-        await Assert.That((await DiscloseAsync(collection)).Items.Select(item => item.Id).SequenceEqual([id])).IsTrue();
+        await using (var request = Workflow(context, scope.TenantAId, actor))
+        {
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            var workflow = request.Workflow;
+            await Assert.That((await workflow.CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
+            var expired = EventResourceAuditEntry.Create(scope.TenantAId, id, actor, EventResourceAuditAction.UpdateMetadata,
+                EventResourceAuditOutcome.Succeeded, EventResourceAuditReason.OrganizerMutation, Now.AddDays(-30));
+            context.EventResourceAuditEntries.Add(expired);
+            await context.SaveChangesAsync();
+            var audit = await workflow.GetAuditAsync(id, 100, default);
+            var auditPage = await DiscloseAsync(audit);
+            await Assert.That(auditPage.Items.Length).IsEqualTo(1);
+            await Assert.That(auditPage.Items.Any(value => value.Id == expired.Id)).IsFalse();
+        }
+        await using (var request = Workflow(context, scope.TenantAId, actor, Policy(retention: 0)))
+        {
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            var zero = await request.Workflow.GetAuditAsync(id, 100, default);
+            await Assert.That((await DiscloseAsync(zero)).Items.Length).IsEqualTo(0);
+        }
+        await using (var request = Workflow(context, scope.TenantAId, actor, Policy(capacity: 0)))
+        {
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            var collection = await request.Workflow.ListAsync(scope.EventAId, 1, 20, default);
+            await Assert.That((await DiscloseAsync(collection)).Items.Select(item => item.Id).SequenceEqual([id])).IsTrue();
+        }
     }
 
     [Test]
@@ -292,7 +335,10 @@ public sealed partial class EventResourceManagementPersistenceTests
     {
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, actor, Policy(capacity: 1));
+        await using var request = Workflow(context, scope.TenantAId, actor, Policy(capacity: 1));
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         foreach (var type in Enum.GetValues<EventResourceDeliveryTypeEnum>())
         {
             var id = Guid.CreateVersion7();

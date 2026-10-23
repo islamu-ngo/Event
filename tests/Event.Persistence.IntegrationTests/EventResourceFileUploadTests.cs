@@ -5,6 +5,8 @@ using Event.Persistence.IntegrationTests.Moderation;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventResource;
 using Explore.Application.Features.EventResources.Handlers.Commands;
@@ -17,6 +19,7 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
@@ -28,6 +31,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using TUnit.Core.Interfaces;
 
@@ -461,7 +465,10 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         parent.Publish(Now);
         parent.VisibilityTypeId = (int)VisibilityTypeEnum.Public;
         await context.SaveChangesAsync();
-        var management = Management(context, seed, allowUnscanned: true);
+        await using var managementRequest = Management(context, seed, allowUnscanned: true);
+        await managementRequest.InitializeAsync();
+        await managementRequest.PrepareAsync();
+        var management = managementRequest.Workflow;
         foreach (var action in new[] { EventResourceManagementAction.Publish, EventResourceManagementAction.Unpublish,
                      EventResourceManagementAction.Publish })
         {
@@ -500,9 +507,12 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         await context.SaveChangesAsync();
         var version = (await context.EventResources.AsNoTracking()
             .SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
-        var manager = Management(context, seed, condition is "cross-owned" or "policy-disallowed",
+        await using var managementRequest = Management(context, seed, condition is "cross-owned" or "policy-disallowed",
             condition == "policy-disallowed"
                 ? ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] : null);
+        await managementRequest.InitializeAsync();
+        await managementRequest.PrepareAsync();
+        var manager = managementRequest.Workflow;
         await Assert.That((await manager.ChangeStateAsync(seed.ResourceId, version,
             EventResourceManagementAction.Publish, default)).IsSuccess).IsFalse();
         await using var verify = database.CreateTenantContext(seed.TenantId);
@@ -530,9 +540,14 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
                 .SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
         }
         await using (var failing = database.CreateTenantContext(seed.TenantId, new AuditFailure()))
-            await Assert.That(async () => await Management(failing, seed, allowUnscanned: true)
+        {
+            await using var request = Management(failing, seed, allowUnscanned: true);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            await Assert.That(async () => await request.Workflow
                 .ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Publish, default))
                 .Throws<DbUpdateException>();
+        }
         await using (var rolledBack = database.CreateTenantContext(seed.TenantId))
         {
             var resource = await rolledBack.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
@@ -544,7 +559,10 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         }
         await using (var resumed = database.CreateTenantContext(seed.TenantId))
         {
-            var management = Management(resumed, seed, allowUnscanned: true);
+            await using var request = Management(resumed, seed, allowUnscanned: true);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            var management = request.Workflow;
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version,
                 EventResourceManagementAction.Publish, default)).IsSuccess).IsTrue();
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version,
@@ -570,8 +588,13 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             version = (await upload.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
         }
         await using (var failing = database.CreateTenantContext(seed.TenantId, new AuditFailure()))
-            await Assert.That(async () => await Management(failing, seed).ChangeStateAsync(seed.ResourceId, version,
+        {
+            await using var request = Management(failing, seed);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            await Assert.That(async () => await request.Workflow.ChangeStateAsync(seed.ResourceId, version,
                 EventResourceManagementAction.Delete, default)).Throws<DbUpdateException>();
+        }
         await using (var verify = database.CreateTenantContext(seed.TenantId))
         {
             await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).StorageObjectId).IsEqualTo(objectId);
@@ -581,7 +604,10 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         }
         await using (var deleting = database.CreateTenantContext(seed.TenantId))
         {
-            var management = Management(deleting, seed);
+            await using var request = Management(deleting, seed);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            var management = request.Workflow;
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Delete, default)).IsSuccess).IsTrue();
             await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Delete, default)).IsSuccess).IsFalse();
         }
@@ -823,7 +849,10 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         var workflow = Workflow(context, seed, async () =>
         {
             await using var deleting = database.CreateTenantContext(seed.TenantId);
-            await Assert.That((await Management(deleting, seed).ChangeStateAsync(seed.ResourceId, seed.Version,
+            await using var request = Management(deleting, seed);
+            await request.InitializeAsync();
+            await request.PrepareAsync();
+            await Assert.That((await request.Workflow.ChangeStateAsync(seed.ResourceId, seed.Version,
                 EventResourceManagementAction.Delete, default)).IsSuccess).IsTrue();
             var tombstone = await deleting.StorageObjectDeletionTombstones.SingleAsync(value => value.TenantId == seed.TenantId);
             await Assert.That(tombstone.State).IsEqualTo(StorageObjectDeletionState.AwaitingProducer);
@@ -1162,7 +1191,7 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
             Lifecycle(context), authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new Clock()));
     }
 
-    private static EventResourceManagementWorkflow Management(ExploreDbContext context, Seed seed, bool allowUnscanned = false,
+    private ManagementRequest Management(ExploreDbContext context, Seed seed, bool allowUnscanned = false,
         string[]? mediaTypes = null)
     {
         var repository = new EventResourceRepository(context);
@@ -1175,19 +1204,41 @@ public sealed partial class EventResourceFileUploadTests(EventResourceFileUpload
         routes.ReadAsync(seed.TenantId, Arg.Any<CancellationToken>()).Returns(new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default"));
         var provider = Substitute.For<IEventResourceAuthorizationProvider>();
         provider.CheckAsync(Arg.Any<EventResourceProviderInput>(), Arg.Any<CancellationToken>()).Returns(EventResourceProviderDecision.Allow);
-        var tenant = Substitute.For<ITenantContext>();
-        tenant.TenantId.Returns(seed.TenantId);
-        var user = Substitute.For<ICurrentUserService>();
-        user.UserId.Returns(seed.UserId);
-        user.IsAuthenticated.Returns(true);
-        return new(repository, unit, Lifecycle(context), new EventResourceAuthorityOrchestrator(unit,
+        var tenant = context.TenantContext;
+        if (tenant is null)
+        {
+            tenant = Substitute.For<ITenantContext>();
+            tenant.TenantId.Returns(seed.TenantId);
+            context.TenantContext = tenant;
+        }
+        else if (tenant.TenantId != seed.TenantId)
+            throw new InvalidOperationException("The management request must retain its original tenant.");
+        var clock = new Clock();
+        var human = new CurrentHumanPrincipalFixture(seed.UserId, seed.TenantId, borrowedContext: context,
+            configureServices: collection => collection.AddSingleton<IPrivacyIdentityFenceAuthority>(
+                database.Privacy.Authority(context, clock)), timeProvider: clock);
+        var services = human.Services;
+        var workflow = new EventResourceManagementWorkflow(repository, unit, Lifecycle(context), new EventResourceAuthorityOrchestrator(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
                 new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                     Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
                     global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
-            routes, provider, new Clock()), tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new Clock());
+            routes, provider, clock), tenant, services.GetRequiredService<ICurrentUserService>(), human.Machine, clock,
+            new EventPublicationMutationBoundary(context, services.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
+                services.GetRequiredService<IUserContext>(), human.Admin, human.Machine, clock,
+                ModerationRecognitionResourceFixture.Reader(context), services.GetRequiredService<IHumanActionCommitFinalizer>()));
+        return new(human, workflow);
+    }
+
+    private sealed class ManagementRequest(CurrentHumanPrincipalFixture human, EventResourceManagementWorkflow workflow)
+        : IAsyncDisposable
+    {
+        public EventResourceManagementWorkflow Workflow => workflow;
+        public Task InitializeAsync() => human.InitializeAsync();
+        public Task PrepareAsync() => human.PrepareAsync();
+        public ValueTask DisposeAsync() => human.DisposeAsync();
     }
 
     private static EventResourceStorageLifecycleService Lifecycle(ExploreDbContext context) =>

@@ -22,7 +22,10 @@ public sealed partial class EventResourceDiscoveryQueryTests
         bool safeStatus = boundary is "current" or "revoked-status";
         if (safeStatus) await ApplyManagementQuarantineAsync(resource);
         await using var context = database.CreateMeasurementContext();
-        var workflow = ManagementWorkflow(context, scope.TenantAId, actor);
+        await using var request = ManagementWorkflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var read = await workflow.GetAsync(resource.Id, default);
         await Assert.That(read.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
         await Assert.That(read.Projection).IsNotNull();

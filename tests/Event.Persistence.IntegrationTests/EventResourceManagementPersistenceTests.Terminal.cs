@@ -15,7 +15,10 @@ public sealed partial class EventResourceManagementPersistenceTests
     {
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateIndependentContext();
-        var workflow = Workflow(context, scope.TenantAId, actor);
+        await using var request = Workflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var id = Guid.CreateVersion7();
         await Assert.That((await workflow.CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
         var prepared = await workflow.GetAsync(id, default);
@@ -57,7 +60,10 @@ public sealed partial class EventResourceManagementPersistenceTests
                 return inputs.Select(_ => EventResourceProviderDecision.Allow).ToArray();
             });
         await using var context = database.CreateIndependentContext();
-        var workflow = Workflow(context, scope.TenantAId, actor, provider: provider, clock: clock);
+        await using var request = Workflow(context, scope.TenantAId, actor, provider: provider, clock: clock);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var id = Guid.CreateVersion7();
         await Assert.That((await workflow.CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
         var nearExpiry = EventResourceAuditEntry.Create(scope.TenantAId, id, actor,
@@ -92,7 +98,10 @@ public sealed partial class EventResourceManagementPersistenceTests
                 .Select(input => input.Action == "download" && !downloadAllowed
                     ? EventResourceProviderDecision.Deny : EventResourceProviderDecision.Allow).ToArray());
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, actor, Policy(allowUnscanned: true), provider);
+        await using var request = Workflow(context, scope.TenantAId, actor, Policy(allowUnscanned: true), provider);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         await Assert.That((await workflow.CreateAsync(scope.EventAId, id, Draft() with
         {
             DisclosureMode = EventResourceDisclosureModeEnum.Public,

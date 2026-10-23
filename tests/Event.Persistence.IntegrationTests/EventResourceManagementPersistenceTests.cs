@@ -1,7 +1,8 @@
 using System.Data.Common;
-using System.Security.Claims;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventResource;
@@ -9,14 +10,12 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using Explore.Infrastructure.Identity;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
@@ -32,7 +31,10 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
     {
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, actor);
+        await using var request = Workflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var id = Guid.CreateVersion7();
         var first = await workflow.CreateAsync(scope.EventAId, id, Draft(), default);
         var replay = await workflow.CreateAsync(scope.EventAId, id, Draft(), default);
@@ -50,7 +52,10 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         var interceptor = new AuditFailure();
         await using var context = database.CreateContext(interceptor);
         var id = Guid.CreateVersion7();
-        await Assert.That(async () => await Workflow(context, scope.TenantAId, actor)
+        await using var request = Workflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        await Assert.That(async () => await request.Workflow
             .CreateAsync(scope.EventAId, id, Draft(), default)).Throws<DbUpdateException>();
         await Assert.That(interceptor.ResourceWriteExecuted).IsTrue();
         await using var verify = database.CreateContext();
@@ -64,7 +69,10 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext(new AuditFailure());
         var id = Guid.CreateVersion7();
-        var result = await Workflow(context, scope.TenantAId, actor, Policy(retention: 0))
+        await using var request = Workflow(context, scope.TenantAId, actor, Policy(retention: 0));
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow
             .CreateAsync(scope.EventAId, id, Draft(), default);
         await Assert.That(result.IsSuccess).IsTrue();
         await using var verify = database.CreateContext();
@@ -108,7 +116,7 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         return released!;
     }
 
-    private EventResourceManagementWorkflow Workflow(ExploreDbContext context, Guid tenantId, Guid actor,
+    private ManagementRequest Workflow(ExploreDbContext context, Guid tenantId, Guid actor,
         EventResourceGovernancePolicy? policy = null, IEventResourceAuthorizationProvider? provider = null,
         IUnitOfWork? unitOfWork = null, TimeProvider? clock = null)
     {
@@ -129,25 +137,21 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
                 .Returns(call => call.Arg<IReadOnlyList<EventResourceProviderInput>>()
                     .Select(_ => EventResourceProviderDecision.Allow).ToArray());
         }
-        var tenant = Substitute.For<ITenantContext>();
-        tenant.TenantId.Returns(tenantId);
-        context.TenantContext = tenant;
-        var user = Substitute.For<ICurrentUserService>();
-        user.IsAuthenticated.Returns(true);
-        user.UserId.Returns(actor);
-        var http = new HttpContextAccessor
+        var tenant = context.TenantContext;
+        if (tenant is null)
         {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, actor.ToString("D"))], "event-resource-native"))
-            }
-        };
-        var identity = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
-            NullLogger<AdminContext>.Instance);
-        var machine = new MachinePrincipalAccessor(http);
-        return new(repository, unit, new EventResourceStorageLifecycleService(
+            tenant = Substitute.For<ITenantContext>();
+            tenant.TenantId.Returns(tenantId);
+            context.TenantContext = tenant;
+        }
+        else if (tenant.TenantId != tenantId)
+            throw new InvalidOperationException("The management request must retain its original tenant.");
+        var human = new CurrentHumanPrincipalFixture(actor, tenantId, borrowedContext: context,
+            configureServices: collection => collection.AddSingleton<IPrivacyIdentityFenceAuthority>(
+                database.Privacy.Authority(context, clock)), timeProvider: clock);
+        var services = human.Services;
+        var machine = human.Machine;
+        var workflow = new EventResourceManagementWorkflow(repository, unit, new EventResourceStorageLifecycleService(
             new EventResourceStorageLifecycleRepository(context), unit, clock), new(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance,
                 new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
@@ -155,10 +159,21 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
                 new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
                     Substitute.For<Explore.Application.Contracts.Persistence.IModerationMachineSubjectBindingRepository>(),
                     global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))),
-            routes, provider, clock), tenant, user, machine, clock,
-            new EventPublicationMutationBoundary(context, database.Privacy.Authority(context, clock),
-                new UserContext(http), identity, machine, clock,
-                global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context)));
+            routes, provider, clock), tenant, services.GetRequiredService<ICurrentUserService>(), machine, clock,
+            new EventPublicationMutationBoundary(context, services.GetRequiredService<IPrivacyIdentityFenceAuthority>(),
+                services.GetRequiredService<IUserContext>(), human.Admin, machine, clock,
+                global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context),
+                services.GetRequiredService<IHumanActionCommitFinalizer>()));
+        return new(human, workflow);
+    }
+
+    private sealed class ManagementRequest(CurrentHumanPrincipalFixture human, EventResourceManagementWorkflow workflow)
+        : IAsyncDisposable
+    {
+        public EventResourceManagementWorkflow Workflow => workflow;
+        public Task InitializeAsync() => human.InitializeAsync();
+        public Task PrepareAsync() => human.PrepareAsync();
+        public ValueTask DisposeAsync() => human.DisposeAsync();
     }
 
     private static EventResourceDraftDto Draft() => new()

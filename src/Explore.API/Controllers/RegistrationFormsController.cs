@@ -68,6 +68,12 @@ public sealed class RegistrationFormsController(
         "registrationForm", "Registration form validation failed", "Registration form authoring failed.");
     private static readonly ApiNotFoundProblemDescriptor NotFoundProblem = new(
         "Registration authoring resource not found", "The requested registration authoring resource was not found.");
+    private static readonly CommandFailurePolicy PublicationFailures = CommandFailurePolicy
+        .ValidatedBy(RegistrationValidationProblem)
+        .Forbidden("Registration form publication restricted", "Current publication restrictions prevent publishing this form version.",
+            "registration_form_publish_restricted")
+        .Unavailable("Registration form publication authority unavailable", "Current publication authority could not be established.",
+            "registration_form_publish_authority_unavailable");
 
     [HttpGet("registration-workflows", Name = RouteNames.GetRegistrationWorkflow)]
     [PrivateNoStore]
@@ -369,8 +375,9 @@ public sealed class RegistrationFormsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public Task<ActionResult<BaseCommandResponse<Guid>>> Publish(Guid eventId, Guid formId, Guid versionId, [FromHeader(Name = "If-Match"), Required] string? ifMatch, CancellationToken ct)
-        => Send(ifMatch, stamp => publishVersionCommand.ExecuteAsync(new PublishRegistrationFormVersionCommand(eventId, formId, versionId, stamp), ct), null, null);
+        => Send(ifMatch, stamp => publishVersionCommand.ExecuteAsync(new PublishRegistrationFormVersionCommand(eventId, formId, versionId, stamp), ct), null, null, PublicationFailures);
 
     [HttpGet("/api/registration-form-templates", Name = RouteNames.GetRegistrationFormTemplates)]
     [PrivateNoStore]
@@ -440,12 +447,15 @@ public sealed class RegistrationFormsController(
         string? ifMatch,
         Func<Guid, Task<BaseCommandResponse<Guid>>> execute,
         string? createdRoute,
-        Func<Guid, object>? createdValues)
+        Func<Guid, object>? createdValues,
+        CommandFailurePolicy? failurePolicy = null)
     {
         if (!TryParseConcurrencyStamp(ifMatch, out Guid stamp))
             return this.ToValidationProblem(RegistrationValidationProblem, "If-Match must be a strong quoted non-empty GUID concurrency stamp.");
         BaseCommandResponse<Guid> response = await execute(stamp);
-        if (!response.IsSuccess) return this.ToCommandValidationProblem(response, RegistrationValidationProblem);
+        if (!response.IsSuccess) return failurePolicy is null
+            ? this.ToCommandValidationProblem(response, RegistrationValidationProblem)
+            : failurePolicy.Map(this, response);
         return createdRoute is null ? Ok(response) : CreatedAtRoute(createdRoute, createdValues!(response.Id), response);
     }
 

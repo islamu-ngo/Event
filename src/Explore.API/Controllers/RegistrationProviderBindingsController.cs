@@ -42,6 +42,20 @@ public sealed class RegistrationProviderBindingsController(
         "Registration provider management request failed",
         "The registration provider management request was invalid.");
 
+    private static readonly CommandFailurePolicy ImportPublicationFailures = CommandFailurePolicy
+        .ValidatedBy(ProviderManagementValidationProblem)
+        .Forbidden("Registration provider import restricted", "Current publication restrictions prevent this import.",
+            "registration_provider_external_import_publish_restricted")
+        .Unavailable("Registration provider import authority unavailable", "Current publication authority could not be established.",
+            "registration_provider_external_import_publish_authority_unavailable");
+
+    private static readonly CommandFailurePolicy BindingPublicationFailures = CommandFailurePolicy
+        .ValidatedBy(ProviderManagementValidationProblem)
+        .Forbidden("Registration provider binding publication restricted", "Current publication restrictions prevent this publication.",
+            "registration_provider_binding_publish_restricted")
+        .Unavailable("Registration provider binding publication authority unavailable", "Current publication authority could not be established.",
+            "registration_provider_binding_publish_authority_unavailable");
+
     [HttpPost("connections/{connectionId:guid}/external-imports", Name = RouteNames.ImportExternalRegistrationProviderFormVersion)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.DefaultPolicy)]
@@ -50,8 +64,9 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ImportExternalFormVersion(Guid tenantId, Guid eventId, Guid connectionId, [FromBody] ImportExternalRegistrationProviderFormVersionRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await importHandler.ExecuteAsync(new ImportExternalRegistrationProviderFormVersionCommand(tenantId, eventId, connectionId, request), cancellationToken));
+        ToImportActionResult(await importHandler.ExecuteAsync(new ImportExternalRegistrationProviderFormVersionCommand(tenantId, eventId, connectionId, request), cancellationToken));
 
     [HttpGet("bindings", Name = RouteNames.GetRegistrationProviderBindings)]
     [EnableRateLimiting(RateLimitingExtensions.AuthenticatedPolicy)]
@@ -117,8 +132,12 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<BaseCommandResponse<Guid>>> PublishBinding(Guid tenantId, Guid eventId, Guid bindingId, CancellationToken cancellationToken = default) =>
-        ToActionResult(await publishBindingHandler.ExecuteAsync(new PublishEventRegistrationProviderBindingCommand(tenantId, eventId, bindingId), cancellationToken));
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<BaseCommandResponse<Guid>>> PublishBinding(Guid tenantId, Guid eventId, Guid bindingId, CancellationToken cancellationToken = default)
+    {
+        var result = await publishBindingHandler.ExecuteAsync(new PublishEventRegistrationProviderBindingCommand(tenantId, eventId, bindingId), cancellationToken);
+        return result.IsSuccess ? Ok(result) : BindingPublicationFailures.Map(this, result);
+    }
 
     [HttpPut("bindings/{bindingId:guid}/mappings", Name = RouteNames.ReplaceRegistrationProviderMappings)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -134,4 +153,8 @@ public sealed class RegistrationProviderBindingsController(
     private ActionResult<BaseCommandResponse<Guid>> ToActionResult(BaseCommandResponse<Guid> result) => result.IsSuccess
         ? Ok(result)
         : this.ToCommandValidationProblem(result, ProviderManagementValidationProblem);
+
+    private ActionResult<BaseCommandResponse<Guid>> ToImportActionResult(BaseCommandResponse<Guid> result) => result.IsSuccess
+        ? Ok(result)
+        : ImportPublicationFailures.Map(this, result);
 }

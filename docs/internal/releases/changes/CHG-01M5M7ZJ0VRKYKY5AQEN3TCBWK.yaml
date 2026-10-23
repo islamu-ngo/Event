@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5M7ZJ0VRKYKY5AQEN3TCBWK
+Title: "show complete policy meanings without implying enforcement"
+Type: feat
+Scope: access
+Summary: "Render retained policy definitions, reference recipes and separate consequence plans in read-only simple and advanced previews without implying adoption or current support. Included component tests are unrun."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Read-only previews keep retained definitions and separate consequence safeguards visible without offering mutation actions or presenting declarations as current enforcement or permission. Included component tests are UNRUN."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Use the previews with the matching native read contracts and subsequent policy authoring screen. Final generated output, paired administrative guidance and runtime verification remain separate main-session work; no readiness is certified."

@@ -6,8 +6,12 @@ using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;
 using Explore.Domain.Constants;
 using Explore.Infrastructure.Mail;
+using Explore.Infrastructure.Services;
+using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using MimeKit;
 using NSubstitute;
@@ -28,7 +32,8 @@ public sealed partial class ModerationNoticeEmailTests
             return Task.CompletedTask;
         });
         await using var context = fixture.Notice.Database.Context();
-        using var settings = new InstanceSettingsCommandFixture(context, fixture.Notice.Database.AdministratorId);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var settings = SmtpSettingsReader(context, cache);
         await EmailDispatchSqliteFixture.SetEmailSettingAsync(context, GovernanceSettingKeys.Email.SmtpHost, "\"127.0.0.1\"");
         await EmailDispatchSqliteFixture.SetEmailSettingAsync(context, GovernanceSettingKeys.Email.SmtpPort,
             peer.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -39,8 +44,8 @@ public sealed partial class ModerationNoticeEmailTests
         var secrets = Substitute.For<ISecretResolver>();
         secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(SecretResolutionResult.Unconfigured);
-        var capability = new EmailDeliveryCapabilityResolver(settings.Settings, secrets, new SecretBindingRepository(context));
-        var resolver = new SmtpConfigResolver(capability, fixture.Notice.Database, settings.Settings);
+        var capability = new EmailDeliveryCapabilityResolver(settings, secrets, new SecretBindingRepository(context));
+        var resolver = new SmtpConfigResolver(capability, fixture.Notice.Database, settings);
         var smtp = new SmtpEmailService(resolver, NullLogger<SmtpEmailService>.Instance,
             fixture.Notice.Clock, fixture.CreateAuthority(context));
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -85,7 +90,8 @@ public sealed partial class ModerationNoticeEmailTests
                 await fixture.InvalidateAsync(change);
         });
         await using var context = fixture.Notice.Database.Context();
-        using var settings = new InstanceSettingsCommandFixture(context, fixture.Notice.Database.AdministratorId);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var settings = SmtpSettingsReader(context, cache);
         await EmailDispatchSqliteFixture.SetEmailSettingAsync(context, GovernanceSettingKeys.Email.SmtpHost, "\"127.0.0.1\"");
         await EmailDispatchSqliteFixture.SetEmailSettingAsync(context, GovernanceSettingKeys.Email.SmtpPort,
             peer.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -94,8 +100,8 @@ public sealed partial class ModerationNoticeEmailTests
         var secrets = Substitute.For<ISecretResolver>();
         secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(SecretResolutionResult.Unconfigured);
-        var capability = new EmailDeliveryCapabilityResolver(settings.Settings, secrets, new SecretBindingRepository(context));
-        var resolver = new SmtpConfigResolver(capability, fixture.Notice.Database, settings.Settings);
+        var capability = new EmailDeliveryCapabilityResolver(settings, secrets, new SecretBindingRepository(context));
+        var resolver = new SmtpConfigResolver(capability, fixture.Notice.Database, settings);
         var smtp = new SmtpEmailService(resolver, NullLogger<SmtpEmailService>.Instance,
             fixture.Notice.Clock, fixture.CreateAuthority(context));
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -124,6 +130,16 @@ public sealed partial class ModerationNoticeEmailTests
         }
         context.ModerationTrustDomainId = fixture.Notice.Database.Scope.TrustDomainId;
         await Assert.That(await context.Set<Explore.Domain.ModerationNoticeNotificationReceipt>().CountAsync()).IsEqualTo(0);
+    }
+
+    private static HierarchicalSettingsReader SmtpSettingsReader(ExploreDbContext context, IMemoryCache cache)
+    {
+        var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
+        return new(SystemSettingRepository.CreateReadOnly(context, mutationLock),
+            TenantSettingRepository.CreateReadOnly(context, mutationLock),
+            new OrganizationSettingRepository(context), new GroupSettingRepository(context),
+            UserPreferenceRepository.CreateReadOnly(context), cache,
+            new AtprotoFederationSettingRepository(context, null));
     }
 
     private sealed class OriginalNoticeSmtpPeer : IAsyncDisposable

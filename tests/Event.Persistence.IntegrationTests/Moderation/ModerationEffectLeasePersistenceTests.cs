@@ -17,6 +17,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Identity;
 using Explore.Infrastructure.Messaging;
+using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Queries;
@@ -1418,13 +1419,7 @@ public sealed class ModerationEffectLeasePersistenceTests
         }
     }
 
-    private sealed class DrainTenant : ITenantContextAccessor
-    {
-        public Guid? TenantId { get; private set; }
-        public bool IsResolved => TenantId is not null;
-        public void SetTenant(Guid tenantId) => TenantId = tenantId;
-        public void Clear() => TenantId = null;
-    }
+    private sealed class DrainTenant() : TenantContextAccessor(new HttpContextAccessor());
 
     private sealed class SelectedTenant(Guid tenantId) : ITenantContext
     {

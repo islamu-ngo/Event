@@ -175,7 +175,8 @@ public sealed class AtprotoOAuthSecurityGatewayTests
             new Explore.Application.Services.PrivacyIdentityFenceOperation(
                 Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>(),
                 Substitute.For<Explore.Application.Contracts.Moderation.IModerationRecognitionContinuity>(),
-                TimeProvider.System, externalLogins),
+                TimeProvider.System, externalLogins,
+                () => throw new InvalidOperationException("A rejected DID cannot settle human enrollment.")),
             null!); // DID mismatch fails before a native membership participant can be acquired.
         var payload = JsonSerializer.SerializeToUtf8Bytes(CreateSession());
 

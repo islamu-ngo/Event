@@ -13,9 +13,11 @@ using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -60,8 +62,10 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             var fixture = new InspectionFixture(native, connection, options);
             await using (var context = native.Context())
             {
-                using var settings = new InstanceSettingsCommandFixture(context, native.Author);
-                var policy = await settings.EventResourceSettingsWriter.ApplyAsync([
+                var unitOfWork = new EfCoreUnitOfWork(context);
+                var writer = new EventResourceSettingsWriter(context,
+                    new RelationalSettingMutationLock(context, unitOfWork), unitOfWork);
+                var policy = await writer.ApplyInternalAsync([
                     new(null, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
                         EventResourceSettingMutationKind.SetValue, "true"),
                     new(null, GovernanceSettingKeys.EventResources.ExternalOrigins,
@@ -161,7 +165,7 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
 
     private sealed class InspectionSession : IAsyncDisposable
     {
-        private readonly InstanceSettingsCommandFixture settings;
+        private readonly MemoryCache cache = new(new MemoryCacheOptions());
         public ExploreDbContext Context { get; }
         public ModerationResourceQuarantineInspectionRepository Owner { get; }
         public ModerationResourceQuarantineStateRepository StateOwner { get; }
@@ -169,14 +173,19 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         public InspectionSession(InspectionFixture fixture, Guid human)
         {
             Context = fixture.Native.Context();
-            settings = new(Context, human);
+            var mutationLock = new RelationalSettingMutationLock(Context, new EfCoreUnitOfWork(Context));
+            var systemSettings = SystemSettingRepository.CreateReadOnly(Context, mutationLock);
+            var tenantSettings = TenantSettingRepository.CreateReadOnly(Context, mutationLock);
+            var settings = new HierarchicalSettingsReader(systemSettings, tenantSettings,
+                new OrganizationSettingRepository(Context), new GroupSettingRepository(Context),
+                UserPreferenceRepository.CreateReadOnly(Context), cache,
+                new AtprotoFederationSettingRepository(Context, null));
             var identity = Identity(Context, human);
             var bindings = new StorageProviderBindingService(new StorageProviderBindingRepository(Context),
-                settings.Settings, Substitute.For<IRetainedSecretResolver>(),
+                settings, Substitute.For<IRetainedSecretResolver>(),
                 Options.Create(new LocalFileStorageOptions()),
                 Substitute.For<IS3ClientFactory>(), NullLoggerFactory.Instance);
-            var policy = new EventResourceGovernancePolicyReader(new SystemSettingRepository(Context, settings.MutationLock),
-                new TenantSettingRepository(Context, settings.MutationLock));
+            var policy = new EventResourceGovernancePolicyReader(systemSettings, tenantSettings);
             var release = new ModerationResourceQuarantineReleaseRepository(
                 Context, identity.Admin, identity.Machine, fixture.Native.Clock);
             Owner = new(release, fixture.Retained(),
@@ -196,7 +205,7 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
 
         public async ValueTask DisposeAsync()
         {
-            settings.Dispose();
+            cache.Dispose();
             await Context.DisposeAsync();
         }
     }

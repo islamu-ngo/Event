@@ -8,6 +8,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Identity;
+using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Microsoft.AspNetCore.Http;

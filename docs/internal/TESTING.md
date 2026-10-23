@@ -144,7 +144,7 @@ Each project has a specific role. Run individually — never use solution-level 
 | `Explore.Diagnostic.UnitTests` | Diagnostic tooling | Doctor exit codes, bounded command evidence, and redaction | No |
 | `ISLAMU.AgentWorkflow.Tests` | Repository tooling | Intents YAML syntax and literal-file commit guard | No |
 | `Event.Standalone.IntegrationTests` | Standalone host | In-process transport, combined host graph, configuration, and API parity | No |
-| `Event.Distributed.IntegrationTests` | Real AppHost | Owned resources/authorities, Split/Standalone startup and lifecycle | None for Harness; Docker-compatible runtime for Distributed |
+| `Event.Distributed.IntegrationTests` | Real AppHost, browser and load | Owned resources/authorities, topology/lifecycle, actual browser scripts/journeys and bounded process/workload profiles | No host for Harness; selected real profiles require their documented runtime/browser/k6 tools |
 | External `Configurator.Terminal.Tests` | Offline terminal (Configurator repository) | Definition workspace, localization and native secret/protected-save boundaries | No |
 | `ISLAMU.ReleaseEngineering.Tests` | Release engineering | Commit/scope policy, release artifact, Git trust, renderer, tag-anchored attestation, provider adapter plans | No (spawns `git`, `ssh-keygen`, and disposable repositories under the temp directory) |
 | `Event.Benchmarks` | Benchmarks | Advisory BenchmarkDotNet performance scenarios; build-only in PRs and executed by `performance-smoke.yml` | Optional PostgreSQL only for the dedicated provider benchmark |
@@ -159,6 +159,12 @@ its selected Environment authority. Their commented `.env.example` entries
 document the interface; they are not interactive deployment settings. A passing
 Harness selection proves its admission/ownership/projection checks only, not
 healthy application startup or completed browser/load journeys.
+
+The [browser](testing/BROWSER_ASSURANCE.md) and
+[load](testing/LOAD_ASSURANCE.md) guides distinguish artifact/process controls
+from actual host execution and measurement. The integrated project owns all
+four categories; neither discovery nor a passing host-free selection admits
+an unexecuted browser, enabled worker, load or recovery profile.
 
 The seven bundled Event setup test roots are removed. Portable engine and
 packaging coverage belongs to Configurator. Event retains client adapter tests under

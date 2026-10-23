@@ -34,7 +34,7 @@ public class ValidateOrganizationInvitationQueryHandler : IQueryHandler<Validate
         if (recipient is null || recipient == Guid.Empty)
             return BaseCommandResponse.Validation<Guid>(["Invitation not found"], "Invitation not found");
 
-        var invitation = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.InvitationId);
+        var invitation = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.InvitationId, cancellationToken);
 
         if (invitation == null)
         {

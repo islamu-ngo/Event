@@ -1,5 +1,7 @@
 namespace Event.Architecture.Tests;
 
+using YamlDotNet.RepresentationModel;
+
 public sealed class AspireLocalInfrastructureArchitectureTests
 {
     private static readonly string RepoRoot = ResolveRepoRoot();
@@ -27,14 +29,20 @@ public sealed class AspireLocalInfrastructureArchitectureTests
     [Test]
     public async Task CerbosAdminApi_MustUseMutablePostgresStore()
     {
-        var cerbosConfig = await File.ReadAllTextAsync(
-            Path.Combine(RepoRoot, "cerbos", "config", ".cerbos.yaml"));
+        var cerbosConfig = ReadYamlMapping(Path.Combine(RepoRoot, "cerbos", "config", ".cerbos.yaml"));
         var appHost = await File.ReadAllTextAsync(Path.Combine(RepoRoot, "src", "Explore.AppHost", "AppHost.cs"));
-        var compose = await File.ReadAllTextAsync(Path.Combine(RepoRoot, "docker-compose.yml"));
+        var compose = ReadYamlMapping(Path.Combine(RepoRoot, "docker-compose.yml"));
+        var storage = (YamlMappingNode)cerbosConfig.Children[new YamlScalarNode("storage")];
+        var services = (YamlMappingNode)compose.Children[new YamlScalarNode("services")];
+        var cerbos = (YamlMappingNode)services.Children[new YamlScalarNode("cerbos")];
+        var environment = (YamlMappingNode)cerbos.Children[new YamlScalarNode("environment")];
 
-        await Assert.That(cerbosConfig).Contains("storage:\n  driver: \"postgres\"");
+        await Assert.That(((YamlScalarNode)storage.Children[new YamlScalarNode("driver")]).Value)
+            .IsEqualTo("postgres");
         await Assert.That(appHost).Contains("\"CERBOS_PG_URL\"");
-        await Assert.That(compose).Contains("CERBOS_PG_URL:");
+        await Assert.That(environment.Children.TryGetValue(new YamlScalarNode("CERBOS_PG_URL"), out var connection))
+            .IsTrue();
+        await Assert.That(connection is YamlScalarNode scalar && !string.IsNullOrWhiteSpace(scalar.Value)).IsTrue();
     }
 
     [Test]
@@ -114,8 +122,11 @@ public sealed class AspireLocalInfrastructureArchitectureTests
         foreach (var profile in document.RootElement.GetProperty("profiles").EnumerateObject())
         {
             var environment = profile.Value.GetProperty("environmentVariables");
-            await Assert.That(environment.TryGetProperty("SecretProvider__Provider", out _)).IsFalse();
-            await Assert.That(environment.TryGetProperty("SecretProvider__Infisical__ClientSecret", out _)).IsFalse();
+            var keys = environment.EnumerateObject()
+                .Select(property => property.Name.Replace("__", ":", StringComparison.Ordinal))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            await Assert.That(keys.Contains("SecretProvider:Provider")).IsFalse();
+            await Assert.That(keys.Contains("SecretProvider:Infisical:ClientSecret")).IsFalse();
         }
     }
 
@@ -161,6 +172,14 @@ public sealed class AspireLocalInfrastructureArchitectureTests
         string blazorComposition = appHost[blazorIndex..standaloneIndex];
         await Assert.That(blazorComposition).DoesNotContain("privacyErasureDatabase");
         await Assert.That(blazorComposition).DoesNotContain("PrivacyErasureAuthorityMigrator");
+    }
+
+    private static YamlMappingNode ReadYamlMapping(string path)
+    {
+        using var reader = File.OpenText(path);
+        var document = new YamlStream();
+        document.Load(reader);
+        return (YamlMappingNode)document.Documents.Single().RootNode;
     }
 
     private static string ResolveRepoRoot()

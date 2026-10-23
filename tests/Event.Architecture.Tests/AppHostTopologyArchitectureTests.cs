@@ -139,46 +139,29 @@ public sealed class AppHostTopologyArchitectureTests
     [Test]
     public async Task EventStandalone_CompositionRoot_MustReferenceOnlyHostsAndStartupMigrationsWithoutExpandingBlazorClientDependencies()
     {
-        var projectXml = await File.ReadAllTextAsync(StandaloneProjectPath);
-
-        var standaloneReferences = XDocument.Load(StandaloneProjectPath)
-            .Descendants()
-            .Where(element => element.Name.LocalName == "ProjectReference")
-            .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
-            .ToArray();
+        var standaloneReferences = ProjectReferences(StandaloneProjectPath);
 
         await Assert.That(standaloneReferences).IsEquivalentTo([
-            "..\\Explore.API\\Explore.API.csproj",
-            "..\\Explore.Blazor\\Explore.Blazor.csproj",
-            "..\\Explore.Persistence.DataProtection.Migrations.MySql\\Explore.Persistence.DataProtection.Migrations.MySql.csproj",
-            "..\\Explore.Persistence.DataProtection.Migrations.Sqlite\\Explore.Persistence.DataProtection.Migrations.Sqlite.csproj",
-            "..\\Explore.Persistence.DataProtection.Migrations.SqlServer\\Explore.Persistence.DataProtection.Migrations.SqlServer.csproj",
-            "..\\Explore.Persistence.Migrations.MySql\\Explore.Persistence.Migrations.MySql.csproj",
-            "..\\Explore.Persistence.Migrations.Sqlite\\Explore.Persistence.Migrations.Sqlite.csproj",
-            "..\\Explore.Persistence.Migrations.SqlServer\\Explore.Persistence.Migrations.SqlServer.csproj",
-            "..\\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite\\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj"
+            "src/Explore.API/Explore.API.csproj",
+            "src/Explore.Blazor/Explore.Blazor.csproj",
+            "src/Explore.Persistence.DataProtection.Migrations.MySql/Explore.Persistence.DataProtection.Migrations.MySql.csproj",
+            "src/Explore.Persistence.DataProtection.Migrations.Sqlite/Explore.Persistence.DataProtection.Migrations.Sqlite.csproj",
+            "src/Explore.Persistence.DataProtection.Migrations.SqlServer/Explore.Persistence.DataProtection.Migrations.SqlServer.csproj",
+            "src/Explore.Persistence.Migrations.MySql/Explore.Persistence.Migrations.MySql.csproj",
+            "src/Explore.Persistence.Migrations.Sqlite/Explore.Persistence.Migrations.Sqlite.csproj",
+            "src/Explore.Persistence.Migrations.SqlServer/Explore.Persistence.Migrations.SqlServer.csproj",
+            "src/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj"
         ]);
-        await Assert.That(projectXml).Contains("<ProjectReference Include=\"..\\Explore.API\\Explore.API.csproj\" />");
-        await Assert.That(projectXml).Contains("<ProjectReference Include=\"..\\Explore.Blazor\\Explore.Blazor.csproj\" />");
+        const string standalone = "src/Event.Standalone/Event.Standalone.csproj";
+        await Assert.That(ProjectReferences(Path.Combine(RepoRoot, "src", "Explore.Blazor.Client", "Explore.Blazor.Client.csproj")))
+            .DoesNotContain(standalone);
+        await Assert.That(ProjectReferences(Path.Combine(RepoRoot, "src", "Explore.Blazor", "Explore.Blazor.csproj")))
+            .DoesNotContain(standalone);
 
-        var blazorClientProject = await File.ReadAllTextAsync(Path.Combine(RepoRoot, "src", "Explore.Blazor.Client", "Explore.Blazor.Client.csproj"));
-        var blazorProject = await File.ReadAllTextAsync(Path.Combine(RepoRoot, "src", "Explore.Blazor", "Explore.Blazor.csproj"));
-        var standaloneCsProj = await File.ReadAllTextAsync(StandaloneProjectPath);
-
-        await Assert.That(blazorClientProject).DoesNotContain("Event.Standalone.csproj");
-        await Assert.That(blazorProject).DoesNotContain("Event.Standalone.csproj");
-        await Assert.That(standaloneCsProj).Contains("ProjectReference Include=\"..\\Explore.API\\Explore.API.csproj\"");
-        await Assert.That(standaloneCsProj).Contains("ProjectReference Include=\"..\\Explore.Blazor\\Explore.Blazor.csproj\"");
-
-        var appHostReferences = XDocument.Load(AppHostProjectPath)
-            .Descendants()
-            .Where(element => element.Name.LocalName == "ProjectReference")
-            .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
-            .ToArray();
-
-        await Assert.That(appHostReferences).Contains("..\\Event.Standalone\\Event.Standalone.csproj");
-        await Assert.That(appHostReferences).Contains("..\\Explore.API\\Explore.API.csproj");
-        await Assert.That(appHostReferences).Contains("..\\Explore.Blazor\\Explore.Blazor.csproj");
+        var appHostReferences = ProjectReferences(AppHostProjectPath);
+        await Assert.That(appHostReferences).Contains(standalone);
+        await Assert.That(appHostReferences).Contains("src/Explore.API/Explore.API.csproj");
+        await Assert.That(appHostReferences).Contains("src/Explore.Blazor/Explore.Blazor.csproj");
     }
 
     [Test]
@@ -199,14 +182,29 @@ public sealed class AppHostTopologyArchitectureTests
     [Test]
     public async Task CompositionRoots_MustBeInSolutionManifest()
     {
-        var solutionManifest = await File.ReadAllTextAsync(Path.Combine(RepoRoot, "Explore.slnx"));
+        var solutionProjects = XDocument.Load(Path.Combine(RepoRoot, "Explore.slnx"))
+            .Descendants()
+            .Where(element => element.Name.LocalName == "Project")
+            .Select(element => NormalizeProjectPath(RepoRoot, element.Attribute("Path")?.Value
+                ?? throw new InvalidDataException("Solution project is missing its path.")))
+            .ToArray();
 
         foreach (var requiredProject in RequiredSolutionProjects)
         {
-            await Assert.That(solutionManifest).Contains(requiredProject);
-            await Assert.That(CountMatches(solutionManifest, requiredProject)).IsEqualTo(1);
+            await Assert.That(solutionProjects.Count(project => project == requiredProject)).IsEqualTo(1);
         }
     }
+
+    private static string[] ProjectReferences(string projectPath) => XDocument.Load(projectPath)
+        .Descendants()
+        .Where(element => element.Name.LocalName == "ProjectReference")
+        .Select(element => NormalizeProjectPath(Path.GetDirectoryName(projectPath)!, element.Attribute("Include")?.Value
+            ?? throw new InvalidDataException("Project reference is missing its include path.")))
+        .ToArray();
+
+    private static string NormalizeProjectPath(string directory, string path) => Path.GetRelativePath(
+        RepoRoot, Path.GetFullPath(Path.Combine(directory, path.Replace('\\', Path.DirectorySeparatorChar))))
+        .Replace('\\', '/');
 
     private static int CountMatches(string input, string value) =>
         CountMatches(input, value, 0, input.Length, StringComparison.Ordinal);

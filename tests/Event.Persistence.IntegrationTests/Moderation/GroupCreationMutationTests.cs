@@ -1,6 +1,6 @@
 using System.Data.Common;
 using System.Security.Claims;
-using Explore.Application.Authorization;
+using Explore.Application.Exceptions;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.DTOs.Group;
 using Explore.Application.Features.Groups.Handlers.Commands;
@@ -38,8 +38,9 @@ public sealed class GroupCreationMutationTests
             context.ModerationHostBindings.RemoveRange(await context.ModerationHostBindings.ToArrayAsync());
             await context.SaveChangesAsync();
         }
-        var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
+        await using var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
             database.Privacy.Authority(context, TimeProvider.System), database.SubjectId);
+        await session.InitializeAsync();
         using var services = Services();
         var result = await Handler(database, context, session.Boundary, services).ExecuteAsync(Command(), default);
         await Assert.That(result.IsSuccess).IsTrue();
@@ -78,7 +79,8 @@ public sealed class GroupCreationMutationTests
         var privacy = database.Privacy.Authority(context, TimeProvider.System);
         if (denial == "erased") await privacy.AppendAsync(PrivacyErasureRequest.Create(Guid.CreateVersion7(),
             PrivacyErasureSubjectKind.User, database.SubjectId, PrivacyErasureReasonCode.SubjectErasureRequest, 1));
-        var session = GroupMemberMutationBoundaryTests.CreateBoundary(context, privacy, database.SubjectId, denial != "provider");
+        await using var session = GroupMemberMutationBoundaryTests.CreateBoundary(context, privacy, database.SubjectId, denial != "provider");
+        await session.InitializeAsync();
         if (denial == "unauthenticated") session.Http.HttpContext!.User = new ClaimsPrincipal(new ClaimsIdentity());
         using var services = Services();
         await Assert.That(async () => await Handler(database, context, session.Boundary, services)
@@ -103,9 +105,11 @@ public sealed class GroupCreationMutationTests
             .AddInterceptors(checkpoint).Options)
         { TenantContext = database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
+        await using var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
             (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.SubjectId);
+        await session.InitializeAsync();
         checkpoint.Http = session.Http;
+        checkpoint.Armed = true;
         using var services = Services();
         await Assert.That(async () => await Handler(database, context, session.Boundary, services)
             .ExecuteAsync(Command(), default)).Throws<AuthorizationException>();
@@ -130,15 +134,17 @@ public sealed class GroupCreationMutationTests
     {
         await using var database = await SourceDatabase.CreateAsync();
         await using var baseline = database.Context();
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollback);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollback) { Armed = false };
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new ExploreDbContext(options.Options) { TenantContext = database };
-        var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
+        await using var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
             database.Privacy.Authority(context, TimeProvider.System), database.SubjectId);
+        await session.InitializeAsync();
         using var services = Services();
         var handler = Handler(database, context, session.Boundary, services);
+        fault.Armed = true;
         if (rollback && !retry)
             await Assert.That(async () => await handler.ExecuteAsync(Command(), default))
                 .Throws<TenantUserRoleGrantMutationBoundaryTests.LostRoleCommitException>();
@@ -186,8 +192,10 @@ public sealed class GroupCreationMutationTests
             .AddInterceptors(checkpoint).Options)
         { TenantContext = database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
+        await using var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
             (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.SubjectId);
+        await session.InitializeAsync();
+        checkpoint.Armed = true;
         using var services = Services();
         var result = await Handler(database, context, session.Boundary, services).ExecuteAsync(Command(), default);
         await Assert.That(result.IsSuccess).IsTrue();
@@ -216,6 +224,7 @@ public sealed class GroupCreationMutationTests
 
     private sealed class HierarchyBeforeTenant(Guid tenantId) : DbCommandInterceptor
     {
+        public bool Armed { get; set; }
         public bool Observed { get; private set; }
         public bool HierarchyHeld { get; private set; }
         public bool PrivacyOwned { get; private set; }
@@ -223,7 +232,7 @@ public sealed class GroupCreationMutationTests
         public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (!Observed && eventData.Context is ExploreDbContext context)
+            if (Armed && !Observed && eventData.Context is ExploreDbContext context)
             {
                 var entity = context.Model.FindEntityType(typeof(Tenant))!;
                 var table = context.GetService<ISqlGenerationHelper>()
@@ -242,14 +251,15 @@ public sealed class GroupCreationMutationTests
 
     private sealed class ChangeCreatorOnEpochSave(Guid replacement) : SaveChangesInterceptor
     {
-        public HttpContextAccessor? Http { get; set; }
+        public IHttpContextAccessor? Http { get; set; }
+        public bool Armed { get; set; }
         public bool Observed { get; private set; }
         public bool PrivacyOwned { get; private set; }
         private bool _pending;
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
             InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            _pending = !Observed && eventData.Context!.ChangeTracker.Entries<ModerationQualificationEpoch>()
+            _pending = Armed && !Observed && eventData.Context!.ChangeTracker.Entries<ModerationQualificationEpoch>()
                 .Any(row => row.State == EntityState.Modified);
             return ValueTask.FromResult(result);
         }

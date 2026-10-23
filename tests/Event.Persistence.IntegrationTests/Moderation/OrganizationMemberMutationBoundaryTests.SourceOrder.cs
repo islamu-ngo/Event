@@ -42,9 +42,11 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         var order = new OrganizationSourcesBeforeTenant(organizationId, actorId);
         await using var context = database.Context(order);
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = CreateBoundary(context, (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.AdministratorId);
+        await using var session = CreateBoundary(context, (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.AdministratorId);
+        await session.InitializeAsync();
+        order.Armed = true;
         var handler = new UpdateOrganizationMemberRoleCommandHandler(new OrganizationMemberRepository(context),
-            new OrganizationRepository(context), new UserContext(session.Http), session.Boundary);
+            new OrganizationRepository(context), new UserContext(session.Http), session.Boundary, session.Preparation);
         var revision = await RevisionAsync(context);
         var result = await handler.ExecuteAsync(new()
         {
@@ -66,6 +68,7 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
     {
         private bool _organization;
         private bool _actor;
+        public bool Armed { get; set; }
         public bool ObservedTenant { get; private set; }
         public bool OrganizationWasHeld { get; private set; }
         public bool ActorWasHeld { get; private set; }
@@ -74,7 +77,7 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (eventData.Context is not ExploreDbContext context || ObservedTenant) return ValueTask.FromResult(result);
+            if (!Armed || eventData.Context is not ExploreDbContext context || ObservedTenant) return ValueTask.FromResult(result);
             var sql = context.GetService<ISqlGenerationHelper>();
             bool Updates<TEntity>()
             {

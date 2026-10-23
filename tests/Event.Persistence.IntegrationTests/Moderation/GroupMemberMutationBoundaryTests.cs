@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Features.GroupMembers.Handlers.Commands;
 using Explore.Application.Features.GroupMembers.Requests.Commands;
@@ -8,13 +10,14 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Identity;
+using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using SourceDatabase = Event.Persistence.IntegrationTests.Moderation.ModerationQualificationWriterTests.SourceDatabase;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
@@ -27,27 +30,41 @@ public sealed partial class GroupMemberMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         var (administrator, target, _) = await SeedAsync(database);
         await using var context = database.Context();
-        var session = Session(database, context, database.AdministratorId);
         var members = new GroupMemberRepository(context);
-        var tenant = database;
-        var update = new UpdateGroupMemberRoleCommandHandler(members, new UserContext(session.Http), tenant, session.Boundary);
-        var delete = new DeleteGroupMemberCommandHandler(members, new UserContext(session.Http), tenant, session.Boundary);
+
+        async Task<BaseCommandResponse<Guid>> Update(UpdateGroupMemberRoleCommand command)
+        {
+            await using var session = Session(database, context, database.AdministratorId);
+            await session.InitializeAsync();
+            var handler = new UpdateGroupMemberRoleCommandHandler(members, new UserContext(session.Http), database,
+                session.Boundary, session.Preparation);
+            return await handler.ExecuteAsync(command, default);
+        }
+
+        async Task<BaseCommandResponse<Guid>> Delete(Guid memberId, Guid actor)
+        {
+            await using var session = Session(database, context, actor);
+            await session.InitializeAsync();
+            var handler = new DeleteGroupMemberCommandHandler(members, new UserContext(session.Http), database,
+                session.Boundary, session.Preparation);
+            return await handler.ExecuteAsync(new() { MemberId = memberId }, default);
+        }
+
         var revision = await RevisionAsync(context);
         var demotion = new UpdateGroupMemberRoleCommand { UpdateGroupMemberRoleDto = new() { Id = administrator, Role = RoleEnum.GroupMember } };
-        await Assert.That((await update.ExecuteAsync(demotion, default)).IsSuccess).IsFalse();
-        await Assert.That((await delete.ExecuteAsync(new() { MemberId = administrator }, default)).IsSuccess).IsFalse();
+        await Assert.That((await Update(demotion)).IsSuccess).IsFalse();
+        await Assert.That((await Delete(administrator, database.AdministratorId)).IsSuccess).IsFalse();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(revision);
         var promotion = new UpdateGroupMemberRoleCommand { UpdateGroupMemberRoleDto = new() { Id = target, Role = RoleEnum.GroupAdmin } };
-        await Assert.That((await update.ExecuteAsync(promotion, default)).IsSuccess).IsTrue();
-        await Assert.That((await update.ExecuteAsync(promotion, default)).IsSuccess).IsTrue();
+        await Assert.That((await Update(promotion)).IsSuccess).IsTrue();
+        await Assert.That((await Update(promotion)).IsSuccess).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(revision + 1);
-        await Assert.That((await update.ExecuteAsync(demotion, default)).IsSuccess).IsTrue();
+        await Assert.That((await Update(demotion)).IsSuccess).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(revision + 2);
-        await Assert.That(async () => await delete.ExecuteAsync(new() { MemberId = administrator }, default))
-            .Throws<Explore.Application.Authorization.AuthorizationException>();
-        session.Http.HttpContext!.User = Principal(database.SubjectId);
-        await Assert.That((await delete.ExecuteAsync(new() { MemberId = target }, default)).IsSuccess).IsFalse();
-        await Assert.That((await delete.ExecuteAsync(new() { MemberId = administrator }, default)).IsSuccess).IsTrue();
+        await Assert.That(async () => await Delete(administrator, database.AdministratorId))
+            .Throws<Explore.Application.Exceptions.AuthorizationException>();
+        await Assert.That((await Delete(target, database.SubjectId)).IsSuccess).IsFalse();
+        await Assert.That((await Delete(administrator, database.SubjectId)).IsSuccess).IsTrue();
         await Assert.That(await context.GroupMembers.Select(row => row.Id).ToArrayAsync()).IsEquivalentTo([target]);
         await Assert.That(await RevisionAsync(context)).IsEqualTo(revision + 3);
     }
@@ -58,10 +75,17 @@ public sealed partial class GroupMemberMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         var (_, _, groupId) = await SeedAsync(database);
         await using var context = database.Context();
-        var session = Session(database, context, database.AdministratorId);
-        var add = new AddGroupMemberCommandHandler(new GroupRepository(context), new GroupTenantRepository(context),
-            new GroupMemberRepository(context), new UserRepository(context), new UserContext(session.Http),
-            database, session.Boundary);
+
+        async Task<BaseCommandResponse<Guid>> Add(AddGroupMemberCommand request)
+        {
+            await using var session = Session(database, context, database.AdministratorId);
+            await session.InitializeAsync();
+            var handler = new AddGroupMemberCommandHandler(new GroupRepository(context), new GroupTenantRepository(context),
+                new GroupMemberRepository(context), new UserRepository(context), new UserContext(session.Http),
+                database, session.Boundary, session.Preparation);
+            return await handler.ExecuteAsync(request, default);
+        }
+
         var email = await context.Users.Where(row => row.Id == database.ReviewerId).Select(row => row.Pii!.Email).SingleAsync();
         var revision = await RevisionAsync(context);
         var command = new AddGroupMemberCommand
@@ -69,19 +93,19 @@ public sealed partial class GroupMemberMutationBoundaryTests
             AddGroupMemberDto = new()
             { GroupId = groupId, Email = email!, Role = RoleEnum.GroupMember, GroupPositionId = 4 }
         };
-        await Assert.That(async () => await add.ExecuteAsync(command with
-        { AddGroupMemberDto = command.AddGroupMemberDto with { GroupId = Guid.CreateVersion7() } }, default))
-            .Throws<Explore.Application.Authorization.AuthorizationException>();
-        await Assert.That((await add.ExecuteAsync(command with
-        { AddGroupMemberDto = command.AddGroupMemberDto with { Email = "missing@example.test" } }, default)).IsSuccess).IsFalse();
-        var created = await add.ExecuteAsync(command, default);
+        await Assert.That(async () => await Add(command with
+        { AddGroupMemberDto = command.AddGroupMemberDto with { GroupId = Guid.CreateVersion7() } }))
+            .Throws<Explore.Application.Exceptions.AuthorizationException>();
+        await Assert.That((await Add(command with
+        { AddGroupMemberDto = command.AddGroupMemberDto with { Email = "missing@example.test" } })).IsSuccess).IsFalse();
+        var created = await Add(command);
         await Assert.That(created.IsSuccess).IsTrue();
         var persisted = await context.GroupMembers.AsNoTracking().SingleAsync(row => row.Id == created.Id);
         await Assert.That(persisted.UserId).IsEqualTo(database.ReviewerId);
         await Assert.That(persisted.TenantId).IsEqualTo(database.TenantId);
         await Assert.That(persisted.GroupPositionId).IsEqualTo((int?)4);
         await Assert.That(persisted.GroupTenantId).IsEqualTo(await context.GroupTenants.Select(row => row.Id).SingleAsync());
-        await Assert.That((await add.ExecuteAsync(command, default)).IsSuccess).IsFalse();
+        await Assert.That((await Add(command)).IsSuccess).IsFalse();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(revision + 1);
     }
 
@@ -93,12 +117,13 @@ public sealed partial class GroupMemberMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         var (_, target, _) = await SeedAsync(database);
         await using var context = database.Context();
-        var session = Session(database, context, deniedProvider ? database.AdministratorId : database.SubjectId, !deniedProvider);
+        await using var session = Session(database, context, deniedProvider ? database.AdministratorId : database.SubjectId, !deniedProvider);
+        await session.InitializeAsync();
         var revision = await RevisionAsync(context);
         var entered = false;
         await Assert.That(async () => await session.Boundary.ExecuteRoleChangeAsync(target, (int)RoleEnum.GroupAdmin,
             (_, _) => { entered = true; throw new InvalidOperationException("Unauthorized mutation entered."); }, default))
-            .Throws<Explore.Application.Authorization.AuthorizationException>();
+            .Throws<Explore.Application.Exceptions.AuthorizationException>();
         await Assert.That(entered).IsFalse();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(revision);
     }
@@ -112,10 +137,11 @@ public sealed partial class GroupMemberMutationBoundaryTests
         var lookups = await context.Permissions.Where(row => row.MasterCode == PermissionCodes.GroupMemberUpdate).ToArrayAsync();
         foreach (var lookup in lookups) lookup.MasterCode = $"unused-{Guid.CreateVersion7():N}";
         await context.SaveChangesAsync();
-        var session = Session(database, context, database.AdministratorId);
+        await using var session = Session(database, context, database.AdministratorId);
+        await session.InitializeAsync();
         var revision = await RevisionAsync(context);
         var handler = new UpdateGroupMemberRoleCommandHandler(new GroupMemberRepository(context),
-            new UserContext(session.Http), database, session.Boundary);
+            new UserContext(session.Http), database, session.Boundary, session.Preparation);
         var result = await handler.ExecuteAsync(new()
         {
             UpdateGroupMemberRoleDto = new()
@@ -137,12 +163,13 @@ public sealed partial class GroupMemberMutationBoundaryTests
             PrivacyErasureRequest.Create(Guid.CreateVersion7(), PrivacyErasureSubjectKind.User,
                 erasedActor ? database.AdministratorId : database.SubjectId,
                 PrivacyErasureReasonCode.SubjectErasureRequest, 1), default);
-        var session = Session(database, context, database.AdministratorId);
+        await using var session = Session(database, context, database.AdministratorId);
+        await session.InitializeAsync();
         var revision = await RevisionAsync(context);
         var entered = false;
         await Assert.That(async () => await session.Boundary.ExecuteRoleChangeAsync(target, (int)RoleEnum.GroupAdmin,
             (_, _) => { entered = true; throw new InvalidOperationException("Erased authority entered."); }, default))
-            .Throws<Explore.Application.Authorization.AuthorizationException>();
+            .Throws<Explore.Application.Exceptions.AuthorizationException>();
         await Assert.That(entered).IsFalse();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(revision);
     }
@@ -156,7 +183,8 @@ public sealed partial class GroupMemberMutationBoundaryTests
         var (_, target, _) = await SeedAsync(database);
         await using var context = database.Context();
         await using var privacy = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = CreateBoundary(context, (privacy ?? database.Privacy).Authority(context, TimeProvider.System), database.AdministratorId);
+        await using var session = CreateBoundary(context, (privacy ?? database.Privacy).Authority(context, TimeProvider.System), database.AdministratorId);
+        await session.InitializeAsync();
         var revision = await RevisionAsync(context);
         bool? ownsCommit = null;
         await Assert.That(async () => await session.Boundary.ExecuteRoleChangeAsync(target, (int)RoleEnum.GroupAdmin,
@@ -168,7 +196,7 @@ public sealed partial class GroupMemberMutationBoundaryTests
                 await context.SaveChangesAsync(token);
                 session.Http.HttpContext!.User = Principal(database.SubjectId);
                 return BaseCommandResponse.Success(target);
-            }, default)).Throws<Explore.Application.Authorization.AuthorizationException>();
+            }, default)).Throws<Explore.Application.Exceptions.AuthorizationException>();
         await Assert.That(ownsCommit).IsEqualTo(colocated);
         await Assert.That(await context.GroupMembers.Where(row => row.Id == target).Select(row => row.RoleId).SingleAsync())
             .IsEqualTo((int)RoleEnum.GroupMember);
@@ -191,15 +219,17 @@ public sealed partial class GroupMemberMutationBoundaryTests
             successor.RoleId = (int)RoleEnum.GroupAdmin;
             await seed.SaveChangesAsync();
         }
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollBack);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollBack) { Armed = false };
         await using var baseline = database.Context();
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new ExploreDbContext(options.Options) { TenantContext = database };
-        var session = Session(database, context, database.AdministratorId);
+        await using var session = Session(database, context, database.AdministratorId);
+        await session.InitializeAsync();
+        fault.Armed = true;
         var handler = new UpdateGroupMemberRoleCommandHandler(new GroupMemberRepository(context),
-            new UserContext(session.Http), database, session.Boundary);
+            new UserContext(session.Http), database, session.Boundary, session.Preparation);
         var revision = await RevisionAsync(context);
         var result = await handler.ExecuteAsync(new()
         {
@@ -254,18 +284,17 @@ public sealed partial class GroupMemberMutationBoundaryTests
         .Select(row => row.Revision).SingleAsync();
     private static ClaimsPrincipal Principal(Guid actor) => new(new ClaimsIdentity(
         [new Claim(ClaimTypes.NameIdentifier, actor.ToString())], "group-membership-witness"));
-    private static (GroupMemberMutationBoundary Boundary, HttpContextAccessor Http) Session(
+    private static MembershipRequest<GroupMemberMutationBoundary> Session(
         SourceDatabase database, ExploreDbContext context, Guid actor, bool allowed = true) =>
         CreateBoundary(context, database.Privacy.Authority(context, TimeProvider.System), actor, allowed);
 
-    internal static (GroupMemberMutationBoundary Boundary, HttpContextAccessor Http) CreateBoundary(
+    internal static MembershipRequest<GroupMemberMutationBoundary> CreateBoundary(
         ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy, Guid actor, bool allowed = true)
     {
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = Principal(actor) } };
-        var members = new GroupMemberRepository(context);
-        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
-            new OrganizationMemberRepository(context), members, new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
-        return (new(context, privacy, new UserContext(http), admin, new MachinePrincipalAccessor(http), new Provider(context, allowed), members), http);
+        return new(context, privacy, actor, new Provider(context, allowed), services =>
+            new(context, privacy, services.GetRequiredService<IUserContext>(), services.GetRequiredService<IAdminContext>(),
+                services.GetRequiredService<IMachinePrincipalAccessor>(), services.GetRequiredService<IAuthorizationProvider>(),
+                new GroupMemberRepository(context), services.GetRequiredService<IHumanActionCommitFinalizer>()));
     }
 
     private sealed class Provider(ExploreDbContext context, bool allowed) : IAuthorizationProvider
@@ -284,4 +313,37 @@ public sealed partial class GroupMemberMutationBoundaryTests
             return results;
         }
     }
+}
+
+/// <summary>Authenticates a real request while retaining the test's selected context and transaction interceptors.</summary>
+internal sealed class MembershipRequest<TBoundary> : IAsyncDisposable
+{
+    private readonly CurrentHumanPrincipalFixture human;
+    private readonly Lazy<TBoundary> boundary;
+    internal IServiceProvider Services => human.Services;
+    internal IHttpContextAccessor Http => Services.GetRequiredService<IHttpContextAccessor>();
+    internal IHumanAccountAdministrativeActionPreparation Preparation => Services.GetRequiredService<IHumanAccountAdministrativeActionPreparation>();
+    internal TBoundary Boundary => boundary.Value;
+
+    internal MembershipRequest(ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy, Guid actor,
+        IAuthorizationProvider authorization, Func<IServiceProvider, TBoundary> createBoundary)
+    {
+        human = new(actor, context.TenantContext!.TenantId, borrowedContext: context, configureServices: services =>
+        {
+            services.AddSingleton(privacy);
+            services.AddSingleton(authorization);
+        });
+        boundary = new(() => createBoundary(Services));
+    }
+
+    // Install the ambient request in the caller before any asynchronous work starts.
+    internal Task InitializeAsync() => PrepareAsync(human.InitializeAsync());
+
+    private async Task PrepareAsync(Task authentication)
+    {
+        await authentication;
+        await human.PrepareAsync();
+    }
+
+    public ValueTask DisposeAsync() => human.DisposeAsync();
 }

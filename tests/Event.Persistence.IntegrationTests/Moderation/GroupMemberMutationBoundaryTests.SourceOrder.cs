@@ -39,9 +39,11 @@ public sealed partial class GroupMemberMutationBoundaryTests
         var order = new GroupSourcesBeforeTenant(groupId, actorId);
         await using var context = database.Context(order);
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = CreateBoundary(context, (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.AdministratorId);
+        await using var session = CreateBoundary(context, (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.AdministratorId);
+        await session.InitializeAsync();
+        order.Armed = true;
         var handler = new UpdateGroupMemberRoleCommandHandler(new GroupMemberRepository(context),
-            new UserContext(session.Http), database, session.Boundary);
+            new UserContext(session.Http), database, session.Boundary, session.Preparation);
         var revision = await RevisionAsync(context);
         var result = await handler.ExecuteAsync(new()
         {
@@ -63,6 +65,7 @@ public sealed partial class GroupMemberMutationBoundaryTests
     {
         private bool _group;
         private bool _actor;
+        public bool Armed { get; set; }
         public bool ObservedTenant { get; private set; }
         public bool GroupWasHeld { get; private set; }
         public bool ActorWasHeld { get; private set; }
@@ -71,7 +74,7 @@ public sealed partial class GroupMemberMutationBoundaryTests
         public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
         {
-            if (eventData.Context is not ExploreDbContext context || ObservedTenant) return ValueTask.FromResult(result);
+            if (!Armed || eventData.Context is not ExploreDbContext context || ObservedTenant) return ValueTask.FromResult(result);
             var sql = context.GetService<ISqlGenerationHelper>();
             bool Updates<TEntity>()
             {

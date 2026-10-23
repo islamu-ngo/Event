@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.Features.OrganizationMembers.Handlers.Commands;
@@ -14,7 +16,7 @@ using Explore.Persistence.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using SourceDatabase = Event.Persistence.IntegrationTests.Moderation.ModerationQualificationWriterTests.SourceDatabase;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
@@ -27,24 +29,38 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         var (administrator, target) = await SeedAsync(database);
         await using var context = database.Context();
-        var session = Session(database, context, database.AdministratorId);
         var members = new OrganizationMemberRepository(context);
         var organizations = new OrganizationRepository(context);
-        var update = new UpdateOrganizationMemberRoleCommandHandler(members, organizations,
-            new UserContext(session.Http), session.Boundary);
+
+        async Task<BaseCommandResponse<Guid>> Update(UpdateOrganizationMemberRoleCommand request)
+        {
+            await using var session = Session(database, context, database.AdministratorId);
+            await session.InitializeAsync();
+            var handler = new UpdateOrganizationMemberRoleCommandHandler(members, organizations,
+                new UserContext(session.Http), session.Boundary, session.Preparation);
+            return await handler.ExecuteAsync(request, default);
+        }
+
+        async Task<BaseCommandResponse<Guid>> Delete(Guid memberId)
+        {
+            await using var session = Session(database, context, database.AdministratorId);
+            await session.InitializeAsync();
+            var handler = new DeleteOrganizationMemberCommandHandler(members, organizations,
+                new UserContext(session.Http), session.Boundary, session.Preparation);
+            return await handler.ExecuteAsync(new() { MemberId = memberId }, default);
+        }
+
         var before = await RevisionAsync(context);
         var command = new Explore.Application.Features.OrganizationMembers.Requests.Commands.UpdateOrganizationMemberRoleCommand
         { UpdateOrganizationMemberRoleDto = new() { Id = target, Role = RoleEnum.OrgAdmin } };
-        await Assert.That((await update.ExecuteAsync(command, default)).IsSuccess).IsTrue();
+        await Assert.That((await Update(command)).IsSuccess).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 1);
-        await Assert.That((await update.ExecuteAsync(command, default)).IsSuccess).IsTrue();
+        await Assert.That((await Update(command)).IsSuccess).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 1);
-        var delete = new DeleteOrganizationMemberCommandHandler(members, organizations,
-            new UserContext(session.Http), session.Boundary);
-        await Assert.That((await delete.ExecuteAsync(new() { MemberId = target }, default)).IsSuccess).IsTrue();
+        await Assert.That((await Delete(target)).IsSuccess).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 2);
         await Assert.That(await context.OrganizationMembers.AnyAsync(row => row.Id == target)).IsFalse();
-        await Assert.That((await delete.ExecuteAsync(new() { MemberId = administrator }, default)).IsSuccess).IsFalse();
+        await Assert.That((await Delete(administrator)).IsSuccess).IsFalse();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 2);
     }
 
@@ -57,12 +73,13 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         var (_, target) = await SeedAsync(database);
         await using var context = database.Context();
         var actor = providerDenied ? database.AdministratorId : database.SubjectId;
-        var session = Session(database, context, actor, !providerDenied);
+        await using var session = Session(database, context, actor, !providerDenied);
+        await session.InitializeAsync();
         var before = await RevisionAsync(context);
         var entered = false;
         await Assert.That(async () => await session.Boundary.ExecuteRoleChangeAsync(target, (int)RoleEnum.OrgAdmin,
             (_, _) => { entered = true; throw new InvalidOperationException("Unauthorized mutation entered."); }, default))
-            .Throws<Explore.Application.Authorization.AuthorizationException>();
+            .Throws<Explore.Application.Exceptions.AuthorizationException>();
         await Assert.That(entered).IsFalse();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before);
         await Assert.That(await context.OrganizationMembers.Where(row => row.Id == target).Select(row => row.RoleId).SingleAsync())
@@ -75,35 +92,45 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         var (_, target) = await SeedAsync(database);
         await using var context = database.Context();
-        var session = Session(database, context, database.AdministratorId);
         var members = new OrganizationMemberRepository(context);
+
+        async Task<BaseCommandResponse<Guid>> Decline(Guid invitationId, Guid actor, bool allowed = true)
+        {
+            await using var session = Session(database, context, actor, allowed);
+            await session.InitializeAsync();
+            var handler = new DeclineInvitationCommandHandler(members, new UserContext(session.Http), session.Boundary);
+            return await handler.ExecuteAsync(new() { InvitationId = invitationId }, default);
+        }
+
         var organizationId = await context.OrganizationMembers.Where(row => row.Id == target)
             .Select(row => row.OrganizationTenant.OrganizationId).SingleAsync();
         var email = await context.Users.Where(row => row.Id == database.ReviewerId).Select(row => row.Pii!.Email).SingleAsync();
         context.ChangeTracker.Clear();
         var before = await RevisionAsync(context);
-        var add = new AddOrganizationMemberCommandHandler(members, new OrganizationRepository(context),
-            new OrganizationTenantRepository(context), new UserRepository(context), new UserContext(session.Http), session.Boundary);
-        var invited = await add.ExecuteAsync(new()
+        BaseCommandResponse<Guid> invited;
+        await using (var session = Session(database, context, database.AdministratorId))
         {
-            TenantId = database.TenantId,
-            AddOrganizationMemberDto = new()
-            { OrganizationId = organizationId, Email = email!, Role = RoleEnum.OrgMember }
-        }, default);
+            await session.InitializeAsync();
+            var add = new AddOrganizationMemberCommandHandler(members, new OrganizationRepository(context),
+                new OrganizationTenantRepository(context), new UserRepository(context), new UserContext(session.Http), session.Boundary, session.Preparation);
+            invited = await add.ExecuteAsync(new()
+            {
+                TenantId = database.TenantId,
+                AddOrganizationMemberDto = new()
+                { OrganizationId = organizationId, Email = email!, Role = RoleEnum.OrgMember }
+            }, default);
+        }
         await Assert.That(invited.IsSuccess).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 1);
-        var outsiderDecline = new DeclineInvitationCommandHandler(members, new UserContext(session.Http), session.Boundary);
         foreach (var invitationId in new[] { invited.Id, Guid.CreateVersion7(), Guid.Empty })
         {
-            var rejected = await outsiderDecline.ExecuteAsync(new() { InvitationId = invitationId }, default);
+            var rejected = await Decline(invitationId, database.AdministratorId);
             await Assert.That(rejected.IsSuccess).IsFalse();
             await Assert.That(rejected.Message).IsEqualTo("Invitation not found");
         }
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 1);
         await Assert.That(await context.OrganizationMembers.AnyAsync(row => row.Id == invited.Id)).IsTrue();
-        var recipient = Session(database, context, database.ReviewerId, allowed: false);
-        var decline = new DeclineInvitationCommandHandler(members, new UserContext(recipient.Http), recipient.Boundary);
-        await Assert.That((await decline.ExecuteAsync(new() { InvitationId = invited.Id }, default)).IsSuccess).IsTrue();
+        await Assert.That((await Decline(invited.Id, database.ReviewerId, allowed: false)).IsSuccess).IsTrue();
         await Assert.That(await context.OrganizationMembers.AnyAsync(row => row.Id == invited.Id)).IsFalse();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 2);
     }
@@ -117,7 +144,8 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         var (_, target) = await SeedAsync(database);
         await using var context = database.Context();
         await using var privacy = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = CreateBoundary(context, (privacy ?? database.Privacy).Authority(context, TimeProvider.System), database.AdministratorId);
+        await using var session = CreateBoundary(context, (privacy ?? database.Privacy).Authority(context, TimeProvider.System), database.AdministratorId);
+        await session.InitializeAsync();
         var before = await RevisionAsync(context);
         bool? observedOwner = null;
         await Assert.That(async () => await session.Boundary.ExecuteRoleChangeAsync(target, (int)RoleEnum.OrgAdmin,
@@ -130,7 +158,7 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
                 session.Http.HttpContext!.User = new ClaimsPrincipal(new ClaimsIdentity(
                     [new Claim(ClaimTypes.NameIdentifier, database.SubjectId.ToString())], "changed-membership-caller"));
                 return BaseCommandResponse.Success(target);
-            }, default)).Throws<Explore.Application.Authorization.AuthorizationException>();
+            }, default)).Throws<Explore.Application.Exceptions.AuthorizationException>();
         await Assert.That(observedOwner).IsEqualTo(colocated);
         await Assert.That(await context.OrganizationMembers.Where(row => row.Id == target).Select(row => row.RoleId).SingleAsync())
             .IsEqualTo((int)RoleEnum.OrgMember);
@@ -154,15 +182,17 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
             successor.RoleId = (int)RoleEnum.OrgAdmin;
             await seed.SaveChangesAsync();
         }
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollBack);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify, rollBack) { Armed = false };
         await using var baseline = database.Context();
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, TenantUserRoleGrantMutationBoundaryTests.RoleCommitRetryFactory>();
         await using var context = new ExploreDbContext(options.Options) { TenantContext = database };
-        var session = Session(database, context, database.AdministratorId);
+        await using var session = Session(database, context, database.AdministratorId);
+        await session.InitializeAsync();
+        fault.Armed = true;
         var handler = new UpdateOrganizationMemberRoleCommandHandler(new OrganizationMemberRepository(context),
-            new OrganizationRepository(context), new UserContext(session.Http), session.Boundary);
+            new OrganizationRepository(context), new UserContext(session.Http), session.Boundary, session.Preparation);
         var before = await RevisionAsync(context);
         var result = await handler.ExecuteAsync(new()
         {
@@ -190,12 +220,13 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
             Guid.CreateVersion7(), PrivacyErasureSubjectKind.User,
             erasedActor ? database.AdministratorId : database.SubjectId,
             PrivacyErasureReasonCode.SubjectErasureRequest, 1));
-        var session = Session(database, context, database.AdministratorId);
+        await using var session = Session(database, context, database.AdministratorId);
+        await session.InitializeAsync();
         var before = await RevisionAsync(context);
         var entered = false;
         await Assert.That(async () => await session.Boundary.ExecuteRoleChangeAsync(target, (int)RoleEnum.OrgAdmin,
             (_, _) => { entered = true; return Task.FromResult(BaseCommandResponse.Success(target)); }, default))
-            .Throws<Explore.Application.Authorization.AuthorizationException>();
+            .Throws<Explore.Application.Exceptions.AuthorizationException>();
         await Assert.That(entered).IsFalse();
         await Assert.That(await context.OrganizationMembers.Where(row => row.Id == target).Select(row => row.RoleId).SingleAsync())
             .IsEqualTo((int)RoleEnum.OrgMember);
@@ -208,13 +239,15 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         var (_, target) = await SeedAsync(database);
         await using var baseline = database.Context();
-        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify: false, rollBack: true);
+        var fault = new TenantUserRoleGrantMutationBoundaryTests.LostRoleCommit(verify: false, rollBack: true) { Armed = false };
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault).Options;
         await using var context = new ExploreDbContext(options) { TenantContext = database };
-        var session = Session(database, context, database.AdministratorId);
+        await using var session = Session(database, context, database.AdministratorId);
+        await session.InitializeAsync();
+        fault.Armed = true;
         var handler = new UpdateOrganizationMemberRoleCommandHandler(new OrganizationMemberRepository(context),
-            new OrganizationRepository(context), new UserContext(session.Http), session.Boundary);
+            new OrganizationRepository(context), new UserContext(session.Http), session.Boundary, session.Preparation);
         var before = await RevisionAsync(context);
         await Assert.That(async () => await handler.ExecuteAsync(new()
         {
@@ -265,26 +298,17 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
     private static Task<long> RevisionAsync(ExploreDbContext context) => context.ModerationQualificationEpochs.AsNoTracking()
         .Select(row => row.Revision).SingleAsync();
 
-    private static (OrganizationMemberMutationBoundary Boundary, HttpContextAccessor Http) Session(
+    private static MembershipRequest<OrganizationMemberMutationBoundary> Session(
         SourceDatabase database, ExploreDbContext context, Guid actor, bool allowed = true)
         => CreateBoundary(context, database.Privacy.Authority(context, TimeProvider.System), actor, allowed);
 
-    internal static (OrganizationMemberMutationBoundary Boundary, HttpContextAccessor Http) CreateBoundary(
+    internal static MembershipRequest<OrganizationMemberMutationBoundary> CreateBoundary(
         ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy, Guid actor, bool allowed = true)
     {
-        var http = new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.NameIdentifier, actor.ToString())], "organization-membership-witness"))
-            }
-        };
-        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
-            NullLogger<AdminContext>.Instance);
-        return (new(context, privacy, new UserContext(http), admin,
-            new MachinePrincipalAccessor(http), new Provider(context, allowed)), http);
+        return new(context, privacy, actor, new Provider(context, allowed), services =>
+            new(context, privacy, services.GetRequiredService<IUserContext>(), services.GetRequiredService<IAdminContext>(),
+                services.GetRequiredService<IMachinePrincipalAccessor>(), services.GetRequiredService<IAuthorizationProvider>(),
+                services.GetRequiredService<IHumanActionCommitFinalizer>()));
     }
 
     private sealed class Provider(ExploreDbContext context, bool allowed) : IAuthorizationProvider

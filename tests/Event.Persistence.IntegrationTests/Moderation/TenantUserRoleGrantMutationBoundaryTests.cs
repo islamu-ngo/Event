@@ -1,6 +1,8 @@
 using System.Data.Common;
 using System.Security.Claims;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.DTOs.TenantUserRoleGrant;
 using Explore.Application.Exceptions;
@@ -17,7 +19,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using SourceDatabase = Event.Persistence.IntegrationTests.Moderation.ModerationQualificationWriterTests.SourceDatabase;
 
 namespace Event.Persistence.IntegrationTests.Moderation;
@@ -30,10 +32,25 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         await SeedAdministratorAsync(database);
         await using var context = database.Context();
-        var session = Session(database, context, database.AdministratorId);
         var repository = new TenantUserRoleGrantRepository(context);
-        var create = new CreateTenantUserRoleGrantCommandHandler(repository,
-            new TenantUserRepository(context), new RoleRepository(context), database, session.Boundary);
+
+        async Task<BaseCommandResponse<Guid>> Create(CreateTenantUserRoleGrantCommand request)
+        {
+            await using var session = Session(database, context, database.AdministratorId);
+            await session.InitializeAsync();
+            var handler = new CreateTenantUserRoleGrantCommandHandler(repository,
+                new TenantUserRepository(context), new RoleRepository(context), database, session.Boundary, session.Preparation);
+            return await handler.ExecuteAsync(request, CancellationToken.None);
+        }
+
+        async Task<bool> Revoke(RevokeTenantUserRoleGrantCommand request)
+        {
+            await using var session = Session(database, context, database.AdministratorId);
+            await session.InitializeAsync();
+            var handler = new RevokeTenantUserRoleGrantCommandHandler(repository, session.Boundary, session.Preparation);
+            return await handler.ExecuteAsync(request, CancellationToken.None);
+        }
+
         var target = await context.TenantUsers.AsNoTracking().SingleAsync(row => row.UserId == database.SubjectId);
         context.ChangeTracker.Clear();
         var command = new CreateTenantUserRoleGrantCommand
@@ -42,21 +59,20 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
             TenantUserRoleGrantDto = new() { TenantUserId = target.Id, RoleId = (int)RoleEnum.TenantModerator }
         };
         var before = await RevisionAsync(context);
-        var result = await create.ExecuteAsync(command, CancellationToken.None);
+        var result = await Create(command);
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 1);
         var grant = await context.TenantUserRoleGrants.AsNoTracking().SingleAsync(row => row.RoleId == (int)RoleEnum.TenantModerator);
         await Assert.That(grant.GrantedBy).IsEqualTo(database.AdministratorId);
         context.ChangeTracker.Clear();
-        await Assert.That((await create.ExecuteAsync(command, CancellationToken.None)).IsSuccess).IsFalse();
+        await Assert.That((await Create(command)).IsSuccess).IsFalse();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 1);
         context.ChangeTracker.Clear();
-        var revoke = new RevokeTenantUserRoleGrantCommandHandler(repository, session.Boundary);
         var removal = new RevokeTenantUserRoleGrantCommand { Id = grant.Id, TenantId = database.TenantId };
-        await Assert.That(await revoke.ExecuteAsync(removal, CancellationToken.None)).IsTrue();
+        await Assert.That(await Revoke(removal)).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 2);
         context.ChangeTracker.Clear();
-        await Assert.That(await revoke.ExecuteAsync(removal, CancellationToken.None)).IsFalse();
+        await Assert.That(await Revoke(removal)).IsFalse();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 2);
     }
 
@@ -69,8 +85,9 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         await SeedAdministratorAsync(database);
         await using var context = database.Context();
-        var session = Session(database, context,
+        await using var session = Session(database, context,
             denial == "member" ? database.SubjectId : database.AdministratorId, denial != "provider");
+        await session.InitializeAsync();
         var membership = await context.TenantUsers.AsNoTracking().SingleAsync(row => row.UserId == database.SubjectId);
         var before = await RevisionAsync(context);
         var invoked = false;
@@ -92,8 +109,9 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
         await SeedAdministratorAsync(database);
         await using var context = database.Context();
         await using var privacy = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
-        var session = Session(database, context, database.AdministratorId,
+        await using var session = Session(database, context, database.AdministratorId,
             privacy: privacy?.Authority(context, TimeProvider.System));
+        await session.InitializeAsync();
         var membership = await context.TenantUsers.AsNoTracking().SingleAsync(row => row.UserId == database.SubjectId);
         var before = await RevisionAsync(context);
         bool? privacyOwnedCommit = null;
@@ -119,14 +137,21 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         var ownGrant = await SeedAdministratorAsync(database);
         await using var context = database.Context();
-        var session = Session(database, context, database.AdministratorId);
-        var handler = new RevokeTenantUserRoleGrantCommandHandler(new TenantUserRoleGrantRepository(context), session.Boundary);
+
+        async Task<bool> Revoke()
+        {
+            await using var session = Session(database, context, database.AdministratorId);
+            await session.InitializeAsync();
+            var handler = new RevokeTenantUserRoleGrantCommandHandler(new TenantUserRoleGrantRepository(context),
+                session.Boundary, session.Preparation);
+            return await handler.ExecuteAsync(new() { Id = ownGrant, TenantId = database.TenantId }, CancellationToken.None);
+        }
+
         var before = await RevisionAsync(context);
-        await Assert.That(await handler.ExecuteAsync(new() { Id = ownGrant, TenantId = database.TenantId }, CancellationToken.None)).IsTrue();
+        await Assert.That(await Revoke()).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 1);
         context.ChangeTracker.Clear();
-        await Assert.That(async () => await handler.ExecuteAsync(new() { Id = ownGrant, TenantId = database.TenantId },
-            CancellationToken.None)).Throws<AuthorizationException>();
+        await Assert.That(async () => await Revoke()).Throws<AuthorizationException>();
     }
 
     [Test]
@@ -141,7 +166,8 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
             Guid.CreateVersion7(), PrivacyErasureSubjectKind.User,
             erasedActor ? database.AdministratorId : database.SubjectId,
             PrivacyErasureReasonCode.SubjectErasureRequest, 1));
-        var session = Session(database, context, database.AdministratorId);
+        await using var session = Session(database, context, database.AdministratorId);
+        await session.InitializeAsync();
         var membership = await context.TenantUsers.AsNoTracking().SingleAsync(row => row.UserId == database.SubjectId);
         var before = await RevisionAsync(context);
         var invoked = false;
@@ -181,19 +207,21 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
             if (mutation == "revoke") { seed.Add(grant); await seed.SaveChangesAsync(); }
             targetGrant = mutation == "self-revoke" ? ownGrant : grant.Id;
         }
-        var fault = new LostRoleCommit(verify, rollBack);
+        var fault = new LostRoleCommit(verify, rollBack) { Armed = false };
         await using var baseline = database.Context();
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault);
         if (retry) options.ReplaceService<IExecutionStrategyFactory, RoleCommitRetryFactory>();
         await using var context = new ExploreDbContext(options.Options) { TenantContext = database };
-        var session = Session(database, context, database.AdministratorId);
+        await using var session = Session(database, context, database.AdministratorId);
+        await session.InitializeAsync();
+        fault.Armed = true;
         var repository = new TenantUserRoleGrantRepository(context);
         var before = await RevisionAsync(context);
         if (mutation == "create")
         {
             var handler = new CreateTenantUserRoleGrantCommandHandler(repository,
-                new TenantUserRepository(context), new RoleRepository(context), database, session.Boundary);
+                new TenantUserRepository(context), new RoleRepository(context), database, session.Boundary, session.Preparation);
             var result = await handler.ExecuteAsync(new()
             {
                 TenantId = database.TenantId,
@@ -204,7 +232,7 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
         }
         else
         {
-            var handler = new RevokeTenantUserRoleGrantCommandHandler(repository, session.Boundary);
+            var handler = new RevokeTenantUserRoleGrantCommandHandler(repository, session.Boundary, session.Preparation);
             await Assert.That(await handler.ExecuteAsync(new() { TenantId = database.TenantId, Id = targetGrant },
                 CancellationToken.None)).IsTrue();
             await Assert.That(await context.TenantUserRoleGrants.Where(row => row.Id == targetGrant)
@@ -221,11 +249,13 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
         await using var database = await SourceDatabase.CreateAsync();
         await SeedAdministratorAsync(database);
         await using var baseline = database.Context();
-        var fault = new LostRoleCommit(verify: false, rollBack: true);
+        var fault = new LostRoleCommit(verify: false, rollBack: true) { Armed = false };
         var options = TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(baseline.Database.GetDbConnection())
             .UseSnakeCaseNamingConvention().AddInterceptors(fault).Options;
         await using var context = new ExploreDbContext(options) { TenantContext = database };
-        var session = Session(database, context, database.AdministratorId);
+        await using var session = Session(database, context, database.AdministratorId);
+        await session.InitializeAsync();
+        fault.Armed = true;
         var membership = await context.TenantUsers.AsNoTracking().Where(row => row.UserId == database.SubjectId)
             .Select(row => row.Id).SingleAsync();
         var grant = Grant(database.TenantId, membership, (int)RoleEnum.TenantModerator, database.AdministratorId);
@@ -273,16 +303,15 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
     private static ClaimsPrincipal Principal(Guid actor) => new(new ClaimsIdentity(
         [new Claim(ClaimTypes.NameIdentifier, actor.ToString())], "tenant-role-witness"));
 
-    private static (TenantUserRoleGrantMutationBoundary Boundary, HttpContextAccessor Http) Session(
+    private static MembershipRequest<TenantUserRoleGrantMutationBoundary> Session(
         SourceDatabase database, ExploreDbContext context, Guid actor, bool allowed = true,
         IPrivacyIdentityFenceAuthority? privacy = null)
     {
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = Principal(actor) } };
-        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
-            NullLogger<AdminContext>.Instance);
-        return (new(context, privacy ?? database.Privacy.Authority(context, TimeProvider.System), new UserContext(http), admin,
-            new MachinePrincipalAccessor(http), new Provider(context, allowed)), http);
+        var authority = privacy ?? database.Privacy.Authority(context, TimeProvider.System);
+        return new(context, authority, actor, new Provider(context, allowed), services =>
+            new(context, authority, services.GetRequiredService<IUserContext>(), services.GetRequiredService<IAdminContext>(),
+                services.GetRequiredService<IMachinePrincipalAccessor>(), services.GetRequiredService<IAuthorizationProvider>(),
+                services.GetRequiredService<IHumanActionCommitFinalizer>()));
     }
 
     internal sealed class LostRoleCommitException(bool verify) : TimeoutException("Role commit acknowledgement lost.")
@@ -292,11 +321,12 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
 
     internal sealed class LostRoleCommit(bool verify, bool rollBack) : DbTransactionInterceptor
     {
+        public bool Armed { get; set; } = true;
         public bool Injected { get; private set; }
         public override async ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
             TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
         {
-            if (rollBack && !Injected)
+            if (Armed && rollBack && !Injected)
             {
                 Injected = true;
                 await transaction.RollbackAsync(cancellationToken);
@@ -307,7 +337,7 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
         public override Task TransactionCommittedAsync(DbTransaction transaction, TransactionEndEventData eventData,
             CancellationToken cancellationToken = default)
         {
-            if (!Injected)
+            if (Armed && !Injected)
             {
                 Injected = true;
                 throw new LostRoleCommitException(verify);

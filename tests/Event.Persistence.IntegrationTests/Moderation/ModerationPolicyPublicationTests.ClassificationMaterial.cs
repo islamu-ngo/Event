@@ -598,10 +598,11 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             if (groupPromotion)
             {
-                var identity = GroupMemberMutationBoundaryTests.CreateBoundary(context, privacy, owner);
+                await using var identity = GroupMemberMutationBoundaryTests.CreateBoundary(context, privacy, owner);
+                await identity.InitializeAsync();
                 var promotion = new Explore.Application.Features.GroupMembers.Handlers.Commands.UpdateGroupMemberRoleCommandHandler(
                     new GroupMemberRepository(context), new UserContext(identity.Http),
-                    context.TenantContext!, identity.Boundary);
+                    context.TenantContext!, identity.Boundary, identity.Preparation);
                 await Assert.That((await promotion.ExecuteAsync(new()
                 {
                     UpdateGroupMemberRoleDto = new()
@@ -610,9 +611,10 @@ public sealed partial class ModerationPolicyPublicationTests
             }
             else
             {
-                var identity = OrganizationMemberMutationBoundaryTests.CreateBoundary(context, privacy, owner);
+                await using var identity = OrganizationMemberMutationBoundaryTests.CreateBoundary(context, privacy, owner);
+                await identity.InitializeAsync();
                 var promotion = new UpdateOrganizationMemberRoleCommandHandler(new OrganizationMemberRepository(context),
-                    new OrganizationRepository(context), new UserContext(identity.Http), identity.Boundary);
+                    new OrganizationRepository(context), new UserContext(identity.Http), identity.Boundary, identity.Preparation);
                 await Assert.That((await promotion.ExecuteAsync(new()
                 {
                     UpdateOrganizationMemberRoleDto = new()

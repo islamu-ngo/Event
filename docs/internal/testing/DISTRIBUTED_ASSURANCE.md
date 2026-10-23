@@ -58,14 +58,31 @@ name from the constructed application. A foreign consumer of an owned volume
 causes cleanup to fail and retain the volume and root. Directory components and
 the marker are revalidated before store removal and again before deleting the
 root. Concurrent callers await one disposal task. Cancellation terminates and
-reaps only the fixture's Docker CLI child and drains its output readers; returned
-startup tasks are observed before store cleanup. A failure to settle the application
-retains its stores, and creation/stop/disposal errors retain their original causes.
+reaps only the fixture's Docker CLI child and drains its output readers;
+the actual AppHost execution is observed before store cleanup. In owned mode,
+the fixture registers a single-assignment `TestingApplicationExecution` observer.
+AppHost gives it the task from its existing `RunAsync()` call and awaits that same
+task. A failure requests termination through `IHostApplicationLifetime.StopApplication()`;
+the fixture then joins the observed task, with a 30-second startup-failure deadline
+and a 60-second cleanup deadline. A missing observation or unsettled execution
+retains stores, and creation/stop/disposal errors retain their original causes.
+Duplicate observation permanently invalidates completion proof, and AppHost still
+awaits its actual execution if attachment fails. A task faulted with an
+`OperationCanceledException` remains a failure; only an observed task whose state
+is actually Canceled is accepted as completed cancellation.
+The testing facade's startup/stop tasks and lifecycle notification tokens alone
+are not used as proof that a pending hosted startup callback has finished.
 
 Current verification is incomplete: fresh Split and Standalone runs stop at
-`discovery_traversal_source_catalog_drift` during migration. A separate delayed
-host-lifecycle witness remains failing: the returned startup task settles before
-the injected lifecycle gate observes cancellation. Full readiness, cancelled
+`discovery_traversal_source_catalog_drift` during migration. The delayed
+host-lifecycle witness now passes: cancellation reaches the real callback,
+startup remains pending until its gate is released, and later disposal preserves
+both the original resource failure and the injected disposal failure. Actual
+build-without-start cleanup also settles execution before removing its root;
+missing and duplicate observations retain roots, including a duplicate while
+startup is still held. The 34-case Harness passes, including the faulted versus
+canceled task controls. A separate healthy-host witness is intended to verify
+errors from an actually started service's stop callback. Full readiness, cancelled
 application startup, and concurrent healthy application owners remain open gates.
 The passing ownership/projection, foreign-volume-consumer, Docker-child
 cancellation, and builder-failure checks do not replace those gates.

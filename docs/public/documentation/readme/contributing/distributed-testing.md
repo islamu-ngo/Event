@@ -51,7 +51,13 @@ prevent directory cleanup. If cleanup fails, retain the error and inspect the ex
 run ID before removing anything. A compilation or discovery pass alone is not
 evidence that the application became healthy.
 
-The distributed lane is not yet green: fresh migrations currently stop at the
-discovery source-catalog guard, and verification of cancellation while a host
-lifecycle service is delayed remains open. Passing ownership or discovery checks
+On startup failure, cancellation reaches the actual host and cleanup waits for
+its execution to finish. If execution cannot be observed or does not settle
+within the cleanup deadline, the run's stores remain available for investigation.
+The startup error and any stop/disposal error remain part of the reported failure.
+
+The delayed-startup, build-without-start, and missing/duplicate execution
+observation checks pass. They prove cancellation and safe retention when execution
+cannot be established. The distributed lane is not yet green: fresh migrations
+currently stop at the discovery source-catalog guard. Passing ownership or discovery checks
 must not be reported as successful full application execution.

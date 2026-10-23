@@ -895,7 +895,18 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
 }
 
 testingIsolation?.Apply(builder);
-await builder.Build().RunAsync();
+var application = builder.Build();
+var testingExecution = testingIsolation is null
+    ? null : application.Services.GetService<TestingApplicationExecution>();
+Task execution = application.RunAsync();
+try { testingExecution?.Observe(execution); }
+catch (Exception observationFailure)
+{
+    try { await execution; }
+    catch (Exception executionFailure) { throw new AggregateException(observationFailure, executionFailure); }
+    throw;
+}
+await execution;
 
 static LocalPlatformResources AddLocalPlatform(
     IDistributedApplicationBuilder builder,

@@ -9,6 +9,8 @@ using Aspire.Hosting.Testing;
 using Event.Testing.DataProtection;
 using Explore.AppHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Event.Distributed.IntegrationTests;
 
@@ -23,6 +25,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private string[] volumes = [];
     private readonly Lock disposalLock = new();
     private readonly CancellationTokenSource lifetime = new();
+    private readonly TestingApplicationExecution execution = new();
+    private IHostApplicationLifetime? applicationLifetime;
     private Task? disposal;
     private Task? runningStartup;
     private HashSet<string> containerResources = [];
@@ -42,6 +46,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
 
     public string RunId { get; }
     public string Root { get; }
+    internal bool ExecutionSettled => execution.IsSettled;
     public string BootstrapIdentifier => $"assurance-{RunId}@example.invalid";
     public string BootstrapPassword => EnvironmentAuthority["INSTANCE_BOOTSTRAP_LOCAL_PASSWORD"]
         ?? throw new InvalidOperationException("test_bootstrap_authority_missing");
@@ -92,6 +97,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                         .Append(new("TestingEnvironment:ISLAMU_TEST_RUN_ID", owner.RunId)));
                 }, cancellationToken);
 
+            builder.Services.AddSingleton(owner.execution);
             string blocklist = Path.Combine(owner.Root, "password-blocklist.json");
             byte[] blocklistBytes = JsonSerializer.SerializeToUtf8Bytes(new
             {
@@ -130,6 +136,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             if (owner.volumes.Any(name => !name.StartsWith($"islamu-test-{owner.RunId}-", StringComparison.Ordinal)))
                 throw new InvalidOperationException("test_resource_unowned_volume");
             owner.Application = await builder.BuildAsync(cancellationToken);
+            owner.applicationLifetime = owner.Application.Services.GetRequiredService<IHostApplicationLifetime>();
             return owner;
         }
         catch (Exception creationFailure)
@@ -177,6 +184,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         catch (Exception exception)
         {
             startupFailure = exception;
+            try { applicationLifetime!.StopApplication(); }
+            catch (Exception stoppingFailure) { startupFailure = new AggregateException(exception, stoppingFailure); }
         }
         finally
         {
@@ -186,14 +195,18 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             {
                 var unexpected = new[] { start, failures, ready }.Where(task => task.IsFaulted)
                     .SelectMany(task => task.Exception!.Flatten().InnerExceptions)
-                    .Where(exception => exception is not OperationCanceledException
-                        && !ReferenceEquals(exception, startupFailure)).ToList();
+                    .Where(exception => !ReferenceEquals(exception, startupFailure)).ToList();
                 if (unexpected.Count > 0)
                 {
                     startupFailure = new AggregateException(startupFailure is null
                         ? unexpected : unexpected.Prepend(startupFailure));
                 }
             }
+        }
+        if (startupFailure is not null)
+        {
+            try { await execution.WaitForCompletionAsync(TimeSpan.FromSeconds(30)); }
+            catch (Exception exception) { startupFailure = new AggregateException(startupFailure, exception); }
         }
         if (startupFailure is not null)
             ExceptionDispatchInfo.Capture(startupFailure).Throw();
@@ -241,6 +254,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         await lifetime.CancelAsync();
         if (Application is not null)
         {
+            try { applicationLifetime!.StopApplication(); }
+            catch (Exception exception) { failures.Add(exception); }
             try { await Application.StopAsync(cleanupDeadline.Token); }
             catch (Exception exception) { failures.Add(exception); }
             finally
@@ -251,6 +266,10 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     applicationSettled = false;
                     failures.Add(exception);
                 }
+                try { await execution.WaitForCompletionAsync(TimeSpan.FromSeconds(60)); }
+                catch (Exception exception) { failures.Add(exception); }
+                if (!execution.IsSettled)
+                    applicationSettled = false;
             }
         }
         if (runningStartup is not null)

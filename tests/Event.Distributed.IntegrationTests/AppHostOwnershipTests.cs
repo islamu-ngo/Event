@@ -271,6 +271,60 @@ public sealed class AppHostOwnershipTests
         await Assert.That(admitted!.Root).IsEqualTo(root.Path);
     }
 
+    [Test]
+    public async Task DuplicateExecutionObservationCannotCertifyCompletion()
+    {
+        var observer = new TestingApplicationExecution();
+        observer.Observe(Task.CompletedTask);
+        var running = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Assert.That(() => observer.Observe(running.Task)).Throws<InvalidOperationException>();
+        await Assert.That(observer.Completion.IsCompletedSuccessfully).IsFalse();
+        await Assert.That(observer.IsSettled).IsFalse();
+        await Assert.That(async () => await observer.Completion).Throws<InvalidOperationException>();
+        running.SetResult();
+    }
+
+    [Test]
+    public async Task CancelledObservationWaitCannotCertifyUnobservedExecution()
+    {
+        var observer = new TestingApplicationExecution();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        await Assert.That(async () => await observer.Completion.WaitAsync(cancelled.Token))
+            .Throws<OperationCanceledException>();
+        await Assert.That(observer.Completion.IsCompleted).IsFalse();
+        await Assert.That(observer.IsSettled).IsFalse();
+        var running = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        observer.Observe(running.Task);
+        await Assert.That(observer.Completion.IsCompleted).IsFalse();
+        running.SetResult();
+        await observer.Completion;
+        await Assert.That(observer.IsSettled).IsTrue();
+    }
+
+    [Test]
+    public async Task FaultedCancellationObservationRetainsItsFailure()
+    {
+        var observer = new TestingApplicationExecution();
+        var failure = new OperationCanceledException("assurance_faulted_cancellation");
+        observer.Observe(Task.FromException(failure));
+        var observed = await Assert.That(async () => await observer.WaitForCompletionAsync(TimeSpan.FromSeconds(1)))
+            .Throws<OperationCanceledException>();
+        await Assert.That(ReferenceEquals(observed, failure)).IsTrue();
+        await Assert.That(observer.IsSettled).IsTrue();
+    }
+
+    [Test]
+    public async Task CancelledExecutionObservationCompletesCleanupWait()
+    {
+        var observer = new TestingApplicationExecution();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        observer.Observe(Task.FromCanceled(cancelled.Token));
+        await observer.WaitForCompletionAsync(TimeSpan.FromSeconds(1));
+        await Assert.That(observer.IsSettled).IsTrue();
+    }
+
     private static IConfiguration Build(Dictionary<string, string?> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 

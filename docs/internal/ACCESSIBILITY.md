@@ -386,9 +386,11 @@ Skip-to-content link. Automatically present in MainLayout. No page-level action 
 
 | Layer | Project | What It Tests |
 |---|---|---|
-| bUnit component tests | `Explore.Blazor.Client.Tests/Accessibility/` | Rendered markup: `role="alert"`, `alt` text, ARIA attributes |
-| Architecture convention tests | `Event.Architecture.Tests/AccessibilityConventionTests.cs` | File scanning: h1 in pages, MainLayout landmarks, CSS physical-direction ban |
-| CI pipeline | `.github/workflows/test.yml` | Build + all test suites on every push/PR |
+| Rendered Blazor component tests | `Explore.Blazor.Client.Tests/` | Component-owned rendered semantics, including the MainLayout shell contract, hidden-chrome shell behavior, and one-h1 assertions in named page states |
+| RTL browser journey | `Event.Distributed.IntegrationTests/BrowserJourneyTests.cs` | One real workspace scenario exercises mobile and desktop geometry in LTR and RTL; it does not establish a project-wide CSS direction ban |
+| CI pipeline | `.github/workflows/test.yml` | Selects build/test lanes from changed paths; ambiguous detection runs every lane |
+
+The rendered examples prove only the component states their tests render. In particular, there is no exhaustive rendered assertion over every routable page, and no source-text scan is treated as proof of the one-`h1`-per-page requirement. The requirement remains in force for every page; page tests such as `SettingsLayoutTests.ViewAllRendersNineStandardSectionsInOrderWithOnePageHeading` and `SetupTests.Setup_WhenSecretIsRequired_RendersOriginalSecretEntryGateway` cover their named states only.
 
 ### Running Accessibility Tests
 
@@ -396,7 +398,7 @@ Skip-to-content link. Automatically present in MainLayout. No page-level action 
 # bUnit accessibility and component tests
 dotnet test --project Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet
 
-# Architecture convention tests, including accessibility guardrails
+# Architecture tests (accessibility coverage is in rendered component scenarios)
 dotnet test --project Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
 ```
 
@@ -424,24 +426,11 @@ Key experience classes for manual accessibility verification:
 
 ---
 
-## Architecture Test Coverage
+## Rendered And Browser Test Coverage
 
-Convention tests in `Event.Architecture.Tests/` enforce accessibility rules at build time.
+Accessibility markup is verified by rendered component tests in `Explore.Blazor.Client.Tests`, not by source-text scans. `MainLayoutTests.Render_OnDefaultRoute_PreservesShellAccessibilityContract` checks the default rendered shell, and `MainLayoutTests.HiddenChromeRoute_PreservesSkipMainAndLiveRegionsWhileHidingShellLandmarks` checks the hidden-chrome `/setup` state. These cover the named states; they are not a universal browser or assistive-technology certification.
 
-### AccessibilityConventionTests (8 tests)
-
-| Test | Rule |
-|---|---|
-| `RoutablePages_MustContainH1Heading` | Every routable page has `<h1>` (excludes Settings wrapper pages where `<h1>` is in active tab) |
-| `MainLayout_MustContainSkipLink` | `MainLayout.razor` contains skip-to-content link |
-| `MainLayout_MustContainMainLandmark` | `<main>` landmark present |
-| `MainLayout_MustContainHeaderLandmark` | `<header>` landmark present |
-| `MainLayout_MustContainNavigationLandmark` | `<nav>` with `aria-label` present |
-| `MainLayout_MustContainAriaLiveRegions` | Polite and assertive `aria-live` regions present |
-| `ScopedCss_MustNotUsePhysicalDirectionProperties` | **ADVISORY** — flags `margin-left/right`, `padding-left/right`, `border-left/right` in `.razor.css` (Phase 5 RTL fix) |
-| `ScopedCss_MustNotUsePhysicalPositionProperties` | **ADVISORY** — flags `left:`/`right:` positioning in `.razor.css` |
-
-`WorkspaceShellScenarioMatrixTests` complements these static checks with rendered rows for anonymous, seeker, organizer, tenant-admin, instance-admin, and multi-role shells. Mobile and desktop use the same semantic application-workspace navigation; browser placement, focus order, RTL mirroring, and console checks are verified by the manual matrix in `DOCK_LAYOUT.md`.
+Rendered page tests retain concrete h1 witnesses, including the Settings view-all page and setup-secret entry state listed above. They do not enumerate all routable pages, so they must not be described as proving the one-h1 requirement for every route. `WorkspaceShellScenarioMatrixTests` separately renders shell rows for anonymous, seeker, organizer, tenant-admin, instance-admin, and multi-role cases. `BrowserJourneyTests.WorkspaceKeyboardValidationAndRtlLayoutUseRealFocusAndGeometry` exercises a specific workspace's keyboard behavior and desktop/mobile placement under LTR and RTL; it is not a blanket computed-style check for every scoped stylesheet.
 
 Personal Settings uses two deliberately distinct navigation labels when administrative scopes are available: `Settings scopes` changes the governed scope, while `Personal settings sections` changes the focused section. The section navigation precedes content in DOM and focus order, remains sticky below the fixed app bar on desktop, and becomes non-sticky above the content on narrow viewports. View all keeps one page `h1`, gives every rendered section a unique `h2`/`aria-labelledby` pair, announces metadata-search result counts politely, uses logical CSS, and disables section entrance motion when `prefers-reduced-motion` is active.
 
@@ -504,7 +493,6 @@ await Focus.RestoreFocusAsync(fallbackSelector: "#trigger-button");
 | `Explore.Blazor/wwwroot/css/base.css` | Target size minimums on interactive elements |
 | `Explore.Blazor.Client/Services/AppearanceThemeService.cs` | WCAG AA compliant color palette |
 | `Explore.Blazor.Client.Tests/Accessibility/` | bUnit accessibility tests |
-| `Event.Architecture.Tests/AccessibilityConventionTests.cs` | Static file-scanning convention tests |
 | `.github/workflows/test.yml` | CI pipeline running all tests |
 | `Explore.Blazor.Client/Models/LanguageContext.cs` | Direction override + EffectiveIsRtl |
 | `Explore.Blazor.Client/Providers/LanguageProvider.razor` | Language/direction cascading provider |

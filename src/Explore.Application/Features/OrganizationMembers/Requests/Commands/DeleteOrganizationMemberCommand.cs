@@ -9,7 +9,6 @@ namespace Explore.Application.Features.OrganizationMembers.Requests.Commands;
 public sealed record DeleteOrganizationMemberCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid MemberId { get; init; }
-    public required string RequesterUserId { get; init; }
 
     string? ISecureRequest.ResourceId => MemberId.ToString();
 }

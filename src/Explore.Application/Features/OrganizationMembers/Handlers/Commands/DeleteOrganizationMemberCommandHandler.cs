@@ -3,6 +3,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.OrganizationMembers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
@@ -14,16 +16,34 @@ public class DeleteOrganizationMemberCommandHandler : ICommandHandler<DeleteOrga
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
     private readonly IOrganizationRepository _organizationRepository;
+    private readonly IUserContext _userContext;
+    private readonly IOrganizationMemberMutationBoundary _mutation;
 
     public DeleteOrganizationMemberCommandHandler(
         IOrganizationMemberRepository organizationMemberRepository,
-        IOrganizationRepository organizationRepository)
+        IOrganizationRepository organizationRepository,
+        IUserContext userContext,
+        IOrganizationMemberMutationBoundary mutation)
     {
         _organizationMemberRepository = organizationMemberRepository;
         _organizationRepository = organizationRepository;
+        _userContext = userContext;
+        _mutation = mutation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteOrganizationMemberCommand request, CancellationToken cancellationToken)
+    {
+        if (!_userContext.IsAuthenticated || _userContext.UserId is not Guid requesterGuid || requesterGuid == Guid.Empty)
+        {
+            return BaseCommandResponse.Validation<Guid>(["Invalid requester User ID."], "Invalid requester User ID.");
+        }
+
+        return await _mutation.ExecuteRemovalAsync(request.MemberId, false,
+            (actor, token) => DeleteAsync(request, actor, token), cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> DeleteAsync(DeleteOrganizationMemberCommand request,
+        Guid requesterGuid, CancellationToken cancellationToken)
     {
         var memberToDelete = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.MemberId);
 
@@ -40,22 +60,12 @@ public class DeleteOrganizationMemberCommandHandler : ICommandHandler<DeleteOrga
 
         // Check permissions - requester must be an Admin
         var members = await _organizationMemberRepository.GetMembersByOrganizationId(memberToDelete.OrganizationTenant.OrganizationId);
-        if (Guid.TryParse(request.RequesterUserId, out Guid requesterGuid))
-        {
-            var requesterMember = members.FirstOrDefault(m => m.UserId == requesterGuid);
-            // Only OrgAdmin role can remove members
-            if (requesterMember == null || requesterMember.RoleId != (int)RoleEnum.OrgAdmin)
-            {
-                return BaseCommandResponse.Validation<Guid>(
-                    ["You do not have permission to remove members."],
-                    "You do not have permission to remove members.");
-            }
-        }
-        else
+        var requesterMember = members.FirstOrDefault(m => m.UserId == requesterGuid);
+        if (requesterMember == null || requesterMember.RoleId != (int)RoleEnum.OrgAdmin)
         {
             return BaseCommandResponse.Validation<Guid>(
-                ["Invalid requester User ID."],
-                "Invalid requester User ID.");
+                ["You do not have permission to remove members."],
+                "You do not have permission to remove members.");
         }
 
         // Prevent self-deletion if they are the only Admin

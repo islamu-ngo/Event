@@ -1,17 +1,75 @@
 using Explore.Application;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.Features.OrganizationMembers.Handlers.Commands;
 using Explore.Application.Features.OrganizationMembers.Handlers.Queries;
 using Explore.Application.Features.OrganizationMembers.Requests.Commands;
 using Explore.Application.Features.OrganizationMembers.Requests.Queries;
 using Explore.Application.Responses;
+using Explore.Domain.Enums;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Application.UnitTests.Operations;
 
 public sealed class NativeOrganizationMemberOperationTests
 {
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task MissingAuthenticatedIdentityCannotReachOrganizationMembershipRepositories(
+        bool authenticated, bool emptyId)
+    {
+        var caller = new CallerContext(
+            emptyId ? Guid.Empty : authenticated ? null : Guid.CreateVersion7(), authenticated);
+        var add = new AddOrganizationMemberCommandHandler(null!, null!, null!, null!, caller, null!);
+        var update = new UpdateOrganizationMemberRoleCommandHandler(null!, null!, caller, null!);
+        var delete = new DeleteOrganizationMemberCommandHandler(null!, null!, caller, null!);
+        var decline = new DeclineInvitationCommandHandler(null!, caller, null!);
+
+        await Assert.That((await add.ExecuteAsync(new()
+        {
+            TenantId = Guid.CreateVersion7(),
+            AddOrganizationMemberDto = new()
+            {
+                OrganizationId = Guid.CreateVersion7(),
+                Email = "member@example.test",
+                Role = RoleEnum.OrgMember
+            }
+        }, default)).IsSuccess).IsFalse();
+        await Assert.That((await update.ExecuteAsync(new()
+        {
+            UpdateOrganizationMemberRoleDto = new() { Id = Guid.CreateVersion7(), Role = RoleEnum.OrgMember }
+        }, default)).IsSuccess).IsFalse();
+        await Assert.That((await delete.ExecuteAsync(new() { MemberId = Guid.CreateVersion7() }, default))
+            .IsSuccess).IsFalse();
+        await Assert.That((await decline.ExecuteAsync(new() { InvitationId = Guid.CreateVersion7() }, default))
+            .IsSuccess).IsFalse();
+    }
+
+    [Test]
+    public async Task UnauthenticatedInvitationValidationCannotReachMembershipRepositories()
+    {
+        var query = new ValidateOrganizationInvitationQueryHandler(null!,
+            new CallerContext(Guid.CreateVersion7(), false), null!, null!);
+        await Assert.That((await query.QueryAsync(new() { InvitationId = Guid.CreateVersion7() }, default))
+            .IsSuccess).IsFalse();
+        var invitations = new GetMyInvitationsRequestHandler(null!,
+            new CallerContext(Guid.CreateVersion7(), false), null!, null!);
+        await Assert.That(await invitations.QueryAsync(new(), default)).IsEmpty();
+    }
+
+    private sealed class CallerContext(Guid? userId, bool authenticated) : IUserContext
+    {
+        public Guid? UserId => userId;
+        public bool IsAuthenticated => authenticated;
+        public string? Email => null;
+        public string? Username => null;
+        public Guid GetRequiredUserId() => IsAuthenticated && UserId is Guid id && id != Guid.Empty
+            ? id : throw new UnauthorizedAccessException();
+    }
+
     [Test]
     public async Task BoundedDiscovery_RegistersFourCommandsAndFourQueries()
     {

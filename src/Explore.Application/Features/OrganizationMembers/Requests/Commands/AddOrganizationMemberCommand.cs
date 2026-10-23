@@ -9,7 +9,6 @@ namespace Explore.Application.Features.OrganizationMembers.Requests.Commands;
 public sealed record AddOrganizationMemberCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public required AddOrganizationMemberDto AddOrganizationMemberDto { get; init; }
-    public required string RequesterUserId { get; init; } // To check permissions
     public Guid TenantId { get; init; }
 
     string? ISecureRequest.ResourceId => AddOrganizationMemberDto.OrganizationId.ToString();

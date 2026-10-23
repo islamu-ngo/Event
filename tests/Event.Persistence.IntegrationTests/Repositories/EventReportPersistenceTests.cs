@@ -1,19 +1,477 @@
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Webhooks;
+using Explore.Application.DTOs.EventReporting;
+using Explore.Application.Features.EventReporting;
+using Explore.Application.Features.EventReporting.Handlers.Commands;
+using Explore.Application.Features.EventReporting.Requests.Commands;
+using Explore.Application.Serialization;
+using Explore.Application.Services.Webhooks;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 [NotInParallel("PersistenceDb")]
-public sealed class EventReportPersistenceTests(PostgreSqlContainerFixture fixture)
+public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixture fixture)
 {
+    [Test]
+    [Arguments("approve", EventReportRecommendedAction.Dismiss)]
+    [Arguments("heavy_redact", EventReportRecommendedAction.HeavyRedact)]
+    [Arguments("global_ban", EventReportRecommendedAction.Escalate)]
+    public async Task CoopAdvice_PreservesLocalDecisionAndEnforcement_WithExactReplay(
+        string action, EventReportRecommendedAction recommendation)
+    {
+        await fixture.ResetAsync();
+        await using var context = fixture.CreateDbContext();
+        var (tenant, @event, user, actor) = await SetupEventAsync(context, "coop-advice");
+        var report = CreateReport(tenant.Id, @event.Id, user.Id, actor.Id);
+        var reportCase = EventReportCase.Create(tenant.Id, report.Id, "default", EventReportPriority.Normal, null);
+        var localDecision = EventReportDecision.Create(tenant.Id, reportCase.Id, report.Id,
+            EventReportDecisionSource.LocalModerator, EventReportDecisionKind.NeedsMoreInfo,
+            "needs_context", null, user.Id, null);
+        reportCase.SelectDecision(localDecision, AdvisoryObservedAt);
+        var link = CreateAdviceLink(report, reportCase, EventReportExternalProvider.Coop);
+        var callback = CreateCoopAdvice(report, reportCase, action);
+        var message = CreateAdviceMessage(callback);
+        var pointer = IncomingWebhookEffectOutbox.CreatePending(tenant.Id, message.Id, "coop",
+            callback.ProviderDecisionId!, CoopDecisionIncomingWebhookHandler.StableEffectKind,
+            message.PayloadHash, AdvisoryObservedAt);
+        var leaseToken = Guid.CreateVersion7();
+        pointer.Claim("advisory-worker", leaseToken, AdvisoryObservedAt.AddMinutes(5), AdvisoryObservedAt);
+        context.EventReports.Add(report);
+        context.EventReportCases.Add(reportCase);
+        context.EventReportDecisions.Add(localDecision);
+        context.EventReportExternalLinks.Add(link);
+        context.IncomingWebhookMessages.Add(message);
+        context.IncomingWebhookEffectOutboxes.Add(pointer);
+        await context.SaveChangesAsync();
+        var caseStamp = reportCase.ConcurrencyStamp;
+        var reportStatus = report.Status;
+        var eventStatus = @event.EventStatusId;
+        var enforcementCount = await context.EventModerationRecords.CountAsync();
+        var outboxCount = await context.OutboxMessages.CountAsync();
+        var handler = CreateCoopAdviceHandler(context, tenant.Id);
+        var command = new ProcessCoopDecisionCallbackCommand { Request = callback, IncomingWebhookMessageId = message.Id };
+
+        var first = await handler.ExecuteAsync(command, CancellationToken.None);
+        // Recover the real advisory write after a worker stops before effect settlement.
+        var service = new IncomingWebhookEffectProcessingService(
+            new IncomingWebhookEffectOutboxRepository(context),
+            new IncomingWebhookMessageRepository(context),
+            new IncomingWebhookEffectReceiptRepository(context),
+            new EfCoreUnitOfWork(context), handler,
+            Options.Create(new IncomingWebhookProcessingSettings()),
+            new AdvisoryTimeProvider());
+        var effect = await service.ProcessAsync(new IncomingWebhookEffectClaim(pointer.Id, tenant.Id,
+            leaseToken, pointer.ProcessingFence, pointer.ProcessingGeneration), CancellationToken.None);
+        var replay = await handler.ExecuteAsync(command, CancellationToken.None);
+
+        await Assert.That(first.IsSuccess).IsTrue();
+        await Assert.That(replay.IsSuccess).IsTrue();
+        await Assert.That(replay.Id).IsEqualTo(first.Id);
+        await Assert.That(effect.Outcome).IsEqualTo(IncomingWebhookClaimExecutionOutcome.Completed);
+        context.ChangeTracker.Clear();
+        var retained = await new EventReportRepository(context).GetByIdAsync(tenant.Id, report.Id, CancellationToken.None);
+        var advice = retained!.Signals.Single();
+        await Assert.That(advice.RecommendedAction).IsEqualTo(recommendation);
+        await Assert.That(advice.SignalType).IsEqualTo(action);
+        await Assert.That(advice.CaseId).IsEqualTo(reportCase.Id);
+        await Assert.That(advice.ProviderLinkId).IsEqualTo(link.Id);
+        await Assert.That(advice.IncomingWebhookMessageId).IsEqualTo(message.Id);
+        await Assert.That(advice.AdvisoryMaterialSha256).IsEqualTo(message.PayloadHash);
+        await Assert.That(retained.Status).IsEqualTo(reportStatus);
+        await Assert.That(retained.Cases.Single().ConcurrencyStamp).IsEqualTo(caseStamp);
+        await Assert.That(retained.Cases.Single().Status).IsEqualTo(EventReportCaseStatus.DecisionReady);
+        await Assert.That(retained.Cases.Single().CurrentDecisionId).IsEqualTo(localDecision.Id);
+        await Assert.That(retained.Decisions.Count).IsEqualTo(1);
+        await Assert.That(retained.Decisions.Single().Execution.State).IsEqualTo(EventReportDecisionExecutionState.Requested);
+        await Assert.That(await context.EventModerationRecords.CountAsync()).IsEqualTo(enforcementCount);
+        await Assert.That(await context.OutboxMessages.CountAsync()).IsEqualTo(outboxCount);
+        var settledPointer = await context.IncomingWebhookEffectOutboxes.AsNoTracking().SingleAsync(candidate => candidate.Id == pointer.Id);
+        var receipt = await context.IncomingWebhookEffectReceipts.AsNoTracking().SingleAsync(candidate => candidate.IncomingWebhookMessageId == message.Id);
+        await Assert.That(settledPointer.Status).IsEqualTo(OutboxMessageStatus.Completed);
+        await Assert.That(receipt.PayloadHash).IsEqualTo(message.PayloadHash);
+        await Assert.That(receipt.EffectKind).IsEqualTo(CoopDecisionIncomingWebhookHandler.StableEffectKind);
+        await Assert.That((await context.Events.SingleAsync(candidate => candidate.Id == @event.Id)).EventStatusId).IsEqualTo(eventStatus);
+    }
+
+    [Test]
+    [Arguments("instance", "instance")]
+    [Arguments("tenant", "another-tenant")]
+    public async Task CoopAdvice_ForgedDispatchScope_IsRejectedWithoutAuthorityWrites(string scope, string target)
+    {
+        await fixture.ResetAsync();
+        await using var context = fixture.CreateDbContext();
+        var (tenant, @event, user, actor) = await SetupEventAsync(context, "coop-forged");
+        var report = CreateReport(tenant.Id, @event.Id, user.Id, actor.Id);
+        var reportCase = EventReportCase.Create(tenant.Id, report.Id, "default", EventReportPriority.Normal, null);
+        var link = CreateAdviceLink(report, reportCase, EventReportExternalProvider.Coop);
+        var callback = CreateCoopAdvice(report, reportCase, "heavy_redact") with
+        {
+            ProviderTargetScope = scope, ProviderTargetId = target
+        };
+        var message = CreateAdviceMessage(callback);
+        context.EventReports.Add(report);
+        context.EventReportCases.Add(reportCase);
+        context.EventReportExternalLinks.Add(link);
+        context.IncomingWebhookMessages.Add(message);
+        await context.SaveChangesAsync();
+        var stamp = reportCase.ConcurrencyStamp;
+
+        var result = await CreateCoopAdviceHandler(context, tenant.Id).ExecuteAsync(
+            new ProcessCoopDecisionCallbackCommand { Request = callback, IncomingWebhookMessageId = message.Id },
+            CancellationToken.None);
+
+        await Assert.That(result.IsSuccess).IsFalse();
+        await Assert.That(result.FailureCode).IsEqualTo(EventReportFailureCodes.ValidationFailed);
+        context.ChangeTracker.Clear();
+        var retained = await new EventReportRepository(context).GetByIdAsync(tenant.Id, report.Id, CancellationToken.None);
+        await Assert.That(retained!.Signals.Count).IsEqualTo(0);
+        await Assert.That(retained.Decisions.Count).IsEqualTo(0);
+        await Assert.That(retained.Cases.Single().CurrentDecisionId).IsNull();
+        await Assert.That(retained.Cases.Single().ConcurrencyStamp).IsEqualTo(stamp);
+        await Assert.That(retained.Cases.Single().Status).IsEqualTo(EventReportCaseStatus.Open);
+        await Assert.That(await context.EventModerationRecords.CountAsync()).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task CoopAdvice_ChangedAuthenticatedMaterialOrForgedEnvelope_PreservesOriginalAdvice()
+    {
+        await fixture.ResetAsync();
+        await using var context = fixture.CreateDbContext();
+        var (tenant, @event, user, actor) = await SetupEventAsync(context, "coop-material");
+        var report = CreateReport(tenant.Id, @event.Id, user.Id, actor.Id);
+        var reportCase = EventReportCase.Create(tenant.Id, report.Id, "default", EventReportPriority.Normal, null);
+        var callback = CreateCoopAdvice(report, reportCase, "approve");
+        var message = CreateAdviceMessage(callback);
+        context.EventReports.Add(report);
+        context.EventReportCases.Add(reportCase);
+        context.EventReportExternalLinks.Add(CreateAdviceLink(report, reportCase, EventReportExternalProvider.Coop));
+        context.IncomingWebhookMessages.Add(message);
+        await context.SaveChangesAsync();
+        var handler = CreateCoopAdviceHandler(context, tenant.Id);
+        var command = new ProcessCoopDecisionCallbackCommand { Request = callback, IncomingWebhookMessageId = message.Id };
+        var first = await handler.ExecuteAsync(command, CancellationToken.None);
+        var forged = await handler.ExecuteAsync(command with { IncomingWebhookMessageId = Guid.CreateVersion7() }, CancellationToken.None);
+        var changed = await handler.ExecuteAsync(command with { Request = callback with { SafeNote = "replacement material" } }, CancellationToken.None);
+        message.ClassifyDuplicate("sha256:" + new string('b', 64), AdvisoryObservedAt.AddMinutes(1));
+        await context.SaveChangesAsync();
+        var conflicted = await handler.ExecuteAsync(command, CancellationToken.None);
+
+        await Assert.That(first.IsSuccess).IsTrue();
+        await Assert.That(forged.IsSuccess).IsFalse();
+        await Assert.That(changed.IsSuccess).IsFalse();
+        await Assert.That(conflicted.IsSuccess).IsFalse();
+        var retained = await context.EventReportSignals.AsNoTracking().SingleAsync(signal => signal.ReportId == report.Id);
+        await Assert.That(retained.Id).IsEqualTo(first.Id);
+        await Assert.That(retained.SafeSummary).IsEqualTo(callback.SafeNote);
+        await Assert.That(retained.AdvisoryMaterialSha256).IsEqualTo(message.PayloadHash);
+        await Assert.That(await context.EventReportDecisions.CountAsync()).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task OspreyAdvice_ExactReplayAndChangedMaterial_PreserveOriginalHumanReviewState()
+    {
+        await fixture.ResetAsync();
+        await using var context = fixture.CreateDbContext();
+        var (tenant, @event, user, actor) = await SetupEventAsync(context, "osprey-advice");
+        var report = CreateReport(tenant.Id, @event.Id, user.Id, actor.Id);
+        var reportCase = EventReportCase.Create(tenant.Id, report.Id, "default", EventReportPriority.Normal, null);
+        var link = CreateAdviceLink(report, reportCase, EventReportExternalProvider.Osprey);
+        context.EventReports.Add(report);
+        context.EventReportCases.Add(reportCase);
+        context.EventReportExternalLinks.Add(link);
+        await context.SaveChangesAsync();
+        var callback = new OspreySignalCallbackRequestDto
+        {
+            TenantId = tenant.Id, EventId = @event.Id, ReportId = report.Id, CaseId = reportCase.Id,
+            ProviderSignalId = "provider-signal", CorrelationId = "dispatch",
+            ProviderTargetScope = "tenant", ProviderTargetId = tenant.Id.ToString("N"),
+            Signals =
+            [
+                new OspreySignalCallbackItemDto
+                {
+                    SignalType = "policy_match", PolicyCode = "spam", Verdict = "urgent",
+                    RecommendedAction = "heavy_redact", SafeSummary = "Advisory evidence.", CreatedAtUtc = AdvisoryObservedAt
+                },
+                new OspreySignalCallbackItemDto
+                {
+                    SignalType = "context_match", PolicyCode = "context", Verdict = "needs_review",
+                    SafeSummary = "Separate material fact.", CreatedAtUtc = AdvisoryObservedAt
+                }
+            ]
+        };
+        var handler = new RecordOspreySignalCallbackCommandHandler(
+            new EventReportRepository(context), new EfCoreUnitOfWork(context), new StaticTenantContext(tenant.Id));
+        var command = new RecordOspreySignalCallbackCommand { Request = callback };
+        var first = await handler.ExecuteAsync(command, CancellationToken.None);
+        var replay = await handler.ExecuteAsync(command, CancellationToken.None);
+        var changed = await handler.ExecuteAsync(command with
+        {
+            Request = callback with
+            {
+                Signals = [callback.Signals[0] with { SafeSummary = "Changed evidence." }, callback.Signals[1]]
+            }
+        }, CancellationToken.None);
+        var forged = await handler.ExecuteAsync(command with
+        {
+            Request = callback with { ProviderTargetScope = "instance", ProviderTargetId = "instance" }
+        }, CancellationToken.None);
+        var foreignTenant = await handler.ExecuteAsync(command with
+        {
+            Request = callback with { TenantId = Guid.CreateVersion7() }
+        }, CancellationToken.None);
+
+        await Assert.That(first.IsSuccess).IsTrue();
+        await Assert.That(replay.IsSuccess).IsTrue();
+        await Assert.That(changed.IsSuccess).IsFalse();
+        await Assert.That(forged.IsSuccess).IsFalse();
+        await Assert.That(foreignTenant.IsSuccess).IsFalse();
+        await Assert.That(foreignTenant.FailureCode).IsEqualTo(EventReportFailureCodes.TenantUnresolved);
+        context.ChangeTracker.Clear();
+        var retained = await new EventReportRepository(context).GetByIdAsync(tenant.Id, report.Id, CancellationToken.None);
+        await Assert.That(retained!.Signals.Count).IsEqualTo(2);
+        var originals = retained.Signals.OrderBy(signal => signal.AdvisoryOrdinal).ToArray();
+        await Assert.That(originals[0].SafeSummary).IsEqualTo("Advisory evidence.");
+        await Assert.That(originals[1].SafeSummary).IsEqualTo("Separate material fact.");
+        foreach (var signal in originals)
+            await Assert.That(signal.ProviderLinkId).IsEqualTo(link.Id);
+        await Assert.That(retained.Cases.Single().Status).IsEqualTo(EventReportCaseStatus.Open);
+        await Assert.That(retained.Cases.Single().Priority).IsEqualTo(EventReportPriority.Urgent);
+        await Assert.That(retained.Cases.Single().CurrentDecisionId).IsNull();
+        await Assert.That(retained.Decisions.Count).IsEqualTo(0);
+        await Assert.That(await context.EventModerationRecords.CountAsync()).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(EventReportExternalProvider.Coop)]
+    [Arguments(EventReportExternalProvider.Osprey)]
+    public async Task ProviderAdvice_ReplayCannotAdoptChangedTargetOnTheSameDispatchRow(EventReportExternalProvider provider)
+    {
+        await fixture.ResetAsync();
+        await using var context = fixture.CreateDbContext();
+        var (tenant, @event, user, actor) = await SetupEventAsync(context, "changed-advice-dispatch");
+        var report = CreateReport(tenant.Id, @event.Id, user.Id, actor.Id);
+        var reportCase = EventReportCase.Create(tenant.Id, report.Id, "default", EventReportPriority.Normal, null);
+        var link = CreateAdviceLink(report, reportCase, provider);
+        context.AddRange(report, reportCase, link);
+        var coop = CreateCoopAdvice(report, reportCase, "heavy_redact") with
+        {
+            ProviderTargetScope = null, ProviderTargetId = null
+        };
+        var message = CreateAdviceMessage(coop);
+        if (provider == EventReportExternalProvider.Coop)
+            context.IncomingWebhookMessages.Add(message);
+        await context.SaveChangesAsync();
+        var osprey = new OspreySignalCallbackRequestDto
+        {
+            TenantId = tenant.Id, EventId = @event.Id, ReportId = report.Id, CaseId = reportCase.Id,
+            ProviderSignalId = "provider-signal", CorrelationId = "dispatch",
+            Signals = [new OspreySignalCallbackItemDto
+            {
+                SignalType = "policy_match", PolicyCode = "spam", Verdict = "needs_review",
+                CreatedAtUtc = AdvisoryObservedAt
+            }]
+        };
+        async Task<Explore.Application.Responses.BaseCommandResponse<Guid>> RecordAsync() =>
+            provider == EventReportExternalProvider.Coop
+                ? await CreateCoopAdviceHandler(context, tenant.Id).ExecuteAsync(new ProcessCoopDecisionCallbackCommand
+                {
+                    Request = coop, IncomingWebhookMessageId = message.Id
+                }, CancellationToken.None)
+                : await new RecordOspreySignalCallbackCommandHandler(
+                    new EventReportRepository(context), new EfCoreUnitOfWork(context), new StaticTenantContext(tenant.Id))
+                    .ExecuteAsync(new RecordOspreySignalCallbackCommand { Request = osprey }, CancellationToken.None);
+
+        await Assert.That((await RecordAsync()).IsSuccess).IsTrue();
+        await context.EventReportExternalLinks.Where(row => row.Id == link.Id).ExecuteUpdateAsync(update =>
+            update.SetProperty(row => row.ProviderTargetScope, EventReportProviderTargetScope.Instance)
+                .SetProperty(row => row.ProviderTargetId, "instance"));
+        context.ChangeTracker.Clear();
+        var replay = await RecordAsync();
+        await Assert.That(replay.IsSuccess).IsFalse();
+        await Assert.That(replay.FailureCode).IsEqualTo(EventReportFailureCodes.DecisionInvalid);
+        var advice = await context.EventReportSignals.AsNoTracking().SingleAsync();
+        await Assert.That(advice.ProviderTargetScope).IsEqualTo(EventReportProviderTargetScope.Tenant);
+        await Assert.That(advice.ProviderTargetId).IsEqualTo(tenant.Id.ToString("N"));
+        await Assert.That(await context.EventReportDecisions.CountAsync()).IsEqualTo(0);
+        await Assert.That(await context.EventModerationRecords.CountAsync()).IsEqualTo(0);
+    }
+
+    private static readonly DateTime AdvisoryObservedAt = new(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
+
+    [Test]
+    [Arguments(EventReportDecisionSource.CoopReviewer, EventReportFailureCodes.DecisionInvalid)]
+    [Arguments(EventReportDecisionSource.OspreyAuto, EventReportFailureCodes.DecisionInvalid)]
+    [Arguments(EventReportDecisionSource.LocalModerator, EventReportFailureCodes.UserUnresolved)]
+    public async Task LegacyExecution_RejectsProviderDecisionBeforeClaim_AndRetainsLocalIdentityGate(
+        EventReportDecisionSource source, string expectedFailure)
+    {
+        await fixture.ResetAsync();
+        await using var context = fixture.CreateDbContext();
+        var (tenant, @event, user, actor) = await SetupEventAsync(context, "provider-execution");
+        var report = CreateReport(tenant.Id, @event.Id, user.Id, actor.Id);
+        var reportCase = EventReportCase.Create(tenant.Id, report.Id, "default", EventReportPriority.Normal, null);
+        var decision = EventReportDecision.Create(tenant.Id, reportCase.Id, report.Id, source,
+            EventReportDecisionKind.HeavyRedact, "spam", null,
+            source == EventReportDecisionSource.LocalModerator ? user.Id : null,
+            source == EventReportDecisionSource.LocalModerator ? null : "legacy-provider-decision");
+        reportCase.SelectDecision(decision, AdvisoryObservedAt);
+        context.EventReports.Add(report);
+        context.EventReportCases.Add(reportCase);
+        context.EventReportDecisions.Add(decision);
+        await context.SaveChangesAsync();
+        var stamp = reportCase.ConcurrencyStamp;
+        // No enforcement or notification dependency can return a fabricated success.
+        // Crossing the preflight boundary instead of rejecting must fail this test.
+        var handler = new ExecuteReportDecisionCommandHandler(
+            eventReportRepository: new EventReportRepository(context),
+            executionRepository: new EventReportDecisionExecutionRepository(context),
+            moderationRecordRepository: null!,
+            eventRoleAssignmentRepository: null!,
+            tenantUserRepository: null!,
+            userRepository: null!,
+            notificationPreferenceResolver: null!,
+            recipientNotificationMaterializer: null!,
+            reportOutcomeNotificationFactory: null!,
+            reportNeedsMoreInformationNotificationFactory: null!,
+            organizerWarningNotificationFactory: null!,
+            unitOfWork: new EfCoreUnitOfWork(context),
+            tenantContext: new StaticTenantContext(tenant.Id),
+            currentUserService: new AnonymousCurrentUserService(),
+            moderateCommandHandler: null!,
+            heavyRedactCommandHandler: null!,
+            mutationLock: null!);
+
+        var result = await handler.ExecuteAsync(new ExecuteReportDecisionCommand
+        {
+            EventId = @event.Id, ReportId = report.Id, CaseId = reportCase.Id, DecisionId = decision.Id,
+            ExpectedCaseConcurrencyStamp = stamp
+        }, CancellationToken.None);
+
+        await Assert.That(result.IsSuccess).IsFalse();
+        await Assert.That(result.FailureCode).IsEqualTo(expectedFailure);
+        context.ChangeTracker.Clear();
+        var retained = await new EventReportRepository(context).GetByIdAsync(tenant.Id, report.Id, CancellationToken.None);
+        await Assert.That(retained!.Decisions.Single().Execution.State).IsEqualTo(EventReportDecisionExecutionState.Requested);
+        await Assert.That(retained.Cases.Single().CurrentDecisionId).IsEqualTo(decision.Id);
+        await Assert.That(retained.Cases.Single().ConcurrencyStamp).IsEqualTo(stamp);
+        await Assert.That(retained.Cases.Single().Status).IsEqualTo(EventReportCaseStatus.DecisionReady);
+        await Assert.That(await context.EventModerationRecords.CountAsync()).IsEqualTo(0);
+        await Assert.That(await context.OutboxMessages.CountAsync()).IsEqualTo(0);
+        await Assert.That((await context.Events.SingleAsync(candidate => candidate.Id == @event.Id)).EventStatusId)
+            .IsEqualTo((int)EventStatusEnum.Published);
+    }
+
+    [Test]
+    public async Task OspreyAdvice_ProviderIdentityCannotMoveToAnotherNativeReportOrDispatch()
+    {
+        await fixture.ResetAsync();
+        await using var context = fixture.CreateDbContext();
+        var (tenant, @event, user, actor) = await SetupEventAsync(context, "osprey-source-reuse");
+        var firstReport = CreateReport(tenant.Id, @event.Id, user.Id, actor.Id);
+        var secondReport = CreateReport(tenant.Id, @event.Id, user.Id, actor.Id);
+        var firstCase = EventReportCase.Create(tenant.Id, firstReport.Id, "default", EventReportPriority.Normal, null);
+        var secondCase = EventReportCase.Create(tenant.Id, secondReport.Id, "default", EventReportPriority.Normal, null);
+        var firstLink = CreateAdviceLink(firstReport, firstCase, EventReportExternalProvider.Osprey);
+        var secondLink = EventReportExternalLink.CreatePending(tenant.Id, secondReport.Id, secondCase.Id,
+            secondCase.ConcurrencyStamp, EventReportExternalProvider.Osprey, "dispatch", AdvisoryObservedAt,
+            EventReportProviderTargetScope.Instance, "instance");
+        secondLink.MarkSynced(null, "provider-signal", null, AdvisoryObservedAt);
+        context.EventReports.AddRange(firstReport, secondReport);
+        context.EventReportCases.AddRange(firstCase, secondCase);
+        context.EventReportExternalLinks.AddRange(firstLink, secondLink);
+        await context.SaveChangesAsync();
+        var callback = new OspreySignalCallbackRequestDto
+        {
+            TenantId = tenant.Id, EventId = @event.Id, ReportId = firstReport.Id, CaseId = firstCase.Id,
+            ProviderSignalId = "provider-signal", CorrelationId = "dispatch",
+            ProviderTargetScope = "tenant", ProviderTargetId = tenant.Id.ToString("N"),
+            Signals = [new OspreySignalCallbackItemDto
+            {
+                SignalType = "policy_match", PolicyCode = "spam", Verdict = "urgent", CreatedAtUtc = AdvisoryObservedAt
+            }]
+        };
+        var handler = new RecordOspreySignalCallbackCommandHandler(
+            new EventReportRepository(context), new EfCoreUnitOfWork(context), new StaticTenantContext(tenant.Id));
+        var first = await handler.ExecuteAsync(new RecordOspreySignalCallbackCommand { Request = callback }, CancellationToken.None);
+        var reused = await handler.ExecuteAsync(new RecordOspreySignalCallbackCommand
+        {
+            Request = callback with
+            {
+                ReportId = secondReport.Id, CaseId = secondCase.Id,
+                ProviderTargetScope = "instance", ProviderTargetId = "instance"
+            }
+        }, CancellationToken.None);
+
+        await Assert.That(first.IsSuccess).IsTrue();
+        await Assert.That(reused.IsSuccess).IsFalse();
+        await Assert.That(reused.FailureCode).IsEqualTo(EventReportFailureCodes.DecisionInvalid);
+        context.ChangeTracker.Clear();
+        var retained = await context.EventReportSignals.AsNoTracking().SingleAsync();
+        await Assert.That(retained.ReportId).IsEqualTo(firstReport.Id);
+        await Assert.That(retained.ProviderLinkId).IsEqualTo(firstLink.Id);
+        var unchanged = await new EventReportRepository(context).GetByIdAsync(tenant.Id, secondReport.Id, CancellationToken.None);
+        await Assert.That(unchanged!.Signals.Count).IsEqualTo(0);
+        await Assert.That(unchanged.Decisions.Count).IsEqualTo(0);
+        await Assert.That(unchanged.Cases.Single().Priority).IsEqualTo(EventReportPriority.Normal);
+        await Assert.That(unchanged.Cases.Single().CurrentDecisionId).IsNull();
+    }
+
+    private sealed class AnonymousCurrentUserService : ICurrentUserService
+    {
+        public Guid? UserId => null;
+        public bool IsAuthenticated => false;
+    }
+
+    private sealed class AdvisoryTimeProvider : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(AdvisoryObservedAt.AddSeconds(1));
+    }
+
+    private static EventReportExternalLink CreateAdviceLink(
+        EventReport report, EventReportCase reportCase, EventReportExternalProvider provider)
+    {
+        var link = EventReportExternalLink.CreatePending(report.TenantId, report.Id, reportCase.Id,
+            reportCase.ConcurrencyStamp, provider, "dispatch", AdvisoryObservedAt,
+            EventReportProviderTargetScope.Tenant, report.TenantId.ToString("N"));
+        link.MarkSynced(provider == EventReportExternalProvider.Coop ? "provider-case" : null,
+            provider == EventReportExternalProvider.Osprey ? "provider-signal" : null, null, AdvisoryObservedAt);
+        return link;
+    }
+
+    private static CoopDecisionCallbackRequestDto CreateCoopAdvice(EventReport report, EventReportCase reportCase, string action) => new()
+    {
+        TenantId = report.TenantId, ReportId = report.Id, EventId = report.EventId, CaseId = reportCase.Id,
+        ProviderDecisionId = "provider-advice", ProviderCaseId = "provider-case", CorrelationId = "dispatch",
+        ProviderTargetScope = "tenant", ProviderTargetId = report.TenantId.ToString("N"),
+        Action = new CoopDecisionCallbackActionDto { Id = action }, SafeNote = "Retained advisory evidence."
+    };
+
+    private static IncomingWebhookMessage CreateAdviceMessage(CoopDecisionCallbackRequestDto callback)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(callback, ExploreJsonContext.Default.CoopDecisionCallbackRequestDto);
+        return IncomingWebhookMessage.CreateVerified(callback.TenantId, "coop", callback.ProviderDecisionId!, null,
+            CoopDecisionIncomingWebhookHandler.StableEffectKind, bytes,
+            "sha256:" + Convert.ToHexStringLower(SHA256.HashData(bytes)), "application/json", "identity", null,
+            AdvisoryObservedAt, AdvisoryObservedAt, AdvisoryObservedAt.AddDays(2), "advisory-tests",
+            AdvisoryObservedAt.AddDays(2), AdvisoryObservedAt.AddDays(3), AdvisoryObservedAt.AddDays(1), AdvisoryObservedAt.AddDays(2));
+    }
+
+    private static ProcessCoopDecisionCallbackCommandHandler CreateCoopAdviceHandler(ExploreDbContext context, Guid tenantId) =>
+        new(new EventReportRepository(context), new IncomingWebhookMessageRepository(context),
+            new EfCoreUnitOfWork(context), new StaticTenantContext(tenantId));
+
     [Test]
     public async Task EventReportGraph_WhenSaved_PersistsTenantScopedRows()
     {
@@ -62,6 +520,7 @@ public sealed class EventReportPersistenceTests(PostgreSqlContainerFixture fixtu
             tenant.Id,
             report.Id,
             reportCase.Id,
+            reportCase.ConcurrencyStamp,
             EventReportExternalProvider.Coop,
             "external-" + Guid.NewGuid().ToString("N")[..12]));
         await context.SaveChangesAsync();

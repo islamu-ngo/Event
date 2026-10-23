@@ -41,7 +41,8 @@ public sealed class ReportProviderSyncDispatcher(
         var report = await LoadReportAsync(request, cancellationToken);
         var reportCase = ResolveCase(report, request.CaseId, message.Id);
 
-        if (HasCompletedSyncMarker(report, configuredTargets, idempotencyKey))
+        if (HasCompletedSyncMarker(report, configuredTargets,
+                request.CaseId, request.CaseConcurrencyStamp, idempotencyKey))
         {
             RecordProviderSync(report.TenantId, configuredTargets, "skipped");
             logger.LogInformation(
@@ -51,12 +52,18 @@ public sealed class ReportProviderSyncDispatcher(
             return;
         }
 
+        if (report.EventId != request.EventId || reportCase.ConcurrencyStamp != request.CaseConcurrencyStamp)
+        {
+            throw new InvalidOperationException("The provider sync request does not match the current native event and case generation.");
+        }
+
         var envelope = CreateEnvelope(request, report, reportCase, idempotencyKey, currentOptions);
         var result = await provider.SyncReportAsync(envelope, cancellationToken);
 
         if (result.ProviderDisabled)
         {
-            await PersistDisabledAsync(report, reportCase.Id, configuredTargets, idempotencyKey, cancellationToken);
+            await PersistDisabledAsync(report, reportCase.Id, request.CaseConcurrencyStamp,
+                configuredTargets, idempotencyKey, cancellationToken);
             RecordProviderSync(report.TenantId, configuredTargets, "disabled", "provider_disabled");
             logger.LogInformation(
                 "Event report provider sync disabled for report {ReportId} from outbox message {MessageId}",
@@ -68,7 +75,8 @@ public sealed class ReportProviderSyncDispatcher(
         if (!result.Succeeded)
         {
             var category = NormalizeErrorCategory(result.Error?.Category);
-            await PersistFailureAsync(report, reportCase.Id, configuredTargets, idempotencyKey, category, cancellationToken);
+            await PersistFailureAsync(report, reportCase.Id, request.CaseConcurrencyStamp,
+                configuredTargets, idempotencyKey, category, cancellationToken);
             RecordProviderSync(
                 report.TenantId,
                 configuredTargets,
@@ -89,7 +97,8 @@ public sealed class ReportProviderSyncDispatcher(
             return;
         }
 
-        await PersistSuccessAsync(report, reportCase.Id, result, idempotencyKey, cancellationToken);
+        await PersistSuccessAsync(report, reportCase.Id, request.CaseConcurrencyStamp,
+            result, idempotencyKey, cancellationToken);
         RecordProviderSync(report.TenantId, configuredTargets, "succeeded");
         logger.LogInformation(
             "Event report provider sync succeeded for report {ReportId} from outbox message {MessageId}",
@@ -155,6 +164,7 @@ public sealed class ReportProviderSyncDispatcher(
     private async Task PersistSuccessAsync(
         EventReport report,
         Guid caseId,
+        Guid caseConcurrencyStamp,
         EventReportProviderSyncResult result,
         string idempotencyKey,
         CancellationToken cancellationToken)
@@ -194,7 +204,7 @@ public sealed class ReportProviderSyncDispatcher(
                 linkEnvelope.Provider,
                 linkEnvelope.ProviderTargetScope,
                 linkEnvelope.ProviderTargetId);
-            var link = GetOrCreateLink(report, caseId, targetToMark, idempotencyKey, utcNow);
+            var link = GetOrCreateLink(report, caseId, caseConcurrencyStamp, targetToMark, idempotencyKey, utcNow);
             link.MarkSynced(
                 linkEnvelope.ProviderCaseId,
                 linkEnvelope.ProviderSignalId,
@@ -212,6 +222,7 @@ public sealed class ReportProviderSyncDispatcher(
     private async Task PersistDisabledAsync(
         EventReport report,
         Guid caseId,
+        Guid caseConcurrencyStamp,
         IReadOnlyList<ProviderTarget> targets,
         string idempotencyKey,
         CancellationToken cancellationToken)
@@ -224,7 +235,7 @@ public sealed class ReportProviderSyncDispatcher(
         var utcNow = DateTime.UtcNow;
         foreach (var configuredTarget in targets)
         {
-            GetOrCreateLink(report, caseId, configuredTarget, idempotencyKey, utcNow).Disable(utcNow);
+            GetOrCreateLink(report, caseId, caseConcurrencyStamp, configuredTarget, idempotencyKey, utcNow).Disable(utcNow);
         }
 
         await eventReportRepository.Update(report);
@@ -233,6 +244,7 @@ public sealed class ReportProviderSyncDispatcher(
     private async Task PersistFailureAsync(
         EventReport report,
         Guid caseId,
+        Guid caseConcurrencyStamp,
         IReadOnlyList<ProviderTarget> targets,
         string idempotencyKey,
         string category,
@@ -246,7 +258,7 @@ public sealed class ReportProviderSyncDispatcher(
         var utcNow = DateTime.UtcNow;
         foreach (var configuredTarget in targets)
         {
-            var link = GetOrCreateLink(report, caseId, configuredTarget, idempotencyKey, utcNow);
+            var link = GetOrCreateLink(report, caseId, caseConcurrencyStamp, configuredTarget, idempotencyKey, utcNow);
             if (link.SyncState == EventReportSyncState.Synced)
             {
                 continue;
@@ -261,6 +273,7 @@ public sealed class ReportProviderSyncDispatcher(
     private static EventReportExternalLink GetOrCreateLink(
         EventReport report,
         Guid caseId,
+        Guid caseConcurrencyStamp,
         ProviderTarget target,
         string idempotencyKey,
         DateTime utcNow)
@@ -273,6 +286,10 @@ public sealed class ReportProviderSyncDispatcher(
 
         if (existing is not null)
         {
+            if (existing.CaseId != caseId || existing.CaseConcurrencyStamp != caseConcurrencyStamp)
+            {
+                throw new InvalidOperationException("The native dispatch identity was reused for another case generation.");
+            }
             return existing;
         }
 
@@ -280,6 +297,7 @@ public sealed class ReportProviderSyncDispatcher(
             report.TenantId,
             report.Id,
             caseId,
+            caseConcurrencyStamp,
             target.Provider,
             idempotencyKey,
             utcNow,
@@ -292,11 +310,14 @@ public sealed class ReportProviderSyncDispatcher(
     private static bool HasCompletedSyncMarker(
         EventReport report,
         IReadOnlyList<ProviderTarget> targets,
+        Guid caseId,
+        Guid caseConcurrencyStamp,
         string idempotencyKey)
     {
         return targets.Count > 0 && targets.All(targetToCheck =>
             report.ExternalLinks.Any(link =>
                 link.Provider == targetToCheck.Provider &&
+                link.CaseId == caseId && link.CaseConcurrencyStamp == caseConcurrencyStamp &&
                 link.ProviderTargetScope == targetToCheck.Scope &&
                 string.Equals(link.ProviderTargetId, targetToCheck.TargetId, StringComparison.Ordinal) &&
                 string.Equals(link.CorrelationId, idempotencyKey, StringComparison.Ordinal) &&

@@ -35,7 +35,7 @@ public sealed class ModerationIntegrationController(
 {
     [HttpPost("osprey/callback", Name = RouteNames.ModerationIntegrationOspreyCallback)]
     [EndpointSummary("Record Osprey Signal Callback")]
-    [EndpointDescription("Accepts authenticated Osprey moderation signal callbacks and records provider signals on the local report.")]
+    [EndpointDescription("Accepts authenticated Osprey advice bound to an existing native provider dispatch. Recommendations are not findings, approvals or executable discipline.")]
     [Authorize(Policy = ModerationIntegrationAuthorizationPolicies.OspreyCallback)]
     [Consumes(HateoasConstants.JsonMediaType)]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
@@ -60,7 +60,7 @@ public sealed class ModerationIntegrationController(
 
     [HttpPost("coop/callback", Name = RouteNames.ModerationIntegrationCoopCallback)]
     [EndpointSummary("Record Coop Decision Callback")]
-    [EndpointDescription("Accepts signed Coop moderation decision callbacks and executes the local report decision flow.")]
+    [EndpointDescription("Captures signed Coop recommendations for durable advisory-only processing against the bound native report and case. Provider advice never approves or executes discipline.")]
     [Authorize(Policy = ModerationIntegrationAuthorizationPolicies.CoopCallback)]
     [Consumes(HateoasConstants.JsonMediaType)]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]

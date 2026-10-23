@@ -19,6 +19,28 @@ namespace Explore.Infrastructure.Tests.Infrastructure.Moderation;
 public sealed class ReportProviderSyncDispatcherTests
 {
     [Test]
+    public async Task DispatchAsync_StaleNativeCaseGenerationCannotSendCurrentCaseMaterial()
+    {
+        var createdAt = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        var (report, reportCase) = CreateReport(createdAt);
+        var message = CreateMessage(report, reportCase, createdAt, "stale-generation");
+        reportCase.ChangePriority(EventReportPriority.Urgent, createdAt.AddMinutes(1));
+        var currentStamp = reportCase.ConcurrencyStamp;
+        var provider = new RecordingEventReportProvider();
+        var dispatcher = CreateDispatcher(provider, CreateRepository(report), new ModerationProviderOptions
+        {
+            Mode = ModerationProviderOptions.ModeOsprey,
+            EvaluateSignals = true
+        });
+        await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.DispatchAsync(message));
+        await Assert.That(provider.Calls).IsEqualTo(0);
+        await Assert.That(provider.LastEnvelope).IsNull();
+        await Assert.That(report.Signals.Count).IsEqualTo(0);
+        await Assert.That(report.ExternalLinks.Count).IsEqualTo(0);
+        await Assert.That(reportCase.ConcurrencyStamp).IsEqualTo(currentStamp);
+    }
+
+    [Test]
     public async Task DispatchAsync_WhenProviderSucceeds_PersistsSignalAndExternalLink()
     {
         var createdAt = DateTime.UtcNow.AddMinutes(-5);
@@ -72,6 +94,7 @@ public sealed class ReportProviderSyncDispatcherTests
         await Assert.That(report.ExternalLinks.Single().Provider).IsEqualTo(EventReportExternalProvider.Osprey);
         await Assert.That(report.ExternalLinks.Single().ProviderTargetScope).IsEqualTo(EventReportProviderTargetScope.Instance);
         await Assert.That(report.ExternalLinks.Single().ProviderTargetId).IsEqualTo("instance");
+        await Assert.That(report.ExternalLinks.Single().CaseConcurrencyStamp).IsEqualTo(provider.LastEnvelope.CaseConcurrencyStamp);
         await Assert.That(report.ExternalLinks.Single().ProviderSignalId).IsEqualTo("signal-1");
         await Assert.That(report.ExternalLinks.Single().SyncState).IsEqualTo(EventReportSyncState.Synced);
         await Assert.That(report.ExternalLinks.Single().CorrelationId).IsEqualTo(idempotencyKey);
@@ -147,6 +170,7 @@ public sealed class ReportProviderSyncDispatcherTests
             report.TenantId,
             report.Id,
             reportCase.Id,
+            reportCase.ConcurrencyStamp,
             EventReportExternalProvider.Coop,
             idempotencyKey,
             createdAt);
@@ -179,6 +203,7 @@ public sealed class ReportProviderSyncDispatcherTests
             report.TenantId,
             report.Id,
             reportCase.Id,
+            reportCase.ConcurrencyStamp,
             EventReportExternalProvider.Coop,
             idempotencyKey,
             createdAt,

@@ -37,7 +37,7 @@ public sealed record ModerationConstitutionTerms(
             || Independence != ModerationConstitutionIndependence.DistinctControllersAndImplicatedPartyExclusion
             || Exposure != ModerationConstitutionExposure.ConcealedPurposeAuthorizedReveal
             || Overload != ModerationConstitutionOverload.AcknowledgeAndEscalate
-            || MinimumIndependentReviewers is < 1 or > 32 || ProtectedComplaintCalendarMonths < 1
+            || MinimumIndependentReviewers is < 1 or > 32 || ProtectedComplaintCalendarMonths < 6
             || MaximumReviewInterval <= TimeSpan.Zero || MaximumReviewInterval == TimeSpan.MaxValue
             || EscalationAfter <= TimeSpan.Zero || EscalationAfter == TimeSpan.MaxValue
             || !Route(SupportRoute) || !Route(IndependentRedressRoute)

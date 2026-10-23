@@ -55,6 +55,30 @@ public sealed class ModerationConstitutionTests
     }
 
     [Test]
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(5)]
+    [Arguments(6)]
+    [Arguments(7)]
+    [Arguments(12)]
+    public async Task Constitution_PreservesTheProjectComplaintFloorWithoutExtendingCustody(int months)
+    {
+        var terms = Terms() with { ProtectedComplaintCalendarMonths = months };
+        if (months < 6)
+        {
+            await Assert.That(() => Source(terms: terms)).Throws<ArgumentException>();
+            return;
+        }
+
+        var source = Source(terms: terms);
+        var adoption = ModerationConstitutionAdoption.Adopt(Guid.CreateVersion7(), source,
+            Guid.CreateVersion7(), 5, Now, Now.AddMinutes(4));
+        await Assert.That(source.ProtectedComplaintCalendarMonths).IsEqualTo(months);
+        await Assert.That(source.ValidUntil).IsEqualTo(Now.AddMinutes(5));
+        await Assert.That(adoption.MatchesCurrent(source, Now.AddMinutes(4))).IsFalse();
+    }
+
+    [Test]
     public async Task ReviewerAvailability_IsFiniteSelfOwnedAndTerminal()
     {
         var reviewer = Guid.CreateVersion7();
@@ -92,10 +116,11 @@ public sealed class ModerationConstitutionTests
         "https://example.invalid/moderation/support", "https://example.invalid/independent-redress",
         Guid.CreateVersion7(), Guid.CreateVersion7());
 
-    private static ModerationConstitutionSource Source(IEnumerable<ModerationConstitutionReviewerTerms>? reviewers = null) =>
+    private static ModerationConstitutionSource Source(IEnumerable<ModerationConstitutionReviewerTerms>? reviewers = null,
+        ModerationConstitutionTerms? terms = null) =>
         ModerationConstitutionSource.Record(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
             Guid.CreateVersion7(), Guid.CreateVersion7(), 1, Guid.CreateVersion7(), Guid.CreateVersion7(),
-            Guid.CreateVersion7(), 1, new string('a', 64), Terms(), reviewers ??
+            Guid.CreateVersion7(), 1, new string('a', 64), terms ?? Terms(), reviewers ??
             [new(Guid.CreateVersion7(), 1, 2, Guid.CreateVersion7(), Guid.CreateVersion7(),
                 "Verified canonical controller through native identity review.",
                 "Qualified for evidence assessment and protected remedy review.",

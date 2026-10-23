@@ -5,6 +5,130 @@ namespace Event.Architecture.Tests;
 public sealed class AssuranceAuditTests
 {
     [Test]
+    public async Task PortfolioInventory_PreservesPartialOwnersAndDeclaredVariants()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"portfolio-{Guid.CreateVersion7():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "Fixture.cs"), """
+                namespace Example;
+                [Category("Runtime")]
+                public partial class Fixture : DatabaseFixture { }
+                """);
+            File.WriteAllText(Path.Combine(root, "Cases.cs"), """
+                namespace Example;
+                public partial class Fixture
+                {
+                    [Test, Arguments(false), Arguments(true)]
+                    public void RejectsMutation(bool locked) { }
+                    [Test, MethodDataSource(nameof(Providers))]
+                    public void ProviderBoundary(string provider) { }
+                }
+                """);
+            File.WriteAllText(Path.Combine(root, "vector.json"), "{}");
+            string metadata = """
+                {"Properties":{"MSBuildProjectFullPath":"Owner.csproj"},"Items":{
+                  "Compile":[{"FullPath":"Fixture.cs"},{"FullPath":"Cases.cs","Link":"Shared/Cases.cs"}],
+                  "None":[{"FullPath":"vector.json"}]}}
+                """;
+            string secondOwner = metadata.Replace("Owner.csproj", "Linked.csproj", StringComparison.Ordinal);
+
+            PortfolioInventory.Report report = PortfolioInventory.Create(root, [metadata, secondOwner]);
+
+            await Assert.That(report.Projects.Select(project => project.Path).ToArray())
+                .IsEquivalentTo(["Linked.csproj", "Owner.csproj"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+            PortfolioInventory.Source cases = report.Sources.Single(source => source.Path == "Cases.cs");
+            await Assert.That(cases.Owners.Count).IsEqualTo(2);
+            await Assert.That(cases.Owners.All(owner => owner.Link == "Shared/Cases.cs")).IsTrue();
+            PortfolioInventory.Declaration declaration = cases.Declarations.Single();
+            await Assert.That(declaration.Type).IsEqualTo("Example.Fixture");
+            await Assert.That(declaration.Partial).IsTrue();
+            await Assert.That(declaration.Tests[0].Attributes.ToArray()).IsEquivalentTo(
+                ["Test", "Arguments(false)", "Arguments(true)"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+            await Assert.That(declaration.Tests[1].Attributes).Contains("MethodDataSource(nameof(Providers))");
+            await Assert.That(report.Sources.Single(source => source.Path == "Fixture.cs").Declarations.Single().BaseTypes)
+                .Contains("DatabaseFixture");
+            await Assert.That(report.Projects.All(project => project.Assets.Single().Path == "vector.json")).IsTrue();
+            await Assert.That(cases.Sha256.Length).IsEqualTo(64);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task PortfolioInventory_RejectsMalformedMetadataAndEscapingPaths()
+    {
+        await Assert.That(() => PortfolioInventory.Create(Path.GetTempPath(), ["{}"])).Throws<InvalidDataException>();
+        const string escaping = """
+            {"Properties":{"MSBuildProjectFullPath":"Owner.csproj"},"Items":{
+              "Compile":[{"FullPath":"../outside.cs"}]}}
+            """;
+        await Assert.That(() => PortfolioInventory.Create(Path.GetTempPath(), [escaping])).Throws<InvalidDataException>();
+    }
+
+    [Test]
+    public async Task PortfolioInventory_IndexesExternalAssetReferencesWithoutReadingThem()
+    {
+        const string metadata = """
+            {"Properties":{"MSBuildProjectFullPath":"Owner.csproj"},"Items":{
+              "None":[{"FullPath":"../external-package/fixture.dll"}]}}
+            """;
+
+        PortfolioInventory.Report report = PortfolioInventory.Create(Path.GetTempPath(), [metadata]);
+
+        PortfolioInventory.Asset asset = report.Projects.Single().Assets.Single();
+        await Assert.That(asset.External).IsTrue();
+        await Assert.That(asset.Exists).IsNull();
+        await Assert.That(asset.Sha256).IsNull();
+    }
+
+    [Test]
+    public async Task PortfolioInventory_KeepsConditionalDeclarationsWithTheirActualCompiledOwner()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"portfolio-{Guid.CreateVersion7():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "Cases.cs"), """
+                public class Cases
+                {
+                #if REAL_PROVIDER
+                    [Test] public void ProviderBoundary() { }
+                #else
+                    [Test] public void PureBoundary() { }
+                #endif
+                }
+                """);
+            const string provider = """
+                {"Properties":{"MSBuildProjectFullPath":"Provider.csproj","DefineConstants":"REAL_PROVIDER"},
+                 "Items":{"Compile":[{"FullPath":"Cases.cs"}]}}
+                """;
+            const string pure = """
+                {"Properties":{"MSBuildProjectFullPath":"Pure.csproj","DefineConstants":""},
+                 "Items":{"Compile":[{"FullPath":"Cases.cs"}]}}
+                """;
+
+            PortfolioInventory.Report report = PortfolioInventory.Create(root, [provider, pure]);
+
+            PortfolioInventory.Declaration[] declarations = report.Sources.Single().Declarations.ToArray();
+            await Assert.That(declarations.Single(declaration => declaration.Tests.Single().Name == "ProviderBoundary")
+                .CompiledOwners.Single()).IsEqualTo("Provider.csproj");
+            await Assert.That(declarations.Single(declaration => declaration.Tests.Single().Name == "PureBoundary")
+                .CompiledOwners.Single()).IsEqualTo("Pure.csproj");
+
+            File.WriteAllText(Path.Combine(root, "Cases.cs"), "public class Cases {");
+            await Assert.That(() => PortfolioInventory.Create(root, [pure])).Throws<InvalidDataException>();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     [Arguments("var value = Activator.CreateInstance(typeof(Service));", AssuranceAudit.ReflectiveBehaviorDispatch)]
     [Arguments("var value = Activator.CreateInstance(\"Product.Assembly\", \"Product.Service\");", AssuranceAudit.ReflectiveBehaviorDispatch)]
     [Arguments("var proxy = DispatchProxy.Create<IService, Proxy>();", AssuranceAudit.ReflectiveBehaviorDispatch)]

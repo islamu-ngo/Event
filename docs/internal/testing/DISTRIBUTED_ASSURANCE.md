@@ -113,10 +113,17 @@ values through resource environment projection. The test process environment
 is never mutated. Concurrent owners have different passwords, JWT keys, and
 Data Protection key rings. Nothing reads repository dotenv or shared User
 Secrets. Credential values are never files, command-line arguments, or evidence.
-Within the external profile only, the two BFFs receive the same generated BFF
+Within the external profile, the two BFFs normally receive the same generated BFF
 ring/admission; the API retains its independent partition. Neither BFF receives
 identity database coordinates. The closed `OwnedBffPeerProtection` fixture enum
-can select a wrong partition, generation below the admitted floor, expired
+also admits an independent valid BFF authority for the peer: both providers must
+accept their own protected payload and reject the other provider's payload.
+That variant changes only the peer's Data Protection input. Both peer variants
+use the same dedicated session backend, generated session password, and stable
+owner run-ID namespace. Independent owners generate different session credentials
+and namespaces; process restart does not change them within an owner. AppHost
+supplies the dedicated resource endpoint and owns its labelled, prefixed volume.
+The enum can select a wrong partition, generation below the admitted floor, expired
 admission, or revoked active key for the peer only. These are fixture fault
 inputs, not AppHost configuration hooks. Revocation imports the same owned ring
 into the existing ephemeral test repository, invokes real `IKeyManager.RevokeKey`,
@@ -124,6 +131,9 @@ and refreshes native ring/admission hashes and inventory without generating a
 different active key. The shared authority's default constructor is unchanged.
 
 Existing documented environment keys used are:
+
+- `BFF_SESSION_REDIS_PASSWORD` and `BFF_SESSION_NAMESPACE`; the dedicated session
+  resource supplies `BFF_SESSION_REDIS_ENDPOINT`, without sharing API/cache credentials.
 
 - `DATABASE_{PURPOSE}_USERNAME` and `DATABASE_{PURPOSE}_PASSWORD`, where PURPOSE
   is `MIGRATOR`, `RUNTIME`, `GLOBAL`, `LOCAL_IDENTITY_WRITER`, `INSTANCE_KEY_READ`,
@@ -169,11 +179,22 @@ The optional `profile` argument selects `OwnedAppHostProfile`; the external
 profile additionally exposes `explore-blazor-peer`. `peerProtection` defaults to
 Shared and is valid only with that external profile when selecting a fault.
 The new profile's initial Harness Red run was 10 intended failures and 40 passes;
-the expanded post-implementation Harness passes all 58 cases, including actual
+the expanded post-implementation Harness passes all 60 cases, including actual
 resource environment callbacks and native Data Protection admission for the
-shared and four rejected peer authorities. Actual cross-process/worker gates
+shared, independent-valid, and four rejected peer authorities, plus generated
+session credential/namespace isolation between owners. The new session-resource
+graph has its own callback checks; these fixture checks do not establish backend
+availability. Actual cross-process/worker gates
 remain pending. A projection or provider check does not prove successful peer startup,
 cookie reuse, worker restart, or delivery recovery.
+
+`CancelledStartupDisposesOnlyItsOwnedRoot(false)` retains cancellation after
+PostgreSQL health. The `true` variant arms the native resource notification wait
+before startup and cancels when the owned `postgres` resource reaches `Starting`.
+That state is an orchestration observation, not proof that the PostgreSQL binary
+or server is running. Both variants require the actual AppHost execution to
+settle and the owned root to disappear after fixture cleanup. Their actual
+runtime results remain pending.
 
 Public Aspire API facts were checked against the official
 [testing](https://aspire.dev/testing/overview/),

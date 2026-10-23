@@ -1,4 +1,5 @@
 using Explore.AppHost;
+using Aspire.Hosting.ApplicationModel;
 using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
@@ -115,7 +116,9 @@ public sealed partial class AppHostRuntimeTests
     }
 
     [Test]
-    public async Task CancelledStartupDisposesOnlyItsOwnedRoot()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CancelledStartupDisposesOnlyItsOwnedRoot(bool cancelWhenPostgresStarting)
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         var owner = await OwnedAppHostFixture.CreateAsync("Split", deadline.Token);
@@ -123,8 +126,12 @@ public sealed partial class AppHostRuntimeTests
         try
         {
             using var cancellation = new CancellationTokenSource();
+            Task postgresState = cancelWhenPostgresStarting
+                ? owner.Application.ResourceNotifications.WaitForResourceAsync(
+                    "postgres", KnownResourceStates.Starting, deadline.Token)
+                : owner.Application.ResourceNotifications.WaitForResourceHealthyAsync("postgres", deadline.Token);
             Task startup = owner.StartAsync(cancellation.Token);
-            await owner.Application.ResourceNotifications.WaitForResourceHealthyAsync("postgres", deadline.Token);
+            await postgresState;
             cancellation.Cancel();
             await Assert.That(async () => await startup).Throws<OperationCanceledException>();
         }
@@ -132,6 +139,7 @@ public sealed partial class AppHostRuntimeTests
         {
             await Task.WhenAll(owner.DisposeAsync().AsTask(), owner.DisposeAsync().AsTask());
         }
+        await Assert.That(owner.ExecutionSettled).IsTrue();
         await Assert.That(Directory.Exists(root)).IsFalse();
     }
 

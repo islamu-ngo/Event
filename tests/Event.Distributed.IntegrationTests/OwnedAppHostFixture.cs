@@ -37,13 +37,14 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     private Task? runningStartup;
     private HashSet<string> containerResources = [];
     private Exception? startupFailure;
-    internal IReadOnlyDictionary<string, string?> EnvironmentAuthority { get; } = CreateEnvironmentAuthority();
+    internal IReadOnlyDictionary<string, string?> EnvironmentAuthority { get; }
 
     internal OwnedAppHostFixture(string topology, OwnedAppHostProfile profile = OwnedAppHostProfile.Standard)
     {
         this.topology = topology;
         this.profile = profile;
         RunId = Guid.NewGuid().ToString("N");
+        EnvironmentAuthority = CreateEnvironmentAuthority(RunId);
         Root = Path.Combine(Path.GetTempPath(), "islamu-assurance", RunId);
         Directory.CreateDirectory(Root);
         if (!OperatingSystem.IsWindows())
@@ -437,6 +438,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
 
     private ExternalDataProtectionInput CreatePeerProtection(OwnedBffPeerProtection protection)
     {
+        if (protection == OwnedBffPeerProtection.IndependentValidAuthority)
+            return new ExternalDataProtectionTestAuthority("bff").Input;
         string partition = protection == OwnedBffPeerProtection.WrongPartition ? "API" : "BFF";
         string prefix = $"EVENT_DP_{partition}_";
         var input = new ExternalDataProtectionInput(EnvironmentAuthority[prefix + "RING"]!,
@@ -461,7 +464,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         };
     }
 
-    private static FrozenDictionary<string, string?> CreateEnvironmentAuthority()
+    private static FrozenDictionary<string, string?> CreateEnvironmentAuthority(string runId)
     {
         var values = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
@@ -470,7 +473,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             ["ASPNETCORE_ENVIRONMENT"] = "Assurance", ["SecretProvider:Provider"] = "Environment",
             ["DATABASE_PROVIDER"] = "PostgreSql", ["DATABASE_NAME"] = "islamu_assurance",
             ["DATABASE_SCHEMA"] = "assurance", ["AUTHENTICATION_PROVIDER"] = "Local",
-            ["AUTHORIZATION_PROVIDER"] = "Local"
+            ["AUTHORIZATION_PROVIDER"] = "Local", ["BFF_SESSION_NAMESPACE"] = runId
         };
         foreach (string purpose in DatabasePurposes.Append("MIGRATOR"))
         {
@@ -479,7 +482,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         }
         foreach (string key in new[] { "CERBOS_POSTGRES_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD",
             "STORAGE_S3_SECRET_ACCESS_KEY", "AUTHENTICATION_LOCAL_JWT_KEY", "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD",
-            "ISLAMU_TEST_REPLACEMENT_PASSWORD" })
+            "ISLAMU_TEST_REPLACEMENT_PASSWORD", "BFF_SESSION_REDIS_PASSWORD" })
             values[key] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         foreach (string partition in new[] { "api", "bff", "combined" })
         {

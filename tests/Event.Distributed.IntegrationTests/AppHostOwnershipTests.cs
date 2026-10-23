@@ -48,6 +48,20 @@ public sealed class AppHostOwnershipTests
     }
 
     [Test]
+    public async Task SessionAuthorityIsStableWithinItsOwnerAndIsolatedFromOtherOwners()
+    {
+        await using var first = new OwnedAppHostFixture("Split");
+        await using var second = new OwnedAppHostFixture("Split");
+        await Assert.That(first.EnvironmentAuthority["BFF_SESSION_NAMESPACE"] == first.RunId).IsTrue();
+        await Assert.That(second.EnvironmentAuthority["BFF_SESSION_NAMESPACE"] == second.RunId).IsTrue();
+        await Assert.That(first.EnvironmentAuthority["BFF_SESSION_NAMESPACE"]
+            == second.EnvironmentAuthority["BFF_SESSION_NAMESPACE"]).IsFalse();
+        await Assert.That(string.IsNullOrWhiteSpace(first.EnvironmentAuthority["BFF_SESSION_REDIS_PASSWORD"])).IsFalse();
+        await Assert.That(first.EnvironmentAuthority["BFF_SESSION_REDIS_PASSWORD"]
+            == second.EnvironmentAuthority["BFF_SESSION_REDIS_PASSWORD"]).IsFalse();
+    }
+
+    [Test]
     [Arguments("API")]
     [Arguments("BFF")]
     [Arguments("COMBINED")]
@@ -472,11 +486,12 @@ public sealed class AppHostOwnershipTests
 
     [Test]
     [Arguments(OwnedBffPeerProtection.Shared)]
+    [Arguments(OwnedBffPeerProtection.IndependentValidAuthority)]
     [Arguments(OwnedBffPeerProtection.WrongPartition)]
     [Arguments(OwnedBffPeerProtection.GenerationBelowFloor)]
     [Arguments(OwnedBffPeerProtection.ExpiredAdmission)]
     [Arguments(OwnedBffPeerProtection.RevokedActiveKey)]
-    public async Task RealPeerProjectionAcceptsOnlySharedBffAuthority(OwnedBffPeerProtection protection)
+    public async Task RealPeerProjectionDistinguishesSharedAndIndependentValidAuthorities(OwnedBffPeerProtection protection)
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(1));
         var failure = await Assert.That(async () => await OwnedAppHostFixture.CreateAsync("Split", false,
@@ -507,6 +522,16 @@ public sealed class AppHostOwnershipTests
                     using var peerProvider = ExternalDataProtectionProvider.Create(peer, "bff", TimeProvider.System);
                     await Assert.That(peerProvider.CreateProtector("owned-peer-session").Unprotect(cookie)
                         == "owned-peer-session").IsTrue();
+                }
+                else if (protection == OwnedBffPeerProtection.IndependentValidAuthority)
+                {
+                    await Assert.That(peer.Ring == bff.Ring || peer.Admission == bff.Admission).IsFalse();
+                    using var peerProvider = ExternalDataProtectionProvider.Create(peer, "bff", TimeProvider.System);
+                    var peerProtector = peerProvider.CreateProtector("owned-peer-session");
+                    await Assert.That(() => peerProtector.Unprotect(cookie)).Throws<CryptographicException>();
+                    string ownCookie = peerProtector.Protect("independent-peer-session");
+                    await Assert.That(peerProtector.Unprotect(ownCookie) == "independent-peer-session").IsTrue();
+                    await Assert.That(() => bffProtector.Unprotect(ownCookie)).Throws<CryptographicException>();
                 }
                 else
                 {

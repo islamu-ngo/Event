@@ -13,7 +13,9 @@ internal enum BrowserJourney
     LocalRecovery,
     ChallengeProof,
     GuestStatus,
-    HostPrivacy
+    HostPrivacy,
+    WorkspaceAccessibility,
+    WorkspaceAuthority
 }
 
 internal static class BrowserArtifactPolicy
@@ -44,6 +46,8 @@ internal static class BrowserArtifactPolicy
             BrowserJourney.ChallengeProof => "challenge_proof",
             BrowserJourney.GuestStatus => "guest_status",
             BrowserJourney.HostPrivacy => "host_privacy",
+            BrowserJourney.WorkspaceAccessibility => "workspace_accessibility",
+            BrowserJourney.WorkspaceAuthority => "workspace_authority",
             _ => throw new InvalidOperationException("browser_journey_not_admitted")
         };
         return $"browser_{name}_{(passed ? "passed" : "failed")}";

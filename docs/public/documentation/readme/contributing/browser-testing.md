@@ -1,6 +1,6 @@
 # Browser testing
 
-The Browser profile checks real sign-in, mandatory first password replacement, logout, browser session expiry, keyboard navigation, Arabic/English direction, tenant routing and free-ticket registration. It starts a disposable local Event installation and uses generated test identities. It does not connect to an existing deployment or use your personal account.
+The Browser profile checks real sign-in, mandatory first password replacement, logout, browser session expiry, keyboard navigation, Arabic/English layout, tenant routing and free-ticket registration. It also checks actual mobile sidebar focus trapping and restoration, desktop dock geometry, accessible resource-form errors, and denied resource management for a separately provisioned ordinary local account. It starts a disposable local Event installation and uses generated test identities. It does not connect to an existing deployment or use your personal account.
 
 Use a Docker-compatible runtime and the repository's .NET SDK. The test fixture selects its Environment secret authority and owns its temporary resources. Run from the repository checkout, with temporary files on a disk-backed directory:
 
@@ -29,7 +29,7 @@ dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed
 Run the actual browser journeys separately:
 
 ```bash
-dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/BrowserJourneyTests/*" --minimum-expected-tests 6 --no-progress --maximum-parallel-tests 1
+dotnet test --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/BrowserJourneyTests/*" --minimum-expected-tests 8 --no-progress --maximum-parallel-tests 1
 ```
 
 The runtime must finish migration and become healthy before the browser can proceed. Startup failure is a failed run, not proof that the journeys passed. Report the candidate revision, named outcomes and any missing checks. Cookie expiry and server token expiry are separate scenarios. The latter deliberately waits for the product's valid five-minute minimum token lifetime and observes endpoint rejection through bounded polling; allow that duration in runtime jobs.

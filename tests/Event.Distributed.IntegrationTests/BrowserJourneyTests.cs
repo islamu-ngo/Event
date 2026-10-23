@@ -64,6 +64,7 @@ public sealed class BrowserJourneyTests
             await LoginAsync(host, browser.Page);
             await AssertAuthenticatedAsync(browser, true);
             using HttpClient api = await AuthenticatedApiAsync(host, cancellationToken);
+            await SelectActiveTenantAsync(host, api, cancellationToken);
             Guid eventId = await CreateFreeEventAsync(api, cancellationToken);
             string protectedPath = $"/api/events/{eventId:D}/ticketing";
             using (HttpResponseMessage initial = await api.GetAsync(protectedPath, cancellationToken))
@@ -83,7 +84,7 @@ public sealed class BrowserJourneyTests
             await AssertAuthenticatedAsync(browser, false);
             await browser.Page.GotoAsync("/events/create");
             await Expect(browser.Page.GetByLabel("Username or email", new() { Exact = true })).ToBeVisibleAsync();
-        });
+        }, deploymentMode: "MultiTenant");
 
     [Test]
     public Task KeyboardLoginAndLanguageSwitchPreserveFocusAndDirection() => RunAsync(
@@ -157,9 +158,10 @@ public sealed class BrowserJourneyTests
         BrowserJourney.FreeRegistration, async (host, browser, cancellationToken) =>
         {
             using HttpClient api = await AuthenticatedApiAsync(host, cancellationToken);
+            string slug = await SelectActiveTenantAsync(host, api, cancellationToken);
             Guid eventId = await CreateFreeEventAsync(api, cancellationToken);
             await LoginAsync(host, browser.Page);
-            await browser.Page.GotoAsync($"/registration/events/{eventId:D}/tickets");
+            await browser.Page.GotoAsync($"/{slug}/registration/events/{eventId:D}/tickets");
             await Expect(browser.Page.GetByRole(AriaRole.Heading, new() { Name = "Select tickets", Exact = true }))
                 .ToBeVisibleAsync();
             await browser.Page.GetByLabel("Quantity", new() { Exact = true }).FillAsync("1");
@@ -180,7 +182,172 @@ public sealed class BrowserJourneyTests
             using JsonDocument confirmed = await ReadAsync(api, $"/api/events/{eventId:D}/registration-orders/{orderId:D}", cancellationToken);
             await Assert.That(confirmed.RootElement.GetProperty("statusCode").GetString()).IsEqualTo("CONFIRMED");
             await Assert.That(confirmed.RootElement.GetProperty("_links").TryGetProperty("finalize", out _)).IsFalse();
-        });
+        }, deploymentMode: "MultiTenant");
+
+    [Test]
+    public Task WorkspaceKeyboardValidationAndRtlLayoutUseRealFocusAndGeometry() => RunAsync(
+        BrowserJourney.WorkspaceAccessibility, async (host, browser, cancellationToken) =>
+        {
+            using HttpClient api = await AuthenticatedApiAsync(host, cancellationToken);
+            string slug = await SelectActiveTenantAsync(host, api, cancellationToken);
+            Guid eventId = await CreateFreeEventAsync(api, cancellationToken);
+            await LoginAsync(host, browser.Page);
+            IPage page = browser.Page;
+            await page.SetViewportSizeAsync(1440, 1000);
+            await page.GotoAsync($"/{slug}/studio/events/{eventId:D}/resources");
+            ILocator create = page.GetByRole(AriaRole.Button, new() { Name = "New resource", Exact = true });
+            await Expect(create).ToBeVisibleAsync();
+            await create.FocusAsync();
+            await page.Keyboard.PressAsync("Enter");
+            ILocator title = page.GetByLabel("Title", new() { Exact = true });
+            await title.FillAsync("   ");
+            await page.GetByLabel("Audience", new() { Exact = true }).SelectOptionAsync(new SelectOptionValue { Label = "Public" });
+            await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).FocusAsync();
+            await page.Keyboard.PressAsync("Enter");
+            await Expect(title).ToHaveAttributeAsync("aria-invalid", "true");
+            await Expect(title).ToHaveAttributeAsync("aria-describedby", "resource-title-error");
+            await Expect(page.Locator("#resource-title-error")).ToBeVisibleAsync();
+            await Expect(page.Locator("#resource-title-error")).ToHaveAttributeAsync("role", "alert");
+            await page.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).FocusAsync();
+            await page.Keyboard.PressAsync("Enter");
+            await Expect(title).ToHaveCountAsync(0);
+            await Expect(create).ToBeFocusedAsync();
+
+            await page.GotoAsync($"/{slug}/studio/events/{eventId:D}");
+            await AssertDesktopDockAsync(page, rtl: false);
+            await page.SetViewportSizeAsync(390, 844);
+            await AssertMobileOverlayAsync(page, rtl: false);
+            await ChangeLanguageAsync(page, "AR");
+            await Expect(page.Locator("html")).ToHaveAttributeAsync("lang", "ar");
+            await Expect(page.Locator("html")).ToHaveAttributeAsync("dir", "rtl");
+            await AssertMobileOverlayAsync(page, rtl: true);
+            await page.SetViewportSizeAsync(1440, 1000);
+            await page.ReloadAsync();
+            await AssertDesktopDockAsync(page, rtl: true);
+        }, deploymentMode: "MultiTenant");
+
+    [Test]
+    public Task SeparatelyProvisionedLocalUserCannotExposeResourceManagementAffordances() => RunAsync(
+        BrowserJourney.WorkspaceAuthority, async (host, browser, cancellationToken) =>
+        {
+            using HttpClient admin = await AuthenticatedApiAsync(host, cancellationToken);
+            string slug = await SelectActiveTenantAsync(host, admin, cancellationToken);
+            Guid eventId = await CreateFreeEventAsync(admin, cancellationToken);
+            string identifier = "assurance-reader-" + host.RunId + "@example.invalid";
+            using JsonDocument issued = await PostAsync(admin, "/api/instance/local-identities", new
+            {
+                operationId = Guid.CreateVersion7(), email = identifier, firstName = "Assurance", lastName = "Reader"
+            }, cancellationToken);
+            string temporaryPassword = issued.RootElement.GetProperty("temporaryPassword").GetString()!;
+            using HttpClient endpoint = host.CreateHttpClient("explore-blazor");
+            await using var reader = await OwnedBrowserContext.CreateAsync(endpoint.BaseAddress!);
+            await Assert.That((await reader.Context.CookiesAsync()).Count == 0).IsTrue();
+            await ReplaceCredentialAsync(identifier, temporaryPassword, host.BootstrapReplacementPassword, reader);
+            await reader.Page.GetByLabel("Username or email", new() { Exact = true }).FillAsync(identifier);
+            await reader.Page.GetByLabel("Password", new() { Exact = true }).FillAsync(host.BootstrapReplacementPassword);
+            await reader.Page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
+            await reader.Page.WaitForURLAsync(url => new Uri(url).AbsolutePath != "/login");
+            await AssertAuthenticatedAsync(reader, true);
+            using HttpClient api = host.CreateHttpClient("explore-api");
+            using JsonDocument login = await PostAsync(api, "/api/auth/local/login", new
+            {
+                identifier, password = host.BootstrapReplacementPassword
+            }, cancellationToken);
+            api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.RootElement.GetProperty("token").GetString());
+            api.DefaultRequestHeaders.Add("X-Tenant-Slug", slug);
+            using JsonDocument audience = await ReadAsync(api, $"/api/event/{eventId:D}/resources", cancellationToken);
+            await Assert.That(audience.RootElement.GetProperty("_links").TryGetProperty("manage-resources", out _)).IsFalse();
+            using HttpResponseMessage denied = await api.GetAsync($"/api/event/{eventId:D}/resources/management", cancellationToken);
+            await Assert.That(denied.StatusCode == HttpStatusCode.Forbidden).IsTrue();
+            await reader.Page.GotoAsync($"/{slug}/studio/events/{eventId:D}/resources");
+            await Expect(reader.Page.GetByTestId("resources-route-unavailable")
+                .Or(reader.Page.GetByRole(AriaRole.Heading, new() { Name = "Event unavailable", Exact = true }))).ToBeVisibleAsync();
+            await Expect(reader.Page.GetByRole(AriaRole.Button, new() { Name = "New resource", Exact = true })).ToHaveCountAsync(0);
+            await Expect(reader.Page.Locator("#resource-title")).ToHaveCountAsync(0);
+            await AssertAuthenticatedAsync(reader, true);
+        }, deploymentMode: "MultiTenant");
+
+    private static async Task AssertMobileOverlayAsync(IPage page, bool rtl)
+    {
+        await Expect(page.GetByRole(AriaRole.Complementary, new() { Name = "Sidebar navigation", Exact = true })).ToHaveCountAsync(0);
+        ILocator dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Sidebar navigation", Exact = true });
+        await Expect(dialog).ToHaveCountAsync(0);
+        ILocator toggle = page.GetByRole(AriaRole.Button, new() { Name = "Toggle sidebar navigation", Exact = true });
+        await toggle.FocusAsync();
+        await page.Keyboard.PressAsync("Enter");
+        await Expect(dialog).ToBeVisibleAsync();
+        await Expect(dialog).ToHaveAttributeAsync("aria-modal", "true");
+        await Expect(dialog).ToHaveAttributeAsync("data-dock-panel-id", "shell.workspace-nav");
+        await Assert.That(await dialog.EvaluateAsync<bool>("element => element === document.activeElement || element.contains(document.activeElement)")).IsTrue();
+        int count = await dialog.Locator("a[href]:visible,button:enabled:visible,[tabindex='0']:visible").CountAsync();
+        await Assert.That(count > 1).IsTrue();
+        foreach (string key in new[] { "Tab", "Shift+Tab" })
+            for (int index = 0; index < count + 2; index++)
+            {
+                await page.Keyboard.PressAsync(key);
+                await Assert.That(await dialog.EvaluateAsync<bool>("element => element.contains(document.activeElement)")).IsTrue();
+            }
+        var bounds = await dialog.BoundingBoxAsync();
+        await Assert.That(bounds is not null && bounds.X >= -1 && bounds.X + bounds.Width <= 391
+            && (rtl ? bounds.X + bounds.Width >= 389 : bounds.X <= 1)).IsTrue();
+        ILocator navigation = dialog.GetByRole(AriaRole.Navigation, new() { Name = "Event management navigation", Exact = true });
+        await Expect(navigation).ToBeVisibleAsync();
+        var links = await navigation.GetByRole(AriaRole.Link).AllAsync();
+        float previousBottom = 0;
+        foreach (ILocator link in links)
+        {
+            if (!await link.IsVisibleAsync()) continue;
+            var item = await link.BoundingBoxAsync();
+            await Assert.That(item is not null && item.Width > 0 && item.X >= bounds!.X - 1
+                && item.X + item.Width <= bounds.X + bounds.Width + 1 && item.Y >= previousBottom - 1
+                && !string.IsNullOrWhiteSpace(await link.InnerTextAsync())).IsTrue();
+            previousBottom = item!.Y + item.Height;
+        }
+        if (rtl)
+            await Assert.That((await navigation.InnerTextAsync()).Any(character => character is >= '\u0600' and <= '\u06ff')).IsTrue();
+        await page.Keyboard.PressAsync("Escape");
+        await Expect(dialog).ToHaveCountAsync(0);
+        await Expect(toggle).ToBeFocusedAsync();
+    }
+
+    private static async Task AssertDesktopDockAsync(IPage page, bool rtl)
+    {
+        ILocator sidebar = page.GetByRole(AriaRole.Complementary, new() { Name = "Sidebar navigation", Exact = true });
+        if (await sidebar.CountAsync() == 0)
+        {
+            await page.GetByRole(AriaRole.Button, new() { Name = "Toggle sidebar navigation", Exact = true }).FocusAsync();
+            await page.Keyboard.PressAsync("Enter");
+        }
+        await Expect(sidebar).ToBeVisibleAsync();
+        await Expect(page.GetByRole(AriaRole.Dialog, new() { Name = "Sidebar navigation", Exact = true })).ToHaveCountAsync(0);
+        await Assert.That(await sidebar.GetAttributeAsync("aria-modal") is null or "false").IsTrue();
+        var panel = await sidebar.BoundingBoxAsync();
+        var main = await page.GetByRole(AriaRole.Main).BoundingBoxAsync();
+        await Assert.That(panel is not null && main is not null && panel.Width > 0 && main.Width > 0
+            && (rtl ? panel.X >= main.X + main.Width - 1 : panel.X + panel.Width <= main.X + 1)).IsTrue();
+        ILocator focusable = sidebar.Locator("a[href]:visible,button:enabled:visible,[tabindex='0']:visible");
+        int count = await focusable.CountAsync();
+        await focusable.First.FocusAsync();
+        bool escaped = false;
+        for (int index = 0; index < count + 2; index++)
+        {
+            await page.Keyboard.PressAsync("Tab");
+            if (!await sidebar.EvaluateAsync<bool>("element => element.contains(document.activeElement)"))
+            {
+                escaped = true;
+                break;
+            }
+        }
+        await Assert.That(escaped).IsTrue();
+    }
+
+    private static async Task ChangeLanguageAsync(IPage page, string code)
+    {
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("^Change language\\.") }).FocusAsync();
+        await page.Keyboard.PressAsync("Enter");
+        await page.GetByRole(AriaRole.Menuitem, new() { NameRegex = new Regex("\\(" + code + "\\)") }).FocusAsync();
+        await page.Keyboard.PressAsync("Enter");
+    }
 
     private static async Task RunAsync(BrowserJourney journey,
         Func<OwnedAppHostFixture, OwnedBrowserContext, CancellationToken, Task> scenario,
@@ -217,18 +384,22 @@ public sealed class BrowserJourneyTests
         await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Create Event", Exact = true })).ToBeVisibleAsync();
     }
 
-    internal static async Task ReplaceBootstrapCredentialAsync(OwnedAppHostFixture host, OwnedBrowserContext browser)
+    internal static Task ReplaceBootstrapCredentialAsync(OwnedAppHostFixture host, OwnedBrowserContext browser) =>
+        ReplaceCredentialAsync(host.BootstrapIdentifier, host.BootstrapPassword, host.BootstrapReplacementPassword, browser);
+
+    private static async Task ReplaceCredentialAsync(string identifier, string temporaryPassword,
+        string replacementPassword, OwnedBrowserContext browser)
     {
         IPage page = browser.Page;
         await page.GotoAsync("/login");
-        await page.GetByLabel("Username or email", new() { Exact = true }).FillAsync(host.BootstrapIdentifier);
-        await page.GetByLabel("Password", new() { Exact = true }).FillAsync(host.BootstrapPassword);
+        await page.GetByLabel("Username or email", new() { Exact = true }).FillAsync(identifier);
+        await page.GetByLabel("Password", new() { Exact = true }).FillAsync(temporaryPassword);
         await page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
         await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Change your password", Exact = true }))
             .ToBeVisibleAsync();
         await AssertAuthenticatedAsync(browser, false);
-        await page.GetByLabel("New password", new() { Exact = true }).FillAsync(host.BootstrapReplacementPassword);
-        await page.GetByLabel("Confirm new password", new() { Exact = true }).FillAsync(host.BootstrapReplacementPassword);
+        await page.GetByLabel("New password", new() { Exact = true }).FillAsync(replacementPassword);
+        await page.GetByLabel("Confirm new password", new() { Exact = true }).FillAsync(replacementPassword);
         await page.GetByRole(AriaRole.Button, new() { Name = "Change password", Exact = true }).ClickAsync();
         await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
         await AssertAuthenticatedAsync(browser, false);
@@ -321,6 +492,14 @@ public sealed class BrowserJourneyTests
                 privacyUrl = "https://example.invalid/privacy"
             }
         }, cancellationToken);
+    }
+
+    private static async Task<string> SelectActiveTenantAsync(OwnedAppHostFixture host, HttpClient api, CancellationToken cancellationToken)
+    {
+        string slug = "assurance-" + host.RunId[..8];
+        await CreateTenantAsync(api, slug, cancellationToken);
+        api.DefaultRequestHeaders.Add("X-Tenant-Slug", slug);
+        return slug;
     }
 
     private static async Task<JsonDocument> PostAsync(HttpClient api, string path, object body, CancellationToken cancellationToken)

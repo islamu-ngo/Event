@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5M6D25ZD8A9ZZH6TE6BHEJW
+Title: "Qualify findings against independent investigation and current grounds"
+Type: feat
+Scope: access
+Summary: "Require retained independent investigation, current narrative purpose and native qualification before finding adjudication or activation; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Independent incident responsibility, current narrative purpose and source-qualified reviewer/urgency evidence bind retained findings and native activation. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned native finding, investigation and qualification source models plus generated schema history; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Finding, lifecycle, investigation and narrative-policy endpoint sources and strict intent converters are introduced here; cumulative generated contracts ship once in final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete paired adjudication/qualification guidance and provider assurance before deployment; existing committed finding core is a prerequisite, not a new verification result."

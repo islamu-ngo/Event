@@ -2,8 +2,10 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
@@ -687,7 +689,9 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
     IRegistrationProviderRegistry providerRegistry,
     SchemaDriftClassifier driftClassifier,
     FormSchemaArtifactPublicationService publicationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IEventPublicationMutationBoundary publicationBoundary,
+    IMachinePrincipalAccessor machine)
     : ICommandHandler<ImportExternalRegistrationProviderFormVersionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ImportExternalRegistrationProviderFormVersionCommand request, CancellationToken cancellationToken = default)
@@ -698,6 +702,23 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
             return Failure(Guid.Empty, "registration_provider_external_import_validation_failed", "External schema import request is invalid.");
         }
 
+        BaseCommandResponse<Guid> result = machine.Current is not null
+            ? await ImportAsync(request, cancellationToken)
+            : await publicationBoundary.ExecuteAsync(request.EventId,
+                token => ImportAsync(request, token), cancellationToken);
+        return result.FailureCode switch
+        {
+            "event_publish_restricted" => BaseCommandResponse.Failure<Guid>(
+                "registration_provider_external_import_publish_restricted", result.Message, result.Errors, request.EventId),
+            "event_publish_authority_unavailable" => BaseCommandResponse.Failure<Guid>(
+                "registration_provider_external_import_publish_authority_unavailable", result.Message, result.Errors, request.EventId),
+            _ => result
+        };
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ImportAsync(
+        ImportExternalRegistrationProviderFormVersionCommand request, CancellationToken cancellationToken)
+    {
         RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.ConnectionId, cancellationToken);
         if (connection is null)
         {

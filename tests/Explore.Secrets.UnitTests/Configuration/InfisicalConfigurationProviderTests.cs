@@ -165,6 +165,13 @@ public sealed class InfisicalConfigurationProviderTests
     }
 
     [Test]
+    public async Task Moderation_maintenance_credential_uses_its_exact_api_authority_key()
+    {
+        var key = await ConvertToConfigurationKey("MODERATION__RECONCILIATION__APIKEY", "/api");
+        await Assert.That(key).IsEqualTo("Moderation:Reconciliation:ApiKey");
+    }
+
+    [Test]
     public async Task ConvertToConfigurationKey_WhenAiToolProposalsSecretProvided_MapsToAiProviderSetting()
     {
         var key = await ConvertToConfigurationKey("AI_TOOL_PROPOSALS_ENABLED", "/");

@@ -514,6 +514,8 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
         if (normalizedPath.Equals("api", StringComparison.OrdinalIgnoreCase))
         {
             var upper = secretKey.ToUpperInvariant();
+            if (upper == "MODERATION__RECONCILIATION__APIKEY")
+                return "Moderation:Reconciliation:ApiKey";
             if (upper.StartsWith("INSTANCE__OPERATORIDENTITY__", StringComparison.Ordinal))
             {
                 var clean = upper["INSTANCE__OPERATORIDENTITY__".Length..];

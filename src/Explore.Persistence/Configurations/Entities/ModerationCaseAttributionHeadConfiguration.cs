@@ -14,8 +14,14 @@ public sealed class ModerationCaseAttributionHeadConfiguration : IEntityTypeConf
         builder.Property(row => row.Id).ValueGeneratedNever();
         builder.Property(row => row.Revision).IsConcurrencyToken();
         builder.HasIndex(row => row.CaseId).IsUnique();
-        builder.HasIndex(row => new { row.TenantId, row.TrustDomainId, row.OccurrenceCaseId,
-            row.SubjectKind, row.SubjectId }).IsUnique();
+        builder.HasIndex(row => new
+        {
+            row.TenantId,
+            row.TrustDomainId,
+            row.OccurrenceCaseId,
+            row.SubjectKind,
+            row.SubjectId
+        }).IsUnique();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(row => row.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ModerationHostBinding>().WithMany().HasForeignKey(row => row.HostBindingId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ModerationCase>().WithMany().HasForeignKey(row => row.CaseId).OnDelete(DeleteBehavior.Restrict);

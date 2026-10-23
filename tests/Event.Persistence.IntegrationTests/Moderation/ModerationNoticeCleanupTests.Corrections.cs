@@ -118,14 +118,19 @@ public sealed partial class ModerationNoticeCleanupTests
             {
                 inspect.NotificationIntents.Add(new NotificationIntent
                 {
-                    Id = Guid.CreateVersion7(), TenantId = fixture.Database.TenantId,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = fixture.Database.TenantId,
                     CategoryId = (int)NotificationCategoryEnum.TrustSafetyModeration,
                     OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
-                    RecipientKindId = (int)NotificationRecipientKindEnum.User, StatusId = (int)NotificationIntentStatusEnum.Pending,
-                    RecipientUserId = fixture.Database.SubjectId, TemplateKey = "moderation.notice.portal.v1",
+                    RecipientKindId = (int)NotificationRecipientKindEnum.User,
+                    StatusId = (int)NotificationIntentStatusEnum.Pending,
+                    RecipientUserId = fixture.Database.SubjectId,
+                    TemplateKey = "moderation.notice.portal.v1",
                     DeduplicationKey = $"moderation-notice:{revokeId:N}:1:{fixture.Database.SubjectId:N}",
                     SafePayloadReference = $"moderation-notice:{revokeNoticeId:D}",
-                    SafePayloadHash = revokeHash, CreatedAt = OriginalAt.AddMinutes(2).UtcDateTime, IsDeleted = true
+                    SafePayloadHash = revokeHash,
+                    CreatedAt = OriginalAt.AddMinutes(2).UtcDateTime,
+                    IsDeleted = true
                 });
                 await inspect.SaveChangesAsync();
             }
@@ -379,7 +384,8 @@ public sealed partial class ModerationNoticeCleanupTests
             original.HostBindingId, original.HostSolutionId, original.HostInstanceId,
             defect is "foreign-writer" or "foreign-instance-writer" ? Guid.CreateVersion7() : original.WriterTenantId,
             original.AuthoritySourceId, effect.QualificationRevision, original.Decision, null, null, [],
-            pending.RetainUntil) { PendingCorrection = pending };
+            pending.RetainUntil)
+        { PendingCorrection = pending };
         var source = ModerationNoticeSource.Capture(effect, legacyNullableProjection ? null : fixture.Database.TenantId,
             JsonSerializer.Serialize(capture), Ceiling);
         var occurrences = pending.Recipients.Select(row => ModerationNotice.CreatePendingCorrection(
@@ -396,21 +402,27 @@ public sealed partial class ModerationNoticeCleanupTests
         if (defect == "native-orphan")
             context.NotificationIntents.Add(new NotificationIntent
             {
-                Id = Guid.CreateVersion7(), TenantId = fixture.Database.TenantId,
+                Id = Guid.CreateVersion7(),
+                TenantId = fixture.Database.TenantId,
                 CategoryId = (int)NotificationCategoryEnum.TrustSafetyModeration,
                 OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
-                RecipientKindId = (int)NotificationRecipientKindEnum.User, StatusId = (int)NotificationIntentStatusEnum.Pending,
-                RecipientUserId = fixture.Database.SubjectId, TemplateKey = "moderation.notice.portal.v1",
+                RecipientKindId = (int)NotificationRecipientKindEnum.User,
+                StatusId = (int)NotificationIntentStatusEnum.Pending,
+                RecipientUserId = fixture.Database.SubjectId,
+                TemplateKey = "moderation.notice.portal.v1",
                 DeduplicationKey = $"moderation-notice:{effect.Id:N}:1:{fixture.Database.SubjectId:N}",
                 SafePayloadReference = $"moderation-notice:{occurrences.Single(row => row.Audience == ModerationNoticeAudience.Subject).Id:D}",
-                SafePayloadHash = source.SnapshotHash, CreatedAt = at.UtcDateTime, IsDeleted = true
+                SafePayloadHash = source.SnapshotHash,
+                CreatedAt = at.UtcDateTime,
+                IsDeleted = true
             });
         await context.SaveChangesAsync();
         if (defect == "ceiling")
         {
             var extended = JsonSerializer.Serialize(capture with
             {
-                ValidUntil = Ceiling.AddTicks(1), PendingCorrection = pending with { RetainUntil = Ceiling.AddTicks(1) }
+                ValidUntil = Ceiling.AddTicks(1),
+                PendingCorrection = pending with { RetainUntil = Ceiling.AddTicks(1) }
             });
             await context.ModerationNoticeSources.Where(row => row.EffectId == effect.Id)
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.SnapshotJson, extended));
@@ -463,20 +475,38 @@ public sealed partial class ModerationNoticeCleanupTests
         var text = new ModerationNoticeSafeText("Independently approved safe revocation explanation.");
         var approval = ModerationNoticeDisclosureApproval.Approve(originalApproval.Intent with
         {
-            ApprovalId = Guid.CreateVersion7(), EffectId = effect.Id, RuleMeaning = text, ReasonMeaning = text,
-            Facts = [text], RemainingActions = text, Recourse = text, Automation = text, Retention = text,
-            ValidUntil = at.AddMinutes(1), RetainUntil = Ceiling
+            ApprovalId = Guid.CreateVersion7(),
+            EffectId = effect.Id,
+            RuleMeaning = text,
+            ReasonMeaning = text,
+            Facts = [text],
+            RemainingActions = text,
+            Recourse = text,
+            Automation = text,
+            Retention = text,
+            ValidUntil = at.AddMinutes(1),
+            RetainUntil = Ceiling
         }, fixture.Database.HostId, effect.TrustDomainId, fixture.Database.TenantId,
             fixture.Database.AdministratorId, 1, at);
         var capture = original with
         {
             Notice = original.Notice! with
             {
-                EffectId = effect.Id, OperationId = effect.OperationId, OperationKind = effect.OperationKind,
-                SanctionRevision = sanction.Revision, SanctionState = sanction.State,
-                ApprovalId = approval.Id, RuleMeaning = text, ReasonMeaning = text, Facts = [text],
-                RemainingActions = text, Recourse = text, Automation = text, Retention = text,
-                CapturedAt = at, RetainUntil = Ceiling
+                EffectId = effect.Id,
+                OperationId = effect.OperationId,
+                OperationKind = effect.OperationKind,
+                SanctionRevision = sanction.Revision,
+                SanctionState = sanction.State,
+                ApprovalId = approval.Id,
+                RuleMeaning = text,
+                ReasonMeaning = text,
+                Facts = [text],
+                RemainingActions = text,
+                Recourse = text,
+                Automation = text,
+                Retention = text,
+                CapturedAt = at,
+                RetainUntil = Ceiling
             },
             ValidUntil = approval.ValidUntil
         };

@@ -143,8 +143,11 @@ public sealed partial class ModerationNoticeEmailTests
             user.Pii!.Email = address;
             var binding = new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Google, AuthenticationProvider = null!,
+                Id = Guid.CreateVersion7(),
+                UserId = user.Id,
+                User = user,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
+                AuthenticationProvider = null!,
                 ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
                     "https://accounts.google.com", Guid.CreateVersion7().ToString("N")).Value,
                 CreatedAt = Notice.Clock.GetUtcNow().UtcDateTime

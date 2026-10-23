@@ -80,12 +80,21 @@ public sealed partial class ModerationAuthorityParticipant
         receipt.ValidatePersistedState();
         var accepted = new RecordModerationContributionSelectionSource
         {
-            OperationId = receipt.Id, Target = decision.Scope, ExpectedQualificationRevision = selection.WriterGeneration - 1,
-            SelectionId = selection.Id, EffectId = selection.EffectId, CaseId = selection.CaseId,
-            ExpectedCaseRevision = selection.CaseRevision, DecisionId = selection.DecisionId,
-            ExpectedDecisionRevision = selection.DecisionRevision, PolicyId = selection.PolicyId,
-            ExpectedPolicyRevision = selection.PolicyRevision, PublicationId = selection.PublicationId,
-            ProfileId = selection.ProfileId, Contribution = contribution, ValidUntil = selection.ValidUntil
+            OperationId = receipt.Id,
+            Target = decision.Scope,
+            ExpectedQualificationRevision = selection.WriterGeneration - 1,
+            SelectionId = selection.Id,
+            EffectId = selection.EffectId,
+            CaseId = selection.CaseId,
+            ExpectedCaseRevision = selection.CaseRevision,
+            DecisionId = selection.DecisionId,
+            ExpectedDecisionRevision = selection.DecisionRevision,
+            PolicyId = selection.PolicyId,
+            ExpectedPolicyRevision = selection.PolicyRevision,
+            PublicationId = selection.PublicationId,
+            ProfileId = selection.ProfileId,
+            Contribution = contribution,
+            ValidUntil = selection.ValidUntil
         };
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
             accepted.GetType().FullName + "\n" + JsonSerializer.Serialize(accepted))));

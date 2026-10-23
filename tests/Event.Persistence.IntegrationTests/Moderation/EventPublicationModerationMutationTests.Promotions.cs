@@ -252,16 +252,27 @@ public sealed partial class EventPublicationModerationMutationTests
         var eventId = Guid.CreateVersion7();
         fixture.Context.Tenants.Add(new Tenant
         {
-            Id = tenantId, FullName = "Other promotion owner", Slug = $"promotion-{tenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = tenantId,
+            FullName = "Other promotion owner",
+            Slug = $"promotion-{tenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         });
         fixture.Context.Events.Add(new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = eventId, Title = "Other tenant promotion event", TenantId = tenantId, Tenant = null!,
-            ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
+            Id = eventId,
+            Title = "Other tenant promotion event",
+            TenantId = tenantId,
+            Tenant = null!,
+            ActorId = fixture.ActorId,
+            Actor = null!,
+            OrganizerActorId = fixture.ActorId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
             CreatedAt = clock.Now.UtcDateTime
         });
         var catalog = EventTicketCatalogVersion.Create(tenantId, eventId, "USD", 1);

@@ -71,7 +71,7 @@ public sealed partial class ModerationPolicyPublicationTests
                     ClassificationControlChange.TenantTarget => selection with { Target = fixture.Database.Scope },
                     ClassificationControlChange.ResourceTarget => selection with { Target = resource },
                     ClassificationControlChange.DifferentEventTarget => selection with
-                        { Target = AuthorityScope.Event(fixture.Database.Scope, Guid.NewGuid()) },
+                    { Target = AuthorityScope.Event(fixture.Database.Scope, Guid.NewGuid()) },
                     ClassificationControlChange.WrongSourceRevision => selection with { ExpectedMaterialSourceRevision = 2 },
                     ClassificationControlChange.WrongSourceWriter => selection with { ExpectedMaterialWriterGeneration = 1 },
                     ClassificationControlChange.WrongReviewRevision => selection with { ExpectedMaterialReviewRevision = 2 },
@@ -80,23 +80,26 @@ public sealed partial class ModerationPolicyPublicationTests
                     ClassificationControlChange.WrongGenerationRevision => selection with { ExpectedEventGenerationRevision = 2 },
                     ClassificationControlChange.WrongGenerationWriter => selection with { ExpectedEventWriterGeneration = 1 },
                     ClassificationControlChange.WrongContributionIdentity => selection with
-                        { Contribution = contribution with { Id = Guid.CreateVersion7() } },
+                    { Contribution = contribution with { Id = Guid.CreateVersion7() } },
                     ClassificationControlChange.MissingEffect => selection with
-                        { Contribution = contribution with { Effects = contribution.Effects.RemoveAt(0) } },
+                    { Contribution = contribution with { Effects = contribution.Effects.RemoveAt(0) } },
                     ClassificationControlChange.MissingBasePlan => selection with
-                        { Contribution = contribution with { Consequences = contribution.Consequences.Where(row => row.Strategy is not null).ToImmutableArray() } },
+                    { Contribution = contribution with { Consequences = contribution.Consequences.Where(row => row.Strategy is not null).ToImmutableArray() } },
                     ClassificationControlChange.MissingStrategy => selection with
-                        { Contribution = contribution with { Consequences = contribution.Consequences.Where(row => row.Strategy is null).ToImmutableArray() } },
+                    { Contribution = contribution with { Consequences = contribution.Consequences.Where(row => row.Strategy is null).ToImmutableArray() } },
                     ClassificationControlChange.HumanSubject => selection with
-                        { Contribution = contribution with { SubjectKind = ModerationSubjectKind.Human, SubjectId = fixture.Owner } },
-                    ClassificationControlChange.ResourceScope => selection with { Contribution = contribution with
+                    { Contribution = contribution with { SubjectKind = ModerationSubjectKind.Human, SubjectId = fixture.Owner } },
+                    ClassificationControlChange.ResourceScope => selection with
                     {
-                        Scope = resource,
-                        Effects = contribution.Effects.Select(row => row with { Target = row.Target with { Scope = resource } }).ToImmutableArray(),
-                        Consequences = contribution.Consequences.Select(row => row with { Target = row.Target with { Scope = resource } }).ToImmutableArray()
-                    } },
+                        Contribution = contribution with
+                        {
+                            Scope = resource,
+                            Effects = contribution.Effects.Select(row => row with { Target = row.Target with { Scope = resource } }).ToImmutableArray(),
+                            Consequences = contribution.Consequences.Select(row => row with { Target = row.Target with { Scope = resource } }).ToImmutableArray()
+                        }
+                    },
                     ClassificationControlChange.SanctionWindow => selection with
-                        { Contribution = contribution with { EventWindowEnd = Now.AddMinutes(1) } },
+                    { Contribution = contribution with { EventWindowEnd = Now.AddMinutes(1) } },
                     _ => selection
                 };
                 var author = change == ClassificationControlChange.OwnerAuthor ? fixture.Owner
@@ -127,14 +130,19 @@ public sealed partial class ModerationPolicyPublicationTests
                     var replay = await fixture.Writer(author).ExecuteAsync(selection);
                     await Assert.That(replay.Receipt!.QualificationRevision).IsEqualTo(epoch);
                     await Assert.That((await fixture.Writer(author).ExecuteAsync(selection with
-                        { ValidUntil = selection.ValidUntil.AddTicks(-1) })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Conflict);
+                    { ValidUntil = selection.ValidUntil.AddTicks(-1) })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Conflict);
                     return;
                 }
                 if (change == ClassificationControlChange.NewUnacceptedMaterialHead)
                 {
-                    var next = fixture.Source with { OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
-                        ExpectedQualificationRevision = epoch, ExpectedMaterialGeneration = fixture.Review.ExpectedSourceWriterGeneration,
-                        Materials = fixture.Source.Materials.Select(row => row with { ReviewId = Guid.CreateVersion7() }).ToImmutableArray() };
+                    var next = fixture.Source with
+                    {
+                        OperationId = Guid.CreateVersion7(),
+                        SourceId = Guid.CreateVersion7(),
+                        ExpectedQualificationRevision = epoch,
+                        ExpectedMaterialGeneration = fixture.Review.ExpectedSourceWriterGeneration,
+                        Materials = fixture.Source.Materials.Select(row => row with { ReviewId = Guid.CreateVersion7() }).ToImmutableArray()
+                    };
                     var result = await fixture.Writer(fixture.Owner).ExecuteAsync(next);
                     await Assert.That(result.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
                     epoch = result.Receipt!.QualificationRevision;
@@ -143,9 +151,13 @@ public sealed partial class ModerationPolicyPublicationTests
                 {
                     var result = await fixture.Writer(author).ExecuteAsync(new EndModerationClassificationMaterialReview
                     {
-                        OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope, ExpectedQualificationRevision = epoch,
-                        ReviewId = fixture.Review.ReviewId, ExpectedReviewRevision = 1,
-                        End = ModerationClassificationMaterialEnd.Withdrawn, Grounds = "Independent acceptance withdrawn."
+                        OperationId = Guid.CreateVersion7(),
+                        Target = fixture.Database.Scope,
+                        ExpectedQualificationRevision = epoch,
+                        ReviewId = fixture.Review.ReviewId,
+                        ExpectedReviewRevision = 1,
+                        End = ModerationClassificationMaterialEnd.Withdrawn,
+                        Grounds = "Independent acceptance withdrawn."
                     });
                     await Assert.That(result.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
                     epoch = result.Receipt!.QualificationRevision;
@@ -163,10 +175,15 @@ public sealed partial class ModerationPolicyPublicationTests
                     : change == ClassificationControlChange.AuthorAdopter ? author : fixture.Adopter;
                 var adopt = new AdoptModerationClassificationEventTarget
                 {
-                    OperationId = Guid.CreateVersion7(), Target = selection.Target, ExpectedQualificationRevision = epoch,
-                    AdoptionId = Guid.CreateVersion7(), SelectionId = selection.SelectionId, ExpectedSelectionRevision = 1,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = selection.Target,
+                    ExpectedQualificationRevision = epoch,
+                    AdoptionId = Guid.CreateVersion7(),
+                    SelectionId = selection.SelectionId,
+                    ExpectedSelectionRevision = 1,
                     BindingOrdinal = change == ClassificationControlChange.WrongOrdinal ? 63 : 0,
-                    EventGenerationId = fixture.Generation.SourceId, ExpectedEventGenerationRevision = 1,
+                    EventGenerationId = fixture.Generation.SourceId,
+                    ExpectedEventGenerationRevision = 1,
                     ValidUntil = Now.AddMinutes(1)
                 };
                 var adopted = await fixture.Writer(adopter).ExecuteAsync(adopt);
@@ -183,8 +200,10 @@ public sealed partial class ModerationPolicyPublicationTests
                 {
                     var result = await fixture.Writer(adopter).ExecuteAsync(adopt with
                     {
-                        OperationId = Guid.CreateVersion7(), AdoptionId = Guid.CreateVersion7(),
-                        ExpectedQualificationRevision = epoch, BindingOrdinal = ordinal
+                        OperationId = Guid.CreateVersion7(),
+                        AdoptionId = Guid.CreateVersion7(),
+                        ExpectedQualificationRevision = epoch,
+                        BindingOrdinal = ordinal
                     });
                     await Assert.That(result.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
                     epoch = result.Receipt!.QualificationRevision;
@@ -207,10 +226,16 @@ public sealed partial class ModerationPolicyPublicationTests
             await Assert.That(recorded.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
             var adopt = new AdoptModerationClassificationEventTarget
             {
-                OperationId = Guid.CreateVersion7(), Target = selection.Target,
-                ExpectedQualificationRevision = recorded.Receipt!.QualificationRevision, AdoptionId = Guid.CreateVersion7(),
-                SelectionId = selection.SelectionId, ExpectedSelectionRevision = 1, BindingOrdinal = 0,
-                EventGenerationId = fixture.Generation.SourceId, ExpectedEventGenerationRevision = 1, ValidUntil = Now.AddMinutes(1)
+                OperationId = Guid.CreateVersion7(),
+                Target = selection.Target,
+                ExpectedQualificationRevision = recorded.Receipt!.QualificationRevision,
+                AdoptionId = Guid.CreateVersion7(),
+                SelectionId = selection.SelectionId,
+                ExpectedSelectionRevision = 1,
+                BindingOrdinal = 0,
+                EventGenerationId = fixture.Generation.SourceId,
+                ExpectedEventGenerationRevision = 1,
+                ValidUntil = Now.AddMinutes(1)
             };
             var adopted = await fixture.Writer(fixture.Adopter).ExecuteAsync(adopt);
             await Assert.That(adopted.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
@@ -219,9 +244,12 @@ public sealed partial class ModerationPolicyPublicationTests
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.IsDeleted, true));
             var revoke = new RevokeModerationClassificationEventTarget
             {
-                OperationId = Guid.CreateVersion7(), Target = selection.Target,
-                ExpectedQualificationRevision = adopted.Receipt!.QualificationRevision, AdoptionId = adopt.AdoptionId,
-                ExpectedAdoptionRevision = 1, Grounds = "End retained material control without granting replacement authority."
+                OperationId = Guid.CreateVersion7(),
+                Target = selection.Target,
+                ExpectedQualificationRevision = adopted.Receipt!.QualificationRevision,
+                AdoptionId = adopt.AdoptionId,
+                ExpectedAdoptionRevision = 1,
+                Grounds = "End retained material control without granting replacement authority."
             };
             var result = await fixture.Writer(fixture.Database.AdminId).ExecuteAsync(revoke);
             await Assert.That(result.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
@@ -232,7 +260,7 @@ public sealed partial class ModerationPolicyPublicationTests
             await Assert.That((await fixture.Writer(fixture.Database.AdminId).ExecuteAsync(revoke)).Outcome)
                 .IsEqualTo(ModerationQualificationWriteOutcome.Known);
             await Assert.That((await fixture.Writer(fixture.Database.AdminId).ExecuteAsync(revoke with
-                { Grounds = "A different correction cannot reuse the immutable operation." })).Outcome)
+            { Grounds = "A different correction cannot reuse the immutable operation." })).Outcome)
                 .IsEqualTo(ModerationQualificationWriteOutcome.Conflict);
         });
     }
@@ -246,13 +274,18 @@ public sealed partial class ModerationPolicyPublicationTests
         var id = Guid.CreateVersion7();
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = scope,
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
             ExpectedQualificationRevision = await fixture.Context.ModerationQualificationEpochs.Select(row => row.Revision).SingleAsync(),
-            SelectionId = id, MaterialSourceId = fixture.Source.SourceId, ExpectedMaterialSourceRevision = 1,
+            SelectionId = id,
+            MaterialSourceId = fixture.Source.SourceId,
+            ExpectedMaterialSourceRevision = 1,
             ExpectedMaterialWriterGeneration = fixture.Review.ExpectedSourceWriterGeneration,
-            MaterialReviewId = fixture.Review.ReviewId, ExpectedMaterialReviewRevision = 1,
+            MaterialReviewId = fixture.Review.ReviewId,
+            ExpectedMaterialReviewRevision = 1,
             ExpectedReviewWriterGeneration = fixture.Review.ExpectedQualificationRevision + 1,
-            EventGenerationId = fixture.Generation.SourceId, ExpectedEventGenerationRevision = 1,
+            EventGenerationId = fixture.Generation.SourceId,
+            ExpectedEventGenerationRevision = 1,
             ExpectedEventWriterGeneration = fixture.Generation.ExpectedQualificationRevision + 1,
             Contribution = new(id, profile.Rule, scope, ModerationSubjectKind.Content, fixture.Generation.EventId, Now, null,
                 profile.Effects.Select(effect => new ModerationPolicyEffectTarget(effect, target)).ToImmutableArray(),
@@ -299,10 +332,15 @@ public sealed partial class ModerationPolicyPublicationTests
                 observer.Enabled = true;
                 var adopt = new AdoptModerationClassificationEventTarget
                 {
-                    OperationId = Guid.CreateVersion7(), Target = selection.Target,
-                    ExpectedQualificationRevision = result.Receipt!.QualificationRevision, AdoptionId = Guid.CreateVersion7(),
-                    SelectionId = selection.SelectionId, ExpectedSelectionRevision = 1, BindingOrdinal = 0,
-                    EventGenerationId = fixture.Generation.SourceId, ExpectedEventGenerationRevision = 1,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = selection.Target,
+                    ExpectedQualificationRevision = result.Receipt!.QualificationRevision,
+                    AdoptionId = Guid.CreateVersion7(),
+                    SelectionId = selection.SelectionId,
+                    ExpectedSelectionRevision = 1,
+                    BindingOrdinal = 0,
+                    EventGenerationId = fixture.Generation.SourceId,
+                    ExpectedEventGenerationRevision = 1,
                     ValidUntil = Now.AddMinutes(1)
                 };
                 var accepted = await fixture.Writer(fixture.Adopter).ExecuteAsync(adopt);

@@ -62,13 +62,23 @@ public sealed class ModerationParticipantInvestigationContractTests
         var at = new DateTimeOffset(2026, 10, 13, 12, 0, 0, TimeSpan.Zero);
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 5,
-            SourceId = Guid.CreateVersion7(), OccurrenceCaseId = Guid.CreateVersion7(),
-            ExpectedCaseRevision = 2, EvidenceCaseRevision = 1, ReadGrantId = Guid.CreateVersion7(),
-            EvidenceSourceId = Guid.CreateVersion7(), EvidenceSourceVersion = Guid.NewGuid(),
-            SubjectHumanId = Guid.CreateVersion7(), SessionId = Guid.CreateVersion7(),
-            ExpectedSessionGeneration = Guid.NewGuid(), IncidentWindowFrom = at.AddMinutes(-10),
-            IncidentWindowUntil = at.AddMinutes(-5), ValidUntil = at.AddMinutes(1), PurgeAt = at.AddMinutes(2),
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 5,
+            SourceId = Guid.CreateVersion7(),
+            OccurrenceCaseId = Guid.CreateVersion7(),
+            ExpectedCaseRevision = 2,
+            EvidenceCaseRevision = 1,
+            ReadGrantId = Guid.CreateVersion7(),
+            EvidenceSourceId = Guid.CreateVersion7(),
+            EvidenceSourceVersion = Guid.NewGuid(),
+            SubjectHumanId = Guid.CreateVersion7(),
+            SessionId = Guid.CreateVersion7(),
+            ExpectedSessionGeneration = Guid.NewGuid(),
+            IncidentWindowFrom = at.AddMinutes(-10),
+            IncidentWindowUntil = at.AddMinutes(-5),
+            ValidUntil = at.AddMinutes(1),
+            PurgeAt = at.AddMinutes(2),
             Grounds = new("Authenticated identification grounds.", "Specific alleged conduct.",
                 "Authenticated evidence provenance.", "Contradiction and credential-use assessment.")
         };

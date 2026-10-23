@@ -33,7 +33,8 @@ public sealed partial class ModerationCaseNativeProofTests
         await Assert.That(await writer.AttributeAsync(contentRequest with
         {
             Basis = ModerationResponsibilityBasis.EventSubmission,
-            SubjectKind = ModerationSubjectKind.Human, SubjectId = database.CallerId
+            SubjectKind = ModerationSubjectKind.Human,
+            SubjectId = database.CallerId
         }, default)).IsNull();
         await Assert.That(await writer.AttributeAsync(contentRequest with { OperationId = Guid.CreateVersion7() }, default)).IsNull();
 
@@ -56,7 +57,8 @@ public sealed partial class ModerationCaseNativeProofTests
         await using var intakeContext = database.Context();
         var accepted = await Committer(intakeContext, database).SubmitAsync(
             new(ModerationCaseAccessPurpose.SubmitAllegation, Guid.Empty, Guid.CreateVersion7(), 0,
-                later.Receipt.Id, later.Token) { Narrative = database.Request(material: "Separately reported additional material.").Material },
+                later.Receipt.Id, later.Token)
+            { Narrative = database.Request(material: "Separately reported additional material.").Material },
             default);
         await Assert.That(accepted.Outcome).IsEqualTo(ModerationCaseIntakeCommitOutcome.Accepted);
         await Assert.That(accepted.Acknowledgement!.CaseId).IsEqualTo(root.Id);
@@ -98,24 +100,37 @@ public sealed partial class ModerationCaseNativeProofTests
                 Id = managerId,
                 Pii = new UserPii
                 {
-                    UserId = managerId, Email = $"{managerId:N}@example.invalid",
-                    FirstName = "Roster", LastName = "Manager"
+                    UserId = managerId,
+                    Email = $"{managerId:N}@example.invalid",
+                    FirstName = "Roster",
+                    LastName = "Manager"
                 }
             };
             var participation = new OrganizationTenant
             {
-                Id = participationId, TenantId = database.TenantId, Tenant = null!,
-                OrganizationId = organizationId, Organization = organization,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!,
-                IsOrganizerEligible = true, IsVisible = true
+                Id = participationId,
+                TenantId = database.TenantId,
+                Tenant = null!,
+                OrganizationId = organizationId,
+                Organization = organization,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!,
+                IsOrganizerEligible = true,
+                IsVisible = true
             };
             setup.AddRange(manager, organization, participation);
             foreach (var userId in new[] { database.CallerId, managerId })
                 setup.OrganizationMembers.Add(new OrganizationMember
                 {
-                    Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                    OrganizationTenantId = participationId, OrganizationTenant = participation,
-                    UserId = userId, User = null!, RoleId = (int)RoleEnum.OrgAdmin, Role = null!
+                    Id = Guid.CreateVersion7(),
+                    TenantId = database.TenantId,
+                    Tenant = null!,
+                    OrganizationTenantId = participationId,
+                    OrganizationTenant = participation,
+                    UserId = userId,
+                    User = null!,
+                    RoleId = (int)RoleEnum.OrgAdmin,
+                    Role = null!
                 });
             var actor = await setup.Actors.SingleAsync(row => row.Id == database.ActorId);
             actor.ActorTypeId = (int)ActorTypeEnum.Organization;
@@ -173,7 +188,8 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             setup.Organizations.Add(new Organization
             {
-                Id = organizationId, Pii = new OrganizationPii { OrganizationId = organizationId, FullName = "Native organization" }
+                Id = organizationId,
+                Pii = new OrganizationPii { OrganizationId = organizationId, FullName = "Native organization" }
             });
             var actor = await setup.Actors.SingleAsync(row => row.Id == database.ActorId);
             actor.ActorTypeId = (int)ActorTypeEnum.Organization;
@@ -419,7 +435,8 @@ public sealed partial class ModerationCaseNativeProofTests
         }
         await using var denied = database.Context();
         var request = review.Request(ModerationResponsibilityBasis.EventSubmission, ModerationSubjectKind.Human, database.CallerId)
-            with { ReadGrantId = selfGrantId };
+            with
+        { ReadGrantId = selfGrantId };
         await Assert.That(await AttributionWriter(denied, database, database.Caller).AttributeAsync(request, default)).IsNull();
         await using var verify = database.Context();
         await Assert.That(await verify.ModerationCaseAttributionSources.AnyAsync()).IsFalse();
@@ -443,7 +460,8 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             var result = await Committer(intake, database).SubmitAsync(
                 new(ModerationCaseAccessPurpose.SubmitAllegation, Guid.Empty, Guid.CreateVersion7(), 0,
-                    issued.Receipt.Id, issued.Token) { Narrative = database.Request().Material }, default);
+                    issued.Receipt.Id, issued.Token)
+                { Narrative = database.Request().Material }, default);
             await Assert.That(result.Outcome).IsEqualTo(ModerationCaseIntakeCommitOutcome.Accepted);
             rootId = result.Acknowledgement!.CaseId;
         }
@@ -453,16 +471,23 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             setup.Users.Add(new User
             {
-                Id = reviewer.UserId!.Value, Pii = new UserPii
+                Id = reviewer.UserId!.Value,
+                Pii = new UserPii
                 {
-                    UserId = reviewer.UserId.Value, Email = $"{reviewer.UserId:N}@example.invalid",
-                    FirstName = "Qualified", LastName = "Reviewer"
+                    UserId = reviewer.UserId.Value,
+                    Email = $"{reviewer.UserId:N}@example.invalid",
+                    FirstName = "Qualified",
+                    LastName = "Reviewer"
                 }
             });
             setup.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = adminId, UserId = reviewer.UserId.Value, RoleId = (int)RoleEnum.Admin,
-                User = null!, Role = null!, GrantedAt = database.Clock.Now.UtcDateTime
+                Id = adminId,
+                UserId = reviewer.UserId.Value,
+                RoleId = (int)RoleEnum.Admin,
+                User = null!,
+                Role = null!,
+                GrantedAt = database.Clock.Now.UtcDateTime
             });
             await setup.SaveChangesAsync();
         }

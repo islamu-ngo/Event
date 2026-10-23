@@ -21,8 +21,11 @@ public sealed class ModerationConsumerInstallationWriterTests
         await Assert.That(replay.QualificationRevision).IsEqualTo(accepted.QualificationRevision);
         var withdrawal = new WithdrawModerationConsumerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            InstallationId = source.InstallationId, ExpectedInstallationRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            InstallationId = source.InstallationId,
+            ExpectedInstallationRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, withdrawal)).IsSuccess).IsTrue();
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, withdrawal)).IsSuccess).IsTrue();
@@ -97,12 +100,17 @@ public sealed class ModerationConsumerInstallationWriterTests
 
     private static InstallModerationConsumerSource Install(
         ModerationQualificationWriterTests.SourceDatabase database, ControlledRuntime runtime) => new()
-    {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 1,
-        InstallationId = Guid.CreateVersion7(), ConsumerId = runtime.ConsumerId, Mode = ModerationNativeMode.Embedded,
-        ExpectedRuntimeGeneration = runtime.Generation, ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
-        ValidUntil = Now.AddMinutes(5)
-    };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 1,
+            InstallationId = Guid.CreateVersion7(),
+            ConsumerId = runtime.ConsumerId,
+            Mode = ModerationNativeMode.Embedded,
+            ExpectedRuntimeGeneration = runtime.Generation,
+            ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
+            ValidUntil = Now.AddMinutes(5)
+        };
 
     [Test]
     public async Task ChangedRuntimeAfterFlush_RollsBackSourceReceiptAndEpoch()
@@ -145,8 +153,11 @@ public sealed class ModerationConsumerInstallationWriterTests
         }
         else mutation = new WithdrawModerationConsumerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            InstallationId = source.InstallationId, ExpectedInstallationRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            InstallationId = source.InstallationId,
+            ExpectedInstallationRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, mutation)).IsSuccess).IsFalse();
         await using var reader = database.Context();

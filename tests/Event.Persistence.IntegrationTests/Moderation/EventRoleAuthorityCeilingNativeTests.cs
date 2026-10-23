@@ -153,8 +153,14 @@ public sealed class EventRoleAuthorityCeilingNativeTests
                 {
                     permission = new Permission
                     {
-                        Id = next++, MasterCode = code, FullName = code, ResourceKind = "event",
-                        Action = code.Split(':')[1], GroupName = "Events", Scope = RoleScopeEnum.Event, IsSystem = true
+                        Id = next++,
+                        MasterCode = code,
+                        FullName = code,
+                        ResourceKind = "event",
+                        Action = code.Split(':')[1],
+                        GroupName = "Events",
+                        Scope = RoleScopeEnum.Event,
+                        IsSystem = true
                     };
                     context.Permissions.Add(permission);
                 }
@@ -163,16 +169,29 @@ public sealed class EventRoleAuthorityCeilingNativeTests
             }
             var actor = new Actor
             {
-                Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                UserId = fixture.UserId, Pii = new ActorPii { DisplayName = "Event delegation" }
+                Id = Guid.CreateVersion7(),
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = fixture.UserId,
+                Pii = new ActorPii { DisplayName = "Event delegation" }
             };
             context.Events.Add(new Explore.Domain.Event(EventStatusEnum.Published)
             {
-                Id = eventId, TenantId = fixture.TenantId, Tenant = null!, ActorId = actor.Id, Actor = actor,
-                OrganizerActorId = actor.Id, Title = "Native delegation", PublicCode = Guid.CreateVersion7().ToString("N")[..12],
+                Id = eventId,
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
+                Title = "Native delegation",
+                PublicCode = Guid.CreateVersion7().ToString("N")[..12],
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!, Timezone = "UTC"
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                EventStatus = null!,
+                Timezone = "UTC"
             });
             context.EventRoleAssignments.AddRange(fixture.Assignment(RoleEnum.EventOwner), fixture.Assignment(RoleEnum.EventManager));
             await context.SaveChangesAsync();

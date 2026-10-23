@@ -30,8 +30,13 @@ public sealed class ModerationQualificationConfiguration :
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(entity => new
         {
-            entity.CaseId, entity.RuleOwnerId, entity.RuleCode, entity.RuleRevision,
-            entity.ScopeKind, entity.ScopeId, entity.AttributionGeneration
+            entity.CaseId,
+            entity.RuleOwnerId,
+            entity.RuleCode,
+            entity.RuleRevision,
+            entity.ScopeKind,
+            entity.ScopeId,
+            entity.AttributionGeneration
         })
             .IsUnique();
         builder.ToTable(table =>

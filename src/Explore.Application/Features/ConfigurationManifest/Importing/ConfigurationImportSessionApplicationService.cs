@@ -330,7 +330,8 @@ public sealed class ConfigurationImportSessionApplicationService(
                 var current = await ReadCurrentAsync(inner);
                 var bytes = await prepare(result with
                 {
-                    Moderation = Project(current), Disclosure = null
+                    Moderation = Project(current),
+                    Disclosure = null
                 }, inner);
                 inner.ThrowIfCancellationRequested();
                 await ReadCurrentAsync(inner);
@@ -500,18 +501,31 @@ public sealed class ConfigurationImportSessionApplicationService(
                             ModerationConfigurationDocumentProjection.FromCompiledDraft(currentDraft)) : null;
                     if (item.Target.SectionKey == ModerationConfigurationImportSections.Instance)
                     {
-                        snapshot = snapshot with { Spec = snapshot.Spec with
-                            { Instance = snapshot.Spec.Instance with { Moderation = prior } } };
+                        snapshot = snapshot with
+                        {
+                            Spec = snapshot.Spec with
+                            { Instance = snapshot.Spec.Instance with { Moderation = prior } }
+                        };
                         if (item.Preview.Document is { } merged)
-                            sourceManifest = sourceManifest with { Spec = sourceManifest.Spec with
-                                { Instance = sourceManifest.Spec.Instance with
-                                    { Moderation = ModerationConfigurationImportSections.ToWire(merged) } } };
+                            sourceManifest = sourceManifest with
+                            {
+                                Spec = sourceManifest.Spec with
+                                {
+                                    Instance = sourceManifest.Spec.Instance with
+                                    { Moderation = ModerationConfigurationImportSections.ToWire(merged) }
+                                }
+                            };
                     }
                     else
                     {
-                        snapshot = snapshot with { Spec = snapshot.Spec with
-                            { Tenants = snapshot.Spec.Tenants.Select(tenant => tenant.Metadata.Name == item.Target.TargetName
-                                ? tenant with { Spec = tenant.Spec with { Moderation = prior } } : tenant).ToArray() } };
+                        snapshot = snapshot with
+                        {
+                            Spec = snapshot.Spec with
+                            {
+                                Tenants = snapshot.Spec.Tenants.Select(tenant => tenant.Metadata.Name == item.Target.TargetName
+                                ? tenant with { Spec = tenant.Spec with { Moderation = prior } } : tenant).ToArray()
+                            }
+                        };
                     }
                 }
                 sourceSections = ConfigurationImportArtifactSnapshotFactory.FromManifest(sourceManifest);
@@ -545,8 +559,11 @@ public sealed class ConfigurationImportSessionApplicationService(
                     .. prior is null ? Array.Empty<ConfigurationImportSectionSnapshot>()
                         : [ModerationConfigurationImportSections.Snapshot(ModerationConfigurationImportSections.Tenant, prior)]];
                 var snapshot = parser.ParseTenantPackage(currentTargetArtifact).Package;
-                snapshot = snapshot with { Spec = snapshot.Spec with
-                    { Moderation = prior is null ? null : ModerationConfigurationImportSections.ToWire(prior) } };
+                snapshot = snapshot with
+                {
+                    Spec = snapshot.Spec with
+                    { Moderation = prior is null ? null : ModerationConfigurationImportSections.ToWire(prior) }
+                };
                 currentTargetArtifact = JsonSerializer.SerializeToUtf8Bytes(snapshot,
                     ConfigurationPortabilityJsonContext.Default.TenantConfigurationPackageV1Alpha2);
             }

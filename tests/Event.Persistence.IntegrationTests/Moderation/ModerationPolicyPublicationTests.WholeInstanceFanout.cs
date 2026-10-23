@@ -93,16 +93,17 @@ public sealed partial class ModerationPolicyPublicationTests
         var request = FanoutRequest();
         if (drift == "mapping")
             request = FanoutRequest(new Dictionary<string, string>
-                { [$"export-{foreign.TenantId:N}"] = $"publication-{database.TenantId:N}" });
+            { [$"export-{foreign.TenantId:N}"] = $"publication-{database.TenantId:N}" });
         if (drift == "missing")
             request = FanoutRequest(new Dictionary<string, string>
-                { [$"export-{foreign.TenantId:N}"] = "missing-native-tenant" });
+            { [$"export-{foreign.TenantId:N}"] = "missing-native-tenant" });
         if (drift == "selection")
             request = new()
             {
                 SelectedSectionKeys = [ModerationConfigurationImportSections.Tenant],
                 Mappings = new Dictionary<string, string>(),
-                ApplyMode = ConfigurationImportApplyMode.ApplySelected, GrantedApprovalCodes = []
+                ApplyMode = ConfigurationImportApplyMode.ApplySelected,
+                GrantedApprovalCodes = []
             };
         if (drift == "root") await DemoteExportAdministratorAsync(database);
         if (drift == "role-replacement")
@@ -113,7 +114,9 @@ public sealed partial class ModerationPolicyPublicationTests
             await changed.SaveChangesAsync();
             changed.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = database.AdminId, RoleId = prior.RoleId,
+                Id = Guid.CreateVersion7(),
+                UserId = database.AdminId,
+                RoleId = prior.RoleId,
                 User = await changed.Users.SingleAsync(row => row.Id == database.AdminId),
                 Role = await changed.Roles.SingleAsync(row => row.Id == prior.RoleId)
             });
@@ -226,7 +229,8 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             SelectedSectionKeys = [ModerationConfigurationImportSections.Instance, ModerationConfigurationImportSections.Tenant],
             Mappings = mappings ?? new Dictionary<string, string>(),
-            ApplyMode = ConfigurationImportApplyMode.ApplySelected, GrantedApprovalCodes = []
+            ApplyMode = ConfigurationImportApplyMode.ApplySelected,
+            GrantedApprovalCodes = []
         };
 
     private static async Task<ReadOnlyMemory<byte>> FanoutArtifactAsync(Database database, ExploreDbContext context)
@@ -242,7 +246,7 @@ public sealed partial class ModerationPolicyPublicationTests
             {
                 Instance = manifest.Spec.Instance with { Moderation = document },
                 Tenants = manifest.Spec.Tenants.Select(tenant => tenant with
-                    { Spec = tenant.Spec with { Moderation = document } }).ToArray()
+                { Spec = tenant.Spec with { Moderation = document } }).ToArray()
             }
         };
         return ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(manifest);

@@ -102,9 +102,16 @@ public sealed class ModerationProfileCollectionAssessmentWithdrawalContractTests
         Jurisdiction = AuthorityScope.Tenant(AuthorityScope.Instance(
             AuthorityScope.Solution(AuthorityScope.TrustDomain(Id(30)), Id(31)), Id(32)), Id(33)),
         SubjectHumanId = Guid.Parse("01234567-89ab-4cde-8fab-0123456789ab"),
-        PolicyId = Id(1), PolicyRevision = 4, PublicationId = Id(2), ProfileId = Id(3),
-        Mode = ModerationNativeMode.Embedded, SourceId = Id(4), ExpectedSourceGeneration = 2,
-        AdoptionId = Id(5), ExpectedAdoptionGeneration = 3, ExpectedAdoptionRevision = 1
+        PolicyId = Id(1),
+        PolicyRevision = 4,
+        PublicationId = Id(2),
+        ProfileId = Id(3),
+        Mode = ModerationNativeMode.Embedded,
+        SourceId = Id(4),
+        ExpectedSourceGeneration = 2,
+        AdoptionId = Id(5),
+        ExpectedAdoptionGeneration = 3,
+        ExpectedAdoptionRevision = 1
     };
 
     private static Guid Id(int value) => Guid.Parse($"019a0000-0000-7000-8000-{value:x12}");

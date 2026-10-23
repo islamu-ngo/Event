@@ -112,18 +112,30 @@ public sealed class ModerationCaseTargetReceipt
 
         var receipt = new ModerationCaseTargetReceipt
         {
-            Id = id, TenantId = tenant.Id, CallerUserId = callerUserId, HostBindingId = hostBindingId,
-            QualificationEpochId = qualificationEpochId, QualificationRevision = qualificationRevision,
-            RelationshipSourceId = relationshipSourceId, RelationshipKind = relationshipKind,
+            Id = id,
+            TenantId = tenant.Id,
+            CallerUserId = callerUserId,
+            HostBindingId = hostBindingId,
+            QualificationEpochId = qualificationEpochId,
+            QualificationRevision = qualificationRevision,
+            RelationshipSourceId = relationshipSourceId,
+            RelationshipKind = relationshipKind,
             RelationshipRevision = relationshipGeneration.Revision,
             RelationshipConcurrencyStamp = relationshipGeneration.ConcurrencyStamp,
             RelationshipFactsDigest = relationshipFactsDigest,
-            LifetimePolicyId = lifetimePolicyId, LifetimePolicyRevision = lifetimePolicyRevision,
+            LifetimePolicyId = lifetimePolicyId,
+            LifetimePolicyRevision = lifetimePolicyRevision,
             TokenDigest = Convert.ToHexStringLower(tokenDigest),
-            TargetKind = evidence.Target.Kind, TargetId = evidence.Target.Id, TargetVersion = evidence.Target.Version,
-            OccurrenceId = evidence.OccurrenceId, SourceId = evidence.SourceId,
-            SourceVersion = evidence.SourceVersion, MaterialFactId = evidence.MaterialFactId,
-            IssuedAt = issuedAt.ToUniversalTime(), ExpiresAt = expiresAt.ToUniversalTime(), Revision = 1
+            TargetKind = evidence.Target.Kind,
+            TargetId = evidence.Target.Id,
+            TargetVersion = evidence.Target.Version,
+            OccurrenceId = evidence.OccurrenceId,
+            SourceId = evidence.SourceId,
+            SourceVersion = evidence.SourceVersion,
+            MaterialFactId = evidence.MaterialFactId,
+            IssuedAt = issuedAt.ToUniversalTime(),
+            ExpiresAt = expiresAt.ToUniversalTime(),
+            Revision = 1
         };
         (receipt.TargetOriginKind, receipt.TargetOriginTrustDomainId, receipt.TargetOriginSolutionId,
             receipt.TargetOriginInstanceId, receipt.TargetOriginTenantId, receipt.TargetOriginCommunityId,

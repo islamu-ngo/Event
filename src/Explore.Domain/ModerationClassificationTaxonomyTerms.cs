@@ -55,9 +55,15 @@ public sealed class ModerationClassificationTaxonomyCategory
 
     internal static ModerationClassificationTaxonomyCategory Capture(Guid sourceId, int ordinal,
         ModerationClassificationTaxonomyCategoryTerms terms) => new()
-    {
-        Id = terms.VersionId, SourceId = sourceId, Ordinal = ordinal, CategoryId = terms.CategoryId,
-        Code = terms.Code, Kind = terms.Kind, MinimumAge = terms.MinimumAge,
-        Meaning = terms.Meaning, ReviewRationale = terms.ReviewRationale
-    };
+        {
+            Id = terms.VersionId,
+            SourceId = sourceId,
+            Ordinal = ordinal,
+            CategoryId = terms.CategoryId,
+            Code = terms.Code,
+            Kind = terms.Kind,
+            MinimumAge = terms.MinimumAge,
+            Meaning = terms.Meaning,
+            ReviewRationale = terms.ReviewRationale
+        };
 }

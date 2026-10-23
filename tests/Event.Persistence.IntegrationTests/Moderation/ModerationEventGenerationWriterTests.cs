@@ -28,8 +28,10 @@ public sealed class ModerationEventGenerationWriterTests
         await Assert.That(replay.QualificationRevision).IsEqualTo(accepted.QualificationRevision);
         var next = source with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
-            ExpectedEventRevision = 1, ExpectedQualificationRevision = 2
+            OperationId = Guid.CreateVersion7(),
+            SourceId = Guid.CreateVersion7(),
+            ExpectedEventRevision = 1,
+            ExpectedQualificationRevision = 2
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, next)).IsSuccess).IsTrue();
         await using var reader = database.Context();
@@ -122,8 +124,11 @@ public sealed class ModerationEventGenerationWriterTests
         var eventId = await SeedAsync(database);
         var replacement = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.ReviewerId, Pii = new ActorPii { DisplayName = "Replacement publisher" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.ReviewerId,
+            Pii = new ActorPii { DisplayName = "Replacement publisher" }
         };
         Guid originalPublisher;
         await using (var seed = database.Context())
@@ -184,8 +189,13 @@ public sealed class ModerationEventGenerationWriterTests
 
     private static RecordModerationEventGenerationSource Source(SourceDatabase database, Guid eventId) => new()
     {
-        OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), EventId = eventId,
-        Target = database.Scope, ExpectedQualificationRevision = 1, ExpectedEventRevision = 0, ValidUntil = Now.AddMinutes(10)
+        OperationId = Guid.CreateVersion7(),
+        SourceId = Guid.CreateVersion7(),
+        EventId = eventId,
+        Target = database.Scope,
+        ExpectedQualificationRevision = 1,
+        ExpectedEventRevision = 0,
+        ValidUntil = Now.AddMinutes(10)
     };
 
     private static async Task<Guid> SeedAsync(SourceDatabase database)

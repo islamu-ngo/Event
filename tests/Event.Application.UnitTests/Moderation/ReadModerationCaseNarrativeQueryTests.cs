@@ -40,7 +40,9 @@ public sealed class ReadModerationCaseNarrativeQueryTests
 
     private static ReadModerationCaseNarrativeQuery Request(ReadOnlyMemory<byte> token) => new()
     {
-        CaseId = Guid.CreateVersion7(), ReceiptId = Guid.CreateVersion7(),
-        ExpectedCaseRevision = 1, PresentedToken = token
+        CaseId = Guid.CreateVersion7(),
+        ReceiptId = Guid.CreateVersion7(),
+        ExpectedCaseRevision = 1,
+        PresentedToken = token
     };
 }

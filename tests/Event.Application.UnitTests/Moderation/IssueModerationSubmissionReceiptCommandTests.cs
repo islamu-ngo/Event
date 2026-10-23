@@ -152,10 +152,14 @@ public sealed class IssueModerationSubmissionReceiptCommandTests
         var targetId = Guid.NewGuid();
         return new()
         {
-            Kind = ModerationCaseTargetKind.EventVersion, NativeKind = ModerationCaseTargetKind.EventVersion,
-            EventId = targetId, NativeTargetId = targetId,
-            RelationshipKind = ModerationCaseRelationshipKind.PublicEvent, RelationshipSourceId = targetId,
-            OccurrenceMaterial = RandomNumberGenerator.GetBytes(32), Material = RandomNumberGenerator.GetBytes(32)
+            Kind = ModerationCaseTargetKind.EventVersion,
+            NativeKind = ModerationCaseTargetKind.EventVersion,
+            EventId = targetId,
+            NativeTargetId = targetId,
+            RelationshipKind = ModerationCaseRelationshipKind.PublicEvent,
+            RelationshipSourceId = targetId,
+            OccurrenceMaterial = RandomNumberGenerator.GetBytes(32),
+            Material = RandomNumberGenerator.GetBytes(32)
         };
     }
 }

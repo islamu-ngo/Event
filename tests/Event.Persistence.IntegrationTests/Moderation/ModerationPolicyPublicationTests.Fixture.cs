@@ -33,11 +33,14 @@ public sealed partial class ModerationPolicyPublicationTests
     private static (GetModerationCurrentPolicyQueryHandler Handler, HttpContextAccessor Http, MachinePrincipalAccessor Machine)
         CurrentAuthoringHandler(Database database, ExploreDbContext context, ModerationCapabilityRegistry? inventory = null)
     {
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext
+        var http = new HttpContextAccessor
         {
-            User = new ClaimsPrincipal(new ClaimsIdentity(
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, database.AdminId.ToString())], "current-authoring-witness"))
-        }};
+            }
+        };
         var identity = new AdminContext(http, new PlatformUserRoleRepository(context),
             new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
             new GroupMemberRepository(context), new UserExternalLoginRepository(context),
@@ -115,27 +118,39 @@ public sealed partial class ModerationPolicyPublicationTests
             var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
             context.Tenants.Add(new Tenant
             {
-                Id = database.TenantId, FullName = "Rich publication witness", Slug = $"publication-{database.TenantId:N}",
-                TenantStatusId = status.Id, TenantStatus = status
+                Id = database.TenantId,
+                FullName = "Rich publication witness",
+                Slug = $"publication-{database.TenantId:N}",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             });
             var role = await context.Roles.SingleAsync(row =>
                 row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
             var user = new User
             {
                 Id = database.AdminId,
-                Pii = new UserPii { UserId = database.AdminId, Email = $"{database.AdminId:N}@example.invalid",
-                    FirstName = "Publication", LastName = "Witness" }
+                Pii = new UserPii
+                {
+                    UserId = database.AdminId,
+                    Email = $"{database.AdminId:N}@example.invalid",
+                    FirstName = "Publication",
+                    LastName = "Witness"
+                }
             };
             context.Users.Add(user);
             context.PlatformUserRoles.Add(new PlatformUserRole
-                { Id = Guid.CreateVersion7(), UserId = user.Id, User = user, RoleId = role.Id, Role = role });
+            { Id = Guid.CreateVersion7(), UserId = user.Id, User = user, RoleId = role.Id, Role = role });
             context.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                UserId = user.Id,
+                User = user,
+                StatusId = (int)TenantUserStatusEnum.Active
             });
             var service = new ServicePrincipal
-                { Id = Guid.CreateVersion7(), Code = $"publication-{database.TenantId:N}", DisplayName = "Publication maintenance" };
+            { Id = Guid.CreateVersion7(), Code = $"publication-{database.TenantId:N}", DisplayName = "Publication maintenance" };
             context.ServicePrincipals.Add(service);
             await context.SaveChangesAsync();
             context.ChangeTracker.Clear();
@@ -143,9 +158,13 @@ public sealed partial class ModerationPolicyPublicationTests
             var result = await new EstablishModerationAuthoritySourcesCommandHandler(
                 new ModerationAuthoritySourceRepository(context, admin, machine)).ExecuteAsync(new EstablishModerationAuthoritySourcesCommand
                 {
-                    HostBindingId = database.HostId, TrustDomainId = database.Scope.TrustDomainId,
-                    SolutionId = database.Scope.Parent!.Parent!.Id, InstanceId = database.Scope.Parent.Id,
-                    MaintenanceServicePrincipalId = service.Id, TenantId = database.TenantId, EpochId = database.EpochId
+                    HostBindingId = database.HostId,
+                    TrustDomainId = database.Scope.TrustDomainId,
+                    SolutionId = database.Scope.Parent!.Parent!.Id,
+                    InstanceId = database.Scope.Parent.Id,
+                    MaintenanceServicePrincipalId = service.Id,
+                    TenantId = database.TenantId,
+                    EpochId = database.EpochId
                 });
             if (!result.IsSuccess) throw new InvalidOperationException("Native publication authority installation failed.");
             return database;
@@ -187,10 +206,11 @@ public sealed partial class ModerationPolicyPublicationTests
 
         public ModerationPolicyPublicationRequest Next(ModerationPolicyPublicationRequest prior) => prior with
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = prior.ExpectedQualificationRevision + 1,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = prior.ExpectedQualificationRevision + 1,
             ExpectedPublicationId = prior.Proposed.PublicationId,
             Proposed = prior.Proposed with
-                { PublicationId = Guid.CreateVersion7(), ExpectedRevision = prior.Proposed.ExpectedRevision + 1 }
+            { PublicationId = Guid.CreateVersion7(), ExpectedRevision = prior.Proposed.ExpectedRevision + 1 }
         };
 
         public ModerationPolicyPublicationRepository Writer(
@@ -249,11 +269,14 @@ public sealed partial class ModerationPolicyPublicationTests
 
         private (AdminContext Admin, MachinePrincipalAccessor Machine) Identity(ExploreDbContext context)
         {
-            var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext
+            var http = new HttpContextAccessor
             {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
                     [new Claim(ClaimTypes.NameIdentifier, AdminId.ToString())], "publication-witness"))
-            }};
+                }
+            };
             return (new(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
                 new OrganizationMemberRepository(context), new GroupMemberRepository(context),
                 new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance), new(http));

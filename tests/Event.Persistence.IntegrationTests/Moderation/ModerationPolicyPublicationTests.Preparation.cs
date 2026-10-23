@@ -68,7 +68,8 @@ public sealed partial class ModerationPolicyPublicationTests
             .IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         var adopted = request with
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 2,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 2,
             Proposed = request.Proposed with { PublicationId = Guid.CreateVersion7() }
         };
         await Assert.That((await database.PublishAsync(adopted)).Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
@@ -108,7 +109,8 @@ public sealed partial class ModerationPolicyPublicationTests
         var first = await writer.PrepareAsync(request, Now.AddMinutes(10));
         var competing = request with
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 2,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 2,
             Proposed = request.Proposed with { PublicationId = Guid.CreateVersion7() }
         };
         var second = await writer.PrepareAsync(competing, Now.AddMinutes(10));

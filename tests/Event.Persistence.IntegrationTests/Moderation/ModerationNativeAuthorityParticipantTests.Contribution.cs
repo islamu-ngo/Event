@@ -62,16 +62,27 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
             writer.ModerationTrustDomainId = database.Scope.TrustDomainId;
             var selection = new ModerationContributionSelection
             {
-                Id = selectionId, EffectId = operation.EffectId, DecisionId = database.Decision.Id,
+                Id = selectionId,
+                EffectId = operation.EffectId,
+                DecisionId = database.Decision.Id,
                 DecisionRevision = substitution == 5 ? noticeDecisionRevision + 1 : noticeDecisionRevision,
-                CaseId = database.Case.Id, CaseRevision = 1,
-                PolicyId = database.PublicationRequest.Proposed.PolicyId, PolicyRevision = 1,
-                PublicationId = database.PublicationRequest.Proposed.PublicationId, ProfileId = database.Rule.Id,
-                HostBindingId = database.HostId, TrustDomainId = database.Scope.TrustDomainId,
-                TenantId = database.TenantId, AuthoredByHumanId = database.UrgencyAssessorId,
-                WriterGeneration = substitution == 11 ? 5 : 3, Revision = 1,
+                CaseId = database.Case.Id,
+                CaseRevision = 1,
+                PolicyId = database.PublicationRequest.Proposed.PolicyId,
+                PolicyRevision = 1,
+                PublicationId = database.PublicationRequest.Proposed.PublicationId,
+                ProfileId = database.Rule.Id,
+                HostBindingId = database.HostId,
+                TrustDomainId = database.Scope.TrustDomainId,
+                TenantId = database.TenantId,
+                AuthoredByHumanId = database.UrgencyAssessorId,
+                WriterGeneration = substitution == 11 ? 5 : 3,
+                Revision = 1,
                 SelectionDigest = ModerationNoticeSnapshotFactory.SelectionDigest(contribution),
-                StartsAt = contribution.StartsAt, EventWindowEnd = null, RecordedAt = Now, ValidUntil = Now.AddMinutes(5),
+                StartsAt = contribution.StartsAt,
+                EventWindowEnd = null,
+                RecordedAt = Now,
+                ValidUntil = Now.AddMinutes(5),
                 Bindings = ModerationContributionSelectionProjection.Bindings(selectionId,
                     substitution == 6 ? contribution with
                     {
@@ -81,13 +92,21 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
             writer.ModerationContributionSelections.Add(selection);
             var selectionSource = new RecordModerationContributionSelectionSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
                 ExpectedQualificationRevision = selection.WriterGeneration - 1,
-                SelectionId = selection.Id, EffectId = operation.EffectId, CaseId = selection.CaseId,
-                ExpectedCaseRevision = selection.CaseRevision, DecisionId = selection.DecisionId,
-                ExpectedDecisionRevision = selection.DecisionRevision, PolicyId = selection.PolicyId,
-                ExpectedPolicyRevision = 1, PublicationId = selection.PublicationId, ProfileId = selection.ProfileId,
-                Contribution = contribution, ValidUntil = selection.ValidUntil
+                SelectionId = selection.Id,
+                EffectId = operation.EffectId,
+                CaseId = selection.CaseId,
+                ExpectedCaseRevision = selection.CaseRevision,
+                DecisionId = selection.DecisionId,
+                ExpectedDecisionRevision = selection.DecisionRevision,
+                PolicyId = selection.PolicyId,
+                ExpectedPolicyRevision = 1,
+                PublicationId = selection.PublicationId,
+                ProfileId = selection.ProfileId,
+                Contribution = contribution,
+                ValidUntil = selection.ValidUntil
             };
             if (substitution != 1)
                 writer.ModerationQualificationMutationReceipts.Add(ModerationQualificationMutationReceipt.Complete(
@@ -107,7 +126,10 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
                 intent, database.HostId, database.Scope.TrustDomainId, database.TenantId, database.AssessorId, 4, Now);
             var disclosureSource = new ApproveModerationNoticeDisclosureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3, Intent = intent
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 3,
+                Intent = intent
             };
             writer.ModerationNoticeDisclosureApprovals.Add(approval);
             writer.ModerationQualificationMutationReceipts.Add(ModerationQualificationMutationReceipt.Complete(

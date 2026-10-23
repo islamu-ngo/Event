@@ -282,7 +282,9 @@ public sealed partial class EventPublicationModerationMutationTests
             Guid.CreateVersion7(), Guid.CreateVersion7(), maintenanceId);
         fixture.Context.ServicePrincipals.Add(new ServicePrincipal
         {
-            Id = maintenanceId, Code = $"ticket-publication-{maintenanceId:N}", DisplayName = "Ticket publication maintenance"
+            Id = maintenanceId,
+            Code = $"ticket-publication-{maintenanceId:N}",
+            DisplayName = "Ticket publication maintenance"
         });
         fixture.Context.ModerationHostBindings.Add(host);
         var tenant = await fixture.Context.Tenants.SingleAsync(row => row.Id == fixture.TenantId);

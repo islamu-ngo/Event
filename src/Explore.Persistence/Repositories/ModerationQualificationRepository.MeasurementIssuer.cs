@@ -62,10 +62,17 @@ public sealed partial class ModerationQualificationRepository
             throw new AbortQualification(ModerationQualificationWriteOutcome.Conflict);
         await RequireTargetSourceReceiptAsync(new EnrollModerationMeasurementIssuerSource
         {
-            OperationId = Guid.Empty, Target = authority.Tenant, ExpectedQualificationRevision = enrollment.WriterGeneration - 1,
-            EnrollmentId = enrollment.Id, KeyId = enrollment.KeyId, Issuer = enrollment.Issuer,
-            PublicKeySpkiBase64 = enrollment.PublicKeySpkiBase64, RunnerDigest = enrollment.RunnerDigest,
-            CatalogueDigest = enrollment.CatalogueDigest, TestBundleDigest = enrollment.TestBundleDigest, ValidUntil = enrollment.ValidUntil
+            OperationId = Guid.Empty,
+            Target = authority.Tenant,
+            ExpectedQualificationRevision = enrollment.WriterGeneration - 1,
+            EnrollmentId = enrollment.Id,
+            KeyId = enrollment.KeyId,
+            Issuer = enrollment.Issuer,
+            PublicKeySpkiBase64 = enrollment.PublicKeySpkiBase64,
+            RunnerDigest = enrollment.RunnerDigest,
+            CatalogueDigest = enrollment.CatalogueDigest,
+            TestBundleDigest = enrollment.TestBundleDigest,
+            ValidUntil = enrollment.ValidUntil
         }, ModerationQualificationSourceKind.MeasurementIssuerEnrollment, enrollment.Id, 1,
             enrollment.ApprovedByHumanId, enrollment.WriterGeneration, enrollment.ApprovedAt, authority, token);
         enrollment.Revoke(source.ExpectedEnrollmentRevision, authority.UserId, now);

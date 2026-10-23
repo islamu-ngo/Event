@@ -198,7 +198,8 @@ public sealed class ModerationCaseTargetReceiptPersistenceTests
 
         public ExploreDbContext Context() => new(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
-            .UseSnakeCaseNamingConvention().Options) { TenantContext = new SelectedTenant(TenantId) };
+            .UseSnakeCaseNamingConvention().Options)
+        { TenantContext = new SelectedTenant(TenantId) };
 
         public static async Task<ReceiptDatabase> CreateAsync()
         {
@@ -209,12 +210,17 @@ public sealed class ModerationCaseTargetReceiptPersistenceTests
             var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
             var tenant = new Tenant
             {
-                Id = database.TenantId, Slug = $"intake-{database.TenantId:N}",
-                FullName = "Intake receipt tests", TenantStatusId = status.Id, TenantStatus = status
+                Id = database.TenantId,
+                Slug = $"intake-{database.TenantId:N}",
+                FullName = "Intake receipt tests",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             };
             var service = new ServicePrincipal
             {
-                Id = Guid.CreateVersion7(), Code = $"intake-{Guid.CreateVersion7():N}", DisplayName = "Maintenance"
+                Id = Guid.CreateVersion7(),
+                Code = $"intake-{Guid.CreateVersion7():N}",
+                DisplayName = "Maintenance"
             };
             var host = ModerationHostBinding.Establish(Guid.CreateVersion7(), database.Instance.TrustDomainId,
                 database.Instance.Parent!.Id, database.Instance.Id, service.Id);
@@ -232,10 +238,13 @@ public sealed class ModerationCaseTargetReceiptPersistenceTests
             context.AddRange(tenant, service, host, epoch, receipt);
             context.Users.Add(new User
             {
-                Id = database.CallerId, Pii = new UserPii
+                Id = database.CallerId,
+                Pii = new UserPii
                 {
-                    UserId = database.CallerId, Email = $"{database.CallerId:N}@example.invalid",
-                    FirstName = "Receipt", LastName = "Caller"
+                    UserId = database.CallerId,
+                    Email = $"{database.CallerId:N}@example.invalid",
+                    FirstName = "Receipt",
+                    LastName = "Caller"
                 }
             });
             await context.SaveChangesAsync();

@@ -309,9 +309,18 @@ public sealed partial class RegistrationProviderFoundationPersistenceTests
         await context.SaveChangesAsync();
         Explore.Domain.Event @event = new(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), Title = "Publication", ActorId = actor.Id, Actor = null!,
-            TenantId = tenantId, Tenant = null!, EventStatus = null!, EventFormatId = 1,
-            EventFormat = null!, EventProvenanceTypeId = 1, VisibilityTypeId = 1, VisibilityType = null!,
+            Id = Guid.CreateVersion7(),
+            Title = "Publication",
+            ActorId = actor.Id,
+            Actor = null!,
+            TenantId = tenantId,
+            Tenant = null!,
+            EventStatus = null!,
+            EventFormatId = 1,
+            EventFormat = null!,
+            EventProvenanceTypeId = 1,
+            VisibilityTypeId = 1,
+            VisibilityType = null!,
             ConcurrencyStamp = Guid.CreateVersion7()
         };
         context.Events.Add(@event);

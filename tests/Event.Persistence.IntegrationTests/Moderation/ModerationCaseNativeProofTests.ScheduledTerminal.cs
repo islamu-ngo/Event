@@ -79,9 +79,12 @@ public sealed partial class ModerationCaseNativeProofTests
         var result = await fixture.Original.Repository(context, fixture.Case.Subject!.Id).ExecuteAsync(
             new RecordModerationCaseResponse
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Case.Scope,
-                ExpectedQualificationRevision = epoch.Revision, EvidenceId = Guid.CreateVersion7(),
-                CaseId = fixture.Case.Id, ExpectedCaseRevision = fixture.Case.Revision,
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Case.Scope,
+                ExpectedQualificationRevision = epoch.Revision,
+                EvidenceId = Guid.CreateVersion7(),
+                CaseId = fixture.Case.Id,
+                ExpectedCaseRevision = fixture.Case.Revision,
                 Statement = "Use the existing protected response channel."
             }, default);
         await Assert.That(result.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
@@ -175,9 +178,13 @@ public sealed partial class ModerationCaseNativeProofTests
         await WriteScheduledTerminalSourceAsync(fixture, fixture.Original.Assessor,
             new RecordModerationEventGenerationSource
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Case.Scope,
-                ExpectedQualificationRevision = 1, SourceId = generationId,
-                EventId = database.EventId, ExpectedEventRevision = 0, ValidUntil = fixture.Until
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Case.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = generationId,
+                EventId = database.EventId,
+                ExpectedEventRevision = 0,
+                ValidUntil = fixture.Until
             });
         var target = new ModerationPolicyTarget(fixture.Case.Scope, fixture.Decision.Subject.Kind,
             fixture.Decision.Subject.Id, database.EventId, 1, "event.publish", null);
@@ -189,31 +196,50 @@ public sealed partial class ModerationCaseNativeProofTests
         await WriteScheduledTerminalSourceAsync(fixture, fixture.Original.Assessor,
             new RecordModerationContributionSelectionSource
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Case.Scope,
-                ExpectedQualificationRevision = 1, SelectionId = selectionId, EffectId = operation.EffectId,
-                CaseId = fixture.Case.Id, ExpectedCaseRevision = fixture.Case.Revision,
-                DecisionId = fixture.Decision.Id, ExpectedDecisionRevision = fixture.Decision.Revision,
-                PolicyId = publication.PolicyId, ExpectedPolicyRevision = publication.Revision,
-                PublicationId = publication.Id, ProfileId = profile.Id,
-                Contribution = contribution, ValidUntil = fixture.Until
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Case.Scope,
+                ExpectedQualificationRevision = 1,
+                SelectionId = selectionId,
+                EffectId = operation.EffectId,
+                CaseId = fixture.Case.Id,
+                ExpectedCaseRevision = fixture.Case.Revision,
+                DecisionId = fixture.Decision.Id,
+                ExpectedDecisionRevision = fixture.Decision.Revision,
+                PolicyId = publication.PolicyId,
+                ExpectedPolicyRevision = publication.Revision,
+                PublicationId = publication.Id,
+                ProfileId = profile.Id,
+                Contribution = contribution,
+                ValidUntil = fixture.Until
             });
         // Each real retained ordinal is independently adopted against the native Event generation.
         foreach (var binding in ModerationContributionSelectionProjection.Bindings(selectionId, contribution))
             await WriteScheduledTerminalSourceAsync(fixture, fixture.PrivacyOwner,
                 new AdoptModerationEventTargetSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Case.Scope,
-                    ExpectedQualificationRevision = 1, AdoptionId = Guid.CreateVersion7(),
-                    SelectionId = selectionId, BindingOrdinal = binding.Ordinal, GenerationId = generationId,
-                    ExpectedGenerationRevision = 1, CaseId = fixture.Case.Id,
-                    ExpectedCaseRevision = fixture.Case.Revision, ValidUntil = fixture.Until
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Case.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AdoptionId = Guid.CreateVersion7(),
+                    SelectionId = selectionId,
+                    BindingOrdinal = binding.Ordinal,
+                    GenerationId = generationId,
+                    ExpectedGenerationRevision = 1,
+                    CaseId = fixture.Case.Id,
+                    ExpectedCaseRevision = fixture.Case.Revision,
+                    ValidUntil = fixture.Until
                 });
         await WriteScheduledTerminalSourceAsync(fixture, fixture.PrivacyOwner, new AdoptModerationProfileSource
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Case.Scope,
-            ExpectedQualificationRevision = 1, AdoptionId = profileAdoptionId,
-            SelectionId = selectionId, Mode = ModerationNativeMode.Embedded,
-            CaseId = fixture.Case.Id, ExpectedCaseRevision = fixture.Case.Revision, ValidUntil = fixture.Until
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Case.Scope,
+            ExpectedQualificationRevision = 1,
+            AdoptionId = profileAdoptionId,
+            SelectionId = selectionId,
+            Mode = ModerationNativeMode.Embedded,
+            CaseId = fixture.Case.Id,
+            ExpectedCaseRevision = fixture.Case.Revision,
+            ValidUntil = fixture.Until
         });
         var draft = ModerationPolicyPublicationProjection.RestoreHistory(publication)!;
         var reason = draft.Proposed.Reasons.Single(row => row.Reference == profile.Reason);
@@ -230,8 +256,10 @@ public sealed partial class ModerationCaseNativeProofTests
         await WriteScheduledTerminalSourceAsync(fixture, fixture.Original.Review.Caller.UserId!.Value,
             new ApproveModerationNoticeDisclosureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Case.Scope,
-                ExpectedQualificationRevision = 1, Intent = disclosure
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Case.Scope,
+                ExpectedQualificationRevision = 1,
+                Intent = disclosure
             });
 
         long qualificationRevision;
@@ -391,7 +419,8 @@ public sealed partial class ModerationCaseNativeProofTests
         var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
         context.CurrentUserService = new NativeCaller(human ?? Guid.Empty)
         {
-            UserId = human, IsAuthenticated = human is not null
+            UserId = human,
+            IsAuthenticated = human is not null
         };
         if (human is { } id)
             http.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(

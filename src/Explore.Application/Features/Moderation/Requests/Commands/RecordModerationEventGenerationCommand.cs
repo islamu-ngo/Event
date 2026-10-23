@@ -10,7 +10,12 @@ public sealed record RecordModerationEventGenerationCommand : ModerationQualific
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationEventGenerationSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, EventId = EventId, ExpectedEventRevision = ExpectedEventRevision, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        EventId = EventId,
+        ExpectedEventRevision = ExpectedEventRevision,
+        ValidUntil = ValidUntil
     };
 }

@@ -40,7 +40,8 @@ public sealed class ModerationClassificationMaterialInventoryReadProjection : IA
             observed.Materials, observed.Components, observed.Taxonomy.Categories.Select(category =>
                 new ModerationClassificationMaterialCategoryView(category.Id, category.CategoryId, category.Revision,
                     category.Code, category.Kind, category.MinimumAge, category.Meaning, category.ReviewRationale)).ToImmutableArray(),
-            observed.ValidUntil) { NativeOwnerQualified = true };
+            observed.ValidUntil)
+        { NativeOwnerQualified = true };
         var representation = await prepare(view, token);
         token.ThrowIfCancellationRequested();
         var current = await lease.RevalidateAsync(token);

@@ -645,22 +645,37 @@ public sealed partial class ModerationCaseNativeProofTests
             {
                 foreach (var id in new[] { privacyOwner, assessor })
                 {
-                    seed.Users.Add(new User { Id = id, Pii = new UserPii
+                    seed.Users.Add(new User
                     {
-                        UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Independent", LastName = "Owner"
-                    }});
+                        Id = id,
+                        Pii = new UserPii
+                        {
+                            UserId = id,
+                            Email = $"{id:N}@example.invalid",
+                            FirstName = "Independent",
+                            LastName = "Owner"
+                        }
+                    });
                     seed.PlatformUserRoles.Add(new PlatformUserRole
                     {
-                        Id = Guid.CreateVersion7(), UserId = id, RoleId = (int)RoleEnum.Admin,
-                        User = null!, Role = null!, GrantedAt = database.Clock.Now.UtcDateTime
+                        Id = Guid.CreateVersion7(),
+                        UserId = id,
+                        RoleId = (int)RoleEnum.Admin,
+                        User = null!,
+                        Role = null!,
+                        GrantedAt = database.Clock.Now.UtcDateTime
                     });
                 }
                 foreach (var id in new[] { database.CallerId, review.Caller.UserId!.Value, privacyOwner, assessor })
                     if (!await seed.TenantUsers.AnyAsync(row => row.TenantId == database.TenantId && row.UserId == id))
                         seed.TenantUsers.Add(new TenantUser
                         {
-                            Id = Guid.CreateVersion7(), TenantId = database.TenantId, UserId = id,
-                            StatusId = (int)TenantUserStatusEnum.Active, Tenant = null!, User = null!
+                            Id = Guid.CreateVersion7(),
+                            TenantId = database.TenantId,
+                            UserId = id,
+                            StatusId = (int)TenantUserStatusEnum.Active,
+                            Tenant = null!,
+                            User = null!
                         });
                 await seed.SaveChangesAsync();
             }
@@ -668,18 +683,32 @@ public sealed partial class ModerationCaseNativeProofTests
             var until = database.Clock.Now.AddSeconds(50);
             await fixture.QualifyAsync(assessor, new PublishModerationQualificationPolicySource
             {
-                OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                SourceId = policyId, CaseId = owner.Id, ExpectedCaseRevision = 1, ExpectedSourceRevision = 0,
-                MaximumReviewerLifetime = TimeSpan.FromMinutes(1), MaximumUrgencyLifetime = TimeSpan.FromMinutes(1), ValidUntil = until
+                OperationId = Guid.CreateVersion7(),
+                Target = owner.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = policyId,
+                CaseId = owner.Id,
+                ExpectedCaseRevision = 1,
+                ExpectedSourceRevision = 0,
+                MaximumReviewerLifetime = TimeSpan.FromMinutes(1),
+                MaximumUrgencyLifetime = TimeSpan.FromMinutes(1),
+                ValidUntil = until
             });
             await using (var read = database.Context())
             {
                 var policy = await read.ModerationQualificationPolicySources.SingleAsync(row => row.Id == policyId);
                 await fixture.QualifyAsync(privacyOwner, new AdoptModerationQualificationPolicySource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                    SourceId = policyId, CaseId = owner.Id, ExpectedCaseRevision = 1, ExpectedSourceRevision = 1,
-                    ExpectedWriterGeneration = policy.WriterGeneration, AdoptionId = Guid.CreateVersion7(), ValidUntil = until
+                    OperationId = Guid.CreateVersion7(),
+                    Target = owner.Scope,
+                    ExpectedQualificationRevision = 1,
+                    SourceId = policyId,
+                    CaseId = owner.Id,
+                    ExpectedCaseRevision = 1,
+                    ExpectedSourceRevision = 1,
+                    ExpectedWriterGeneration = policy.WriterGeneration,
+                    AdoptionId = Guid.CreateVersion7(),
+                    ValidUntil = until
                 });
             }
             foreach (var reviewer in new[] { review.Caller.UserId!.Value, privacyOwner })
@@ -687,21 +716,35 @@ public sealed partial class ModerationCaseNativeProofTests
                 var assignmentId = Guid.CreateVersion7();
                 await fixture.QualifyAsync(assessor, new AssignModerationReviewerSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = assignmentId, CaseId = owner.Id, ExpectedCaseRevision = 1, ReviewerHumanId = reviewer
+                    OperationId = Guid.CreateVersion7(),
+                    Target = owner.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = assignmentId,
+                    CaseId = owner.Id,
+                    ExpectedCaseRevision = 1,
+                    ReviewerHumanId = reviewer
                 });
                 await fixture.QualifyAsync(assessor, new QualifyModerationReviewerController
                 {
-                    OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = assignmentId, ExpectedAssignmentRevision = 1, ControllerHumanId = reviewer,
-                    EvidenceId = Guid.CreateVersion7(), Justification = "Independently verified canonical controller.",
+                    OperationId = Guid.CreateVersion7(),
+                    Target = owner.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = assignmentId,
+                    ExpectedAssignmentRevision = 1,
+                    ControllerHumanId = reviewer,
+                    EvidenceId = Guid.CreateVersion7(),
+                    Justification = "Independently verified canonical controller.",
                     QualifiedUntil = until
                 });
                 await fixture.QualifyAsync(assessor, new AssessModerationReviewerConflict
                 {
-                    OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = assignmentId, ExpectedAssignmentRevision = 2,
-                    State = ModerationReviewerConflictState.Independent, EvidenceId = Guid.CreateVersion7(),
+                    OperationId = Guid.CreateVersion7(),
+                    Target = owner.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = assignmentId,
+                    ExpectedAssignmentRevision = 2,
+                    State = ModerationReviewerConflictState.Independent,
+                    EvidenceId = Guid.CreateVersion7(),
                     Justification = "Independent of this attributed Content case and its representative."
                 });
             }

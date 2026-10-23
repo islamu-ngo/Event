@@ -124,26 +124,47 @@ public sealed class ModerationDecisionControllerTests
             case 0:
                 return await adjudication.AcceptFinding(decisionId, findingId, new()
                 {
-                    OperationId = operation, EffectId = effect, DecisionId = bodyDecision, Subject = subject,
-                    Target = target, ExpectedRevision = 1, ExpectedPolicyRevision = 1, FindingId = Guid.CreateVersion7()
+                    OperationId = operation,
+                    EffectId = effect,
+                    DecisionId = bodyDecision,
+                    Subject = subject,
+                    Target = target,
+                    ExpectedRevision = 1,
+                    ExpectedPolicyRevision = 1,
+                    FindingId = Guid.CreateVersion7()
                 }, default);
             case 1:
                 return await adjudication.Approve(decisionId, new()
                 {
-                    OperationId = operation, EffectId = effect, DecisionId = bodyDecision, Subject = subject,
-                    Target = target, ExpectedRevision = 1, ExpectedPolicyRevision = 1
+                    OperationId = operation,
+                    EffectId = effect,
+                    DecisionId = bodyDecision,
+                    Subject = subject,
+                    Target = target,
+                    ExpectedRevision = 1,
+                    ExpectedPolicyRevision = 1
                 }, default);
             case 2:
                 return await adjudication.Reject(decisionId, new()
                 {
-                    OperationId = operation, EffectId = effect, DecisionId = bodyDecision, Subject = subject,
-                    Target = target, ExpectedRevision = 1, ExpectedPolicyRevision = 1
+                    OperationId = operation,
+                    EffectId = effect,
+                    DecisionId = bodyDecision,
+                    Subject = subject,
+                    Target = target,
+                    ExpectedRevision = 1,
+                    ExpectedPolicyRevision = 1
                 }, default);
             case 3:
                 return await adjudication.Withdraw(decisionId, new()
                 {
-                    OperationId = operation, EffectId = effect, DecisionId = bodyDecision, Subject = subject,
-                    Target = target, ExpectedRevision = 1, ExpectedPolicyRevision = 1
+                    OperationId = operation,
+                    EffectId = effect,
+                    DecisionId = bodyDecision,
+                    Subject = subject,
+                    Target = target,
+                    ExpectedRevision = 1,
+                    ExpectedPolicyRevision = 1
                 }, default);
             case 5:
                 var proposals = new ModerationDecisionProposalController(new ProposeModerationDecisionCommandHandler(operations))
@@ -152,8 +173,13 @@ public sealed class ModerationDecisionControllerTests
                 };
                 return await proposals.Propose(decisionId, new()
                 {
-                    OperationId = operation, EffectId = effect, DecisionId = bodyDecision, Subject = subject,
-                    Target = target, ExpectedRevision = 1, ExpectedPolicyRevision = 1,
+                    OperationId = operation,
+                    EffectId = effect,
+                    DecisionId = bodyDecision,
+                    Subject = subject,
+                    Target = target,
+                    ExpectedRevision = 1,
+                    ExpectedPolicyRevision = 1,
                     Proposal = new(Guid.CreateVersion7(), ModerationRuleReference.Create(Guid.CreateVersion7(), "conduct", 1),
                         [ModerationCapability.Publish], new(2026, 10, 12, 12, 0, 0, TimeSpan.Zero),
                         new(2026, 10, 13, 12, 0, 0, TimeSpan.Zero), null, 1)
@@ -165,8 +191,14 @@ public sealed class ModerationDecisionControllerTests
                 };
                 return await revocation.Revoke(decisionId, findingId, new()
                 {
-                    OperationId = operation, EffectId = effect, DecisionId = bodyDecision, Subject = subject,
-                    Target = target, ExpectedRevision = 1, ExpectedPolicyRevision = 1, SanctionId = Guid.CreateVersion7()
+                    OperationId = operation,
+                    EffectId = effect,
+                    DecisionId = bodyDecision,
+                    Subject = subject,
+                    Target = target,
+                    ExpectedRevision = 1,
+                    ExpectedPolicyRevision = 1,
+                    SanctionId = Guid.CreateVersion7()
                 }, default);
             case 7:
                 var supersession = new ModerationSanctionSupersessionController(new SupersedeModerationSanctionCommandHandler(operations))
@@ -175,9 +207,17 @@ public sealed class ModerationDecisionControllerTests
                 };
                 return await supersession.Supersede(decisionId, findingId, new()
                 {
-                    OperationId = operation, EffectId = effect, DecisionId = bodyDecision, Subject = subject,
-                    Target = target, ExpectedRevision = 1, ExpectedPolicyRevision = 1, SanctionId = Guid.CreateVersion7(),
-                    SupersededSanctionId = Guid.CreateVersion7(), SupersededScope = target, ExpectedSanctionRevision = 1
+                    OperationId = operation,
+                    EffectId = effect,
+                    DecisionId = bodyDecision,
+                    Subject = subject,
+                    Target = target,
+                    ExpectedRevision = 1,
+                    ExpectedPolicyRevision = 1,
+                    SanctionId = Guid.CreateVersion7(),
+                    SupersededSanctionId = Guid.CreateVersion7(),
+                    SupersededScope = target,
+                    ExpectedSanctionRevision = 1
                 }, default);
             default:
                 var activation = new ModerationDecisionActivationController(new ActivateModerationDecisionCommandHandler(operations))
@@ -186,8 +226,14 @@ public sealed class ModerationDecisionControllerTests
                 };
                 return await activation.Activate(decisionId, new()
                 {
-                    OperationId = operation, EffectId = effect, DecisionId = bodyDecision, Subject = subject,
-                    Target = target, ExpectedRevision = 1, ExpectedPolicyRevision = 1, SanctionId = Guid.CreateVersion7()
+                    OperationId = operation,
+                    EffectId = effect,
+                    DecisionId = bodyDecision,
+                    Subject = subject,
+                    Target = target,
+                    ExpectedRevision = 1,
+                    ExpectedPolicyRevision = 1,
+                    SanctionId = Guid.CreateVersion7()
                 }, default);
         }
     }

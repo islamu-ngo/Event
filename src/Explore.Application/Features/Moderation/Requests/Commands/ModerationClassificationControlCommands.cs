@@ -22,13 +22,21 @@ public sealed record RecordModerationClassificationControlSelectionCommand : Mod
 
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationClassificationControlSelection
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SelectionId = SelectionId, MaterialSourceId = MaterialSourceId,
-        ExpectedMaterialSourceRevision = ExpectedMaterialSourceRevision, ExpectedMaterialWriterGeneration = ExpectedMaterialWriterGeneration,
-        MaterialReviewId = MaterialReviewId, ExpectedMaterialReviewRevision = ExpectedMaterialReviewRevision,
-        ExpectedReviewWriterGeneration = ExpectedReviewWriterGeneration, EventGenerationId = EventGenerationId,
-        ExpectedEventGenerationRevision = ExpectedEventGenerationRevision, ExpectedEventWriterGeneration = ExpectedEventWriterGeneration,
-        Contribution = Contribution, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SelectionId = SelectionId,
+        MaterialSourceId = MaterialSourceId,
+        ExpectedMaterialSourceRevision = ExpectedMaterialSourceRevision,
+        ExpectedMaterialWriterGeneration = ExpectedMaterialWriterGeneration,
+        MaterialReviewId = MaterialReviewId,
+        ExpectedMaterialReviewRevision = ExpectedMaterialReviewRevision,
+        ExpectedReviewWriterGeneration = ExpectedReviewWriterGeneration,
+        EventGenerationId = EventGenerationId,
+        ExpectedEventGenerationRevision = ExpectedEventGenerationRevision,
+        ExpectedEventWriterGeneration = ExpectedEventWriterGeneration,
+        Contribution = Contribution,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -45,10 +53,16 @@ public sealed record AdoptModerationClassificationEventTargetCommand : Moderatio
 
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationClassificationEventTarget
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, SelectionId = SelectionId, ExpectedSelectionRevision = ExpectedSelectionRevision,
-        BindingOrdinal = BindingOrdinal, EventGenerationId = EventGenerationId,
-        ExpectedEventGenerationRevision = ExpectedEventGenerationRevision, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        SelectionId = SelectionId,
+        ExpectedSelectionRevision = ExpectedSelectionRevision,
+        BindingOrdinal = BindingOrdinal,
+        EventGenerationId = EventGenerationId,
+        ExpectedEventGenerationRevision = ExpectedEventGenerationRevision,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -61,7 +75,11 @@ public sealed record RevokeModerationClassificationEventTargetCommand : Moderati
 
     internal override ModerationQualificationMutation ToMutation() => new RevokeModerationClassificationEventTarget
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision, Grounds = Grounds
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision,
+        Grounds = Grounds
     };
 }

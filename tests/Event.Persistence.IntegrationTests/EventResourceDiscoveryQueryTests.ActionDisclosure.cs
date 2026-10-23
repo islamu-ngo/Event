@@ -147,17 +147,26 @@ public sealed partial class EventResourceDiscoveryQueryTests
         var fixture = await context.StorageObjects.AsNoTracking().SingleAsync(row => row.Id == scope.StorageAId);
         var storage = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-            FileTypeId = fixture.FileTypeId, FileType = null!, Provider = fixture.Provider,
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            FileTypeId = fixture.FileTypeId,
+            FileType = null!,
+            Provider = fixture.Provider,
             StorageProviderBindingId = fixture.StorageProviderBindingId,
             ObjectKey = $"fixtures/{Guid.CreateVersion7():N}.pdf",
-            FullName = "audience-action.pdf", SafeDisplayName = "audience-action.pdf",
-            Extension = ".pdf", ContentType = "application/pdf",
+            FullName = "audience-action.pdf",
+            SafeDisplayName = "audience-action.pdf",
+            Extension = ".pdf",
+            ContentType = "application/pdf",
             Sha256Checksum = Convert.ToHexString(SHA256.HashData("audience action fixture"u8)),
-            Size = 1024, Purpose = StorageObjectPurposes.EventResource,
+            Size = 1024,
+            Purpose = StorageObjectPurposes.EventResource,
             Visibility = StorageObjectVisibilities.PrivateOwner,
-            OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = resource.Id,
-            LifecycleState = StorageObjectLifecycleStates.Active, ConcurrencyStamp = Guid.CreateVersion7()
+            OwningResourceKind = StorageOwningResourceKinds.EventResource,
+            OwningResourceId = resource.Id,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         storage.RecordEventResourceInspection(storage.Id, storage.Sha256Checksum!);
         resource.SetStoredFile(storage.Id, resource.ConcurrencyStamp, publisher, Now);

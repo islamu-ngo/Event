@@ -36,9 +36,13 @@ public sealed class OrganizationCreationMutationTests
             var membership = await context.TenantUsers.SingleAsync(row => row.UserId == database.SubjectId);
             context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, TenantUserId = membership.Id,
-                RoleId = (int)RoleEnum.TenantAdmin, RoleScopeId = (int)RoleScopeEnum.Tenant,
-                GrantedAt = DateTime.UtcNow, GrantedBy = database.AdministratorId
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                TenantUserId = membership.Id,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = DateTime.UtcNow,
+                GrantedBy = database.AdministratorId
             });
         }
         if (absentHost)
@@ -113,7 +117,8 @@ public sealed class OrganizationCreationMutationTests
         var checkpoint = new ChangeCreatorOnEpochSave(database.ReviewerId);
         await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(baseline.Database.GetDbConnection()).UseSnakeCaseNamingConvention()
-            .AddInterceptors(checkpoint).Options) { TenantContext = database };
+            .AddInterceptors(checkpoint).Options)
+        { TenantContext = database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
         var session = OrganizationMemberMutationBoundaryTests.CreateBoundary(context,
             (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.SubjectId);
@@ -139,15 +144,20 @@ public sealed class OrganizationCreationMutationTests
         var grantId = Guid.CreateVersion7();
         baseline.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = grantId, TenantId = database.TenantId, TenantUserId = membership.Id,
-            RoleId = (int)RoleEnum.TenantAdmin, RoleScopeId = (int)RoleScopeEnum.Tenant,
-            GrantedAt = DateTime.UtcNow, GrantedBy = database.AdministratorId
+            Id = grantId,
+            TenantId = database.TenantId,
+            TenantUserId = membership.Id,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            RoleScopeId = (int)RoleScopeEnum.Tenant,
+            GrantedAt = DateTime.UtcNow,
+            GrantedBy = database.AdministratorId
         });
         await baseline.SaveChangesAsync();
         var checkpoint = new RevokeApprovalOnEpochSave(grantId);
         await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(baseline.Database.GetDbConnection()).UseSnakeCaseNamingConvention()
-            .AddInterceptors(checkpoint).Options) { TenantContext = database };
+            .AddInterceptors(checkpoint).Options)
+        { TenantContext = database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
         var session = OrganizationMemberMutationBoundaryTests.CreateBoundary(context,
             (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.SubjectId);
@@ -206,11 +216,19 @@ public sealed class OrganizationCreationMutationTests
         await Assert.That(await context.Actors.CountAsync(row => row.OrganizationId != null)).IsEqualTo(0);
         await Assert.That(await context.ModerationQualificationEpochs.Select(row => row.Revision).SingleAsync()).IsEqualTo(1L);
     }
-    private static CreateOrganizationCommand Command() => new() { OrganizationDto = new CreateOrganizationDto
+    private static CreateOrganizationCommand Command() => new()
     {
-        FullName = "New organization", WebsiteUrl = "https://new.example.test", Email = "office@example.test",
-        Country = "BE", City = "Brussels", Postcode = 1000, Address = "Square 1"
-    } };
+        OrganizationDto = new CreateOrganizationDto
+        {
+            FullName = "New organization",
+            WebsiteUrl = "https://new.example.test",
+            Email = "office@example.test",
+            Country = "BE",
+            City = "Brussels",
+            Postcode = 1000,
+            Address = "Square 1"
+        }
+    };
     private static ServiceProvider Services()
     {
         var services = new ServiceCollection(); services.AddHybridCache(); services.AddMetrics();

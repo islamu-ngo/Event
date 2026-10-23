@@ -156,28 +156,60 @@ public sealed partial class ModerationPolicyPublicationTests
             ? Guid.CreateVersion7() : reviewer;
         foreach (var human in new[] { owner, reviewer, adopter, reviewerController }.Distinct())
         {
-            context.Users.Add(new User { Id = human, Pii = new UserPii
-            { UserId = human, Email = $"{human:N}@example.invalid", FirstName = "Material", LastName = "Reviewer" } });
+            context.Users.Add(new User
+            {
+                Id = human,
+                Pii = new UserPii
+                { UserId = human, Email = $"{human:N}@example.invalid", FirstName = "Material", LastName = "Reviewer" }
+            });
             context.PlatformUserRoles.Add(new PlatformUserRole
             { Id = Guid.CreateVersion7(), UserId = human, User = null!, RoleId = (int)RoleEnum.Admin, Role = null! });
             context.TenantUsers.Add(new TenantUser
-            { Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, UserId = human, User = null!,
-                StatusId = (int)TenantUserStatusEnum.Active });
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                UserId = human,
+                User = null!,
+                StatusId = (int)TenantUserStatusEnum.Active
+            });
         }
         var actorId = Guid.CreateVersion7();
-        var actor = new Actor { Id = actorId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = owner, Pii = new ActorPii { ActorId = actorId, DisplayName = "Material publisher" } };
+        var actor = new Actor
+        {
+            Id = actorId,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = owner,
+            Pii = new ActorPii { ActorId = actorId, DisplayName = "Material publisher" }
+        };
         Guid? promotedMembershipId = null;
         var groupPromotion = change is MaterialChange.GroupReviewerPromoted or MaterialChange.GroupControllerPromoted;
         if (groupPromotion)
         {
             var group = new Group { Id = Guid.CreateVersion7(), FullName = "Material publishing group" };
-            var participation = new GroupTenant { Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-                Tenant = null!, GroupId = group.Id, Group = group,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null! };
-            GroupMember Membership(Guid human, RoleEnum role) => new() { Id = Guid.CreateVersion7(),
-                TenantId = database.TenantId, Tenant = null!, GroupTenantId = participation.Id, GroupTenant = participation,
-                UserId = human, User = null!, RoleId = (int)role, Role = null! };
+            var participation = new GroupTenant
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                GroupId = group.Id,
+                Group = group,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!
+            };
+            GroupMember Membership(Guid human, RoleEnum role) => new()
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                GroupTenantId = participation.Id,
+                GroupTenant = participation,
+                UserId = human,
+                User = null!,
+                RoleId = (int)role,
+                Role = null!
+            };
             var promoted = Membership(change == MaterialChange.GroupReviewerPromoted ? reviewer : reviewerController, RoleEnum.GroupMember);
             promotedMembershipId = promoted.Id;
             context.AddRange(group, participation, Membership(owner, RoleEnum.GroupAdmin), promoted);
@@ -187,14 +219,33 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         if (change is MaterialChange.OrganizationReviewerPromoted or MaterialChange.OrganizationControllerPromoted)
         {
-            var organization = new Organization { Id = Guid.CreateVersion7(),
-                Pii = new OrganizationPii { FullName = "Material publishing organization" } };
-            var participation = new OrganizationTenant { Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-                Tenant = null!, OrganizationId = organization.Id, Organization = organization,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null! };
-            OrganizationMember Membership(Guid human, RoleEnum role) => new() { Id = Guid.CreateVersion7(),
-                TenantId = database.TenantId, Tenant = null!, OrganizationTenantId = participation.Id,
-                OrganizationTenant = participation, UserId = human, User = null!, RoleId = (int)role, Role = null! };
+            var organization = new Organization
+            {
+                Id = Guid.CreateVersion7(),
+                Pii = new OrganizationPii { FullName = "Material publishing organization" }
+            };
+            var participation = new OrganizationTenant
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                OrganizationId = organization.Id,
+                Organization = organization,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!
+            };
+            OrganizationMember Membership(Guid human, RoleEnum role) => new()
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                OrganizationTenantId = participation.Id,
+                OrganizationTenant = participation,
+                UserId = human,
+                User = null!,
+                RoleId = (int)role,
+                Role = null!
+            };
             var promoted = Membership(change == MaterialChange.OrganizationReviewerPromoted ? reviewer : reviewerController,
                 RoleEnum.OrgMember);
             promotedMembershipId = promoted.Id;
@@ -206,23 +257,39 @@ public sealed partial class ModerationPolicyPublicationTests
         if (publicCalendar) context.TenantUsers.Local.Single(row => row.UserId == owner).ActorId = actorId;
         var owningEvent = new Explore.Domain.Event(publicCalendar ? EventStatusEnum.Published : EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, ActorId = actorId, Actor = actor,
-            Title = "Exact native material", SubmittedByUserId = owner,
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            ActorId = actorId,
+            Actor = actor,
+            Title = "Exact native material",
+            SubmittedByUserId = owner,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)(publicCalendar ? VisibilityTypeEnum.Public : VisibilityTypeEnum.Private), VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!
+            VisibilityTypeId = (int)(publicCalendar ? VisibilityTypeEnum.Public : VisibilityTypeEnum.Private),
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!
         };
         var session = new EventSession(publicCalendar ? EventSessionStatusEnum.Published : EventSessionStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), EventId = owningEvent.Id, Event = owningEvent,
-            TenantId = database.TenantId, Tenant = null!, Title = "Reviewed session",
+            Id = Guid.CreateVersion7(),
+            EventId = owningEvent.Id,
+            Event = owningEvent,
+            TenantId = database.TenantId,
+            Tenant = null!,
+            Title = "Reviewed session",
             StartTime = publicCalendar ? Now.AddDays(1) : null,
             EndTime = publicCalendar ? Now.AddDays(1).AddHours(1) : null
         };
         var resourceId = Guid.CreateVersion7();
         var resource = EventResource.CreateDraft(resourceId, database.TenantId, owningEvent.Id, session.Id,
-            new EventResourceMetadata { Title = "Reviewed resource", Kind = EventResourceKindEnum.GeneralDocument,
-                DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly },
+            new EventResourceMetadata
+            {
+                Title = "Reviewed resource",
+                Kind = EventResourceKindEnum.GeneralDocument,
+                DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
+            },
             EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
             [EventResourceAudienceRule.Create(database.TenantId, owningEvent.Id, resourceId, EventResourceAudienceKindEnum.Organizer)],
             owner, Now.UtcDateTime);
@@ -235,11 +302,27 @@ public sealed partial class ModerationPolicyPublicationTests
         var section = RegistrationFormSection.Create(Guid.CreateVersion7(), version, 1, "Reviewed prompt", Now.UtcDateTime);
         version.AddSection(section);
         form.AddVersion(version);
-        var option = new EventCustomPropertyOption { Id = Guid.CreateVersion7(), Namespace = "event", Key = "safe",
-            DisplayName = "Reviewed option", Value = "safe", IsActive = true };
-        var definition = new EventCustomPropertyDefinition { Id = Guid.CreateVersion7(), EventId = owningEvent.Id,
-            TenantId = database.TenantId, Namespace = "event", Key = "topic", DisplayName = "Topic", IsActive = true,
-            PropertyType = PropertyType.Option, ExposureLevel = ExposureLevel.Public };
+        var option = new EventCustomPropertyOption
+        {
+            Id = Guid.CreateVersion7(),
+            Namespace = "event",
+            Key = "safe",
+            DisplayName = "Reviewed option",
+            Value = "safe",
+            IsActive = true
+        };
+        var definition = new EventCustomPropertyDefinition
+        {
+            Id = Guid.CreateVersion7(),
+            EventId = owningEvent.Id,
+            TenantId = database.TenantId,
+            Namespace = "event",
+            Key = "topic",
+            DisplayName = "Topic",
+            IsActive = true,
+            PropertyType = PropertyType.Option,
+            ExposureLevel = ExposureLevel.Public
+        };
         option.EventCustomPropertyDefinitionId = definition.Id;
         var workflow = RegistrationWorkflow.Create(database.TenantId, owningEvent.Id, "Reviewed registration purpose", Now.UtcDateTime);
         context.AddRange(actor, owningEvent, session, resource, ownership, form, definition, option, workflow);
@@ -263,17 +346,35 @@ public sealed partial class ModerationPolicyPublicationTests
         var ownerAvailability = Guid.CreateVersion7();
         var reviewerAvailability = Guid.CreateVersion7();
         await Known(owner, new RecordModerationConstitutionAvailability
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            AvailabilityId = ownerAvailability, MaximumCaseload = 5, ValidUntil = Now.AddMinutes(9) });
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            AvailabilityId = ownerAvailability,
+            MaximumCaseload = 5,
+            ValidUntil = Now.AddMinutes(9)
+        });
         await Known(reviewer, new RecordModerationConstitutionAvailability
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            AvailabilityId = reviewerAvailability, MaximumCaseload = 5, ValidUntil = Now.AddMinutes(9) });
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            AvailabilityId = reviewerAvailability,
+            MaximumCaseload = 5,
+            ValidUntil = Now.AddMinutes(9)
+        });
         var constitution = new RecordModerationConstitutionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(8),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddMinutes(8),
             Terms = new(ModerationScopeKind.Tenant, ModerationConstitutionEvidence.QualifiedFindingsAndResponse,
                 ModerationConstitutionRemedies.RestrictedAuthenticationAndProofBoundRecovery,
                 ModerationConstitutionIndependence.DistinctControllersAndImplicatedPartyExclusion,
@@ -290,29 +391,58 @@ public sealed partial class ModerationPolicyPublicationTests
         };
         await Known(database.AdminId, constitution);
         await Known(adopter, new AdoptModerationConstitutionSource
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = constitution.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(7) });
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = constitution.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(7)
+        });
         var age = new RecordModerationChildAgePolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), PolicyId = constitution.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = constitution.PublicationId, ProfileId = constitution.ProfileId, Mode = constitution.Mode,
-            ValidUntil = Now.AddMinutes(7), Terms = ChildAgeTerms(),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = constitution.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = constitution.PublicationId,
+            ProfileId = constitution.ProfileId,
+            Mode = constitution.Mode,
+            ValidUntil = Now.AddMinutes(7),
+            Terms = ChildAgeTerms(),
             Ownership = new(reviewer, reviewerController, owner, owner, database.AdminId,
                 "Independent controllers.", "Privacy mandate.", "Child safeguarding mandate.", "Collection mandate.")
         };
         await Known(database.AdminId, age);
         await Known(reviewer, new AdoptModerationChildAgePolicySource
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = age.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(6) });
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = age.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(6)
+        });
         var taxonomy = new RecordModerationClassificationTaxonomySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), TaxonomyId = Guid.CreateVersion7(), ExpectedTaxonomyGeneration = 0,
-            PolicyId = constitution.PolicyId, ExpectedPolicyRevision = 1, PublicationId = constitution.PublicationId,
-            ProfileId = constitution.ProfileId, Mode = constitution.Mode, ValidUntil = Now.AddMinutes(5),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            TaxonomyId = Guid.CreateVersion7(),
+            ExpectedTaxonomyGeneration = 0,
+            PolicyId = constitution.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = constitution.PublicationId,
+            ProfileId = constitution.ProfileId,
+            Mode = constitution.Mode,
+            ValidUntil = Now.AddMinutes(5),
             Mandate = new(owner, owner, reviewer, reviewerController, "Adopted taxonomy coordinator.", "Independent category meaning review."),
             Categories = [new(Guid.CreateVersion7(), 1, publicCalendar ? "general" : "debate",
                 publicCalendar ? EventContentClassificationVersion.CategoryKind.General : EventContentClassificationVersion.CategoryKind.Debate,
@@ -321,20 +451,37 @@ public sealed partial class ModerationPolicyPublicationTests
         };
         await Known(owner, taxonomy);
         var taxonomyAdoption = new AdoptModerationClassificationTaxonomySource
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = taxonomy.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(4) };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = taxonomy.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(4)
+        };
         await Known(reviewer, taxonomyAdoption);
         var eventGeneration = new RecordModerationEventGenerationSource
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), EventId = owningEvent.Id, ExpectedEventRevision = 0, ValidUntil = Now.AddMinutes(4) };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            EventId = owningEvent.Id,
+            ExpectedEventRevision = 0,
+            ValidUntil = Now.AddMinutes(4)
+        };
         await Known(database.AdminId, eventGeneration);
         if (change == MaterialChange.ActorParentChangedBeforeMaterialTenant)
         {
             var replacement = new Actor
             {
-                Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                UserId = adopter, Pii = new ActorPii { DisplayName = "Replacement material publisher" }
+                Id = Guid.CreateVersion7(),
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = adopter,
+                Pii = new ActorPii { DisplayName = "Replacement material publisher" }
             };
             context.Actors.Add(replacement);
             await context.SaveChangesAsync();
@@ -369,12 +516,22 @@ public sealed partial class ModerationPolicyPublicationTests
             await Assert.That(inventory).IsNotNull();
             record = new()
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                SourceId = Guid.CreateVersion7(), ExpectedMaterialGeneration = 0, EventGenerationId = eventGeneration.SourceId,
-                PolicyId = constitution.PolicyId, ExpectedPolicyRevision = 1, PublicationId = constitution.PublicationId,
-                ProfileId = constitution.ProfileId, Mode = constitution.Mode, TaxonomyId = taxonomy.TaxonomyId,
-                ExpectedTaxonomySourceId = taxonomy.SourceId, ExpectedTaxonomyAdoptionId = taxonomyAdoption.AdoptionId,
-                Mandate = mandate, Components = inventory!.Components,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                SourceId = Guid.CreateVersion7(),
+                ExpectedMaterialGeneration = 0,
+                EventGenerationId = eventGeneration.SourceId,
+                PolicyId = constitution.PolicyId,
+                ExpectedPolicyRevision = 1,
+                PublicationId = constitution.PublicationId,
+                ProfileId = constitution.ProfileId,
+                Mode = constitution.Mode,
+                TaxonomyId = taxonomy.TaxonomyId,
+                ExpectedTaxonomySourceId = taxonomy.SourceId,
+                ExpectedTaxonomyAdoptionId = taxonomyAdoption.AdoptionId,
+                Mandate = mandate,
+                Components = inventory!.Components,
                 Materials = inventory.Materials.Select(material => new ModerationClassificationMaterialSelection(
                     Guid.CreateVersion7(), material, [taxonomy.Categories[0].VersionId])).ToImmutableArray(),
                 ValidUntil = Now.AddMinutes(3)
@@ -385,15 +542,27 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             var invalid = change switch
             {
-                MaterialChange.OmittedSession => record with { Materials = record.Materials.Where(row =>
-                    row.Material.SessionId is null || row.Material.ResourceId is not null).ToImmutableArray() },
+                MaterialChange.OmittedSession => record with
+                {
+                    Materials = record.Materials.Where(row =>
+                    row.Material.SessionId is null || row.Material.ResourceId is not null).ToImmutableArray()
+                },
                 MaterialChange.OmittedComponent => record with { Components = record.Components.RemoveAt(0) },
-                MaterialChange.WrongCategory => record with { Materials = record.Materials.SetItem(0,
-                    record.Materials[0] with { CategoryVersionIds = [Guid.CreateVersion7()] }) },
-                MaterialChange.WrongAncestry => record with { Materials = record.Materials.SetItem(0,
-                    record.Materials[0] with { Material = record.Materials[0].Material with { EventStamp = Guid.NewGuid() } }) },
-                MaterialChange.AdminWithoutOwnership => record with { Mandate = mandate with
-                    { OwnerHumanId = database.AdminId, OwnerControllerHumanId = database.AdminId } },
+                MaterialChange.WrongCategory => record with
+                {
+                    Materials = record.Materials.SetItem(0,
+                    record.Materials[0] with { CategoryVersionIds = [Guid.CreateVersion7()] })
+                },
+                MaterialChange.WrongAncestry => record with
+                {
+                    Materials = record.Materials.SetItem(0,
+                    record.Materials[0] with { Material = record.Materials[0].Material with { EventStamp = Guid.NewGuid() } })
+                },
+                MaterialChange.AdminWithoutOwnership => record with
+                {
+                    Mandate = mandate with
+                    { OwnerHumanId = database.AdminId, OwnerControllerHumanId = database.AdminId }
+                },
                 _ => record with { Mandate = mandate with { ReviewerControllerHumanId = owner } }
             };
             await Assert.That((await Writer(change == MaterialChange.AdminWithoutOwnership ? database.AdminId : owner)
@@ -415,9 +584,16 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That(recorded.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         generation = recorded.Receipt!.QualificationRevision;
         var accept = new AcceptModerationClassificationMaterialSource
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            ReviewId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(2) };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            ReviewId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(2)
+        };
         if (promotedMembershipId is { } memberId)
         {
             if (groupPromotion)
@@ -426,16 +602,22 @@ public sealed partial class ModerationPolicyPublicationTests
                 var promotion = new Explore.Application.Features.GroupMembers.Handlers.Commands.UpdateGroupMemberRoleCommandHandler(
                     new GroupMemberRepository(context), new UserContext(identity.Http),
                     context.TenantContext!, identity.Boundary);
-                await Assert.That((await promotion.ExecuteAsync(new() { UpdateGroupMemberRoleDto = new()
-                    { Id = memberId, Role = RoleEnum.GroupAdmin } }, default)).IsSuccess).IsTrue();
+                await Assert.That((await promotion.ExecuteAsync(new()
+                {
+                    UpdateGroupMemberRoleDto = new()
+                    { Id = memberId, Role = RoleEnum.GroupAdmin }
+                }, default)).IsSuccess).IsTrue();
             }
             else
             {
                 var identity = OrganizationMemberMutationBoundaryTests.CreateBoundary(context, privacy, owner);
                 var promotion = new UpdateOrganizationMemberRoleCommandHandler(new OrganizationMemberRepository(context),
                     new OrganizationRepository(context), new UserContext(identity.Http), identity.Boundary);
-                await Assert.That((await promotion.ExecuteAsync(new() { UpdateOrganizationMemberRoleDto = new()
-                    { Id = memberId, Role = RoleEnum.OrgAdmin } }, default)).IsSuccess).IsTrue();
+                await Assert.That((await promotion.ExecuteAsync(new()
+                {
+                    UpdateOrganizationMemberRoleDto = new()
+                    { Id = memberId, Role = RoleEnum.OrgAdmin }
+                }, default)).IsSuccess).IsTrue();
             }
             var updatedGeneration = await context.ModerationQualificationEpochs.AsNoTracking()
                 .Select(row => row.Revision).SingleAsync();
@@ -490,21 +672,41 @@ public sealed partial class ModerationPolicyPublicationTests
                 .IsEqualTo(ModerationQualificationWriteOutcome.Conflict);
         }
         if (change == MaterialChange.NewUnacceptedHead)
-            await Known(owner, record with { OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
-                ExpectedMaterialGeneration = recorded.Receipt.QualificationRevision, ExpectedQualificationRevision = generation,
-                Materials = record.Materials.Select(row => row with { ReviewId = Guid.CreateVersion7() }).ToImmutableArray() });
+            await Known(owner, record with
+            {
+                OperationId = Guid.CreateVersion7(),
+                SourceId = Guid.CreateVersion7(),
+                ExpectedMaterialGeneration = recorded.Receipt.QualificationRevision,
+                ExpectedQualificationRevision = generation,
+                Materials = record.Materials.Select(row => row with { ReviewId = Guid.CreateVersion7() }).ToImmutableArray()
+            });
         if (change == MaterialChange.TaxonomyReplaced)
-            await Known(owner, taxonomy with { OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
-                ExpectedQualificationRevision = generation, ExpectedTaxonomyGeneration = taxonomy.ExpectedQualificationRevision + 1,
-                Categories = [taxonomy.Categories[0] with { VersionId = Guid.CreateVersion7() }] });
+            await Known(owner, taxonomy with
+            {
+                OperationId = Guid.CreateVersion7(),
+                SourceId = Guid.CreateVersion7(),
+                ExpectedQualificationRevision = generation,
+                ExpectedTaxonomyGeneration = taxonomy.ExpectedQualificationRevision + 1,
+                Categories = [taxonomy.Categories[0] with { VersionId = Guid.CreateVersion7() }]
+            });
         if (change == MaterialChange.TaxonomyWithdrawn)
             await Known(adopter, new WithdrawModerationClassificationTaxonomyAdoption
-            { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                AdoptionId = taxonomyAdoption.AdoptionId, ExpectedAdoptionRevision = 1 });
+            {
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                AdoptionId = taxonomyAdoption.AdoptionId,
+                ExpectedAdoptionRevision = 1
+            });
         if (change == MaterialChange.ReviewerAvailabilityLost)
             await Known(reviewer, new WithdrawModerationConstitutionAvailability
-            { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                AvailabilityId = reviewerAvailability, ExpectedAvailabilityRevision = 1 });
+            {
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                AvailabilityId = reviewerAvailability,
+                ExpectedAvailabilityRevision = 1
+            });
         if (change == MaterialChange.OwnerAssignmentLost)
             await context.EventRoleAssignments.Where(row => row.Id == ownership.Id).ExecuteDeleteAsync();
         if (change == MaterialChange.FormLabelRaw)
@@ -535,15 +737,29 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         if (change == MaterialChange.OptionAdded)
         {
-            context.Set<EventCustomPropertyOption>().Add(new() { Id = Guid.CreateVersion7(),
-                EventCustomPropertyDefinitionId = definition.Id, Namespace = "event", Key = "new",
-                DisplayName = "Unreviewed option", Value = "new", IsActive = true });
+            context.Set<EventCustomPropertyOption>().Add(new()
+            {
+                Id = Guid.CreateVersion7(),
+                EventCustomPropertyDefinitionId = definition.Id,
+                Namespace = "event",
+                Key = "new",
+                DisplayName = "Unreviewed option",
+                Value = "new",
+                IsActive = true
+            });
             await context.SaveChangesAsync();
         }
         if (change == MaterialChange.SessionAdded)
         {
-            context.EventSessions.Add(new() { Id = Guid.CreateVersion7(), EventId = owningEvent.Id, Event = null!,
-                TenantId = database.TenantId, Tenant = null!, Title = "Unreviewed child" });
+            context.EventSessions.Add(new()
+            {
+                Id = Guid.CreateVersion7(),
+                EventId = owningEvent.Id,
+                Event = null!,
+                TenantId = database.TenantId,
+                Tenant = null!,
+                Title = "Unreviewed child"
+            });
             await context.SaveChangesAsync();
         }
         if (change == MaterialChange.TrackedOptionMutation)
@@ -575,8 +791,11 @@ public sealed partial class ModerationPolicyPublicationTests
             }
             var end = new EndModerationClassificationMaterialReview
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                ReviewId = accept.ReviewId, ExpectedReviewRevision = 1,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                ReviewId = accept.ReviewId,
+                ExpectedReviewRevision = 1,
                 End = change == MaterialChange.WithdrawnHead ? ModerationClassificationMaterialEnd.Withdrawn : ModerationClassificationMaterialEnd.Corrected,
                 Grounds = "Accountable correction preserving the original finite acceptance."
             };

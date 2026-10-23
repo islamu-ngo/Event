@@ -105,8 +105,12 @@ public sealed partial class ModerationPolicyPublicationTests
             row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
         foreach (var id in new[] { owner, reviewer, adopter })
         {
-            var user = new User { Id = id, Pii = new UserPii
-            { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Taxonomy", LastName = "Reviewer" } };
+            var user = new User
+            {
+                Id = id,
+                Pii = new UserPii
+                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Taxonomy", LastName = "Reviewer" }
+            };
             context.Users.Add(user);
             context.PlatformUserRoles.Add(new PlatformUserRole
             { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
@@ -133,15 +137,25 @@ public sealed partial class ModerationPolicyPublicationTests
         foreach (var entry in new[] { (owner, ownerAvailability), (reviewer, reviewerAvailability) })
             await Known(entry.Item1, new RecordModerationConstitutionAvailability
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                AvailabilityId = entry.Item2, MaximumCaseload = 5, ValidUntil = Now.AddMinutes(9)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                AvailabilityId = entry.Item2,
+                MaximumCaseload = 5,
+                ValidUntil = Now.AddMinutes(9)
             });
         var constitution = new RecordModerationConstitutionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(8),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddMinutes(8),
             Terms = new(ModerationScopeKind.Tenant, ModerationConstitutionEvidence.QualifiedFindingsAndResponse,
                 ModerationConstitutionRemedies.RestrictedAuthenticationAndProofBoundRecovery,
                 ModerationConstitutionIndependence.DistinctControllersAndImplicatedPartyExclusion,
@@ -159,34 +173,59 @@ public sealed partial class ModerationPolicyPublicationTests
         await Known(database.AdminId, constitution);
         var governanceAdoption = new AdoptModerationConstitutionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = constitution.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(7)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = constitution.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(7)
         };
         await Known(adopter, governanceAdoption);
         var age = new RecordModerationChildAgePolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), PolicyId = constitution.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = constitution.PublicationId, ProfileId = constitution.ProfileId,
-            Mode = constitution.Mode, ValidUntil = Now.AddMinutes(7), Terms = ChildAgeTerms(),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = constitution.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = constitution.PublicationId,
+            ProfileId = constitution.ProfileId,
+            Mode = constitution.Mode,
+            ValidUntil = Now.AddMinutes(7),
+            Terms = ChildAgeTerms(),
             Ownership = new(reviewer, reviewer, owner, owner, database.AdminId,
                 "Independent canonical controllers.", "Privacy mandate.", "Child safeguarding mandate.", "Collection mandate.")
         };
         await Known(database.AdminId, age);
         var ageAdoption = new AdoptModerationChildAgePolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = age.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(6)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = age.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(6)
         };
         await Known(reviewer, ageAdoption);
         var record = new RecordModerationClassificationTaxonomySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), TaxonomyId = Guid.CreateVersion7(), ExpectedTaxonomyGeneration = 0,
-            PolicyId = constitution.PolicyId, ExpectedPolicyRevision = 1, PublicationId = constitution.PublicationId,
-            ProfileId = constitution.ProfileId, Mode = constitution.Mode, ValidUntil = Now.AddMinutes(5),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            TaxonomyId = Guid.CreateVersion7(),
+            ExpectedTaxonomyGeneration = 0,
+            PolicyId = constitution.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = constitution.PublicationId,
+            ProfileId = constitution.ProfileId,
+            Mode = constitution.Mode,
+            ValidUntil = Now.AddMinutes(5),
             Mandate = new(owner, owner, reviewer, reviewer,
                 "Adopted coordinator owns this taxonomy and its finite category inventory.",
                 "Independent substantive content meaning, child-risk and audience-floor review."),
@@ -249,9 +288,14 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var adopt = new AdoptModerationClassificationTaxonomySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(4)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(4)
         };
         await Assert.That((await Writer(owner).ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
         await Assert.That((await Writer(adopter).ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
@@ -289,14 +333,19 @@ public sealed partial class ModerationPolicyPublicationTests
         if (change == TaxonomyChange.GovernanceWithdrawn)
             await Known(adopter, new WithdrawModerationConstitutionAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                AdoptionId = governanceAdoption.AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                AdoptionId = governanceAdoption.AdoptionId,
+                ExpectedAdoptionRevision = 1
             });
         if (change is TaxonomyChange.OwnerAvailabilityWithdrawn or TaxonomyChange.ReviewerAvailabilityWithdrawn)
             await Known(change == TaxonomyChange.OwnerAvailabilityWithdrawn ? owner : reviewer,
                 new WithdrawModerationConstitutionAvailability
                 {
-                    OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = database.Scope,
+                    ExpectedQualificationRevision = generation,
                     AvailabilityId = change == TaxonomyChange.OwnerAvailabilityWithdrawn ? ownerAvailability : reviewerAvailability,
                     ExpectedAvailabilityRevision = 1
                 });
@@ -310,7 +359,9 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             var replacement = record with
             {
-                OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), ExpectedQualificationRevision = generation,
+                OperationId = Guid.CreateVersion7(),
+                SourceId = Guid.CreateVersion7(),
+                ExpectedQualificationRevision = generation,
                 ExpectedTaxonomyGeneration = record.ExpectedQualificationRevision + 1,
                 Categories = [record.Categories[0] with { VersionId = Guid.CreateVersion7() }]
             };
@@ -324,8 +375,11 @@ public sealed partial class ModerationPolicyPublicationTests
             {
                 adopt = adopt with
                 {
-                    OperationId = Guid.CreateVersion7(), SourceId = replacement.SourceId, AdoptionId = Guid.CreateVersion7(),
-                    ExpectedQualificationRevision = generation, ExpectedSourceWriterGeneration = generation
+                    OperationId = Guid.CreateVersion7(),
+                    SourceId = replacement.SourceId,
+                    AdoptionId = Guid.CreateVersion7(),
+                    ExpectedQualificationRevision = generation,
+                    ExpectedSourceWriterGeneration = generation
                 };
                 await Known(reviewer, adopt);
             }
@@ -339,8 +393,11 @@ public sealed partial class ModerationPolicyPublicationTests
             }
             var withdrawal = new WithdrawModerationClassificationTaxonomyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                AdoptionId = adopt.AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                AdoptionId = adopt.AdoptionId,
+                ExpectedAdoptionRevision = 1
             };
             await Known(adopter, withdrawal);
             await Assert.That((await Writer(adopter).ExecuteAsync(withdrawal)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);

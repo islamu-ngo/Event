@@ -202,7 +202,8 @@ public partial class PolicyAdministration : ComponentBase, IDisposable
         state.Proposed.Classes.Add(new()
         {
             Reference = state.Reference(classCode, state.NextRevision(classCode, state.Proposed.Classes.Select(item => item.Reference))),
-            Meaning = classMeaning, Ground = originalClass?.Ground ?? reference!.Ground!.Value,
+            Meaning = classMeaning,
+            Ground = originalClass?.Ground ?? reference!.Ground!.Value,
             Basis = originalClass?.Basis ?? reference!.Basis!.Value
         });
         state.MarkChanged();
@@ -241,7 +242,8 @@ public partial class PolicyAdministration : ComponentBase, IDisposable
         state.Proposed.Reasons.Add(new()
         {
             Reference = state.Reference(reasonCode, state.NextRevision(reasonCode, state.Proposed.Reasons.Select(item => item.Reference))),
-            Meaning = reasonMeaning, Class = PolicyAuthoringState.Copy(classification.Reference)
+            Meaning = reasonMeaning,
+            Class = PolicyAuthoringState.Copy(classification.Reference)
         });
         state.MarkChanged();
         reasonOpen = false;

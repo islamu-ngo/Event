@@ -56,7 +56,9 @@ public sealed class ModerationCaseReadGrantCommandTests
     {
         var command = new RevokeModerationCaseReadPurposeCommand
         {
-            OperationId = Guid.CreateVersion7(), GrantId = Guid.CreateVersion7(), ExpectedGrantRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            GrantId = Guid.CreateVersion7(),
+            ExpectedGrantRevision = 1
         };
         var result = await new RevokeModerationCaseReadPurposeCommandValidator().ValidateAsync(command);
         await Assert.That(result.IsValid).IsTrue();
@@ -73,7 +75,9 @@ public sealed class ModerationCaseReadGrantCommandTests
     {
         var command = new RevokeModerationCaseReadPurposeCommand
         {
-            OperationId = Guid.CreateVersion7(), GrantId = Guid.CreateVersion7(), ExpectedGrantRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            GrantId = Guid.CreateVersion7(),
+            ExpectedGrantRevision = 1
         };
         command = change switch
         {
@@ -90,8 +94,11 @@ public sealed class ModerationCaseReadGrantCommandTests
 
     private static GrantModerationCaseReadPurposeCommand Command() => new()
     {
-        OperationId = Guid.CreateVersion7(), CaseId = Guid.CreateVersion7(), ExpectedCaseRevision = 1,
-        SourceId = Guid.CreateVersion7(), GranteeUserId = Guid.CreateVersion7(),
+        OperationId = Guid.CreateVersion7(),
+        CaseId = Guid.CreateVersion7(),
+        ExpectedCaseRevision = 1,
+        SourceId = Guid.CreateVersion7(),
+        GranteeUserId = Guid.CreateVersion7(),
         ValidUntil = new(2026, 10, 12, 16, 0, 0, TimeSpan.Zero)
     };
 }

@@ -28,9 +28,18 @@ public sealed class ModerationMeasuredOperationsAcceptance
             throw new ArgumentException("Acceptance requires the independent nominated reviewer and original finite evidence.");
         var acceptance = new ModerationMeasuredOperationsAcceptance
         {
-            Id = id, HostBindingId = source.HostBindingId, TrustDomainId = source.TrustDomainId, TenantId = source.TenantId,
-            SourceId = source.Id, SourceRevision = source.Revision, SourceWriterGeneration = source.WriterGeneration,
-            AcceptedByHumanId = human, WriterGeneration = generation, Revision = 1, AcceptedAt = now, ValidUntil = validUntil
+            Id = id,
+            HostBindingId = source.HostBindingId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = source.TenantId,
+            SourceId = source.Id,
+            SourceRevision = source.Revision,
+            SourceWriterGeneration = source.WriterGeneration,
+            AcceptedByHumanId = human,
+            WriterGeneration = generation,
+            Revision = 1,
+            AcceptedAt = now,
+            ValidUntil = validUntil
         };
         acceptance.ValidatePersistedState();
         return acceptance;

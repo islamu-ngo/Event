@@ -67,7 +67,8 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
             },
             "extra-case" => receipt with
             {
-                CaseIds = receipt.CaseIds.Add("case.foreign"), ExecutedCount = 4
+                CaseIds = receipt.CaseIds.Add("case.foreign"),
+                ExecutedCount = 4
             },
             "reordered-cases" => receipt with { CaseIds = receipt.CaseIds.Reverse().ToImmutableArray() },
             _ => receipt

@@ -104,19 +104,29 @@ internal sealed class ModerationCaseNarrativePolicyReader(ExploreDbContext conte
 
     internal static RecordModerationCaseNarrativePolicySource RecordRequest(
         ModerationCaseNarrativePolicySource source, AuthorityScope tenant) => new()
-    {
-        OperationId = Guid.Empty, Target = tenant, ExpectedQualificationRevision = source.WriterGeneration - 1,
-        SourceId = source.Id, TargetKind = source.TargetKind, Terms = source.Terms, Ownership = source.Ownership,
-        ValidUntil = source.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = tenant,
+            ExpectedQualificationRevision = source.WriterGeneration - 1,
+            SourceId = source.Id,
+            TargetKind = source.TargetKind,
+            Terms = source.Terms,
+            Ownership = source.Ownership,
+            ValidUntil = source.ValidUntil
+        };
 
     internal static AdoptModerationCaseNarrativePolicySource AdoptionRequest(
         ModerationCaseNarrativeAdoption adoption, AuthorityScope tenant) => new()
-    {
-        OperationId = Guid.Empty, Target = tenant, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-        SourceId = adoption.SourceId, ExpectedSourceRevision = adoption.SourceRevision,
-        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration, AdoptionId = adoption.Id, ValidUntil = adoption.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = tenant,
+            ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+            SourceId = adoption.SourceId,
+            ExpectedSourceRevision = adoption.SourceRevision,
+            ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
+            AdoptionId = adoption.Id,
+            ValidUntil = adoption.ValidUntil
+        };
 
     internal static string Slot(ModerationSourceAuthority authority, ModerationCaseTargetKind kind,
         ModerationCaseNarrativePurpose purpose = ModerationCaseNarrativePurpose.ConfidentialAllegation) =>

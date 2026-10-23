@@ -25,9 +25,16 @@ public sealed class ModerationConstitutionAvailability
     {
         var row = new ModerationConstitutionAvailability
         {
-            Id = id, HostBindingId = hostId, TrustDomainId = trustId, TenantId = tenantId,
-            ReviewerHumanId = reviewerHumanId, MaximumCaseload = maximumCaseload,
-            WriterGeneration = writerGeneration, Revision = 1, RecordedAt = now, ValidUntil = validUntil
+            Id = id,
+            HostBindingId = hostId,
+            TrustDomainId = trustId,
+            TenantId = tenantId,
+            ReviewerHumanId = reviewerHumanId,
+            MaximumCaseload = maximumCaseload,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            RecordedAt = now,
+            ValidUntil = validUntil
         };
         row.ValidatePersistedState();
         return row;

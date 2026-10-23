@@ -28,9 +28,14 @@ public sealed class ModerationConsumerInstallationObservationTests
         database.ConsumerRuntimeSources = [runtime];
         var installed = new InstallModerationConsumerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            InstallationId = Guid.CreateVersion7(), ConsumerId = "resource.payload", Mode = ModerationNativeMode.Embedded,
-            ExpectedRuntimeGeneration = runtime.Generation, ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            InstallationId = Guid.CreateVersion7(),
+            ConsumerId = "resource.payload",
+            Mode = ModerationNativeMode.Embedded,
+            ExpectedRuntimeGeneration = runtime.Generation,
+            ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
             ValidUntil = Now.AddMinutes(5)
         };
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, installed)).IsSuccess).IsTrue();
@@ -45,8 +50,11 @@ public sealed class ModerationConsumerInstallationObservationTests
         if (change == 1)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new WithdrawModerationConsumerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-                InstallationId = installed.InstallationId, ExpectedInstallationRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 6,
+                InstallationId = installed.InstallationId,
+                ExpectedInstallationRevision = 1
             })).IsSuccess).IsTrue();
         if (change == 2) runtime.Generation = new string('e', 64);
         if (change is 3 or 4)

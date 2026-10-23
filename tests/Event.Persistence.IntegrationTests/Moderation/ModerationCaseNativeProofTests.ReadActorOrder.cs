@@ -48,27 +48,36 @@ public sealed partial class ModerationCaseNativeProofTests
             {
                 var service = new ServicePrincipal
                 {
-                    Id = Guid.CreateVersion7(), Code = $"read-order-{id:N}", DisplayName = "Read order publisher"
+                    Id = Guid.CreateVersion7(),
+                    Code = $"read-order-{id:N}",
+                    DisplayName = "Read order publisher"
                 };
                 seed.AddRange(service, new Actor
                 {
-                    Id = id, ActorTypeId = (int)ActorTypeEnum.Bot, ActorType = null!,
+                    Id = id,
+                    ActorTypeId = (int)ActorTypeEnum.Bot,
+                    ActorType = null!,
                     ServicePrincipalId = service.Id,
                     Pii = new ActorPii { ActorId = id, DisplayName = "Read order publisher" }
                 });
             }
             seed.Users.Add(new User
             {
-                Id = otherCallerId, Pii = new UserPii
+                Id = otherCallerId,
+                Pii = new UserPii
                 {
-                    UserId = otherCallerId, Email = $"{otherCallerId:N}@example.invalid",
-                    FirstName = "Other", LastName = "Reader"
+                    UserId = otherCallerId,
+                    Email = $"{otherCallerId:N}@example.invalid",
+                    FirstName = "Other",
+                    LastName = "Reader"
                 }
             });
             if (change == "service-owner")
                 seed.ServicePrincipals.Add(new ServicePrincipal
                 {
-                    Id = replacementServiceId, Code = $"read-unowned-{replacementServiceId:N}", DisplayName = "Unowned service"
+                    Id = replacementServiceId,
+                    Code = $"read-unowned-{replacementServiceId:N}",
+                    DisplayName = "Unowned service"
                 });
             (await seed.Events.SingleAsync(row => row.Id == database.EventId)).OrganizerActorId = organizerId;
             await seed.SaveChangesAsync();

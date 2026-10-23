@@ -47,10 +47,20 @@ public sealed class ModerationOperationalBudgetSource
         terms.Validate();
         var source = new ModerationOperationalBudgetSource
         {
-            Id = id, HostBindingId = hostId, TrustDomainId = trustId, TenantId = tenantId,
-            SubjectKind = terms.SubjectKind, Action = terms.Action, MaximumOccurrences = terms.MaximumOccurrences,
-            WindowTicks = terms.Window.Ticks, OperatorHumanId = operatorHumanId, RecordedByHumanId = recorder,
-            WriterGeneration = writerGeneration, Revision = 1, RecordedAt = now, ValidUntil = validUntil
+            Id = id,
+            HostBindingId = hostId,
+            TrustDomainId = trustId,
+            TenantId = tenantId,
+            SubjectKind = terms.SubjectKind,
+            Action = terms.Action,
+            MaximumOccurrences = terms.MaximumOccurrences,
+            WindowTicks = terms.Window.Ticks,
+            OperatorHumanId = operatorHumanId,
+            RecordedByHumanId = recorder,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            RecordedAt = now,
+            ValidUntil = validUntil
         };
         source.ValidatePersistedState();
         return source;

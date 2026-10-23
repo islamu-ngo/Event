@@ -87,7 +87,9 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         var replacement = await ReplaceSelectedPublicationAsync(fixture);
         var record = original with
         {
-            OriginalEffect = null, PublicationId = replacement, ExpectedPolicyRevision = original.ExpectedPolicyRevision + 1,
+            OriginalEffect = null,
+            PublicationId = replacement,
+            ExpectedPolicyRevision = original.ExpectedPolicyRevision + 1,
             ExpectedQualificationRevision = await OriginalEpochAsync(fixture)
         };
         await Assert.That((await fixture.Database.ExecuteAsync(fixture.Database.AdministratorId, record)).IsSuccess).IsTrue();
@@ -143,8 +145,10 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             await Assert.That((await fixture.Database.ExecuteAsync(fixture.Database.ReviewerId,
                 new WithdrawModerationConstitutionAvailability
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope,
-                    ExpectedQualificationRevision = epoch, AvailabilityId = record.Reviewers[0].AvailabilityId,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Database.Scope,
+                    ExpectedQualificationRevision = epoch,
+                    AvailabilityId = record.Reviewers[0].AvailabilityId,
                     ExpectedAvailabilityRevision = 1
                 })).IsSuccess).IsTrue();
         if (change == "availability") epoch = await OriginalEpochAsync(fixture);
@@ -193,14 +197,17 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             await Assert.That((await fixture.Database.ExecuteAsync(fixture.Database.UrgencyAssessorId,
                 new WithdrawModerationConstitutionAdoption
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Database.Scope,
                     ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
-                    AdoptionId = adopt.AdoptionId, ExpectedAdoptionRevision = 1
+                    AdoptionId = adopt.AdoptionId,
+                    ExpectedAdoptionRevision = 1
                 })).IsSuccess).IsTrue();
         if (change == "new-source")
             await Assert.That((await fixture.Database.ExecuteAsync(fixture.Database.AdministratorId, record with
             {
-                OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
+                OperationId = Guid.CreateVersion7(),
+                SourceId = Guid.CreateVersion7(),
                 ExpectedQualificationRevision = await OriginalEpochAsync(fixture)
             })).IsSuccess).IsTrue();
         if (change is "source-receipt" or "adoption-receipt" or "availability-receipt" or "reviewer" or "adopter" or "custody")
@@ -254,15 +261,25 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         {
             var role = await writer.Roles.SingleAsync(row => row.RoleScopeId == (int)RoleScopeEnum.Platform
                 && row.MasterCode == "platform.admin");
-            var user = new User { Id = secondReviewer, Pii = new UserPii
+            var user = new User
             {
-                UserId = secondReviewer, Email = $"{secondReviewer:N}@example.invalid",
-                FirstName = "Independent", LastName = "Reviewer"
-            }};
+                Id = secondReviewer,
+                Pii = new UserPii
+                {
+                    UserId = secondReviewer,
+                    Email = $"{secondReviewer:N}@example.invalid",
+                    FirstName = "Independent",
+                    LastName = "Reviewer"
+                }
+            };
             writer.Users.Add(user);
             writer.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = secondReviewer, User = user, RoleId = role.Id, Role = role
+                Id = Guid.CreateVersion7(),
+                UserId = secondReviewer,
+                User = user,
+                RoleId = role.Id,
+                Role = role
             });
             await writer.SaveChangesAsync();
         }
@@ -272,8 +289,12 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             var epoch = await OriginalEpochAsync(fixture);
             var availability = new RecordModerationConstitutionAvailability
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
-                AvailabilityId = Guid.CreateVersion7(), MaximumCaseload = 10, ValidUntil = Now.AddMinutes(2)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch,
+                AvailabilityId = Guid.CreateVersion7(),
+                MaximumCaseload = 10,
+                ValidUntil = Now.AddMinutes(2)
             };
             await Assert.That((await database.ExecuteAsync(human, availability)).IsSuccess).IsTrue();
             reviewers.Add(new(availability.AvailabilityId, 1, epoch + 1, human, human,
@@ -287,12 +308,18 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         var notice = JsonSerializer.Deserialize<ModerationNoticeCaptureSnapshot>(source.SnapshotJson)!.Notice!;
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope,
-            ExpectedQualificationRevision = await OriginalEpochAsync(fixture), SourceId = Guid.CreateVersion7(),
-            PolicyId = notice.PolicyId, ExpectedPolicyRevision = notice.PolicyRevision,
-            PublicationId = notice.PublicationId, ProfileId = notice.ProfileId, Mode = ModerationNativeMode.Embedded,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = notice.PolicyId,
+            ExpectedPolicyRevision = notice.PolicyRevision,
+            PublicationId = notice.PublicationId,
+            ProfileId = notice.ProfileId,
+            Mode = ModerationNativeMode.Embedded,
             OriginalEffect = new(fixture.EffectId, source.SnapshotHash, source.EffectBindingHash),
-            ValidUntil = Now.AddSeconds(40), Reviewers = [.. reviewers],
+            ValidUntil = Now.AddSeconds(40),
+            Reviewers = [.. reviewers],
             Terms = new(ModerationScopeKind.Tenant, ModerationConstitutionEvidence.QualifiedFindingsAndResponse,
                 ModerationConstitutionRemedies.RestrictedAuthenticationAndProofBoundRecovery,
                 ModerationConstitutionIndependence.DistinctControllersAndImplicatedPartyExclusion,
@@ -305,12 +332,17 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
 
     private static async Task<AdoptModerationConstitutionSource> OriginalConstitutionAdoptionAsync(
         Fixture fixture, RecordModerationConstitutionSource record) => new()
-    {
-        OperationId = Guid.CreateVersion7(), Target = record.Target,
-        ExpectedQualificationRevision = await OriginalEpochAsync(fixture), SourceId = record.SourceId,
-        ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = record.ExpectedQualificationRevision + 1,
-        AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddSeconds(30), OriginalEffect = record.OriginalEffect
-    };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = record.Target,
+            ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = record.ExpectedQualificationRevision + 1,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddSeconds(30),
+            OriginalEffect = record.OriginalEffect
+        };
 
     private static async Task<ModerationConstitutionAdoptionObservation?> ObserveOriginalConstitutionAsync(
         Fixture fixture, Guid profileId, bool original)

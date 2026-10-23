@@ -105,17 +105,33 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                 : ResourceSafetyReviewStep.ApproveContinuedQuarantine };
         var chain = Enumerable.Range(0, 4).Select(index => new EventResourceModerationQuarantineReview
         {
-            Id = ids[index], TenantId = cause.TenantId, HostBindingId = fixture.Database.HostId,
-            TrustDomainId = fixture.Database.Scope.TrustDomainId, QuarantineId = cause.Id,
-            EventId = cause.EventId, EventResourceId = cause.EventResourceId, MaterialVersionId = cause.MaterialVersionId,
-            CaseId = Guid.CreateVersion7(), CaseRevision = 1, Step = steps[index], PurposeId = ids[0],
-            PredecessorId = index == 0 ? null : ids[index - 1], HumanId = humans[index], ControllerHumanId = humans[index],
-            ReviewerAssignmentId = Guid.CreateVersion7(), ReviewerRevision = 3, RequiredApprovals = 1,
+            Id = ids[index],
+            TenantId = cause.TenantId,
+            HostBindingId = fixture.Database.HostId,
+            TrustDomainId = fixture.Database.Scope.TrustDomainId,
+            QuarantineId = cause.Id,
+            EventId = cause.EventId,
+            EventResourceId = cause.EventResourceId,
+            MaterialVersionId = cause.MaterialVersionId,
+            CaseId = Guid.CreateVersion7(),
+            CaseRevision = 1,
+            Step = steps[index],
+            PurposeId = ids[0],
+            PredecessorId = index == 0 ? null : ids[index - 1],
+            HumanId = humans[index],
+            ControllerHumanId = humans[index],
+            ReviewerAssignmentId = Guid.CreateVersion7(),
+            ReviewerRevision = 3,
+            RequiredApprovals = 1,
             MaximumEvidenceLifetimeTicks = TimeSpan.FromMinutes(1).Ticks,
             Attestation = index == 2 ? safe ? ResourceSafetyAttestation.IndependentlyInspectedSafeForCurrentAudience
                 : ResourceSafetyAttestation.IndependentlyInspectedUnsafeForCurrentAudience : null,
-            ResourceStamp = Guid.NewGuid(), NativeDigest = new string('A', 64), RequestDigest = new string('B', 64),
-            QualificationRevision = 1, RecordedAt = Now, ValidUntil = Now.AddMinutes(1)
+            ResourceStamp = Guid.NewGuid(),
+            NativeDigest = new string('A', 64),
+            RequestDigest = new string('B', 64),
+            QualificationRevision = 1,
+            RecordedAt = Now,
+            ValidUntil = Now.AddMinutes(1)
         }).ToArray();
         var completion = EventResourceModerationReviewCompletion.Complete(cause, chain);
         await using var writer = fixture.Context();

@@ -342,7 +342,9 @@ public sealed class ModerationCaseAttributionRenewalReceiptTests
             host ??= Host;
             var epoch = ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), host, new Tenant
             {
-                Id = Root.Scope.Id, FullName = "Renewal jurisdiction", Slug = "renewal-jurisdiction",
+                Id = Root.Scope.Id,
+                FullName = "Renewal jurisdiction",
+                Slug = "renewal-jurisdiction",
                 TenantStatus = new TenantStatus { Id = 1, MasterCode = "Active", FullName = "Active" }
             });
             var grant = ModerationCaseReadGrant.Grant(Guid.CreateVersion7(), Root.Scope.Id, Root.Scope.TrustDomainId,

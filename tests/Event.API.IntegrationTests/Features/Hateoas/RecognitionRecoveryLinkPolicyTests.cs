@@ -43,7 +43,8 @@ public sealed class RecognitionRecoveryLinkPolicyTests
         var now = new DateTimeOffset(2026, 10, 11, 12, 0, 0, TimeSpan.Zero);
         var dto = new RecognitionRecoveryEscalationDto(Guid.CreateVersion7(), Guid.CreateVersion7(),
             Guid.CreateVersion7(), null, 2, ModerationRecognitionEscalationStage.OwnerActionRequired,
-            now, now.AddHours(1), null, null) { QualifiedOwnerHumanId = owner };
+            now, now.AddHours(1), null, null)
+        { QualifiedOwnerHumanId = owner };
         await Assert.That(policy.GetLinks(dto, principal).Any(link => link.Rel == "acknowledge")).IsFalse();
         await Assert.That(policy.GetLinks(dto with { DeliveredAt = now }, principal)
             .Single(link => link.Rel == "acknowledge").RouteName).IsEqualTo(RouteNames.AcknowledgeRecognitionRecovery);

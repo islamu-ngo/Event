@@ -99,17 +99,30 @@ public sealed partial class ModerationPolicyPublicationTests
         var loginId = Guid.CreateVersion7();
         fixture.Context.UserExternalLogins.Add(new UserExternalLogin
         {
-            Id = loginId, UserId = fixture.OtherSubjectId, User = null!,
-            AuthenticationProviderId = (int)account.ProviderKind, AuthenticationProvider = null!, ProviderKey = account.Value
+            Id = loginId,
+            UserId = fixture.OtherSubjectId,
+            User = null!,
+            AuthenticationProviderId = (int)account.ProviderKind,
+            AuthenticationProvider = null!,
+            ProviderKey = account.Value
         });
         await fixture.Context.SaveChangesAsync();
         var other = new IndividualPolicyFixture
         {
-            Database = fixture.Database, Context = fixture.Context, Privacy = fixture.Privacy,
-            PrivacyOptions = fixture.PrivacyOptions, Clock = fixture.Clock, Age = fixture.Age,
-            ParentAdoption = fixture.ParentAdoption, Record = fixture.Record, Adopt = fixture.Adopt,
-            SubjectId = fixture.OtherSubjectId, OtherSubjectId = fixture.SubjectId,
-            OwnerId = fixture.OwnerId, ReviewerId = fixture.ReviewerId, LoginId = loginId
+            Database = fixture.Database,
+            Context = fixture.Context,
+            Privacy = fixture.Privacy,
+            PrivacyOptions = fixture.PrivacyOptions,
+            Clock = fixture.Clock,
+            Age = fixture.Age,
+            ParentAdoption = fixture.ParentAdoption,
+            Record = fixture.Record,
+            Adopt = fixture.Adopt,
+            SubjectId = fixture.OtherSubjectId,
+            OtherSubjectId = fixture.SubjectId,
+            OwnerId = fixture.OwnerId,
+            ReviewerId = fixture.ReviewerId,
+            LoginId = loginId
         };
         // The shared procedure vocabulary was published once for both independent subjects.
         var otherHttp = ObservationPrincipal(other, false);

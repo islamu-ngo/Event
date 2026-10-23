@@ -100,8 +100,10 @@ public sealed partial class ModerationCaseNativeProofTests
 
     private static SubmitModerationAllegationCommand Submission(
         Guid receiptId, ReadOnlyMemory<byte> token, ReadOnlyMemory<byte> narrative) => new()
-    {
-        OperationId = Guid.CreateVersion7(),
-        ReceiptId = receiptId, PresentedToken = token, Narrative = narrative
-    };
+        {
+            OperationId = Guid.CreateVersion7(),
+            ReceiptId = receiptId,
+            PresentedToken = token,
+            Narrative = narrative
+        };
 }

@@ -141,22 +141,34 @@ public sealed class ModerationResourceQuarantineStateTests
         var actorId = Guid.CreateVersion7();
         var actor = new Actor
         {
-            Id = actorId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.SubjectId, Pii = new ActorPii { ActorId = actorId, DisplayName = "Resource owner" }
+            Id = actorId,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.SubjectId,
+            Pii = new ActorPii { ActorId = actorId, DisplayName = "Resource owner" }
         };
         var owningEvent = new DomainEvent(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-            Title = "Resource quarantine", SubmittedByUserId = database.SubjectId,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            ActorId = actor.Id,
+            Actor = actor,
+            Title = "Resource quarantine",
+            SubmittedByUserId = database.SubjectId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Private, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!
+            VisibilityTypeId = (int)VisibilityTypeEnum.Private,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!
         };
         var resourceId = Guid.CreateVersion7();
         var resource = EventResource.CreateDraft(resourceId, tenant.Id, owningEvent.Id, null,
             new EventResourceMetadata
             {
-                Title = "Material", Kind = EventResourceKindEnum.GeneralDocument,
+                Title = "Material",
+                Kind = EventResourceKindEnum.GeneralDocument,
                 DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
             }, stored ? EventResourceDeliveryTypeEnum.StoredFile : EventResourceDeliveryTypeEnum.ExternalLink,
             EventResourceAvailability.Create(),
@@ -168,11 +180,21 @@ public sealed class ModerationResourceQuarantineStateTests
             var fileType = await context.Set<FileType>().FirstAsync();
             var storage = new StorageObject
             {
-                Id = Guid.CreateVersion7(), FileTypeId = fileType.Id, FileType = fileType, Provider = binding.Provider,
-                StorageProviderBindingId = binding.Id, FullName = "Material", SafeDisplayName = "Material",
-                Extension = ".pdf", TenantId = tenant.Id, Tenant = tenant, Visibility = StorageObjectVisibilities.PrivateOwner,
-                Purpose = StorageObjectPurposes.EventResource, LifecycleState = StorageObjectLifecycleStates.Active,
-                OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = resourceId
+                Id = Guid.CreateVersion7(),
+                FileTypeId = fileType.Id,
+                FileType = fileType,
+                Provider = binding.Provider,
+                StorageProviderBindingId = binding.Id,
+                FullName = "Material",
+                SafeDisplayName = "Material",
+                Extension = ".pdf",
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                Visibility = StorageObjectVisibilities.PrivateOwner,
+                Purpose = StorageObjectPurposes.EventResource,
+                LifecycleState = StorageObjectLifecycleStates.Active,
+                OwningResourceKind = StorageOwningResourceKinds.EventResource,
+                OwningResourceId = resourceId
             };
             resource.SetStoredFile(storage.Id, resource.ConcurrencyStamp, database.AdministratorId, Now.UtcDateTime);
             context.AddRange(binding, storage);

@@ -326,19 +326,31 @@ public sealed class ModerationParticipantIncidentResponsibilitySourceTests
                 AuthorityScope.TrustDomain(Host.TrustDomainId), Host.SolutionId), Host.InstanceId), Guid.CreateVersion7());
             var tenant = new Tenant
             {
-                Id = scope.Id, FullName = "Incident tenant", Slug = "incident",
+                Id = scope.Id,
+                FullName = "Incident tenant",
+                Slug = "incident",
                 TenantStatus = new TenantStatus { Id = 1, FullName = "Active", MasterCode = "Active" }
             };
             var @event = new Explore.Domain.Event
             {
-                Id = Guid.CreateVersion7(), Title = "Incident event", TenantId = scope.Id, Tenant = tenant,
-                Actor = null!, VisibilityType = null!, EventStatus = null!, EventFormat = null!,
+                Id = Guid.CreateVersion7(),
+                Title = "Incident event",
+                TenantId = scope.Id,
+                Tenant = tenant,
+                Actor = null!,
+                VisibilityType = null!,
+                EventStatus = null!,
+                EventFormat = null!,
                 ConcurrencyStamp = Guid.NewGuid()
             };
             Session = new EventSession
             {
-                Id = Guid.CreateVersion7(), Event = @event, EventId = @event.Id, Tenant = tenant,
-                TenantId = scope.Id, ConcurrencyStamp = Guid.NewGuid()
+                Id = Guid.CreateVersion7(),
+                Event = @event,
+                EventId = @event.Id,
+                Tenant = tenant,
+                TenantId = scope.Id,
+                ConcurrencyStamp = Guid.NewGuid()
             };
             Order = NewOrder(@event.Id);
             Participant = RegistrationParticipant.Create(scope.Id, Order.Id, null, ParticipantTypeEnum.Adult, null);

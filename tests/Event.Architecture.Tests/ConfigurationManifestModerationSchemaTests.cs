@@ -61,9 +61,11 @@ public sealed class ConfigurationManifestModerationSchemaTests
                 Metadata = new() { Name = "reference", Source = new() { TenantName = "reference" } },
                 Spec = new()
                 {
-                    DisplayName = "Reference", Settings = new Dictionary<string, JsonElement>(),
+                    DisplayName = "Reference",
+                    Settings = new Dictionary<string, JsonElement>(),
                     Documents = new Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(),
-                    LegalDocuments = new Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>(), Moderation = wire
+                    LegalDocuments = new Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>(),
+                    Moderation = wire
                 }
             };
             var retained = ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(
@@ -72,8 +74,10 @@ public sealed class ConfigurationManifestModerationSchemaTests
                 ConfigurationPortabilityJsonContext.Default.ConfigurationModerationDocumentV1));
             await Assert.That(reverse.Profiles[0]).IsEqualTo(native.Profiles[0] with
             {
-                ScopeKinds = reverse.Profiles[0].ScopeKinds, SubjectKinds = reverse.Profiles[0].SubjectKinds,
-                Effects = reverse.Profiles[0].Effects, Strategies = reverse.Profiles[0].Strategies,
+                ScopeKinds = reverse.Profiles[0].ScopeKinds,
+                SubjectKinds = reverse.Profiles[0].SubjectKinds,
+                Effects = reverse.Profiles[0].Effects,
+                Strategies = reverse.Profiles[0].Strategies,
                 Recipes = reverse.Profiles[0].Recipes
             });
             await Assert.That(reverse.Profiles[0].Effects.SequenceEqual(native.Profiles[0].Effects)).IsTrue();

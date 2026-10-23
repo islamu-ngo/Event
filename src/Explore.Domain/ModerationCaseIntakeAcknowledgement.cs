@@ -64,12 +64,21 @@ public sealed class ModerationCaseIntakeAcknowledgement
 
         return new ModerationCaseIntakeAcknowledgement
         {
-            Id = id, TenantId = receipt.TenantId, TrustDomainId = receipt.TargetOriginTrustDomainId,
-            CallerUserId = receipt.CallerUserId, CaseId = allegation.Id, CaseRevision = allegation.Revision,
-            ReceiptId = receipt.Id, ReceiptRevision = receipt.Revision, OperationId = receipt.ConsumedOperationId.Value,
-            EvidenceCaseRevision = evidence.CaseRevision, RequestDigest = Convert.ToHexStringLower(requestDigest),
-            BudgetSourceId = budget.Id, BudgetAdoptionId = adoption.Id,
-            BudgetSourceWriterGeneration = budget.WriterGeneration, BudgetAdoptionWriterGeneration = adoption.WriterGeneration,
+            Id = id,
+            TenantId = receipt.TenantId,
+            TrustDomainId = receipt.TargetOriginTrustDomainId,
+            CallerUserId = receipt.CallerUserId,
+            CaseId = allegation.Id,
+            CaseRevision = allegation.Revision,
+            ReceiptId = receipt.Id,
+            ReceiptRevision = receipt.Revision,
+            OperationId = receipt.ConsumedOperationId.Value,
+            EvidenceCaseRevision = evidence.CaseRevision,
+            RequestDigest = Convert.ToHexStringLower(requestDigest),
+            BudgetSourceId = budget.Id,
+            BudgetAdoptionId = adoption.Id,
+            BudgetSourceWriterGeneration = budget.WriterGeneration,
+            BudgetAdoptionWriterGeneration = adoption.WriterGeneration,
             AcceptedAt = receipt.ConsumedAt.Value
         };
     }

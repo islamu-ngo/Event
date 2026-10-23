@@ -104,7 +104,8 @@ public sealed class SubmitModerationAllegationCommandTests
 
     private static SubmitModerationAllegationCommand Command() => new()
     {
-        OperationId = Guid.CreateVersion7(), ReceiptId = Guid.CreateVersion7(),
+        OperationId = Guid.CreateVersion7(),
+        ReceiptId = Guid.CreateVersion7(),
         PresentedToken = RandomNumberGenerator.GetBytes(32),
         Narrative = new byte[] { 1, 2, 3 }
     };

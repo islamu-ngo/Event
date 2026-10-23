@@ -58,11 +58,15 @@ public sealed partial class ModerationCaseNativeProofTests
             {
                 var service = new ServicePrincipal
                 {
-                    Id = Guid.CreateVersion7(), Code = $"narrative-order-{id:N}", DisplayName = "Narrative publisher"
+                    Id = Guid.CreateVersion7(),
+                    Code = $"narrative-order-{id:N}",
+                    DisplayName = "Narrative publisher"
                 };
                 seed.AddRange(service, new Actor
                 {
-                    Id = id, ActorTypeId = (int)ActorTypeEnum.Bot, ActorType = null!,
+                    Id = id,
+                    ActorTypeId = (int)ActorTypeEnum.Bot,
+                    ActorType = null!,
                     ServicePrincipalId = service.Id,
                     Pii = new ActorPii { ActorId = id, DisplayName = "Narrative publisher" }
                 });
@@ -70,20 +74,30 @@ public sealed partial class ModerationCaseNativeProofTests
             foreach (var id in new[] { issuerId, otherCallerId })
                 seed.Users.Add(new User
                 {
-                    Id = id, Pii = new UserPii
+                    Id = id,
+                    Pii = new UserPii
                     {
-                        UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Independent", LastName = "Reader"
+                        UserId = id,
+                        Email = $"{id:N}@example.invalid",
+                        FirstName = "Independent",
+                        LastName = "Reader"
                     }
                 });
             seed.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = issuerRoleId, UserId = issuerId, User = null!, RoleId = (int)RoleEnum.Admin,
-                Role = null!, GrantedAt = database.Clock.Now.UtcDateTime
+                Id = issuerRoleId,
+                UserId = issuerId,
+                User = null!,
+                RoleId = (int)RoleEnum.Admin,
+                Role = null!,
+                GrantedAt = database.Clock.Now.UtcDateTime
             });
             if (change == "service-owner")
                 seed.ServicePrincipals.Add(new ServicePrincipal
                 {
-                    Id = replacementServiceId, Code = $"narrative-unowned-{replacementServiceId:N}", DisplayName = "Unowned service"
+                    Id = replacementServiceId,
+                    Code = $"narrative-unowned-{replacementServiceId:N}",
+                    DisplayName = "Unowned service"
                 });
             (await seed.Events.SingleAsync(row => row.Id == database.EventId)).OrganizerActorId = organizerId;
             await seed.SaveChangesAsync();
@@ -143,24 +157,70 @@ public sealed partial class ModerationCaseNativeProofTests
             .Select(row => new { row.Id, row.ConcurrencyStamp });
         var grants = inspect.ModerationCaseReadGrants.AsNoTracking().OrderBy(row => row.Id).Select(row => new
         {
-            row.Id, row.TenantId, row.TrustDomainId, row.CaseId, row.CaseRevision, row.SourceId, row.CallerUserId,
-            row.IssuerUserId, row.IssuerRoleGrantId, row.IssuerPlatformGrant, row.Revision,
-            row.IssuedAt, row.ExpiresAt, row.RevokedAt
+            row.Id,
+            row.TenantId,
+            row.TrustDomainId,
+            row.CaseId,
+            row.CaseRevision,
+            row.SourceId,
+            row.CallerUserId,
+            row.IssuerUserId,
+            row.IssuerRoleGrantId,
+            row.IssuerPlatformGrant,
+            row.Revision,
+            row.IssuedAt,
+            row.ExpiresAt,
+            row.RevokedAt
         });
         var receipts = inspect.ModerationCaseTargetReceipts.AsNoTracking().OrderBy(row => row.Id).Select(row => new
         {
-            row.Id, row.TenantId, row.CallerUserId, row.HostBindingId, row.QualificationEpochId, row.QualificationRevision,
-            row.RelationshipKind, row.RelationshipSourceId, row.RelationshipRevision, row.RelationshipConcurrencyStamp,
-            row.RelationshipFactsDigest, row.TokenDigest, row.SourceId, row.SourceVersion, row.MaterialFactId,
-            row.TargetKind, row.TargetId, row.TargetVersion, row.OccurrenceId, row.LifetimePolicyId,
-            row.LifetimePolicyRevision, row.Revision, row.IssuedAt, row.ExpiresAt,
-            row.ConsumedAt, row.ConsumedCaseId, row.ConsumedOperationId
+            row.Id,
+            row.TenantId,
+            row.CallerUserId,
+            row.HostBindingId,
+            row.QualificationEpochId,
+            row.QualificationRevision,
+            row.RelationshipKind,
+            row.RelationshipSourceId,
+            row.RelationshipRevision,
+            row.RelationshipConcurrencyStamp,
+            row.RelationshipFactsDigest,
+            row.TokenDigest,
+            row.SourceId,
+            row.SourceVersion,
+            row.MaterialFactId,
+            row.TargetKind,
+            row.TargetId,
+            row.TargetVersion,
+            row.OccurrenceId,
+            row.LifetimePolicyId,
+            row.LifetimePolicyRevision,
+            row.Revision,
+            row.IssuedAt,
+            row.ExpiresAt,
+            row.ConsumedAt,
+            row.ConsumedCaseId,
+            row.ConsumedOperationId
         });
         var sources = inspect.ModerationCaseTargetSources.AsNoTracking().OrderBy(row => row.Id).Select(row => new
         {
-            row.Id, row.Version, row.TenantId, row.TrustDomainId, row.EventId, row.EventVersion,
-            row.Kind, row.NativeKind, row.NativeTargetId, row.NativeTargetVersion, row.NativeFactsDigest,
-            row.OccurrenceId, row.OccurrenceVersion, row.MaterialFactId, row.OccurrenceDigest, row.MaterialDigest, row.RecordedAt
+            row.Id,
+            row.Version,
+            row.TenantId,
+            row.TrustDomainId,
+            row.EventId,
+            row.EventVersion,
+            row.Kind,
+            row.NativeKind,
+            row.NativeTargetId,
+            row.NativeTargetVersion,
+            row.NativeFactsDigest,
+            row.OccurrenceId,
+            row.OccurrenceVersion,
+            row.MaterialFactId,
+            row.OccurrenceDigest,
+            row.MaterialDigest,
+            row.RecordedAt
         });
         var roles = inspect.PlatformUserRoles.AsNoTracking().Where(row => row.Id == issuerRoleId)
             .Select(row => new { row.Id, row.UserId, row.RoleId, row.GrantedAt, row.GrantedBy });

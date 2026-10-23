@@ -80,9 +80,11 @@ public sealed class ModerationCaseAttributionSourceTests
         var f = new Fixture();
         switch (defect)
         {
-            case "caller": f.Subject = SubjectReference.Create(
+            case "caller":
+                f.Subject = SubjectReference.Create(
                 ModerationSubjectKind.Human, f.Grant.CallerUserId, f.Root.Scope.Parent!); break;
-            case "issuer": f.Subject = SubjectReference.Create(
+            case "issuer":
+                f.Subject = SubjectReference.Create(
                 ModerationSubjectKind.Human, f.Grant.IssuerUserId, f.Root.Scope.Parent!); break;
             case "expired": f.At = f.Grant.ExpiresAt; break;
             case "longer-than-read": f.Until = f.Grant.ExpiresAt.AddTicks(1); break;
@@ -190,7 +192,9 @@ public sealed class ModerationCaseAttributionSourceTests
             Epoch = ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), Host,
                 new Tenant
                 {
-                    Id = scope.Id, FullName = "Attribution tenant", Slug = "attribution",
+                    Id = scope.Id,
+                    FullName = "Attribution tenant",
+                    Slug = "attribution",
                     TenantStatus = new TenantStatus { Id = 1, FullName = "Active", MasterCode = "Active" }
                 });
             Material = ModerationCaseTargetSource.Record(Guid.CreateVersion7(), Guid.NewGuid(), scope.Id,

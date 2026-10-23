@@ -139,20 +139,32 @@ public sealed class ModerationParticipantInvestigationAttributionTests
                 AuthorityScope.TrustDomain(Host.TrustDomainId), Host.SolutionId), Host.InstanceId), Guid.CreateVersion7());
             var tenant = new Tenant
             {
-                Id = scope.Id, FullName = "Investigation tenant", Slug = "investigation",
+                Id = scope.Id,
+                FullName = "Investigation tenant",
+                Slug = "investigation",
                 TenantStatus = new TenantStatus { Id = 1, FullName = "Active", MasterCode = "Active" }
             };
             epoch = ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), Host, tenant);
             var @event = new Explore.Domain.Event
             {
-                Id = Guid.CreateVersion7(), Title = "Incident event", TenantId = scope.Id, Tenant = tenant,
-                Actor = null!, VisibilityType = null!, EventStatus = null!, EventFormat = null!,
+                Id = Guid.CreateVersion7(),
+                Title = "Incident event",
+                TenantId = scope.Id,
+                Tenant = tenant,
+                Actor = null!,
+                VisibilityType = null!,
+                EventStatus = null!,
+                EventFormat = null!,
                 ConcurrencyStamp = Guid.NewGuid()
             };
             var session = new EventSession
             {
-                Id = Guid.CreateVersion7(), Event = @event, EventId = @event.Id, Tenant = tenant,
-                TenantId = scope.Id, ConcurrencyStamp = Guid.NewGuid()
+                Id = Guid.CreateVersion7(),
+                Event = @event,
+                EventId = @event.Id,
+                Tenant = tenant,
+                TenantId = scope.Id,
+                ConcurrencyStamp = Guid.NewGuid()
             };
             var order = RegistrationOrder.Create(scope.Id, @event.Id, Guid.CreateVersion7(), null,
                 BookingPartyTypeEnum.Individual, Guid.CreateVersion7(),

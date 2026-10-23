@@ -92,9 +92,15 @@ public sealed class ModerationProfileDeploymentSourceOwnerTests
         {
             await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, new AdoptModerationProfileSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch++,
-                AdoptionId = profileAdoptionId, SelectionId = target.SelectionId, Mode = ModerationNativeMode.Embedded,
-                CaseId = target.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(5)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch++,
+                AdoptionId = profileAdoptionId,
+                SelectionId = target.SelectionId,
+                Mode = ModerationNativeMode.Embedded,
+                CaseId = target.CaseId,
+                ExpectedCaseRevision = 1,
+                ValidUntil = Now.AddMinutes(5)
             })).IsSuccess).IsTrue();
         }
         ModerationPolicyPublication publication;
@@ -116,9 +122,14 @@ public sealed class ModerationProfileDeploymentSourceOwnerTests
         {
             var installation = new InstallModerationConsumerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch++,
-                InstallationId = Guid.CreateVersion7(), ConsumerId = runtime.ConsumerId, Mode = runtime.Mode,
-                ExpectedRuntimeGeneration = runtime.Generation, ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch++,
+                InstallationId = Guid.CreateVersion7(),
+                ConsumerId = runtime.ConsumerId,
+                Mode = runtime.Mode,
+                ExpectedRuntimeGeneration = runtime.Generation,
+                ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
                 ValidUntil = Now.AddMinutes(10)
             };
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, installation)).IsSuccess).IsTrue();
@@ -126,9 +137,14 @@ public sealed class ModerationProfileDeploymentSourceOwnerTests
         }
         var record = new RecordModerationDeploymentSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
-            SourceId = Guid.CreateVersion7(), PolicyId = publication.PolicyId, ExpectedPolicyRevision = publication.Revision,
-            PublicationId = publication.Id, ProfileId = compiled.Profiles.Single().Definition.Id,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = epoch,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = publication.PolicyId,
+            ExpectedPolicyRevision = publication.Revision,
+            PublicationId = publication.Id,
+            ProfileId = compiled.Profiles.Single().Definition.Id,
             Mode = ModerationNativeMode.Embedded,
             ValidUntil = Now.AddMinutes(change == Change.ConfigurationBoundsDeployment ? 8 : 5)
         };
@@ -140,8 +156,12 @@ public sealed class ModerationProfileDeploymentSourceOwnerTests
         }
         var adopt = new AdoptModerationDeploymentSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
-            SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = epoch,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = epoch,
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = epoch,
             AdoptionId = Guid.CreateVersion7(),
             ValidUntil = Now.AddMinutes(change == Change.ConfigurationBoundsDeployment ? 7 : 4)
         };
@@ -154,15 +174,22 @@ public sealed class ModerationProfileDeploymentSourceOwnerTests
         if (change == Change.WithdrawnDeploymentAdoption)
             await Assert.That((await WriteDeploymentAsync(database, database.AdministratorId, new WithdrawModerationDeploymentAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
-                AdoptionId = adopt.AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch,
+                AdoptionId = adopt.AdoptionId,
+                ExpectedAdoptionRevision = 1
             })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         if (change == Change.RevokedConfiguration)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RevokeModerationProfileSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
-                AdoptionId = profileAdoptionId, ExpectedAdoptionRevision = 1,
-                CaseId = target.CaseId, ExpectedCaseRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch,
+                AdoptionId = profileAdoptionId,
+                ExpectedAdoptionRevision = 1,
+                CaseId = target.CaseId,
+                ExpectedCaseRevision = 1
             })).IsSuccess).IsTrue();
         await using (var reader = database.Context())
         {
@@ -171,8 +198,12 @@ public sealed class ModerationProfileDeploymentSourceOwnerTests
         }
         await Assert.That((await database.ExecuteAsync(database.SubjectId, new RecordModerationCaseResponse
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
-            EvidenceId = Guid.CreateVersion7(), CaseId = target.CaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = epoch,
+            EvidenceId = Guid.CreateVersion7(),
+            CaseId = target.CaseId,
+            ExpectedCaseRevision = 1,
             Statement = "The subject requests review without activating a restriction."
         })).IsSuccess).IsTrue();
         var missingReceiptKind = change switch
@@ -358,11 +389,14 @@ public sealed class ModerationProfileDeploymentSourceOwnerTests
 
     private static (AdminContext Admin, MachinePrincipalAccessor Machine) Identity(ExploreDbContext context, Guid actor)
     {
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext
+        var http = new HttpContextAccessor
         {
-            User = new ClaimsPrincipal(new ClaimsIdentity(
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, actor.ToString())], "profile-deployment-witness"))
-        }};
+            }
+        };
         return (new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context),
             new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance), new MachinePrincipalAccessor(http));

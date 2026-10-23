@@ -88,10 +88,14 @@ public sealed partial class ModerationQualificationRepository
         ModerationConsumerInstallation installed, ModerationSourceAuthority authority, CancellationToken token) =>
         RequireTargetSourceReceiptAsync(new InstallModerationConsumerSource
         {
-            OperationId = Guid.Empty, Target = authority.Tenant, ExpectedQualificationRevision = installed.WriterGeneration - 1,
-            InstallationId = installed.Id, ConsumerId = installed.ConsumerId,
+            OperationId = Guid.Empty,
+            Target = authority.Tenant,
+            ExpectedQualificationRevision = installed.WriterGeneration - 1,
+            InstallationId = installed.Id,
+            ConsumerId = installed.ConsumerId,
             Mode = (Explore.Application.Services.Moderation.ModerationNativeMode)installed.ModeCode,
-            ExpectedRuntimeGeneration = installed.RuntimeGeneration, ExpectedInventoryFingerprint = installed.InventoryFingerprint,
+            ExpectedRuntimeGeneration = installed.RuntimeGeneration,
+            ExpectedInventoryFingerprint = installed.InventoryFingerprint,
             ValidUntil = installed.ValidUntil
         }, ModerationQualificationSourceKind.ConsumerInstallation, installed.Id, 1,
             installed.InstalledByHumanId, installed.WriterGeneration, installed.InstalledAt, authority, token);

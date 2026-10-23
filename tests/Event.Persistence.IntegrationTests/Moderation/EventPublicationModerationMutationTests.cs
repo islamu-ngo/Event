@@ -48,7 +48,9 @@ public sealed partial class EventPublicationModerationMutationTests
                 fixture.TenantId, parent.Id, Guid.CreateVersion7(),
                 new Explore.Application.DTOs.RegistrationProviders.ImportExternalRegistrationProviderFormVersionRequestDto
                 {
-                    Key = "external-import", Name = "External import", ProviderSurveyId = "survey"
+                    Key = "external-import",
+                    Name = "External import",
+                    ProviderSurveyId = "survey"
                 }), CancellationToken.None));
 
         await Assert.That(fixture.Context.Entry(parent).State).IsEqualTo(EntityState.Modified);
@@ -140,7 +142,7 @@ public sealed partial class EventPublicationModerationMutationTests
         {
             Id = session.Id,
             Request = new Explore.Application.DTOs.EventSession.PublishEventSessionRequestDto
-                { ExpectedConcurrencyStamp = originalStamp }
+            { ExpectedConcurrencyStamp = originalStamp }
         }, CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsFalse();
@@ -222,7 +224,8 @@ public sealed partial class EventPublicationModerationMutationTests
         var declared = ModerationPolicyPublicationProjection.RestoreHistory(adoption.Publication)!.Proposed;
         var retired = await PublishPolicyAsync(fixture, clock, adoption.Host, declared with
         {
-            PublicationId = Guid.CreateVersion7(), ExpectedRevision = adoption.Publication.Revision,
+            PublicationId = Guid.CreateVersion7(),
+            ExpectedRevision = adoption.Publication.Revision,
             SupportedProfiles = []
         }, adoption.Publication.Id);
         await Assert.That(retired.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
@@ -314,8 +317,11 @@ public sealed partial class EventPublicationModerationMutationTests
         var publisher = NativeUser(Guid.CreateVersion7());
         var publisherActor = new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = publisher.Id, User = publisher,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = publisher.Id,
+            User = publisher,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Different event publisher" }
         };
         fixture.Context.Actors.Add(publisherActor);
@@ -399,13 +405,23 @@ public sealed partial class EventPublicationModerationMutationTests
                     Guid.CreateVersion7(), tracked, clock.Now));
                 fixture.Context.PdsSyncOutbox.Add(new PdsSyncOutbox
                 {
-                    Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, UserId = fixture.UserId,
-                    Did = "did:plc:publication-boundary", Collection = "community.lexicon.calendar.event",
-                    RecordKey = Guid.CreateVersion7().ToString("N"), Operation = PdsSyncOperation.Create,
-                    Payload = "{\"name\":\"Human publication boundary\"}", PayloadHash = new string('a', 64),
-                    IdempotencyKey = $"event:{draft.Id:N}:create", PdsHost = "https://pds.example.test",
-                    SourceEntityType = "Event", SourceEntityId = draft.Id, SourceVersion = tracked.ConcurrencyStamp,
-                    Status = PdsSyncStatus.Pending, CreatedAt = clock.Now.UtcDateTime, MaxRetries = 3
+                    Id = Guid.CreateVersion7(),
+                    TenantId = fixture.TenantId,
+                    UserId = fixture.UserId,
+                    Did = "did:plc:publication-boundary",
+                    Collection = "community.lexicon.calendar.event",
+                    RecordKey = Guid.CreateVersion7().ToString("N"),
+                    Operation = PdsSyncOperation.Create,
+                    Payload = "{\"name\":\"Human publication boundary\"}",
+                    PayloadHash = new string('a', 64),
+                    IdempotencyKey = $"event:{draft.Id:N}:create",
+                    PdsHost = "https://pds.example.test",
+                    SourceEntityType = "Event",
+                    SourceEntityId = draft.Id,
+                    SourceVersion = tracked.ConcurrencyStamp,
+                    Status = PdsSyncStatus.Pending,
+                    CreatedAt = clock.Now.UtcDateTime,
+                    MaxRetries = 3
                 });
                 await fixture.Context.SaveChangesAsync(token);
                 observedBothOutboxes = await fixture.Context.OutboxMessages.AnyAsync(row => row.AggregateId == draft.Id, token)
@@ -476,11 +492,17 @@ public sealed partial class EventPublicationModerationMutationTests
             && row.RoleScopeId == (int)RoleScopeEnum.Platform);
         context.ServicePrincipals.Add(new ServicePrincipal
         {
-            Id = maintenanceId, Code = $"publish-maintenance-{maintenanceId:N}", DisplayName = "Publication maintenance"
+            Id = maintenanceId,
+            Code = $"publish-maintenance-{maintenanceId:N}",
+            DisplayName = "Publication maintenance"
         });
         context.PlatformUserRoles.Add(new PlatformUserRole
         {
-            Id = Guid.CreateVersion7(), UserId = fixture.UserId, User = null!, RoleId = role.Id, Role = role
+            Id = Guid.CreateVersion7(),
+            UserId = fixture.UserId,
+            User = null!,
+            RoleId = role.Id,
+            Role = role
         });
         context.ModerationHostBindings.Add(host);
         var tenant = await context.Tenants.SingleAsync(row => row.Id == fixture.TenantId);
@@ -569,7 +591,8 @@ public sealed partial class EventPublicationModerationMutationTests
 
     private static User NativeUser(Guid id) => new()
     {
-        Id = id, Pii = new UserPii { Email = $"{id:N}@example.invalid", FirstName = "Publication", LastName = "Publisher" }
+        Id = id,
+        Pii = new UserPii { Email = $"{id:N}@example.invalid", FirstName = "Publication", LastName = "Publisher" }
     };
 
     private sealed record Adoption(ModerationHostBinding Host, AuthorityScope Instance,
@@ -617,10 +640,16 @@ public sealed partial class EventPublicationModerationMutationTests
         var tracked = await fixture.Context.Events.SingleAsync(value => value.Id == draft.Id);
         var session = new Explore.Domain.EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), EventId = tracked.Id, Event = tracked,
-            TenantId = fixture.TenantId, Tenant = null!, Title = "Human publish regression session",
-            SortOrder = 1, EventSessionKindId = (int)EventSessionKindEnum.Talk,
-            RegistrationModeId = 1, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            EventId = tracked.Id,
+            Event = tracked,
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            Title = "Human publish regression session",
+            SortOrder = 1,
+            EventSessionKindId = (int)EventSessionKindEnum.Talk,
+            RegistrationModeId = 1,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var start = DateTimeOffset.UtcNow.AddDays(7);
         session.Reschedule(UtcInstantRange.Create(start, start.AddHours(1)), "UTC",

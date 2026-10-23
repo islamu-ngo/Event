@@ -119,11 +119,15 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             var service = new ServicePrincipal
             {
-                Id = Guid.CreateVersion7(), Code = $"read-plan-{organizerId:N}", DisplayName = "Read receipt organizer"
+                Id = Guid.CreateVersion7(),
+                Code = $"read-plan-{organizerId:N}",
+                DisplayName = "Read receipt organizer"
             };
             seed.AddRange(service, new Actor
             {
-                Id = organizerId, ActorTypeId = (int)Explore.Domain.Enums.ActorTypeEnum.Bot, ActorType = null!,
+                Id = organizerId,
+                ActorTypeId = (int)Explore.Domain.Enums.ActorTypeEnum.Bot,
+                ActorType = null!,
                 ServicePrincipalId = service.Id,
                 Pii = new ActorPii { ActorId = organizerId, DisplayName = "Read receipt organizer" }
             });
@@ -175,10 +179,13 @@ public sealed partial class ModerationCaseNativeProofTests
         var otherCaller = Guid.CreateVersion7();
         context.Users.Add(new User
         {
-            Id = otherCaller, Pii = new UserPii
+            Id = otherCaller,
+            Pii = new UserPii
             {
-                UserId = otherCaller, Email = $"{otherCaller:N}@example.invalid",
-                FirstName = "Other", LastName = "Caller"
+                UserId = otherCaller,
+                Email = $"{otherCaller:N}@example.invalid",
+                FirstName = "Other",
+                LastName = "Caller"
             }
         });
         await context.SaveChangesAsync();

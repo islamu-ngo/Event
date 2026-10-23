@@ -14,9 +14,17 @@ public sealed record EnrollModerationMeasurementIssuerCommand : ModerationQualif
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new EnrollModerationMeasurementIssuerSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        EnrollmentId = EnrollmentId, KeyId = KeyId, Issuer = Issuer, PublicKeySpkiBase64 = PublicKeySpkiBase64,
-        RunnerDigest = RunnerDigest, CatalogueDigest = CatalogueDigest, TestBundleDigest = TestBundleDigest, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        EnrollmentId = EnrollmentId,
+        KeyId = KeyId,
+        Issuer = Issuer,
+        PublicKeySpkiBase64 = PublicKeySpkiBase64,
+        RunnerDigest = RunnerDigest,
+        CatalogueDigest = CatalogueDigest,
+        TestBundleDigest = TestBundleDigest,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -26,7 +34,10 @@ public sealed record RevokeModerationMeasurementIssuerCommand : ModerationQualif
     public required long ExpectedEnrollmentRevision { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RevokeModerationMeasurementIssuerSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        EnrollmentId = EnrollmentId, ExpectedEnrollmentRevision = ExpectedEnrollmentRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        EnrollmentId = EnrollmentId,
+        ExpectedEnrollmentRevision = ExpectedEnrollmentRevision
     };
 }

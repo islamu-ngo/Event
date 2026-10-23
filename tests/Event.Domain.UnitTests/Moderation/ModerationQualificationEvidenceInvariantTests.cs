@@ -291,17 +291,17 @@ public class ModerationQualificationEvidenceInvariantTests
 
     private static ModerationQualificationEvidence Evidence(
         int purpose, Guid? assessor = null, DateTimeOffset? until = null, string text = PrivateText) => purpose switch
-    {
-        1 => ModerationQualificationEvidence.RecordResponse(
-            Id, CaseId, TrustId, TenantId, Subject, Subject, text, Now),
-        2 => ModerationQualificationEvidence.QualifyController(Id, CaseId, TrustId, TenantId,
-            Reviewer, Controller, assessor ?? Assessor, text, until ?? Now.AddHours(1), Now),
-        3 => ModerationQualificationEvidence.AssessConflict(Id, CaseId, TrustId, TenantId,
-            Reviewer, Controller, assessor ?? Assessor, 2, text, until ?? Now.AddHours(1), Now),
-        4 => ModerationQualificationEvidence.QualifyUrgency(Id, CaseId, TrustId, TenantId,
-            Subject, assessor ?? Assessor, text, until ?? Now.AddHours(1), Now),
-        _ => throw new ArgumentOutOfRangeException(nameof(purpose))
-    };
+        {
+            1 => ModerationQualificationEvidence.RecordResponse(
+                Id, CaseId, TrustId, TenantId, Subject, Subject, text, Now),
+            2 => ModerationQualificationEvidence.QualifyController(Id, CaseId, TrustId, TenantId,
+                Reviewer, Controller, assessor ?? Assessor, text, until ?? Now.AddHours(1), Now),
+            3 => ModerationQualificationEvidence.AssessConflict(Id, CaseId, TrustId, TenantId,
+                Reviewer, Controller, assessor ?? Assessor, 2, text, until ?? Now.AddHours(1), Now),
+            4 => ModerationQualificationEvidence.QualifyUrgency(Id, CaseId, TrustId, TenantId,
+                Subject, assessor ?? Assessor, text, until ?? Now.AddHours(1), Now),
+            _ => throw new ArgumentOutOfRangeException(nameof(purpose))
+        };
 
     private static ModerationQualificationMutationReceipt Receipt(
         ModerationQualificationSourceKind kind = ModerationQualificationSourceKind.Case) =>

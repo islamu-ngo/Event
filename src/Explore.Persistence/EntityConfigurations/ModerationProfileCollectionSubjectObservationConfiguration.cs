@@ -39,7 +39,7 @@ public sealed class ModerationProfileCollectionSubjectObservationConfiguration
         builder.Property(row => row.Revision).IsConcurrencyToken();
         // A policy or procedure change must not reset the subject observation slot.
         builder.HasIndex(row => new
-            { row.HostBindingId, row.TenantId, row.SubjectHumanId, row.ProfileId, row.ModeCode, row.ObservationSequence })
+        { row.HostBindingId, row.TenantId, row.SubjectHumanId, row.ProfileId, row.ModeCode, row.ObservationSequence })
             .HasDatabaseName("ux_profile_subject_observation_slot").IsUnique();
         builder.HasIndex(row => row.ObservationStamp).IsUnique();
         builder.HasOne<UserPii>().WithMany().HasForeignKey(row => row.SubjectHumanId)

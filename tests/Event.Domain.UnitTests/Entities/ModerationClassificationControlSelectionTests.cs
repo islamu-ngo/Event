@@ -182,11 +182,22 @@ internal sealed class ClassificationControlState
         var taxonomyAdoption = ModerationClassificationTaxonomyAdoption.Adopt(Guid.CreateVersion7(), taxonomy, reviewer, 8, Now, Now.AddMinutes(5));
         Generation = new()
         {
-            Id = Guid.CreateVersion7(), HostBindingId = age.HostBindingId, TrustDomainId = age.TrustDomainId,
-            TenantId = age.TenantId, EventId = Guid.NewGuid(), EventStamp = Guid.NewGuid(),
-            ActorId = Guid.CreateVersion7(), ActorStamp = Guid.NewGuid(), OrganizerActorId = null, OrganizerActorStamp = null,
-            SubmittedByHumanId = owner, ObservedByHumanId = recorder, Revision = 1, WriterGeneration = 3,
-            ObservedAt = Now, ValidUntil = Now.AddMinutes(8)
+            Id = Guid.CreateVersion7(),
+            HostBindingId = age.HostBindingId,
+            TrustDomainId = age.TrustDomainId,
+            TenantId = age.TenantId,
+            EventId = Guid.NewGuid(),
+            EventStamp = Guid.NewGuid(),
+            ActorId = Guid.CreateVersion7(),
+            ActorStamp = Guid.NewGuid(),
+            OrganizerActorId = null,
+            OrganizerActorStamp = null,
+            SubmittedByHumanId = owner,
+            ObservedByHumanId = recorder,
+            Revision = 1,
+            WriterGeneration = 3,
+            ObservedAt = Now,
+            ValidUntil = Now.AddMinutes(8)
         };
         Source = ModerationClassificationMaterialSource.Record(Guid.CreateVersion7(), 0, Generation, taxonomy, taxonomyAdoption,
             new(owner, owner, Guid.CreateVersion7(), 1, reviewer, reviewer,
@@ -212,29 +223,43 @@ internal sealed class ClassificationControlState
     internal ModerationContributionBinding Binding(int ordinal, Guid? selectionId = null,
         ModerationSubjectKind subjectKind = ModerationSubjectKind.Content, AuthorityScope? scope = null,
         DateTimeOffset? windowEnd = null) => new()
-    {
-        SelectionId = selectionId ?? SelectionId, Ordinal = ordinal,
-        Kind = ordinal < 2 ? ModerationContributionBindingKind.Effect : ModerationContributionBindingKind.Consequence,
-        EffectKind = ordinal == 0 ? ModerationReferenceEffectKind.ClassificationAndMaterialApproval
+        {
+            SelectionId = selectionId ?? SelectionId,
+            Ordinal = ordinal,
+            Kind = ordinal < 2 ? ModerationContributionBindingKind.Effect : ModerationContributionBindingKind.Consequence,
+            EffectKind = ordinal == 0 ? ModerationReferenceEffectKind.ClassificationAndMaterialApproval
             : ordinal == 1 ? ModerationReferenceEffectKind.AudienceDisclosureAndDerivatives : null,
-        EffectMode = ordinal == 0 ? ModerationReferenceEffectMode.RequireReview : ordinal == 1 ? ModerationReferenceEffectMode.Guard : null,
-        EffectTarget = ordinal < 2 ? ModerationReferenceTarget.ClassifiedContentVersions : null,
-        Capability = ordinal == 0 ? ModerationCapability.Publish : ordinal == 1 ? ModerationCapability.ReadResource : null,
-        Execution = ordinal < 2 ? ModerationReferenceExecution.NativeOwner : null,
-        Strategy = ordinal == 3 ? ModerationAdditiveStrategyKind.ClassificationIntegrity : null,
-        Scope = scope ?? AuthorityScope.Event(TenantScope, Generation.EventId),
-        SubjectKind = subjectKind, SubjectId = Generation.EventId, TargetId = Generation.EventId,
-        TargetRevision = Generation.Revision, Operation = ordinal == 0 ? "classification.approval" : "event.disclosure",
-        WindowEnd = windowEnd
-    };
+            EffectMode = ordinal == 0 ? ModerationReferenceEffectMode.RequireReview : ordinal == 1 ? ModerationReferenceEffectMode.Guard : null,
+            EffectTarget = ordinal < 2 ? ModerationReferenceTarget.ClassifiedContentVersions : null,
+            Capability = ordinal == 0 ? ModerationCapability.Publish : ordinal == 1 ? ModerationCapability.ReadResource : null,
+            Execution = ordinal < 2 ? ModerationReferenceExecution.NativeOwner : null,
+            Strategy = ordinal == 3 ? ModerationAdditiveStrategyKind.ClassificationIntegrity : null,
+            Scope = scope ?? AuthorityScope.Event(TenantScope, Generation.EventId),
+            SubjectKind = subjectKind,
+            SubjectId = Generation.EventId,
+            TargetId = Generation.EventId,
+            TargetRevision = Generation.Revision,
+            Operation = ordinal == 0 ? "classification.approval" : "event.disclosure",
+            WindowEnd = windowEnd
+        };
 
     internal ModerationEventGeneration Reobserve() => new()
     {
-        Id = Guid.CreateVersion7(), HostBindingId = Generation.HostBindingId, TrustDomainId = Generation.TrustDomainId,
-        TenantId = Generation.TenantId, EventId = Generation.EventId, EventStamp = Generation.EventStamp,
-        ActorId = Generation.ActorId, ActorStamp = Generation.ActorStamp,
-        OrganizerActorId = Generation.OrganizerActorId, OrganizerActorStamp = Generation.OrganizerActorStamp,
-        SubmittedByHumanId = Generation.SubmittedByHumanId, ObservedByHumanId = Generation.ObservedByHumanId,
-        Revision = Generation.Revision, WriterGeneration = 12, ObservedAt = Now, ValidUntil = Generation.ValidUntil
+        Id = Guid.CreateVersion7(),
+        HostBindingId = Generation.HostBindingId,
+        TrustDomainId = Generation.TrustDomainId,
+        TenantId = Generation.TenantId,
+        EventId = Generation.EventId,
+        EventStamp = Generation.EventStamp,
+        ActorId = Generation.ActorId,
+        ActorStamp = Generation.ActorStamp,
+        OrganizerActorId = Generation.OrganizerActorId,
+        OrganizerActorStamp = Generation.OrganizerActorStamp,
+        SubmittedByHumanId = Generation.SubmittedByHumanId,
+        ObservedByHumanId = Generation.ObservedByHumanId,
+        Revision = Generation.Revision,
+        WriterGeneration = 12,
+        ObservedAt = Now,
+        ValidUntil = Generation.ValidUntil
     };
 }

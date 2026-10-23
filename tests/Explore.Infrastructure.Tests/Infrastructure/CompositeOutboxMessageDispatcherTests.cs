@@ -49,7 +49,9 @@ public sealed class CompositeOutboxMessageDispatcherTests
         var id = Guid.CreateVersion7();
         var message = new OutboxMessage
         {
-            Id = id, AggregateId = id, AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
+            Id = id,
+            AggregateId = id,
+            AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
             EventType = ModerationEffectOutboxMessageFactory.EventType
         };
         handler.DispatchAsync(message, Arg.Any<CancellationToken>())

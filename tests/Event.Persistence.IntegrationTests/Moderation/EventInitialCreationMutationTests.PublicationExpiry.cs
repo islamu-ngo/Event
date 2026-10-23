@@ -23,7 +23,8 @@ public sealed partial class EventInitialCreationMutationTests
         var clock = new InitialPublicationClock();
         var creation = (await PrepareAsync(database, setup, "organization")) with
         {
-            RequestedStatus = EventStatusEnum.Published, CreatedAtUtc = clock.Now.UtcDateTime
+            RequestedStatus = EventStatusEnum.Published,
+            CreatedAtUtc = clock.Now.UtcDateTime
         };
         var publication = await AdoptInitialPublicationAsync(database);
         var originalUntil = clock.Now.AddMinutes(1);

@@ -68,7 +68,7 @@ public sealed partial class ModerationPolicyCompilationTests
         denial = denial with
         {
             Effects = denial.Effects.Select(item => item with
-                { Target = item.Target with { Operation = "other.publication" } }).ToImmutableArray()
+            { Target = item.Target with { Operation = "other.publication" } }).ToImmutableArray()
         };
         var result = ModerationPolicyProposedStateCompiler.Compose(draft, [denial, review], Now);
         await Assert.That(result.Operations.Length).IsEqualTo(2);
@@ -132,7 +132,7 @@ public sealed partial class ModerationPolicyCompilationTests
         quarantine = quarantine with
         {
             Effects = quarantine.Effects.Select(item => item with
-                { Target = read.Effects.Single().Target }).ToImmutableArray()
+            { Target = read.Effects.Single().Target }).ToImmutableArray()
         };
         var result = ModerationPolicyProposedStateCompiler.Compose(draft, [read, quarantine], Now);
         await Assert.That(result.Operations.Length).IsEqualTo(1);

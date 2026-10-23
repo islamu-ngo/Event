@@ -44,8 +44,13 @@ public sealed class ModerationEventTargetAdoptionWriterTests
         await Assert.That(retainedReplay.QualificationRevision).IsEqualTo(accepted.QualificationRevision);
         var revoke = new RevokeModerationEventTargetSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-            AdoptionId = source.AdoptionId, ExpectedAdoptionRevision = 1, CaseId = source.CaseId, ExpectedCaseRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 6,
+            AdoptionId = source.AdoptionId,
+            ExpectedAdoptionRevision = 1,
+            CaseId = source.CaseId,
+            ExpectedCaseRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, revoke)).IsSuccess).IsTrue();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, revoke)).IsSuccess).IsTrue();
@@ -70,8 +75,11 @@ public sealed class ModerationEventTargetAdoptionWriterTests
         await using var owner = database;
         var replacement = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.ReviewerId, Pii = new ActorPii { DisplayName = "Replacement publisher" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.ReviewerId,
+            Pii = new ActorPii { DisplayName = "Replacement publisher" }
         };
         Guid eventId;
         Guid publisher;
@@ -217,8 +225,13 @@ public sealed class ModerationEventTargetAdoptionWriterTests
         var generationId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RecordModerationEventGenerationSource
         {
-            OperationId = Guid.CreateVersion7(), SourceId = generationId, Target = database.Scope,
-            ExpectedQualificationRevision = 1, EventId = eventId, ExpectedEventRevision = 0, ValidUntil = Now.AddMinutes(10)
+            OperationId = Guid.CreateVersion7(),
+            SourceId = generationId,
+            Target = database.Scope,
+            ExpectedQualificationRevision = 1,
+            EventId = eventId,
+            ExpectedEventRevision = 0,
+            ValidUntil = Now.AddMinutes(10)
         })).IsSuccess).IsTrue();
         var opened = database.OpenCase() with { ExpectedQualificationRevision = 2 };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, opened)).IsSuccess).IsTrue();
@@ -241,20 +254,37 @@ public sealed class ModerationEventTargetAdoptionWriterTests
         var selectionId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RecordModerationContributionSelectionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            SelectionId = selectionId, EffectId = Guid.CreateVersion7(), CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-            DecisionId = decision.Id, ExpectedDecisionRevision = selectionDecisionRevision, PolicyId = request.Proposed.PolicyId,
-            ExpectedPolicyRevision = 1, PublicationId = publication.Publication!.Id, ProfileId = profile.Id,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            SelectionId = selectionId,
+            EffectId = Guid.CreateVersion7(),
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            DecisionId = decision.Id,
+            ExpectedDecisionRevision = selectionDecisionRevision,
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = publication.Publication!.Id,
+            ProfileId = profile.Id,
             Contribution = new(decision.Id, decision.Rule, decision.Scope, decision.Subject.Kind, decision.Subject.Id,
                 decision.StartsAt, null, profile.Effects.Select(effect => new ModerationPolicyEffectTarget(effect, target)).ToImmutableArray(),
-                [new(null, target)]), ValidUntil = Now.AddMinutes(10)
+                [new(null, target)]),
+            ValidUntil = Now.AddMinutes(10)
         })).IsSuccess).IsEqualTo(selectionDecisionRevision is 1 or 2);
         return (database, new()
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
             ExpectedQualificationRevision = selectionDecisionRevision is 1 or 2 ? 5 : 4,
-            AdoptionId = Guid.CreateVersion7(), SelectionId = selectionId, BindingOrdinal = 0, GenerationId = generationId,
-            ExpectedGenerationRevision = 1, CaseId = opened.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(5)
+            AdoptionId = Guid.CreateVersion7(),
+            SelectionId = selectionId,
+            BindingOrdinal = 0,
+            GenerationId = generationId,
+            ExpectedGenerationRevision = 1,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            ValidUntil = Now.AddMinutes(5)
         });
     }
 }

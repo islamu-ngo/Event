@@ -51,12 +51,23 @@ public sealed class ModerationEventTargetAdoption
             throw new ArgumentException("Event adoption requires independent approval of the exact retained partition and observation.");
         var row = new ModerationEventTargetAdoption
         {
-            Id = id, HostBindingId = selection.HostBindingId, TrustDomainId = selection.TrustDomainId,
-            TenantId = selection.TenantId, SelectionId = selection.Id, SelectionRevision = selection.Revision,
-            BindingOrdinal = binding.Ordinal, GenerationId = generation.Id, GenerationRevision = generation.Revision,
-            GenerationWriterGeneration = generation.WriterGeneration, CaseId = selection.CaseId, CaseRevision = selection.CaseRevision,
-            AdoptedByHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1,
-            AdoptedAt = now.ToUniversalTime(), ValidUntil = validUntil
+            Id = id,
+            HostBindingId = selection.HostBindingId,
+            TrustDomainId = selection.TrustDomainId,
+            TenantId = selection.TenantId,
+            SelectionId = selection.Id,
+            SelectionRevision = selection.Revision,
+            BindingOrdinal = binding.Ordinal,
+            GenerationId = generation.Id,
+            GenerationRevision = generation.Revision,
+            GenerationWriterGeneration = generation.WriterGeneration,
+            CaseId = selection.CaseId,
+            CaseRevision = selection.CaseRevision,
+            AdoptedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            AdoptedAt = now.ToUniversalTime(),
+            ValidUntil = validUntil
         };
         row.ValidatePersistedState();
         return row;

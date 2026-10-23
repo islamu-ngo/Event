@@ -102,8 +102,11 @@ public sealed partial class ModerationPolicyPublicationTests
         var original = expected.Original;
         var actor = change switch
         {
-            "other" => fixture.OtherSubjectId, "administrator" => fixture.Database.AdminId,
-            "owner" => fixture.OwnerId, "reviewer" => fixture.ReviewerId, _ => fixture.SubjectId
+            "other" => fixture.OtherSubjectId,
+            "administrator" => fixture.Database.AdminId,
+            "owner" => fixture.OwnerId,
+            "reviewer" => fixture.ReviewerId,
+            _ => fixture.SubjectId
         };
         http.HttpContext!.User = IndividualPrincipal(actor);
         if (change == "unaccepted")
@@ -219,8 +222,10 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             Assessment = priorRequest.Assessment with
             {
-                Original = AssessmentOriginal(nextObservation), SourceId = nextSource.Id,
-                ExpectedSourceRevision = nextSource.Revision, ExpectedSourceGeneration = nextSource.Generation
+                Original = AssessmentOriginal(nextObservation),
+                SourceId = nextSource.Id,
+                ExpectedSourceRevision = nextSource.Revision,
+                ExpectedSourceGeneration = nextSource.Generation
             }
         };
         if (tie)
@@ -298,8 +303,11 @@ public sealed partial class ModerationPolicyPublicationTests
         var consent = (await owner.GrantAsync(request))!;
         await Assert.That((await fixture.Writer(fixture.Database.AdminId).ExecuteAsync(new WithdrawModerationChildAgePolicyAdoption
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope, ExpectedQualificationRevision = 8,
-            AdoptionId = fixture.ParentAdoption.AdoptionId, ExpectedAdoptionRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Database.Scope,
+            ExpectedQualificationRevision = 8,
+            AdoptionId = fixture.ParentAdoption.AdoptionId,
+            ExpectedAdoptionRevision = 1
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         await fixture.Context.Set<ModerationProfileCollectionAssessmentAdoption>().ExecuteDeleteAsync();
         await fixture.Context.Set<ModerationProfileCollectionAssessmentSource>().ExecuteDeleteAsync();
@@ -333,8 +341,11 @@ public sealed partial class ModerationPolicyPublicationTests
         var consent = (await ConsentOwner(fixture, http).GrantAsync(request))!;
         var actor = change switch
         {
-            "other" => fixture.OtherSubjectId, "administrator" => fixture.Database.AdminId,
-            "owner" => fixture.OwnerId, "reviewer" => fixture.ReviewerId, _ => fixture.SubjectId
+            "other" => fixture.OtherSubjectId,
+            "administrator" => fixture.Database.AdminId,
+            "owner" => fixture.OwnerId,
+            "reviewer" => fixture.ReviewerId,
+            _ => fixture.SubjectId
         };
         http.HttpContext!.User = IndividualPrincipal(actor);
         var withdraw = ConsentWithdrawal(consent);
@@ -401,11 +412,14 @@ public sealed partial class ModerationPolicyPublicationTests
                 case "procedure":
                     await context.Set<ModerationProfileCollectionProcedureAdoption>().Where(row => row.Id == observation.ProcedureAdoptionId)
                         .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.ValidUntil, Now.AddMinutes(1)), token); break;
-                case "policy": await context.ModerationPolicySelections.ExecuteUpdateAsync(
+                case "policy":
+                    await context.ModerationPolicySelections.ExecuteUpdateAsync(
                     setters => setters.SetProperty(row => row.ActivePublicationId, (Guid?)null), token); break;
-                case "slot": await context.Set<ModerationProfileSubjectConsent>().ExecuteUpdateAsync(
+                case "slot":
+                    await context.Set<ModerationProfileSubjectConsent>().ExecuteUpdateAsync(
                     setters => setters.SetProperty(row => row.Generation, 2L), token); break;
-                case "consent": await context.Set<ModerationProfileSubjectConsent>().ExecuteUpdateAsync(
+                case "consent":
+                    await context.Set<ModerationProfileSubjectConsent>().ExecuteUpdateAsync(
                     setters => setters.SetProperty(row => row.ValidUntil, Now.AddMinutes(1)), token); break;
                 case "expiry": fixture.Clock.UtcNow = request.ValidUntil; break;
                 case "cancel": cancellation.Cancel(); break;
@@ -530,7 +544,8 @@ public sealed partial class ModerationPolicyPublicationTests
         switch (change)
         {
             case "principal": http.HttpContext!.User = IndividualPrincipal(fixture.OtherSubjectId); break;
-            case "login": await context.UserExternalLogins.Where(row => row.Id == fixture.LoginId)
+            case "login":
+                await context.UserExternalLogins.Where(row => row.Id == fixture.LoginId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.UserId, fixture.OtherSubjectId), token); break;
             case "pii": await context.Set<UserPii>().Where(row => row.UserId == fixture.SubjectId).ExecuteDeleteAsync(token); break;
             case "privacy":
@@ -543,11 +558,13 @@ public sealed partial class ModerationPolicyPublicationTests
                     await authority.SaveChangesAsync(token);
                 }
                 break;
-            case "epoch": await context.ModerationQualificationEpochs.ExecuteUpdateAsync(
+            case "epoch":
+                await context.ModerationQualificationEpochs.ExecuteUpdateAsync(
                 setters => setters.SetProperty(row => row.Revision, row => row.Revision + 1), token); break;
             case "tenant": context.TenantContext = new ChildAgeTenantContext(Guid.CreateVersion7()); break;
             case "trust": context.ModerationTrustDomainId = Guid.CreateVersion7(); break;
-            case "host": await context.ModerationHostBindings.ExecuteUpdateAsync(
+            case "host":
+                await context.ModerationHostBindings.ExecuteUpdateAsync(
                 setters => setters.SetProperty(row => row.InstanceId, Guid.CreateVersion7()), token); break;
         }
     }

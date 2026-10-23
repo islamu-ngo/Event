@@ -69,7 +69,8 @@ public static class ModerationPolicyPublicationProjection
         if (restored is null) return null;
         var proposed = restored.Proposed with
         {
-            PublicationId = candidate.Id, RequestedState = ModerationPolicyRequestedState.Active
+            PublicationId = candidate.Id,
+            RequestedState = ModerationPolicyRequestedState.Active
         };
         if (ProposedDigest(proposed) != candidate.ProposedStateDigest) return null;
         return new(proposed, restored.Publication with { PublicationId = candidate.Id },
@@ -124,7 +125,8 @@ public static class ModerationPolicyPublicationProjection
         {
             MaximumFiniteDuration = TimeSpan.FromTicks(publication.MaximumFiniteDurationTicks),
             MaximumReviewDelay = TimeSpan.FromTicks(publication.MaximumReviewDelayTicks),
-            MinimumApprovals = publication.MinimumApprovals, MaximumApprovals = publication.MaximumApprovals,
+            MinimumApprovals = publication.MinimumApprovals,
+            MaximumApprovals = publication.MaximumApprovals,
             MinimumContestationCalendarMonths = publication.MinimumContestationCalendarMonths
         };
         var compiled = profiles.Select(profile => new ModerationPolicyCompiledProfile(profile,
@@ -183,7 +185,7 @@ public static class ModerationPolicyPublicationProjection
             || integrity.Profiles.Length != compiled.Length
             || integrity.Profiles.Where((profile, index) => !profile.Consequences.SequenceEqual(compiled[index].Consequences)).Any()
             || Digest(integrity.Consumers.Select(item => item with
-                { Binding = item.Binding with { PolicyRevision = publication.Revision } }).ToImmutableArray()) != Digest(restored.Consumers)
+            { Binding = item.Binding with { PolicyRevision = publication.Revision } }).ToImmutableArray()) != Digest(restored.Consumers)
             || Digest(integrity.Effects) != Digest(restored.Effects)
             || Digest(integrity.Consequences) != Digest(restored.Consequences)
             || Digest(integrity.Prerequisites) != Digest(restored.Prerequisites))

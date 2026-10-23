@@ -131,15 +131,24 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         if (procedural)
             await fixture.SourceAsync(fixture.Database.AdministratorId, new RevokeModerationQualificationPolicyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-                SourceId = fixture.PolicySourceId, ExpectedSourceRevision = 1, AdoptionId = fixture.PolicyAdoptionId,
-                ExpectedAdoptionRevision = 1, CaseId = fixture.CaseId, ExpectedCaseRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = fixture.PolicySourceId,
+                ExpectedSourceRevision = 1,
+                AdoptionId = fixture.PolicyAdoptionId,
+                ExpectedAdoptionRevision = 1,
+                CaseId = fixture.CaseId,
+                ExpectedCaseRevision = 1
             });
         else
             await fixture.SourceAsync(fixture.Database.AdministratorId, new WithdrawModerationReviewerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-                AssignmentId = fixture.Assignments[fixture.Approver], ExpectedAssignmentRevision = 3
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Scope,
+                ExpectedQualificationRevision = 1,
+                AssignmentId = fixture.Assignments[fixture.Approver],
+                ExpectedAssignmentRevision = 3
             });
         await Assert.That((await fixture.ReleaseAsync(fixture.ReleaseIntent())).Outcome)
             .IsEqualTo(ModerationResourceSafetyOutcome.Unavailable);
@@ -205,7 +214,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         await using var fixture = await Fixture.CreateAsync();
         var intent = fixture.Intent(fixture.Database.AdministratorId, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(1)
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(1)
         };
         var interceptor = new ExpireAfterFlush(fixture.Clock, fixture.Deadline);
         await Assert.That((await fixture.ReviewAsync(fixture.Database.AdministratorId, intent, interceptor)).Outcome)

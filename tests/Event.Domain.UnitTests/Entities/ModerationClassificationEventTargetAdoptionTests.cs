@@ -37,8 +37,10 @@ public sealed class ModerationClassificationEventTargetAdoptionTests
         var selection = state.Select();
         var human = actor switch
         {
-            0 => state.Source.OwnerHumanId, 1 => state.Source.ReviewerHumanId,
-            2 => state.Source.OwnerControllerHumanId, 3 => state.Source.ReviewerControllerHumanId,
+            0 => state.Source.OwnerHumanId,
+            1 => state.Source.ReviewerHumanId,
+            2 => state.Source.OwnerControllerHumanId,
+            3 => state.Source.ReviewerControllerHumanId,
             _ => selection.AuthoredByHumanId
         };
         await Assert.That(() => Adopt(state, selection, human)).Throws<ArgumentException>();

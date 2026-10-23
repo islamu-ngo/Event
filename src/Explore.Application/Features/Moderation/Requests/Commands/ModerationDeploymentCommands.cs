@@ -14,9 +14,16 @@ public sealed record RecordModerationDeploymentCommand : ModerationQualification
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationDeploymentSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, PolicyId = PolicyId, ExpectedPolicyRevision = ExpectedPolicyRevision,
-        PublicationId = PublicationId, ProfileId = ProfileId, Mode = Mode, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        PolicyId = PolicyId,
+        ExpectedPolicyRevision = ExpectedPolicyRevision,
+        PublicationId = PublicationId,
+        ProfileId = ProfileId,
+        Mode = Mode,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -29,9 +36,14 @@ public sealed record AdoptModerationDeploymentCommand : ModerationQualificationC
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationDeploymentSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration, AdoptionId = AdoptionId, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration,
+        AdoptionId = AdoptionId,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -41,7 +53,10 @@ public sealed record WithdrawModerationDeploymentCommand : ModerationQualificati
     public required long ExpectedAdoptionRevision { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new WithdrawModerationDeploymentAdoption
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision
     };
 }

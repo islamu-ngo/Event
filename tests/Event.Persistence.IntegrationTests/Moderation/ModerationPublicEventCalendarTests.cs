@@ -21,10 +21,16 @@ public sealed partial class ModerationPolicyPublicationTests
                 {
                     var adopted = await fixture.Writer(fixture.Adopter).ExecuteAsync(new AdoptModerationClassificationEventTarget
                     {
-                        OperationId = Guid.CreateVersion7(), Target = selection.Target, ExpectedQualificationRevision = epoch,
-                        AdoptionId = Guid.CreateVersion7(), SelectionId = selection.SelectionId, ExpectedSelectionRevision = 1,
-                        BindingOrdinal = ordinal, EventGenerationId = fixture.Generation.SourceId,
-                        ExpectedEventGenerationRevision = 1, ValidUntil = Now.AddMinutes(1)
+                        OperationId = Guid.CreateVersion7(),
+                        Target = selection.Target,
+                        ExpectedQualificationRevision = epoch,
+                        AdoptionId = Guid.CreateVersion7(),
+                        SelectionId = selection.SelectionId,
+                        ExpectedSelectionRevision = 1,
+                        BindingOrdinal = ordinal,
+                        EventGenerationId = fixture.Generation.SourceId,
+                        ExpectedEventGenerationRevision = 1,
+                        ValidUntil = Now.AddMinutes(1)
                     });
                     await Assert.That(adopted.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
                     epoch = adopted.Receipt!.QualificationRevision;

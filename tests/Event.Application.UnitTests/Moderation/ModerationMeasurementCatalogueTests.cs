@@ -105,22 +105,31 @@ public sealed class ModerationMeasurementCatalogueTests
         {
             jobs.Add(new JsonObject
             {
-                ["bundle"] = bundle, ["treeFilter"] = "/*/*/MeasuredCase/*",
+                ["bundle"] = bundle,
+                ["treeFilter"] = "/*/*/MeasuredCase/*",
                 ["cases"] = new JsonArray(new JsonObject
                 {
-                    ["caseId"] = name + ".case", ["journalTestId"] = "journal." + name,
-                    ["nodeUid"] = "node." + name, ["className"] = "MeasuredCase",
-                    ["methodName"] = "Outcome", ["displayName"] = "Outcome",
-                    ["mtpClassName"] = "Tests.MeasuredCase", ["mtpMethodName"] = "Outcome",
+                    ["caseId"] = name + ".case",
+                    ["journalTestId"] = "journal." + name,
+                    ["nodeUid"] = "node." + name,
+                    ["className"] = "MeasuredCase",
+                    ["methodName"] = "Outcome",
+                    ["displayName"] = "Outcome",
+                    ["mtpClassName"] = "Tests.MeasuredCase",
+                    ["mtpMethodName"] = "Outcome",
                     ["mtpTestName"] = "Outcome"
                 })
             });
         }
         return new()
         {
-            ["schemaVersion"] = 1, ["consumerId"] = "resource.payload", ["runtimeVersion"] = "10.0.0",
-            ["providerCode"] = "Sqlite", ["providerVersion"] = "3.49.0",
-            ["configurationDigest"] = new string('a', 64), ["productArtifactDigest"] = new string('b', 64),
+            ["schemaVersion"] = 1,
+            ["consumerId"] = "resource.payload",
+            ["runtimeVersion"] = "10.0.0",
+            ["providerCode"] = "Sqlite",
+            ["providerVersion"] = "3.49.0",
+            ["configurationDigest"] = new string('a', 64),
+            ["productArtifactDigest"] = new string('b', 64),
             ["jobs"] = jobs
         };
     }

@@ -51,11 +51,17 @@ public sealed partial class ModerationNoticeCleanupTests
             fixture.Credential = ApiKeyHashing.FormatPersistedApiKey(fixture.KeyId, secret);
             context.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), KeyId = fixture.KeyId, Name = "Original notice cleanup",
-                SecretHash = ApiKeyHashing.ComputeHash(secret), Scopes = "events:read",
-                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = database.AdministratorId,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                KeyId = fixture.KeyId,
+                Name = "Original notice cleanup",
+                SecretHash = ApiKeyHashing.ComputeHash(secret),
+                Scopes = "events:read",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                OwnerId = database.AdministratorId,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                ExternalApiKeyCreditPeriod = null!
             });
             context.ModerationMachineSubjectBindings.Add(ModerationMachineSubjectBinding.Establish(
                 Guid.CreateVersion7(), host.Id, ModerationMachineCredentialSource.Persisted, fixture.KeyId,
@@ -71,7 +77,7 @@ public sealed partial class ModerationNoticeCleanupTests
             var options = (DbContextOptions<ExploreDbContext>)context.GetService<IDbContextOptions>();
             context.Dispose();
             return new(new DbContextOptionsBuilder<ExploreDbContext>(options).AddInterceptors(interceptors).Options)
-                { TenantContext = Database };
+            { TenantContext = Database };
         }
 
         public async Task<MachinePrincipalAccessor> AuthenticateAsync(ExploreDbContext context)
@@ -196,12 +202,17 @@ public sealed partial class ModerationNoticeCleanupTests
             if (nativeId is { } id)
                 context.NotificationIntents.Add(new NotificationIntent
                 {
-                    Id = id, TenantId = Database.TenantId, CategoryId = (int)NotificationCategoryEnum.TrustSafetyModeration,
+                    Id = id,
+                    TenantId = Database.TenantId,
+                    CategoryId = (int)NotificationCategoryEnum.TrustSafetyModeration,
                     OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
-                    RecipientKindId = (int)NotificationRecipientKindEnum.User, StatusId = (int)NotificationIntentStatusEnum.Pending,
-                    RecipientUserId = Database.SubjectId, TemplateKey = "moderation.notice.portal.v1",
+                    RecipientKindId = (int)NotificationRecipientKindEnum.User,
+                    StatusId = (int)NotificationIntentStatusEnum.Pending,
+                    RecipientUserId = Database.SubjectId,
+                    TemplateKey = "moderation.notice.portal.v1",
                     DeduplicationKey = $"moderation-notice:{effect.Id:N}:1:{Database.SubjectId:N}",
-                    SafePayloadReference = $"moderation-notice:{noticeId:D}", SafePayloadHash = source.SnapshotHash,
+                    SafePayloadReference = $"moderation-notice:{noticeId:D}",
+                    SafePayloadHash = source.SnapshotHash,
                     CreatedAt = OriginalAt.UtcDateTime
                 });
             await context.SaveChangesAsync();

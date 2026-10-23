@@ -30,10 +30,19 @@ public sealed class ModerationConsumerInstallation
     {
         var source = new ModerationConsumerInstallation
         {
-            Id = id, HostBindingId = hostBindingId, TrustDomainId = trustDomainId, TenantId = tenantId,
-            ConsumerId = consumerId, ModeCode = modeCode, RuntimeGeneration = runtimeGeneration,
-            InventoryFingerprint = inventoryFingerprint, InstalledByHumanId = humanId,
-            WriterGeneration = writerGeneration, Revision = 1, InstalledAt = now.ToUniversalTime(), ValidUntil = validUntil
+            Id = id,
+            HostBindingId = hostBindingId,
+            TrustDomainId = trustDomainId,
+            TenantId = tenantId,
+            ConsumerId = consumerId,
+            ModeCode = modeCode,
+            RuntimeGeneration = runtimeGeneration,
+            InventoryFingerprint = inventoryFingerprint,
+            InstalledByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            InstalledAt = now.ToUniversalTime(),
+            ValidUntil = validUntil
         };
         source.ValidatePersistedState();
         return source;

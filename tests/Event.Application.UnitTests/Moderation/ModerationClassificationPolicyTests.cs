@@ -27,11 +27,21 @@ public sealed class ModerationClassificationPolicyTests
         var previous = context.Generation;
         context.Generation = new()
         {
-            Id = Guid.CreateVersion7(), HostBindingId = previous.HostBindingId, TrustDomainId = previous.TrustDomainId,
-            TenantId = previous.TenantId, EventId = native.Id, EventStamp = native.ConcurrencyStamp, Revision = 2,
-            ObservedByHumanId = previous.ObservedByHumanId, WriterGeneration = 5, ObservedAt = Now,
-            ValidUntil = previous.ValidUntil, ActorId = previous.ActorId, ActorStamp = previous.ActorStamp,
-            OrganizerActorId = previous.OrganizerActorId, OrganizerActorStamp = previous.OrganizerActorStamp,
+            Id = Guid.CreateVersion7(),
+            HostBindingId = previous.HostBindingId,
+            TrustDomainId = previous.TrustDomainId,
+            TenantId = previous.TenantId,
+            EventId = native.Id,
+            EventStamp = native.ConcurrencyStamp,
+            Revision = 2,
+            ObservedByHumanId = previous.ObservedByHumanId,
+            WriterGeneration = 5,
+            ObservedAt = Now,
+            ValidUntil = previous.ValidUntil,
+            ActorId = previous.ActorId,
+            ActorStamp = previous.ActorStamp,
+            OrganizerActorId = previous.OrganizerActorId,
+            OrganizerActorStamp = previous.OrganizerActorStamp,
             SubmittedByHumanId = previous.SubmittedByHumanId
         };
         var material = new ModerationClassificationMaterial(native.Id, native.ConcurrencyStamp, null, null, null, null);
@@ -196,13 +206,22 @@ public sealed class ModerationClassificationPolicyTests
         var old = context.Generation;
         var changed = new ModerationEventGeneration
         {
-            Id = old.Id, HostBindingId = old.HostBindingId, TrustDomainId = old.TrustDomainId,
-            TenantId = old.TenantId, EventId = old.EventId, EventStamp = change == "event" ? Guid.NewGuid() : old.EventStamp,
-            Revision = old.Revision, ObservedByHumanId = old.ObservedByHumanId,
+            Id = old.Id,
+            HostBindingId = old.HostBindingId,
+            TrustDomainId = old.TrustDomainId,
+            TenantId = old.TenantId,
+            EventId = old.EventId,
+            EventStamp = change == "event" ? Guid.NewGuid() : old.EventStamp,
+            Revision = old.Revision,
+            ObservedByHumanId = old.ObservedByHumanId,
             WriterGeneration = change == "writer" ? 7 : old.WriterGeneration,
             ObservedAt = change == "observation" ? Now.AddTicks(-1) : Now,
-            ValidUntil = old.ValidUntil, ActorId = old.ActorId, ActorStamp = change == "actor" ? Guid.NewGuid() : old.ActorStamp,
-            OrganizerActorId = null, OrganizerActorStamp = null, SubmittedByHumanId = old.SubmittedByHumanId
+            ValidUntil = old.ValidUntil,
+            ActorId = old.ActorId,
+            ActorStamp = change == "actor" ? Guid.NewGuid() : old.ActorStamp,
+            OrganizerActorId = null,
+            OrganizerActorStamp = null,
+            SubmittedByHumanId = old.SubmittedByHumanId
         };
         var result = ModerationAudiencePolicyCompiler.Compile(changed, context.Materials,
             context.Taxonomy, context.Reviews, context.Source, context.Adoption, Now);
@@ -215,12 +234,16 @@ public sealed class ModerationClassificationPolicyTests
 
     private static Explore.Domain.Event NativeEvent(ModerationEventGeneration generation) => new()
     {
-        Id = generation.EventId, ConcurrencyStamp = generation.EventStamp, Title = "Debate",
+        Id = generation.EventId,
+        ConcurrencyStamp = generation.EventStamp,
+        Title = "Debate",
         Actor = new() { ActorType = new() { FullName = "Person", MasterCode = "person" }, Pii = new() { DisplayName = "Organizer" } },
         Tenant = new() { FullName = "Tenant", Slug = "tenant", TenantStatus = new() { FullName = "Active", MasterCode = "active" } },
-        VisibilityType = new() { MasterCode = "public", FullName = "Public" }, EventStatus = new(),
+        VisibilityType = new() { MasterCode = "public", FullName = "Public" },
+        EventStatus = new(),
         EventFormat = new() { MasterCode = "online", FullName = "Online" },
-        EventType = new() { Id = 11, MasterCode = "conference", FullName = "Conference" }, EventTypeId = 11
+        EventType = new() { Id = 11, MasterCode = "conference", FullName = "Conference" },
+        EventTypeId = 11
     };
 
     private sealed class Context
@@ -251,11 +274,22 @@ public sealed class ModerationClassificationPolicyTests
             Adoption = ModerationChildAgePolicyAdoption.Adopt(Guid.CreateVersion7(), Source, policyReviewer, 2, Now, Now.AddMinutes(9));
             Generation = new()
             {
-                Id = Guid.CreateVersion7(), HostBindingId = Source.HostBindingId, TrustDomainId = Source.TrustDomainId,
-                TenantId = Source.TenantId, EventId = Guid.NewGuid(), EventStamp = Guid.NewGuid(), Revision = 1,
-                ObservedByHumanId = Owner, WriterGeneration = 3, ObservedAt = Now, ValidUntil = Now.AddMinutes(8),
-                ActorId = Guid.NewGuid(), ActorStamp = Guid.NewGuid(), OrganizerActorId = null,
-                OrganizerActorStamp = null, SubmittedByHumanId = Owner
+                Id = Guid.CreateVersion7(),
+                HostBindingId = Source.HostBindingId,
+                TrustDomainId = Source.TrustDomainId,
+                TenantId = Source.TenantId,
+                EventId = Guid.NewGuid(),
+                EventStamp = Guid.NewGuid(),
+                Revision = 1,
+                ObservedByHumanId = Owner,
+                WriterGeneration = 3,
+                ObservedAt = Now,
+                ValidUntil = Now.AddMinutes(8),
+                ActorId = Guid.NewGuid(),
+                ActorStamp = Guid.NewGuid(),
+                OrganizerActorId = null,
+                OrganizerActorStamp = null,
+                SubmittedByHumanId = Owner
             };
             General = Category(1, EventContentClassificationVersion.CategoryKind.General, 6);
             Taxonomy.Add(General);

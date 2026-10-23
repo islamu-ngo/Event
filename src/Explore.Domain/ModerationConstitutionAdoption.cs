@@ -29,9 +29,18 @@ public sealed class ModerationConstitutionAdoption
             throw new ArgumentException("Constitution adoption requires independent current authority and exact finite source coverage.");
         var adoption = new ModerationConstitutionAdoption
         {
-            Id = id, HostBindingId = source.HostBindingId, TrustDomainId = source.TrustDomainId, TenantId = source.TenantId,
-            SourceId = source.Id, SourceRevision = source.Revision, SourceWriterGeneration = source.WriterGeneration,
-            AdoptedByHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1, AdoptedAt = now, ValidUntil = validUntil
+            Id = id,
+            HostBindingId = source.HostBindingId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = source.TenantId,
+            SourceId = source.Id,
+            SourceRevision = source.Revision,
+            SourceWriterGeneration = source.WriterGeneration,
+            AdoptedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            AdoptedAt = now,
+            ValidUntil = validUntil
         };
         adoption.ValidatePersistedState();
         return adoption;

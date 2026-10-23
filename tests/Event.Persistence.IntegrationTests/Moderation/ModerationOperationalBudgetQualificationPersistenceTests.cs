@@ -169,11 +169,14 @@ public sealed class ModerationOperationalBudgetQualificationPersistenceTests
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, adoption)).IsSuccess).IsFalse();
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, adoption with
         {
-            OperationId = Guid.CreateVersion7(), AdoptionId = Guid.CreateVersion7(), ExpectedQualificationRevision = 4
+            OperationId = Guid.CreateVersion7(),
+            AdoptionId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 4
         })).IsSuccess).IsFalse();
         var currentAdoption = Adopt(database, replacement) with
         {
-            ExpectedQualificationRevision = 4, ExpectedSourceWriterGeneration = 4
+            ExpectedQualificationRevision = 4,
+            ExpectedSourceWriterGeneration = 4
         };
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, currentAdoption)).IsSuccess).IsTrue();
         await using var context = database.Context();
@@ -204,8 +207,11 @@ public sealed class ModerationOperationalBudgetQualificationPersistenceTests
             database.EvaluationTime = source.ValidUntil;
         var withdrawal = new WithdrawModerationOperationalBudgetAdoption
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            AdoptionId = adoption.AdoptionId, ExpectedAdoptionRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            AdoptionId = adoption.AdoptionId,
+            ExpectedAdoptionRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.ReviewerId, withdrawal)).IsSuccess).IsTrue();
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, adoption)).IsSuccess).IsFalse();
@@ -273,19 +279,27 @@ public sealed class ModerationOperationalBudgetQualificationPersistenceTests
 
     private static RecordModerationOperationalBudgetSource Request(SourceDatabase database) => new()
     {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 1,
+        OperationId = Guid.CreateVersion7(),
+        Target = database.Scope,
+        ExpectedQualificationRevision = 1,
         SourceId = Guid.CreateVersion7(),
         Terms = new(ModerationSubjectKind.Human, ModerationOperationalAction.SubmitReport, 3, TimeSpan.FromHours(1)),
-        OperatorHumanId = database.UrgencyAssessorId, ValidUntil = database.EvaluationTime.AddHours(2)
+        OperatorHumanId = database.UrgencyAssessorId,
+        ValidUntil = database.EvaluationTime.AddHours(2)
     };
 
     private static AdoptModerationOperationalBudgetSource Adopt(
         SourceDatabase database, RecordModerationOperationalBudgetSource source) => new()
-    {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-        SourceId = source.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 2,
-        AdoptionId = Guid.CreateVersion7(), ValidUntil = source.ValidUntil
-    };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = source.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 2,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = source.ValidUntil
+        };
 
     /// <summary>
     /// Observes the helper's actual completed save and mutates only its owning transaction.

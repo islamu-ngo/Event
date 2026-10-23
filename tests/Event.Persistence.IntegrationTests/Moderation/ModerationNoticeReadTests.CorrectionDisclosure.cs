@@ -87,10 +87,13 @@ public sealed partial class ModerationNoticeReadTests
             var state = await CorrectionApprovalStateAsync(fixture, pending);
             var revoked = await WriteCorrectionApprovalAsync(fixture, new RevokeModerationNoticeDisclosureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = pending.Request.Target,
+                OperationId = Guid.CreateVersion7(),
+                Target = pending.Request.Target,
                 ExpectedQualificationRevision = state.QualificationRevision,
-                ApprovalId = pending.Request.Intent.ApprovalId, CaseId = pending.Request.Intent.CaseId,
-                ExpectedCaseRevision = pending.Request.Intent.ExpectedCaseRevision, ExpectedApprovalRevision = 1
+                ApprovalId = pending.Request.Intent.ApprovalId,
+                CaseId = pending.Request.Intent.CaseId,
+                ExpectedCaseRevision = pending.Request.Intent.ExpectedCaseRevision,
+                ExpectedApprovalRevision = 1
             });
             await Assert.That(revoked.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         }

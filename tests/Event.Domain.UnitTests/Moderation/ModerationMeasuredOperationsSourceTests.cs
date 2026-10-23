@@ -41,8 +41,12 @@ public sealed class ModerationMeasuredOperationsSourceTests
         var proof = Proof();
         var evidence = Evidence() with
         {
-            Staffing = proof, Recovery = proof, Transport = proof, KeyConvergence = proof,
-            RecognitionPrivacy = proof, RecognitionPurpose = 1,
+            Staffing = proof,
+            Recovery = proof,
+            Transport = proof,
+            KeyConvergence = proof,
+            RecognitionPrivacy = proof,
+            RecognitionPurpose = 1,
             Consumers = [new("resource.payload", proof)]
         };
         evidence = omission switch
@@ -64,7 +68,9 @@ public sealed class ModerationMeasuredOperationsSourceTests
     {
         var evidence = Evidence() with
         {
-            Staffing = Proof(), Recovery = Proof(), Consumers = [new("resource.payload", Proof())]
+            Staffing = Proof(),
+            Recovery = Proof(),
+            Consumers = [new("resource.payload", Proof())]
         };
         await Assert.That(evidence.IsComplete(["resource.payload"], 1, 0, Now)).IsTrue();
         await Assert.That(evidence.IsComplete(["resource.payload"], 2, 0, Now)).IsFalse();
@@ -94,7 +100,9 @@ public sealed class ModerationMeasuredOperationsSourceTests
         var proof = Proof() with { Id = Guid.Parse(id) };
         var evidence = Evidence() with
         {
-            Staffing = proof, Recovery = Proof(), Consumers = [new("resource.payload", Proof())]
+            Staffing = proof,
+            Recovery = Proof(),
+            Consumers = [new("resource.payload", Proof())]
         };
         await Assert.That(proof.IsCurrent(Now)).IsFalse();
         await Assert.That(() => evidence.Validate(Now)).Throws<ArgumentException>();

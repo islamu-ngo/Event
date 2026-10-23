@@ -33,9 +33,13 @@ public sealed class EventResourceModerationReviewDuty : ITenantEntity
             throw new ArgumentException("The original object-review deadline must be no later than 24 hours after custody.");
         var duty = new EventResourceModerationReviewDuty
         {
-            Id = cause.Id, TenantId = cause.TenantId, EventId = cause.EventId,
-            EventResourceId = cause.EventResourceId, MaterialVersionId = cause.MaterialVersionId,
-            AppliedAt = cause.AppliedAt, DueAt = reviewAt
+            Id = cause.Id,
+            TenantId = cause.TenantId,
+            EventId = cause.EventId,
+            EventResourceId = cause.EventResourceId,
+            MaterialVersionId = cause.MaterialVersionId,
+            AppliedAt = cause.AppliedAt,
+            DueAt = reviewAt
         };
         duty.ValidatePersistedState();
         return duty;

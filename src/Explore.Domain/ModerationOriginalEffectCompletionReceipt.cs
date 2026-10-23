@@ -46,12 +46,25 @@ public sealed class ModerationOriginalEffectCompletionReceipt
             throw new ArgumentException("Completion requires the exact pending lease and retained original source.");
         var receipt = new ModerationOriginalEffectCompletionReceipt
         {
-            Id = id, EffectId = effect.Id, HostBindingId = hostBindingId, TenantId = tenantId,
-            TrustDomainId = effect.TrustDomainId, LeaseId = leaseId, LeaseRevision = leaseRevision,
-            LeaseStartedAt = started, LeaseExpiresAt = expires, PublicationId = publicationId, ProfileId = profileId,
-            SnapshotHash = source.SnapshotHash, EffectBindingHash = source.EffectBindingHash,
-            SelectionDigest = selectionDigest, ProofDigest = proofDigest, OriginalCauseCount = originalCauseCount,
-            CompletedAt = completedAt, QualifiedUntil = qualifiedUntil, RetainUntil = retainUntil
+            Id = id,
+            EffectId = effect.Id,
+            HostBindingId = hostBindingId,
+            TenantId = tenantId,
+            TrustDomainId = effect.TrustDomainId,
+            LeaseId = leaseId,
+            LeaseRevision = leaseRevision,
+            LeaseStartedAt = started,
+            LeaseExpiresAt = expires,
+            PublicationId = publicationId,
+            ProfileId = profileId,
+            SnapshotHash = source.SnapshotHash,
+            EffectBindingHash = source.EffectBindingHash,
+            SelectionDigest = selectionDigest,
+            ProofDigest = proofDigest,
+            OriginalCauseCount = originalCauseCount,
+            CompletedAt = completedAt,
+            QualifiedUntil = qualifiedUntil,
+            RetainUntil = retainUntil
         };
         receipt.ValidatePersistedState();
         return receipt;

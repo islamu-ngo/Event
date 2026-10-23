@@ -153,25 +153,33 @@ public sealed class ModerationProfileCollectionProcedureSourceOwner(
 
     internal static RecordModerationProfileCollectionProcedureSource RecordRequest(
         ModerationProfileCollectionProcedureSource source, AuthorityScope target) => new()
-    {
-        OperationId = Guid.Empty, Target = target, ExpectedQualificationRevision = source.WriterGeneration - 1,
-        SourceId = source.Id, ChildAgeSourceId = source.ChildAgeSourceId,
-        ExpectedChildAgeSourceRevision = source.ChildAgeSourceRevision,
-        ExpectedChildAgeSourceWriterGeneration = source.ChildAgeSourceWriterGeneration,
-        ChildAgeAdoptionId = source.ChildAgeAdoptionId,
-        ExpectedChildAgeAdoptionRevision = source.ChildAgeAdoptionRevision,
-        ExpectedChildAgeAdoptionWriterGeneration = source.ChildAgeAdoptionWriterGeneration,
-        Procedure = source.Procedure, ValidUntil = source.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = target,
+            ExpectedQualificationRevision = source.WriterGeneration - 1,
+            SourceId = source.Id,
+            ChildAgeSourceId = source.ChildAgeSourceId,
+            ExpectedChildAgeSourceRevision = source.ChildAgeSourceRevision,
+            ExpectedChildAgeSourceWriterGeneration = source.ChildAgeSourceWriterGeneration,
+            ChildAgeAdoptionId = source.ChildAgeAdoptionId,
+            ExpectedChildAgeAdoptionRevision = source.ChildAgeAdoptionRevision,
+            ExpectedChildAgeAdoptionWriterGeneration = source.ChildAgeAdoptionWriterGeneration,
+            Procedure = source.Procedure,
+            ValidUntil = source.ValidUntil
+        };
 
     internal static AdoptModerationProfileCollectionProcedureSource AdoptionRequest(
         ModerationProfileCollectionProcedureAdoption adoption, AuthorityScope target) => new()
-    {
-        OperationId = Guid.Empty, Target = target, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-        SourceId = adoption.SourceId, ExpectedSourceRevision = adoption.SourceRevision,
-        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
-        AdoptionId = adoption.Id, ValidUntil = adoption.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = target,
+            ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+            SourceId = adoption.SourceId,
+            ExpectedSourceRevision = adoption.SourceRevision,
+            ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
+            AdoptionId = adoption.Id,
+            ValidUntil = adoption.ValidUntil
+        };
 
     internal static string Slot(ModerationSourceAuthority authority, Guid publication, Guid profile, ModerationNativeMode mode) =>
         $"moderation.profile-procedure:{authority.Binding.Id:N}:{authority.Tenant.Id:N}:{publication:N}:{profile:N}:{(int)mode}";

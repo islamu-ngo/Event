@@ -66,9 +66,14 @@ public sealed class EventResourceModerationQuarantine : ITenantEntity
             throw new InvalidOperationException("A quarantine cause must bind native material.");
         var receipt = new EventResourceModerationQuarantine
         {
-            Id = id, TenantId = resource.TenantId, EventId = resource.EventId,
-            EventResourceId = resource.Id, MaterialVersionId = materialVersionId,
-            EffectId = effectId, BindingOrdinal = bindingOrdinal, AppliedAt = appliedAt
+            Id = id,
+            TenantId = resource.TenantId,
+            EventId = resource.EventId,
+            EventResourceId = resource.Id,
+            MaterialVersionId = materialVersionId,
+            EffectId = effectId,
+            BindingOrdinal = bindingOrdinal,
+            AppliedAt = appliedAt
         };
         receipt.ValidatePersistedState();
         return receipt;

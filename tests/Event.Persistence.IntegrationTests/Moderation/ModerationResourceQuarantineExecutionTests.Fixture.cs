@@ -84,23 +84,32 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             var generationId = Guid.CreateVersion7();
             await Accept(database.AdministratorId, new RecordModerationResourceGenerationSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 1,
-                SourceId = generationId, ResourceId = fixture.ResourceId, ExpectedResourceRevision = 0,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = generationId,
+                ResourceId = fixture.ResourceId,
+                ExpectedResourceRevision = 0,
                 ValidUntil = Now.AddMinutes(10)
             });
             var opened = database.OpenCase(scope) with
             {
-                ExpectedQualificationRevision = 2, SubjectKind = ModerationSubjectKind.Content, SubjectId = eventId
+                ExpectedQualificationRevision = 2,
+                SubjectKind = ModerationSubjectKind.Content,
+                SubjectId = eventId
             };
             await Accept(database.AdministratorId, opened);
             var request = database.Publication(3, ModerationReferenceProfileId.CFG09);
-            request = request with { Proposed = request.Proposed with
+            request = request with
             {
-                Profiles = [request.Proposed.Profiles.Single() with
+                Proposed = request.Proposed with
+                {
+                    Profiles = [request.Proposed.Profiles.Single() with
                 {
                     ScopeKinds = [ModerationScopeKind.Resource], SubjectKinds = [ModerationSubjectKind.Content]
                 }]
-            }};
+                }
+            };
             var published = await database.PublishAsync(database.AdministratorId, request);
             await Assert.That(published.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
             var publication = published.Publication!;
@@ -108,39 +117,65 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             var evidenceId = Guid.CreateVersion7();
             await Accept(database.UrgencyAssessorId, new QualifyModerationCaseUrgency
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 4,
-                EvidenceId = evidenceId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-                Justification = "Independently qualified unsafe native resource.", ValidUntil = Now.AddMinutes(30)
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 4,
+                EvidenceId = evidenceId,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                Justification = "Independently qualified unsafe native resource.",
+                ValidUntil = Now.AddMinutes(30)
             });
             var assignmentId = Guid.CreateVersion7();
             await Accept(database.AdministratorId, new AssignModerationReviewerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 5,
-                AssignmentId = assignmentId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 5,
+                AssignmentId = assignmentId,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
                 ReviewerHumanId = database.ReviewerId
             });
             var identityId = Guid.CreateVersion7();
             await Accept(database.AdministratorId, new QualifyModerationReviewerController
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 6,
-                AssignmentId = assignmentId, ExpectedAssignmentRevision = 1, ControllerHumanId = database.ReviewerId,
-                EvidenceId = identityId, Justification = "Independent canonical reviewer control.",
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 6,
+                AssignmentId = assignmentId,
+                ExpectedAssignmentRevision = 1,
+                ControllerHumanId = database.ReviewerId,
+                EvidenceId = identityId,
+                Justification = "Independent canonical reviewer control.",
                 QualifiedUntil = Now.AddMinutes(30)
             });
             var conflictId = Guid.CreateVersion7();
             await Accept(database.AdministratorId, new AssessModerationReviewerConflict
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 7,
-                AssignmentId = assignmentId, ExpectedAssignmentRevision = 2, State = ModerationReviewerConflictState.Independent,
-                EvidenceId = conflictId, Justification = "Independent reviewer for this exact resource case."
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 7,
+                AssignmentId = assignmentId,
+                ExpectedAssignmentRevision = 2,
+                State = ModerationReviewerConflictState.Independent,
+                EvidenceId = conflictId,
+                Justification = "Independent reviewer for this exact resource case."
             });
             var findingId = Guid.CreateVersion7();
             await Accept(database.ReviewerId, new FinalizeModerationFindingSource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 8,
-                FindingId = findingId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-                PolicyId = publication.PolicyId, ExpectedPolicyRevision = publication.Revision,
-                Rule = profile.Rule, Reason = profile.Reason, EvidenceId = evidenceId,
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 8,
+                FindingId = findingId,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                PolicyId = publication.PolicyId,
+                ExpectedPolicyRevision = publication.Revision,
+                Rule = profile.Rule,
+                Reason = profile.Reason,
+                EvidenceId = evidenceId,
                 Justification = "Final finding for the exact observed unsafe material."
             });
             ModerationDecision decision;
@@ -170,11 +205,21 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                 [new(null, target)]);
             await Accept(database.AdministratorId, new RecordModerationContributionSelectionSource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 9,
-                SelectionId = selectionId, EffectId = fixture.EffectId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-                DecisionId = decision.Id, ExpectedDecisionRevision = 4, PolicyId = publication.PolicyId,
-                ExpectedPolicyRevision = 1, PublicationId = publication.Id, ProfileId = profile.Id,
-                Contribution = contribution, ValidUntil = Now.AddMinutes(10)
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 9,
+                SelectionId = selectionId,
+                EffectId = fixture.EffectId,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                DecisionId = decision.Id,
+                ExpectedDecisionRevision = 4,
+                PolicyId = publication.PolicyId,
+                ExpectedPolicyRevision = 1,
+                PublicationId = publication.Id,
+                ProfileId = profile.Id,
+                Contribution = contribution,
+                ValidUntil = Now.AddMinutes(10)
             });
             var epoch = 10L;
             foreach (var binding in ModerationContributionSelectionProjection.Bindings(selectionId, contribution))
@@ -183,17 +228,30 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                 if (binding.Ordinal == 0) fixture.AdoptionId = id;
                 await Accept(database.UrgencyAssessorId, new AdoptModerationResourceTargetSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = epoch++,
-                    AdoptionId = id, SelectionId = selectionId, BindingOrdinal = binding.Ordinal, GenerationId = generationId,
-                    ExpectedGenerationRevision = 1, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = scope,
+                    ExpectedQualificationRevision = epoch++,
+                    AdoptionId = id,
+                    SelectionId = selectionId,
+                    BindingOrdinal = binding.Ordinal,
+                    GenerationId = generationId,
+                    ExpectedGenerationRevision = 1,
+                    CaseId = opened.CaseId,
+                    ExpectedCaseRevision = 1,
                     ValidUntil = fixture.PurposeDeadline
                 });
             }
             await Accept(database.UrgencyAssessorId, new AdoptModerationProfileSource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = epoch++,
-                AdoptionId = Guid.CreateVersion7(), SelectionId = selectionId, Mode = ModerationNativeMode.Embedded,
-                CaseId = opened.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(4)
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = epoch++,
+                AdoptionId = Guid.CreateVersion7(),
+                SelectionId = selectionId,
+                Mode = ModerationNativeMode.Embedded,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                ValidUntil = Now.AddMinutes(4)
             });
             var intent = new ModerationNoticeDisclosureIntent(Guid.CreateVersion7(), fixture.EffectId, decision.Id, 4,
                 opened.CaseId, 1, publication.PolicyId, 1, publication.Id, profile.Id, decision.Id,
@@ -201,10 +259,13 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                 new("Native source classification."), new("Current source authority and protected response."),
                 [new("Approved exact material explanation.")], new("Protected review remains available."),
                 new("Request independent review."), new("No automated finding."), new("Finite original retention."),
-                Now.AddMinutes(10), Now.AddYears(1)) { ContentRepresentatives = [representativeProof] };
+                Now.AddMinutes(10), Now.AddYears(1))
+            { ContentRepresentatives = [representativeProof] };
             await Accept(database.ReviewerId, new ApproveModerationNoticeDisclosureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = epoch++,
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = epoch++,
                 Intent = intent
             });
             await using (var writer = database.Context())
@@ -266,17 +327,26 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                 var tenantStatus = await writer.TenantStatuses.SingleAsync(row => row.IsActiveState);
                 var foreignTenant = new Tenant
                 {
-                    Id = fixture.OtherTenantId, Slug = $"quarantine-{fixture.OtherTenantId:N}",
-                    FullName = "Other quarantine tenant", TenantStatusId = tenantStatus.Id, TenantStatus = tenantStatus
+                    Id = fixture.OtherTenantId,
+                    Slug = $"quarantine-{fixture.OtherTenantId:N}",
+                    FullName = "Other quarantine tenant",
+                    TenantStatusId = tenantStatus.Id,
+                    TenantStatus = tenantStatus
                 };
                 writer.AddRange(foreignTenant, ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), host, foreignTenant));
                 writer.ExternalApiKeys.Add(new ExternalApiKey
                 {
-                    Id = Guid.CreateVersion7(), KeyId = fixture.KeyId, Name = "Native quarantine maintenance",
-                    SecretHash = ApiKeyHashing.ComputeHash(secret), Scopes = "events:read",
-                    OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = database.AdministratorId,
-                    ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                    ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                    Id = Guid.CreateVersion7(),
+                    KeyId = fixture.KeyId,
+                    Name = "Native quarantine maintenance",
+                    SecretHash = ApiKeyHashing.ComputeHash(secret),
+                    Scopes = "events:read",
+                    OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                    OwnerId = database.AdministratorId,
+                    ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                    ExternalApiKeyStatus = null!,
+                    ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                    ExternalApiKeyCreditPeriod = null!
                 });
                 writer.ModerationMachineSubjectBindings.Add(ModerationMachineSubjectBinding.Establish(
                     Guid.CreateVersion7(), host.Id, ModerationMachineCredentialSource.Persisted, fixture.KeyId,

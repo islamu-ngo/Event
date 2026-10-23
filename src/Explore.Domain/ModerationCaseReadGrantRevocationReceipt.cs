@@ -25,10 +25,15 @@ public sealed class ModerationCaseReadGrantRevocationReceipt
             throw new ArgumentException("Revocation ownership requires the exact completed native transition and administrator.");
         return new()
         {
-            Id = operationId, GrantId = revoked.Id, TenantId = revoked.TenantId,
-            TrustDomainId = revoked.TrustDomainId, ExpectedRevision = expectedRevision,
-            AdministratorUserId = administratorUserId, AdministratorRoleGrantId = administratorRoleGrantId,
-            AdministratorPlatformGrant = administratorPlatformGrant, RevokedAt = revokedAt
+            Id = operationId,
+            GrantId = revoked.Id,
+            TenantId = revoked.TenantId,
+            TrustDomainId = revoked.TrustDomainId,
+            ExpectedRevision = expectedRevision,
+            AdministratorUserId = administratorUserId,
+            AdministratorRoleGrantId = administratorRoleGrantId,
+            AdministratorPlatformGrant = administratorPlatformGrant,
+            RevokedAt = revokedAt
         };
     }
 

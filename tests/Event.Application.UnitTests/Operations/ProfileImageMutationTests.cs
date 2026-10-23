@@ -13,7 +13,9 @@ public sealed class ProfileImageMutationTests
             null!, null!, new UnauthenticatedCaller(), null!, null!, null!, null!);
         await Assert.That(async () => await handler.ExecuteAsync(new()
         {
-            UserId = Guid.CreateVersion7(), ExpectedConcurrencyStamp = Guid.CreateVersion7(), ProfileImage = new()
+            UserId = Guid.CreateVersion7(),
+            ExpectedConcurrencyStamp = Guid.CreateVersion7(),
+            ProfileImage = new()
         })).Throws<AuthorizationException>();
     }
 

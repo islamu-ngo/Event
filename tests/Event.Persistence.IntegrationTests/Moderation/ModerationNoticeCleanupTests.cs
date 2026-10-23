@@ -246,7 +246,9 @@ public sealed partial class ModerationNoticeCleanupTests
             await using var mutation = fixture.Context();
             var service = new ServicePrincipal
             {
-                Id = Guid.CreateVersion7(), Code = $"other-{Guid.CreateVersion7():N}", DisplayName = "Unrelated service"
+                Id = Guid.CreateVersion7(),
+                Code = $"other-{Guid.CreateVersion7():N}",
+                DisplayName = "Unrelated service"
             };
             mutation.ServicePrincipals.Add(service);
             await mutation.SaveChangesAsync();

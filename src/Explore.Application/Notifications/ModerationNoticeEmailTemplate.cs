@@ -23,10 +23,13 @@ public static class ModerationNoticeEmailTemplate
 
     public static EmailMessage Create(Guid noticeId, string address, DateTimeOffset until,
         ModerationNoticeEmailWindow window) => new()
-    {
-        To = address, Subject = Subject, PlainTextBody = Body(noticeId),
-        DisclosureUntilUtc = until.UtcDateTime, ModerationNoticeWindow = window
-    };
+        {
+            To = address,
+            Subject = Subject,
+            PlainTextBody = Body(noticeId),
+            DisclosureUntilUtc = until.UtcDateTime,
+            ModerationNoticeWindow = window
+        };
 
     public static bool Matches(EmailDispatchOutbox dispatch, NotificationIntent intent, Guid noticeId) =>
         dispatch.Kind == EmailDispatchKind.AccountModerationOriginalNotice

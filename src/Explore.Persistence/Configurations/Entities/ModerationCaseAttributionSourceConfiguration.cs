@@ -19,8 +19,15 @@ public sealed class ModerationCaseAttributionSourceConfiguration : IEntityTypeCo
         builder.Property(row => row.NativeResponsibilityDigest).HasMaxLength(64).IsUnicode(false).IsRequired();
         builder.Property(row => row.QualificationFactsDigest).HasMaxLength(64).IsUnicode(false).IsRequired();
         builder.HasIndex(row => new { row.CaseId, row.Generation }).IsUnique();
-        builder.HasIndex(row => new { row.TenantId, row.TrustDomainId, row.OccurrenceCaseId,
-            row.SubjectKind, row.SubjectId, row.Generation }).IsUnique();
+        builder.HasIndex(row => new
+        {
+            row.TenantId,
+            row.TrustDomainId,
+            row.OccurrenceCaseId,
+            row.SubjectKind,
+            row.SubjectId,
+            row.Generation
+        }).IsUnique();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(row => row.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ModerationCase>().WithMany().HasForeignKey(row => row.OccurrenceCaseId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ModerationCase>().WithMany().HasForeignKey(row => row.CaseId).OnDelete(DeleteBehavior.Restrict);

@@ -246,23 +246,33 @@ public sealed class ModerationMeasuredOperationsSourceOwner(
 
     internal static RecordModerationMeasuredOperationsSource RecordRequest(
         ModerationMeasuredOperationsSource source, ModerationActivationBinding binding) => new()
-    {
-        OriginalEffect = OriginalAnchor(source),
-        OperationId = Guid.Empty, Target = binding.Jurisdiction, ExpectedQualificationRevision = source.WriterGeneration - 1,
-        SourceId = source.Id, ProfileId = source.ProfileId, Binding = binding, ReviewerHumanId = source.ReviewerHumanId,
-        ReviewerControllerHumanId = source.ReviewerControllerHumanId, RecorderControllerHumanId = source.RecorderControllerHumanId,
-        ValidUntil = source.ValidUntil
-    };
+        {
+            OriginalEffect = OriginalAnchor(source),
+            OperationId = Guid.Empty,
+            Target = binding.Jurisdiction,
+            ExpectedQualificationRevision = source.WriterGeneration - 1,
+            SourceId = source.Id,
+            ProfileId = source.ProfileId,
+            Binding = binding,
+            ReviewerHumanId = source.ReviewerHumanId,
+            ReviewerControllerHumanId = source.ReviewerControllerHumanId,
+            RecorderControllerHumanId = source.RecorderControllerHumanId,
+            ValidUntil = source.ValidUntil
+        };
     internal static AcceptModerationMeasuredOperationsSource AcceptanceRequest(
         ModerationMeasuredOperationsAcceptance acceptance, ModerationActivationBinding binding,
         ModerationMeasuredOperationsSource source) => new()
-    {
-        OriginalEffect = OriginalAnchor(source),
-        OperationId = Guid.Empty, Target = binding.Jurisdiction, ExpectedQualificationRevision = acceptance.WriterGeneration - 1,
-        SourceId = acceptance.SourceId, ExpectedSourceRevision = acceptance.SourceRevision,
-        ExpectedSourceWriterGeneration = acceptance.SourceWriterGeneration, AcceptanceId = acceptance.Id,
-        ValidUntil = acceptance.ValidUntil
-    };
+        {
+            OriginalEffect = OriginalAnchor(source),
+            OperationId = Guid.Empty,
+            Target = binding.Jurisdiction,
+            ExpectedQualificationRevision = acceptance.WriterGeneration - 1,
+            SourceId = acceptance.SourceId,
+            ExpectedSourceRevision = acceptance.SourceRevision,
+            ExpectedSourceWriterGeneration = acceptance.SourceWriterGeneration,
+            AcceptanceId = acceptance.Id,
+            ValidUntil = acceptance.ValidUntil
+        };
     internal static string Slot(ModerationSourceAuthority authority, ModerationActivationBinding binding) =>
         $"moderation.measured-operations:{authority.Binding.Id:N}:{authority.Tenant.Id:N}:{ModerationPolicyPublicationProjection.Digest(binding)}";
     internal static ModerationOriginalEffectAnchor? OriginalAnchor(ModerationMeasuredOperationsSource source) =>

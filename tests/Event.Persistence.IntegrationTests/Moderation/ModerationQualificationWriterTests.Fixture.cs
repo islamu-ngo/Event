@@ -83,7 +83,8 @@ public sealed partial class ModerationQualificationWriterTests
         public Action? QualificationSaved { get; set; }
         public Guid PartialEvidenceId { get; } = Guid.CreateVersion7();
         public ExploreDbContext Context(IInterceptor? interceptor = null) => new(interceptor is null ? _options
-            : new DbContextOptionsBuilder<ExploreDbContext>(_options).AddInterceptors(interceptor).Options) { TenantContext = this };
+            : new DbContextOptionsBuilder<ExploreDbContext>(_options).AddInterceptors(interceptor).Options)
+        { TenantContext = this };
 
         public static async Task<SourceDatabase> CreateAsync()
         {
@@ -95,8 +96,11 @@ public sealed partial class ModerationQualificationWriterTests
             var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
             context.Tenants.Add(new Tenant
             {
-                Id = database.TenantId, FullName = "Qualification source tenant", Slug = $"source-{database.TenantId:N}",
-                TenantStatusId = status.Id, TenantStatus = status
+                Id = database.TenantId,
+                FullName = "Qualification source tenant",
+                Slug = $"source-{database.TenantId:N}",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             });
             var role = await context.Roles.SingleAsync(row =>
                 row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
@@ -104,26 +108,40 @@ public sealed partial class ModerationQualificationWriterTests
             {
                 var user = new User
                 {
-                    Id = id, Pii = new UserPii
+                    Id = id,
+                    Pii = new UserPii
                     {
-                        UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Source", LastName = "Witness"
+                        UserId = id,
+                        Email = $"{id:N}@example.invalid",
+                        FirstName = "Source",
+                        LastName = "Witness"
                     }
                 };
                 context.Users.Add(user);
                 if (id != database.SubjectId)
                     context.PlatformUserRoles.Add(new PlatformUserRole
                     {
-                        Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role
+                        Id = Guid.CreateVersion7(),
+                        UserId = id,
+                        User = user,
+                        RoleId = role.Id,
+                        Role = role
                     });
                 context.TenantUsers.Add(new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                    UserId = id, User = user, StatusId = (int)TenantUserStatusEnum.Active
+                    Id = Guid.CreateVersion7(),
+                    TenantId = database.TenantId,
+                    Tenant = null!,
+                    UserId = id,
+                    User = user,
+                    StatusId = (int)TenantUserStatusEnum.Active
                 });
             }
             var principal = new ServicePrincipal
             {
-                Id = Guid.CreateVersion7(), Code = $"maintenance-{database.TenantId:N}", DisplayName = "Source maintenance"
+                Id = Guid.CreateVersion7(),
+                Code = $"maintenance-{database.TenantId:N}",
+                DisplayName = "Source maintenance"
             };
             context.ServicePrincipals.Add(principal);
             await context.SaveChangesAsync();
@@ -133,9 +151,12 @@ public sealed partial class ModerationQualificationWriterTests
                 new ModerationAuthoritySourceRepository(context, identity.Admin, identity.Machine))
                 .ExecuteAsync(new EstablishModerationAuthoritySourcesCommand
                 {
-                    HostBindingId = database.HostId, TrustDomainId = database.Instance.TrustDomainId,
-                    SolutionId = database.Instance.Parent!.Id, InstanceId = database.Instance.Id,
-                    MaintenanceServicePrincipalId = principal.Id, TenantId = database.TenantId,
+                    HostBindingId = database.HostId,
+                    TrustDomainId = database.Instance.TrustDomainId,
+                    SolutionId = database.Instance.Parent!.Id,
+                    InstanceId = database.Instance.Id,
+                    MaintenanceServicePrincipalId = principal.Id,
+                    TenantId = database.TenantId,
                     EpochId = database.EpochId
                 });
             if (!setup.IsSuccess)
@@ -149,9 +170,13 @@ public sealed partial class ModerationQualificationWriterTests
             CaseScope = target ?? Scope;
             return new()
             {
-                OperationId = Guid.CreateVersion7(), Target = CaseScope, ExpectedQualificationRevision = 1,
-                CaseId = CaseId, SubjectKind = ModerationSubjectKind.Human,
-                SubjectId = SubjectId, OccurrenceId = Guid.CreateVersion7()
+                OperationId = Guid.CreateVersion7(),
+                Target = CaseScope,
+                ExpectedQualificationRevision = 1,
+                CaseId = CaseId,
+                SubjectKind = ModerationSubjectKind.Human,
+                SubjectId = SubjectId,
+                OccurrenceId = Guid.CreateVersion7()
             };
         }
 

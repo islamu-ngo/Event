@@ -64,20 +64,40 @@ public sealed class ModerationClassificationMaterialSource
         mandate.Validate();
         var source = new ModerationClassificationMaterialSource
         {
-            Id = id, Revision = 1, PreviousGeneration = previousGeneration,
-            HostBindingId = generation.HostBindingId, TrustDomainId = generation.TrustDomainId, TenantId = generation.TenantId,
-            EventId = generation.EventId, EventStamp = generation.EventStamp, EventGenerationId = generation.Id,
-            EventGenerationRevision = generation.Revision, EventWriterGeneration = generation.WriterGeneration,
-            PolicyId = taxonomy.PolicyId, PolicyRevision = taxonomy.PolicyRevision, PublicationId = taxonomy.PublicationId,
-            ProfileId = taxonomy.ProfileId, ModeCode = taxonomy.ModeCode, TaxonomyId = taxonomy.TaxonomyId,
-            TaxonomySourceId = taxonomy.Id, TaxonomySourceRevision = taxonomy.Revision, TaxonomySourceGeneration = taxonomy.WriterGeneration,
-            TaxonomyAdoptionId = taxonomyAdoption.Id, TaxonomyAdoptionRevision = taxonomyAdoption.Revision,
+            Id = id,
+            Revision = 1,
+            PreviousGeneration = previousGeneration,
+            HostBindingId = generation.HostBindingId,
+            TrustDomainId = generation.TrustDomainId,
+            TenantId = generation.TenantId,
+            EventId = generation.EventId,
+            EventStamp = generation.EventStamp,
+            EventGenerationId = generation.Id,
+            EventGenerationRevision = generation.Revision,
+            EventWriterGeneration = generation.WriterGeneration,
+            PolicyId = taxonomy.PolicyId,
+            PolicyRevision = taxonomy.PolicyRevision,
+            PublicationId = taxonomy.PublicationId,
+            ProfileId = taxonomy.ProfileId,
+            ModeCode = taxonomy.ModeCode,
+            TaxonomyId = taxonomy.TaxonomyId,
+            TaxonomySourceId = taxonomy.Id,
+            TaxonomySourceRevision = taxonomy.Revision,
+            TaxonomySourceGeneration = taxonomy.WriterGeneration,
+            TaxonomyAdoptionId = taxonomyAdoption.Id,
+            TaxonomyAdoptionRevision = taxonomyAdoption.Revision,
             TaxonomyAdoptionGeneration = taxonomyAdoption.WriterGeneration,
-            OwnerHumanId = mandate.OwnerHumanId, OwnerControllerHumanId = mandate.OwnerControllerHumanId,
-            OwnerAssignmentId = mandate.OwnerAssignmentId, OwnerAssignmentRevision = mandate.OwnerAssignmentRevision,
-            ReviewerHumanId = mandate.ReviewerHumanId, ReviewerControllerHumanId = mandate.ReviewerControllerHumanId,
-            OwnershipGrounds = mandate.OwnershipGrounds, ReviewGrounds = mandate.ReviewGrounds,
-            WriterGeneration = writerGeneration, RecordedAt = now, ValidUntil = validUntil
+            OwnerHumanId = mandate.OwnerHumanId,
+            OwnerControllerHumanId = mandate.OwnerControllerHumanId,
+            OwnerAssignmentId = mandate.OwnerAssignmentId,
+            OwnerAssignmentRevision = mandate.OwnerAssignmentRevision,
+            ReviewerHumanId = mandate.ReviewerHumanId,
+            ReviewerControllerHumanId = mandate.ReviewerControllerHumanId,
+            OwnershipGrounds = mandate.OwnershipGrounds,
+            ReviewGrounds = mandate.ReviewGrounds,
+            WriterGeneration = writerGeneration,
+            RecordedAt = now,
+            ValidUntil = validUntil
         };
         source._materials.AddRange(materials.Take(4097).Select((item, index) => ModerationClassificationMaterialEntry.Capture(id, index, item)));
         source._components.AddRange(components.Take(4097).Select((item, index) => ModerationClassificationMaterialComponent.Capture(id, index, item)));
@@ -206,9 +226,18 @@ public sealed class ModerationClassificationMaterialEntry
     {
         selection.Validate();
         var material = selection.Material;
-        var entry = new ModerationClassificationMaterialEntry { Id = selection.ReviewId, SourceId = sourceId, Ordinal = ordinal,
-            EventId = material.EventId, EventStamp = material.EventStamp, SessionId = material.SessionId, SessionStamp = material.SessionStamp,
-            ResourceId = material.ResourceId, ResourceStamp = material.ResourceStamp };
+        var entry = new ModerationClassificationMaterialEntry
+        {
+            Id = selection.ReviewId,
+            SourceId = sourceId,
+            Ordinal = ordinal,
+            EventId = material.EventId,
+            EventStamp = material.EventStamp,
+            SessionId = material.SessionId,
+            SessionStamp = material.SessionStamp,
+            ResourceId = material.ResourceId,
+            ResourceStamp = material.ResourceStamp
+        };
         entry._categories.AddRange(selection.CategoryVersionIds.Select((id, index) => ModerationClassificationMaterialCategory.Capture(entry.Id, index, id)));
         return entry;
     }
@@ -236,6 +265,13 @@ public sealed class ModerationClassificationMaterialComponent
     public ModerationClassificationMaterialComponentVersion Version => new(Kind, NativeId, NativeStamp, Digest);
     internal static ModerationClassificationMaterialComponent Capture(Guid sourceId, int ordinal,
         ModerationClassificationMaterialComponentVersion version) =>
-        new() { SourceId = sourceId, Ordinal = ordinal, Kind = version.Kind, NativeId = version.NativeId,
-            NativeStamp = version.NativeStamp, Digest = version.Digest };
+        new()
+        {
+            SourceId = sourceId,
+            Ordinal = ordinal,
+            Kind = version.Kind,
+            NativeId = version.NativeId,
+            NativeStamp = version.NativeStamp,
+            Digest = version.Digest
+        };
 }

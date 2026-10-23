@@ -70,7 +70,11 @@ public sealed class ModerationParticipantIncidentResponsibilitySourceConfigurati
         builder.HasOne<ModerationCaseNarrativeAdoption>().WithMany()
             .HasForeignKey(row => new
             {
-                row.CustodyAdoptionId, row.HostBindingId, row.TrustDomainId, row.TenantId, row.CustodySourceId
+                row.CustodyAdoptionId,
+                row.HostBindingId,
+                row.TrustDomainId,
+                row.TenantId,
+                row.CustodySourceId
             })
             .HasPrincipalKey(row => new { row.Id, row.HostBindingId, row.TrustDomainId, row.TenantId, row.SourceId })
             .OnDelete(DeleteBehavior.Restrict);

@@ -57,9 +57,15 @@ public sealed class ModerationQualificationPolicyCommandTests
     {
         var command = new AdoptModerationQualificationPolicyCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = Target, ExpectedQualificationRevision = 5,
-            SourceId = Guid.CreateVersion7(), ExpectedSourceRevision = 2, ExpectedWriterGeneration = 4,
-            AdoptionId = Guid.CreateVersion7(), CaseId = Guid.CreateVersion7(), ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = Target,
+            ExpectedQualificationRevision = 5,
+            SourceId = Guid.CreateVersion7(),
+            ExpectedSourceRevision = 2,
+            ExpectedWriterGeneration = 4,
+            AdoptionId = Guid.CreateVersion7(),
+            CaseId = Guid.CreateVersion7(),
+            ExpectedCaseRevision = 1,
             ValidUntil = Until
         };
         var mutation = (AdoptModerationQualificationPolicySource)command.ToMutation();
@@ -70,9 +76,15 @@ public sealed class ModerationQualificationPolicyCommandTests
             .ValidateAsync(command with { ExpectedWriterGeneration = 0 })).IsValid).IsFalse();
         var revoke = new RevokeModerationQualificationPolicyAdoptionCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = Target, ExpectedQualificationRevision = 6,
-            SourceId = command.SourceId, ExpectedSourceRevision = 2, AdoptionId = command.AdoptionId,
-            ExpectedAdoptionRevision = 1, CaseId = command.CaseId, ExpectedCaseRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = Target,
+            ExpectedQualificationRevision = 6,
+            SourceId = command.SourceId,
+            ExpectedSourceRevision = 2,
+            AdoptionId = command.AdoptionId,
+            ExpectedAdoptionRevision = 1,
+            CaseId = command.CaseId,
+            ExpectedCaseRevision = 1
         };
         await Assert.That(((RevokeModerationQualificationPolicyAdoption)revoke.ToMutation())
             .ExpectedAdoptionRevision).IsEqualTo(1L);
@@ -82,9 +94,15 @@ public sealed class ModerationQualificationPolicyCommandTests
 
     private static PublishModerationQualificationPolicyCommand Publish() => new()
     {
-        OperationId = Guid.CreateVersion7(), Target = Target, ExpectedQualificationRevision = 4,
-        SourceId = Guid.CreateVersion7(), CaseId = Guid.CreateVersion7(), ExpectedCaseRevision = 2,
-        ExpectedSourceRevision = 0, MaximumReviewerLifetime = TimeSpan.FromMinutes(30),
-        MaximumUrgencyLifetime = TimeSpan.FromMinutes(5), ValidUntil = Until
+        OperationId = Guid.CreateVersion7(),
+        Target = Target,
+        ExpectedQualificationRevision = 4,
+        SourceId = Guid.CreateVersion7(),
+        CaseId = Guid.CreateVersion7(),
+        ExpectedCaseRevision = 2,
+        ExpectedSourceRevision = 0,
+        MaximumReviewerLifetime = TimeSpan.FromMinutes(30),
+        MaximumUrgencyLifetime = TimeSpan.FromMinutes(5),
+        ValidUntil = Until
     };
 }

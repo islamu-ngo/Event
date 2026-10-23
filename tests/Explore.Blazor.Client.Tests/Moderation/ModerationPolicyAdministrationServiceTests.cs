@@ -527,9 +527,14 @@ public sealed class ModerationPolicyAdministrationServiceTests
                 : PolicyId;
             var authoring = Uninitialized || NullAuthoring ? "null" : JsonSerializer.Serialize(new ModerationCurrentPolicyAuthoringState
             {
-                PublicationId = PredecessorId, HistoricalExpectedRevision = 2,
-                CatalogueRevision = 8, InventoryRevision = 3, InventoryFingerprint = "retained",
-                Modes = proposed.Modes, Classes = proposed.Classes, Reasons = proposed.Reasons,
+                PublicationId = PredecessorId,
+                HistoricalExpectedRevision = 2,
+                CatalogueRevision = 8,
+                InventoryRevision = 3,
+                InventoryFingerprint = "retained",
+                Modes = proposed.Modes,
+                Classes = proposed.Classes,
+                Reasons = proposed.Reasons,
                 Profiles = proposed.Profiles.Select(p => new ModerationCurrentPolicyProfileView
                 {
                     Definition = p,

@@ -29,14 +29,14 @@ public sealed partial class ModerationNoticeReadTests
             var repository = AdjudicatedGrants(writer, fixture, fixture.Database.AdministratorId);
             await Assert.That(await repository.GrantAsync(request with { ValidUntil = fixture.Clock.GetUtcNow() })).IsNull();
             await Assert.That(await repository.GrantAsync(request with
-                { ValidUntil = original.Source.RetainUntil!.Value.AddMicroseconds(1) })).IsNull();
+            { ValidUntil = original.Source.RetainUntil!.Value.AddMicroseconds(1) })).IsNull();
             await Assert.That(await repository.GrantAsync(request with { GranteeUserId = Guid.CreateVersion7() })).IsNull();
             await Assert.That(await repository.GrantAsync(request with
-                { Original = request.Original with { EffectId = fixture.EffectId } })).IsNull();
+            { Original = request.Original with { EffectId = fixture.EffectId } })).IsNull();
             await Assert.That(await repository.GrantAsync(request with
-                { Original = request.Original with { SnapshotHash = new string('0', 64) } })).IsNull();
+            { Original = request.Original with { SnapshotHash = new string('0', 64) } })).IsNull();
             await Assert.That(await repository.GrantAsync(request with
-                { Original = request.Original with { EffectBindingHash = new string('0', 64) } })).IsNull();
+            { Original = request.Original with { EffectBindingHash = new string('0', 64) } })).IsNull();
             var granted = await repository.GrantAsync(request);
             await Assert.That(granted).IsNotNull();
             await Assert.That(granted!.Id).IsEqualTo(request.OperationId);
@@ -234,8 +234,12 @@ public sealed partial class ModerationNoticeReadTests
             await context.PlatformUserRoles.Where(row => row.Id == originalRoleId).ExecuteDeleteAsync();
             context.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = role.UserId, RoleId = role.RoleId,
-                User = null!, Role = null!, GrantedAt = fixture.Clock.GetUtcNow().UtcDateTime
+                Id = Guid.CreateVersion7(),
+                UserId = role.UserId,
+                RoleId = role.RoleId,
+                User = null!,
+                Role = null!,
+                GrantedAt = fixture.Clock.GetUtcNow().UtcDateTime
             });
         });
         await using (var reader = fixture.Database.Context())

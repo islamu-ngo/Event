@@ -33,7 +33,9 @@ public sealed partial class ModerationContentNoticeCommitTests
             originalActor = (await setup.Events.SingleAsync()).ActorId;
             setup.Actors.Add(new Actor
             {
-                Id = replacementActor, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+                Id = replacementActor,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
                 UserId = database.ReviewerId,
                 Pii = new ActorPii { ActorId = replacementActor, DisplayName = "Unplanned notice parent" }
             });

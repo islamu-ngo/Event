@@ -131,17 +131,27 @@ public sealed partial class ModerationContentNoticeCommitTests
             var actorId = Guid.CreateVersion7();
             var actor = new Actor
             {
-                Id = actorId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+                Id = actorId,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
                 UserId = database.SubjectId,
                 Pii = new ActorPii { ActorId = actorId, DisplayName = "Original Content representative" }
             };
             owningEvent = new(EventStatusEnum.Draft)
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-                Title = OriginalTitle, SubmittedByUserId = database.SubjectId,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                ActorId = actor.Id,
+                Actor = actor,
+                Title = OriginalTitle,
+                SubmittedByUserId = database.SubjectId,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Private, VisibilityType = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!
+                VisibilityTypeId = (int)VisibilityTypeEnum.Private,
+                VisibilityType = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                EventStatus = null!
             };
             assignment = EventRoleAssignment.Create(tenant.Id, owningEvent.Id, database.SubjectId,
                 (int)role, EventRoleAssignmentStatus.Active,
@@ -151,7 +161,8 @@ public sealed partial class ModerationContentNoticeCommitTests
         }
         var opened = database.OpenCase() with
         {
-            SubjectKind = ModerationSubjectKind.Content, SubjectId = owningEvent.Id
+            SubjectKind = ModerationSubjectKind.Content,
+            SubjectId = owningEvent.Id
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, opened)).IsSuccess).IsTrue();
         var request = database.Publication(2, ModerationReferenceProfileId.CFG09);
@@ -178,7 +189,9 @@ public sealed partial class ModerationContentNoticeCommitTests
         }
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
             Intent = new ModerationNoticeDisclosureIntent(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), decision.Id, 2, opened.CaseId, 1,
                 request.Proposed.PolicyId, 1, published.Publication!.Id, profile.Id,

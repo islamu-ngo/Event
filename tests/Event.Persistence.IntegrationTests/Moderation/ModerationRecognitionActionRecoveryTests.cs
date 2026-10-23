@@ -157,7 +157,8 @@ public sealed partial class ModerationPolicyPublicationTests
             await context.SaveChangesAsync();
             context.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = substituteId, UserId = scenario.FreshSubject,
+                Id = substituteId,
+                UserId = scenario.FreshSubject,
                 User = await context.Users.SingleAsync(row => row.Id == scenario.FreshSubject),
                 AuthenticationProviderId = (int)scenario.Account.ProviderKind,
                 AuthenticationProvider = await context.Set<AuthenticationProvider>()
@@ -256,15 +257,25 @@ public sealed partial class ModerationPolicyPublicationTests
                 var user = await context.Users.SingleOrDefaultAsync(row => row.Id == scenario.FreshSubject, inner);
                 if (user is null)
                 {
-                    user = new User { Id = scenario.FreshSubject, Pii = new UserPii
-                    { UserId = scenario.FreshSubject, Email = $"{scenario.FreshSubject:N}@example.invalid",
-                        FirstName = "Fresh", LastName = "Subject" } };
+                    user = new User
+                    {
+                        Id = scenario.FreshSubject,
+                        Pii = new UserPii
+                        {
+                            UserId = scenario.FreshSubject,
+                            Email = $"{scenario.FreshSubject:N}@example.invalid",
+                            FirstName = "Fresh",
+                            LastName = "Subject"
+                        }
+                    };
                     context.Users.Add(user);
                 }
                 if (!await context.UserExternalLogins.AnyAsync(row => row.Id == loginId, inner))
                     context.UserExternalLogins.Add(new UserExternalLogin
                     {
-                        Id = loginId, UserId = scenario.FreshSubject, User = user,
+                        Id = loginId,
+                        UserId = scenario.FreshSubject,
+                        User = user,
                         AuthenticationProviderId = (int)scenario.Account.ProviderKind,
                         AuthenticationProvider = await context.Set<AuthenticationProvider>()
                             .SingleAsync(row => row.Id == (int)scenario.Account.ProviderKind, inner),

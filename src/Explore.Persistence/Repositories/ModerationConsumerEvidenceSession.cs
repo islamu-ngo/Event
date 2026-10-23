@@ -175,11 +175,17 @@ internal sealed class ModerationConsumerEvidenceSession(
             {
                 OriginalEffect = challenge.OriginalEffectId is { } originalEffectId
                     ? new(originalEffectId, challenge.OriginalSnapshotHash!, challenge.OriginalEffectBindingHash!) : null,
-                OperationId = operationId, Target = authority.Tenant,
-                ExpectedQualificationRevision = challenge.WriterGeneration - 1, ChallengeId = challenge.Id,
-                InstallationId = installed.Id, ExpectedInstallationRevision = installed.Revision,
-                ConsumerId = consumerId, Binding = binding, ExpectedRuntimeGeneration = challenge.RuntimeGeneration,
-                ExpectedInventoryFingerprint = challenge.InventoryFingerprint, ValidUntil = challenge.ValidUntil
+                OperationId = operationId,
+                Target = authority.Tenant,
+                ExpectedQualificationRevision = challenge.WriterGeneration - 1,
+                ChallengeId = challenge.Id,
+                InstallationId = installed.Id,
+                ExpectedInstallationRevision = installed.Revision,
+                ConsumerId = consumerId,
+                Binding = binding,
+                ExpectedRuntimeGeneration = challenge.RuntimeGeneration,
+                ExpectedInventoryFingerprint = challenge.InventoryFingerprint,
+                ValidUntil = challenge.ValidUntil
             }, ModerationQualificationSourceKind.ConsumerMeasurementChallenge, challenge.Id, 1,
                 challenge.PreparedByHumanId, challenge.WriterGeneration, challenge.PreparedAt, token))
             return null;
@@ -206,11 +212,17 @@ internal sealed class ModerationConsumerEvidenceSession(
                 && row.Role.MasterCode == "platform.admin", token)
             || !await HasReceiptAsync(operationId => new EnrollModerationMeasurementIssuerSource
             {
-                OperationId = operationId, Target = authority.Tenant,
-                ExpectedQualificationRevision = issuer.WriterGeneration - 1, EnrollmentId = issuer.Id,
-                KeyId = issuer.KeyId, Issuer = issuer.Issuer, PublicKeySpkiBase64 = issuer.PublicKeySpkiBase64,
-                RunnerDigest = issuer.RunnerDigest, CatalogueDigest = issuer.CatalogueDigest,
-                TestBundleDigest = issuer.TestBundleDigest, ValidUntil = issuer.ValidUntil
+                OperationId = operationId,
+                Target = authority.Tenant,
+                ExpectedQualificationRevision = issuer.WriterGeneration - 1,
+                EnrollmentId = issuer.Id,
+                KeyId = issuer.KeyId,
+                Issuer = issuer.Issuer,
+                PublicKeySpkiBase64 = issuer.PublicKeySpkiBase64,
+                RunnerDigest = issuer.RunnerDigest,
+                CatalogueDigest = issuer.CatalogueDigest,
+                TestBundleDigest = issuer.TestBundleDigest,
+                ValidUntil = issuer.ValidUntil
             }, ModerationQualificationSourceKind.MeasurementIssuerEnrollment, issuer.Id, 1,
                 issuer.ApprovedByHumanId, issuer.WriterGeneration, issuer.ApprovedAt, token))
             return null;
@@ -235,11 +247,16 @@ internal sealed class ModerationConsumerEvidenceSession(
             || accepted.ValidUntil > issuer.ValidUntil) return null;
         var trust = new ModerationMeasurementTrustKey
         {
-            Issuer = issuer.Issuer, KeyId = issuer.KeyId,
+            Issuer = issuer.Issuer,
+            KeyId = issuer.KeyId,
             SubjectPublicKeyInfo = Convert.FromBase64String(issuer.PublicKeySpkiBase64).ToImmutableArray(),
-            HostBindingId = issuer.HostBindingId, TrustDomainId = issuer.TrustDomainId, TenantId = issuer.TenantId,
-            ApprovedRunnerDigest = issuer.RunnerDigest, ApprovedCatalogueDigest = issuer.CatalogueDigest,
-            ApprovedTestBundleDigest = issuer.TestBundleDigest, ValidUntil = issuer.ValidUntil
+            HostBindingId = issuer.HostBindingId,
+            TrustDomainId = issuer.TrustDomainId,
+            TenantId = issuer.TenantId,
+            ApprovedRunnerDigest = issuer.RunnerDigest,
+            ApprovedCatalogueDigest = issuer.CatalogueDigest,
+            ApprovedTestBundleDigest = issuer.TestBundleDigest,
+            ValidUntil = issuer.ValidUntil
         };
         var verified = measurementReceipts.Verify(accepted.SignedToken, trust, binding, observedAt);
         if (verified is not { Outcome: ModerationMeasurementVerificationOutcome.Known, Receipt: { } assertion }
@@ -255,9 +272,14 @@ internal sealed class ModerationConsumerEvidenceSession(
             || assertion.ValidUntil > challenge.ValidUntil || assertion.ValidUntil > issuer.ValidUntil
             || !await HasReceiptAsync(operationId => new AcceptModerationConsumerMeasurementSource
             {
-                OperationId = operationId, Target = authority.Tenant,
-                ExpectedQualificationRevision = accepted.WriterGeneration - 1, ReceiptId = accepted.Id,
-                ChallengeId = challenge.Id, IssuerEnrollmentId = issuer.Id, Binding = binding, SignedToken = accepted.SignedToken
+                OperationId = operationId,
+                Target = authority.Tenant,
+                ExpectedQualificationRevision = accepted.WriterGeneration - 1,
+                ReceiptId = accepted.Id,
+                ChallengeId = challenge.Id,
+                IssuerEnrollmentId = issuer.Id,
+                Binding = binding,
+                SignedToken = accepted.SignedToken
             }, ModerationQualificationSourceKind.ConsumerMeasurementReceipt, accepted.Id, 1,
                 accepted.AcceptedByHumanId, accepted.WriterGeneration, accepted.AcceptedAt, token))
             return null;
@@ -298,10 +320,15 @@ internal sealed class ModerationConsumerEvidenceSession(
             || installed.WriterGeneration > qualificationRevision
             || !await HasReceiptAsync(operationId => new InstallModerationConsumerSource
             {
-                OperationId = operationId, Target = authority.Tenant,
-                ExpectedQualificationRevision = installed.WriterGeneration - 1, InstallationId = installed.Id,
-                ConsumerId = consumerId, Mode = binding.Mode, ExpectedRuntimeGeneration = installed.RuntimeGeneration,
-                ExpectedInventoryFingerprint = installed.InventoryFingerprint, ValidUntil = installed.ValidUntil
+                OperationId = operationId,
+                Target = authority.Tenant,
+                ExpectedQualificationRevision = installed.WriterGeneration - 1,
+                InstallationId = installed.Id,
+                ConsumerId = consumerId,
+                Mode = binding.Mode,
+                ExpectedRuntimeGeneration = installed.RuntimeGeneration,
+                ExpectedInventoryFingerprint = installed.InventoryFingerprint,
+                ValidUntil = installed.ValidUntil
             }, ModerationQualificationSourceKind.ConsumerInstallation, installed.Id, 1,
                 installed.InstalledByHumanId, installed.WriterGeneration, installed.InstalledAt, token))
             return null;

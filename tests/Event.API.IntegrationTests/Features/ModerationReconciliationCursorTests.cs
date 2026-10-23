@@ -280,11 +280,17 @@ public sealed class ModerationReconciliationCursorTests
             var keys = Substitute.For<IExternalApiKeyAuthenticationRepository>();
             keys.GetByKeyIdForAuthentication(keyId, Arg.Any<CancellationToken>()).Returns(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), Name = "Cursor recovery maintenance", KeyId = keyId,
-                SecretHash = ApiKeyHashing.ComputeHash(secret), TenantId = TenantId,
-                OwnerId = Guid.CreateVersion7(), OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
-                Scopes = "events:read", ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
-                ExternalApiKeyStatus = null!, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                Name = "Cursor recovery maintenance",
+                KeyId = keyId,
+                SecretHash = ApiKeyHashing.ComputeHash(secret),
+                TenantId = TenantId,
+                OwnerId = Guid.CreateVersion7(),
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                Scopes = "events:read",
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriod = null!
             });
             var cleanup = Substitute.For<IModerationNoticeCleanupRepository>();
             cleanup.PruneAsync(Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(call =>

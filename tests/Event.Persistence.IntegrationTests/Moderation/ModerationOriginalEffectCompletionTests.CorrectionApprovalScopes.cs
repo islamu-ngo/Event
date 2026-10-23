@@ -74,22 +74,34 @@ public sealed partial class ModerationCaseNativeProofTests
                     ModerationNoticeDeliveryDisposition.RecipientUnavailable)).ToImmutableArray());
             var capture = new ModerationNoticeCaptureSnapshot(2, "event.moderation.capture.v2", original.HostBindingId,
                 original.HostSolutionId, original.HostInstanceId, original.WriterTenantId, original.AuthoritySourceId,
-                correction.QualificationRevision, original.Decision, null, null, [], originalR) { PendingCorrection = pending };
+                correction.QualificationRevision, original.Decision, null, null, [], originalR)
+            { PendingCorrection = pending };
             await Assert.That(capture.Matches(correction)).IsTrue();
             var source = ModerationNoticeSource.Capture(correction, fixture.Database.TenantId,
                 JsonSerializer.Serialize(capture), originalR);
             var text = new ModerationNoticeSafeText("Separately approved correction text; no body or delivery grant.");
             var intent = originalApproval.Intent with
             {
-                ApprovalId = Guid.CreateVersion7(), EffectId = correction.Id,
-                RuleMeaning = text, ReasonMeaning = text, Facts = [text], RemainingActions = text,
-                Recourse = text, Automation = text, Retention = text, ContentRepresentatives = [],
-                ValidUntil = at.AddMinutes(1), RetainUntil = originalR
+                ApprovalId = Guid.CreateVersion7(),
+                EffectId = correction.Id,
+                RuleMeaning = text,
+                ReasonMeaning = text,
+                Facts = [text],
+                RemainingActions = text,
+                Recourse = text,
+                Automation = text,
+                Retention = text,
+                ContentRepresentatives = [],
+                ValidUntil = at.AddMinutes(1),
+                RetainUntil = originalR
             };
             var request = new ApproveModerationNoticeCorrectionDisclosureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = decision.Scope, ExpectedQualificationRevision = epoch.Revision,
-                Intent = intent, ExpectedPendingSnapshotHash = source.SnapshotHash,
+                OperationId = Guid.CreateVersion7(),
+                Target = decision.Scope,
+                ExpectedQualificationRevision = epoch.Revision,
+                Intent = intent,
+                ExpectedPendingSnapshotHash = source.SnapshotHash,
                 ExpectedPendingEffectBindingHash = source.EffectBindingHash
             };
             epoch.Advance(epoch.Revision);

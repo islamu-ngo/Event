@@ -163,24 +163,41 @@ public sealed class ModerationProfileSubjectConsentContractTests
         {
             Original = new()
             {
-                ObservationId = Id(1), ExpectedObservationRevision = 1, ExpectedObservationGeneration = 2,
+                ObservationId = Id(1),
+                ExpectedObservationRevision = 1,
+                ExpectedObservationGeneration = 2,
                 Jurisdiction = AuthorityScope.Tenant(AuthorityScope.Instance(
                     AuthorityScope.Solution(AuthorityScope.TrustDomain(Id(30)), Id(31)), Id(32)), Id(33)),
-                PolicyId = Id(2), PolicyRevision = 4, PublicationId = Id(3), ProfileId = Id(4),
-                Mode = ModerationNativeMode.Embedded, ProcedureSourceId = Id(5), ExpectedProcedureSourceRevision = 1,
-                ExpectedProcedureSourceWriterGeneration = 7, ProcedureAdoptionId = Id(6),
-                ExpectedProcedureAdoptionRevision = 1, ExpectedProcedureAdoptionWriterGeneration = 8
+                PolicyId = Id(2),
+                PolicyRevision = 4,
+                PublicationId = Id(3),
+                ProfileId = Id(4),
+                Mode = ModerationNativeMode.Embedded,
+                ProcedureSourceId = Id(5),
+                ExpectedProcedureSourceRevision = 1,
+                ExpectedProcedureSourceWriterGeneration = 7,
+                ProcedureAdoptionId = Id(6),
+                ExpectedProcedureAdoptionRevision = 1,
+                ExpectedProcedureAdoptionWriterGeneration = 8
             },
-            SourceId = Id(7), ExpectedSourceRevision = 1, ExpectedSourceGeneration = 9,
-            AdoptionId = Id(8), ExpectedAdoptionRevision = 1, ExpectedAdoptionGeneration = 10
+            SourceId = Id(7),
+            ExpectedSourceRevision = 1,
+            ExpectedSourceGeneration = 9,
+            AdoptionId = Id(8),
+            ExpectedAdoptionRevision = 1,
+            ExpectedAdoptionGeneration = 10
         },
-        ConsentId = Id(9), ExpectedGeneration = 3,
+        ConsentId = Id(9),
+        ExpectedGeneration = 3,
         ValidUntil = new DateTimeOffset(2026, 10, 14, 12, 0, 0, TimeSpan.Zero)
     };
 
     private static WithdrawModerationProfileSubjectConsentCommand Withdraw() => new()
     {
-        ConsentId = Id(9), ExpectedConsentRevision = 1, ExpectedConsentGeneration = 4, ExpectedGeneration = 4
+        ConsentId = Id(9),
+        ExpectedConsentRevision = 1,
+        ExpectedConsentGeneration = 4,
+        ExpectedGeneration = 4
     };
 
     private static Guid Id(int value) => Guid.Parse($"019a0000-0000-7000-8000-{value:x12}");

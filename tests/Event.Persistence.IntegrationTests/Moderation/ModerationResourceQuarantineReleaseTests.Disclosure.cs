@@ -37,7 +37,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         var recordedAt = fixture.Clock.Now;
         var review = fixture.Intent(human, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(1)
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(1)
         };
         var removal = fixture.ReleaseIntent();
         var operationId = release ? removal.OperationId : review.OperationId;

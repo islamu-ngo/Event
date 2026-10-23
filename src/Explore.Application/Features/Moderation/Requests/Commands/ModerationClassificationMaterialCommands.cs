@@ -27,11 +27,23 @@ public sealed record RecordModerationClassificationMaterialCommand : ModerationQ
 
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationClassificationMaterialSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedMaterialGeneration = ExpectedMaterialGeneration, EventGenerationId = EventGenerationId,
-        PolicyId = PolicyId, ExpectedPolicyRevision = ExpectedPolicyRevision, PublicationId = PublicationId, ProfileId = ProfileId,
-        Mode = Mode, TaxonomyId = TaxonomyId, ExpectedTaxonomySourceId = ExpectedTaxonomySourceId,
-        ExpectedTaxonomyAdoptionId = ExpectedTaxonomyAdoptionId, Mandate = Mandate, Materials = Materials, Components = Components,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedMaterialGeneration = ExpectedMaterialGeneration,
+        EventGenerationId = EventGenerationId,
+        PolicyId = PolicyId,
+        ExpectedPolicyRevision = ExpectedPolicyRevision,
+        PublicationId = PublicationId,
+        ProfileId = ProfileId,
+        Mode = Mode,
+        TaxonomyId = TaxonomyId,
+        ExpectedTaxonomySourceId = ExpectedTaxonomySourceId,
+        ExpectedTaxonomyAdoptionId = ExpectedTaxonomyAdoptionId,
+        Mandate = Mandate,
+        Materials = Materials,
+        Components = Components,
         ValidUntil = ValidUntil
     };
 }
@@ -47,9 +59,14 @@ public sealed record AcceptModerationClassificationMaterialCommand : ModerationQ
 
     internal override ModerationQualificationMutation ToMutation() => new AcceptModerationClassificationMaterialSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration, ReviewId = ReviewId, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration,
+        ReviewId = ReviewId,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -63,7 +80,12 @@ public sealed record EndModerationClassificationMaterialCommand : ModerationQual
 
     internal override ModerationQualificationMutation ToMutation() => new EndModerationClassificationMaterialReview
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        ReviewId = ReviewId, ExpectedReviewRevision = ExpectedReviewRevision, End = End, Grounds = Grounds
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        ReviewId = ReviewId,
+        ExpectedReviewRevision = ExpectedReviewRevision,
+        End = End,
+        Grounds = Grounds
     };
 }

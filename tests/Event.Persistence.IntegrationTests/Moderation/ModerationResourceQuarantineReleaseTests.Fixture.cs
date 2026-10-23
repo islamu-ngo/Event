@@ -100,7 +100,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             {
                 var opened = database.OpenCase(fixture.Scope) with
                 {
-                    SubjectKind = ModerationSubjectKind.Content, SubjectId = eventId
+                    SubjectKind = ModerationSubjectKind.Content,
+                    SubjectId = eventId
                 };
                 fixture.CaseId = opened.CaseId;
                 await fixture.SourceAsync(database.AdministratorId, opened);
@@ -108,10 +109,16 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             fixture.PolicySourceId = Guid.CreateVersion7();
             await fixture.SourceAsync(database.AdministratorId, new PublishModerationQualificationPolicySource
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-                SourceId = fixture.PolicySourceId, CaseId = fixture.CaseId, ExpectedCaseRevision = 1,
-                ExpectedSourceRevision = 0, MaximumReviewerLifetime = TimeSpan.FromHours(1),
-                MaximumUrgencyLifetime = TimeSpan.FromMinutes(1), ValidUntil = fixture.Clock.Now.AddHours(1)
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = fixture.PolicySourceId,
+                CaseId = fixture.CaseId,
+                ExpectedCaseRevision = 1,
+                ExpectedSourceRevision = 0,
+                MaximumReviewerLifetime = TimeSpan.FromHours(1),
+                MaximumUrgencyLifetime = TimeSpan.FromMinutes(1),
+                ValidUntil = fixture.Clock.Now.AddHours(1)
             });
             long generation;
             await using (var reader = database.Context())
@@ -123,9 +130,15 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             fixture.PolicyAdoptionId = Guid.CreateVersion7();
             await fixture.SourceAsync(database.UrgencyAssessorId, new AdoptModerationQualificationPolicySource
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-                SourceId = fixture.PolicySourceId, ExpectedSourceRevision = 1, ExpectedWriterGeneration = generation,
-                AdoptionId = fixture.PolicyAdoptionId, CaseId = fixture.CaseId, ExpectedCaseRevision = 1,
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = fixture.PolicySourceId,
+                ExpectedSourceRevision = 1,
+                ExpectedWriterGeneration = generation,
+                AdoptionId = fixture.PolicyAdoptionId,
+                CaseId = fixture.CaseId,
+                ExpectedCaseRevision = 1,
                 ValidUntil = fixture.Clock.Now.AddMinutes(50)
             });
             foreach (var human in new[] { database.ReviewerId, database.UrgencyAssessorId, database.AdministratorId })
@@ -135,21 +148,36 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
                 fixture.Assignments.Add(human, assignment);
                 await fixture.SourceAsync(qualifier, new AssignModerationReviewerSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = assignment, CaseId = fixture.CaseId, ExpectedCaseRevision = 1, ReviewerHumanId = human
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = assignment,
+                    CaseId = fixture.CaseId,
+                    ExpectedCaseRevision = 1,
+                    ReviewerHumanId = human
                 });
                 await fixture.SourceAsync(qualifier, new QualifyModerationReviewerController
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = assignment, ExpectedAssignmentRevision = 1, ControllerHumanId = human,
-                    EvidenceId = Guid.CreateVersion7(), Justification = "Current independently established canonical controller.",
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = assignment,
+                    ExpectedAssignmentRevision = 1,
+                    ControllerHumanId = human,
+                    EvidenceId = Guid.CreateVersion7(),
+                    Justification = "Current independently established canonical controller.",
                     QualifiedUntil = fixture.Clock.Now.AddMinutes(30)
                 });
                 await fixture.SourceAsync(qualifier, new AssessModerationReviewerConflict
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = assignment, ExpectedAssignmentRevision = 2, State = ModerationReviewerConflictState.Independent,
-                    EvidenceId = Guid.CreateVersion7(), Justification = "Independent current reviewer for this material-safety case."
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = assignment,
+                    ExpectedAssignmentRevision = 2,
+                    State = ModerationReviewerConflictState.Independent,
+                    EvidenceId = Guid.CreateVersion7(),
+                    Justification = "Independent current reviewer for this material-safety case."
                 });
             }
             fixture.Deadline = fixture.Clock.Now.AddMinutes(10);
@@ -162,7 +190,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             CauseId = causeId;
             var purpose = Intent(Author, ResourceSafetyReviewStep.ProposePurpose, null) with
             {
-                RequiredApprovals = approvals, MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
+                RequiredApprovals = approvals,
+                MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
             };
             await AcceptAsync(Author, purpose);
             PurposeId = purpose.OperationId;
@@ -181,9 +210,17 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
 
         public ModerationResourceSafetyReviewIntent Intent(Guid human, ResourceSafetyReviewStep step, Guid? predecessor) => new()
         {
-            OperationId = Guid.CreateVersion7(), QuarantineId = CauseId, ResourceId = ResourceId, MaterialVersionId = MaterialId,
-            CaseId = CaseId, ExpectedCaseRevision = 1, ReviewerAssignmentId = Assignments[human],
-            ExpectedReviewerRevision = 3, Step = step, PredecessorId = predecessor, ValidUntil = Deadline
+            OperationId = Guid.CreateVersion7(),
+            QuarantineId = CauseId,
+            ResourceId = ResourceId,
+            MaterialVersionId = MaterialId,
+            CaseId = CaseId,
+            ExpectedCaseRevision = 1,
+            ReviewerAssignmentId = Assignments[human],
+            ExpectedReviewerRevision = 3,
+            Step = step,
+            PredecessorId = predecessor,
+            ValidUntil = Deadline
         };
 
         public ModerationResourceQuarantineReleaseIntent ReleaseIntent() =>

@@ -272,30 +272,47 @@ public sealed class ModerationLedgerConcurrencyTests(PostgreSqlContainerFixture 
             ConcurrencyStamp = Guid.CreateVersion7(),
             Pii = new UserPii
             {
-                UserId = principalId, Email = $"{principalId:N}@example.invalid", FirstName = "Test", LastName = "Reviewer"
+                UserId = principalId,
+                Email = $"{principalId:N}@example.invalid",
+                FirstName = "Test",
+                LastName = "Reviewer"
             }
         };
         var tenant = new Tenant
         {
-            Id = scope.Id, FullName = "Moderation race scope", Slug = $"moderation-{scope.Id:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = scope.Id,
+            FullName = "Moderation race scope",
+            Slug = $"moderation-{scope.Id:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var membership = new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, UserId = user.Id, User = user,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            UserId = user.Id,
+            User = user,
             StatusId = (int)TenantUserStatusEnum.Active
         };
         var grant = new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-            TenantUserId = membership.Id, TenantUser = membership,
-            RoleId = (int)RoleEnum.TenantAdmin, RoleScopeId = (int)RoleScopeEnum.Tenant, Role = null!
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            RoleScopeId = (int)RoleScopeEnum.Tenant,
+            Role = null!
         };
         await using var context = fixture.CreateDbContext();
         context.AddRange(user, tenant, membership, grant);
         var service = new ServicePrincipal
         {
-            Id = Guid.CreateVersion7(), Code = $"capture-{scope.Id:N}", DisplayName = "Capture integration test"
+            Id = Guid.CreateVersion7(),
+            Code = $"capture-{scope.Id:N}",
+            DisplayName = "Capture integration test"
         };
         var host = ModerationHostBinding.Establish(Guid.CreateVersion7(),
             scope.TrustDomainId, scope.Parent!.Parent!.Id, scope.Parent.Id, service.Id);

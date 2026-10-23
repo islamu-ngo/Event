@@ -13,21 +13,42 @@ public static class ModerationContributionSelectionProjection
         foreach (var row in contribution.Effects)
             bindings.Add(new()
             {
-                SelectionId = selectionId, Ordinal = bindings.Count, Kind = ModerationContributionBindingKind.Effect,
-                EffectKind = row.Effect.Kind, EffectMode = row.Effect.Mode, EffectTarget = row.Effect.Target,
-                Capability = row.Effect.Capability, Execution = row.Effect.Execution, Strategy = null,
-                Scope = row.Target.Scope, SubjectKind = row.Target.SubjectKind, SubjectId = row.Target.SubjectId,
-                TargetId = row.Target.TargetId, TargetRevision = row.Target.TargetRevision,
-                Operation = row.Target.Operation, WindowEnd = row.Target.WindowEnd
+                SelectionId = selectionId,
+                Ordinal = bindings.Count,
+                Kind = ModerationContributionBindingKind.Effect,
+                EffectKind = row.Effect.Kind,
+                EffectMode = row.Effect.Mode,
+                EffectTarget = row.Effect.Target,
+                Capability = row.Effect.Capability,
+                Execution = row.Effect.Execution,
+                Strategy = null,
+                Scope = row.Target.Scope,
+                SubjectKind = row.Target.SubjectKind,
+                SubjectId = row.Target.SubjectId,
+                TargetId = row.Target.TargetId,
+                TargetRevision = row.Target.TargetRevision,
+                Operation = row.Target.Operation,
+                WindowEnd = row.Target.WindowEnd
             });
         foreach (var row in contribution.Consequences)
             bindings.Add(new()
             {
-                SelectionId = selectionId, Ordinal = bindings.Count, Kind = ModerationContributionBindingKind.Consequence,
-                EffectKind = null, EffectMode = null, EffectTarget = null, Capability = null, Execution = null,
-                Strategy = row.Strategy, Scope = row.Target.Scope, SubjectKind = row.Target.SubjectKind,
-                SubjectId = row.Target.SubjectId, TargetId = row.Target.TargetId, TargetRevision = row.Target.TargetRevision,
-                Operation = row.Target.Operation, WindowEnd = row.Target.WindowEnd
+                SelectionId = selectionId,
+                Ordinal = bindings.Count,
+                Kind = ModerationContributionBindingKind.Consequence,
+                EffectKind = null,
+                EffectMode = null,
+                EffectTarget = null,
+                Capability = null,
+                Execution = null,
+                Strategy = row.Strategy,
+                Scope = row.Target.Scope,
+                SubjectKind = row.Target.SubjectKind,
+                SubjectId = row.Target.SubjectId,
+                TargetId = row.Target.TargetId,
+                TargetRevision = row.Target.TargetRevision,
+                Operation = row.Target.Operation,
+                WindowEnd = row.Target.WindowEnd
             });
         return bindings.ToImmutable();
     }

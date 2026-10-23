@@ -59,9 +59,15 @@ public sealed class RecognitionRecoveryContractTests
 
     private static AssessRecognitionRecoveryCommand Assessment() => new()
     {
-        OperationId = Guid.CreateVersion7(), IntentId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
-        AdoptionId = Guid.CreateVersion7(), ExpectedPendingRevision = 2, ExpectedSourceRevision = 1,
-        ExpectedSourceGeneration = 3, ExpectedAdoptionRevision = 1, ExpectedAdoptionGeneration = 4,
+        OperationId = Guid.CreateVersion7(),
+        IntentId = Guid.CreateVersion7(),
+        SourceId = Guid.CreateVersion7(),
+        AdoptionId = Guid.CreateVersion7(),
+        ExpectedPendingRevision = 2,
+        ExpectedSourceRevision = 1,
+        ExpectedSourceGeneration = 3,
+        ExpectedAdoptionRevision = 1,
+        ExpectedAdoptionGeneration = 4,
         Grounds = ModerationRecognitionDispositionGrounds.OriginalKeyRecoveryUnavailable,
         ValidUntil = new DateTimeOffset(2026, 10, 11, 12, 5, 0, TimeSpan.Zero)
     };

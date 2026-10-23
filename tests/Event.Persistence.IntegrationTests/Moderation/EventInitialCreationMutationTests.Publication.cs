@@ -22,7 +22,8 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = (await PrepareAsync(database, context, "organization", absentHost: absentHost))
-            with { RequestedStatus = EventStatusEnum.Published };
+            with
+        { RequestedStatus = EventStatusEnum.Published };
         var session = Session(database, context);
 
         var result = await session.Boundary.ExecuteCreationAsync(creation,
@@ -49,7 +50,8 @@ public sealed partial class EventInitialCreationMutationTests
         await using var context = database.Context();
         var clock = new InitialPublicationClock();
         var creation = (await PrepareAsync(database, context, "organization"))
-            with { RequestedStatus = EventStatusEnum.Published, CreatedAtUtc = clock.Now.UtcDateTime };
+            with
+        { RequestedStatus = EventStatusEnum.Published, CreatedAtUtc = clock.Now.UtcDateTime };
         var publication = await AdoptInitialPublicationAsync(database);
         await StoreInitialPublicationRestrictionAsync(database, publication, clock.Now, protective,
             scope: instanceScope ? database.Instance : database.Scope);
@@ -99,7 +101,8 @@ public sealed partial class EventInitialCreationMutationTests
         await using var context = database.Context();
         var clock = new InitialPublicationClock();
         var creation = (await PrepareAsync(database, context, "organization"))
-            with { RequestedStatus = EventStatusEnum.Published, CreatedAtUtc = clock.Now.UtcDateTime };
+            with
+        { RequestedStatus = EventStatusEnum.Published, CreatedAtUtc = clock.Now.UtcDateTime };
         var publication = await AdoptInitialPublicationAsync(database);
         await StoreInitialPublicationRestrictionAsync(database, publication, clock.Now,
             subjectId: database.AdministratorId);
@@ -122,7 +125,8 @@ public sealed partial class EventInitialCreationMutationTests
         await using var context = database.Context();
         var clock = new InitialPublicationClock();
         var creation = (await PrepareAsync(database, context, "organization"))
-            with { RequestedStatus = EventStatusEnum.Published, CreatedAtUtc = clock.Now.UtcDateTime };
+            with
+        { RequestedStatus = EventStatusEnum.Published, CreatedAtUtc = clock.Now.UtcDateTime };
         var publication = await AdoptInitialPublicationAsync(database);
         await StoreInitialPublicationRestrictionAsync(database, publication, clock.Now, protective);
         var declared = ModerationPolicyPublicationProjection.RestoreHistory(publication)!.Proposed;
@@ -131,7 +135,9 @@ public sealed partial class EventInitialCreationMutationTests
             ExpectedPublicationId = publication.Id,
             Proposed = declared with
             {
-                PublicationId = Guid.CreateVersion7(), ExpectedRevision = publication.Revision, SupportedProfiles = []
+                PublicationId = Guid.CreateVersion7(),
+                ExpectedRevision = publication.Revision,
+                SupportedProfiles = []
             }
         });
         await Assert.That(retired.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
@@ -166,7 +172,8 @@ public sealed partial class EventInitialCreationMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var creation = (await PrepareAsync(database, context, "organization"))
-            with { RequestedStatus = EventStatusEnum.Published };
+            with
+        { RequestedStatus = EventStatusEnum.Published };
         var publication = await AdoptInitialPublicationAsync(database);
         await RemoveInitialPublicationHistoryAsync(database, publication.Id, missing);
         var entered = false;
@@ -220,7 +227,8 @@ public sealed partial class EventInitialCreationMutationTests
         await using var setup = database.Context();
         var clock = new InitialPublicationClock();
         var creation = (await PrepareAsync(database, setup, "organization"))
-            with { RequestedStatus = EventStatusEnum.Published, CreatedAtUtc = clock.Now.UtcDateTime };
+            with
+        { RequestedStatus = EventStatusEnum.Published, CreatedAtUtc = clock.Now.UtcDateTime };
         var publication = await AdoptInitialPublicationAsync(database);
         var startsAt = clock.Now.AddMinutes(1);
         await StoreInitialPublicationRestrictionAsync(database, publication, startsAt);

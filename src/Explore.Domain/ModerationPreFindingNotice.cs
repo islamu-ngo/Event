@@ -77,16 +77,29 @@ public sealed class ModerationPreFindingNotice
             throw new ArgumentException("Notice requires exact attributed evidence, independently accepted custody and an explicit recipient.");
         var row = new ModerationPreFindingNotice
         {
-            Id = id, HostBindingId = custody.HostBindingId, TrustDomainId = custody.TrustDomainId,
-            TenantId = custody.TenantId, CustodyId = custody.Id, CaseId = owner.Id,
-            CaseRevision = owner.Revision, OccurrenceCaseId = owner.OccurrenceCaseId.Value,
-            EvidenceRevision = attribution.EvidenceCaseRevision, AttributionSourceId = attribution.Id,
+            Id = id,
+            HostBindingId = custody.HostBindingId,
+            TrustDomainId = custody.TrustDomainId,
+            TenantId = custody.TenantId,
+            CustodyId = custody.Id,
+            CaseId = owner.Id,
+            CaseRevision = owner.Revision,
+            OccurrenceCaseId = owner.OccurrenceCaseId.Value,
+            EvidenceRevision = attribution.EvidenceCaseRevision,
+            AttributionSourceId = attribution.Id,
             AttributionGeneration = attribution.Generation,
-            SubjectKind = owner.Subject.Kind, SubjectId = owner.Subject.Id,
-            RecipientHumanId = recipient.HumanId, RecipientAssignmentId = recipient.AssignmentId,
-            RecipientAssignmentRevision = recipient.AssignmentRevision, IssuedByHumanId = issuer,
-            ReviewerAssignmentId = reviewerAssignmentId, ReviewerAssignmentRevision = reviewerRevision,
-            IssuedAt = now, RetainUntil = retainUntil, protectedNotice = ciphertext.ToArray(), Revision = 1
+            SubjectKind = owner.Subject.Kind,
+            SubjectId = owner.Subject.Id,
+            RecipientHumanId = recipient.HumanId,
+            RecipientAssignmentId = recipient.AssignmentId,
+            RecipientAssignmentRevision = recipient.AssignmentRevision,
+            IssuedByHumanId = issuer,
+            ReviewerAssignmentId = reviewerAssignmentId,
+            ReviewerAssignmentRevision = reviewerRevision,
+            IssuedAt = now,
+            RetainUntil = retainUntil,
+            protectedNotice = ciphertext.ToArray(),
+            Revision = 1
         };
         row.ValidatePersistedState();
         return row;

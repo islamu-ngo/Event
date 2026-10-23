@@ -19,10 +19,19 @@ public sealed record RecordModerationRecognitionPrivacyCommand : ModerationQuali
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationRecognitionPrivacySource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, PolicyId = PolicyId, ExpectedPolicyRevision = ExpectedPolicyRevision,
-        PublicationId = PublicationId, ProfileId = ProfileId, Mode = Mode, Terms = Terms, Ownership = Ownership,
-        Retention = Retention, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        PolicyId = PolicyId,
+        ExpectedPolicyRevision = ExpectedPolicyRevision,
+        PublicationId = PublicationId,
+        ProfileId = ProfileId,
+        Mode = Mode,
+        Terms = Terms,
+        Ownership = Ownership,
+        Retention = Retention,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -35,9 +44,14 @@ public sealed record AdoptModerationRecognitionPrivacyCommand : ModerationQualif
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationRecognitionPrivacySource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration, AdoptionId = AdoptionId, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration,
+        AdoptionId = AdoptionId,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -47,7 +61,10 @@ public sealed record WithdrawModerationRecognitionPrivacyCommand : ModerationQua
     public required long ExpectedAdoptionRevision { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new WithdrawModerationRecognitionPrivacyAdoption
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision
     };
 }

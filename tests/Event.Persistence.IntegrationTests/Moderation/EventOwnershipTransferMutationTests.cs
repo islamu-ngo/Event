@@ -50,8 +50,11 @@ public sealed class EventOwnershipTransferMutationTests
             session.Provider, session.Boundary);
         var result = await handler.ExecuteAsync(new TransferEventOwnershipCommand
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, CurrentOwnerAssignmentId = old.Id,
-            NewOwnerUserId = fixture.Database.SubjectId, StartsAtUtc = DateTime.UtcNow.AddMinutes(-1)
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            CurrentOwnerAssignmentId = old.Id,
+            NewOwnerUserId = fixture.Database.SubjectId,
+            StartsAtUtc = DateTime.UtcNow.AddMinutes(-1)
         });
         await Assert.That(result.IsSuccess).IsTrue();
         if (replacementId is { } id) await Assert.That(result.Id).IsEqualTo(id);
@@ -80,8 +83,11 @@ public sealed class EventOwnershipTransferMutationTests
             session.Provider, session.Boundary);
         var result = await handler.ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, CurrentOwnerAssignmentId = old.Id,
-            NewOwnerUserId = fixture.Database.SubjectId, StartsAtUtc = DateTime.UtcNow.AddDays(1)
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            CurrentOwnerAssignmentId = old.Id,
+            NewOwnerUserId = fixture.Database.SubjectId,
+            StartsAtUtc = DateTime.UtcNow.AddDays(1)
         });
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(await context.EventRoleAssignments.CountAsync(row => row.EventId == fixture.EventId && row.UserId == fixture.Database.SubjectId)).IsEqualTo(0);
@@ -155,8 +161,12 @@ public sealed class EventOwnershipTransferMutationTests
         {
             await handler.ExecuteAsync(new()
             {
-                TenantId = fixture.TenantId, EventId = fixture.EventId, CurrentOwnerAssignmentId = old.Id,
-                NewOwnerUserId = fixture.Database.SubjectId, StartsAtUtc = DateTime.UtcNow.AddMinutes(-1), ExpiresAtUtc = until
+                TenantId = fixture.TenantId,
+                EventId = fixture.EventId,
+                CurrentOwnerAssignmentId = old.Id,
+                NewOwnerUserId = fixture.Database.SubjectId,
+                StartsAtUtc = DateTime.UtcNow.AddMinutes(-1),
+                ExpiresAtUtc = until
             });
         });
         await Assert.That(checkpoint.Observed).IsTrue();
@@ -194,8 +204,11 @@ public sealed class EventOwnershipTransferMutationTests
             session.Provider, session.Boundary);
         var request = new TransferEventOwnershipCommand
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, CurrentOwnerAssignmentId = old.Id,
-            NewOwnerUserId = fixture.Database.SubjectId, StartsAtUtc = DateTime.UtcNow.AddMinutes(-1)
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            CurrentOwnerAssignmentId = old.Id,
+            NewOwnerUserId = fixture.Database.SubjectId,
+            StartsAtUtc = DateTime.UtcNow.AddMinutes(-1)
         };
         if (rollback && !retry)
         {
@@ -264,8 +277,11 @@ public sealed class EventOwnershipTransferMutationTests
 
         var result = await handler.ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, CurrentOwnerAssignmentId = old.Id,
-            NewOwnerUserId = fixture.Database.SubjectId, StartsAtUtc = DateTime.UtcNow.AddMinutes(-1)
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            CurrentOwnerAssignmentId = old.Id,
+            NewOwnerUserId = fixture.Database.SubjectId,
+            StartsAtUtc = DateTime.UtcNow.AddMinutes(-1)
         });
 
         await Assert.That(fault.Injected).IsTrue();
@@ -300,8 +316,14 @@ public sealed class EventOwnershipTransferMutationTests
         Func<CancellationToken, Task>? beforeAuthorize = null)
     {
         clock ??= TimeProvider.System;
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, fixture.UserId.ToString("D"))], "event-transfer-native")) } };
+        var http = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(
+            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, fixture.UserId.ToString("D"))], "event-transfer-native"))
+            }
+        };
         var identity = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);

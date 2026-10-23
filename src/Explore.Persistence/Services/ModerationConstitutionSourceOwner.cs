@@ -179,10 +179,10 @@ public sealed class ModerationConstitutionSourceOwner(
             // Qualification writers and lifecycle writers share the original authority/epoch fences.
             // Count all live assignments, including unresolved ones, rather than hiding their workload.
             var caseload = await (from assignment in context.ModerationReviewerAssignments.AsNoTracking()
-                join allegation in context.ModerationCases.AsNoTracking() on assignment.CaseId equals allegation.Id
-                where assignment.WithdrawnAt == null && allegation.State == ModerationCaseState.Open
-                    && (assignment.ReviewerHumanId == reviewer.ReviewerHumanId || assignment.ControllerHumanId == reviewer.ControllerHumanId)
-                select assignment.CaseId).Distinct().CountAsync(token);
+                                  join allegation in context.ModerationCases.AsNoTracking() on assignment.CaseId equals allegation.Id
+                                  where assignment.WithdrawnAt == null && allegation.State == ModerationCaseState.Open
+                                      && (assignment.ReviewerHumanId == reviewer.ReviewerHumanId || assignment.ControllerHumanId == reviewer.ControllerHumanId)
+                                  select assignment.CaseId).Distinct().CountAsync(token);
             if (caseload >= availability.MaximumCaseload) return null;
             if (availability.ValidUntil < until) until = availability.ValidUntil;
         }
@@ -257,23 +257,40 @@ public sealed class ModerationConstitutionSourceOwner(
     internal static RecordModerationConstitutionSource RecordRequest(ModerationConstitutionSource source, AuthorityScope jurisdiction) => new()
     {
         OriginalEffect = OriginalAnchor(source),
-        OperationId = Guid.Empty, Target = jurisdiction, ExpectedQualificationRevision = source.WriterGeneration - 1,
-        SourceId = source.Id, PolicyId = source.PolicyId, ExpectedPolicyRevision = source.PolicyRevision,
-        PublicationId = source.PublicationId, ProfileId = source.ProfileId, Mode = (ModerationNativeMode)source.ModeCode,
-        Terms = source.Terms, Reviewers = source.Reviewers.Select(row => row.ToTerms()).ToImmutableArray(), ValidUntil = source.ValidUntil
+        OperationId = Guid.Empty,
+        Target = jurisdiction,
+        ExpectedQualificationRevision = source.WriterGeneration - 1,
+        SourceId = source.Id,
+        PolicyId = source.PolicyId,
+        ExpectedPolicyRevision = source.PolicyRevision,
+        PublicationId = source.PublicationId,
+        ProfileId = source.ProfileId,
+        Mode = (ModerationNativeMode)source.ModeCode,
+        Terms = source.Terms,
+        Reviewers = source.Reviewers.Select(row => row.ToTerms()).ToImmutableArray(),
+        ValidUntil = source.ValidUntil
     };
     internal static AdoptModerationConstitutionSource AdoptionRequest(ModerationConstitutionAdoption adoption,
         AuthorityScope jurisdiction, ModerationConstitutionSource source) => new()
-    {
-        OriginalEffect = OriginalAnchor(source),
-        OperationId = Guid.Empty, Target = jurisdiction, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-        SourceId = adoption.SourceId, ExpectedSourceRevision = adoption.SourceRevision, ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
-        AdoptionId = adoption.Id, ValidUntil = adoption.ValidUntil
-    };
+        {
+            OriginalEffect = OriginalAnchor(source),
+            OperationId = Guid.Empty,
+            Target = jurisdiction,
+            ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+            SourceId = adoption.SourceId,
+            ExpectedSourceRevision = adoption.SourceRevision,
+            ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
+            AdoptionId = adoption.Id,
+            ValidUntil = adoption.ValidUntil
+        };
     internal static RecordModerationConstitutionAvailability AvailabilityRequest(ModerationConstitutionAvailability row, AuthorityScope jurisdiction) => new()
     {
-        OperationId = Guid.Empty, Target = jurisdiction, ExpectedQualificationRevision = row.WriterGeneration - 1,
-        AvailabilityId = row.Id, MaximumCaseload = row.MaximumCaseload, ValidUntil = row.ValidUntil
+        OperationId = Guid.Empty,
+        Target = jurisdiction,
+        ExpectedQualificationRevision = row.WriterGeneration - 1,
+        AvailabilityId = row.Id,
+        MaximumCaseload = row.MaximumCaseload,
+        ValidUntil = row.ValidUntil
     };
     internal static string Slot(IModerationSourceProvenance authority, Guid publicationId, Guid profileId, ModerationNativeMode mode) =>
         $"moderation.constitution:{authority.Binding.Id:N}:{authority.Tenant.Id:N}:{publicationId:N}:{profileId:N}:{(int)mode}";

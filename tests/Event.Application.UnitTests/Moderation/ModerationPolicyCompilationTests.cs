@@ -62,27 +62,28 @@ public sealed partial class ModerationPolicyCompilationTests
     public async Task Every_shipped_response_compiles_without_inventing_a_generic_duration_or_quorum()
     {
         foreach (var reference in ModerationReferenceCatalogue.Profiles.Values)
-        foreach (var response in reference.Responses)
-        {
-            var state = State(reference.Id);
-            var definition = state.Profiles[0] with
+            foreach (var response in reference.Responses)
             {
-                Grade = response.Grade,
-                Timing = new(response.Timing.Kind, response.Timing.Duration),
-                RequiredApprovals = response.RequiredApprovals
-            };
-            var result = Compile(state with { Profiles = [definition] });
-            await Assert.That(result.Draft is not null).IsTrue();
-            await Assert.That(result.Draft!.Profiles[0].Definition.Timing.Kind).IsEqualTo(response.Timing.Kind);
-            await Assert.That(result.Draft.Profiles[0].Definition.RequiredApprovals).IsEqualTo(response.RequiredApprovals);
-        }
+                var state = State(reference.Id);
+                var definition = state.Profiles[0] with
+                {
+                    Grade = response.Grade,
+                    Timing = new(response.Timing.Kind, response.Timing.Duration),
+                    RequiredApprovals = response.RequiredApprovals
+                };
+                var result = Compile(state with { Profiles = [definition] });
+                await Assert.That(result.Draft is not null).IsTrue();
+                await Assert.That(result.Draft!.Profiles[0].Definition.Timing.Kind).IsEqualTo(response.Timing.Kind);
+                await Assert.That(result.Draft.Profiles[0].Definition.RequiredApprovals).IsEqualTo(response.RequiredApprovals);
+            }
     }
 
     [Test]
     public async Task Active_request_rejects_the_whole_supported_set_without_dropping_unimplemented_consumers()
     {
         var result = Compile(State(ModerationReferenceProfileId.CFG06, ModerationReferenceProfileId.CFG08)
-            with { RequestedState = ModerationPolicyRequestedState.Active });
+            with
+        { RequestedState = ModerationPolicyRequestedState.Active });
         await Assert.That(result.Outcome).IsEqualTo(ModerationPolicyCompilationOutcome.ActiveRejected);
         await Assert.That(result.Draft!.Profiles.Length).IsEqualTo(2);
         await Assert.That(result.Draft.Consumers.SelectMany(item => item.Consumers)
@@ -188,11 +189,17 @@ public sealed partial class ModerationPolicyCompilationTests
             "unknown-effect" => state with { Profiles = [first with { Effects = [first.Effects[0] with { Kind = (ModerationReferenceEffectKind)999 }] }] },
             "missing-effect" => state with { Profiles = [first with { Effects = [first.Effects[0]] }] },
             "duplicate-effect" => state with { Profiles = [first with { Effects = [.. first.Effects, first.Effects[0]] }] },
-            "wrong-execution" => state with { Profiles = [first with { Effects = first.Effects.SetItem(0,
-                first.Effects[0] with { Execution = ModerationReferenceExecution.OverlayDenial }) }] },
+            "wrong-execution" => state with
+            {
+                Profiles = [first with { Effects = first.Effects.SetItem(0,
+                first.Effects[0] with { Execution = ModerationReferenceExecution.OverlayDenial }) }]
+            },
             "missing-strategy" => state with { Profiles = [first, state.Profiles[1] with { Strategies = [] }] },
-            "duplicate-strategy" => state with { Profiles = [first, state.Profiles[1] with
-                { Strategies = [ModerationAdditiveStrategyKind.AgeAudienceEligibility, ModerationAdditiveStrategyKind.AgeAudienceEligibility] }] },
+            "duplicate-strategy" => state with
+            {
+                Profiles = [first, state.Profiles[1] with
+                { Strategies = [ModerationAdditiveStrategyKind.AgeAudienceEligibility, ModerationAdditiveStrategyKind.AgeAudienceEligibility] }]
+            },
             "unknown-mode" => state with { Modes = [(ModerationNativeMode)999] },
             "duplicate-mode" => state with { Modes = [ModerationNativeMode.Embedded, ModerationNativeMode.Embedded] },
             "missing-purpose" => state with { Profiles = [first with { ProtectionPurpose = null }, state.Profiles[1]] },

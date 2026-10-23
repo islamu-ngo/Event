@@ -67,19 +67,42 @@ public sealed class ModerationClassificationControlSelection
             throw new ArgumentException("Classification control requires the exact independently accepted native Event material generation.");
         var row = new ModerationClassificationControlSelection
         {
-            Id = id, Revision = 1, SourceId = source.Id, SourceRevision = source.Revision,
-            SourceWriterGeneration = source.WriterGeneration, SourceRecordedAt = source.RecordedAt, SourceValidUntil = source.ValidUntil,
-            ReviewId = review.Id, ReviewRevision = review.Revision, ReviewWriterGeneration = review.WriterGeneration,
-            ReviewValidUntil = review.ValidUntil, GenerationId = generation.Id, GenerationRevision = generation.Revision,
-            GenerationWriterGeneration = generation.WriterGeneration, GenerationObservedAt = generation.ObservedAt,
-            GenerationValidUntil = generation.ValidUntil, HostBindingId = source.HostBindingId,
-            TrustDomainId = source.TrustDomainId, TenantId = source.TenantId, EventId = source.EventId, EventStamp = source.EventStamp,
-            PolicyId = source.PolicyId, PolicyRevision = source.PolicyRevision, PublicationId = source.PublicationId,
-            ProfileId = source.ProfileId, ModeCode = source.ModeCode, OwnerHumanId = source.OwnerHumanId,
-            OwnerControllerHumanId = source.OwnerControllerHumanId, ReviewerHumanId = review.ReviewerHumanId,
-            ReviewerControllerHumanId = source.ReviewerControllerHumanId, AuthoredByHumanId = authoredByHumanId,
-            WriterGeneration = writerGeneration, SelectionDigest = selectionDigest, StartsAt = review.AcceptedAt,
-            RecordedAt = now, ValidUntil = validUntil
+            Id = id,
+            Revision = 1,
+            SourceId = source.Id,
+            SourceRevision = source.Revision,
+            SourceWriterGeneration = source.WriterGeneration,
+            SourceRecordedAt = source.RecordedAt,
+            SourceValidUntil = source.ValidUntil,
+            ReviewId = review.Id,
+            ReviewRevision = review.Revision,
+            ReviewWriterGeneration = review.WriterGeneration,
+            ReviewValidUntil = review.ValidUntil,
+            GenerationId = generation.Id,
+            GenerationRevision = generation.Revision,
+            GenerationWriterGeneration = generation.WriterGeneration,
+            GenerationObservedAt = generation.ObservedAt,
+            GenerationValidUntil = generation.ValidUntil,
+            HostBindingId = source.HostBindingId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = source.TenantId,
+            EventId = source.EventId,
+            EventStamp = source.EventStamp,
+            PolicyId = source.PolicyId,
+            PolicyRevision = source.PolicyRevision,
+            PublicationId = source.PublicationId,
+            ProfileId = source.ProfileId,
+            ModeCode = source.ModeCode,
+            OwnerHumanId = source.OwnerHumanId,
+            OwnerControllerHumanId = source.OwnerControllerHumanId,
+            ReviewerHumanId = review.ReviewerHumanId,
+            ReviewerControllerHumanId = source.ReviewerControllerHumanId,
+            AuthoredByHumanId = authoredByHumanId,
+            WriterGeneration = writerGeneration,
+            SelectionDigest = selectionDigest,
+            StartsAt = review.AcceptedAt,
+            RecordedAt = now,
+            ValidUntil = validUntil
         };
         row._bindings.AddRange(bindings.Take(65).Select(ModerationClassificationControlBinding.Capture));
         row.ValidatePersistedState();
@@ -195,12 +218,23 @@ public sealed class ModerationClassificationControlBinding
     public DateTimeOffset? WindowEnd { get; private set; }
     public ModerationContributionBinding Value => new()
     {
-        SelectionId = SelectionId, Ordinal = Ordinal, Kind = Kind, EffectKind = EffectKind, EffectMode = EffectMode,
-        EffectTarget = EffectTarget, Capability = Capability, Execution = Execution, Strategy = Strategy,
+        SelectionId = SelectionId,
+        Ordinal = Ordinal,
+        Kind = Kind,
+        EffectKind = EffectKind,
+        EffectMode = EffectMode,
+        EffectTarget = EffectTarget,
+        Capability = Capability,
+        Execution = Execution,
+        Strategy = Strategy,
         Scope = AuthorityScope.FromCoordinates(ScopeKind, ScopeTrustDomainId, ScopeSolutionId, ScopeInstanceId,
             ScopeTenantId, ScopeCommunityId, ScopeResourceId, ScopeEventId),
-        SubjectKind = SubjectKind, SubjectId = SubjectId, TargetId = TargetId, TargetRevision = TargetRevision,
-        Operation = Operation, WindowEnd = WindowEnd
+        SubjectKind = SubjectKind,
+        SubjectId = SubjectId,
+        TargetId = TargetId,
+        TargetRevision = TargetRevision,
+        Operation = Operation,
+        WindowEnd = WindowEnd
     };
 
     internal static ModerationClassificationControlBinding Capture(ModerationContributionBinding binding)
@@ -208,15 +242,29 @@ public sealed class ModerationClassificationControlBinding
         binding.ValidatePersistedState();
         return new()
         {
-            SelectionId = binding.SelectionId, Ordinal = binding.Ordinal, Kind = binding.Kind,
-            EffectKind = binding.EffectKind, EffectMode = binding.EffectMode, EffectTarget = binding.EffectTarget,
-            Capability = binding.Capability, Execution = binding.Execution, Strategy = binding.Strategy,
-            ScopeKind = binding.ScopeKind, ScopeTrustDomainId = binding.ScopeTrustDomainId,
-            ScopeSolutionId = binding.ScopeSolutionId, ScopeInstanceId = binding.ScopeInstanceId,
-            ScopeTenantId = binding.ScopeTenantId, ScopeCommunityId = binding.ScopeCommunityId,
-            ScopeResourceId = binding.ScopeResourceId, ScopeEventId = binding.ScopeEventId,
-            SubjectKind = binding.SubjectKind, SubjectId = binding.SubjectId, TargetId = binding.TargetId,
-            TargetRevision = binding.TargetRevision, Operation = binding.Operation, WindowEnd = binding.WindowEnd
+            SelectionId = binding.SelectionId,
+            Ordinal = binding.Ordinal,
+            Kind = binding.Kind,
+            EffectKind = binding.EffectKind,
+            EffectMode = binding.EffectMode,
+            EffectTarget = binding.EffectTarget,
+            Capability = binding.Capability,
+            Execution = binding.Execution,
+            Strategy = binding.Strategy,
+            ScopeKind = binding.ScopeKind,
+            ScopeTrustDomainId = binding.ScopeTrustDomainId,
+            ScopeSolutionId = binding.ScopeSolutionId,
+            ScopeInstanceId = binding.ScopeInstanceId,
+            ScopeTenantId = binding.ScopeTenantId,
+            ScopeCommunityId = binding.ScopeCommunityId,
+            ScopeResourceId = binding.ScopeResourceId,
+            ScopeEventId = binding.ScopeEventId,
+            SubjectKind = binding.SubjectKind,
+            SubjectId = binding.SubjectId,
+            TargetId = binding.TargetId,
+            TargetRevision = binding.TargetRevision,
+            Operation = binding.Operation,
+            WindowEnd = binding.WindowEnd
         };
     }
 

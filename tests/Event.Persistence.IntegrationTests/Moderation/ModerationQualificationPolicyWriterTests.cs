@@ -99,7 +99,9 @@ public sealed class ModerationQualificationPolicyWriterTests
         await Execute(database, database.AdministratorId, Adopt(database, publish.SourceId));
         var replace = publish with
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 4, ExpectedSourceRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 4,
+            ExpectedSourceRevision = 1,
             MaximumUrgencyLifetime = TimeSpan.FromMinutes(2)
         };
         await Assert.That((await Execute(database, database.AdministratorId, replace)).Outcome)
@@ -119,7 +121,9 @@ public sealed class ModerationQualificationPolicyWriterTests
             .IsEqualTo(ModerationQualificationWriteOutcome.Unavailable);
         await Assert.That((await Execute(database, database.AdministratorId, Adopt(database, publish.SourceId) with
         {
-            ExpectedQualificationRevision = 5, ExpectedSourceRevision = 2, ExpectedWriterGeneration = 5
+            ExpectedQualificationRevision = 5,
+            ExpectedSourceRevision = 2,
+            ExpectedWriterGeneration = 5
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var adopted = await Observe(database);
         await Assert.That(adopted.Joined!.Approval.ApprovedSourceRevision).IsEqualTo(2L);
@@ -142,9 +146,15 @@ public sealed class ModerationQualificationPolicyWriterTests
         await Execute(database, database.AdministratorId, adopt);
         var revoke = new RevokeModerationQualificationPolicyAdoption
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            CaseId = database.CaseId, ExpectedCaseRevision = 1, SourceId = publish.SourceId,
-            ExpectedSourceRevision = 1, AdoptionId = adopt.AdoptionId, ExpectedAdoptionRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            CaseId = database.CaseId,
+            ExpectedCaseRevision = 1,
+            SourceId = publish.SourceId,
+            ExpectedSourceRevision = 1,
+            AdoptionId = adopt.AdoptionId,
+            ExpectedAdoptionRevision = 1
         };
         await Assert.That((await Execute(database, database.AdministratorId, revoke)).Outcome)
             .IsEqualTo(ModerationQualificationWriteOutcome.Known);
@@ -249,7 +259,8 @@ public sealed class ModerationQualificationPolicyWriterTests
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
         await Assert.That((await Execute(database, database.AdministratorId, Adopt(database, publish.SourceId) with
         {
-            CaseId = originalCase, ExpectedQualificationRevision = 4,
+            CaseId = originalCase,
+            ExpectedQualificationRevision = 4,
             Target = ISLAMU.Moderation.Domain.AuthorityScope.Tenant(database.Instance, Guid.CreateVersion7())
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
         await using var reader = Read(database);
@@ -302,22 +313,33 @@ public sealed class ModerationQualificationPolicyWriterTests
         var assignmentId = Guid.CreateVersion7();
         await Assert.That((await Execute(database, database.AdministratorId, new AssignModerationReviewerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            AssignmentId = assignmentId, CaseId = database.CaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            AssignmentId = assignmentId,
+            CaseId = database.CaseId,
+            ExpectedCaseRevision = 1,
             ReviewerHumanId = database.ReviewerId
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var qualify = new QualifyModerationReviewerController
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            AssignmentId = assignmentId, ExpectedAssignmentRevision = 1, ControllerHumanId = database.UrgencyAssessorId,
-            EvidenceId = Guid.CreateVersion7(), Justification = "Native independently assessed canonical controller.",
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            AssignmentId = assignmentId,
+            ExpectedAssignmentRevision = 1,
+            ControllerHumanId = database.UrgencyAssessorId,
+            EvidenceId = Guid.CreateVersion7(),
+            Justification = "Native independently assessed canonical controller.",
             QualifiedUntil = Now.AddMinutes(30).AddTicks(1)
         };
         await Assert.That((await Execute(database, database.AdministratorId, qualify)).Outcome)
             .IsEqualTo(ModerationQualificationWriteOutcome.Denied);
         await Assert.That((await Execute(database, database.AdministratorId, qualify with
         {
-            OperationId = Guid.CreateVersion7(), EvidenceId = Guid.CreateVersion7(), QualifiedUntil = Now.AddMinutes(30)
+            OperationId = Guid.CreateVersion7(),
+            EvidenceId = Guid.CreateVersion7(),
+            QualifiedUntil = Now.AddMinutes(30)
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         await Assert.That((await Execute(database, database.AdministratorId, Urgency(database, 6) with
         {
@@ -373,9 +395,15 @@ public sealed class ModerationQualificationPolicyWriterTests
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Unavailable);
         await Assert.That((await Execute(database, database.AdministratorId, new RevokeModerationQualificationPolicyAdoption
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            SourceId = publish.SourceId, ExpectedSourceRevision = 1, AdoptionId = adopt.AdoptionId,
-            ExpectedAdoptionRevision = 1, CaseId = database.CaseId, ExpectedCaseRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            SourceId = publish.SourceId,
+            ExpectedSourceRevision = 1,
+            AdoptionId = adopt.AdoptionId,
+            ExpectedAdoptionRevision = 1,
+            CaseId = database.CaseId,
+            ExpectedCaseRevision = 1
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         await using var reader = Read(database);
         await Assert.That((await reader.ModerationQualificationEpochs.SingleAsync()).Revision).IsEqualTo(5L);
@@ -401,7 +429,9 @@ public sealed class ModerationQualificationPolicyWriterTests
         await Assert.That(expired.Joined).IsNull();
         await Assert.That((await Execute(database, database.AdministratorId, publish with
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 4, ExpectedSourceRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 4,
+            ExpectedSourceRevision = 1,
             ValidUntil = database.EvaluationTime.AddHours(1)
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var replaced = await Observe(database);
@@ -421,25 +451,40 @@ public sealed class ModerationQualificationPolicyWriterTests
 
     private static PublishModerationQualificationPolicySource Publish(SourceDatabase database) => new()
     {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-        SourceId = Guid.CreateVersion7(), ExpectedSourceRevision = 0,
-        CaseId = database.CaseId, ExpectedCaseRevision = 1,
-        MaximumReviewerLifetime = TimeSpan.FromMinutes(30), MaximumUrgencyLifetime = TimeSpan.FromMinutes(5),
+        OperationId = Guid.CreateVersion7(),
+        Target = database.Scope,
+        ExpectedQualificationRevision = 2,
+        SourceId = Guid.CreateVersion7(),
+        ExpectedSourceRevision = 0,
+        CaseId = database.CaseId,
+        ExpectedCaseRevision = 1,
+        MaximumReviewerLifetime = TimeSpan.FromMinutes(30),
+        MaximumUrgencyLifetime = TimeSpan.FromMinutes(5),
         ValidUntil = Now.AddHours(3)
     };
 
     private static AdoptModerationQualificationPolicySource Adopt(SourceDatabase database, Guid sourceId) => new()
     {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-        SourceId = sourceId, ExpectedSourceRevision = 1, ExpectedWriterGeneration = 3,
-        CaseId = database.CaseId, ExpectedCaseRevision = 1, AdoptionId = Guid.CreateVersion7(),
+        OperationId = Guid.CreateVersion7(),
+        Target = database.Scope,
+        ExpectedQualificationRevision = 3,
+        SourceId = sourceId,
+        ExpectedSourceRevision = 1,
+        ExpectedWriterGeneration = 3,
+        CaseId = database.CaseId,
+        ExpectedCaseRevision = 1,
+        AdoptionId = Guid.CreateVersion7(),
         ValidUntil = Now.AddHours(2)
     };
 
     private static QualifyModerationCaseUrgency Urgency(SourceDatabase database, long generation) => new()
     {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-        CaseId = database.CaseId, ExpectedCaseRevision = 1, EvidenceId = Guid.CreateVersion7(),
+        OperationId = Guid.CreateVersion7(),
+        Target = database.Scope,
+        ExpectedQualificationRevision = generation,
+        CaseId = database.CaseId,
+        ExpectedCaseRevision = 1,
+        EvidenceId = Guid.CreateVersion7(),
         Justification = "Current case-specific urgency independently assessed by a native administrator.",
         ValidUntil = Now.AddMinutes(5)
     };

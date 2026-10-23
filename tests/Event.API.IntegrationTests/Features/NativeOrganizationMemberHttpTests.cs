@@ -129,8 +129,11 @@ public sealed class NativeOrganizationMemberHttpTests
                 var command = new ValidateOrganizationInvitationQuery { InvitationId = id };
                 foreach (var userId in new[] { Guid.Empty, data.Outsider.Id, data.Invitee.Id })
                 {
-                    http.HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(
-                        [new Claim(ClaimTypes.NameIdentifier, userId.ToString())], "native-invitation-caller")) };
+                    http.HttpContext = new DefaultHttpContext
+                    {
+                        User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.NameIdentifier, userId.ToString())], "native-invitation-caller"))
+                    };
                     var result = await query.QueryAsync(command, default);
                     await Assert.That(result.IsSuccess).IsEqualTo(userId == data.Invitee.Id);
                     if (result.IsSuccess) await Assert.That(result.Id).IsEqualTo(id);

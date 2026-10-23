@@ -45,7 +45,9 @@ public sealed class ModerationEventTargetObservationTests
         }
         await Assert.That((await database.ExecuteAsync(database.ReviewerId, new ApproveModerationNoticeDisclosureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 6,
             Intent = new(Guid.CreateVersion7(), selection.EffectId, original.Id, 2, original.CaseId, 1,
                 selection.PolicyId, 1, publication.Id, selection.ProfileId, original.Id, selection.SelectionDigest,
                 new("Native Event source classification."), new("Current source authority and protected response."),
@@ -83,8 +85,12 @@ public sealed class ModerationEventTargetObservationTests
         if (substitution == 6)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RecordModerationEventGenerationSource
             {
-                OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), Target = database.Scope,
-                ExpectedQualificationRevision = 7, EventId = generation.EventId, ExpectedEventRevision = 1,
+                OperationId = Guid.CreateVersion7(),
+                SourceId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 7,
+                EventId = generation.EventId,
+                ExpectedEventRevision = 1,
                 ValidUntil = Now.AddMinutes(10)
             })).IsSuccess).IsTrue();
         var clock = new ObservationClock();
@@ -158,8 +164,11 @@ public sealed class ModerationEventTargetObservationTests
                 var id = Guid.CreateVersion7();
                 await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, source with
                 {
-                    OperationId = Guid.CreateVersion7(), AdoptionId = id, BindingOrdinal = binding.Ordinal,
-                    ExpectedQualificationRevision = epoch, ValidUntil = Now.AddMinutes(4)
+                    OperationId = Guid.CreateVersion7(),
+                    AdoptionId = id,
+                    BindingOrdinal = binding.Ordinal,
+                    ExpectedQualificationRevision = epoch,
+                    ValidUntil = Now.AddMinutes(4)
                 })).IsSuccess).IsTrue();
                 otherAdoptions.Add(id);
                 epoch++;
@@ -167,7 +176,9 @@ public sealed class ModerationEventTargetObservationTests
         }
         await Assert.That((await database.ExecuteAsync(database.ReviewerId, new ApproveModerationNoticeDisclosureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = epoch,
             Intent = new(Guid.CreateVersion7(), selection.EffectId, original.Id, 2, original.CaseId, 1,
                 selection.PolicyId, 1, publication.Id, selection.ProfileId, original.Id, selection.SelectionDigest,
                 new("Native Event source classification."), new("Current source authority and protected response."),

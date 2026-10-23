@@ -50,8 +50,10 @@ public sealed class ModerationPreFindingRecipientCommandTests
         var response = Response();
         var command = new AcknowledgeModerationPreFindingNoticeCommand
         {
-            OperationId = response.OperationId, CaseId = response.CaseId,
-            ExpectedCaseRevision = response.ExpectedCaseRevision, NoticeId = response.NoticeId,
+            OperationId = response.OperationId,
+            CaseId = response.CaseId,
+            ExpectedCaseRevision = response.ExpectedCaseRevision,
+            NoticeId = response.NoticeId,
             ExpectedNoticeRevision = response.ExpectedNoticeRevision
         };
         var validator = new AcknowledgeModerationPreFindingNoticeCommandValidator();
@@ -61,8 +63,11 @@ public sealed class ModerationPreFindingRecipientCommandTests
 
     private static SubmitModerationPreFindingResponseCommand Response() => new()
     {
-        OperationId = Guid.CreateVersion7(), CaseId = Guid.CreateVersion7(),
-        ExpectedCaseRevision = 1, NoticeId = Guid.CreateVersion7(), ExpectedNoticeRevision = 1,
+        OperationId = Guid.CreateVersion7(),
+        CaseId = Guid.CreateVersion7(),
+        ExpectedCaseRevision = 1,
+        NoticeId = Guid.CreateVersion7(),
+        ExpectedNoticeRevision = 1,
         Statement = "Subject-owned response"
     };
 }

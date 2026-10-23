@@ -24,8 +24,15 @@ public sealed class ModerationCaseNativeSourceConfiguration :
         // exempts standalone Actor/Service material from database uniqueness.
         builder.HasIndex(row => new
         {
-            row.TenantId, row.TrustDomainId, row.Kind, row.NativeKind, row.NativeTargetId,
-            row.NativeTargetVersion, row.NativeFactsDigest, row.OccurrenceDigest, row.MaterialDigest
+            row.TenantId,
+            row.TrustDomainId,
+            row.Kind,
+            row.NativeKind,
+            row.NativeTargetId,
+            row.NativeTargetVersion,
+            row.NativeFactsDigest,
+            row.OccurrenceDigest,
+            row.MaterialDigest
         }).IsUnique();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(row => row.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Event>().WithMany().HasForeignKey(row => row.EventId).OnDelete(DeleteBehavior.Restrict);

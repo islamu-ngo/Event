@@ -243,10 +243,15 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         var notice = JsonSerializer.Deserialize<ModerationNoticeCaptureSnapshot>(noticeSource.SnapshotJson)!.Notice!;
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope,
-            ExpectedQualificationRevision = await OriginalEpochAsync(fixture), SourceId = Guid.CreateVersion7(),
-            ProfileId = notice.ProfileId, OriginalEffect = constitution.OriginalEffect, ValidUntil = Now.AddSeconds(25),
-            ReviewerHumanId = fixture.Database.UrgencyAssessorId, ReviewerControllerHumanId = fixture.Database.UrgencyAssessorId,
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Database.Scope,
+            ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
+            SourceId = Guid.CreateVersion7(),
+            ProfileId = notice.ProfileId,
+            OriginalEffect = constitution.OriginalEffect,
+            ValidUntil = Now.AddSeconds(25),
+            ReviewerHumanId = fixture.Database.UrgencyAssessorId,
+            ReviewerControllerHumanId = fixture.Database.UrgencyAssessorId,
             RecorderControllerHumanId = fixture.Database.AdministratorId,
             Binding = new(notice.PolicyId, notice.PolicyRevision, notice.PublicationId, fixture.Database.Scope,
                 ModerationRuleReference.Create(notice.Rule.OwnerId, notice.Rule.Code, notice.Rule.Revision),
@@ -278,9 +283,11 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         database.EvaluationTime = fixture.PurposeDeadline.AddDays(1);
         var withdraw = new WithdrawModerationMeasuredOperationsAcceptance
         {
-            OperationId = Guid.CreateVersion7(), Target = record.Target,
+            OperationId = Guid.CreateVersion7(),
+            Target = record.Target,
             ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
-            AcceptanceId = accept.AcceptanceId, ExpectedAcceptanceRevision = 1
+            AcceptanceId = accept.AcceptanceId,
+            ExpectedAcceptanceRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, withdraw)).IsSuccess)
             .IsEqualTo(change == "exact");
@@ -295,12 +302,17 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
 
     private static async Task<AcceptModerationMeasuredOperationsSource> OriginalMeasuredAcceptanceAsync(
         Fixture fixture, RecordModerationMeasuredOperationsSource record) => new()
-    {
-        OperationId = Guid.CreateVersion7(), Target = record.Target,
-        ExpectedQualificationRevision = await OriginalEpochAsync(fixture), SourceId = record.SourceId,
-        ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = record.ExpectedQualificationRevision + 1,
-        AcceptanceId = Guid.CreateVersion7(), ValidUntil = Now.AddSeconds(20), OriginalEffect = record.OriginalEffect
-    };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = record.Target,
+            ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = record.ExpectedQualificationRevision + 1,
+            AcceptanceId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddSeconds(20),
+            OriginalEffect = record.OriginalEffect
+        };
 
     private static async Task<(ModerationMeasuredOperationsSourceObservation? Source,
         ModerationMeasuredOperationsAcceptanceObservation? Acceptance, ModerationPrerequisiteObservation? Prerequisite)>

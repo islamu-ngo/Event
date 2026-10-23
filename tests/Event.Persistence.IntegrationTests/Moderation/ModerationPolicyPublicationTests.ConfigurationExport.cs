@@ -253,8 +253,11 @@ public sealed partial class ModerationPolicyPublicationTests
         var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
         var tenant = new Tenant
         {
-            Id = tenantId, Slug = $"export-{tenantId:N}", FullName = "Foreign definition owner",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = tenantId,
+            Slug = $"export-{tenantId:N}",
+            FullName = "Foreign definition owner",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         context.Tenants.Add(tenant);
         var host = await context.ModerationHostBindings.SingleAsync();
@@ -280,9 +283,9 @@ public sealed partial class ModerationPolicyPublicationTests
                 Jurisdiction = scope,
                 Classes = request.Proposed.Classes.Select(row => row with { Reference = Rebind(row.Reference) }).ToImmutableArray(),
                 Reasons = request.Proposed.Reasons.Select(row => row with
-                    { Reference = Rebind(row.Reference), Class = Rebind(row.Class) }).ToImmutableArray(),
+                { Reference = Rebind(row.Reference), Class = Rebind(row.Class) }).ToImmutableArray(),
                 Profiles = request.Proposed.Profiles.Select(row => row with
-                    { Rule = Rebind(row.Rule), Reason = Rebind(row.Reason) }).ToImmutableArray(),
+                { Rule = Rebind(row.Rule), Reason = Rebind(row.Reason) }).ToImmutableArray(),
                 SupportedProfiles = []
             }
         };
@@ -319,9 +322,14 @@ public sealed partial class ModerationPolicyPublicationTests
         var role = await context.Roles.SingleAsync(row => row.Id == (int)RoleEnum.TenantAdmin);
         context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-            TenantUserId = membership.Id, TenantUser = membership,
-            RoleId = role.Id, Role = role, RoleScopeId = (int)RoleScopeEnum.Tenant,
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = role.Id,
+            Role = role,
+            RoleScopeId = (int)RoleScopeEnum.Tenant,
             GrantedAt = Now.UtcDateTime
         });
         await context.SaveChangesAsync();

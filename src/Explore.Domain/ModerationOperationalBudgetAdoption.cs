@@ -28,9 +28,18 @@ public sealed class ModerationOperationalBudgetAdoption
             throw new ArgumentException("Budget adoption requires the named independent operator and exact finite source.");
         var adoption = new ModerationOperationalBudgetAdoption
         {
-            Id = id, HostBindingId = source.HostBindingId, TrustDomainId = source.TrustDomainId, TenantId = source.TenantId,
-            SourceId = source.Id, SourceRevision = source.Revision, SourceWriterGeneration = source.WriterGeneration,
-            AdoptedByHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1, AdoptedAt = now, ValidUntil = validUntil
+            Id = id,
+            HostBindingId = source.HostBindingId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = source.TenantId,
+            SourceId = source.Id,
+            SourceRevision = source.Revision,
+            SourceWriterGeneration = source.WriterGeneration,
+            AdoptedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            AdoptedAt = now,
+            ValidUntil = validUntil
         };
         adoption.ValidatePersistedState();
         return adoption;

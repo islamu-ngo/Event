@@ -515,12 +515,15 @@ public sealed partial class ModerationPolicyPublicationTests
         public async Task<KeyCapture> CaptureAsync(TimeSpan? retention = null)
         {
             var request = database.Request();
-            request = request with { Proposed = request.Proposed with
+            request = request with
             {
-                RequestedState = ModerationPolicyRequestedState.Active,
-                Profiles = [request.Proposed.Profiles.Single() with
+                Proposed = request.Proposed with
+                {
+                    RequestedState = ModerationPolicyRequestedState.Active,
+                    Profiles = [request.Proposed.Profiles.Single() with
                 { Recognition = ModerationReferenceRecognition.SeparatelyQualifiedFinalAction }]
-            }};
+                }
+            };
             var (admin, machine) = DeploymentIdentity(Context, database.AdminId);
             var publications = new ModerationPolicyPublicationRepository(Context, admin, machine, database.Inventory, null, Clock);
             if ((await publications.PrepareAsync(request, Now.AddDays(10))).Outcome != ModerationPolicyPublicationOutcome.Known)
@@ -532,8 +535,12 @@ public sealed partial class ModerationPolicyPublicationTests
                 row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
             foreach (var id in new[] { privacy, recovery, subject })
             {
-                var user = new User { Id = id, Pii = new UserPii
-                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Lifecycle", LastName = "Witness" } };
+                var user = new User
+                {
+                    Id = id,
+                    Pii = new UserPii
+                    { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Lifecycle", LastName = "Witness" }
+                };
                 Context.Users.Add(user);
                 if (id != subject) Context.PlatformUserRoles.Add(new PlatformUserRole
                 { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
@@ -549,10 +556,17 @@ public sealed partial class ModerationPolicyPublicationTests
             }
             var sourceRequest = new RecordModerationRecognitionPrivacySource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-                SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-                PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-                Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddDays(8), Terms = RecognitionPrivacyTerms(),
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 2,
+                SourceId = Guid.CreateVersion7(),
+                PolicyId = request.Proposed.PolicyId,
+                ExpectedPolicyRevision = 1,
+                PublicationId = request.Proposed.PublicationId,
+                ProfileId = request.Proposed.Profiles.Single().Id,
+                Mode = ModerationNativeMode.Embedded,
+                ValidUntil = Now.AddDays(8),
+                Terms = RecognitionPrivacyTerms(),
                 Ownership = new(privacy, privacy, recovery, recovery, database.AdminId,
                     "Independently reviewed original canonical controllers.",
                     "Appointed privacy owner for finite original recognition.",
@@ -572,9 +586,14 @@ public sealed partial class ModerationPolicyPublicationTests
             var adoption = Guid.CreateVersion7();
             if ((await Writer(privacy).ExecuteAsync(new AdoptModerationRecognitionPrivacySource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-                SourceId = sourceRequest.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 3,
-                AdoptionId = adoption, ValidUntil = Now.AddDays(7)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 3,
+                SourceId = sourceRequest.SourceId,
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = 3,
+                AdoptionId = adoption,
+                ValidUntil = Now.AddDays(7)
             })).Outcome != ModerationQualificationWriteOutcome.Known)
                 throw new InvalidOperationException("Native lifecycle original source was not adopted.");
             var source = await Context.Set<ModerationRecognitionPrivacySource>().Include(row => row.Retention)
@@ -652,12 +671,18 @@ public sealed partial class ModerationPolicyPublicationTests
         private ResolvedSecret Secret() => new(ModerationRecognitionKeyRing.SecretSettingKey,
             JsonSerializer.Serialize(new
             {
-                version = 1, trustDomainId = Trust.ToString("D"), ringGeneration = generation,
+                version = 1,
+                trustDomainId = Trust.ToString("D"),
+                ringGeneration = generation,
                 issuedAt = Clock.UtcNow.ToString("O", CultureInfo.InvariantCulture),
                 validUntil = Clock.UtcNow.AddMinutes(5).ToString("O", CultureInfo.InvariantCulture),
-                keys = material.Select(row => new { kid = row.Key, generation = row.Value.Generation,
+                keys = material.Select(row => new
+                {
+                    kid = row.Key,
+                    generation = row.Value.Generation,
                     k = Convert.ToBase64String(row.Value.Material).TrimEnd('=').Replace('+', '-').Replace('/', '_'),
-                    status = row.Value.Writing ? "active" : "readable" }).ToArray()
+                    status = row.Value.Writing ? "active" : "readable"
+                }).ToArray()
             }), SelectedSource, SecretScope.Instance, null, Clock.UtcNow, BindingRevision);
 
         public async ValueTask DisposeAsync()

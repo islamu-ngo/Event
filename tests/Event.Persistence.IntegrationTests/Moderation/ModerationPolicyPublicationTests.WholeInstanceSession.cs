@@ -46,7 +46,11 @@ public sealed partial class ModerationPolicyPublicationTests
             original = new ConfigurationImportArtifactParser().Parse((await reader.ReadAsync(
                 ConfigurationManifestExportView.Overrides, CancellationToken.None)).Utf8Json).Manifest;
             var source = new ConfigurationImportArtifactParser().Parse(await FanoutArtifactAsync(database, context)).Manifest;
-            source = source with { Spec = source.Spec with { Tenants = source.Spec.Tenants.Select(tenant =>
+            source = source with
+            {
+                Spec = source.Spec with
+                {
+                    Tenants = source.Spec.Tenants.Select(tenant =>
             {
                 var document = ModerationConfigurationImportSections.FromWire(tenant.Spec.Moderation!);
                 var changed = new ModerationConfigurationDocument(document.SchemaVersion, document.CatalogueRevision,
@@ -58,7 +62,9 @@ public sealed partial class ModerationPolicyPublicationTests
                         ? tenant.Metadata with { Name = "source-alias" } : tenant.Metadata,
                     Spec = tenant.Spec with { Moderation = ModerationConfigurationImportSections.ToWire(changed) }
                 };
-            }).ToArray() } };
+            }).ToArray()
+                }
+            };
             var (manager, previews, _) = FanoutSessionServices(database, context, protection, privacy);
             created = await previews.CreateInstanceAsync(ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(source),
                 CancellationToken.None);
@@ -124,11 +130,14 @@ public sealed partial class ModerationPolicyPublicationTests
         // managed scheduling or cache invalidation service may participate.
         var sections = new ConfigurationImportSectionApplier(null!, null!, null!, null!, null!, null!, null!,
             tenants, new TenantSettingsDocumentRepository(context), legal);
-        var currentUser = new CurrentUserService(new HttpContextAccessor { HttpContext = new DefaultHttpContext
+        var currentUser = new CurrentUserService(new HttpContextAccessor
         {
-            User = new ClaimsPrincipal(new ClaimsIdentity(
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, database.AdminId.ToString())], "fanout-session"))
-        } });
+            }
+        });
         var delivery = new ConfigurationImportEffectDelivery(outbox, operations, null!, null!, tenants, []);
         return (manager, previews, new ConfigurationImportApplyService(manager, sessions, artifacts, operations,
             previews, new(), new(), sections, new RelationalSettingMutationLock(context, unit), unit,

@@ -67,7 +67,8 @@ public sealed partial class ModerationPolicyPublicationTests
             var handler = ProfileHandler(fixture, owner, services.GetRequiredService<HybridCache>());
             await Assert.That((await handler.ExecuteAsync(new()
             {
-                UserId = user.Id, ExpectedConcurrencyStamp = user.ConcurrencyStamp,
+                UserId = user.Id,
+                ExpectedConcurrencyStamp = user.ConcurrencyStamp,
                 UpdateUserDto = new() { Names = new() { FirstName = "Admitted", LastName = "Profile" } }
             }, token)).IsSuccess).IsTrue();
         });
@@ -247,8 +248,12 @@ public sealed partial class ModerationPolicyPublicationTests
                  "Email":"forged@example.test","EmailVerified":true,"IsDeleted":true,"IsInstanceAdmin":true}
                 """)!;
             await Assert.That((await ProfileHandler(fixture, owner, services.GetRequiredService<HybridCache>())
-                .ExecuteAsync(new() { UserId = current.Id, ExpectedConcurrencyStamp = current.ConcurrencyStamp,
-                    UpdateUserDto = input }, token)).IsSuccess).IsTrue();
+                .ExecuteAsync(new()
+                {
+                    UserId = current.Id,
+                    ExpectedConcurrencyStamp = current.ConcurrencyStamp,
+                    UpdateUserDto = input
+                }, token)).IsSuccess).IsTrue();
         })).IsTrue();
         var saved = await fixture.Context.Users.Include(row => row.Pii)
             .Include(row => row.IdentityEmailClaims).ThenInclude(row => row.Evidence)
@@ -278,7 +283,8 @@ public sealed partial class ModerationPolicyPublicationTests
             var user = await fixture.Context.Users.SingleAsync(row => row.Id == fixture.SubjectId, token);
             var result = await ProfileHandler(fixture, owner, services.GetRequiredService<HybridCache>()).ExecuteAsync(new()
             {
-                UserId = user.Id, ExpectedConcurrencyStamp = failure == "stale" ? Guid.Empty : user.ConcurrencyStamp,
+                UserId = user.Id,
+                ExpectedConcurrencyStamp = failure == "stale" ? Guid.Empty : user.ConcurrencyStamp,
                 UpdateUserDto = new() { Names = new() { FirstName = failure == "invalid" ? "" : "Changed", LastName = "Family" } }
             }, token);
             await Assert.That(result.IsSuccess).IsFalse();

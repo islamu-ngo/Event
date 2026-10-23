@@ -117,19 +117,29 @@ public sealed class ModerationFindingsControllerContractTests
             Guid.CreateVersion7());
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 7,
-            FindingId = Guid.CreateVersion7(), CaseId = Guid.CreateVersion7(), ExpectedCaseRevision = 1,
-            PolicyId = Guid.CreateVersion7(), ExpectedPolicyRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 7,
+            FindingId = Guid.CreateVersion7(),
+            CaseId = Guid.CreateVersion7(),
+            ExpectedCaseRevision = 1,
+            PolicyId = Guid.CreateVersion7(),
+            ExpectedPolicyRevision = 1,
             Rule = ModerationRuleReference.Create(scope.Id, "classification-rule", 1),
             Reason = ModerationRuleReference.Create(scope.Id, "classification-reason", 1),
-            EvidenceId = Guid.CreateVersion7(), Justification = "The independent reviewer retains the qualified finding."
+            EvidenceId = Guid.CreateVersion7(),
+            Justification = "The independent reviewer retains the qualified finding."
         };
     }
 
     private static ReverseModerationFindingCommand Reversal() => new()
     {
-        OperationId = Guid.CreateVersion7(), Target = Finalization().Target, ExpectedQualificationRevision = 8,
-        FindingId = Guid.CreateVersion7(), ExpectedFindingRevision = 1, ReversalReferenceId = Guid.CreateVersion7(),
+        OperationId = Guid.CreateVersion7(),
+        Target = Finalization().Target,
+        ExpectedQualificationRevision = 8,
+        FindingId = Guid.CreateVersion7(),
+        ExpectedFindingRevision = 1,
+        ReversalReferenceId = Guid.CreateVersion7(),
         Justification = "The independent correction preserves the original finding provenance."
     };
 }

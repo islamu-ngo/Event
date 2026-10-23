@@ -229,9 +229,9 @@ public sealed class ModerationProfileCollectionProcedureTests
     {
         var age = Parent();
         await Assert.That(() => Parent(ownership: age.Ownership with
-            { CollectionOwnerHumanId = age.ReviewerHumanId })).Throws<ArgumentException>();
+        { CollectionOwnerHumanId = age.ReviewerHumanId })).Throws<ArgumentException>();
         await Assert.That(() => Parent(ownership: age.Ownership with
-            { CollectionControllerHumanId = age.ReviewerControllerHumanId })).Throws<ArgumentException>();
+        { CollectionControllerHumanId = age.ReviewerControllerHumanId })).Throws<ArgumentException>();
     }
 
     [Test]

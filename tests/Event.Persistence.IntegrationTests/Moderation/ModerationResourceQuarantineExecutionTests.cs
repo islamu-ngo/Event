@@ -138,13 +138,16 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
                     {
                         Decision = capture.Decision with { State = ISLAMU.Moderation.Domain.ModerationDecisionState.AwaitingApproval }
                     },
-                    _ => capture with { Notice = capture.Notice! with
+                    _ => capture with
                     {
-                        Effects = [capture.Notice.Effects[0] with { Effect = capture.Notice.Effects[0].Effect with
+                        Notice = capture.Notice! with
+                        {
+                            Effects = [capture.Notice.Effects[0] with { Effect = capture.Notice.Effects[0].Effect with
                         {
                             Mode = ISLAMU.Moderation.Domain.Policies.ModerationReferenceEffectMode.Notice
                         }}]
-                    }}
+                        }
+                    }
                 };
                 writer.ModerationNoticeSources.Remove(original);
                 await writer.SaveChangesAsync();
@@ -162,9 +165,13 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             await Assert.That((await fixture.Database.ExecuteAsync(fixture.Database.AdministratorId,
                 new RecordModerationResourceGenerationSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope,
-                    ExpectedQualificationRevision = epoch.Revision, SourceId = Guid.CreateVersion7(),
-                    ResourceId = fixture.ResourceId, ExpectedResourceRevision = 1, ValidUntil = Now.AddMinutes(10)
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Database.Scope,
+                    ExpectedQualificationRevision = epoch.Revision,
+                    SourceId = Guid.CreateVersion7(),
+                    ResourceId = fixture.ResourceId,
+                    ExpectedResourceRevision = 1,
+                    ValidUntil = Now.AddMinutes(10)
                 })).IsSuccess).IsTrue();
         }
         var result = await fixture.ExecuteAsync(

@@ -70,11 +70,15 @@ public sealed class ModerationNoticeNativeMaterializer(
             NotificationPreferenceCategoryCodes.TrustSafety, NotificationPreferenceChannelCodes.Email), token);
         var emailDraft = email.HasVerifiedEmail && emailPreference.IsEnabled ? new EmailDispatchOutbox
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
             Kind = EmailDispatchKind.AccountModerationOriginalNotice,
-            SourceType = ModerationNoticeEmailTemplate.SourceType, SourceId = noticeId,
-            RecipientUserId = recipient.Id, RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail,
-            RecipientEmail = email.Email!, Subject = ModerationNoticeEmailTemplate.Subject,
+            SourceType = ModerationNoticeEmailTemplate.SourceType,
+            SourceId = noticeId,
+            RecipientUserId = recipient.Id,
+            RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail,
+            RecipientEmail = email.Email!,
+            Subject = ModerationNoticeEmailTemplate.Subject,
             PlainTextBody = ModerationNoticeEmailTemplate.Body(noticeId),
             CreatedAt = source.CapturedAt.UtcDateTime
         } : null;

@@ -15,10 +15,17 @@ public sealed record RecordModerationMeasuredOperationsCommand : ModerationQuali
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationMeasuredOperationsSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ProfileId = ProfileId, Binding = Binding, ReviewerHumanId = ReviewerHumanId,
-        ReviewerControllerHumanId = ReviewerControllerHumanId, RecorderControllerHumanId = RecorderControllerHumanId,
-        ValidUntil = ValidUntil, OriginalEffect = OriginalEffect
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ProfileId = ProfileId,
+        Binding = Binding,
+        ReviewerHumanId = ReviewerHumanId,
+        ReviewerControllerHumanId = ReviewerControllerHumanId,
+        RecorderControllerHumanId = RecorderControllerHumanId,
+        ValidUntil = ValidUntil,
+        OriginalEffect = OriginalEffect
     };
 }
 
@@ -32,9 +39,14 @@ public sealed record AcceptModerationMeasuredOperationsCommand : ModerationQuali
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new AcceptModerationMeasuredOperationsSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration, AcceptanceId = AcceptanceId, ValidUntil = ValidUntil,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration,
+        AcceptanceId = AcceptanceId,
+        ValidUntil = ValidUntil,
         OriginalEffect = OriginalEffect
     };
 }
@@ -45,7 +57,10 @@ public sealed record WithdrawModerationMeasuredOperationsCommand : ModerationQua
     public required long ExpectedAcceptanceRevision { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new WithdrawModerationMeasuredOperationsAcceptance
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AcceptanceId = AcceptanceId, ExpectedAcceptanceRevision = ExpectedAcceptanceRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AcceptanceId = AcceptanceId,
+        ExpectedAcceptanceRevision = ExpectedAcceptanceRevision
     };
 }

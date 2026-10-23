@@ -52,9 +52,14 @@ public sealed record ModerationReconciliationTarget(
         var operation = Operation();
         return new()
         {
-            OperationId = operation.OperationId, EffectId = operation.EffectId, DecisionId = DecisionId,
-            Subject = Subject, Target = Scope, ExpectedRevision = DecisionRevision,
-            ExpectedPolicyRevision = PolicyRevision, SanctionId = SanctionId,
+            OperationId = operation.OperationId,
+            EffectId = operation.EffectId,
+            DecisionId = DecisionId,
+            Subject = Subject,
+            Target = Scope,
+            ExpectedRevision = DecisionRevision,
+            ExpectedPolicyRevision = PolicyRevision,
+            SanctionId = SanctionId,
             ExpectedSanctionRevision = SanctionRevision
         };
     }

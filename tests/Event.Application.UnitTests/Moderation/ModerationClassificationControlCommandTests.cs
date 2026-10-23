@@ -59,9 +59,14 @@ public sealed class ModerationClassificationControlCommandTests
             Guid.CreateVersion7()), Guid.CreateVersion7());
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = AuthorityScope.Event(tenant, Guid.CreateVersion7()),
-            ExpectedQualificationRevision = 12, AdoptionId = Guid.CreateVersion7(), SelectionId = Guid.CreateVersion7(),
-            ExpectedSelectionRevision = 1, BindingOrdinal = 0, EventGenerationId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = AuthorityScope.Event(tenant, Guid.CreateVersion7()),
+            ExpectedQualificationRevision = 12,
+            AdoptionId = Guid.CreateVersion7(),
+            SelectionId = Guid.CreateVersion7(),
+            ExpectedSelectionRevision = 1,
+            BindingOrdinal = 0,
+            EventGenerationId = Guid.CreateVersion7(),
             ExpectedEventGenerationRevision = 1,
             ValidUntil = new DateTimeOffset(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
         };

@@ -154,15 +154,24 @@ public sealed partial class ModerationCaseTargetProofOwner
             receipt.ValidatePersistedState();
             var captured = new RecordModerationParticipantIncidentResponsibilitySource
             {
-                OperationId = receipt.Id, Target = environment.Scope,
+                OperationId = receipt.Id,
+                Target = environment.Scope,
                 ExpectedQualificationRevision = receipt.QualificationRevision - 1,
-                SourceId = row.Id, OccurrenceCaseId = row.OccurrenceCaseId,
-                ExpectedCaseRevision = row.OccurrenceCaseRevision, EvidenceCaseRevision = row.EvidenceCaseRevision,
-                ReadGrantId = row.ReadGrantId, EvidenceSourceId = row.EvidenceSourceId,
-                EvidenceSourceVersion = row.EvidenceSourceVersion, SubjectHumanId = row.SubjectId,
-                SessionId = row.SessionId, ExpectedSessionGeneration = row.SessionGeneration,
-                IncidentWindowFrom = row.IncidentWindowFrom, IncidentWindowUntil = row.IncidentWindowUntil,
-                ValidUntil = row.ValidUntil, PurgeAt = row.PurgeAt, Grounds = grounds
+                SourceId = row.Id,
+                OccurrenceCaseId = row.OccurrenceCaseId,
+                ExpectedCaseRevision = row.OccurrenceCaseRevision,
+                EvidenceCaseRevision = row.EvidenceCaseRevision,
+                ReadGrantId = row.ReadGrantId,
+                EvidenceSourceId = row.EvidenceSourceId,
+                EvidenceSourceVersion = row.EvidenceSourceVersion,
+                SubjectHumanId = row.SubjectId,
+                SessionId = row.SessionId,
+                ExpectedSessionGeneration = row.SessionGeneration,
+                IncidentWindowFrom = row.IncidentWindowFrom,
+                IncidentWindowUntil = row.IncidentWindowUntil,
+                ValidUntil = row.ValidUntil,
+                PurgeAt = row.PurgeAt,
+                Grounds = grounds
             };
             capturedRequestBytes = JsonSerializer.SerializeToUtf8Bytes(captured, captured.GetType());
             using var requestHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);

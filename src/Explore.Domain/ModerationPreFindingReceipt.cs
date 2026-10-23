@@ -25,9 +25,16 @@ public sealed class ModerationPreFindingReceipt
             throw new ArgumentException("Pre-finding receipt requires exact native result coordinates.");
         return new()
         {
-            Id = id, HostBindingId = host, TrustDomainId = trust, TenantId = tenant,
-            CaseId = caseId, ActorHumanId = actor, ResultId = resultId, ResultRevision = revision,
-            RequestDigest = digest, CompletedAt = now
+            Id = id,
+            HostBindingId = host,
+            TrustDomainId = trust,
+            TenantId = tenant,
+            CaseId = caseId,
+            ActorHumanId = actor,
+            ResultId = resultId,
+            ResultRevision = revision,
+            RequestDigest = digest,
+            CompletedAt = now
         };
     }
 }

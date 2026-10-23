@@ -150,56 +150,113 @@ public sealed class ModerationLifecycleCommandTests
         {
             0 => new ProposeModerationDecisionCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8,
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8,
                 Proposal = new ModerationProposal(Id(15), ModerationRuleReference.Create(Id(16), "conduct", 3),
                     [ModerationCapability.Publish], Now, Now.AddDays(1), null, 1)
             },
             1 => new RecordModerationDecisionResponseCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8
             },
             2 => new AcceptModerationFindingCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8, FindingId = Id(13)
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8,
+                FindingId = Id(13)
             },
             3 => new ApproveModerationDecisionCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8
             },
             4 => new ActivateModerationDecisionCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8, SanctionId = Id(13)
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8,
+                SanctionId = Id(13)
             },
             5 => new RejectModerationDecisionCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8
             },
             6 => new WithdrawModerationDecisionCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8
             },
             7 => new RevokeModerationSanctionCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8, SanctionId = Id(13)
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8,
+                SanctionId = Id(13)
             },
             8 => new ReconcileModerationSanctionCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8, SanctionId = Id(13), ExpectedSanctionRevision = 4
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8,
+                SanctionId = Id(13),
+                ExpectedSanctionRevision = 4
             },
             9 => new SupersedeModerationSanctionCommand
             {
-                OperationId = Id(10), EffectId = Id(11), DecisionId = Id(12), Subject = Subject, Target = Target,
-                ExpectedRevision = 6, ExpectedPolicyRevision = 8,
-                SanctionId = Id(13), SupersededSanctionId = Id(14), SupersededScope = Target,
+                OperationId = Id(10),
+                EffectId = Id(11),
+                DecisionId = Id(12),
+                Subject = Subject,
+                Target = Target,
+                ExpectedRevision = 6,
+                ExpectedPolicyRevision = 8,
+                SanctionId = Id(13),
+                SupersededSanctionId = Id(14),
+                SupersededScope = Target,
                 ExpectedSanctionRevision = 4
             },
             _ => throw new ArgumentOutOfRangeException(nameof(variant))

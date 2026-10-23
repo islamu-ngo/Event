@@ -46,15 +46,21 @@ public sealed class ModerationNoticeSource
             throw new ArgumentException("Capture requires a pending effect and a bounded typed snapshot.");
         var source = new ModerationNoticeSource
         {
-            EffectId = effect.Id, OperationId = effect.OperationId,
-            DecisionId = effect.DecisionId, DecisionRevision = effect.DecisionRevision,
-            TrustDomainId = effect.TrustDomainId, TenantId = tenantId,
-            ScopeKind = effect.ScopeKind, ScopeId = effect.ScopeId,
-            SubjectKind = effect.SubjectKind, SubjectId = effect.SubjectId,
+            EffectId = effect.Id,
+            OperationId = effect.OperationId,
+            DecisionId = effect.DecisionId,
+            DecisionRevision = effect.DecisionRevision,
+            TrustDomainId = effect.TrustDomainId,
+            TenantId = tenantId,
+            ScopeKind = effect.ScopeKind,
+            ScopeId = effect.ScopeId,
+            SubjectKind = effect.SubjectKind,
+            SubjectId = effect.SubjectId,
             SnapshotJson = snapshotJson,
             SnapshotHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(snapshotJson))),
             EffectBindingHash = BindingHash(effect, retainUntil),
-            CapturedAt = effect.CreatedAt, RetainUntil = retainUntil
+            CapturedAt = effect.CreatedAt,
+            RetainUntil = retainUntil
         };
         var metadata = source.DeriveStatusMetadata(effect);
         if (metadata is not null)
@@ -164,7 +170,8 @@ public sealed class ModerationNoticeSource
                 || !ModerationNoticeRetention.CanNotifyAt(CapturedAt, months, ceiling))
                 return null;
             return new(host, writer, caseId, months, Hash(ScopeText(scope)), Hash(origin),
-                SnapshotHash, BindingHash(effect, RetainUntil)) { ContentRepresentatives = representatives };
+                SnapshotHash, BindingHash(effect, RetainUntil))
+            { ContentRepresentatives = representatives };
         }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException
             or InvalidOperationException or FormatException or ArgumentException)
@@ -241,10 +248,24 @@ public sealed class ModerationNoticeSource
     private static string BindingHash(ModerationEffectIntent effect, DateTimeOffset? retainUntil) =>
         Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
         {
-            effect.Id, effect.OperationId, effect.DecisionId, effect.DecisionRevision,
-            effect.SanctionId, effect.SanctionRevision, effect.SupersededSanctionId, effect.SupersededSanctionRevision,
-            effect.TrustDomainId, effect.ScopeKind, effect.ScopeId, effect.SubjectKind, effect.SubjectId,
-            effect.OperationKind, effect.PolicyRevision, effect.QualificationRevision, effect.CreatedAt, RetainUntil = retainUntil
+            effect.Id,
+            effect.OperationId,
+            effect.DecisionId,
+            effect.DecisionRevision,
+            effect.SanctionId,
+            effect.SanctionRevision,
+            effect.SupersededSanctionId,
+            effect.SupersededSanctionRevision,
+            effect.TrustDomainId,
+            effect.ScopeKind,
+            effect.ScopeId,
+            effect.SubjectKind,
+            effect.SubjectId,
+            effect.OperationKind,
+            effect.PolicyRevision,
+            effect.QualificationRevision,
+            effect.CreatedAt,
+            RetainUntil = retainUntil
         })));
 
     public override string ToString() => nameof(ModerationNoticeSource);

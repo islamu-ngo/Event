@@ -234,13 +234,20 @@ public sealed partial class ModerationNoticeCleanupTests
         var text = new ModerationNoticeSafeText("Separately approved correction text; no body or delivery grant.");
         var intent = original.Intent with
         {
-            ApprovalId = approvalId, EffectId = correctionId,
+            ApprovalId = approvalId,
+            EffectId = correctionId,
             CaseId = defect == "case"
                 ? await context.ModerationCases.Where(row => row.Id != original.CaseId).Select(row => row.Id).SingleAsync()
                 : original.CaseId,
-            RuleMeaning = text, ReasonMeaning = text, Facts = [text], RemainingActions = text,
-            Recourse = text, Automation = text, Retention = text,
-            ValidUntil = at.AddMinutes(1), RetainUntil = defect == "ceiling" ? Ceiling.AddTicks(1) : Ceiling,
+            RuleMeaning = text,
+            ReasonMeaning = text,
+            Facts = [text],
+            RemainingActions = text,
+            Recourse = text,
+            Automation = text,
+            Retention = text,
+            ValidUntil = at.AddMinutes(1),
+            RetainUntil = defect == "ceiling" ? Ceiling.AddTicks(1) : Ceiling,
             ContentRepresentatives = defect == "representatives"
                 ? [new(Guid.CreateVersion7(), 1, fixture.Database.ReviewerId)] : []
         };
@@ -249,7 +256,9 @@ public sealed partial class ModerationNoticeCleanupTests
         if (revoked) approval.Revoke(1, fixture.Database.AdministratorId, at.AddSeconds(1));
         var request = new ApproveModerationNoticeCorrectionDisclosureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = decision.Scope, ExpectedQualificationRevision = 2,
+            OperationId = Guid.CreateVersion7(),
+            Target = decision.Scope,
+            ExpectedQualificationRevision = 2,
             Intent = intent,
             ExpectedPendingSnapshotHash = defect == "snapshot" ? new string('d', 64) : source.SnapshotHash,
             ExpectedPendingEffectBindingHash = defect == "binding" ? new string('e', 64) : source.EffectBindingHash
@@ -257,8 +266,10 @@ public sealed partial class ModerationNoticeCleanupTests
         ModerationQualificationMutation digested = defect == "ordinary-request"
             ? new ApproveModerationNoticeDisclosureSource
             {
-                OperationId = request.OperationId, Target = request.Target,
-                ExpectedQualificationRevision = request.ExpectedQualificationRevision, Intent = intent
+                OperationId = request.OperationId,
+                Target = request.Target,
+                ExpectedQualificationRevision = request.ExpectedQualificationRevision,
+                Intent = intent
             } : request;
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         hash.AppendData(Encoding.UTF8.GetBytes(digested.GetType().FullName + "\n"));
@@ -285,13 +296,17 @@ public sealed partial class ModerationNoticeCleanupTests
                 var full = JsonSerializer.Deserialize<ModerationNoticeCaptureSnapshot>(originalSource.SnapshotJson)!;
                 rewritten = full with
                 {
-                    Decision = capture.Decision, QualificationRevision = effect.QualificationRevision,
+                    Decision = capture.Decision,
+                    QualificationRevision = effect.QualificationRevision,
                     Notice = full.Notice! with
                     {
-                        EffectId = effect.Id, OperationId = effect.OperationId, OperationKind = effect.OperationKind,
+                        EffectId = effect.Id,
+                        OperationId = effect.OperationId,
+                        OperationKind = effect.OperationKind,
                         SanctionRevision = effect.SanctionRevision,
                         SanctionState = ISLAMU.Moderation.Domain.ModerationSanctionState.Revoked,
-                        ApprovalId = approval.Id, CapturedAt = source.CapturedAt
+                        ApprovalId = approval.Id,
+                        CapturedAt = source.CapturedAt
                     },
                     ValidUntil = source.CapturedAt.AddMinutes(1)
                 };

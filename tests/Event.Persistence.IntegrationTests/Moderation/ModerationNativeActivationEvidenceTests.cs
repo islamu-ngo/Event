@@ -148,15 +148,23 @@ public sealed class ModerationNativeActivationEvidenceTests
             case 15: owner.Profile = owner.Profile with { ProfileId = Guid.CreateVersion7() }; break;
             case 16: owner.Profile = owner.Profile with { DecisionId = Guid.CreateVersion7() }; break;
             case 17: owner.Profile = owner.Profile with { DecisionRevision = decision.Revision + 1 }; break;
-            case 18: owner.Profile = owner.Profile with
+            case 18:
+                owner.Profile = owner.Profile with
                 { Contribution = owner.Profile.Contribution with { SubjectId = Guid.CreateVersion7() } }; break;
-            case 19: owner.Profile = owner.Profile with
-                { Contribution = owner.Profile.Contribution with
-                    { Effects = owner.Profile.Contribution.Effects.Select(effect => effect with
-                        { Target = effect.Target with { Scope = instance } }).ToImmutableArray() } }; break;
-            case 20: owner.Profile = owner.Profile with
+            case 19:
+                owner.Profile = owner.Profile with
+                {
+                    Contribution = owner.Profile.Contribution with
+                    {
+                        Effects = owner.Profile.Contribution.Effects.Select(effect => effect with
+                        { Target = effect.Target with { Scope = instance } }).ToImmutableArray()
+                    }
+                }; break;
+            case 20:
+                owner.Profile = owner.Profile with
                 { Contribution = owner.Profile.Contribution with { Effects = [] } }; break;
-            case 21: owner.Profile = owner.Profile with
+            case 21:
+                owner.Profile = owner.Profile with
                 { Contribution = owner.Profile.Contribution with { StartsAt = Now.AddTicks(1) } }; break;
             case 22: owner.Profile = owner.Profile with { Mode = ModerationNativeMode.RemoteStrict }; break;
             case 24: owner.Profile = owner.Profile with { ValidUntil = Now }; break;
@@ -197,14 +205,16 @@ public sealed class ModerationNativeActivationEvidenceTests
             case 40: owner.CurrentSources[first] = owner.CurrentSources[first] with { ValidUntil = Now }; break;
             case 45: owner.Registrations[first] = owner.Registrations[first] with { ValidUntil = Now }; break;
             case 46: owner.Registrations[first] = owner.Registrations[first] with { ValidUntil = DateTimeOffset.MaxValue }; break;
-            case 47: owner.Registrations[first] = owner.Registrations[first] with
+            case 47:
+                owner.Registrations[first] = owner.Registrations[first] with
                 { ValidUntil = Now.AddMinutes(5).ToOffset(TimeSpan.FromHours(1)) }; break;
             case 48:
             case 49:
                 owner.Registrations[first] = owner.Registrations[first] with { ValidUntil = Now.AddMinutes(5) };
                 break;
             case 41: owner.CurrentSources[first] = owner.CurrentSources[first] with { ValidUntil = DateTimeOffset.MaxValue }; break;
-            case 42: owner.CurrentSources[first] = owner.CurrentSources[first] with
+            case 42:
+                owner.CurrentSources[first] = owner.CurrentSources[first] with
                 { ValidUntil = Now.AddMinutes(5).ToOffset(TimeSpan.FromHours(1)) }; break;
             case 43:
             case 44:
@@ -217,7 +227,9 @@ public sealed class ModerationNativeActivationEvidenceTests
             foreach (var prerequisite in owner.Profile.RequiredPrerequisites)
                 owner.Prerequisites.TryAdd(prerequisite, existing with
                 {
-                    Prerequisite = prerequisite, ApprovalId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7()
+                    Prerequisite = prerequisite,
+                    ApprovalId = Guid.CreateVersion7(),
+                    SourceId = Guid.CreateVersion7()
                 });
         }
         var clock = new FixedClock(changedSource == 13 ? Now.AddTicks(-1) : Now);
@@ -234,7 +246,7 @@ public sealed class ModerationNativeActivationEvidenceTests
             34 => configuration with { WriterGeneration = "withdrawn-profile-configuration" },
             35 => configuration with { PublicationId = Guid.CreateVersion7() },
             36 => configuration with
-                { Contribution = configuration.Contribution with { SubjectId = Guid.CreateVersion7() } },
+            { Contribution = configuration.Contribution with { SubjectId = Guid.CreateVersion7() } },
             37 => configuration with { ValidUntil = Now },
             38 or 39 => configuration with { ValidUntil = Now.AddMinutes(5) },
             _ => configuration

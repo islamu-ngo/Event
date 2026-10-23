@@ -142,9 +142,11 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             await Assert.That((await fixture.Database.ExecuteAsync(fixture.Database.AdministratorId,
                 new RevokeModerationMeasurementIssuerSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Database.Scope,
                     ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
-                    EnrollmentId = measurement.EnrollmentId, ExpectedEnrollmentRevision = 1
+                    EnrollmentId = measurement.EnrollmentId,
+                    ExpectedEnrollmentRevision = 1
                 })).IsSuccess).IsTrue();
         if (change is "actor" or "cleanup" or "acceptance" or "signature")
         {
@@ -230,9 +232,14 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         var installation = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new InstallModerationConsumerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
-            InstallationId = installation, ConsumerId = runtime.ConsumerId, Mode = runtime.Mode,
-            ExpectedRuntimeGeneration = runtime.Generation, ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
+            InstallationId = installation,
+            ConsumerId = runtime.ConsumerId,
+            Mode = runtime.Mode,
+            ExpectedRuntimeGeneration = runtime.Generation,
+            ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
             ValidUntil = Now.AddMinutes(5)
         })).IsSuccess).IsTrue();
         await using var reader = fixture.Context();
@@ -241,10 +248,16 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         var notice = JsonSerializer.Deserialize<ModerationNoticeCaptureSnapshot>(source.SnapshotJson)!.Notice!;
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
-            ChallengeId = Guid.CreateVersion7(), InstallationId = installation, ExpectedInstallationRevision = 1,
-            ConsumerId = runtime.ConsumerId, ExpectedRuntimeGeneration = runtime.Generation,
-            ExpectedInventoryFingerprint = database.Inventory.Fingerprint, ValidUntil = Now.AddSeconds(30),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
+            ChallengeId = Guid.CreateVersion7(),
+            InstallationId = installation,
+            ExpectedInstallationRevision = 1,
+            ConsumerId = runtime.ConsumerId,
+            ExpectedRuntimeGeneration = runtime.Generation,
+            ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
+            ValidUntil = Now.AddSeconds(30),
             OriginalEffect = new(fixture.EffectId, source.SnapshotHash, source.EffectBindingHash),
             Binding = new(notice.PolicyId, notice.PolicyRevision, notice.PublicationId, database.Scope,
                 ModerationRuleReference.Create(notice.Rule.OwnerId, notice.Rule.Code, notice.Rule.Revision),
@@ -269,7 +282,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             ExpectedPublicationId = publication.Id,
             Proposed = original.Proposed with
             {
-                ExpectedRevision = publication.Revision, PublicationId = Guid.CreateVersion7(),
+                ExpectedRevision = publication.Revision,
+                PublicationId = Guid.CreateVersion7(),
                 RequestedState = ModerationPolicyRequestedState.Draft
             }
         };
@@ -327,41 +341,77 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         var enrollmentId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.ReviewerId, new EnrollModerationMeasurementIssuerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
-            EnrollmentId = enrollmentId, KeyId = keyId, Issuer = "original-recipe-measurement",
-            PublicKeySpkiBase64 = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()), RunnerDigest = new string('a', 64),
-            CatalogueDigest = new string('b', 64), TestBundleDigest = new string('c', 64), ValidUntil = Now.AddMinutes(2)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
+            EnrollmentId = enrollmentId,
+            KeyId = keyId,
+            Issuer = "original-recipe-measurement",
+            PublicKeySpkiBase64 = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()),
+            RunnerDigest = new string('a', 64),
+            CatalogueDigest = new string('b', 64),
+            TestBundleDigest = new string('c', 64),
+            ValidUntil = Now.AddMinutes(2)
         })).IsSuccess).IsTrue();
         await using var reader = fixture.Context();
         reader.ModerationTrustDomainId = database.Scope.TrustDomainId;
         var challenge = await reader.ModerationConsumerMeasurementChallenges.SingleAsync(row => row.Id == preparation.ChallengeId);
         var assertion = new ModerationMeasurementReceipt
         {
-            Issuer = "original-recipe-measurement", ReceiptId = Guid.CreateVersion7(), ChallengeId = challenge.Id,
-            ChallengeNonce = challenge.Nonce, RunId = Guid.CreateVersion7(), HostBindingId = database.HostId,
-            TrustDomainId = database.Scope.TrustDomainId, TenantId = database.TenantId, Binding = preparation.Binding,
-            ConsumerId = challenge.ConsumerId, ConsumerContractDigest = challenge.ConsumerContractDigest.ToLowerInvariant(),
-            InstallationId = challenge.InstallationId, InstallationRevision = challenge.InstallationRevision,
-            InstallationWriterGeneration = challenge.InstallationWriterGeneration, RuntimeGeneration = challenge.RuntimeGeneration,
-            InventoryFingerprint = challenge.InventoryFingerprint.ToLowerInvariant(), RunnerDigest = new string('a', 64),
-            CatalogueDigest = new string('b', 64), TestBundleDigest = new string('c', 64), ProductArtifactDigest = new string('d', 64),
-            ConfigurationDigest = new string('e', 64), PrimaryConfigurationDigest = new string('1', 64),
-            TestConfigurationDigest = new string('2', 64), ProviderCode = "sqlite", ProviderVersion = "10.0",
-            CaseIds = ["original.authority-boundary"], ExecutedCount = 1, AttemptCount = 1, ResultArtifactDigest = new string('f', 64),
-            StartedAt = Now, CompletedAt = Now, IssuedAt = Now, ValidUntil = Now.AddSeconds(20)
+            Issuer = "original-recipe-measurement",
+            ReceiptId = Guid.CreateVersion7(),
+            ChallengeId = challenge.Id,
+            ChallengeNonce = challenge.Nonce,
+            RunId = Guid.CreateVersion7(),
+            HostBindingId = database.HostId,
+            TrustDomainId = database.Scope.TrustDomainId,
+            TenantId = database.TenantId,
+            Binding = preparation.Binding,
+            ConsumerId = challenge.ConsumerId,
+            ConsumerContractDigest = challenge.ConsumerContractDigest.ToLowerInvariant(),
+            InstallationId = challenge.InstallationId,
+            InstallationRevision = challenge.InstallationRevision,
+            InstallationWriterGeneration = challenge.InstallationWriterGeneration,
+            RuntimeGeneration = challenge.RuntimeGeneration,
+            InventoryFingerprint = challenge.InventoryFingerprint.ToLowerInvariant(),
+            RunnerDigest = new string('a', 64),
+            CatalogueDigest = new string('b', 64),
+            TestBundleDigest = new string('c', 64),
+            ProductArtifactDigest = new string('d', 64),
+            ConfigurationDigest = new string('e', 64),
+            PrimaryConfigurationDigest = new string('1', 64),
+            TestConfigurationDigest = new string('2', 64),
+            ProviderCode = "sqlite",
+            ProviderVersion = "10.0",
+            CaseIds = ["original.authority-boundary"],
+            ExecutedCount = 1,
+            AttemptCount = 1,
+            ResultArtifactDigest = new string('f', 64),
+            StartedAt = Now,
+            CompletedAt = Now,
+            IssuedAt = Now,
+            ValidUntil = Now.AddSeconds(20)
         };
         static string Encode(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         var input = Encode(JsonSerializer.SerializeToUtf8Bytes(new
         {
-            alg = "ES256", typ = ModerationMeasurementReceiptVerifier.RequiredType, kid = keyId.ToString("D")
+            alg = "ES256",
+            typ = ModerationMeasurementReceiptVerifier.RequiredType,
+            kid = keyId.ToString("D")
         })) + "." + Encode(JsonSerializer.SerializeToUtf8Bytes(assertion));
         var signed = input + "." + Encode(key.SignData(Encoding.ASCII.GetBytes(input), HashAlgorithmName.SHA256,
             DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AcceptModerationConsumerMeasurementSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
-            ReceiptId = assertion.ReceiptId, ChallengeId = challenge.Id, IssuerEnrollmentId = enrollmentId,
-            Binding = assertion.Binding, SignedToken = signed, OriginalEffect = preparation.OriginalEffect
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = await OriginalEpochAsync(fixture),
+            ReceiptId = assertion.ReceiptId,
+            ChallengeId = challenge.Id,
+            IssuerEnrollmentId = enrollmentId,
+            Binding = assertion.Binding,
+            SignedToken = signed,
+            OriginalEffect = preparation.OriginalEffect
         })).IsSuccess).IsTrue();
         return new(key, assertion.Binding, assertion.ReceiptId, enrollmentId, input + "." + Encode(new byte[64]));
     }

@@ -144,7 +144,9 @@ public sealed class ModerationAdjudicatedCaseReadGrantCommandTests
 
     private static GrantModerationAdjudicatedCaseReadPurposeCommand Command() => new()
     {
-        OperationId = Guid.CreateVersion7(), CaseId = Guid.CreateVersion7(), ExpectedCaseRevision = 1,
+        OperationId = Guid.CreateVersion7(),
+        CaseId = Guid.CreateVersion7(),
+        ExpectedCaseRevision = 1,
         GranteeUserId = Guid.CreateVersion7(),
         Original = new ModerationOriginalEffectAnchor(Guid.CreateVersion7(),
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -154,6 +156,8 @@ public sealed class ModerationAdjudicatedCaseReadGrantCommandTests
 
     private static RevokeModerationAdjudicatedCaseReadPurposeCommand Revocation() => new()
     {
-        OperationId = Guid.CreateVersion7(), GrantId = Guid.CreateVersion7(), ExpectedGrantRevision = 1
+        OperationId = Guid.CreateVersion7(),
+        GrantId = Guid.CreateVersion7(),
+        ExpectedGrantRevision = 1
     };
 }

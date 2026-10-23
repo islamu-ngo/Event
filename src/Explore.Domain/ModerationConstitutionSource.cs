@@ -59,19 +59,40 @@ public sealed class ModerationConstitutionSource
         terms.Validate();
         var source = new ModerationConstitutionSource
         {
-            Id = id, HostBindingId = hostId, TrustDomainId = trustId, TenantId = tenantId,
-            PolicyId = policyId, PolicyRevision = policyRevision, PublicationId = publicationId, DefinitionId = definitionId,
-            ProfileId = profileId, ModeCode = modeCode, ProposedStateDigest = proposedStateDigest,
-            ScopeCeiling = terms.ScopeCeiling, Evidence = terms.Evidence, Remedies = terms.Remedies,
-            Independence = terms.Independence, Exposure = terms.Exposure, Overload = terms.Overload,
+            Id = id,
+            HostBindingId = hostId,
+            TrustDomainId = trustId,
+            TenantId = tenantId,
+            PolicyId = policyId,
+            PolicyRevision = policyRevision,
+            PublicationId = publicationId,
+            DefinitionId = definitionId,
+            ProfileId = profileId,
+            ModeCode = modeCode,
+            ProposedStateDigest = proposedStateDigest,
+            ScopeCeiling = terms.ScopeCeiling,
+            Evidence = terms.Evidence,
+            Remedies = terms.Remedies,
+            Independence = terms.Independence,
+            Exposure = terms.Exposure,
+            Overload = terms.Overload,
             MinimumIndependentReviewers = terms.MinimumIndependentReviewers,
             ProtectedComplaintCalendarMonths = terms.ProtectedComplaintCalendarMonths,
-            MaximumReviewIntervalTicks = terms.MaximumReviewInterval.Ticks, EscalationAfterTicks = terms.EscalationAfter.Ticks,
-            SupportRoute = terms.SupportRoute, IndependentRedressRoute = terms.IndependentRedressRoute,
-            CoordinatorHumanId = terms.CoordinatorHumanId, FallbackHumanId = terms.FallbackHumanId,
-            RecordedByHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1, RecordedAt = now, ValidUntil = validUntil,
-            OriginalEffectId = originalEffectId, OriginalSnapshotHash = originalSnapshotHash,
-            OriginalEffectBindingHash = originalEffectBindingHash, OriginalCustodyUntil = originalCustodyUntil,
+            MaximumReviewIntervalTicks = terms.MaximumReviewInterval.Ticks,
+            EscalationAfterTicks = terms.EscalationAfter.Ticks,
+            SupportRoute = terms.SupportRoute,
+            IndependentRedressRoute = terms.IndependentRedressRoute,
+            CoordinatorHumanId = terms.CoordinatorHumanId,
+            FallbackHumanId = terms.FallbackHumanId,
+            RecordedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            RecordedAt = now,
+            ValidUntil = validUntil,
+            OriginalEffectId = originalEffectId,
+            OriginalSnapshotHash = originalSnapshotHash,
+            OriginalEffectBindingHash = originalEffectBindingHash,
+            OriginalCustodyUntil = originalCustodyUntil,
             Reviewers = reviewers.Select((item, ordinal) => ModerationConstitutionReviewer.Capture(id, ordinal, item)).ToList()
         };
         source.ValidatePersistedState();
@@ -141,10 +162,16 @@ public sealed class ModerationConstitutionReviewer
         terms.Validate();
         return new()
         {
-            SourceId = sourceId, Ordinal = ordinal, AvailabilityId = terms.AvailabilityId,
-            AvailabilityRevision = terms.AvailabilityRevision, AvailabilityWriterGeneration = terms.AvailabilityWriterGeneration,
-            ReviewerHumanId = terms.ReviewerHumanId, ControllerHumanId = terms.ControllerHumanId,
-            IdentityBasis = terms.IdentityBasis, QualificationBasis = terms.QualificationBasis, IndependenceBasis = terms.IndependenceBasis
+            SourceId = sourceId,
+            Ordinal = ordinal,
+            AvailabilityId = terms.AvailabilityId,
+            AvailabilityRevision = terms.AvailabilityRevision,
+            AvailabilityWriterGeneration = terms.AvailabilityWriterGeneration,
+            ReviewerHumanId = terms.ReviewerHumanId,
+            ControllerHumanId = terms.ControllerHumanId,
+            IdentityBasis = terms.IdentityBasis,
+            QualificationBasis = terms.QualificationBasis,
+            IndependenceBasis = terms.IndependenceBasis
         };
     }
     public ModerationConstitutionReviewerTerms ToTerms() => new(AvailabilityId, AvailabilityRevision, AvailabilityWriterGeneration,

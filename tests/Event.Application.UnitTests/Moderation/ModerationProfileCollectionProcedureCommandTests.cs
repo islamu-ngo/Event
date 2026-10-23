@@ -35,22 +35,37 @@ public sealed class ModerationProfileCollectionProcedureCommandTests
         {
             0 => new RecordModerationProfileCollectionProcedureSource
             {
-                OperationId = Id(1), Target = Target, ExpectedQualificationRevision = 13,
-                SourceId = Id(2), ChildAgeSourceId = Id(3), ExpectedChildAgeSourceRevision = 1,
-                ExpectedChildAgeSourceWriterGeneration = 5, ChildAgeAdoptionId = Id(4),
-                ExpectedChildAgeAdoptionRevision = 1, ExpectedChildAgeAdoptionWriterGeneration = 7,
-                Procedure = Procedure, ValidUntil = Until
+                OperationId = Id(1),
+                Target = Target,
+                ExpectedQualificationRevision = 13,
+                SourceId = Id(2),
+                ChildAgeSourceId = Id(3),
+                ExpectedChildAgeSourceRevision = 1,
+                ExpectedChildAgeSourceWriterGeneration = 5,
+                ChildAgeAdoptionId = Id(4),
+                ExpectedChildAgeAdoptionRevision = 1,
+                ExpectedChildAgeAdoptionWriterGeneration = 7,
+                Procedure = Procedure,
+                ValidUntil = Until
             },
             1 => new AdoptModerationProfileCollectionProcedureSource
             {
-                OperationId = Id(1), Target = Target, ExpectedQualificationRevision = 13,
-                SourceId = Id(2), ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 11,
-                AdoptionId = Id(5), ValidUntil = Until
+                OperationId = Id(1),
+                Target = Target,
+                ExpectedQualificationRevision = 13,
+                SourceId = Id(2),
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = 11,
+                AdoptionId = Id(5),
+                ValidUntil = Until
             },
             _ => new WithdrawModerationProfileCollectionProcedureAdoption
             {
-                OperationId = Id(1), Target = Target, ExpectedQualificationRevision = 13,
-                AdoptionId = Id(5), ExpectedAdoptionRevision = 1
+                OperationId = Id(1),
+                Target = Target,
+                ExpectedQualificationRevision = 13,
+                AdoptionId = Id(5),
+                ExpectedAdoptionRevision = 1
             }
         };
         await Assert.That(command.ToMutation()).IsEqualTo(expected);
@@ -242,22 +257,37 @@ public sealed class ModerationProfileCollectionProcedureCommandTests
     {
         0 => new RecordModerationProfileCollectionProcedureCommand
         {
-            OperationId = Id(1), Target = Target, ExpectedQualificationRevision = 13,
-            SourceId = Id(2), ChildAgeSourceId = Id(3), ExpectedChildAgeSourceRevision = 1,
-            ExpectedChildAgeSourceWriterGeneration = 5, ChildAgeAdoptionId = Id(4),
-            ExpectedChildAgeAdoptionRevision = 1, ExpectedChildAgeAdoptionWriterGeneration = 7,
-            Procedure = Procedure, ValidUntil = Until
+            OperationId = Id(1),
+            Target = Target,
+            ExpectedQualificationRevision = 13,
+            SourceId = Id(2),
+            ChildAgeSourceId = Id(3),
+            ExpectedChildAgeSourceRevision = 1,
+            ExpectedChildAgeSourceWriterGeneration = 5,
+            ChildAgeAdoptionId = Id(4),
+            ExpectedChildAgeAdoptionRevision = 1,
+            ExpectedChildAgeAdoptionWriterGeneration = 7,
+            Procedure = Procedure,
+            ValidUntil = Until
         },
         1 => new AdoptModerationProfileCollectionProcedureCommand
         {
-            OperationId = Id(1), Target = Target, ExpectedQualificationRevision = 13,
-            SourceId = Id(2), ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 11,
-            AdoptionId = Id(5), ValidUntil = Until
+            OperationId = Id(1),
+            Target = Target,
+            ExpectedQualificationRevision = 13,
+            SourceId = Id(2),
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 11,
+            AdoptionId = Id(5),
+            ValidUntil = Until
         },
         2 => new WithdrawModerationProfileCollectionProcedureCommand
         {
-            OperationId = Id(1), Target = Target, ExpectedQualificationRevision = 13,
-            AdoptionId = Id(5), ExpectedAdoptionRevision = 1
+            OperationId = Id(1),
+            Target = Target,
+            ExpectedQualificationRevision = 13,
+            AdoptionId = Id(5),
+            ExpectedAdoptionRevision = 1
         },
         _ => throw new ArgumentOutOfRangeException(nameof(variant))
     };

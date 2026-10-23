@@ -69,10 +69,15 @@ public sealed class ModerationReferenceProfilePreviewTests
 
     private static ModerationReferenceProfile Profile() => new()
     {
-        Id = ModerationReferenceProfileId.CFG09, Code = "CFG09", Revision = 1,
-        Basis = ModerationReferenceBasis.VerifiedUnsafeObject, Ground = ModerationReferenceGround.VerifiedUnsafeResource,
-        Bundle = ModerationConsequenceBundleKind.ObjectQuarantine, Recognition = ModerationReferenceRecognition.Never,
-        ScopeKinds = [ModerationScopeKind.Resource], SubjectKinds = [ModerationSubjectKind.Content],
+        Id = ModerationReferenceProfileId.CFG09,
+        Code = "CFG09",
+        Revision = 1,
+        Basis = ModerationReferenceBasis.VerifiedUnsafeObject,
+        Ground = ModerationReferenceGround.VerifiedUnsafeResource,
+        Bundle = ModerationConsequenceBundleKind.ObjectQuarantine,
+        Recognition = ModerationReferenceRecognition.Never,
+        ScopeKinds = [ModerationScopeKind.Resource],
+        SubjectKinds = [ModerationSubjectKind.Content],
         Prerequisites = [ModerationReferencePrerequisite.ExactResourceAudienceAndVersion],
         Effects =
         [

@@ -76,14 +76,24 @@ public sealed class ModerationPreFindingCustody
             throw new ArgumentException("Custody requires one independently attributed human or Content case.");
         var row = new ModerationPreFindingCustody
         {
-            Id = id, HostBindingId = hostId, TrustDomainId = owner.Scope.TrustDomainId,
-            TenantId = owner.Scope.Id, CaseId = owner.Id, CaseRevision = owner.Revision,
-            AttributionSourceId = attribution.Id, AttributionGeneration = attribution.Generation,
+            Id = id,
+            HostBindingId = hostId,
+            TrustDomainId = owner.Scope.TrustDomainId,
+            TenantId = owner.Scope.Id,
+            CaseId = owner.Id,
+            CaseRevision = owner.Revision,
+            AttributionSourceId = attribution.Id,
+            AttributionGeneration = attribution.Generation,
             EvidenceRevision = attribution.EvidenceCaseRevision,
-            ProposedByHumanId = recorder, PrivacyOwnerHumanId = privacyOwner,
-            MaximumRetentionTicks = terms.MaximumRetention.Ticks, MaximumTextBytes = terms.MaximumTextBytes,
-            Purpose = terms.Purpose, PrivacyLegalMandate = terms.PrivacyLegalMandate,
-            ProposedAt = now, ValidUntil = validUntil, Revision = 1
+            ProposedByHumanId = recorder,
+            PrivacyOwnerHumanId = privacyOwner,
+            MaximumRetentionTicks = terms.MaximumRetention.Ticks,
+            MaximumTextBytes = terms.MaximumTextBytes,
+            Purpose = terms.Purpose,
+            PrivacyLegalMandate = terms.PrivacyLegalMandate,
+            ProposedAt = now,
+            ValidUntil = validUntil,
+            Revision = 1
         };
         row.ValidatePersistedState();
         return row;

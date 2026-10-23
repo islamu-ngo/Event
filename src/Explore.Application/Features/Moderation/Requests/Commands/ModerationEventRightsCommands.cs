@@ -17,9 +17,17 @@ public sealed record RecordModerationEventRightsCommand : ModerationQualificatio
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationEventRightsSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, PolicyId = PolicyId, ExpectedPolicyRevision = ExpectedPolicyRevision,
-        PublicationId = PublicationId, ProfileId = ProfileId, Mode = Mode, Terms = Terms, Ownership = Ownership,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        PolicyId = PolicyId,
+        ExpectedPolicyRevision = ExpectedPolicyRevision,
+        PublicationId = PublicationId,
+        ProfileId = ProfileId,
+        Mode = Mode,
+        Terms = Terms,
+        Ownership = Ownership,
         ValidUntil = ValidUntil
     };
 }
@@ -33,9 +41,14 @@ public sealed record AdoptModerationEventRightsCommand : ModerationQualification
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationEventRightsSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration, AdoptionId = AdoptionId, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration,
+        AdoptionId = AdoptionId,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -45,7 +58,10 @@ public sealed record WithdrawModerationEventRightsCommand : ModerationQualificat
     public required long ExpectedAdoptionRevision { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new WithdrawModerationEventRightsAdoption
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision
     };
 }

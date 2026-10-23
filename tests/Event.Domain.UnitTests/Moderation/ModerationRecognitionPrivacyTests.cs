@@ -64,7 +64,8 @@ public sealed class ModerationRecognitionPrivacyTests
         retention[1] = retention[1] with
         {
             Hold = ModerationRecognitionPrivacyHold.IndividuallyJustifiedLegalClaim,
-            MaximumHold = TimeSpan.FromDays(1), HoldReviewWithin = TimeSpan.FromHours(1)
+            MaximumHold = TimeSpan.FromDays(1),
+            HoldReviewWithin = TimeSpan.FromHours(1)
         };
         await Assert.That(() => Source(retention: retention)).Throws<ArgumentException>();
         retention = Retention();

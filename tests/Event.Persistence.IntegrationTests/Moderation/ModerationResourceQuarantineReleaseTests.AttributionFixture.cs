@@ -34,7 +34,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
                 var sibling = EventResource.CreateDraft(targetId, Database.TenantId, eventId, null,
                     new EventResourceMetadata
                     {
-                        Title = "Separate native Resource", Kind = EventResourceKindEnum.GeneralDocument,
+                        Title = "Separate native Resource",
+                        Kind = EventResourceKindEnum.GeneralDocument,
                         DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                     }, EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
                     [EventResourceAudienceRule.Create(Database.TenantId, eventId, targetId, EventResourceAudienceKindEnum.Organizer)],
@@ -47,8 +48,11 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             var narrativeId = Guid.CreateVersion7();
             await SourceAsync(Database.AdministratorId, new RecordModerationCaseNarrativePolicySource
             {
-                OperationId = Guid.CreateVersion7(), Target = Database.Scope, ExpectedQualificationRevision = 1,
-                SourceId = narrativeId, TargetKind = ModerationCaseTargetKind.Resource,
+                OperationId = Guid.CreateVersion7(),
+                Target = Database.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = narrativeId,
+                TargetKind = ModerationCaseTargetKind.Resource,
                 Terms = new(ModerationCaseNarrativePurpose.ConfidentialAllegation, TimeSpan.FromHours(1), 4096),
                 Ownership = new(Database.UrgencyAssessorId, Database.UrgencyAssessorId, Database.AdministratorId,
                     "Separately controlled native privacy and governance accounts.",
@@ -64,16 +68,24 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             }
             await SourceAsync(Database.UrgencyAssessorId, new AdoptModerationCaseNarrativePolicySource
             {
-                OperationId = Guid.CreateVersion7(), Target = Database.Scope, ExpectedQualificationRevision = 1,
-                SourceId = narrativeId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-                AdoptionId = Guid.CreateVersion7(), ValidUntil = Clock.Now.AddHours(1)
+                OperationId = Guid.CreateVersion7(),
+                Target = Database.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = narrativeId,
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = generation,
+                AdoptionId = Guid.CreateVersion7(),
+                ValidUntil = Clock.Now.AddHours(1)
             });
             var caller = new AttributionCaller(Database.AdministratorId);
             var budgetId = Guid.CreateVersion7();
             await SourceAsync(Database.AdministratorId, new RecordModerationOperationalBudgetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = Database.Scope, ExpectedQualificationRevision = 1,
-                SourceId = budgetId, OperatorHumanId = Database.UrgencyAssessorId,
+                OperationId = Guid.CreateVersion7(),
+                Target = Database.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = budgetId,
+                OperatorHumanId = Database.UrgencyAssessorId,
                 Terms = new(ModerationSubjectKind.Human, ModerationOperationalAction.SubmitReport, 8, TimeSpan.FromHours(1)),
                 ValidUntil = Clock.Now.AddHours(1)
             });
@@ -85,9 +97,14 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             }
             await SourceAsync(Database.UrgencyAssessorId, new AdoptModerationOperationalBudgetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = Database.Scope, ExpectedQualificationRevision = 1,
-                SourceId = budgetId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-                AdoptionId = Guid.CreateVersion7(), ValidUntil = Clock.Now.AddHours(1)
+                OperationId = Guid.CreateVersion7(),
+                Target = Database.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = budgetId,
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = generation,
+                AdoptionId = Guid.CreateVersion7(),
+                ValidUntil = Clock.Now.AddHours(1)
             });
             await using (var context = Context())
             {
@@ -128,7 +145,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
                     new ModerationCaseNarrativeRepository(context, identity.Admin, reporter, identity.Machine,
                         intake, Clock, new EphemeralDataProtectionProvider()), identity.Admin);
                 var accepted = await committer.SubmitAsync(new(ModerationCaseAccessPurpose.SubmitAllegation,
-                    Guid.Empty, Guid.CreateVersion7(), 0, issued.Receipt.Id, issued.Token) { Narrative = material }, default);
+                    Guid.Empty, Guid.CreateVersion7(), 0, issued.Receipt.Id, issued.Token)
+                { Narrative = material }, default);
                 await Assert.That(accepted.Outcome).IsEqualTo(ModerationCaseIntakeCommitOutcome.Accepted);
                 OccurrenceCaseId = accepted.Acknowledgement!.CaseId;
             }

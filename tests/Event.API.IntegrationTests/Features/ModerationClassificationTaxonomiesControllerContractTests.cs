@@ -112,10 +112,17 @@ public sealed class ModerationClassificationTaxonomiesControllerContractTests
         {
             "record" => new RecordModerationClassificationTaxonomyCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 1,
-                SourceId = Guid.CreateVersion7(), TaxonomyId = Guid.CreateVersion7(), ExpectedTaxonomyGeneration = 0,
-                PolicyId = Guid.CreateVersion7(), ExpectedPolicyRevision = 1, PublicationId = Guid.CreateVersion7(),
-                ProfileId = Guid.CreateVersion7(), Mode = ModerationNativeMode.Embedded,
+                OperationId = Guid.CreateVersion7(),
+                Target = target,
+                ExpectedQualificationRevision = 1,
+                SourceId = Guid.CreateVersion7(),
+                TaxonomyId = Guid.CreateVersion7(),
+                ExpectedTaxonomyGeneration = 0,
+                PolicyId = Guid.CreateVersion7(),
+                ExpectedPolicyRevision = 1,
+                PublicationId = Guid.CreateVersion7(),
+                ProfileId = Guid.CreateVersion7(),
+                Mode = ModerationNativeMode.Embedded,
                 Mandate = new(owner, owner, reviewer, reviewer, "Accountable taxonomy owner.", "Independent floor review."),
                 Categories = [new(Guid.CreateVersion7(), 1, "general", EventContentClassificationVersion.CategoryKind.General,
                     6, "Reviewed meaning.", "Reviewed floor.")],
@@ -123,14 +130,22 @@ public sealed class ModerationClassificationTaxonomiesControllerContractTests
             },
             "adopt" => new AdoptModerationClassificationTaxonomyCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 2,
-                SourceId = Guid.CreateVersion7(), ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 2,
-                AdoptionId = Guid.CreateVersion7(), ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
+                OperationId = Guid.CreateVersion7(),
+                Target = target,
+                ExpectedQualificationRevision = 2,
+                SourceId = Guid.CreateVersion7(),
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = 2,
+                AdoptionId = Guid.CreateVersion7(),
+                ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
             },
             "withdraw" => new WithdrawModerationClassificationTaxonomyCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 3,
-                AdoptionId = Guid.CreateVersion7(), ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = target,
+                ExpectedQualificationRevision = 3,
+                AdoptionId = Guid.CreateVersion7(),
+                ExpectedAdoptionRevision = 1
             },
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };

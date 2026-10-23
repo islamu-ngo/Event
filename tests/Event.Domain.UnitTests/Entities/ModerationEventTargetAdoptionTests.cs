@@ -135,11 +135,21 @@ public sealed class ModerationEventTargetAdoptionTests
         var selection = ModerationContributionSelectionTests.Selection(scopeKind, subjectKind, substituteEvent).Selection;
         return (selection, new()
         {
-            Id = Guid.CreateVersion7(), HostBindingId = selection.HostBindingId, TrustDomainId = selection.TrustDomainId,
-            TenantId = selection.TenantId, EventId = selection.Bindings[0].TargetId, Revision = 1,
-            ObservedByHumanId = Guid.CreateVersion7(), WriterGeneration = 3, ObservedAt = selection.RecordedAt,
-            ValidUntil = selection.ValidUntil, EventStamp = Guid.NewGuid(), ActorId = Guid.CreateVersion7(), ActorStamp = Guid.NewGuid(),
-            OrganizerActorId = null, OrganizerActorStamp = null,
+            Id = Guid.CreateVersion7(),
+            HostBindingId = selection.HostBindingId,
+            TrustDomainId = selection.TrustDomainId,
+            TenantId = selection.TenantId,
+            EventId = selection.Bindings[0].TargetId,
+            Revision = 1,
+            ObservedByHumanId = Guid.CreateVersion7(),
+            WriterGeneration = 3,
+            ObservedAt = selection.RecordedAt,
+            ValidUntil = selection.ValidUntil,
+            EventStamp = Guid.NewGuid(),
+            ActorId = Guid.CreateVersion7(),
+            ActorStamp = Guid.NewGuid(),
+            OrganizerActorId = null,
+            OrganizerActorStamp = null,
             SubmittedByHumanId = substitutedSubmitter ? Guid.CreateVersion7() : selection.Bindings[0].SubjectId
         });
     }

@@ -111,7 +111,9 @@ public sealed partial class TenantAuthorityMembershipParityTests
         foreach (var role in new[] { RoleEnum.GroupAdmin, RoleEnum.GroupModerator, RoleEnum.GroupMember, RoleEnum.OrgAdmin })
             context.Roles.Add(new Role
             {
-                Id = (int)role, MasterCode = role.ToString(), FullName = role.ToString(),
+                Id = (int)role,
+                MasterCode = role.ToString(),
+                FullName = role.ToString(),
                 Scope = role == RoleEnum.OrgAdmin ? RoleScopeEnum.Organization : RoleScopeEnum.Group
             });
         var approval = new ApprovalStatus { Id = (int)ApprovalStatusEnum.Approved, MasterCode = "approved", FullName = "Approved" };
@@ -119,39 +121,70 @@ public sealed partial class TenantAuthorityMembershipParityTests
         var group = new Group { Id = Guid.CreateVersion7(), FullName = "Membership authority" };
         var participation = new GroupTenant
         {
-            Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, Group = group, GroupId = group.Id,
-            ApprovalStatus = approval, ApprovalStatusId = approval.Id
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            Group = group,
+            GroupId = group.Id,
+            ApprovalStatus = approval,
+            ApprovalStatusId = approval.Id
         };
         context.GroupMembers.Add(new GroupMember
         {
-            Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, GroupTenant = participation, GroupTenantId = participation.Id,
-            UserId = database.UserId, User = null!, Role = null!,
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            GroupTenant = participation,
+            GroupTenantId = participation.Id,
+            UserId = database.UserId,
+            User = null!,
+            Role = null!,
             RoleId = (int)(scenario is "administrator" or "deleted-membership" ? RoleEnum.GroupAdmin
                 : scenario is "delegated" or "inactive-permission" ? RoleEnum.GroupModerator : RoleEnum.GroupMember),
             IsDeleted = scenario == "deleted-membership"
         });
         var permission = new Permission
         {
-            Id = 9101, MasterCode = PermissionCodes.GroupMemberUpdate, ResourceKind = ResourceKinds.GroupMember,
-            Action = AuthorizationActions.Update, FullName = "Change group membership", GroupName = "Group",
-            Scope = RoleScopeEnum.Group, IsActive = scenario != "inactive-permission"
+            Id = 9101,
+            MasterCode = PermissionCodes.GroupMemberUpdate,
+            ResourceKind = ResourceKinds.GroupMember,
+            Action = AuthorizationActions.Update,
+            FullName = "Change group membership",
+            GroupName = "Group",
+            Scope = RoleScopeEnum.Group,
+            IsActive = scenario != "inactive-permission"
         };
         context.Set<RolePermission>().Add(new RolePermission
         {
-            RoleId = (int)RoleEnum.GroupModerator, Role = null!, Permission = permission, PermissionId = permission.Id
+            RoleId = (int)RoleEnum.GroupModerator,
+            Role = null!,
+            Permission = permission,
+            PermissionId = permission.Id
         });
         if (scenario == "organization-administrator")
         {
             var organization = new Organization { Id = Guid.CreateVersion7(), Pii = new OrganizationPii { FullName = "Unrelated organization" } };
             var organizationTenant = new OrganizationTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, Organization = organization,
-                OrganizationId = organization.Id, ApprovalStatus = approval, ApprovalStatusId = approval.Id
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                Organization = organization,
+                OrganizationId = organization.Id,
+                ApprovalStatus = approval,
+                ApprovalStatusId = approval.Id
             };
             context.OrganizationMembers.Add(new OrganizationMember
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, OrganizationTenant = organizationTenant,
-                OrganizationTenantId = organizationTenant.Id, UserId = database.UserId, User = null!, Role = null!, RoleId = (int)RoleEnum.OrgAdmin
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                OrganizationTenant = organizationTenant,
+                OrganizationTenantId = organizationTenant.Id,
+                UserId = database.UserId,
+                User = null!,
+                Role = null!,
+                RoleId = (int)RoleEnum.OrgAdmin
             });
         }
         await context.SaveChangesAsync();

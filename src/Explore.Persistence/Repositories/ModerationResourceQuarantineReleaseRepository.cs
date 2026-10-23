@@ -73,20 +73,32 @@ public sealed partial class ModerationResourceQuarantineReleaseRepository(
                     throw new SafetyUnavailable();
                 var receipt = new EventResourceModerationQuarantineReview
                 {
-                    Id = intent.OperationId, TenantId = qualified.Authority.Tenant.Id,
-                    HostBindingId = qualified.Authority.Binding.Id, TrustDomainId = qualified.Authority.Binding.TrustDomainId,
-                    QuarantineId = qualified.Cause.Id, EventId = qualified.Native.EventId,
-                    EventResourceId = intent.ResourceId, MaterialVersionId = intent.MaterialVersionId,
-                    CaseId = intent.CaseId, CaseRevision = intent.ExpectedCaseRevision, Step = intent.Step,
-                    PurposeId = purpose?.Id ?? intent.OperationId, PredecessorId = intent.PredecessorId,
-                    HumanId = qualified.Authority.UserId, ReviewerAssignmentId = reviewer.Id,
-                    ReviewerRevision = reviewer.Revision, ControllerHumanId = reviewer.ControllerHumanId!.Value,
+                    Id = intent.OperationId,
+                    TenantId = qualified.Authority.Tenant.Id,
+                    HostBindingId = qualified.Authority.Binding.Id,
+                    TrustDomainId = qualified.Authority.Binding.TrustDomainId,
+                    QuarantineId = qualified.Cause.Id,
+                    EventId = qualified.Native.EventId,
+                    EventResourceId = intent.ResourceId,
+                    MaterialVersionId = intent.MaterialVersionId,
+                    CaseId = intent.CaseId,
+                    CaseRevision = intent.ExpectedCaseRevision,
+                    Step = intent.Step,
+                    PurposeId = purpose?.Id ?? intent.OperationId,
+                    PredecessorId = intent.PredecessorId,
+                    HumanId = qualified.Authority.UserId,
+                    ReviewerAssignmentId = reviewer.Id,
+                    ReviewerRevision = reviewer.Revision,
+                    ControllerHumanId = reviewer.ControllerHumanId!.Value,
                     RequiredApprovals = purpose?.RequiredApprovals ?? intent.RequiredApprovals,
                     MaximumEvidenceLifetimeTicks = purpose?.MaximumEvidenceLifetimeTicks ?? intent.MaximumEvidenceLifetime.Ticks,
-                    Attestation = intent.Attestation, NativeDigest = NativeDigest(qualified.Native),
-                    ResourceStamp = qualified.Native.ResourceStamp, RequestDigest = digest,
+                    Attestation = intent.Attestation,
+                    NativeDigest = NativeDigest(qualified.Native),
+                    ResourceStamp = qualified.Native.ResourceStamp,
+                    RequestDigest = digest,
                     QualificationRevision = qualified.Authority.Epoch.Revision,
-                    RecordedAt = recordedAt.Value, ValidUntil = intent.ValidUntil
+                    RecordedAt = recordedAt.Value,
+                    ValidUntil = intent.ValidUntil
                 };
                 receipt.ValidatePersistedState();
                 context.Set<EventResourceModerationQuarantineReview>().Add(receipt);
@@ -202,12 +214,19 @@ public sealed partial class ModerationResourceQuarantineReleaseRepository(
                     ?? throw new SafetyUnavailable();
                 var receipt = new EventResourceModerationQuarantineRelease
                 {
-                    Id = intent.OperationId, TenantId = qualified.Cause.TenantId,
-                    QuarantineId = qualified.Cause.Id, EventId = qualified.Cause.EventId,
-                    EventResourceId = qualified.Cause.EventResourceId, MaterialVersionId = qualified.Cause.MaterialVersionId,
-                    OriginalEffectId = qualified.Cause.EffectId, OriginalBindingOrdinal = qualified.Cause.BindingOrdinal,
-                    OriginallyAppliedAt = qualified.Cause.AppliedAt, ApprovalId = intent.ApprovalId,
-                    ReleasedByHumanId = qualified.Authority.UserId, ReleasedAt = releasedAt.Value, RequestDigest = digest
+                    Id = intent.OperationId,
+                    TenantId = qualified.Cause.TenantId,
+                    QuarantineId = qualified.Cause.Id,
+                    EventId = qualified.Cause.EventId,
+                    EventResourceId = qualified.Cause.EventResourceId,
+                    MaterialVersionId = qualified.Cause.MaterialVersionId,
+                    OriginalEffectId = qualified.Cause.EffectId,
+                    OriginalBindingOrdinal = qualified.Cause.BindingOrdinal,
+                    OriginallyAppliedAt = qualified.Cause.AppliedAt,
+                    ApprovalId = intent.ApprovalId,
+                    ReleasedByHumanId = qualified.Authority.UserId,
+                    ReleasedAt = releasedAt.Value,
+                    RequestDigest = digest
                 };
                 resource.ReleaseModerationQuarantine(receipt, qualified.Native.ResourceStamp);
                 var remainingCount = resource.ModerationQuarantineCount;
@@ -280,10 +299,17 @@ public sealed partial class ModerationResourceQuarantineReleaseRepository(
                     || row.ValidUntil > rows[index - 1].ValidUntil)
                 || row.RequestDigest != Digest(new ModerationResourceSafetyReviewIntent
                 {
-                    OperationId = row.Id, QuarantineId = row.QuarantineId, ResourceId = row.EventResourceId,
-                    MaterialVersionId = row.MaterialVersionId, CaseId = row.CaseId, ExpectedCaseRevision = row.CaseRevision,
-                    ReviewerAssignmentId = row.ReviewerAssignmentId, ExpectedReviewerRevision = row.ReviewerRevision,
-                    Step = row.Step, PredecessorId = row.PredecessorId, ValidUntil = row.ValidUntil,
+                    OperationId = row.Id,
+                    QuarantineId = row.QuarantineId,
+                    ResourceId = row.EventResourceId,
+                    MaterialVersionId = row.MaterialVersionId,
+                    CaseId = row.CaseId,
+                    ExpectedCaseRevision = row.CaseRevision,
+                    ReviewerAssignmentId = row.ReviewerAssignmentId,
+                    ExpectedReviewerRevision = row.ReviewerRevision,
+                    Step = row.Step,
+                    PredecessorId = row.PredecessorId,
+                    ValidUntil = row.ValidUntil,
                     RequiredApprovals = index == 0 ? row.RequiredApprovals : 0,
                     MaximumEvidenceLifetime = index == 0 ? TimeSpan.FromTicks(row.MaximumEvidenceLifetimeTicks) : TimeSpan.Zero,
                     Attestation = row.Attestation

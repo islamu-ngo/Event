@@ -196,7 +196,8 @@ public sealed class ModerationQualificationCommandTests
         }))).IsValid).IsFalse();
         await Assert.That((await validator.ValidateAsync(new PublishModerationPolicyCommand(request with
         {
-            ExpectedPublicationId = Id(60), Proposed = request.Proposed with { ExpectedRevision = 1 }
+            ExpectedPublicationId = Id(60),
+            Proposed = request.Proposed with { ExpectedRevision = 1 }
         }))).IsValid).IsTrue();
     }
 
@@ -293,11 +294,14 @@ public sealed class ModerationQualificationCommandTests
             8 => proposed with { Profiles = [profile with { Timing = profile.Timing with { Duration = TimeSpan.MaxValue } }] },
             9 => proposed with { Profiles = [profile with { RequiredApprovals = 3 }] },
             10 => proposed with { Profiles = [profile, profile with { Id = Id(12) }] },
-            _ => proposed with { Profiles = [profile with
+            _ => proposed with
+            {
+                Profiles = [profile with
             {
                 Timing = new(ModerationReferenceTimingKind.ReviewedIndefinite, TimeSpan.FromHours(1)),
                 RequiredApprovals = 1
-            }] }
+            }]
+            }
         };
         await Assert.That(Compile(proposed).Draft).IsNull();
     }

@@ -140,8 +140,14 @@ public sealed class EventDiscoveryCommitBoundAuthorityTests(EventResourcePersist
                 (int)RoleEnum.EventManager, EventRoleAssignmentStatus.Active, Now.AddDays(-1), Now.AddDays(1), human);
             assignmentId = assignment.Id;
             seed.EventRoleAssignments.Add(assignment);
-            seed.Actors.Add(new Actor { Id = replacementId, ActorTypeId = (int)ActorTypeEnum.User,
-                ActorType = null!, UserId = human, Pii = new ActorPii { DisplayName = "Replacement custody publisher" } });
+            seed.Actors.Add(new Actor
+            {
+                Id = replacementId,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = human,
+                Pii = new ActorPii { DisplayName = "Replacement custody publisher" }
+            });
             await seed.SaveChangesAsync();
         }
         var early = new CountBorrowedEarlyAnchors();

@@ -34,10 +34,19 @@ public sealed class ModerationCaseReadGrant
             throw new ArgumentException("A read grant requires actual case, source, caller, issuer and finite validity.");
         return new()
         {
-            Id = id, TenantId = tenantId, TrustDomainId = trustDomainId, CaseId = caseId, CaseRevision = caseRevision,
-            SourceId = sourceId, CallerUserId = callerUserId, IssuerUserId = issuerUserId,
-            IssuerRoleGrantId = issuerRoleGrantId, IssuerPlatformGrant = issuerPlatformGrant,
-            IssuedAt = now, ExpiresAt = expiresAt, Revision = 1
+            Id = id,
+            TenantId = tenantId,
+            TrustDomainId = trustDomainId,
+            CaseId = caseId,
+            CaseRevision = caseRevision,
+            SourceId = sourceId,
+            CallerUserId = callerUserId,
+            IssuerUserId = issuerUserId,
+            IssuerRoleGrantId = issuerRoleGrantId,
+            IssuerPlatformGrant = issuerPlatformGrant,
+            IssuedAt = now,
+            ExpiresAt = expiresAt,
+            Revision = 1
         };
     }
 

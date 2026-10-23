@@ -37,8 +37,11 @@ public sealed class EventRoleAssignmentWindowMutationTests
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = assignment.Id,
-            StartsAtUtc = starts, ExpiresAtUtc = expires
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            AssignmentId = assignment.Id,
+            StartsAtUtc = starts,
+            ExpiresAtUtc = expires
         });
 
         await Assert.That(result.IsSuccess).IsTrue();
@@ -79,8 +82,11 @@ public sealed class EventRoleAssignmentWindowMutationTests
         {
             await Handler(fixture, context, session, metrics).ExecuteAsync(new()
             {
-                TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = manager.Id,
-                StartsAtUtc = manager.StartsAtUtc, ExpiresAtUtc = until.AddDays(10)
+                TenantId = fixture.TenantId,
+                EventId = fixture.EventId,
+                AssignmentId = manager.Id,
+                StartsAtUtc = manager.StartsAtUtc,
+                ExpiresAtUtc = until.AddDays(10)
             });
         });
         await Assert.That(checkpoint.Observed).IsTrue();
@@ -116,8 +122,11 @@ public sealed class EventRoleAssignmentWindowMutationTests
         var expires = DateTime.UtcNow.AddHours(3);
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = assignment.Id,
-            StartsAtUtc = assignment.StartsAtUtc, ExpiresAtUtc = expires
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            AssignmentId = assignment.Id,
+            StartsAtUtc = assignment.StartsAtUtc,
+            ExpiresAtUtc = expires
         });
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(fault.Injected).IsTrue();
@@ -149,8 +158,11 @@ public sealed class EventRoleAssignmentWindowMutationTests
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = assignment.Id,
-            StartsAtUtc = assignment.StartsAtUtc, ExpiresAtUtc = DateTime.UtcNow.AddHours(3)
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            AssignmentId = assignment.Id,
+            StartsAtUtc = assignment.StartsAtUtc,
+            ExpiresAtUtc = DateTime.UtcNow.AddHours(3)
         });
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(fault.Injected).IsTrue();
@@ -194,8 +206,11 @@ public sealed class EventRoleAssignmentWindowMutationTests
         {
             await Handler(fixture, context, session, metrics).ExecuteAsync(new()
             {
-                TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = assignment.Id,
-                StartsAtUtc = assignment.StartsAtUtc, ExpiresAtUtc = until.AddDays(10)
+                TenantId = fixture.TenantId,
+                EventId = fixture.EventId,
+                AssignmentId = assignment.Id,
+                StartsAtUtc = assignment.StartsAtUtc,
+                ExpiresAtUtc = until.AddDays(10)
             });
         });
         await Assert.That(checkpoint.Observed).IsTrue();

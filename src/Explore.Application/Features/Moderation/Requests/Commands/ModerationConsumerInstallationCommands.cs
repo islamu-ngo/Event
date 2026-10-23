@@ -13,9 +13,14 @@ public sealed record InstallModerationConsumerCommand : ModerationQualificationC
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new InstallModerationConsumerSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        InstallationId = InstallationId, ConsumerId = ConsumerId, Mode = Mode,
-        ExpectedRuntimeGeneration = ExpectedRuntimeGeneration, ExpectedInventoryFingerprint = ExpectedInventoryFingerprint,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        InstallationId = InstallationId,
+        ConsumerId = ConsumerId,
+        Mode = Mode,
+        ExpectedRuntimeGeneration = ExpectedRuntimeGeneration,
+        ExpectedInventoryFingerprint = ExpectedInventoryFingerprint,
         ValidUntil = ValidUntil
     };
 }
@@ -26,7 +31,10 @@ public sealed record WithdrawModerationConsumerCommand : ModerationQualification
     public required long ExpectedInstallationRevision { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new WithdrawModerationConsumerSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        InstallationId = InstallationId, ExpectedInstallationRevision = ExpectedInstallationRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        InstallationId = InstallationId,
+        ExpectedInstallationRevision = ExpectedInstallationRevision
     };
 }

@@ -114,9 +114,12 @@ public sealed class ModerationParticipantInvestigationCommandTests
     {
         var command = Valid() with
         {
-            IdentificationGrounds = new string('i', 2048), AllegedConduct = new string('c', 2048),
-            EvidenceProvenance = new string('p', 2048), ContradictionsAndCredentialMisuse = new string('m', 2048),
-            EvidenceCaseRevision = 1, PurgeAt = Valid().ValidUntil
+            IdentificationGrounds = new string('i', 2048),
+            AllegedConduct = new string('c', 2048),
+            EvidenceProvenance = new string('p', 2048),
+            ContradictionsAndCredentialMisuse = new string('m', 2048),
+            EvidenceCaseRevision = 1,
+            PurgeAt = Valid().ValidUntil
         };
         await Assert.That((await new ModerationParticipantInvestigationCommandValidator().ValidateAsync(command)).IsValid)
             .IsTrue();
@@ -181,10 +184,17 @@ public sealed class ModerationParticipantInvestigationCommandTests
         Target = AuthorityScope.Tenant(AuthorityScope.Instance(
             AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()),
             Guid.CreateVersion7()), Guid.CreateVersion7()),
-        ExpectedQualificationRevision = 4, SourceId = Guid.CreateVersion7(), OccurrenceCaseId = Guid.CreateVersion7(),
-        ExpectedCaseRevision = 3, EvidenceCaseRevision = 2, ReadGrantId = Guid.CreateVersion7(),
-        EvidenceSourceId = Guid.CreateVersion7(), EvidenceSourceVersion = Guid.NewGuid(),
-        SubjectHumanId = Guid.CreateVersion7(), SessionId = Guid.CreateVersion7(), ExpectedSessionGeneration = Guid.NewGuid(),
+        ExpectedQualificationRevision = 4,
+        SourceId = Guid.CreateVersion7(),
+        OccurrenceCaseId = Guid.CreateVersion7(),
+        ExpectedCaseRevision = 3,
+        EvidenceCaseRevision = 2,
+        ReadGrantId = Guid.CreateVersion7(),
+        EvidenceSourceId = Guid.CreateVersion7(),
+        EvidenceSourceVersion = Guid.NewGuid(),
+        SubjectHumanId = Guid.CreateVersion7(),
+        SessionId = Guid.CreateVersion7(),
+        ExpectedSessionGeneration = Guid.NewGuid(),
         IncidentWindowFrom = new(2026, 10, 13, 9, 0, 0, TimeSpan.Zero),
         IncidentWindowUntil = new(2026, 10, 13, 10, 0, 0, TimeSpan.Zero),
         ValidUntil = new(2026, 10, 13, 11, 0, 0, TimeSpan.Zero),

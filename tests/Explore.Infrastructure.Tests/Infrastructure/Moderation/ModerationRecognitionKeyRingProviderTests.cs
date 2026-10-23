@@ -36,7 +36,9 @@ public sealed class ModerationRecognitionKeyRingProviderTests
         {
             var payload = JsonSerializer.Serialize(new
             {
-                version = 1, trustDomainId = trustDomain.ToString("D"), ringGeneration = 1,
+                version = 1,
+                trustDomainId = trustDomain.ToString("D"),
+                ringGeneration = 1,
                 issuedAt = now.AddMinutes(-1).ToString("O", CultureInfo.InvariantCulture),
                 validUntil = now.AddMinutes(1).ToString("O", CultureInfo.InvariantCulture),
                 keys = new[] { new { kid = "selected", generation = 1, k = Convert.ToBase64String(material)

@@ -12,7 +12,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         await using var fixture = await Fixture.CreateAsync(prepare: false);
         var purpose = fixture.Intent(fixture.Author, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
         };
         await fixture.AcceptAsync(fixture.Author, purpose);
         var adoption = fixture.Intent(fixture.Approver, ResourceSafetyReviewStep.AdoptPurpose, purpose.OperationId);

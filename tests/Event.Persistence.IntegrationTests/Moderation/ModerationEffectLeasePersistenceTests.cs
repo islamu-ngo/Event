@@ -327,7 +327,9 @@ public sealed class ModerationEffectLeasePersistenceTests
         var dispatcher = services.GetRequiredService<ModerationEffectOutboxDispatcher>();
         var message = new OutboxMessage
         {
-            Id = id, AggregateId = id, AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
+            Id = id,
+            AggregateId = id,
+            AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
             EventType = ModerationEffectOutboxMessageFactory.EventType
         };
         await dispatcher.DispatchAsync(message);
@@ -364,7 +366,9 @@ public sealed class ModerationEffectLeasePersistenceTests
         var dispatcher = services.GetRequiredService<ModerationEffectOutboxDispatcher>();
         var message = new OutboxMessage
         {
-            Id = id, AggregateId = id, AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
+            Id = id,
+            AggregateId = id,
+            AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
             EventType = ModerationEffectOutboxMessageFactory.EventType
         };
         await Assert.That(() => dispatcher.DispatchAsync(message)).Throws<InvalidOperationException>();
@@ -881,7 +885,9 @@ public sealed class ModerationEffectLeasePersistenceTests
                 case "unregistered-service":
                     var other = new ServicePrincipal
                     {
-                        Id = Guid.CreateVersion7(), Code = $"other-{Guid.CreateVersion7():N}", DisplayName = "Other service"
+                        Id = Guid.CreateVersion7(),
+                        Code = $"other-{Guid.CreateVersion7():N}",
+                        DisplayName = "Other service"
                     };
                     writer.ServicePrincipals.Add(other);
                     await writer.SaveChangesAsync();
@@ -1157,7 +1163,9 @@ public sealed class ModerationEffectLeasePersistenceTests
             var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
             var service = new ServicePrincipal
             {
-                Id = Guid.CreateVersion7(), Code = $"lease-{Guid.CreateVersion7():N}", DisplayName = "Maintenance"
+                Id = Guid.CreateVersion7(),
+                Code = $"lease-{Guid.CreateVersion7():N}",
+                DisplayName = "Maintenance"
             };
             var host = ModerationHostBinding.Establish(Guid.CreateVersion7(), database.Instance.TrustDomainId,
                 database.Instance.Parent!.Id, database.Instance.Id, service.Id);
@@ -1166,24 +1174,38 @@ public sealed class ModerationEffectLeasePersistenceTests
             {
                 var tenant = new Tenant
                 {
-                    Id = id, Slug = $"lease-{id:N}", FullName = "Lease tests", TenantStatusId = status.Id, TenantStatus = status
+                    Id = id,
+                    Slug = $"lease-{id:N}",
+                    FullName = "Lease tests",
+                    TenantStatusId = status.Id,
+                    TenantStatus = status
                 };
                 context.AddRange(tenant, ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), host, tenant));
             }
             context.Users.Add(new User
             {
-                Id = database.OwnerId, Pii = new UserPii
+                Id = database.OwnerId,
+                Pii = new UserPii
                 {
-                    UserId = database.OwnerId, Email = $"{database.OwnerId:N}@example.invalid", FirstName = "Lease", LastName = "Owner"
+                    UserId = database.OwnerId,
+                    Email = $"{database.OwnerId:N}@example.invalid",
+                    FirstName = "Lease",
+                    LastName = "Owner"
                 }
             });
             context.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), KeyId = database.KeyId, Name = "Lease maintenance",
-                SecretHash = ApiKeyHashing.ComputeHash(secret), Scopes = "events:read",
-                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = database.OwnerId,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                KeyId = database.KeyId,
+                Name = "Lease maintenance",
+                SecretHash = ApiKeyHashing.ComputeHash(secret),
+                Scopes = "events:read",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                OwnerId = database.OwnerId,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                ExternalApiKeyCreditPeriod = null!
             });
             context.ModerationMachineSubjectBindings.Add(ModerationMachineSubjectBinding.Establish(
                 Guid.CreateVersion7(), host.Id, ModerationMachineCredentialSource.Persisted, database.KeyId,
@@ -1256,7 +1278,8 @@ public sealed class ModerationEffectLeasePersistenceTests
                         Reviewers = [new(Guid.CreateVersion7(), 1, Guid.CreateVersion7(), Guid.CreateVersion7(),
                             Guid.CreateVersion7(), 1, Guid.CreateVersion7(), Guid.CreateVersion7(), 1,
                             Guid.CreateVersion7(), created.AddDays(1))],
-                        ValidUntil = created.AddDays(1), ReviewerPolicySource = stamp
+                        ValidUntil = created.AddDays(1),
+                        ReviewerPolicySource = stamp
                     };
                     await Assert.That(snapshot.Matches(effect)).IsTrue();
                     await Assert.That(snapshot.HasNoSubstantiveWork).IsFalse();
@@ -1268,10 +1291,16 @@ public sealed class ModerationEffectLeasePersistenceTests
                     "host" => snapshot with { HostInstanceId = Guid.CreateVersion7() },
                     "authority" => snapshot with { AuthoritySourceId = Guid.CreateVersion7() },
                     "qualification" => snapshot with { QualificationRevision = 2 },
-                    "ancestry" => snapshot with { Decision = original with
-                        { Scope = original.Scope with { Parent = ModerationNoticeScope.From(Instance.Parent!) } } },
-                    "subject-origin" => snapshot with { Decision = original with
-                        { SubjectOrigin = ModerationNoticeScope.From(scope) } },
+                    "ancestry" => snapshot with
+                    {
+                        Decision = original with
+                        { Scope = original.Scope with { Parent = ModerationNoticeScope.From(Instance.Parent!) } }
+                    },
+                    "subject-origin" => snapshot with
+                    {
+                        Decision = original with
+                        { SubjectOrigin = ModerationNoticeScope.From(scope) }
+                    },
                     _ => snapshot
                 };
                 source = ModerationNoticeSource.Capture(effect, capture == "source-tenant" ? null : TenantId,

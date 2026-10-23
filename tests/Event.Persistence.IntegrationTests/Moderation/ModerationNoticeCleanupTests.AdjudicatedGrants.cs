@@ -104,8 +104,11 @@ public sealed partial class ModerationNoticeCleanupTests
         {
             seed.Tenants.Add(new Tenant
             {
-                Id = otherTenant, FullName = "Former grant custody", Slug = $"former-{otherTenant:N}",
-                TenantStatusId = (int)TenantStatusEnum.Suspended, TenantStatus = null!
+                Id = otherTenant,
+                FullName = "Former grant custody",
+                Slug = $"former-{otherTenant:N}",
+                TenantStatusId = (int)TenantStatusEnum.Suspended,
+                TenantStatus = null!
             });
             await seed.SaveChangesAsync();
         }

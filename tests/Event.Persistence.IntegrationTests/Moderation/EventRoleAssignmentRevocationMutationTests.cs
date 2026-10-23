@@ -34,7 +34,9 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = assignment.Id
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            AssignmentId = assignment.Id
         });
         await Assert.That(result.IsSuccess).IsTrue();
         var saved = await context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.Id == assignment.Id);
@@ -69,7 +71,9 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = manager.Id
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            AssignmentId = manager.Id
         });
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(fault.Injected).IsTrue();
@@ -101,7 +105,9 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = owner.Id
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            AssignmentId = owner.Id
         });
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo("event_owner_transfer_required");
@@ -132,7 +138,9 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         {
             var result = await Handler(fixture, context, session, metrics).ExecuteAsync(new()
             {
-                TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = assignment.Id
+                TenantId = fixture.TenantId,
+                EventId = fixture.EventId,
+                AssignmentId = assignment.Id
             });
             await Assert.That(result.IsSuccess).IsTrue();
         }
@@ -171,7 +179,9 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         {
             await Handler(fixture, context, session, metrics).ExecuteAsync(new()
             {
-                TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = manager.Id
+                TenantId = fixture.TenantId,
+                EventId = fixture.EventId,
+                AssignmentId = manager.Id
             });
         });
         await Assert.That(checkpoint.Observed).IsTrue();
@@ -214,7 +224,9 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         {
             await Handler(fixture, context, session, metrics).ExecuteAsync(new()
             {
-                TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = target.Id
+                TenantId = fixture.TenantId,
+                EventId = fixture.EventId,
+                AssignmentId = target.Id
             });
         });
         await Assert.That(checkpoint.Observed).IsTrue();
@@ -244,7 +256,9 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         var log = new DenialLog();
         var result = await Handler(fixture, context, session, metrics, log).ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = owner.Id
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            AssignmentId = owner.Id
         });
         await Assert.That(result.FailureCode).IsEqualTo("event_owner_transfer_required");
         await Assert.That(fault.Injected).IsTrue();
@@ -280,7 +294,9 @@ public sealed class EventRoleAssignmentRevocationMutationTests
         var log = new DenialLog();
         var result = await Handler(fixture, context, session, metrics, log).ExecuteAsync(new()
         {
-            TenantId = fixture.TenantId, EventId = fixture.EventId, AssignmentId = owner.Id
+            TenantId = fixture.TenantId,
+            EventId = fixture.EventId,
+            AssignmentId = owner.Id
         });
         await Assert.That(result.FailureCode).IsEqualTo("event_role_assignment_not_found");
         await Assert.That(removed).IsTrue();

@@ -33,8 +33,11 @@ public sealed class ModerationNoticeCorrectionDisclosureCommandTests
         await Assert.That((await Validate(command)).IsValid).IsTrue();
         await Assert.That(command.ToMutation()).IsEqualTo(new ApproveModerationNoticeCorrectionDisclosureSource
         {
-            OperationId = Id(1), Target = command.Target, ExpectedQualificationRevision = 13,
-            Intent = command.Intent, ExpectedPendingSnapshotHash = new string('a', 64),
+            OperationId = Id(1),
+            Target = command.Target,
+            ExpectedQualificationRevision = 13,
+            Intent = command.Intent,
+            ExpectedPendingSnapshotHash = new string('a', 64),
             ExpectedPendingEffectBindingHash = new string('b', 64)
         });
     }
@@ -192,8 +195,11 @@ public sealed class ModerationNoticeCorrectionDisclosureCommandTests
 
     private static ApproveModerationNoticeCorrectionDisclosureCommand Create() => new()
     {
-        OperationId = Id(1), Target = Tenant, ExpectedQualificationRevision = 13,
-        ExpectedPendingSnapshotHash = new string('a', 64), ExpectedPendingEffectBindingHash = new string('b', 64),
+        OperationId = Id(1),
+        Target = Tenant,
+        ExpectedQualificationRevision = 13,
+        ExpectedPendingSnapshotHash = new string('a', 64),
+        ExpectedPendingEffectBindingHash = new string('b', 64),
         Intent = new ModerationNoticeDisclosureIntent(Id(2), Id(3), Id(4), 2, Id(5), 1, Id(6), 1,
             Id(7), Id(8), Id(9), new string('c', 64), new(SafeText), new(SafeText), [new(SafeText)],
             new(SafeText), new(SafeText), new(SafeText), new(SafeText), Until, Until.AddDays(1))

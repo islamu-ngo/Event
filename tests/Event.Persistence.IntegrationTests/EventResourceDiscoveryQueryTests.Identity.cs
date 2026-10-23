@@ -78,7 +78,11 @@ public sealed partial class EventResourceDiscoveryQueryTests
                 row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
             setup.AddRange(key, new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = owner, User = null!, RoleId = role.Id, Role = role
+                Id = Guid.CreateVersion7(),
+                UserId = owner,
+                User = null!,
+                RoleId = role.Id,
+                Role = role
             });
             await setup.SaveChangesAsync();
         }
@@ -253,8 +257,12 @@ public sealed partial class EventResourceDiscoveryQueryTests
         {
             context.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = alternativeTenantId, Tenant = null!,
-                UserId = original.OwnerId, User = null!, StatusId = (int)TenantUserStatusEnum.Active
+                Id = Guid.CreateVersion7(),
+                TenantId = alternativeTenantId,
+                Tenant = null!,
+                UserId = original.OwnerId,
+                User = null!,
+                StatusId = (int)TenantUserStatusEnum.Active
             });
         }
         if (coordinate == "key")

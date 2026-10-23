@@ -42,14 +42,20 @@ public sealed class ModerationRecognitionDispositionRemedy
             throw new InvalidOperationException("Protected remedy proof belongs to the exact independent legal authorization.");
         var result = new ModerationRecognitionDispositionRemedy
         {
-            Id = disposition.Id, IntentId = disposition.IntentId, SourceId = source.Id,
-            PendingRevision = pending.Revision, PrivacyOwnerHumanId = disposition.PrivacyOwnerHumanId,
+            Id = disposition.Id,
+            IntentId = disposition.IntentId,
+            SourceId = source.Id,
+            PendingRevision = pending.Revision,
+            PrivacyOwnerHumanId = disposition.PrivacyOwnerHumanId,
             OriginalMaterialReceipt = disposition.OriginalMaterialReceipt,
             ObservedMaterialCommitment = disposition.ObservedMaterialCommitment,
-            GroundsReceipt = disposition.GroundsReceipt, LegalMandateReceipt = disposition.LegalMandateReceipt,
+            GroundsReceipt = disposition.GroundsReceipt,
+            LegalMandateReceipt = disposition.LegalMandateReceipt,
             CoverageReceipt = disposition.CoverageReceipt,
-            RecoveryOwnerHumanId = disposition.RecoveryOwnerHumanId, Grounds = disposition.Grounds,
-            ReceiptHash = pending.ReceiptHash.ToArray(), ProtectedAt = now,
+            RecoveryOwnerHumanId = disposition.RecoveryOwnerHumanId,
+            Grounds = disposition.Grounds,
+            ReceiptHash = pending.ReceiptHash.ToArray(),
+            ProtectedAt = now,
             RemedyUntil = now.AddMonths(source.ProtectedRemedyCalendarMonths),
             RetainUntil = now.AddTicks(source.Retention.Single(row =>
                 row.RecordClass == ModerationRecognitionPrivacyRecordClass.ProtectedCorrectionEvidence).MaximumRetentionTicks)

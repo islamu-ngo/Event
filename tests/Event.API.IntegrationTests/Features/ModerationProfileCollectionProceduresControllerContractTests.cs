@@ -171,10 +171,15 @@ public sealed class ModerationProfileCollectionProceduresControllerContractTests
         {
             "record" => new RecordModerationProfileCollectionProcedureCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 3,
-                SourceId = Guid.CreateVersion7(), ChildAgeSourceId = Guid.CreateVersion7(),
-                ExpectedChildAgeSourceRevision = 1, ExpectedChildAgeSourceWriterGeneration = 1,
-                ChildAgeAdoptionId = Guid.CreateVersion7(), ExpectedChildAgeAdoptionRevision = 1,
+                OperationId = Guid.CreateVersion7(),
+                Target = target,
+                ExpectedQualificationRevision = 3,
+                SourceId = Guid.CreateVersion7(),
+                ChildAgeSourceId = Guid.CreateVersion7(),
+                ExpectedChildAgeSourceRevision = 1,
+                ExpectedChildAgeSourceWriterGeneration = 1,
+                ChildAgeAdoptionId = Guid.CreateVersion7(),
+                ExpectedChildAgeAdoptionRevision = 1,
                 ExpectedChildAgeAdoptionWriterGeneration = 2,
                 Procedure = new(ModerationIndividualPurpose.ProfileCompletion,
                     ModerationProfileCollectionApplicability.NativeIndependentlyAcceptedAssessment,
@@ -186,14 +191,22 @@ public sealed class ModerationProfileCollectionProceduresControllerContractTests
             },
             "adopt" => new AdoptModerationProfileCollectionProcedureCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 4,
-                SourceId = Guid.CreateVersion7(), ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 3,
-                AdoptionId = Guid.CreateVersion7(), ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
+                OperationId = Guid.CreateVersion7(),
+                Target = target,
+                ExpectedQualificationRevision = 4,
+                SourceId = Guid.CreateVersion7(),
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = 3,
+                AdoptionId = Guid.CreateVersion7(),
+                ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
             },
             "withdraw" => new WithdrawModerationProfileCollectionProcedureCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 5,
-                AdoptionId = Guid.CreateVersion7(), ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = target,
+                ExpectedQualificationRevision = 5,
+                AdoptionId = Guid.CreateVersion7(),
+                ExpectedAdoptionRevision = 1
             },
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };

@@ -412,38 +412,66 @@ public sealed class ModerationMeasurementReceiptVerifierTests
             };
             Header = new JsonObject
             {
-                ["alg"] = "ES256", ["typ"] = "islamu-moderation-conformance+jwt", ["kid"] = Trust.KeyId.ToString("D")
+                ["alg"] = "ES256",
+                ["typ"] = "islamu-moderation-conformance+jwt",
+                ["kid"] = Trust.KeyId.ToString("D")
             };
             var coordinates = scope.Coordinates;
             Payload = JsonSerializer.SerializeToNode(new
             {
-                version = 1, iss = Trust.Issuer, aud = "islamu.moderation.native-measurement",
-                receiptId = ReceiptId, challengeId = Guid.CreateVersion7(),
-                challengeNonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)), runId = Guid.CreateVersion7(),
-                hostBindingId = Trust.HostBindingId, trustDomainId = Trust.TrustDomainId, tenantId = Trust.TenantId,
+                version = 1,
+                iss = Trust.Issuer,
+                aud = "islamu.moderation.native-measurement",
+                receiptId = ReceiptId,
+                challengeId = Guid.CreateVersion7(),
+                challengeNonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)),
+                runId = Guid.CreateVersion7(),
+                hostBindingId = Trust.HostBindingId,
+                trustDomainId = Trust.TrustDomainId,
+                tenantId = Trust.TenantId,
                 binding = new
                 {
-                    policyId = Binding.PolicyId, policyRevision = "1", publicationId = Binding.PublicationId,
+                    policyId = Binding.PolicyId,
+                    policyRevision = "1",
+                    publicationId = Binding.PublicationId,
                     jurisdiction = new
                     {
-                        kind = "Tenant", trustDomainId = coordinates.TrustDomainId,
-                        solutionId = coordinates.SolutionId, instanceId = coordinates.InstanceId,
-                        tenantId = coordinates.TenantId, communityId = coordinates.CommunityId, resourceId = coordinates.ResourceId
+                        kind = "Tenant",
+                        trustDomainId = coordinates.TrustDomainId,
+                        solutionId = coordinates.SolutionId,
+                        instanceId = coordinates.InstanceId,
+                        tenantId = coordinates.TenantId,
+                        communityId = coordinates.CommunityId,
+                        resourceId = coordinates.ResourceId
                     },
                     rule = new { ownerId = scope.Id, code = "publication", revision = "1" },
-                    capability = "Publish", mode = "Embedded"
+                    capability = "Publish",
+                    mode = "Embedded"
                 },
-                consumerId = "event.publish", consumerContractDigest = new string('a', 64),
-                installationId = Guid.CreateVersion7(), installationRevision = long.MaxValue.ToString(CultureInfo.InvariantCulture),
-                installationWriterGeneration = "1", runtimeGeneration = "runtime-1", inventoryFingerprint = new string('a', 64),
-                runnerDigest = Trust.ApprovedRunnerDigest, catalogueDigest = Trust.ApprovedCatalogueDigest,
-                testBundleDigest = Trust.ApprovedTestBundleDigest, productArtifactDigest = new string('a', 64),
-                configurationDigest = new string('a', 64), providerCode = "postgresql", providerVersion = "18.0",
-                primaryConfigurationDigest = new string('1', 64), testConfigurationDigest = new string('2', 64),
-                caseIds = new[] { "case.one", "case.two" }, executedCount = 2, attemptCount = 1,
+                consumerId = "event.publish",
+                consumerContractDigest = new string('a', 64),
+                installationId = Guid.CreateVersion7(),
+                installationRevision = long.MaxValue.ToString(CultureInfo.InvariantCulture),
+                installationWriterGeneration = "1",
+                runtimeGeneration = "runtime-1",
+                inventoryFingerprint = new string('a', 64),
+                runnerDigest = Trust.ApprovedRunnerDigest,
+                catalogueDigest = Trust.ApprovedCatalogueDigest,
+                testBundleDigest = Trust.ApprovedTestBundleDigest,
+                productArtifactDigest = new string('a', 64),
+                configurationDigest = new string('a', 64),
+                providerCode = "postgresql",
+                providerVersion = "18.0",
+                primaryConfigurationDigest = new string('1', 64),
+                testConfigurationDigest = new string('2', 64),
+                caseIds = new[] { "case.one", "case.two" },
+                executedCount = 2,
+                attemptCount = 1,
                 resultArtifactDigest = new string('a', 64),
-                startedAt = Instant(ObservedAt.AddMinutes(-2)), completedAt = Instant(ObservedAt.AddMinutes(-1)),
-                issuedAt = Instant(ObservedAt), validUntil = Instant(ObservedAt.AddMinutes(5))
+                startedAt = Instant(ObservedAt.AddMinutes(-2)),
+                completedAt = Instant(ObservedAt.AddMinutes(-1)),
+                issuedAt = Instant(ObservedAt),
+                validUntil = Instant(ObservedAt.AddMinutes(5))
             })!.AsObject();
         }
 

@@ -33,9 +33,18 @@ public sealed class ModerationClassificationMaterialReview
             throw new ArgumentException("Only the nominated independent reviewer can accept this exact finite material proposal.");
         var review = new ModerationClassificationMaterialReview
         {
-            Id = id, HostBindingId = source.HostBindingId, TrustDomainId = source.TrustDomainId, TenantId = source.TenantId,
-            SourceId = source.Id, SourceRevision = source.Revision, SourceWriterGeneration = source.WriterGeneration,
-            ReviewerHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1, AcceptedAt = now, ValidUntil = validUntil
+            Id = id,
+            HostBindingId = source.HostBindingId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = source.TenantId,
+            SourceId = source.Id,
+            SourceRevision = source.Revision,
+            SourceWriterGeneration = source.WriterGeneration,
+            ReviewerHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            AcceptedAt = now,
+            ValidUntil = validUntil
         };
         review.ValidatePersistedState();
         return review;

@@ -77,8 +77,11 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             seed.Actors.Add(new Actor
             {
-                Id = replacement, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                UserId = fixture.Assessor, Pii = new ActorPii { ActorId = replacement, DisplayName = "Replacement" }
+                Id = replacement,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = fixture.Assessor,
+                Pii = new ActorPii { ActorId = replacement, DisplayName = "Replacement" }
             });
             await seed.SaveChangesAsync();
         }

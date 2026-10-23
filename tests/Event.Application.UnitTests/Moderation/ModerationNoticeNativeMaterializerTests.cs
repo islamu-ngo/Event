@@ -26,7 +26,8 @@ public sealed class ModerationNoticeNativeMaterializerTests
         var tenantId = Guid.CreateVersion7();
         var user = new User
         {
-            Id = userId, Pii = new() { UserId = userId, Email = "subject@example.test", FirstName = "", LastName = "" }
+            Id = userId,
+            Pii = new() { UserId = userId, Email = "subject@example.test", FirstName = "", LastName = "" }
         };
         if (verified)
         {

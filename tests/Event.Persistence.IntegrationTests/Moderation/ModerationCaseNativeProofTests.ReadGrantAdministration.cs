@@ -177,8 +177,12 @@ public sealed partial class ModerationCaseNativeProofTests
             await change.PlatformUserRoles.Where(row => row.Id == database.AdminId).ExecuteDeleteAsync();
             change.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = database.CallerId, User = null!, Role = null!,
-                RoleId = (int)Explore.Domain.Enums.RoleEnum.Admin, GrantedAt = database.Clock.Now.UtcDateTime
+                Id = Guid.CreateVersion7(),
+                UserId = database.CallerId,
+                User = null!,
+                Role = null!,
+                RoleId = (int)Explore.Domain.Enums.RoleEnum.Admin,
+                GrantedAt = database.Clock.Now.UtcDateTime
             });
             await change.SaveChangesAsync();
         }

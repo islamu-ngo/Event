@@ -199,9 +199,14 @@ public sealed class ModerationCase
         RequireEvidenceScope(scope, evidence);
         var allegation = new ModerationCase
         {
-            Id = id, Scope = scope, Target = evidence.Target, OccurrenceId = evidence.OccurrenceId,
-            CreatedAt = now.ToUniversalTime(), UpdatedAt = now.ToUniversalTime(),
-            State = ModerationCaseState.Open, Revision = 1
+            Id = id,
+            Scope = scope,
+            Target = evidence.Target,
+            OccurrenceId = evidence.OccurrenceId,
+            CreatedAt = now.ToUniversalTime(),
+            UpdatedAt = now.ToUniversalTime(),
+            State = ModerationCaseState.Open,
+            Revision = 1
         };
         allegation._evidence.Add(ModerationCaseEvidence.Capture(id, 1, evidence, now));
         return allegation;
@@ -321,8 +326,11 @@ public sealed class ModerationCaseEvidence
     {
         var evidence = new ModerationCaseEvidence
         {
-            CaseId = caseId, CaseRevision = caseRevision, SourceId = reference.SourceId,
-            SourceVersion = reference.SourceVersion, MaterialFactId = reference.MaterialFactId,
+            CaseId = caseId,
+            CaseRevision = caseRevision,
+            SourceId = reference.SourceId,
+            SourceVersion = reference.SourceVersion,
+            MaterialFactId = reference.MaterialFactId,
             RecordedAt = now.ToUniversalTime()
         };
         (evidence.SourceOriginKind, evidence.SourceOriginTrustDomainId,

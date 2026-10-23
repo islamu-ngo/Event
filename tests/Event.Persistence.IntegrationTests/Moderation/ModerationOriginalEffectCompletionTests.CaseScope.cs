@@ -270,15 +270,25 @@ public sealed partial class ModerationCaseNativeProofTests
             var generationId = Guid.CreateVersion7();
             await fixture.AcceptAsync(original.Assessor, new RecordModerationResourceGenerationSource
             {
-                OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                SourceId = generationId, ResourceId = database.ResourceId, ExpectedResourceRevision = 0, ValidUntil = until
+                OperationId = Guid.CreateVersion7(),
+                Target = owner.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = generationId,
+                ResourceId = database.ResourceId,
+                ExpectedResourceRevision = 0,
+                ValidUntil = until
             });
             var evidenceId = Guid.CreateVersion7();
             await fixture.AcceptAsync(original.Assessor, new QualifyModerationCaseUrgency
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 1,
-                EvidenceId = evidenceId, CaseId = owner.Id, ExpectedCaseRevision = 1,
-                Justification = "Independent urgency for the exact native resource.", ValidUntil = until
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 1,
+                EvidenceId = evidenceId,
+                CaseId = owner.Id,
+                ExpectedCaseRevision = 1,
+                Justification = "Independent urgency for the exact native resource.",
+                ValidUntil = until
             });
             ModerationDecision decision;
             await using (var writer = fixture.Context())
@@ -313,25 +323,48 @@ public sealed partial class ModerationCaseNativeProofTests
                 [new(null, target)]);
             await fixture.AcceptAsync(original.Assessor, new RecordModerationContributionSelectionSource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 1,
-                SelectionId = selectionId, EffectId = fixture.EffectId, CaseId = owner.Id, ExpectedCaseRevision = 1,
-                DecisionId = decision.Id, ExpectedDecisionRevision = 4, PolicyId = publication.PolicyId,
-                ExpectedPolicyRevision = 1, PublicationId = publication.Id, ProfileId = profile.Id,
-                Contribution = contribution, ValidUntil = until
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 1,
+                SelectionId = selectionId,
+                EffectId = fixture.EffectId,
+                CaseId = owner.Id,
+                ExpectedCaseRevision = 1,
+                DecisionId = decision.Id,
+                ExpectedDecisionRevision = 4,
+                PolicyId = publication.PolicyId,
+                ExpectedPolicyRevision = 1,
+                PublicationId = publication.Id,
+                ProfileId = profile.Id,
+                Contribution = contribution,
+                ValidUntil = until
             });
             foreach (var binding in ModerationContributionSelectionProjection.Bindings(selectionId, contribution))
                 await fixture.AcceptAsync(adopter, new AdoptModerationResourceTargetSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 1,
-                    AdoptionId = Guid.CreateVersion7(), SelectionId = selectionId, BindingOrdinal = binding.Ordinal,
-                    GenerationId = generationId, ExpectedGenerationRevision = 1,
-                    CaseId = owner.Id, ExpectedCaseRevision = 1, ValidUntil = until
+                    OperationId = Guid.CreateVersion7(),
+                    Target = scope,
+                    ExpectedQualificationRevision = 1,
+                    AdoptionId = Guid.CreateVersion7(),
+                    SelectionId = selectionId,
+                    BindingOrdinal = binding.Ordinal,
+                    GenerationId = generationId,
+                    ExpectedGenerationRevision = 1,
+                    CaseId = owner.Id,
+                    ExpectedCaseRevision = 1,
+                    ValidUntil = until
                 });
             await fixture.AcceptAsync(adopter, new AdoptModerationProfileSource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 1,
-                AdoptionId = Guid.CreateVersion7(), SelectionId = selectionId, Mode = ModerationNativeMode.Embedded,
-                CaseId = owner.Id, ExpectedCaseRevision = 1, ValidUntil = until
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 1,
+                AdoptionId = Guid.CreateVersion7(),
+                SelectionId = selectionId,
+                Mode = ModerationNativeMode.Embedded,
+                CaseId = owner.Id,
+                ExpectedCaseRevision = 1,
+                ValidUntil = until
             });
             var representative = new ModerationNoticeContentRepresentative(database.RoleId, 7, database.CallerId);
             var intent = new ModerationNoticeDisclosureIntent(Guid.CreateVersion7(), fixture.EffectId, decision.Id, 4,
@@ -340,10 +373,14 @@ public sealed partial class ModerationCaseNativeProofTests
                 new("Native source classification."), new("Current source authority and protected response."),
                 [new("Approved exact material explanation.")], new("Protected review remains available."),
                 new("Request independent review."), new("No automated finding."), new("Finite original retention."),
-                until, now.AddYears(1)) { ContentRepresentatives = [representative] };
+                until, now.AddYears(1))
+            { ContentRepresentatives = [representative] };
             await fixture.AcceptAsync(reviewerId, new ApproveModerationNoticeDisclosureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 1, Intent = intent
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 1,
+                Intent = intent
             });
             await using (var writer = fixture.Context())
             {
@@ -404,11 +441,17 @@ public sealed partial class ModerationCaseNativeProofTests
                 var keyId = ApiKeyHashing.CreateKeyId();
                 writer.ExternalApiKeys.Add(new ExternalApiKey
                 {
-                    Id = Guid.CreateVersion7(), KeyId = keyId, Name = "Original native case scope",
-                    SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()), Scopes = "events:read",
-                    OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = original.Assessor,
-                    ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                    ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                    Id = Guid.CreateVersion7(),
+                    KeyId = keyId,
+                    Name = "Original native case scope",
+                    SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
+                    Scopes = "events:read",
+                    OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                    OwnerId = original.Assessor,
+                    ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                    ExternalApiKeyStatus = null!,
+                    ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                    ExternalApiKeyCreditPeriod = null!
                 });
                 writer.ModerationMachineSubjectBindings.Add(ModerationMachineSubjectBinding.Establish(
                     Guid.CreateVersion7(), host.Id, ModerationMachineCredentialSource.Persisted, keyId,
@@ -498,16 +541,23 @@ public sealed partial class ModerationCaseNativeProofTests
             var deadline = Database.Clock.Now.AddSeconds(20);
             ModerationResourceSafetyReviewIntent Intent(
                 ModerationReviewerAssignment reviewer, ResourceSafetyReviewStep step, Guid? predecessor) => new()
-            {
-                OperationId = Guid.CreateVersion7(), QuarantineId = causeId,
-                ResourceId = generation.ResourceId, MaterialVersionId = generation.MaterialVersionId,
-                CaseId = Original.Case.Id, ExpectedCaseRevision = Original.Case.Revision,
-                ReviewerAssignmentId = reviewer.Id, ExpectedReviewerRevision = reviewer.Revision,
-                Step = step, PredecessorId = predecessor, ValidUntil = deadline
-            };
+                {
+                    OperationId = Guid.CreateVersion7(),
+                    QuarantineId = causeId,
+                    ResourceId = generation.ResourceId,
+                    MaterialVersionId = generation.MaterialVersionId,
+                    CaseId = Original.Case.Id,
+                    ExpectedCaseRevision = Original.Case.Revision,
+                    ReviewerAssignmentId = reviewer.Id,
+                    ExpectedReviewerRevision = reviewer.Revision,
+                    Step = step,
+                    PredecessorId = predecessor,
+                    ValidUntil = deadline
+                };
             var purpose = Intent(author, ResourceSafetyReviewStep.ProposePurpose, null) with
             {
-                RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromSeconds(20)
+                RequiredApprovals = 1,
+                MaximumEvidenceLifetime = TimeSpan.FromSeconds(20)
             };
             await RequireNativeReviewAsync(author.ReviewerHumanId, purpose);
             var adoption = Intent(approver, ResourceSafetyReviewStep.AdoptPurpose, purpose.OperationId);
@@ -560,7 +610,8 @@ public sealed partial class ModerationCaseNativeProofTests
                 var resource = EventResource.CreateDraft(resourceId, Database.TenantId, Database.EventId, null,
                     new EventResourceMetadata
                     {
-                        Title = "Another native resource", Kind = EventResourceKindEnum.GeneralDocument,
+                        Title = "Another native resource",
+                        Kind = EventResourceKindEnum.GeneralDocument,
                         DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                     }, EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
                     [EventResourceAudienceRule.Create(Database.TenantId, Database.EventId, resourceId,

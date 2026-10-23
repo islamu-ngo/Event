@@ -33,13 +33,23 @@ public sealed record RecordModerationParticipantInvestigationCommand : Moderatio
     internal override ModerationQualificationMutation ToMutation() =>
         new RecordModerationParticipantIncidentResponsibilitySource
         {
-            OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-            SourceId = SourceId, OccurrenceCaseId = OccurrenceCaseId, ExpectedCaseRevision = ExpectedCaseRevision,
-            EvidenceCaseRevision = EvidenceCaseRevision, ReadGrantId = ReadGrantId,
-            EvidenceSourceId = EvidenceSourceId, EvidenceSourceVersion = EvidenceSourceVersion,
-            SubjectHumanId = SubjectHumanId, SessionId = SessionId, ExpectedSessionGeneration = ExpectedSessionGeneration,
-            IncidentWindowFrom = IncidentWindowFrom, IncidentWindowUntil = IncidentWindowUntil,
-            ValidUntil = ValidUntil, PurgeAt = PurgeAt,
+            OperationId = OperationId,
+            Target = Target,
+            ExpectedQualificationRevision = ExpectedQualificationRevision,
+            SourceId = SourceId,
+            OccurrenceCaseId = OccurrenceCaseId,
+            ExpectedCaseRevision = ExpectedCaseRevision,
+            EvidenceCaseRevision = EvidenceCaseRevision,
+            ReadGrantId = ReadGrantId,
+            EvidenceSourceId = EvidenceSourceId,
+            EvidenceSourceVersion = EvidenceSourceVersion,
+            SubjectHumanId = SubjectHumanId,
+            SessionId = SessionId,
+            ExpectedSessionGeneration = ExpectedSessionGeneration,
+            IncidentWindowFrom = IncidentWindowFrom,
+            IncidentWindowUntil = IncidentWindowUntil,
+            ValidUntil = ValidUntil,
+            PurgeAt = PurgeAt,
             Grounds = new(IdentificationGrounds, AllegedConduct, EvidenceProvenance, ContradictionsAndCredentialMisuse)
         };
 }

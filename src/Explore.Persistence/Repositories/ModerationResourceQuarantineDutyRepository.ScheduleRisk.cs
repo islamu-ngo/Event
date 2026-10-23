@@ -76,14 +76,30 @@ public sealed partial class ModerationResourceQuarantineDutyRepository
                         : ModerationScheduleRiskReconciliationOutcome.AwaitingDeadline;
                 var expected = new
                 {
-                    review.Revision, review.State, review.Coordinates, review.OriginalCoordinates,
-                    review.SourceSanctionId, review.SourceSanctionRevision, review.SourceDecisionId,
-                    review.SourceScope, review.SourceRule, review.Owner, review.EscalationOwner,
-                    review.OriginalSanctionStartsAt, review.OriginalSanctionEndsAt,
-                    review.DueAt, review.OriginalDueAt, review.CreatedAt, review.UpdatedAt,
-                    review.AcceptedIntentId, review.AcceptedFindingId, review.AcceptedFindingRevision,
-                    review.AcceptedReviewerAssignmentId, review.AcceptedReviewerAssignmentRevision,
-                    review.WithdrawalIntentId, review.WithdrawnBy
+                    review.Revision,
+                    review.State,
+                    review.Coordinates,
+                    review.OriginalCoordinates,
+                    review.SourceSanctionId,
+                    review.SourceSanctionRevision,
+                    review.SourceDecisionId,
+                    review.SourceScope,
+                    review.SourceRule,
+                    review.Owner,
+                    review.EscalationOwner,
+                    review.OriginalSanctionStartsAt,
+                    review.OriginalSanctionEndsAt,
+                    review.DueAt,
+                    review.OriginalDueAt,
+                    review.CreatedAt,
+                    review.UpdatedAt,
+                    review.AcceptedIntentId,
+                    review.AcceptedFindingId,
+                    review.AcceptedFindingRevision,
+                    review.AcceptedReviewerAssignmentId,
+                    review.AcceptedReviewerAssignmentRevision,
+                    review.WithdrawalIntentId,
+                    review.WithdrawnBy
                 };
                 await context.SaveChangesAsync(token);
                 await RequireCurrentAsync(authority, tenantId, principal, token);

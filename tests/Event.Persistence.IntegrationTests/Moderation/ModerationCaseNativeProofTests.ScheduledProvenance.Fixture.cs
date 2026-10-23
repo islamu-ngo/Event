@@ -181,9 +181,15 @@ public sealed partial class ModerationCaseNativeProofTests
             var qualifiedUntil = database.Clock.Now.AddSeconds(50);
             await fixture.QualifyAsync(original.Assessor, new PublishModerationQualificationPolicySource
             {
-                OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                SourceId = policyId, CaseId = owner.Id, ExpectedCaseRevision = 1, ExpectedSourceRevision = 0,
-                MaximumReviewerLifetime = TimeSpan.FromMinutes(1), MaximumUrgencyLifetime = TimeSpan.FromMinutes(1),
+                OperationId = Guid.CreateVersion7(),
+                Target = owner.Scope,
+                ExpectedQualificationRevision = 1,
+                SourceId = policyId,
+                CaseId = owner.Id,
+                ExpectedCaseRevision = 1,
+                ExpectedSourceRevision = 0,
+                MaximumReviewerLifetime = TimeSpan.FromMinutes(1),
+                MaximumUrgencyLifetime = TimeSpan.FromMinutes(1),
                 ValidUntil = qualifiedUntil
             });
             await using (var read = database.Context())
@@ -191,9 +197,15 @@ public sealed partial class ModerationCaseNativeProofTests
                 var policy = await read.ModerationQualificationPolicySources.SingleAsync(row => row.Id == policyId);
                 await fixture.QualifyAsync(fixture.PrivacyOwner, new AdoptModerationQualificationPolicySource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                    SourceId = policyId, CaseId = owner.Id, ExpectedCaseRevision = 1, ExpectedSourceRevision = 1,
-                    ExpectedWriterGeneration = policy.WriterGeneration, AdoptionId = Guid.CreateVersion7(),
+                    OperationId = Guid.CreateVersion7(),
+                    Target = owner.Scope,
+                    ExpectedQualificationRevision = 1,
+                    SourceId = policyId,
+                    CaseId = owner.Id,
+                    ExpectedCaseRevision = 1,
+                    ExpectedSourceRevision = 1,
+                    ExpectedWriterGeneration = policy.WriterGeneration,
+                    AdoptionId = Guid.CreateVersion7(),
                     ValidUntil = qualifiedUntil
                 });
             }
@@ -202,21 +214,35 @@ public sealed partial class ModerationCaseNativeProofTests
                 var assignmentId = Guid.CreateVersion7();
                 await fixture.QualifyAsync(original.Assessor, new AssignModerationReviewerSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = assignmentId, CaseId = owner.Id, ExpectedCaseRevision = 1, ReviewerHumanId = reviewer
+                    OperationId = Guid.CreateVersion7(),
+                    Target = owner.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = assignmentId,
+                    CaseId = owner.Id,
+                    ExpectedCaseRevision = 1,
+                    ReviewerHumanId = reviewer
                 });
                 await fixture.QualifyAsync(original.Assessor, new QualifyModerationReviewerController
                 {
-                    OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = assignmentId, ExpectedAssignmentRevision = 1, ControllerHumanId = reviewer,
-                    EvidenceId = Guid.CreateVersion7(), Justification = "Independent canonical Human controller.",
+                    OperationId = Guid.CreateVersion7(),
+                    Target = owner.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = assignmentId,
+                    ExpectedAssignmentRevision = 1,
+                    ControllerHumanId = reviewer,
+                    EvidenceId = Guid.CreateVersion7(),
+                    Justification = "Independent canonical Human controller.",
                     QualifiedUntil = qualifiedUntil
                 });
                 await fixture.QualifyAsync(original.Assessor, new AssessModerationReviewerConflict
                 {
-                    OperationId = Guid.CreateVersion7(), Target = owner.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = assignmentId, ExpectedAssignmentRevision = 2,
-                    State = ModerationReviewerConflictState.Independent, EvidenceId = Guid.CreateVersion7(),
+                    OperationId = Guid.CreateVersion7(),
+                    Target = owner.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = assignmentId,
+                    ExpectedAssignmentRevision = 2,
+                    State = ModerationReviewerConflictState.Independent,
+                    EvidenceId = Guid.CreateVersion7(),
                     Justification = "Independent of the attributed Human and original reporter."
                 });
             }
@@ -305,24 +331,40 @@ public sealed partial class ModerationCaseNativeProofTests
                 fixture.Sanction = fixture.Decision.Activate(Guid.CreateVersion7(), fixture.Decision.Revision, now);
                 context.AddRange(finding, fixture.Decision, fixture.Sanction);
                 fixture.KeyOwnerId = Guid.CreateVersion7();
-                context.Users.Add(new User { Id = fixture.KeyOwnerId, Pii = new UserPii
+                context.Users.Add(new User
                 {
-                    UserId = fixture.KeyOwnerId, Email = $"{fixture.KeyOwnerId:N}@example.invalid",
-                    FirstName = "Unrelated", LastName = "CredentialOwner"
-                }});
+                    Id = fixture.KeyOwnerId,
+                    Pii = new UserPii
+                    {
+                        UserId = fixture.KeyOwnerId,
+                        Email = $"{fixture.KeyOwnerId:N}@example.invalid",
+                        FirstName = "Unrelated",
+                        LastName = "CredentialOwner"
+                    }
+                });
                 context.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), UserId = fixture.KeyOwnerId, User = null!,
-                    RoleId = (int)RoleEnum.Admin, Role = null!, GrantedAt = now.UtcDateTime
+                    Id = Guid.CreateVersion7(),
+                    UserId = fixture.KeyOwnerId,
+                    User = null!,
+                    RoleId = (int)RoleEnum.Admin,
+                    Role = null!,
+                    GrantedAt = now.UtcDateTime
                 });
                 var keyId = Guid.CreateVersion7().ToString("N");
                 context.ExternalApiKeys.Add(new ExternalApiKey
                 {
-                    Id = Guid.CreateVersion7(), KeyId = keyId, Name = "Scheduled native maintenance",
-                    SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()), Scopes = "events:read",
-                    OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = fixture.KeyOwnerId,
-                    ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                    ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                    Id = Guid.CreateVersion7(),
+                    KeyId = keyId,
+                    Name = "Scheduled native maintenance",
+                    SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
+                    Scopes = "events:read",
+                    OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                    OwnerId = fixture.KeyOwnerId,
+                    ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                    ExternalApiKeyStatus = null!,
+                    ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                    ExternalApiKeyCreditPeriod = null!
                 });
                 context.ModerationMachineSubjectBindings.Add(ModerationMachineSubjectBinding.Establish(
                     Guid.CreateVersion7(), host.Id, ModerationMachineCredentialSource.Persisted, keyId,

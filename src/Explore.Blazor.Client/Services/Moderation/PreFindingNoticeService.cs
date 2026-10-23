@@ -82,8 +82,10 @@ public sealed class PreFindingNoticeService(IModerationPreFindingNoticesClient c
         var command = new AcknowledgeModerationPreFindingNoticeCommand
         {
             OperationId = Guid.CreateVersion7(),
-            CaseId = view.CaseId, ExpectedCaseRevision = view.CaseRevision,
-            NoticeId = view.NoticeId, ExpectedNoticeRevision = view.NoticeRevision
+            CaseId = view.CaseId,
+            ExpectedCaseRevision = view.CaseRevision,
+            NoticeId = view.NoticeId,
+            ExpectedNoticeRevision = view.NoticeRevision
         };
         return WriteAsync(() => client.AcknowledgeModerationPreFindingNoticeAsync(
             view.NoticeId, command, cancellationToken: cancellationToken), cancellationToken);
@@ -101,8 +103,10 @@ public sealed class PreFindingNoticeService(IModerationPreFindingNoticesClient c
         var command = new SubmitModerationPreFindingResponseCommand
         {
             OperationId = Guid.CreateVersion7(),
-            CaseId = view.CaseId, ExpectedCaseRevision = view.CaseRevision,
-            NoticeId = view.NoticeId, ExpectedNoticeRevision = view.NoticeRevision,
+            CaseId = view.CaseId,
+            ExpectedCaseRevision = view.CaseRevision,
+            NoticeId = view.NoticeId,
+            ExpectedNoticeRevision = view.NoticeRevision,
             Statement = statement
         };
         return WriteAsync(() => client.SubmitModerationPreFindingResponseAsync(

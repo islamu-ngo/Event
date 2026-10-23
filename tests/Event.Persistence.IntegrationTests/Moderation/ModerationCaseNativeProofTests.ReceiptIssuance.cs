@@ -296,10 +296,13 @@ public sealed partial class ModerationCaseNativeProofTests
         var checkpoint = new ReceiptTransactionStartedCheckpoint(context =>
             context.Users.Add(new User
             {
-                Id = foreignId, Pii = new UserPii
+                Id = foreignId,
+                Pii = new UserPii
                 {
-                    UserId = foreignId, Email = $"{foreignId:N}@example.invalid",
-                    FirstName = "Foreign", LastName = "Work"
+                    UserId = foreignId,
+                    Email = $"{foreignId:N}@example.invalid",
+                    FirstName = "Foreign",
+                    LastName = "Work"
                 }
             }));
         await using var context = database.Context(checkpoint);

@@ -118,12 +118,28 @@ public sealed partial class RolePermissionMutationTests
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
         var group = new Group { Id = Guid.CreateVersion7(), FullName = "Role usage witness" };
-        var participation = new GroupTenant { Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-            Tenant = null!, Group = group, GroupId = group.Id, ApprovalStatus = null!,
-            ApprovalStatusId = (int)ApprovalStatusEnum.Approved };
-        var member = new GroupMember { Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-            GroupTenant = participation, GroupTenantId = participation.Id, User = null!, UserId = database.SubjectId,
-            Role = null!, RoleId = (int)RoleEnum.GroupMember };
+        var participation = new GroupTenant
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            Group = group,
+            GroupId = group.Id,
+            ApprovalStatus = null!,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Approved
+        };
+        var member = new GroupMember
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            GroupTenant = participation,
+            GroupTenantId = participation.Id,
+            User = null!,
+            UserId = database.SubjectId,
+            Role = null!,
+            RoleId = (int)RoleEnum.GroupMember
+        };
         context.Add(member);
         await context.SaveChangesAsync();
         await Assert.That(await new RoleRepository(context).HasActiveMembersAsync((int)RoleEnum.GroupMember)).IsTrue();
@@ -136,11 +152,24 @@ public sealed partial class RolePermissionMutationTests
         var role = await context.Roles.MaxAsync(row => row.Id) + 1;
         var permission = (await context.Permissions.Select(row => (int?)row.Id).MaxAsync() ?? 0) + 1;
         var prefix = Guid.CreateVersion7().ToString("N");
-        context.Roles.AddRange(Enumerable.Range(role, 2).Select(id => new Role { Id = id,
-            MasterCode = $"role-{prefix}-{id}", FullName = "Permission mutation witness", Scope = scope }));
-        context.Permissions.AddRange(Enumerable.Range(permission, 3).Select(id => new Permission { Id = id,
-            MasterCode = $"permission-{prefix}-{id}", ResourceKind = "group_member", Action = $"witness-{id}",
-            FullName = "Permission mutation witness", GroupName = "Group", Scope = RoleScopeEnum.Group, IsActive = true }));
+        context.Roles.AddRange(Enumerable.Range(role, 2).Select(id => new Role
+        {
+            Id = id,
+            MasterCode = $"role-{prefix}-{id}",
+            FullName = "Permission mutation witness",
+            Scope = scope
+        }));
+        context.Permissions.AddRange(Enumerable.Range(permission, 3).Select(id => new Permission
+        {
+            Id = id,
+            MasterCode = $"permission-{prefix}-{id}",
+            ResourceKind = "group_member",
+            Action = $"witness-{id}",
+            FullName = "Permission mutation witness",
+            GroupName = "Group",
+            Scope = RoleScopeEnum.Group,
+            IsActive = true
+        }));
         await context.SaveChangesAsync();
         return (role, role + 1, permission, permission + 1, permission + 2);
     }

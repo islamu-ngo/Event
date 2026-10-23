@@ -35,8 +35,11 @@ public sealed class ModerationOperationalBudgetsControllerContractTests
             AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()), Guid.CreateVersion7());
         var record = new RecordModerationOperationalBudgetCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = AuthorityScope.Tenant(instance, Guid.CreateVersion7()),
-            ExpectedQualificationRevision = 1, SourceId = Guid.CreateVersion7(), OperatorHumanId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = AuthorityScope.Tenant(instance, Guid.CreateVersion7()),
+            ExpectedQualificationRevision = 1,
+            SourceId = Guid.CreateVersion7(),
+            OperatorHumanId = Guid.CreateVersion7(),
             Terms = new(ModerationSubjectKind.Human, ModerationOperationalAction.SubmitReport, 3, TimeSpan.FromHours(1)),
             ValidUntil = new(2026, 10, 16, 12, 0, 0, TimeSpan.Zero)
         };
@@ -44,14 +47,22 @@ public sealed class ModerationOperationalBudgetsControllerContractTests
         {
             "adopt" => new AdoptModerationOperationalBudgetCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = record.Target, ExpectedQualificationRevision = 2,
-                SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 2,
-                AdoptionId = Guid.CreateVersion7(), ValidUntil = record.ValidUntil
+                OperationId = Guid.CreateVersion7(),
+                Target = record.Target,
+                ExpectedQualificationRevision = 2,
+                SourceId = record.SourceId,
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = 2,
+                AdoptionId = Guid.CreateVersion7(),
+                ValidUntil = record.ValidUntil
             },
             "withdraw" => new WithdrawModerationOperationalBudgetCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = record.Target, ExpectedQualificationRevision = 3,
-                AdoptionId = Guid.CreateVersion7(), ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = record.Target,
+                ExpectedQualificationRevision = 3,
+                AdoptionId = Guid.CreateVersion7(),
+                ExpectedAdoptionRevision = 1
             },
             _ => record
         };
@@ -98,8 +109,11 @@ public sealed class ModerationOperationalBudgetsControllerContractTests
         var bodyId = Guid.CreateVersion7();
         var command = new WithdrawModerationOperationalBudgetCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = AuthorityScope.Tenant(instance, Guid.CreateVersion7()),
-            ExpectedQualificationRevision = 3, AdoptionId = bodyId, ExpectedAdoptionRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = AuthorityScope.Tenant(instance, Guid.CreateVersion7()),
+            ExpectedQualificationRevision = 3,
+            AdoptionId = bodyId,
+            ExpectedAdoptionRevision = 1
         };
         var routeId = Guid.CreateVersion7();
         await controller.Withdraw(routeId, command, default);

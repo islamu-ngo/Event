@@ -36,8 +36,13 @@ public sealed class ModerationScheduleRiskReviewConfiguration : IEntityTypeConfi
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(entity => new
         {
-            entity.SourceSanctionId, entity.EventScopeEventId, entity.SessionId, entity.ParticipantId,
-            entity.OriginalScheduleGeneration, entity.OriginalParticipantGeneration, entity.OriginalPublicationId
+            entity.SourceSanctionId,
+            entity.EventScopeEventId,
+            entity.SessionId,
+            entity.ParticipantId,
+            entity.OriginalScheduleGeneration,
+            entity.OriginalParticipantGeneration,
+            entity.OriginalPublicationId
         }).IsUnique();
         builder.HasIndex(entity => new { entity.EventScopeTrustDomainId, entity.EventScopeTenantId, entity.State, entity.DueAt });
         builder.ToTable(table =>

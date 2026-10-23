@@ -16,10 +16,17 @@ public sealed record PrepareModerationConsumerMeasurementCommand : ModerationQua
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new PrepareModerationConsumerMeasurementSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
         OriginalEffect = OriginalEffect,
-        ChallengeId = ChallengeId, InstallationId = InstallationId, ExpectedInstallationRevision = ExpectedInstallationRevision,
-        ConsumerId = ConsumerId, Binding = Binding, ExpectedRuntimeGeneration = ExpectedRuntimeGeneration,
-        ExpectedInventoryFingerprint = ExpectedInventoryFingerprint, ValidUntil = ValidUntil
+        ChallengeId = ChallengeId,
+        InstallationId = InstallationId,
+        ExpectedInstallationRevision = ExpectedInstallationRevision,
+        ConsumerId = ConsumerId,
+        Binding = Binding,
+        ExpectedRuntimeGeneration = ExpectedRuntimeGeneration,
+        ExpectedInventoryFingerprint = ExpectedInventoryFingerprint,
+        ValidUntil = ValidUntil
     };
 }

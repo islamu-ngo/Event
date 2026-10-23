@@ -69,14 +69,23 @@ public sealed class ModerationAuthoritySourceInstallationTests(PostgreSqlContain
         {
             var membership = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = seed.Command.TenantId, Tenant = null!,
-                UserId = seed.UserId, User = null!, StatusId = (int)TenantUserStatusEnum.Active
+                Id = Guid.CreateVersion7(),
+                TenantId = seed.Command.TenantId,
+                Tenant = null!,
+                UserId = seed.UserId,
+                User = null!,
+                StatusId = (int)TenantUserStatusEnum.Active
             };
             writer.AddRange(membership, new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = membership.TenantId, Tenant = null!,
-                TenantUserId = membership.Id, TenantUser = membership,
-                RoleId = (int)RoleEnum.TenantAdmin, RoleScopeId = (int)RoleScopeEnum.Tenant, Role = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = membership.TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                Role = null!
             });
             await writer.SaveChangesAsync();
         }
@@ -155,7 +164,9 @@ public sealed class ModerationAuthoritySourceInstallationTests(PostgreSqlContain
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.IsDeleted, true));
             writer.Add(new ServicePrincipal
             {
-                Id = Guid.CreateVersion7(), Code = "other-maintenance", DisplayName = "Other maintenance"
+                Id = Guid.CreateVersion7(),
+                Code = "other-maintenance",
+                DisplayName = "Other maintenance"
             });
             await writer.SaveChangesAsync();
         }
@@ -360,29 +371,43 @@ public sealed class ModerationAuthoritySourceInstallationTests(PostgreSqlContain
         var userId = Guid.CreateVersion7();
         var user = new User
         {
-            Id = userId, Pii = new UserPii
+            Id = userId,
+            Pii = new UserPii
             {
-                UserId = userId, Email = $"{userId:N}@example.invalid", FirstName = "Installation", LastName = "Operator"
+                UserId = userId,
+                Email = $"{userId:N}@example.invalid",
+                FirstName = "Installation",
+                LastName = "Operator"
             }
         };
         var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Installation tenant", Slug = $"installation-{Guid.CreateVersion7():N}",
-            TenantStatusId = status.Id, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            FullName = "Installation tenant",
+            Slug = $"installation-{Guid.CreateVersion7():N}",
+            TenantStatusId = status.Id,
+            TenantStatus = null!
         };
         var otherTenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Other actual tenant", Slug = $"installation-{Guid.CreateVersion7():N}",
-            TenantStatusId = status.Id, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            FullName = "Other actual tenant",
+            Slug = $"installation-{Guid.CreateVersion7():N}",
+            TenantStatusId = status.Id,
+            TenantStatus = null!
         };
         var principal = new ServicePrincipal
         {
-            Id = Guid.CreateVersion7(), Code = "selected-maintenance", DisplayName = "Selected maintenance"
+            Id = Guid.CreateVersion7(),
+            Code = "selected-maintenance",
+            DisplayName = "Selected maintenance"
         };
         var otherPrincipal = new ServicePrincipal
         {
-            Id = Guid.CreateVersion7(), Code = "other-maintenance", DisplayName = "Other maintenance"
+            Id = Guid.CreateVersion7(),
+            Code = "other-maintenance",
+            DisplayName = "Other maintenance"
         };
         var role = await context.Roles.SingleAsync(row =>
             row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
@@ -392,22 +417,34 @@ public sealed class ModerationAuthoritySourceInstallationTests(PostgreSqlContain
             "https://installation.example.invalid/realm", userId.ToString());
         context.AddRange(user, tenant, otherTenant, principal, otherPrincipal, new UserExternalLogin
         {
-            Id = loginId, UserId = userId, User = user, AuthenticationProviderId = (int)account.ProviderKind,
-            AuthenticationProvider = null!, ProviderKey = account.Value
+            Id = loginId,
+            UserId = userId,
+            User = user,
+            AuthenticationProviderId = (int)account.ProviderKind,
+            AuthenticationProvider = null!,
+            ProviderKey = account.Value
         });
         if (admin)
         {
             context.Add(new PlatformUserRole
             {
-                Id = grantId, UserId = userId, User = user, RoleId = role.Id, Role = role
+                Id = grantId,
+                UserId = userId,
+                User = user,
+                RoleId = role.Id,
+                Role = role
             });
         }
         await context.SaveChangesAsync();
         return new(new EstablishModerationAuthoritySourcesCommand
         {
-            HostBindingId = Guid.CreateVersion7(), TrustDomainId = Guid.CreateVersion7(),
-            SolutionId = Guid.CreateVersion7(), InstanceId = Guid.CreateVersion7(),
-            MaintenanceServicePrincipalId = principal.Id, TenantId = tenant.Id, EpochId = Guid.CreateVersion7()
+            HostBindingId = Guid.CreateVersion7(),
+            TrustDomainId = Guid.CreateVersion7(),
+            SolutionId = Guid.CreateVersion7(),
+            InstanceId = Guid.CreateVersion7(),
+            MaintenanceServicePrincipalId = principal.Id,
+            TenantId = tenant.Id,
+            EpochId = Guid.CreateVersion7()
         }, userId, grantId, role.Id, status.Id, otherTenant.Id, otherPrincipal.Id, loginId);
     }
 

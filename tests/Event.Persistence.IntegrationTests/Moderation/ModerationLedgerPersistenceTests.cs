@@ -422,12 +422,17 @@ public sealed class ModerationLedgerPersistenceTests(PostgreSqlContainerFixture 
         var tenantScope = writerTenant ?? scope;
         var tenant = new Tenant
         {
-            Id = tenantScope.Id, FullName = "Capture test tenant", Slug = $"capture-{tenantScope.Id:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = tenantScope.Id,
+            FullName = "Capture test tenant",
+            Slug = $"capture-{tenantScope.Id:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var service = new ServicePrincipal
         {
-            Id = Guid.CreateVersion7(), Code = $"capture-{scope.Id:N}", DisplayName = "Capture integration test"
+            Id = Guid.CreateVersion7(),
+            Code = $"capture-{scope.Id:N}",
+            DisplayName = "Capture integration test"
         };
         var host = ModerationHostBinding.Establish(Guid.CreateVersion7(),
             tenantScope.TrustDomainId, tenantScope.Parent!.Parent!.Id, tenantScope.Parent.Id, service.Id);

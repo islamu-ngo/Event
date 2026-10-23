@@ -184,8 +184,11 @@ public sealed partial class EventAuthorityPlanningProviderTests
         var token = timeout.Token;
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = $"role-planning-{Guid.CreateVersion7():N}", FullName = "Role planning",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            Slug = $"role-planning-{Guid.CreateVersion7():N}",
+            FullName = "Role planning",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var user = new User
         {
@@ -194,16 +197,29 @@ public sealed partial class EventAuthorityPlanningProviderTests
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, User = user,
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            User = user,
             Pii = new ActorPii { DisplayName = "Role planner" }
         };
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-            OrganizerActorId = actor.Id, Title = "Before role-source write", PublicCode = Guid.CreateVersion7().ToString("N")[..12],
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            ActorId = actor.Id,
+            Actor = actor,
+            OrganizerActorId = actor.Id,
+            Title = "Before role-source write",
+            PublicCode = Guid.CreateVersion7().ToString("N")[..12],
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!, Timezone = "UTC"
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            Timezone = "UTC"
         };
         var second = new User
         {

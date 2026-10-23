@@ -340,13 +340,13 @@ public sealed class PolicyAdministrationTests
         await page.Find("#reason-code").ChangeAsync(new ChangeEventArgs { Value = "warning.reason" });
         await page.Find("#reason-meaning").ChangeAsync(new ChangeEventArgs { Value = "A deliberately authored reason" });
         await page.Find("#reason-class").ChangeAsync(new ChangeEventArgs
-            { Value = page.FindAll("#reason-class option").Last().GetAttribute("value") });
+        { Value = page.FindAll("#reason-class option").Last().GetAttribute("value") });
         await page.Find("form").SubmitAsync();
         await page.Find("#add-profile").ClickAsync(new MouseEventArgs());
         await page.Find("#profile-code").ChangeAsync(new ChangeEventArgs { Value = "warning.profile" });
         await page.Find("#profile-template").ChangeAsync(new ChangeEventArgs { Value = "CFG01" });
         await page.Find("#profile-reason").ChangeAsync(new ChangeEventArgs
-            { Value = page.FindAll("#profile-reason option").Last().GetAttribute("value") });
+        { Value = page.FindAll("#profile-reason option").Last().GetAttribute("value") });
         await page.Find("#profile-grade").ChangeAsync(new ChangeEventArgs { Value = "G0" });
         await page.Find("#profile-scope-Tenant").ChangeAsync(new ChangeEventArgs { Value = true });
         await page.Find("#profile-subject-Content").ChangeAsync(new ChangeEventArgs { Value = true });
@@ -477,8 +477,10 @@ public sealed class PolicyAdministrationTests
             LastScope = request.RequestUri.Query.Contains("instance", StringComparison.Ordinal) ? "instance" : "tenant";
             var classification = new ModerationPolicyClassDefinition
             {
-                Reference = Rule("class"), Meaning = "Original class",
-                Ground = ModerationReferenceGround.CompatibleConfirmedConduct, Basis = ModerationReferenceBasis.ConfirmedWarning
+                Reference = Rule("class"),
+                Meaning = "Original class",
+                Ground = ModerationReferenceGround.CompatibleConfirmedConduct,
+                Basis = ModerationReferenceBasis.ConfirmedWarning
             };
             var reason = new ModerationPolicyReasonDefinition { Reference = Rule("reason"), Meaning = "Original reason", Class = classification.Reference };
             var links = new Dictionary<string, HalLink>();
@@ -486,26 +488,41 @@ public sealed class PolicyAdministrationTests
             if (Preparation) links["publication-preparation"] = new() { Href = $"/api/moderation/policies/{PolicyId:D}/publication-preparations", Method = "POST" };
             var current = new HalResourceOfModerationCurrentPolicyView
             {
-                PolicyId = PolicyId, Scope = LastScope, State = Uninitialized ? "uninitialized" : "adopted",
+                PolicyId = PolicyId,
+                Scope = LastScope,
+                State = Uninitialized ? "uninitialized" : "adopted",
                 Jurisdiction = new() { Id = owner, Kind = LastScope == "tenant" ? AuthorityScopeKind.Tenant : AuthorityScopeKind.Instance },
-                ExpectedHostBindingId = owner, ExpectedAuthoritySourceId = owner, ExpectedQualificationRevision = 1,
-                ExpectedWriterGeneration = "current", ExpectedRevision = Uninitialized ? 0 : Revision,
+                ExpectedHostBindingId = owner,
+                ExpectedAuthoritySourceId = owner,
+                ExpectedQualificationRevision = 1,
+                ExpectedWriterGeneration = "current",
+                ExpectedRevision = Uninitialized ? 0 : Revision,
                 ExpectedPublicationId = Uninitialized ? null : previous,
-                InstalledCatalogueRevision = 8, InstalledInventoryRevision = 9, InstalledInventoryFingerprint = "installed",
+                InstalledCatalogueRevision = 8,
+                InstalledInventoryRevision = 9,
+                InstalledInventoryFingerprint = "installed",
                 AuthoringBounds = new()
                 {
                     Jurisdiction = new() { Id = owner, Kind = LastScope == "tenant" ? AuthorityScopeKind.Tenant : AuthorityScopeKind.Instance },
-                    ScopeKinds = [ModerationScopeKind.Tenant], SubjectKinds = [ModerationSubjectKind.Content],
+                    ScopeKinds = [ModerationScopeKind.Tenant],
+                    SubjectKinds = [ModerationSubjectKind.Content],
                     Effects = [NoticeEffect()],
                     TimingKinds = [ModerationReferenceTimingKind.NoEnforcementInterval, ModerationReferenceTimingKind.Finite],
-                    MaximumFiniteDuration = "1.00:00:00", MaximumReviewDelay = "01:00:00",
-                    MinimumApprovals = 0, MaximumApprovals = 2, MinimumContestationCalendarMonths = 6
+                    MaximumFiniteDuration = "1.00:00:00",
+                    MaximumReviewDelay = "01:00:00",
+                    MinimumApprovals = 0,
+                    MaximumApprovals = 2,
+                    MinimumContestationCalendarMonths = 6
                 },
                 Authoring = Uninitialized ? null : new()
                 {
-                    PublicationId = previous, CatalogueRevision = 8, InventoryRevision = 3, InventoryFingerprint = "historical",
+                    PublicationId = previous,
+                    CatalogueRevision = 8,
+                    InventoryRevision = 3,
+                    InventoryFingerprint = "historical",
                     Modes = [ModerationNativeMode.Embedded, ModerationNativeMode.RemoteStrict],
-                    Classes = [classification], Reasons = [reason],
+                    Classes = [classification],
+                    Reasons = [reason],
                     Profiles = [new() { Definition = Profile("selected", 6), Consequences = [Plan()] },
                         new() { Definition = Profile("disabled", 9), Consequences = [Plan()] }],
                     SelectedProfiles = [Rule("selected")]
@@ -520,22 +537,39 @@ public sealed class PolicyAdministrationTests
         private ModerationRuleReference Rule(string code) => new() { OwnerId = owner, Code = code, Revision = 1 };
         private ModerationPolicyProfileDefinition Profile(string code, int months) => new()
         {
-            Id = Guid.CreateVersion7(), Rule = Rule(code), Reason = Rule("reason"),
-            ReferenceProfile = ModerationReferenceProfileId.CFG01, ReferenceRevision = 8,
-            Grade = ModerationReferenceGrade.G0, ScopeKinds = [ModerationScopeKind.Tenant],
-            SubjectKinds = [ModerationSubjectKind.Content], Effects = [NoticeEffect()], Bundle = ModerationConsequenceBundleKind.Unaffected,
-            Strategies = [], Timing = new() { Kind = ModerationReferenceTimingKind.NoEnforcementInterval, Duration = "00:00:00" },
-            RequiredApprovals = 0, ContestationCalendarMonths = months, Recognition = ModerationReferenceRecognition.Never
+            Id = Guid.CreateVersion7(),
+            Rule = Rule(code),
+            Reason = Rule("reason"),
+            ReferenceProfile = ModerationReferenceProfileId.CFG01,
+            ReferenceRevision = 8,
+            Grade = ModerationReferenceGrade.G0,
+            ScopeKinds = [ModerationScopeKind.Tenant],
+            SubjectKinds = [ModerationSubjectKind.Content],
+            Effects = [NoticeEffect()],
+            Bundle = ModerationConsequenceBundleKind.Unaffected,
+            Strategies = [],
+            Timing = new() { Kind = ModerationReferenceTimingKind.NoEnforcementInterval, Duration = "00:00:00" },
+            RequiredApprovals = 0,
+            ContestationCalendarMonths = months,
+            Recognition = ModerationReferenceRecognition.Never
         };
         private static ModerationReferenceProfile Reference() => new()
         {
-            Id = ModerationReferenceProfileId.CFG01, Code = "CFG01", Revision = 8,
-            Ground = ModerationReferenceGround.CompatibleConfirmedConduct, Basis = ModerationReferenceBasis.ConfirmedWarning,
-            Bundle = ModerationConsequenceBundleKind.Unaffected, Recognition = ModerationReferenceRecognition.Never,
-            ScopeKinds = [ModerationScopeKind.Tenant], SubjectKinds = [ModerationSubjectKind.Content], Effects = [NoticeEffect()], Strategies = [],
+            Id = ModerationReferenceProfileId.CFG01,
+            Code = "CFG01",
+            Revision = 8,
+            Ground = ModerationReferenceGround.CompatibleConfirmedConduct,
+            Basis = ModerationReferenceBasis.ConfirmedWarning,
+            Bundle = ModerationConsequenceBundleKind.Unaffected,
+            Recognition = ModerationReferenceRecognition.Never,
+            ScopeKinds = [ModerationScopeKind.Tenant],
+            SubjectKinds = [ModerationSubjectKind.Content],
+            Effects = [NoticeEffect()],
+            Strategies = [],
             Responses = [new() { Grade = ModerationReferenceGrade.G0, RequiredApprovals = 0,
                 Timing = new() { Kind = ModerationReferenceTimingKind.NoEnforcementInterval, Duration = "00:00:00" } }],
-            ConsequencePlans = [Plan()], Prerequisites =
+            ConsequencePlans = [Plan()],
+            Prerequisites =
             [
                 ModerationReferencePrerequisite.ExplicitPolicyAdoption, ModerationReferencePrerequisite.CurrentNativeConformance,
                 ModerationReferencePrerequisite.CurrentOrdinaryAuthorization, ModerationReferencePrerequisite.QualifiedSubjectAndTarget,
@@ -546,17 +580,25 @@ public sealed class PolicyAdministrationTests
         };
         private static ModerationReferenceEffect NoticeEffect() => new()
         {
-            Kind = ModerationReferenceEffectKind.ReasonedNotice, Mode = ModerationReferenceEffectMode.Notice,
-            Target = ModerationReferenceTarget.SelectedOperations, Execution = ModerationReferenceExecution.NativeOwner
+            Kind = ModerationReferenceEffectKind.ReasonedNotice,
+            Mode = ModerationReferenceEffectMode.Notice,
+            Target = ModerationReferenceTarget.SelectedOperations,
+            Execution = ModerationReferenceExecution.NativeOwner
         };
         private static ModerationConsequenceModes Plan() => new()
         {
-            Content = ModerationContentMode.PreserveSafePublished, Management = ModerationManagementMode.CurrentAuthority,
-            Resources = ModerationResourceReadMode.CurrentAudience, NewAdmission = ModerationNewAdmissionMode.CurrentEligibility,
-            ExistingAdmission = ModerationExistingAdmissionMode.CurrentEligibility, PrivateDisclosure = ModerationPrivateDisclosureMode.CurrentAudience,
-            Settlement = ModerationSettlementMode.NoBookingChange, Capacity = ModerationCapacityMode.NoSeatChange,
-            Credentials = ModerationCredentialMode.CurrentCredentialLifecycle, Notifications = ModerationNotificationMode.DurableSafeSubjectAndAdmin,
-            Recognition = ModerationRecognitionMode.NoCaptureFromThisControl, PendingWork = ModerationPendingWorkMode.RecheckCurrentEffectAtUseAndDispatch,
+            Content = ModerationContentMode.PreserveSafePublished,
+            Management = ModerationManagementMode.CurrentAuthority,
+            Resources = ModerationResourceReadMode.CurrentAudience,
+            NewAdmission = ModerationNewAdmissionMode.CurrentEligibility,
+            ExistingAdmission = ModerationExistingAdmissionMode.CurrentEligibility,
+            PrivateDisclosure = ModerationPrivateDisclosureMode.CurrentAudience,
+            Settlement = ModerationSettlementMode.NoBookingChange,
+            Capacity = ModerationCapacityMode.NoSeatChange,
+            Credentials = ModerationCredentialMode.CurrentCredentialLifecycle,
+            Notifications = ModerationNotificationMode.DurableSafeSubjectAndAdmin,
+            Recognition = ModerationRecognitionMode.NoCaptureFromThisControl,
+            PendingWork = ModerationPendingWorkMode.RecheckCurrentEffectAtUseAndDispatch,
             Restoration = ModerationRestorationMode.RecomputeCurrentRightsOnly
         };
         private static HttpResponseMessage Response(object body, HttpStatusCode status = HttpStatusCode.OK) =>

@@ -28,9 +28,18 @@ public sealed class ModerationEventRightsAdoption
             throw new ArgumentException("Event-rights adoption requires the nominated independent reviewer and exact finite source coverage.");
         var adoption = new ModerationEventRightsAdoption
         {
-            Id = id, HostBindingId = source.HostBindingId, TrustDomainId = source.TrustDomainId, TenantId = source.TenantId,
-            SourceId = source.Id, SourceRevision = source.Revision, SourceWriterGeneration = source.WriterGeneration,
-            AdoptedByHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1, AdoptedAt = now, ValidUntil = validUntil
+            Id = id,
+            HostBindingId = source.HostBindingId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = source.TenantId,
+            SourceId = source.Id,
+            SourceRevision = source.Revision,
+            SourceWriterGeneration = source.WriterGeneration,
+            AdoptedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            AdoptedAt = now,
+            ValidUntil = validUntil
         };
         adoption.ValidatePersistedState();
         return adoption;

@@ -91,8 +91,10 @@ public sealed partial class ModerationNoticeReadTests
         var replacement = Guid.CreateVersion7();
         setup.Actors.Add(new Actor
         {
-            Id = replacement, ActorTypeId = (int)ActorTypeEnum.User,
-            UserId = fixture.Database.ReviewerId, Pii = new ActorPii()
+            Id = replacement,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            UserId = fixture.Database.ReviewerId,
+            Pii = new ActorPii()
         });
         await setup.SaveChangesAsync();
         return (eventId, actor, replacement);

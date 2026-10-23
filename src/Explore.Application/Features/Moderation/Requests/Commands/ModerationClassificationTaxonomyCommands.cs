@@ -23,10 +23,20 @@ public sealed record RecordModerationClassificationTaxonomyCommand : ModerationQ
 
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationClassificationTaxonomySource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, TaxonomyId = TaxonomyId, ExpectedTaxonomyGeneration = ExpectedTaxonomyGeneration,
-        PolicyId = PolicyId, ExpectedPolicyRevision = ExpectedPolicyRevision, PublicationId = PublicationId,
-        ProfileId = ProfileId, Mode = Mode, Mandate = Mandate, Categories = Categories, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        TaxonomyId = TaxonomyId,
+        ExpectedTaxonomyGeneration = ExpectedTaxonomyGeneration,
+        PolicyId = PolicyId,
+        ExpectedPolicyRevision = ExpectedPolicyRevision,
+        PublicationId = PublicationId,
+        ProfileId = ProfileId,
+        Mode = Mode,
+        Mandate = Mandate,
+        Categories = Categories,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -41,9 +51,14 @@ public sealed record AdoptModerationClassificationTaxonomyCommand : ModerationQu
 
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationClassificationTaxonomySource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration, AdoptionId = AdoptionId, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration,
+        AdoptionId = AdoptionId,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -55,7 +70,10 @@ public sealed record WithdrawModerationClassificationTaxonomyCommand : Moderatio
 
     internal override ModerationQualificationMutation ToMutation() => new WithdrawModerationClassificationTaxonomyAdoption
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision
     };
 }

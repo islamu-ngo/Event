@@ -113,14 +113,29 @@ public sealed class ModerationResourceTargetAdoptionTests
         var selection = ModerationContributionSelectionTests.Selection(scopeKind, substituteEvent: substituteScope).Selection;
         return (selection, new()
         {
-            Id = Guid.CreateVersion7(), HostBindingId = selection.HostBindingId, TrustDomainId = selection.TrustDomainId,
-            TenantId = selection.TenantId, ResourceId = selection.Bindings[0].TargetId, Revision = 1,
-            ObservedByHumanId = Guid.CreateVersion7(), WriterGeneration = 3, ObservedAt = selection.RecordedAt,
-            ValidUntil = selection.ValidUntil, ResourceStamp = Guid.NewGuid(), EventId = Guid.CreateVersion7(), EventStamp = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
+            HostBindingId = selection.HostBindingId,
+            TrustDomainId = selection.TrustDomainId,
+            TenantId = selection.TenantId,
+            ResourceId = selection.Bindings[0].TargetId,
+            Revision = 1,
+            ObservedByHumanId = Guid.CreateVersion7(),
+            WriterGeneration = 3,
+            ObservedAt = selection.RecordedAt,
+            ValidUntil = selection.ValidUntil,
+            ResourceStamp = Guid.NewGuid(),
+            EventId = Guid.CreateVersion7(),
+            EventStamp = Guid.NewGuid(),
             MaterialVersionId = Guid.CreateVersion7(),
-            ActorId = Guid.CreateVersion7(), ActorStamp = Guid.NewGuid(), OrganizerActorId = null, OrganizerActorStamp = null,
-            DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink, StorageObjectId = null, StorageObjectStamp = null,
-            StorageProviderBindingId = null, StorageProvider = null
+            ActorId = Guid.CreateVersion7(),
+            ActorStamp = Guid.NewGuid(),
+            OrganizerActorId = null,
+            OrganizerActorStamp = null,
+            DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink,
+            StorageObjectId = null,
+            StorageObjectStamp = null,
+            StorageProviderBindingId = null,
+            StorageProvider = null
         });
     }
 }

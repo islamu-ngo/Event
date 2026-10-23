@@ -17,8 +17,11 @@ public sealed class ModerationCaseReadGrantControllerTests
     {
         var command = new GrantModerationCaseReadPurposeCommand
         {
-            OperationId = Guid.CreateVersion7(), CaseId = Guid.CreateVersion7(), ExpectedCaseRevision = 1,
-            SourceId = Guid.CreateVersion7(), GranteeUserId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            CaseId = Guid.CreateVersion7(),
+            ExpectedCaseRevision = 1,
+            SourceId = Guid.CreateVersion7(),
+            GranteeUserId = Guid.CreateVersion7(),
             ValidUntil = new(2026, 10, 12, 16, 0, 0, TimeSpan.Zero)
         };
         var response = await Controller().Grant(
@@ -37,7 +40,9 @@ public sealed class ModerationCaseReadGrantControllerTests
     {
         var command = new RevokeModerationCaseReadPurposeCommand
         {
-            OperationId = Guid.CreateVersion7(), GrantId = Guid.CreateVersion7(), ExpectedGrantRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            GrantId = Guid.CreateVersion7(),
+            ExpectedGrantRevision = 1
         };
         var response = await Controller().Revoke(
             wrongVersion ? Guid.NewGuid() : Guid.Empty, command, default);

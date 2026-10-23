@@ -151,8 +151,11 @@ public sealed partial class EventPublicationModerationMutationTests
         var otherTenantId = Guid.CreateVersion7();
         fixture.Context.Tenants.Add(new Tenant
         {
-            Id = otherTenantId, FullName = "Other import authority", Slug = $"other-import-{otherTenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = otherTenantId,
+            FullName = "Other import authority",
+            Slug = $"other-import-{otherTenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         });
         fixture.Context.RegistrationForms.Add(otherForm);
         await fixture.Context.SaveChangesAsync();
@@ -347,8 +350,11 @@ public sealed partial class EventPublicationModerationMutationTests
             var organizer = NativeUser(Guid.CreateVersion7());
             var actor = new Actor
             {
-                Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                UserId = organizer.Id, Pii = new ActorPii { DisplayName = "Independent import organizer" },
+                Id = Guid.CreateVersion7(),
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = organizer.Id,
+                Pii = new ActorPii { DisplayName = "Independent import organizer" },
                 CreatedAt = clock.Now.UtcDateTime
             };
             fixture.Context.Users.Add(organizer);
@@ -370,8 +376,12 @@ public sealed partial class EventPublicationModerationMutationTests
         if (grantOwner) await GrantRegistrationPublisherAsync(fixture, parent.Id);
         return new(fixture.TenantId, parent.Id, connection.Id, new ImportExternalRegistrationProviderFormVersionRequestDto
         {
-            Namespace = "external", Key = "publication-import", Name = "Imported publication questions",
-            LanguageTag = "en", ProviderSurveyId = "publication-survey", ProviderSurveyRevisionId = "survey-revision-1"
+            Namespace = "external",
+            Key = "publication-import",
+            Name = "Imported publication questions",
+            LanguageTag = "en",
+            ProviderSurveyId = "publication-survey",
+            ProviderSurveyRevisionId = "survey-revision-1"
         });
     }
 

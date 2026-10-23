@@ -26,8 +26,11 @@ public sealed partial class ModerationPolicyPublicationTests
             var status = await writer.TenantStatuses.SingleAsync(row => row.IsActiveState);
             writer.Tenants.Add(new Tenant
             {
-                Id = otherTenantId, FullName = "Other legal owner", Slug = $"legal-{otherTenantId:N}",
-                TenantStatusId = status.Id, TenantStatus = status
+                Id = otherTenantId,
+                FullName = "Other legal owner",
+                Slug = $"legal-{otherTenantId:N}",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             });
             writer.LegalDocuments.AddRange(instance, own, other);
             await writer.SaveChangesAsync();

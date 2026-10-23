@@ -9,11 +9,13 @@ public sealed class PrimaryDatabasePublicIdentityTests
     {
         var original = Options() with
         {
-            Username = SecretsTestValues.CreateSecret(), Password = SecretsTestValues.CreateSecret()
+            Username = SecretsTestValues.CreateSecret(),
+            Password = SecretsTestValues.CreateSecret()
         };
         var changed = original with
         {
-            Username = SecretsTestValues.CreateSecret(), Password = SecretsTestValues.CreateSecret()
+            Username = SecretsTestValues.CreateSecret(),
+            Password = SecretsTestValues.CreateSecret()
         };
         await Assert.That(PrimaryDatabasePublicIdentity.Digest(original))
             .IsEqualTo(PrimaryDatabasePublicIdentity.Digest(changed));
@@ -53,8 +55,11 @@ public sealed class PrimaryDatabasePublicIdentityTests
 
     private static PrimaryDatabaseConnectionOptions Options() => new()
     {
-        Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.PostgreSql,
-        Host = "primary.example.test", Port = 5432, Database = "primary_authority",
+        Role = PrimaryDatabaseRole.Runtime,
+        Provider = PrimaryDatabaseProvider.PostgreSql,
+        Host = "primary.example.test",
+        Port = 5432,
+        Database = "primary_authority",
         Schema = PrimaryDatabaseConnectionOptions.DefaultSchema
     };
 }

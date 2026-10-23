@@ -54,10 +54,13 @@ public sealed class ModerationQualifiedJsonTests
             Guid.CreateVersion7());
         var command = new ApproveModerationDecisionCommand
         {
-            OperationId = Guid.CreateVersion7(), EffectId = Guid.CreateVersion7(), DecisionId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            EffectId = Guid.CreateVersion7(),
+            DecisionId = Guid.CreateVersion7(),
             Subject = SubjectReference.Create(kind, Guid.CreateVersion7(), origin),
             Target = AuthorityScope.Resource(origin, Guid.CreateVersion7()),
-            ExpectedRevision = 2, ExpectedPolicyRevision = 3
+            ExpectedRevision = 2,
+            ExpectedPolicyRevision = 3
         };
         var restored = JsonSerializer.Deserialize<ApproveModerationDecisionCommand>(
             JsonSerializer.Serialize(command, Options), Options);

@@ -150,7 +150,10 @@ public sealed partial class ModerationCaseNarrativeRepository
         var selected = await eligible.AsNoTracking().OrderBy(row => row.Id).Take(maximumRows)
             .Select(row => new
             {
-                row.Id, row.OriginalNarrativeId, row.PurgeAt, row.WithdrawnAt,
+                row.Id,
+                row.OriginalNarrativeId,
+                row.PurgeAt,
+                row.WithdrawnAt,
                 InvestigationWithdrawnAt = context.ModerationCaseNarrativeAdoptions
                     .Where(adoption => adoption.Id == row.CustodyAdoptionId
                         && adoption.TenantId == tenant && adoption.TrustDomainId == host.TrustDomainId)

@@ -19,8 +19,11 @@ public sealed class ModerationLedgerConfiguration :
         ConfigureScope(builder, "target_origin", optional: true);
         builder.HasIndex(entity => new
         {
-            entity.ScopeTrustDomainId, entity.ScopeTenantId, entity.OccurrenceId,
-            entity.OccurrenceOwnerKind, entity.OccurrenceOwnerId
+            entity.ScopeTrustDomainId,
+            entity.ScopeTenantId,
+            entity.OccurrenceId,
+            entity.OccurrenceOwnerKind,
+            entity.OccurrenceOwnerId
         }).IsUnique();
         builder.HasOne<ModerationCase>().WithMany().HasForeignKey(entity => entity.OccurrenceCaseId)
             .OnDelete(DeleteBehavior.Restrict);

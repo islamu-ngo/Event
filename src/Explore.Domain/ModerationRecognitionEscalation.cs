@@ -45,11 +45,17 @@ public sealed class ModerationRecognitionEscalation
         var deadline = action?.DispositionBy ?? pending.SettleBy;
         var result = new ModerationRecognitionEscalation
         {
-            Id = id, IntentId = pending.IntentId, TargetId = action?.Id ?? pending.IntentId, SourceId = source.Id,
-            ActionRecoveryId = action?.Id, PendingRevision = pending.Revision,
-            RecipientHumanId = recipient, OtherOwnerHumanId = recipient == source.PrivacyOwnerHumanId
+            Id = id,
+            IntentId = pending.IntentId,
+            TargetId = action?.Id ?? pending.IntentId,
+            SourceId = source.Id,
+            ActionRecoveryId = action?.Id,
+            PendingRevision = pending.Revision,
+            RecipientHumanId = recipient,
+            OtherOwnerHumanId = recipient == source.PrivacyOwnerHumanId
                 ? source.RecoveryOwnerHumanId : source.PrivacyOwnerHumanId,
-            RequiredAt = now, OriginalDeadline = deadline,
+            RequiredAt = now,
+            OriginalDeadline = deadline,
             RetainUntil = (action?.ReceivedAt ?? pending.ReceivedAt).AddTicks(source.Retention.Single(item =>
                 item.RecordClass == ModerationRecognitionPrivacyRecordClass.DispositionAndReplayReceipt).MaximumRetentionTicks),
             Stage = now >= deadline ? ModerationRecognitionEscalationStage.LawfulDeadlineReached

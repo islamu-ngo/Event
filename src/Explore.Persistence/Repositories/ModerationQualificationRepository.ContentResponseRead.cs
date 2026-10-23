@@ -92,9 +92,20 @@ public sealed partial class ModerationQualificationRepository
         context.ModerationTrustDomainId = host.TrustDomainId;
         var metadata = await context.Set<ModerationContentResponse>().AsNoTracking()
             .Where(row => row.Id == responseId && row.HostBindingId == host.Id)
-            .Select(row => new { row.CaseId, row.EffectId, row.RepresentativeHumanId, row.SubmittedAt,
-                row.RetainUntil, row.AssignmentId, row.AssignmentRevision, row.SnapshotHash,
-                row.ContentSubjectId, row.TenantId, row.TrustDomainId })
+            .Select(row => new
+            {
+                row.CaseId,
+                row.EffectId,
+                row.RepresentativeHumanId,
+                row.SubmittedAt,
+                row.RetainUntil,
+                row.AssignmentId,
+                row.AssignmentRevision,
+                row.SnapshotHash,
+                row.ContentSubjectId,
+                row.TenantId,
+                row.TrustDomainId
+            })
             .SingleOrDefaultAsync(token);
         var observedAt = clock.GetUtcNow();
         if (metadata is null || observedAt < metadata.SubmittedAt || observedAt >= metadata.RetainUntil
@@ -141,8 +152,17 @@ public sealed partial class ModerationQualificationRepository
             context, $"moderation.notice:{metadata.EffectId:D}", token);
         var source = await context.ModerationNoticeSources.AsNoTracking()
             .Where(row => row.EffectId == metadata.EffectId)
-            .Select(row => new { row.DecisionId, row.SubjectId, row.SubjectKind, row.SnapshotHash,
-                row.CapturedAt, row.RetainUntil, row.StatusMetadataJson, row.StatusMetadataHash })
+            .Select(row => new
+            {
+                row.DecisionId,
+                row.SubjectId,
+                row.SubjectKind,
+                row.SnapshotHash,
+                row.CapturedAt,
+                row.RetainUntil,
+                row.StatusMetadataJson,
+                row.StatusMetadataHash
+            })
             .SingleOrDefaultAsync(token);
         var original = source is null ? null
             : ModerationNoticeSource.StatusMetadata.Read(source.StatusMetadataJson, source.StatusMetadataHash);

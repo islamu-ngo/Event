@@ -92,8 +92,11 @@ public sealed partial class ModerationPolicyPublicationTests
                 setters.SetProperty(row => row.ActivePublicationId, first.Proposed.PublicationId));
         }
         var future = database.Next(latest);
-        future = future with { Proposed = future.Proposed with
-            { RequestedState = ModerationPolicyRequestedState.Active } };
+        future = future with
+        {
+            Proposed = future.Proposed with
+            { RequestedState = ModerationPolicyRequestedState.Active }
+        };
         await using (var preparation = database.Context())
             await Assert.That((await database.Writer(preparation).PrepareAsync(future, Now.AddHours(1))).Outcome)
                 .IsEqualTo(ModerationPolicyPublicationOutcome.Known);
@@ -321,9 +324,11 @@ public sealed partial class ModerationPolicyPublicationTests
                     break;
                 case "tenant": context.TenantContext = new ExportTenantContext(Guid.CreateVersion7()); break;
                 case "trust": context.ModerationTrustDomainId = Guid.CreateVersion7(); break;
-                case "epoch": await context.ModerationQualificationEpochs.ExecuteUpdateAsync(setters =>
+                case "epoch":
+                    await context.ModerationQualificationEpochs.ExecuteUpdateAsync(setters =>
                     setters.SetProperty(row => row.Revision, row => row.Revision + 1)); break;
-                case "slot": await context.ModerationPolicySelections.ExecuteUpdateAsync(setters =>
+                case "slot":
+                    await context.ModerationPolicySelections.ExecuteUpdateAsync(setters =>
                     setters.SetProperty(row => row.Revision, row => row.Revision + 1)); break;
                 case "dirty": (await context.Tenants.SingleAsync()).FullName = "Unflushed preparation write"; break;
                 case "transaction": await context.Database.CurrentTransaction!.DisposeAsync(); break;

@@ -46,8 +46,10 @@ public sealed partial class ModerationNoticeEmailTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var result = await smtp.SendAsync(new EmailMessage
         {
-            ModerationNotice = request, To = "stale-copy@example.invalid",
-            Subject = "UNTRUSTED_QUEUE_COPY", PlainTextBody = fixture.Notice.PrivateJustification
+            ModerationNotice = request,
+            To = "stale-copy@example.invalid",
+            Subject = "UNTRUSTED_QUEUE_COPY",
+            PlainTextBody = fixture.Notice.PrivateJustification
         }, timeout.Token);
         await peer.Completed.WaitAsync(timeout.Token);
         await Assert.That(result.Outcome).IsEqualTo(expireAtGreeting
@@ -99,8 +101,10 @@ public sealed partial class ModerationNoticeEmailTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var result = await smtp.SendAsync(new EmailMessage
         {
-            ModerationNotice = request, To = "stale-copy@example.invalid",
-            Subject = "UNTRUSTED_QUEUE_COPY", PlainTextBody = fixture.Notice.PrivateJustification
+            ModerationNotice = request,
+            To = "stale-copy@example.invalid",
+            Subject = "UNTRUSTED_QUEUE_COPY",
+            PlainTextBody = fixture.Notice.PrivateJustification
         }, timeout.Token);
         await peer.Completed.WaitAsync(timeout.Token);
         var delivered = change == "address";

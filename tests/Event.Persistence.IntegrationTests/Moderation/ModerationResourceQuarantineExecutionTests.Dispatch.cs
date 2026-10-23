@@ -32,7 +32,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         var dispatcher = services.GetRequiredService<ModerationEffectOutboxDispatcher>();
         var message = new OutboxMessage
         {
-            Id = fixture.EffectId, AggregateId = fixture.EffectId,
+            Id = fixture.EffectId,
+            AggregateId = fixture.EffectId,
             AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
             EventType = ModerationEffectOutboxMessageFactory.EventType
         };
@@ -88,7 +89,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         await using var services = DrainServices(fixture, tenants, machines);
         var message = new OutboxMessage
         {
-            Id = fixture.EffectId, AggregateId = fixture.EffectId,
+            Id = fixture.EffectId,
+            AggregateId = fixture.EffectId,
             AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
             EventType = ModerationEffectOutboxMessageFactory.EventType
         };

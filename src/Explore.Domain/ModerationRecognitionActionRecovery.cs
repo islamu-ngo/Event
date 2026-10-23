@@ -43,10 +43,16 @@ public sealed class ModerationRecognitionActionRecovery
             throw new InvalidOperationException("Deferred action recovery needs an exact settled candidate, not a matched identity.");
         return new()
         {
-            Id = id, FreshSubjectId = freshSubjectId, VerifiedBindingId = verifiedBindingId,
-            CaptureItemId = item.Id, CaptureMaterialReceipt = item.ComputeMaterialReceipt(), OriginalIntentId = item.IntentId,
-            PrivacyOwnerHumanId = receipt.PrivacyOwnerHumanId, RecoveryOwnerHumanId = receipt.RecoveryOwnerHumanId,
-            ProviderKind = item.ProviderKind, ReceivedAt = now,
+            Id = id,
+            FreshSubjectId = freshSubjectId,
+            VerifiedBindingId = verifiedBindingId,
+            CaptureItemId = item.Id,
+            CaptureMaterialReceipt = item.ComputeMaterialReceipt(),
+            OriginalIntentId = item.IntentId,
+            PrivacyOwnerHumanId = receipt.PrivacyOwnerHumanId,
+            RecoveryOwnerHumanId = receipt.RecoveryOwnerHumanId,
+            ProviderKind = item.ProviderKind,
+            ReceivedAt = now,
             DispositionBy = item.EndsAt is { } end && end < item.RetainUntil ? end : item.RetainUntil
         };
     }

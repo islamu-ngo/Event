@@ -118,7 +118,8 @@ public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixtu
         var link = CreateAdviceLink(report, reportCase, EventReportExternalProvider.Coop);
         var callback = CreateCoopAdvice(report, reportCase, "heavy_redact") with
         {
-            ProviderTargetScope = scope, ProviderTargetId = target
+            ProviderTargetScope = scope,
+            ProviderTargetId = target
         };
         var message = CreateAdviceMessage(callback);
         context.EventReports.Add(report);
@@ -194,9 +195,14 @@ public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixtu
         await context.SaveChangesAsync();
         var callback = new OspreySignalCallbackRequestDto
         {
-            TenantId = tenant.Id, EventId = @event.Id, ReportId = report.Id, CaseId = reportCase.Id,
-            ProviderSignalId = "provider-signal", CorrelationId = "dispatch",
-            ProviderTargetScope = "tenant", ProviderTargetId = tenant.Id.ToString("N"),
+            TenantId = tenant.Id,
+            EventId = @event.Id,
+            ReportId = report.Id,
+            CaseId = reportCase.Id,
+            ProviderSignalId = "provider-signal",
+            CorrelationId = "dispatch",
+            ProviderTargetScope = "tenant",
+            ProviderTargetId = tenant.Id.ToString("N"),
             Signals =
             [
                 new OspreySignalCallbackItemDto
@@ -267,7 +273,8 @@ public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixtu
         context.AddRange(report, reportCase, link);
         var coop = CreateCoopAdvice(report, reportCase, "heavy_redact") with
         {
-            ProviderTargetScope = null, ProviderTargetId = null
+            ProviderTargetScope = null,
+            ProviderTargetId = null
         };
         var message = CreateAdviceMessage(coop);
         if (provider == EventReportExternalProvider.Coop)
@@ -275,8 +282,12 @@ public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixtu
         await context.SaveChangesAsync();
         var osprey = new OspreySignalCallbackRequestDto
         {
-            TenantId = tenant.Id, EventId = @event.Id, ReportId = report.Id, CaseId = reportCase.Id,
-            ProviderSignalId = "provider-signal", CorrelationId = "dispatch",
+            TenantId = tenant.Id,
+            EventId = @event.Id,
+            ReportId = report.Id,
+            CaseId = reportCase.Id,
+            ProviderSignalId = "provider-signal",
+            CorrelationId = "dispatch",
             Signals = [new OspreySignalCallbackItemDto
             {
                 SignalType = "policy_match", PolicyCode = "spam", Verdict = "needs_review",
@@ -287,7 +298,8 @@ public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixtu
             provider == EventReportExternalProvider.Coop
                 ? await CreateCoopAdviceHandler(context, tenant.Id).ExecuteAsync(new ProcessCoopDecisionCallbackCommand
                 {
-                    Request = coop, IncomingWebhookMessageId = message.Id
+                    Request = coop,
+                    IncomingWebhookMessageId = message.Id
                 }, CancellationToken.None)
                 : await new RecordOspreySignalCallbackCommandHandler(
                     new EventReportRepository(context), new EfCoreUnitOfWork(context), new StaticTenantContext(tenant.Id))
@@ -355,7 +367,10 @@ public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixtu
 
         var result = await handler.ExecuteAsync(new ExecuteReportDecisionCommand
         {
-            EventId = @event.Id, ReportId = report.Id, CaseId = reportCase.Id, DecisionId = decision.Id,
+            EventId = @event.Id,
+            ReportId = report.Id,
+            CaseId = reportCase.Id,
+            DecisionId = decision.Id,
             ExpectedCaseConcurrencyStamp = stamp
         }, CancellationToken.None);
 
@@ -394,9 +409,14 @@ public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixtu
         await context.SaveChangesAsync();
         var callback = new OspreySignalCallbackRequestDto
         {
-            TenantId = tenant.Id, EventId = @event.Id, ReportId = firstReport.Id, CaseId = firstCase.Id,
-            ProviderSignalId = "provider-signal", CorrelationId = "dispatch",
-            ProviderTargetScope = "tenant", ProviderTargetId = tenant.Id.ToString("N"),
+            TenantId = tenant.Id,
+            EventId = @event.Id,
+            ReportId = firstReport.Id,
+            CaseId = firstCase.Id,
+            ProviderSignalId = "provider-signal",
+            CorrelationId = "dispatch",
+            ProviderTargetScope = "tenant",
+            ProviderTargetId = tenant.Id.ToString("N"),
             Signals = [new OspreySignalCallbackItemDto
             {
                 SignalType = "policy_match", PolicyCode = "spam", Verdict = "urgent", CreatedAtUtc = AdvisoryObservedAt
@@ -409,8 +429,10 @@ public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixtu
         {
             Request = callback with
             {
-                ReportId = secondReport.Id, CaseId = secondCase.Id,
-                ProviderTargetScope = "instance", ProviderTargetId = "instance"
+                ReportId = secondReport.Id,
+                CaseId = secondCase.Id,
+                ProviderTargetScope = "instance",
+                ProviderTargetId = "instance"
             }
         }, CancellationToken.None);
 
@@ -452,10 +474,17 @@ public sealed partial class EventReportPersistenceTests(PostgreSqlContainerFixtu
 
     private static CoopDecisionCallbackRequestDto CreateCoopAdvice(EventReport report, EventReportCase reportCase, string action) => new()
     {
-        TenantId = report.TenantId, ReportId = report.Id, EventId = report.EventId, CaseId = reportCase.Id,
-        ProviderDecisionId = "provider-advice", ProviderCaseId = "provider-case", CorrelationId = "dispatch",
-        ProviderTargetScope = "tenant", ProviderTargetId = report.TenantId.ToString("N"),
-        Action = new CoopDecisionCallbackActionDto { Id = action }, SafeNote = "Retained advisory evidence."
+        TenantId = report.TenantId,
+        ReportId = report.Id,
+        EventId = report.EventId,
+        CaseId = reportCase.Id,
+        ProviderDecisionId = "provider-advice",
+        ProviderCaseId = "provider-case",
+        CorrelationId = "dispatch",
+        ProviderTargetScope = "tenant",
+        ProviderTargetId = report.TenantId.ToString("N"),
+        Action = new CoopDecisionCallbackActionDto { Id = action },
+        SafeNote = "Retained advisory evidence."
     };
 
     private static IncomingWebhookMessage CreateAdviceMessage(CoopDecisionCallbackRequestDto callback)

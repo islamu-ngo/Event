@@ -37,12 +37,19 @@ public sealed class KeyObligation
             throw ModerationRecognitionKeyLifecycle.Unavailable();
         var result = new KeyObligation
         {
-            Id = item.Id, IntentId = item.IntentId, TrustDomainId = item.TrustDomainId, SourceId = source.Id,
-            KeyId = item.KeyId, KeyGeneration = item.KeyGeneration, VerificationTag = item.KeyVerificationTag,
+            Id = item.Id,
+            IntentId = item.IntentId,
+            TrustDomainId = item.TrustDomainId,
+            SourceId = source.Id,
+            KeyId = item.KeyId,
+            KeyGeneration = item.KeyGeneration,
+            VerificationTag = item.KeyVerificationTag,
             CaptureMaterialReceipt = item.ComputeMaterialReceipt(),
             MaterialReceipt = materialReceipt,
-            OriginalCapturedAt = item.OriginalCapturedAt, OriginalRetainUntil = item.RetainUntil,
-            BackupHorizonTicks = source.MaximumBackupHorizonTicks, BackupSafetyMarginTicks = source.BackupSafetyMarginTicks,
+            OriginalCapturedAt = item.OriginalCapturedAt,
+            OriginalRetainUntil = item.RetainUntil,
+            BackupHorizonTicks = source.MaximumBackupHorizonTicks,
+            BackupSafetyMarginTicks = source.BackupSafetyMarginTicks,
             ReceiptRetentionTicks = source.Retention.Single(row =>
                 row.RecordClass == ModerationRecognitionPrivacyRecordClass.DispositionAndReplayReceipt).MaximumRetentionTicks,
             ReadableUntil = item.RetainUntil.AddTicks(checked(source.MaximumBackupHorizonTicks + source.BackupSafetyMarginTicks))

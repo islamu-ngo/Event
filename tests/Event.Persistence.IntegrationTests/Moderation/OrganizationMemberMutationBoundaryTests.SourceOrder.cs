@@ -31,8 +31,11 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
                 .Select(row => row.OrganizationTenant.OrganizationId).SingleAsync();
             seed.Actors.Add(new Actor
             {
-                Id = actorId, OrganizationId = organizationId, ActorTypeId = (int)ActorTypeEnum.Organization,
-                ActorType = null!, Pii = new ActorPii { ActorId = actorId, DisplayName = "Native organization" }
+                Id = actorId,
+                OrganizationId = organizationId,
+                ActorTypeId = (int)ActorTypeEnum.Organization,
+                ActorType = null!,
+                Pii = new ActorPii { ActorId = actorId, DisplayName = "Native organization" }
             });
             await seed.SaveChangesAsync();
         }
@@ -43,8 +46,11 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         var handler = new UpdateOrganizationMemberRoleCommandHandler(new OrganizationMemberRepository(context),
             new OrganizationRepository(context), new UserContext(session.Http), session.Boundary);
         var revision = await RevisionAsync(context);
-        var result = await handler.ExecuteAsync(new() { UpdateOrganizationMemberRoleDto = new()
-            { Id = target, Role = RoleEnum.OrgAdmin } }, default);
+        var result = await handler.ExecuteAsync(new()
+        {
+            UpdateOrganizationMemberRoleDto = new()
+            { Id = target, Role = RoleEnum.OrgAdmin }
+        }, default);
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(order.ObservedTenant).IsTrue();
         await Assert.That(order.OrganizationWasHeld).IsTrue();

@@ -92,30 +92,44 @@ public sealed partial class EventResourceDiscoveryQueryTests
         {
             var owner = new Organization
             {
-                Id = ownerId, Pii = new OrganizationPii { FullName = "Independent machine owner" },
-                CreatedAt = Now, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = ownerId,
+                Pii = new OrganizationPii { FullName = "Independent machine owner" },
+                CreatedAt = Now,
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             context.OrganizationTenants.Add(new OrganizationTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                OrganizationId = owner.Id, Organization = owner,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!,
-                CreatedAt = Now, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                OrganizationId = owner.Id,
+                Organization = owner,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!,
+                CreatedAt = Now,
+                ConcurrencyStamp = Guid.CreateVersion7()
             });
         }
         else
         {
             var owner = new Group
             {
-                Id = ownerId, FullName = "Independent machine owner",
-                CreatedAt = Now, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = ownerId,
+                FullName = "Independent machine owner",
+                CreatedAt = Now,
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             context.GroupTenants.Add(new GroupTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                GroupId = owner.Id, Group = owner,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!,
-                CreatedAt = Now, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                GroupId = owner.Id,
+                Group = owner,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!,
+                CreatedAt = Now,
+                ConcurrencyStamp = Guid.CreateVersion7()
             });
         }
         await context.SaveChangesAsync();

@@ -49,8 +49,10 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             OperationId = Guid.CreateVersion7(),
             Target = foreignResource ? AuthorityScope.Resource(fixture.Case.Scope, Guid.CreateVersion7()) : scope,
-            ExpectedQualificationRevision = epoch.Revision, FindingId = finding.Id,
-            ExpectedFindingRevision = finding.Revision, ReversalReferenceId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = epoch.Revision,
+            FindingId = finding.Id,
+            ExpectedFindingRevision = finding.Revision,
+            ReversalReferenceId = Guid.CreateVersion7(),
             Justification = "Current independent correction remains within the retained Resource action scope."
         };
         var repository = fixture.Repository(writer, fixture.Assessor);
@@ -98,9 +100,12 @@ public sealed partial class ModerationCaseNativeProofTests
         var epoch = await writer.ModerationQualificationEpochs.AsNoTracking().SingleAsync();
         var request = new ReverseModerationFindingSource
         {
-            OperationId = Guid.CreateVersion7(), Target = finding.Scope,
-            ExpectedQualificationRevision = epoch.Revision, FindingId = finding.Id,
-            ExpectedFindingRevision = finding.Revision, ReversalReferenceId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = finding.Scope,
+            ExpectedQualificationRevision = epoch.Revision,
+            FindingId = finding.Id,
+            ExpectedFindingRevision = finding.Revision,
+            ReversalReferenceId = Guid.CreateVersion7(),
             Justification = "Current independent correction of the retained finding."
         };
         var repository = fixture.Original.Repository(writer, fixture.Original.Assessor);
@@ -173,16 +178,22 @@ public sealed partial class ModerationCaseNativeProofTests
         ModerationQualificationMutation request = reviewer
             ? new WithdrawModerationReviewerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Case.Scope,
-                ExpectedQualificationRevision = epoch.Revision, AssignmentId = assignment.Id,
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Case.Scope,
+                ExpectedQualificationRevision = epoch.Revision,
+                AssignmentId = assignment.Id,
                 ExpectedAssignmentRevision = assignment.Revision
             }
             : new RevokeModerationQualificationPolicyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Case.Scope,
-                ExpectedQualificationRevision = epoch.Revision, CaseId = fixture.Case.Id,
-                ExpectedCaseRevision = owner.Revision, SourceId = policy.Id,
-                ExpectedSourceRevision = policy.Revision, AdoptionId = adoption.Id,
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Case.Scope,
+                ExpectedQualificationRevision = epoch.Revision,
+                CaseId = fixture.Case.Id,
+                ExpectedCaseRevision = owner.Revision,
+                SourceId = policy.Id,
+                ExpectedSourceRevision = policy.Revision,
+                AdoptionId = adoption.Id,
                 ExpectedAdoptionRevision = adoption.Revision
             };
         var repository = fixture.Original.Repository(writer, fixture.Original.Assessor);
@@ -268,10 +279,13 @@ public sealed partial class ModerationCaseNativeProofTests
         var currentEpoch = await writer.ModerationQualificationEpochs.AsNoTracking().SingleAsync();
         var request = new RevokeModerationNoticeDisclosureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Case.Scope,
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Case.Scope,
             ExpectedQualificationRevision = currentEpoch.Revision,
-            CaseId = fixture.Case.Id, ExpectedCaseRevision = fixture.Case.Revision,
-            ApprovalId = approval.Id, ExpectedApprovalRevision = 1
+            CaseId = fixture.Case.Id,
+            ExpectedCaseRevision = fixture.Case.Revision,
+            ApprovalId = approval.Id,
+            ExpectedApprovalRevision = 1
         };
         request = change switch
         {

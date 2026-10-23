@@ -89,10 +89,13 @@ public sealed partial class ModerationPolicyPublicationTests
             or IndividualAcquisitionChange.ProviderBindingSubstitution
             or IndividualAcquisitionChange.ProviderLoginReplacement
             or IndividualAcquisitionChange.ProviderPrincipalSubstitution;
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext
+        var http = new HttpContextAccessor
         {
-            User = provider ? fixture.ProviderPrincipal() : IndividualPrincipal(fixture.SubjectId)
-        }};
+            HttpContext = new DefaultHttpContext
+            {
+                User = provider ? fixture.ProviderPrincipal() : IndividualPrincipal(fixture.SubjectId)
+            }
+        };
         var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
             new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
             new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
@@ -152,8 +155,11 @@ public sealed partial class ModerationPolicyPublicationTests
         if (change == IndividualAcquisitionChange.ParentWithdrawn)
             await Assert.That((await fixture.Writer(fixture.Database.AdminId).ExecuteAsync(new WithdrawModerationChildAgePolicyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope, ExpectedQualificationRevision = 6,
-                AdoptionId = fixture.ParentAdoption.AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Database.Scope,
+                ExpectedQualificationRevision = 6,
+                AdoptionId = fixture.ParentAdoption.AdoptionId,
+                ExpectedAdoptionRevision = 1
             })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         if (change is IndividualAcquisitionChange.OwnerRoleLost or IndividualAcquisitionChange.ReviewerRoleLost)
         {
@@ -166,7 +172,9 @@ public sealed partial class ModerationPolicyPublicationTests
         if (change == IndividualAcquisitionChange.LatestUnadoptedSource)
             await Assert.That((await fixture.Writer(fixture.OwnerId).ExecuteAsync(fixture.Record with
             {
-                OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), ExpectedQualificationRevision = 6
+                OperationId = Guid.CreateVersion7(),
+                SourceId = Guid.CreateVersion7(),
+                ExpectedQualificationRevision = 6
             })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
 
         ModerationProfileCollectionIndividualAcquisition? retained = null;
@@ -328,8 +336,15 @@ public sealed partial class ModerationPolicyPublicationTests
         public UserExternalLogin Login(Guid id)
         {
             var account = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(Issuer, ProviderSubject);
-            return new() { Id = id, UserId = SubjectId, User = null!,
-                AuthenticationProviderId = (int)account.ProviderKind, AuthenticationProvider = null!, ProviderKey = account.Value };
+            return new()
+            {
+                Id = id,
+                UserId = SubjectId,
+                User = null!,
+                AuthenticationProviderId = (int)account.ProviderKind,
+                AuthenticationProvider = null!,
+                ProviderKey = account.Value
+            };
         }
 
         public ModerationQualificationRepository Writer(Guid human)
@@ -365,8 +380,12 @@ public sealed partial class ModerationPolicyPublicationTests
                 row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
             foreach (var id in new[] { owner, reviewer, subject, other })
             {
-                var human = new User { Id = id, Pii = new UserPii
-                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Profile", LastName = "Witness" } };
+                var human = new User
+                {
+                    Id = id,
+                    Pii = new UserPii
+                    { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Profile", LastName = "Witness" }
+                };
                 context.Users.Add(human);
                 if (id == owner || id == reviewer)
                     context.PlatformUserRoles.Add(new PlatformUserRole
@@ -376,38 +395,73 @@ public sealed partial class ModerationPolicyPublicationTests
             context.ChangeTracker.Clear();
             var age = new RecordModerationChildAgePolicySource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-                SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-                PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-                Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(8), Terms = ChildAgeTerms(),
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 2,
+                SourceId = Guid.CreateVersion7(),
+                PolicyId = request.Proposed.PolicyId,
+                ExpectedPolicyRevision = 1,
+                PublicationId = request.Proposed.PublicationId,
+                ProfileId = request.Proposed.Profiles.Single().Id,
+                Mode = ModerationNativeMode.Embedded,
+                ValidUntil = Now.AddMinutes(8),
+                Terms = ChildAgeTerms(),
                 Ownership = new(reviewer, reviewer, owner, owner, database.AdminId,
                     "Distinct controllers.", "Independent privacy mandate.", "Child-risk mandate.", "Collection owner mandate.")
             };
             var parent = new AdoptModerationChildAgePolicySource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-                SourceId = age.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 3,
-                AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(7)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 3,
+                SourceId = age.SourceId,
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = 3,
+                AdoptionId = Guid.CreateVersion7(),
+                ValidUntil = Now.AddMinutes(7)
             };
             var record = new RecordModerationProfileCollectionProcedureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-                SourceId = Guid.CreateVersion7(), ChildAgeSourceId = age.SourceId,
-                ExpectedChildAgeSourceRevision = 1, ExpectedChildAgeSourceWriterGeneration = 3,
-                ChildAgeAdoptionId = parent.AdoptionId, ExpectedChildAgeAdoptionRevision = 1,
-                ExpectedChildAgeAdoptionWriterGeneration = 4, Procedure = ProcedureVocabulary(), ValidUntil = Now.AddMinutes(6)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 4,
+                SourceId = Guid.CreateVersion7(),
+                ChildAgeSourceId = age.SourceId,
+                ExpectedChildAgeSourceRevision = 1,
+                ExpectedChildAgeSourceWriterGeneration = 3,
+                ChildAgeAdoptionId = parent.AdoptionId,
+                ExpectedChildAgeAdoptionRevision = 1,
+                ExpectedChildAgeAdoptionWriterGeneration = 4,
+                Procedure = ProcedureVocabulary(),
+                ValidUntil = Now.AddMinutes(6)
             };
             var adopt = new AdoptModerationProfileCollectionProcedureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-                SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 5,
-                AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(5)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 5,
+                SourceId = record.SourceId,
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = 5,
+                AdoptionId = Guid.CreateVersion7(),
+                ValidUntil = Now.AddMinutes(5)
             };
             var fixture = new IndividualPolicyFixture
             {
-                Database = database, Context = context, Clock = clock, Privacy = privacy, PrivacyOptions = options,
-                Age = age, ParentAdoption = parent, Record = record, Adopt = adopt,
-                SubjectId = subject, OtherSubjectId = other, OwnerId = owner, ReviewerId = reviewer, LoginId = Guid.CreateVersion7()
+                Database = database,
+                Context = context,
+                Clock = clock,
+                Privacy = privacy,
+                PrivacyOptions = options,
+                Age = age,
+                ParentAdoption = parent,
+                Record = record,
+                Adopt = adopt,
+                SubjectId = subject,
+                OtherSubjectId = other,
+                OwnerId = owner,
+                ReviewerId = reviewer,
+                LoginId = Guid.CreateVersion7()
             };
             context.UserExternalLogins.Add(fixture.Login(fixture.LoginId));
             await context.SaveChangesAsync();
@@ -453,19 +507,30 @@ public sealed partial class ModerationPolicyPublicationTests
             foreach (var obligation in obligations)
                 context.Set<ModerationPolicyPublicationEvidence>().Add(new()
                 {
-                    PublicationId = publication.Id, RequirementDigest = ModerationPolicyPublicationProjection.Digest(obligation),
-                    ApprovalId = Guid.CreateVersion7(), ApprovalRevision = 1, SourceId = Guid.CreateVersion7(),
-                    SourceRevision = 1, WriterGeneration = "persisted-read-precondition",
-                    ObservedAt = Now, ValidUntil = Now.AddMinutes(10)
+                    PublicationId = publication.Id,
+                    RequirementDigest = ModerationPolicyPublicationProjection.Digest(obligation),
+                    ApprovalId = Guid.CreateVersion7(),
+                    ApprovalRevision = 1,
+                    SourceId = Guid.CreateVersion7(),
+                    SourceRevision = 1,
+                    WriterGeneration = "persisted-read-precondition",
+                    ObservedAt = Now,
+                    ValidUntil = Now.AddMinutes(10)
                 });
             foreach (var requirement in draft.Consumers)
                 foreach (var consumer in requirement.Consumers)
                     context.Set<ModerationPolicyPublicationEvidence>().Add(new()
                     {
-                        PublicationId = publication.Id, RequirementDigest = ModerationPolicyPublicationProjection.Digest(new
+                        PublicationId = publication.Id,
+                        RequirementDigest = ModerationPolicyPublicationProjection.Digest(new
                         { requirement.Binding, ConsumerId = consumer.Id, draft.Proposed.InventoryFingerprint }),
-                        ApprovalId = null, ApprovalRevision = null, SourceId = Guid.CreateVersion7(), SourceRevision = 1,
-                        WriterGeneration = "persisted-read-precondition", ObservedAt = Now, ValidUntil = Now.AddMinutes(10)
+                        ApprovalId = null,
+                        ApprovalRevision = null,
+                        SourceId = Guid.CreateVersion7(),
+                        SourceRevision = 1,
+                        WriterGeneration = "persisted-read-precondition",
+                        ObservedAt = Now,
+                        ValidUntil = Now.AddMinutes(10)
                     });
             await context.SaveChangesAsync();
             await context.ModerationPolicyPublications.Where(row => row.Id == publication.Id).ExecuteUpdateAsync(setters => setters

@@ -32,10 +32,18 @@ public sealed class UserBirthDateCollectionReceipt
             throw new ArgumentException("Private collection provenance requires exact live original coordinates.");
         return new()
         {
-            Id = receipt.Id, UserId = userId, ObservationId = observationId,
-            AssessmentId = assessmentId, AssessmentAdoptionId = assessmentAdoptionId, ConsentId = consentId,
-            PolicyId = policyId, PolicyRevision = policyRevision, PublicationId = publicationId, ProfileId = profileId,
-            CollectedAt = now, ValidUntil = receipt.ValidUntil
+            Id = receipt.Id,
+            UserId = userId,
+            ObservationId = observationId,
+            AssessmentId = assessmentId,
+            AssessmentAdoptionId = assessmentAdoptionId,
+            ConsentId = consentId,
+            PolicyId = policyId,
+            PolicyRevision = policyRevision,
+            PublicationId = publicationId,
+            ProfileId = profileId,
+            CollectedAt = now,
+            ValidUntil = receipt.ValidUntil
         };
     }
 

@@ -29,8 +29,10 @@ public sealed partial class ModerationResourceGenerationWriterTests
         await Assert.That(replay.QualificationRevision).IsEqualTo(accepted.QualificationRevision);
         var next = source with
         {
-            SourceId = Guid.CreateVersion7(), OperationId = Guid.CreateVersion7(),
-            ExpectedQualificationRevision = 2, ExpectedResourceRevision = 1
+            SourceId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 2,
+            ExpectedResourceRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, next)).IsSuccess).IsTrue();
         await using var reader = database.Context();
@@ -99,8 +101,11 @@ public sealed partial class ModerationResourceGenerationWriterTests
         var resourceId = await SeedAsync(database);
         var replacement = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.ReviewerId, Pii = new ActorPii { DisplayName = "Replacement resource publisher" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.ReviewerId,
+            Pii = new ActorPii { DisplayName = "Replacement resource publisher" }
         };
         Guid eventId;
         Guid publisher;
@@ -138,13 +143,19 @@ public sealed partial class ModerationResourceGenerationWriterTests
         var resourceId = await SeedAsync(database, storedFile: true);
         var owner = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.ReviewerId, Pii = new ActorPii { DisplayName = "Stored resource owner" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.ReviewerId,
+            Pii = new ActorPii { DisplayName = "Stored resource owner" }
         };
         var replacement = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.UrgencyAssessorId, Pii = new ActorPii { DisplayName = "Replacement storage owner" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.UrgencyAssessorId,
+            Pii = new ActorPii { DisplayName = "Replacement storage owner" }
         };
         Guid storageId;
         await using (var seed = database.Context())
@@ -235,8 +246,13 @@ public sealed partial class ModerationResourceGenerationWriterTests
 
     private static RecordModerationResourceGenerationSource Source(SourceDatabase database, Guid resourceId) => new()
     {
-        OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), Target = database.Scope,
-        ExpectedQualificationRevision = 1, ResourceId = resourceId, ExpectedResourceRevision = 0, ValidUntil = Now.AddMinutes(10)
+        OperationId = Guid.CreateVersion7(),
+        SourceId = Guid.CreateVersion7(),
+        Target = database.Scope,
+        ExpectedQualificationRevision = 1,
+        ResourceId = resourceId,
+        ExpectedResourceRevision = 0,
+        ValidUntil = Now.AddMinutes(10)
     };
 
 }

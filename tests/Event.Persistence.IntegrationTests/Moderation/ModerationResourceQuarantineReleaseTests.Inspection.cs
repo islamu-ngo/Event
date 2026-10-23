@@ -75,8 +75,10 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             case "reviewer":
                 await fixture.Native.SourceAsync(fixture.Native.Database.AdministratorId, new WithdrawModerationReviewerSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Native.Scope,
-                    ExpectedQualificationRevision = 1, AssignmentId = fixture.Intent.ReviewerAssignmentId,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Native.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = fixture.Intent.ReviewerAssignmentId,
                     ExpectedAssignmentRevision = 3
                 });
                 break;
@@ -87,10 +89,15 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             case "controller":
                 await fixture.Native.SourceAsync(fixture.Native.Database.AdministratorId, new QualifyModerationReviewerController
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Native.Scope, ExpectedQualificationRevision = 1,
-                    AssignmentId = fixture.Intent.ReviewerAssignmentId, ExpectedAssignmentRevision = 3,
-                    ControllerHumanId = fixture.Native.Database.SubjectId, EvidenceId = Guid.CreateVersion7(),
-                    Justification = "New independently established controller.", QualifiedUntil = fixture.Native.Clock.Now.AddMinutes(15)
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Native.Scope,
+                    ExpectedQualificationRevision = 1,
+                    AssignmentId = fixture.Intent.ReviewerAssignmentId,
+                    ExpectedAssignmentRevision = 3,
+                    ControllerHumanId = fixture.Native.Database.SubjectId,
+                    EvidenceId = Guid.CreateVersion7(),
+                    Justification = "New independently established controller.",
+                    QualifiedUntil = fixture.Native.Clock.Now.AddMinutes(15)
                 });
                 break;
             case "audience":

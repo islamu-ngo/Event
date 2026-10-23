@@ -146,10 +146,14 @@ public sealed partial class ModerationResourceQuarantineDutyRepository(
                                 throw new DutyUnavailable(ModerationResourceReviewDutyOutcome.RecipientUnavailable);
                             escalation = new()
                             {
-                                Id = id, TenantId = tenantId, HostBindingId = authority.Host.Id,
+                                Id = id,
+                                TenantId = tenantId,
+                                HostBindingId = authority.Host.Id,
                                 ServicePrincipalId = authority.Host.MaintenanceServicePrincipalId,
-                                QualificationRevision = authority.EpochRevision, EscalatedAt = observedAt,
-                                PurposeUntil = authority.Until, RecipientCount = recipients.Length
+                                QualificationRevision = authority.EpochRevision,
+                                EscalatedAt = observedAt,
+                                PurposeUntil = authority.Until,
+                                RecipientCount = recipients.Length
                             };
                             escalation.ValidatePersistedState();
                             foreach (var recipient in recipients)

@@ -249,8 +249,14 @@ public sealed class PublicEventCalendarHttpResultTests
     {
         public Explore.Domain.Event Event { get; } = new(EventStatusEnum.Published)
         {
-            Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), Title = "Reviewed calendar title",
-            Actor = null!, Tenant = null!, VisibilityType = null!, EventStatus = null!, EventFormat = null!
+            Id = Guid.NewGuid(),
+            TenantId = Guid.NewGuid(),
+            Title = "Reviewed calendar title",
+            Actor = null!,
+            Tenant = null!,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormat = null!
         };
         public EventSession PrimarySession { get; }
         public DateTimeOffset ValidUntil => Now.AddMinutes(1);
@@ -260,8 +266,13 @@ public sealed class PublicEventCalendarHttpResultTests
         public bool Disposed { get; private set; }
         public Lease() => PrimarySession = new(EventSessionStatusEnum.Published)
         {
-            Id = Guid.NewGuid(), EventId = Event.Id, Event = Event, TenantId = Event.TenantId, Tenant = null!,
-            StartTime = Now.AddDays(1), EndTime = Now.AddDays(1).AddHours(1)
+            Id = Guid.NewGuid(),
+            EventId = Event.Id,
+            Event = Event,
+            TenantId = Event.TenantId,
+            Tenant = null!,
+            StartTime = Now.AddDays(1),
+            EndTime = Now.AddDays(1).AddHours(1)
         };
         public Task<ModerationPublicEventCalendarOutcome> RevalidateAsync(CancellationToken cancellationToken) =>
             Task.FromResult(Current && !Disposed ? ModerationPublicEventCalendarOutcome.Allowed

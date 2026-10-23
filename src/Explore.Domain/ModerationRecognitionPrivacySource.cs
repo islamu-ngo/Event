@@ -82,20 +82,42 @@ public sealed class ModerationRecognitionPrivacySource
         ownership.Validate(humanId);
         var source = new ModerationRecognitionPrivacySource
         {
-            Id = id, HostBindingId = hostId, TrustDomainId = trustId, TenantId = tenantId,
-            PolicyId = policyId, PolicyRevision = policyRevision, PublicationId = publicationId,
-            DefinitionId = definitionId, ProfileId = profileId, ModeCode = modeCode, ProposedStateDigest = proposedStateDigest,
-            Purposes = terms.Purposes, ScopeCeiling = terms.ScopeCeiling, Linkage = terms.Linkage,
-            OrdinaryErasure = terms.OrdinaryErasure, Correction = terms.Correction, CatastrophicDisposition = terms.CatastrophicDisposition,
-            KeyObligations = terms.KeyObligations, ProtectedRemedyCalendarMonths = terms.ProtectedRemedyCalendarMonths,
-            EscalationAfterTicks = terms.EscalationAfter.Ticks, LawfulRequestDeadlineTicks = terms.LawfulRequestDeadline.Ticks,
-            MaximumBackupHorizonTicks = terms.MaximumBackupHorizon.Ticks, BackupSafetyMarginTicks = terms.BackupSafetyMargin.Ticks,
-            PrivacyOwnerHumanId = ownership.PrivacyOwnerHumanId, PrivacyControllerHumanId = ownership.PrivacyControllerHumanId,
-            RecoveryOwnerHumanId = ownership.RecoveryOwnerHumanId, RecoveryControllerHumanId = ownership.RecoveryControllerHumanId,
+            Id = id,
+            HostBindingId = hostId,
+            TrustDomainId = trustId,
+            TenantId = tenantId,
+            PolicyId = policyId,
+            PolicyRevision = policyRevision,
+            PublicationId = publicationId,
+            DefinitionId = definitionId,
+            ProfileId = profileId,
+            ModeCode = modeCode,
+            ProposedStateDigest = proposedStateDigest,
+            Purposes = terms.Purposes,
+            ScopeCeiling = terms.ScopeCeiling,
+            Linkage = terms.Linkage,
+            OrdinaryErasure = terms.OrdinaryErasure,
+            Correction = terms.Correction,
+            CatastrophicDisposition = terms.CatastrophicDisposition,
+            KeyObligations = terms.KeyObligations,
+            ProtectedRemedyCalendarMonths = terms.ProtectedRemedyCalendarMonths,
+            EscalationAfterTicks = terms.EscalationAfter.Ticks,
+            LawfulRequestDeadlineTicks = terms.LawfulRequestDeadline.Ticks,
+            MaximumBackupHorizonTicks = terms.MaximumBackupHorizon.Ticks,
+            BackupSafetyMarginTicks = terms.BackupSafetyMargin.Ticks,
+            PrivacyOwnerHumanId = ownership.PrivacyOwnerHumanId,
+            PrivacyControllerHumanId = ownership.PrivacyControllerHumanId,
+            RecoveryOwnerHumanId = ownership.RecoveryOwnerHumanId,
+            RecoveryControllerHumanId = ownership.RecoveryControllerHumanId,
             GovernanceControllerHumanId = ownership.GovernanceControllerHumanId,
             IdentityAndIndependenceBasis = ownership.IdentityAndIndependenceBasis,
-            PrivacyLegalMandateBasis = ownership.PrivacyLegalMandateBasis, RecoveryMandateBasis = ownership.RecoveryMandateBasis,
-            RecordedByHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1, RecordedAt = now, ValidUntil = validUntil
+            PrivacyLegalMandateBasis = ownership.PrivacyLegalMandateBasis,
+            RecoveryMandateBasis = ownership.RecoveryMandateBasis,
+            RecordedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            RecordedAt = now,
+            ValidUntil = validUntil
         };
         source.retention.AddRange(retentionTerms.OrderBy(row => row.RecordClass)
             .Select(row => ModerationRecognitionPrivacyRetention.Capture(id, row)));
@@ -150,8 +172,12 @@ public sealed class ModerationRecognitionPrivacyRetention
         terms.Validate();
         return new()
         {
-            SourceId = sourceId, RecordClass = terms.RecordClass, MaximumRetentionTicks = terms.MaximumRetention.Ticks,
-            Hold = terms.Hold, MaximumHoldTicks = terms.MaximumHold.Ticks, HoldReviewWithinTicks = terms.HoldReviewWithin.Ticks
+            SourceId = sourceId,
+            RecordClass = terms.RecordClass,
+            MaximumRetentionTicks = terms.MaximumRetention.Ticks,
+            Hold = terms.Hold,
+            MaximumHoldTicks = terms.MaximumHold.Ticks,
+            HoldReviewWithinTicks = terms.HoldReviewWithin.Ticks
         };
     }
     public ModerationRecognitionPrivacyRetentionTerms ToTerms() => new(RecordClass, TimeSpan.FromTicks(MaximumRetentionTicks),

@@ -112,18 +112,35 @@ public sealed class ModerationNoticeDisclosureApproval
         intent.Validate();
         var row = new ModerationNoticeDisclosureApproval
         {
-            Id = intent.ApprovalId, HostBindingId = hostBindingId, TrustDomainId = trustDomainId, TenantId = tenantId,
-            EffectId = intent.EffectId, DecisionId = intent.DecisionId, DecisionRevision = intent.ExpectedDecisionRevision,
-            CaseId = intent.CaseId, CaseRevision = intent.ExpectedCaseRevision,
-            PolicyId = intent.PolicyId, PolicyRevision = intent.ExpectedPolicyRevision, PublicationId = intent.PublicationId,
-            ProfileId = intent.ProfileId, ContributionId = intent.ContributionId, SelectionDigest = intent.SelectionDigest,
-            RuleMeaning = intent.RuleMeaning.Value, ReasonMeaning = intent.ReasonMeaning.Value,
+            Id = intent.ApprovalId,
+            HostBindingId = hostBindingId,
+            TrustDomainId = trustDomainId,
+            TenantId = tenantId,
+            EffectId = intent.EffectId,
+            DecisionId = intent.DecisionId,
+            DecisionRevision = intent.ExpectedDecisionRevision,
+            CaseId = intent.CaseId,
+            CaseRevision = intent.ExpectedCaseRevision,
+            PolicyId = intent.PolicyId,
+            PolicyRevision = intent.ExpectedPolicyRevision,
+            PublicationId = intent.PublicationId,
+            ProfileId = intent.ProfileId,
+            ContributionId = intent.ContributionId,
+            SelectionDigest = intent.SelectionDigest,
+            RuleMeaning = intent.RuleMeaning.Value,
+            ReasonMeaning = intent.ReasonMeaning.Value,
             FactsJson = JsonSerializer.Serialize(intent.Facts.Select(value => value.Value).ToArray()),
-            RemainingActions = intent.RemainingActions.Value, Recourse = intent.Recourse.Value,
-            Automation = intent.Automation.Value, Retention = intent.Retention.Value,
+            RemainingActions = intent.RemainingActions.Value,
+            Recourse = intent.Recourse.Value,
+            Automation = intent.Automation.Value,
+            Retention = intent.Retention.Value,
             ContentRepresentativesJson = JsonSerializer.Serialize(intent.ContentRepresentatives),
-            ApprovedByHumanId = approvedByHumanId, WriterGeneration = writerGeneration, Revision = 1,
-            ApprovedAt = now.ToUniversalTime(), ValidUntil = intent.ValidUntil, RetainUntil = intent.RetainUntil
+            ApprovedByHumanId = approvedByHumanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            ApprovedAt = now.ToUniversalTime(),
+            ValidUntil = intent.ValidUntil,
+            RetainUntil = intent.RetainUntil
         };
         row.ValidatePersistedState();
         return row;

@@ -144,9 +144,13 @@ public sealed class ModerationNoticeDisclosureWriterTests
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, Approve(database, intent))).IsSuccess).IsTrue();
         var revoke = new RevokeModerationNoticeDisclosureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            ApprovalId = intent.ApprovalId, CaseId = intent.CaseId,
-            ExpectedCaseRevision = intent.ExpectedCaseRevision, ExpectedApprovalRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            ApprovalId = intent.ApprovalId,
+            CaseId = intent.CaseId,
+            ExpectedCaseRevision = intent.ExpectedCaseRevision,
+            ExpectedApprovalRevision = 1
         };
         var first = await database.ExecuteAsync(database.AdministratorId, revoke);
         var replay = await database.ExecuteAsync(database.AdministratorId, revoke);
@@ -193,7 +197,10 @@ public sealed class ModerationNoticeDisclosureWriterTests
 
     private static ApproveModerationNoticeDisclosureSource Approve(SourceDatabase database, ModerationNoticeDisclosureIntent intent) => new()
     {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3, Intent = intent
+        OperationId = Guid.CreateVersion7(),
+        Target = database.Scope,
+        ExpectedQualificationRevision = 3,
+        Intent = intent
     };
 
     private static Explore.Persistence.ExploreDbContext Read(SourceDatabase database)

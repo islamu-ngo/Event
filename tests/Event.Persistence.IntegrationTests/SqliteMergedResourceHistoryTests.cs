@@ -110,7 +110,7 @@ public sealed class SqliteMergedResourceHistoryTests
         using var context = CreateContext();
         Migration migration = ReadMigration(context, Sources);
         var operations = migration.UpOperations.Where(operation => operation is not AddColumnOperation
-            { Table: "ie_event_resources", Name: "material_version_id" }).ToArray();
+        { Table: "ie_event_resources", Name: "material_version_id" }).ToArray();
 
         await Assert.That(() => Generate(context, operations, TargetModel(context, migration)))
             .Throws<InvalidOperationException>();

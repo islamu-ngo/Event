@@ -115,15 +115,22 @@ public sealed class ModerationContentNoticeCustodyTests
             var status = await writer.TenantStatuses.SingleAsync(row => row.IsActiveState);
             tenant = new Tenant
             {
-                Id = Guid.CreateVersion7(), FullName = "Foreign custody tenant",
-                Slug = $"custody-{Guid.CreateVersion7():N}", TenantStatusId = status.Id, TenantStatus = status
+                Id = Guid.CreateVersion7(),
+                FullName = "Foreign custody tenant",
+                Slug = $"custody-{Guid.CreateVersion7():N}",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             };
             writer.Tenants.Add(tenant);
             writer.TenantContext = new FixtureTenant(tenant.Id);
             writer.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                UserId = database.SubjectId, User = null!, StatusId = (int)TenantUserStatusEnum.Active
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                UserId = database.SubjectId,
+                User = null!,
+                StatusId = (int)TenantUserStatusEnum.Active
             });
         }
         var actor = await writer.Actors.SingleAsync(row => row.UserId == database.SubjectId);
@@ -150,8 +157,12 @@ public sealed class ModerationContentNoticeCustodyTests
         if (reviewer)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AssignModerationReviewerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-                AssignmentId = Guid.CreateVersion7(), CaseId = intent.CaseId, ExpectedCaseRevision = 1,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 3,
+                AssignmentId = Guid.CreateVersion7(),
+                CaseId = intent.CaseId,
+                ExpectedCaseRevision = 1,
                 ReviewerHumanId = database.ReviewerId
             })).IsSuccess).IsTrue();
         var proof = intent.ContentRepresentatives.Single();
@@ -410,24 +421,38 @@ public sealed class ModerationContentNoticeCustodyTests
         var actorId = Guid.CreateVersion7();
         actor ??= new Actor
         {
-            Id = actorId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.SubjectId, Pii = new ActorPii { ActorId = actorId, DisplayName = "Original Event representative" }
+            Id = actorId,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.SubjectId,
+            Pii = new ActorPii { ActorId = actorId, DisplayName = "Original Event representative" }
         };
         return new(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-            Title = "Original Content notice custody", SubmittedByUserId = database.SubjectId,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            ActorId = actor.Id,
+            Actor = actor,
+            Title = "Original Content notice custody",
+            SubmittedByUserId = database.SubjectId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Private, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!
+            VisibilityTypeId = (int)VisibilityTypeEnum.Private,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!
         };
     }
 
     private static ApproveModerationNoticeDisclosureSource Approve(
         SourceDatabase database, ModerationNoticeDisclosureIntent intent) => new()
-    {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3, Intent = intent
-    };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            Intent = intent
+        };
 
     private static ExploreDbContext Read(SourceDatabase database)
     {

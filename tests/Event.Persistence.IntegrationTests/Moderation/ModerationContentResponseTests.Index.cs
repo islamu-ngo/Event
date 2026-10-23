@@ -32,7 +32,8 @@ public sealed partial class ModerationContentResponseTests
         using var template = fixture.Database.Context();
         var options = (DbContextOptions<ExploreDbContext>)template.GetService<IDbContextOptions>();
         var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>(options)
-            .AddInterceptors(witness).Options) { TenantContext = fixture.Database };
+            .AddInterceptors(witness).Options)
+        { TenantContext = fixture.Database };
         await using var reviewer = new ResponseSession(fixture, fixture.Database.ReviewerId, context, protection: keys);
         var query = new GetModerationContentResponsesQueryHandler(reviewer.Repository, fixture.Database);
         var pending = await query.QueryAsync(new(fixture.Approval.CaseId, ordered[0], 1));

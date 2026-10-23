@@ -66,15 +66,28 @@ public sealed class ModerationPolicyPublicationCandidate
 
         var candidate = new ModerationPolicyPublicationCandidate
         {
-            Id = publicationId, DefinitionId = snapshot.Id, PolicyId = snapshot.PolicyId,
-            ExpectedRevision = snapshot.Revision - 1, PreviousPublicationId = snapshot.PreviousPublicationId,
-            HostBindingId = snapshot.HostBindingId, TrustDomainId = snapshot.TrustDomainId,
-            SolutionId = snapshot.SolutionId, InstanceId = snapshot.InstanceId,
-            JurisdictionTenantId = snapshot.JurisdictionTenantId, TenantId = snapshot.TenantId,
-            PreparedByHumanId = humanId, OperationId = operationId, RequestDigest = requestDigest,
-            ProposedStateDigest = proposedStateDigest, AuthoritySourceId = snapshot.AuthoritySourceId,
-            AuthorityRevision = snapshot.AuthorityRevision, WriterGeneration = snapshot.QualificationRevision,
-            PreparedAt = now, ValidUntil = validUntil, Revision = 1, Definition = snapshot
+            Id = publicationId,
+            DefinitionId = snapshot.Id,
+            PolicyId = snapshot.PolicyId,
+            ExpectedRevision = snapshot.Revision - 1,
+            PreviousPublicationId = snapshot.PreviousPublicationId,
+            HostBindingId = snapshot.HostBindingId,
+            TrustDomainId = snapshot.TrustDomainId,
+            SolutionId = snapshot.SolutionId,
+            InstanceId = snapshot.InstanceId,
+            JurisdictionTenantId = snapshot.JurisdictionTenantId,
+            TenantId = snapshot.TenantId,
+            PreparedByHumanId = humanId,
+            OperationId = operationId,
+            RequestDigest = requestDigest,
+            ProposedStateDigest = proposedStateDigest,
+            AuthoritySourceId = snapshot.AuthoritySourceId,
+            AuthorityRevision = snapshot.AuthorityRevision,
+            WriterGeneration = snapshot.QualificationRevision,
+            PreparedAt = now,
+            ValidUntil = validUntil,
+            Revision = 1,
+            Definition = snapshot
         };
         candidate.ValidatePersistedState();
         return candidate;

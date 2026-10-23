@@ -48,12 +48,15 @@ public sealed partial class ModerationPolicyPublicationTests
         var flush = new RecognitionPrivacyFlushObserver(clock);
         await using var context = database.Context(flush);
         var request = database.Request();
-        request = request with { Proposed = request.Proposed with
+        request = request with
         {
-            RequestedState = ModerationPolicyRequestedState.Active,
-            Profiles = [request.Proposed.Profiles.Single() with
+            Proposed = request.Proposed with
+            {
+                RequestedState = ModerationPolicyRequestedState.Active,
+                Profiles = [request.Proposed.Profiles.Single() with
             { Recognition = ModerationReferenceRecognition.SeparatelyQualifiedFinalAction }]
-        }};
+            }
+        };
         var (admin, machine) = DeploymentIdentity(context, database.AdminId);
         var publications = new ModerationPolicyPublicationRepository(context, admin, machine, database.Inventory, null, clock);
         var prepared = await publications.PrepareAsync(request, Now.AddMinutes(10));
@@ -65,8 +68,12 @@ public sealed partial class ModerationPolicyPublicationTests
             row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
         foreach (var id in new[] { privacy, recovery })
         {
-            var user = new User { Id = id, Pii = new UserPii
-            { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Privacy", LastName = "Owner" }};
+            var user = new User
+            {
+                Id = id,
+                Pii = new UserPii
+                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Privacy", LastName = "Owner" }
+            };
             context.Users.Add(user);
             context.PlatformUserRoles.Add(new PlatformUserRole
             { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
@@ -82,10 +89,16 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var record = new RecordModerationRecognitionPrivacySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(5),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddMinutes(5),
             Terms = RecognitionPrivacyTerms(),
             Ownership = new(privacy, privacy, recovery, recovery, database.AdminId,
                 "Canonical distinct controllers independently reviewed.",
@@ -127,9 +140,14 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That((await writer.ExecuteAsync(record)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var adopt = new AdoptModerationRecognitionPrivacySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 3,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(4)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 3,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(4)
         };
         await Assert.That((await writer.ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
         await Assert.That((await Writer(recovery).ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
@@ -178,14 +196,18 @@ public sealed partial class ModerationPolicyPublicationTests
             if (change == 8)
                 await Assert.That((await writer.ExecuteAsync(record with
                 {
-                    OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
+                    OperationId = Guid.CreateVersion7(),
+                    SourceId = Guid.CreateVersion7(),
                     ExpectedQualificationRevision = 4
                 })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
             clock.UtcNow = Now.AddMinutes(20);
             var withdraw = new WithdrawModerationRecognitionPrivacyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = change == 8 ? 5 : 4,
-                AdoptionId = adopt.AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = change == 8 ? 5 : 4,
+                AdoptionId = adopt.AdoptionId,
+                ExpectedAdoptionRevision = 1
             };
             if (change == 18)
             {

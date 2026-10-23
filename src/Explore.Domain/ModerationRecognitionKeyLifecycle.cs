@@ -28,9 +28,23 @@ public sealed class ModerationRecognitionKeyLifecycle
     public IReadOnlyList<ModerationRecognitionKeyLifecycleKey> Keys => keys.AsReadOnly();
 
     public string Commitment => Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
-        new { Id, RingGeneration, InitialErasureHead, InitialErasureRetainedFloor, Keys = keys.OrderBy(row => row.KeyGeneration)
-            .Select(row => new { row.KeyId, row.KeyGeneration, row.VerificationTag, row.State,
-                row.OriginalObligationsUntil, row.RequiredErasureHead }) })));
+        new
+        {
+            Id,
+            RingGeneration,
+            InitialErasureHead,
+            InitialErasureRetainedFloor,
+            Keys = keys.OrderBy(row => row.KeyGeneration)
+            .Select(row => new
+            {
+                row.KeyId,
+                row.KeyGeneration,
+                row.VerificationTag,
+                row.State,
+                row.OriginalObligationsUntil,
+                row.RequiredErasureHead
+            })
+        })));
 
     public static ModerationRecognitionKeyLifecycle Initialize(Guid trustDomainId, Guid hostBindingId,
         string keyId, long generation, string verificationTag, long ringGeneration, DateTimeOffset now,
@@ -38,9 +52,14 @@ public sealed class ModerationRecognitionKeyLifecycle
     {
         var lifecycle = new ModerationRecognitionKeyLifecycle
         {
-            Id = trustDomainId, HostBindingId = hostBindingId, RingGeneration = ringGeneration,
-            Revision = 1, AcknowledgementSequence = 0, ChangedAt = now,
-            InitialErasureHead = initialErasureHead, InitialErasureRetainedFloor = initialErasureRetainedFloor
+            Id = trustDomainId,
+            HostBindingId = hostBindingId,
+            RingGeneration = ringGeneration,
+            Revision = 1,
+            AcknowledgementSequence = 0,
+            ChangedAt = now,
+            InitialErasureHead = initialErasureHead,
+            InitialErasureRetainedFloor = initialErasureRetainedFloor
         };
         lifecycle.keys.Add(ModerationRecognitionKeyLifecycleKey.Create(trustDomainId, keyId, generation,
             verificationTag, ModerationRecognitionKeyState.Writing, now));
@@ -191,9 +210,14 @@ public sealed class ModerationRecognitionKeyLifecycleKey
     {
         var key = new ModerationRecognitionKeyLifecycleKey
         {
-            TrustDomainId = trustDomainId, KeyId = keyId, KeyGeneration = generation,
-            VerificationTag = tag, State = state, ChangedAt = now,
-            OriginalObligationsUntil = null, RequiredErasureHead = 0
+            TrustDomainId = trustDomainId,
+            KeyId = keyId,
+            KeyGeneration = generation,
+            VerificationTag = tag,
+            State = state,
+            ChangedAt = now,
+            OriginalObligationsUntil = null,
+            RequiredErasureHead = 0
         };
         key.ValidatePersistedState();
         return key;

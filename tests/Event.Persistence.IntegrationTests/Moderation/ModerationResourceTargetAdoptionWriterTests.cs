@@ -43,8 +43,13 @@ public sealed class ModerationResourceTargetAdoptionWriterTests
         }
         var revoke = new RevokeModerationResourceTargetSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-            AdoptionId = source.AdoptionId, ExpectedAdoptionRevision = 1, CaseId = source.CaseId, ExpectedCaseRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 6,
+            AdoptionId = source.AdoptionId,
+            ExpectedAdoptionRevision = 1,
+            CaseId = source.CaseId,
+            ExpectedCaseRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, revoke)).IsSuccess).IsTrue();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, revoke)).IsSuccess).IsTrue();
@@ -76,7 +81,9 @@ public sealed class ModerationResourceTargetAdoptionWriterTests
             publisherId = generation.ActorId;
             setup.Actors.Add(new Explore.Domain.Actor
             {
-                Id = replacement, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+                Id = replacement,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
                 UserId = database.ReviewerId,
                 Pii = new Explore.Domain.ActorPii { ActorId = replacement, DisplayName = "Replacement resource parent" }
             });
@@ -116,7 +123,9 @@ public sealed class ModerationResourceTargetAdoptionWriterTests
             storageActor = (await setup.StorageObjects.SingleAsync(row => row.Id == storageId)).ActorId!.Value;
             setup.Actors.Add(new Explore.Domain.Actor
             {
-                Id = replacement, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+                Id = replacement,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
                 UserId = database.UrgencyAssessorId,
                 Pii = new Explore.Domain.ActorPii { ActorId = replacement, DisplayName = "Replacement storage owner" }
             });
@@ -340,7 +349,10 @@ public sealed class ModerationResourceTargetAdoptionWriterTests
             var actorId = Guid.CreateVersion7();
             setup.Actors.Add(new Explore.Domain.Actor
             {
-                Id = actorId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, UserId = database.ReviewerId,
+                Id = actorId,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = database.ReviewerId,
                 Pii = new Explore.Domain.ActorPii { ActorId = actorId, DisplayName = "Original resource storage owner" }
             });
             var storageId = await setup.EventResources.Where(row => row.Id == resourceId).Select(row => row.StorageObjectId).SingleAsync();
@@ -355,8 +367,12 @@ public sealed class ModerationResourceTargetAdoptionWriterTests
         var generationId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RecordModerationResourceGenerationSource
         {
-            OperationId = Guid.CreateVersion7(), SourceId = generationId, Target = database.Scope,
-            ExpectedQualificationRevision = 1, ResourceId = resourceId, ExpectedResourceRevision = 0,
+            OperationId = Guid.CreateVersion7(),
+            SourceId = generationId,
+            Target = database.Scope,
+            ExpectedQualificationRevision = 1,
+            ResourceId = resourceId,
+            ExpectedResourceRevision = 0,
             ValidUntil = Now.AddMinutes(10)
         })).IsSuccess).IsTrue();
         var opened = database.OpenCase(scope) with
@@ -402,21 +418,38 @@ public sealed class ModerationResourceTargetAdoptionWriterTests
         var selectionId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RecordModerationContributionSelectionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 4,
-            SelectionId = selectionId, EffectId = Guid.CreateVersion7(), CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-            DecisionId = decision.Id, ExpectedDecisionRevision = selectionDecisionRevision, PolicyId = request.Proposed.PolicyId,
-            ExpectedPolicyRevision = 1, PublicationId = publication.Publication!.Id, ProfileId = profile.Id,
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 4,
+            SelectionId = selectionId,
+            EffectId = Guid.CreateVersion7(),
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            DecisionId = decision.Id,
+            ExpectedDecisionRevision = selectionDecisionRevision,
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = publication.Publication!.Id,
+            ProfileId = profile.Id,
             Contribution = new(decision.Id, decision.Rule, decision.Scope, decision.Subject.Kind, decision.Subject.Id,
                 decision.StartsAt, null,
                 profile.Effects.Select(effect => new ModerationPolicyEffectTarget(effect, target)).ToImmutableArray(),
-                [new(null, target)]), ValidUntil = Now.AddMinutes(10)
+                [new(null, target)]),
+            ValidUntil = Now.AddMinutes(10)
         })).IsSuccess).IsEqualTo(selectionDecisionRevision is 1 or 2);
         return (database, new()
         {
-            OperationId = Guid.CreateVersion7(), Target = scope,
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
             ExpectedQualificationRevision = selectionDecisionRevision is 1 or 2 ? 5 : 4,
-            AdoptionId = Guid.CreateVersion7(), SelectionId = selectionId, BindingOrdinal = 0, GenerationId = generationId,
-            ExpectedGenerationRevision = 1, CaseId = opened.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(5)
+            AdoptionId = Guid.CreateVersion7(),
+            SelectionId = selectionId,
+            BindingOrdinal = 0,
+            GenerationId = generationId,
+            ExpectedGenerationRevision = 1,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            ValidUntil = Now.AddMinutes(5)
         });
     }
 }

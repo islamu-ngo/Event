@@ -85,11 +85,21 @@ public sealed partial class ModerationAuthorityParticipant
             return null;
         if (!await HasNativeTargetReceiptAsync(operationId => new RecordModerationContributionSelectionSource
         {
-            OperationId = operationId, Target = decision.Scope, ExpectedQualificationRevision = selection.WriterGeneration - 1,
-            SelectionId = selection.Id, EffectId = selection.EffectId, CaseId = selection.CaseId,
-            ExpectedCaseRevision = selection.CaseRevision, DecisionId = decision.Id, ExpectedDecisionRevision = selection.DecisionRevision,
-            PolicyId = selection.PolicyId, ExpectedPolicyRevision = selection.PolicyRevision, PublicationId = selection.PublicationId,
-            ProfileId = selection.ProfileId, Contribution = contribution, ValidUntil = selection.ValidUntil
+            OperationId = operationId,
+            Target = decision.Scope,
+            ExpectedQualificationRevision = selection.WriterGeneration - 1,
+            SelectionId = selection.Id,
+            EffectId = selection.EffectId,
+            CaseId = selection.CaseId,
+            ExpectedCaseRevision = selection.CaseRevision,
+            DecisionId = decision.Id,
+            ExpectedDecisionRevision = selection.DecisionRevision,
+            PolicyId = selection.PolicyId,
+            ExpectedPolicyRevision = selection.PolicyRevision,
+            PublicationId = selection.PublicationId,
+            ProfileId = selection.ProfileId,
+            Contribution = contribution,
+            ValidUntil = selection.ValidUntil
         }, ModerationQualificationSourceKind.ContributionSelection, selection.Id, selection.Revision,
             selection.AuthoredByHumanId, selection.WriterGeneration, selection.RecordedAt, acquired, token))
             return null;
@@ -125,9 +135,15 @@ public sealed partial class ModerationAuthorityParticipant
             return null;
         if (!await HasNativeTargetReceiptAsync(operationId => new AdoptModerationProfileSource
         {
-            OperationId = operationId, Target = decision.Scope, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-            AdoptionId = adoption.Id, SelectionId = selection.Id, Mode = mode,
-            CaseId = adoption.CaseId, ExpectedCaseRevision = adoption.CaseRevision, ValidUntil = adoption.ValidUntil
+            OperationId = operationId,
+            Target = decision.Scope,
+            ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+            AdoptionId = adoption.Id,
+            SelectionId = selection.Id,
+            Mode = mode,
+            CaseId = adoption.CaseId,
+            ExpectedCaseRevision = adoption.CaseRevision,
+            ValidUntil = adoption.ValidUntil
         }, ModerationQualificationSourceKind.ProfileAdoption, adoption.Id, 1,
             adoption.AdoptedByHumanId, adoption.WriterGeneration, adoption.AdoptedAt, acquired, token))
             return null;

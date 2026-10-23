@@ -34,9 +34,11 @@ public sealed class ModerationResourceQuarantineInspectionHttpResult(
             if (!disclosed)
                 await new ObjectResult(new ProblemDetails
                 {
-                    Status = StatusCodes.Status404NotFound, Title = "Material unavailable",
+                    Status = StatusCodes.Status404NotFound,
+                    Title = "Material unavailable",
                     Detail = "The requested material is unavailable for inspection."
-                }) { StatusCode = StatusCodes.Status404NotFound }.ExecuteResultAsync(context);
+                })
+                { StatusCode = StatusCodes.Status404NotFound }.ExecuteResultAsync(context);
         }
         catch
         {

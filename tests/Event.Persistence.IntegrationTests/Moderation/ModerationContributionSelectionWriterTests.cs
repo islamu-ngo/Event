@@ -117,11 +117,21 @@ public sealed class ModerationContributionSelectionWriterTests
             ImmutableArray.Create(new ModerationPolicyConsequenceTarget(null, target)));
         return (database, new()
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            SelectionId = Guid.CreateVersion7(), EffectId = Guid.CreateVersion7(), CaseId = opened.CaseId,
-            ExpectedCaseRevision = 1, DecisionId = decision.Id, ExpectedDecisionRevision = 2,
-            PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1, PublicationId = publication.Publication!.Id,
-            ProfileId = profile.Id, Contribution = contribution, ValidUntil = Now.AddMinutes(10)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            SelectionId = Guid.CreateVersion7(),
+            EffectId = Guid.CreateVersion7(),
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            DecisionId = decision.Id,
+            ExpectedDecisionRevision = 2,
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = publication.Publication!.Id,
+            ProfileId = profile.Id,
+            Contribution = contribution,
+            ValidUntil = Now.AddMinutes(10)
         });
     }
 

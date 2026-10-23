@@ -75,7 +75,9 @@ public sealed class ModerationPreFindingAdministrationControllerTests
         };
         var proposal = new ProposeModerationPreFindingCustodyCommand
         {
-            OperationId = Guid.CreateVersion7(), CaseId = Guid.CreateVersion7(), ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            CaseId = Guid.CreateVersion7(),
+            ExpectedCaseRevision = 1,
             PrivacyOwnerHumanId = Guid.CreateVersion7(),
             Terms = new(TimeSpan.FromHours(1), 32768, "Protected response opportunity", "Explicit case-purpose mandate"),
             ValidUntil = new(2026, 10, 13, 12, 0, 0, TimeSpan.Zero)
@@ -87,14 +89,20 @@ public sealed class ModerationPreFindingAdministrationControllerTests
             case 1:
                 return await custody.Accept(caseId, custodyId, new()
                 {
-                    OperationId = proposal.OperationId, CaseId = proposal.CaseId, ExpectedCaseRevision = 1,
-                    CustodyId = Guid.CreateVersion7(), ExpectedCustodyRevision = 1
+                    OperationId = proposal.OperationId,
+                    CaseId = proposal.CaseId,
+                    ExpectedCaseRevision = 1,
+                    CustodyId = Guid.CreateVersion7(),
+                    ExpectedCustodyRevision = 1
                 }, default);
             case 3:
                 return await custody.Withdraw(caseId, custodyId, new()
                 {
-                    OperationId = proposal.OperationId, CaseId = proposal.CaseId, ExpectedCaseRevision = 1,
-                    CustodyId = Guid.CreateVersion7(), ExpectedCustodyRevision = 2
+                    OperationId = proposal.OperationId,
+                    CaseId = proposal.CaseId,
+                    ExpectedCaseRevision = 1,
+                    CustodyId = Guid.CreateVersion7(),
+                    ExpectedCustodyRevision = 2
                 }, default);
             default:
                 var notices = new ModerationPreFindingNoticeIssuanceController(
@@ -104,8 +112,11 @@ public sealed class ModerationPreFindingAdministrationControllerTests
                 };
                 return await notices.Issue(caseId, new()
                 {
-                    OperationId = proposal.OperationId, CaseId = proposal.CaseId, ExpectedCaseRevision = 1,
-                    CustodyId = custodyId, Recipient = new(Guid.Empty, 0, Guid.CreateVersion7()),
+                    OperationId = proposal.OperationId,
+                    CaseId = proposal.CaseId,
+                    ExpectedCaseRevision = 1,
+                    CustodyId = custodyId,
+                    Recipient = new(Guid.Empty, 0, Guid.CreateVersion7()),
                     Text = new(new("Subject-safe allegation"), new("Applicable rule"), new("Respond privately")),
                     RetainUntil = proposal.ValidUntil
                 }, default);

@@ -25,13 +25,15 @@ public sealed partial class ModerationCaseNativeProofTests
             // Unrelated historical inbox state supplies no private-case qualification.
             seed.NotificationIntents.Add(new NotificationIntent
             {
-                Id = unrelatedId, TenantId = fixture.Database.TenantId,
+                Id = unrelatedId,
+                TenantId = fixture.Database.TenantId,
                 RecipientUserId = fixture.Database.CallerId,
                 CategoryId = (int)NotificationCategoryEnum.TrustSafetyModeration,
                 OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
                 RecipientKindId = (int)NotificationRecipientKindEnum.User,
                 StatusId = (int)NotificationIntentStatusEnum.Resolved,
-                TemplateKey = "system.notice.v1", DeduplicationKey = $"unrelated:{unrelatedId:N}",
+                TemplateKey = "system.notice.v1",
+                DeduplicationKey = $"unrelated:{unrelatedId:N}",
                 CreatedAt = fixture.Database.Clock.Now.UtcDateTime
             });
             await seed.SaveChangesAsync();

@@ -29,9 +29,15 @@ public sealed class ConfigurationModerationPreviewTests : IDisposable
             links.Add("apply-configuration-import", new { href = "/api/configuration/apply", method = "POST" });
         var json = JsonSerializer.Serialize(new
         {
-            sessionId, targetScope = scope.ToString(), targetTenantId = scope == ConfigurationImportScope.Tenant ? (Guid?)tenantId : null,
-            state = "PreviewReady", expiresAt = DateTimeOffset.UtcNow.AddMinutes(10), isApplyReady = true,
-            items = Array.Empty<object>(), moderation = new[] { Target() }, _links = links
+            sessionId,
+            targetScope = scope.ToString(),
+            targetTenantId = scope == ConfigurationImportScope.Tenant ? (Guid?)tenantId : null,
+            state = "PreviewReady",
+            expiresAt = DateTimeOffset.UtcNow.AddMinutes(10),
+            isApplyReady = true,
+            items = Array.Empty<object>(),
+            moderation = new[] { Target() },
+            _links = links
         });
         using var transport = new PreviewTransport(json);
         using var http = new HttpClient(transport) { BaseAddress = new Uri("https://localhost/") };
@@ -72,8 +78,12 @@ public sealed class ConfigurationModerationPreviewTests : IDisposable
 
     private static object Target() => new
     {
-        sectionKey = "tenant.moderation", sourceName = "Source", targetName = "Destination <review>",
-        currentPolicyRevision = 3L, hasBaseline = true, canApply = false,
+        sectionKey = "tenant.moderation",
+        sourceName = "Source",
+        targetName = "Destination <review>",
+        currentPolicyRevision = 3L,
+        hasBaseline = true,
+        canApply = false,
         changes = new[] { new { section = "profiles", referenceCode = "publication", referenceRevision = 2L, kind = "Changed", conflict = true } },
         diagnostics = new[] { new { kind = "MeaningRevisionConflict", severity = "Error", ruleCode = "publication", ruleRevision = 2L, consumerId = (string?)null, mode = (string?)null } }
     };

@@ -140,8 +140,11 @@ public sealed partial class EventPublicationModerationMutationTests
             var otherHuman = NativeUser(Guid.CreateVersion7());
             var otherActor = new Actor
             {
-                Id = Guid.CreateVersion7(), UserId = otherHuman.Id, User = otherHuman,
-                ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+                Id = Guid.CreateVersion7(),
+                UserId = otherHuman.Id,
+                User = otherHuman,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
                 Pii = new ActorPii { DisplayName = "Other add-on owner" }
             };
             fixture.Context.Actors.Add(otherActor);
@@ -258,16 +261,27 @@ public sealed partial class EventPublicationModerationMutationTests
         var tenantId = Guid.CreateVersion7();
         fixture.Context.Tenants.Add(new Tenant
         {
-            Id = tenantId, FullName = "Other add-on tenant", Slug = $"add-on-{tenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = tenantId,
+            FullName = "Other add-on tenant",
+            Slug = $"add-on-{tenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         });
         var parent = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), Title = "Foreign add-on event", TenantId = tenantId, Tenant = null!,
-            ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
+            Id = Guid.CreateVersion7(),
+            Title = "Foreign add-on event",
+            TenantId = tenantId,
+            Tenant = null!,
+            ActorId = fixture.ActorId,
+            Actor = null!,
+            OrganizerActorId = fixture.ActorId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
             CreatedAt = clock.Now.UtcDateTime
         };
         parent.ParticipationConfiguration = EventParticipationConfiguration.Create(parent.Id, tenantId,

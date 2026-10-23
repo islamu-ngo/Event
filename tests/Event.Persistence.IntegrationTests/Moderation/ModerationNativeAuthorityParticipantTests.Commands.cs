@@ -113,8 +113,13 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
 
     private static ProposeModerationDecisionCommand NativeProposal(NativeDatabase database) => new()
     {
-        OperationId = Guid.CreateVersion7(), EffectId = Guid.CreateVersion7(), DecisionId = Guid.CreateVersion7(),
-        Subject = database.Subject, Target = database.Scope, ExpectedRevision = 1, ExpectedPolicyRevision = 1,
+        OperationId = Guid.CreateVersion7(),
+        EffectId = Guid.CreateVersion7(),
+        DecisionId = Guid.CreateVersion7(),
+        Subject = database.Subject,
+        Target = database.Scope,
+        ExpectedRevision = 1,
+        ExpectedPolicyRevision = 1,
         Proposal = new ModerationProposal(database.Case.Id, database.Rule.Rule, [ModerationCapability.Publish],
             Now, Now.AddHours(1), null, 1)
     };

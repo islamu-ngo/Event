@@ -103,12 +103,19 @@ public sealed class EventResourceModerationQuarantineReleaseTests
 
     private static EventResourceModerationQuarantineRelease Receipt(
         EventResourceModerationQuarantine cause, Guid? material = null) => new()
-    {
-        Id = Guid.CreateVersion7(), TenantId = cause.TenantId, QuarantineId = cause.Id,
-        EventId = cause.EventId, EventResourceId = cause.EventResourceId,
-        MaterialVersionId = material ?? cause.MaterialVersionId, OriginalEffectId = cause.EffectId,
-        OriginalBindingOrdinal = cause.BindingOrdinal, OriginallyAppliedAt = cause.AppliedAt,
-        ApprovalId = Guid.CreateVersion7(), ReleasedByHumanId = Guid.CreateVersion7(),
-        ReleasedAt = Now.AddDays(2), RequestDigest = new string('A', 64)
-    };
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = cause.TenantId,
+            QuarantineId = cause.Id,
+            EventId = cause.EventId,
+            EventResourceId = cause.EventResourceId,
+            MaterialVersionId = material ?? cause.MaterialVersionId,
+            OriginalEffectId = cause.EffectId,
+            OriginalBindingOrdinal = cause.BindingOrdinal,
+            OriginallyAppliedAt = cause.AppliedAt,
+            ApprovalId = Guid.CreateVersion7(),
+            ReleasedByHumanId = Guid.CreateVersion7(),
+            ReleasedAt = Now.AddDays(2),
+            RequestDigest = new string('A', 64)
+        };
 }

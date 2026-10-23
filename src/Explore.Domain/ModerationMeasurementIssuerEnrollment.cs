@@ -39,11 +39,21 @@ public sealed class ModerationMeasurementIssuerEnrollment
     {
         var source = new ModerationMeasurementIssuerEnrollment
         {
-            Id = id, HostBindingId = hostBindingId, TrustDomainId = trustDomainId, TenantId = tenantId,
-            KeyId = keyId, Issuer = issuer, PublicKeySpkiBase64 = publicKeySpkiBase64,
-            RunnerDigest = runnerDigest, CatalogueDigest = catalogueDigest, TestBundleDigest = testBundleDigest,
-            ApprovedByHumanId = approvedByHumanId, WriterGeneration = writerGeneration, Revision = 1,
-            ApprovedAt = approvedAt.ToUniversalTime(), ValidUntil = validUntil.ToUniversalTime()
+            Id = id,
+            HostBindingId = hostBindingId,
+            TrustDomainId = trustDomainId,
+            TenantId = tenantId,
+            KeyId = keyId,
+            Issuer = issuer,
+            PublicKeySpkiBase64 = publicKeySpkiBase64,
+            RunnerDigest = runnerDigest,
+            CatalogueDigest = catalogueDigest,
+            TestBundleDigest = testBundleDigest,
+            ApprovedByHumanId = approvedByHumanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            ApprovedAt = approvedAt.ToUniversalTime(),
+            ValidUntil = validUntil.ToUniversalTime()
         };
         source.ValidatePersistedState();
         return source;

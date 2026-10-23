@@ -37,9 +37,15 @@ public sealed class ModerationProfileAdoptionWriterTests
         }
         var source = new AdoptModerationProfileSource
         {
-            OperationId = Guid.CreateVersion7(), Target = targetSource.Target, ExpectedQualificationRevision = 5,
-            AdoptionId = Guid.CreateVersion7(), SelectionId = targetSource.SelectionId, Mode = ModerationNativeMode.Embedded,
-            CaseId = targetSource.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(5)
+            OperationId = Guid.CreateVersion7(),
+            Target = targetSource.Target,
+            ExpectedQualificationRevision = 5,
+            AdoptionId = Guid.CreateVersion7(),
+            SelectionId = targetSource.SelectionId,
+            Mode = ModerationNativeMode.Embedded,
+            CaseId = targetSource.CaseId,
+            ExpectedCaseRevision = 1,
+            ValidUntil = Now.AddMinutes(5)
         };
         var result = await database.ExecuteAsync(database.UrgencyAssessorId, source);
         await Assert.That(result.IsSuccess).IsEqualTo(accepted);
@@ -81,9 +87,15 @@ public sealed class ModerationProfileAdoptionWriterTests
         await using var owner = database;
         var source = new AdoptModerationProfileSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            AdoptionId = Guid.CreateVersion7(), SelectionId = targetSource.SelectionId, Mode = ModerationNativeMode.Embedded,
-            CaseId = targetSource.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(5)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            AdoptionId = Guid.CreateVersion7(),
+            SelectionId = targetSource.SelectionId,
+            Mode = ModerationNativeMode.Embedded,
+            CaseId = targetSource.CaseId,
+            ExpectedCaseRevision = 1,
+            ValidUntil = Now.AddMinutes(5)
         };
         var accepted = await database.ExecuteAsync(database.UrgencyAssessorId, source);
         await Assert.That(accepted.IsSuccess).IsTrue();
@@ -92,8 +104,13 @@ public sealed class ModerationProfileAdoptionWriterTests
         await Assert.That(replay.QualificationRevision).IsEqualTo(accepted.QualificationRevision);
         var revoke = new RevokeModerationProfileSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-            AdoptionId = source.AdoptionId, ExpectedAdoptionRevision = 1, CaseId = source.CaseId, ExpectedCaseRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 6,
+            AdoptionId = source.AdoptionId,
+            ExpectedAdoptionRevision = 1,
+            CaseId = source.CaseId,
+            ExpectedCaseRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, revoke)).IsSuccess).IsTrue();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, revoke)).IsSuccess).IsTrue();
@@ -126,9 +143,15 @@ public sealed class ModerationProfileAdoptionWriterTests
         await using var owner = database;
         var source = new AdoptModerationProfileSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            AdoptionId = Guid.CreateVersion7(), SelectionId = targetSource.SelectionId, Mode = ModerationNativeMode.Embedded,
-            CaseId = targetSource.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(5)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            AdoptionId = Guid.CreateVersion7(),
+            SelectionId = targetSource.SelectionId,
+            Mode = ModerationNativeMode.Embedded,
+            CaseId = targetSource.CaseId,
+            ExpectedCaseRevision = 1,
+            ValidUntil = Now.AddMinutes(5)
         };
         if (change is 1 or 4)
         {

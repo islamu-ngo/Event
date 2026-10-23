@@ -129,7 +129,9 @@ public sealed partial class ModerationContentResponseTests
         var replacement = Guid.CreateVersion7();
         context.Actors.Add(new Actor
         {
-            Id = replacement, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = replacement,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             UserId = fixture.Database.ReviewerId,
             Pii = new ActorPii { ActorId = replacement, DisplayName = "Unplanned response parent" }
         });

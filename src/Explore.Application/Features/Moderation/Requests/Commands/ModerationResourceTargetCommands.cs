@@ -14,9 +14,16 @@ public sealed record AdoptModerationResourceTargetCommand : ModerationQualificat
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationResourceTargetSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, SelectionId = SelectionId, BindingOrdinal = BindingOrdinal, GenerationId = GenerationId,
-        ExpectedGenerationRevision = ExpectedGenerationRevision, CaseId = CaseId, ExpectedCaseRevision = ExpectedCaseRevision,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        SelectionId = SelectionId,
+        BindingOrdinal = BindingOrdinal,
+        GenerationId = GenerationId,
+        ExpectedGenerationRevision = ExpectedGenerationRevision,
+        CaseId = CaseId,
+        ExpectedCaseRevision = ExpectedCaseRevision,
         ValidUntil = ValidUntil
     };
 }
@@ -29,8 +36,12 @@ public sealed record RevokeModerationResourceTargetCommand : ModerationQualifica
     public required long ExpectedCaseRevision { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RevokeModerationResourceTargetSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision, CaseId = CaseId,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision,
+        CaseId = CaseId,
         ExpectedCaseRevision = ExpectedCaseRevision
     };
 }

@@ -70,9 +70,11 @@ public sealed class ModerationResourceQuarantineReviewStateHttpResult(
             else if (!disclosed)
                 await new ObjectResult(new ProblemDetails
                 {
-                    Status = StatusCodes.Status404NotFound, Title = "Review state unavailable",
+                    Status = StatusCodes.Status404NotFound,
+                    Title = "Review state unavailable",
                     Detail = "The requested resource review state is unavailable."
-                }) { StatusCode = StatusCodes.Status404NotFound }.ExecuteResultAsync(context);
+                })
+                { StatusCode = StatusCodes.Status404NotFound }.ExecuteResultAsync(context);
         }
         catch
         {

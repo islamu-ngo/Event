@@ -187,17 +187,30 @@ public sealed class ModerationRecognitionPrivacySourceOwner(
 
     internal static RecordModerationRecognitionPrivacySource RecordRequest(ModerationRecognitionPrivacySource source, AuthorityScope jurisdiction) => new()
     {
-        OperationId = Guid.Empty, Target = jurisdiction, ExpectedQualificationRevision = source.WriterGeneration - 1,
-        SourceId = source.Id, PolicyId = source.PolicyId, ExpectedPolicyRevision = source.PolicyRevision,
-        PublicationId = source.PublicationId, ProfileId = source.ProfileId, Mode = (ModerationNativeMode)source.ModeCode,
-        Terms = source.Terms, Ownership = source.Ownership,
-        Retention = source.Retention.OrderBy(row => row.RecordClass).Select(row => row.ToTerms()).ToImmutableArray(), ValidUntil = source.ValidUntil
+        OperationId = Guid.Empty,
+        Target = jurisdiction,
+        ExpectedQualificationRevision = source.WriterGeneration - 1,
+        SourceId = source.Id,
+        PolicyId = source.PolicyId,
+        ExpectedPolicyRevision = source.PolicyRevision,
+        PublicationId = source.PublicationId,
+        ProfileId = source.ProfileId,
+        Mode = (ModerationNativeMode)source.ModeCode,
+        Terms = source.Terms,
+        Ownership = source.Ownership,
+        Retention = source.Retention.OrderBy(row => row.RecordClass).Select(row => row.ToTerms()).ToImmutableArray(),
+        ValidUntil = source.ValidUntil
     };
     internal static AdoptModerationRecognitionPrivacySource AdoptionRequest(ModerationRecognitionPrivacyAdoption adoption, AuthorityScope jurisdiction) => new()
     {
-        OperationId = Guid.Empty, Target = jurisdiction, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-        SourceId = adoption.SourceId, ExpectedSourceRevision = adoption.SourceRevision,
-        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration, AdoptionId = adoption.Id, ValidUntil = adoption.ValidUntil
+        OperationId = Guid.Empty,
+        Target = jurisdiction,
+        ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+        SourceId = adoption.SourceId,
+        ExpectedSourceRevision = adoption.SourceRevision,
+        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
+        AdoptionId = adoption.Id,
+        ValidUntil = adoption.ValidUntil
     };
     internal static string Slot(ModerationSourceAuthority authority, Guid publication, Guid profile, ModerationNativeMode mode) =>
         $"moderation.recognition-privacy:{authority.Binding.Id:N}:{authority.Tenant.Id:N}:{publication:N}:{profile:N}:{(int)mode}";

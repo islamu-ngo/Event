@@ -121,17 +121,30 @@ public sealed partial class ModerationResourceQuarantineReleaseRepository
         await ProveAsync(ModerationQualificationSourceKind.QualificationPolicy, policy.Id, policy.Revision,
             policy.PublishedByHumanId, policy.PublishedAt, authority, receipt => new PublishModerationQualificationPolicySource
             {
-                OperationId = receipt.Id, Target = allegation.Scope, ExpectedQualificationRevision = receipt.QualificationRevision - 1,
-                SourceId = policy.Id, CaseId = caseId, ExpectedCaseRevision = caseRevision,
-                ExpectedSourceRevision = policy.Revision - 1, MaximumReviewerLifetime = policy.MaximumReviewerLifetime,
-                MaximumUrgencyLifetime = policy.MaximumUrgencyLifetime, ValidUntil = policy.ValidUntil
+                OperationId = receipt.Id,
+                Target = allegation.Scope,
+                ExpectedQualificationRevision = receipt.QualificationRevision - 1,
+                SourceId = policy.Id,
+                CaseId = caseId,
+                ExpectedCaseRevision = caseRevision,
+                ExpectedSourceRevision = policy.Revision - 1,
+                MaximumReviewerLifetime = policy.MaximumReviewerLifetime,
+                MaximumUrgencyLifetime = policy.MaximumUrgencyLifetime,
+                ValidUntil = policy.ValidUntil
             }, token);
         await ProveAsync(ModerationQualificationSourceKind.QualificationPolicyAdoption, adoption.Id, 1,
             adoption.AdoptedByHumanId, adoption.AdoptedAt, authority, receipt => new AdoptModerationQualificationPolicySource
             {
-                OperationId = receipt.Id, Target = allegation.Scope, ExpectedQualificationRevision = receipt.QualificationRevision - 1,
-                SourceId = policy.Id, ExpectedSourceRevision = policy.Revision, ExpectedWriterGeneration = policy.WriterGeneration,
-                AdoptionId = adoption.Id, CaseId = caseId, ExpectedCaseRevision = caseRevision, ValidUntil = adoption.ValidUntil
+                OperationId = receipt.Id,
+                Target = allegation.Scope,
+                ExpectedQualificationRevision = receipt.QualificationRevision - 1,
+                SourceId = policy.Id,
+                ExpectedSourceRevision = policy.Revision,
+                ExpectedWriterGeneration = policy.WriterGeneration,
+                AdoptionId = adoption.Id,
+                CaseId = caseId,
+                ExpectedCaseRevision = caseRevision,
+                ValidUntil = adoption.ValidUntil
             }, token);
         var until = policy.ValidUntil < adoption.ValidUntil ? policy.ValidUntil : adoption.ValidUntil;
         var reviewers = new Dictionary<Guid, ModerationReviewerAssignment>();
@@ -216,8 +229,12 @@ public sealed partial class ModerationResourceQuarantineReleaseRepository
         await ProveAsync(ModerationQualificationSourceKind.Reviewer, reviewer.Id, 1,
             reviewer.AssignedByHumanId, reviewer.CreatedAt, authority, receipt => new AssignModerationReviewerSource
             {
-                OperationId = receipt.Id, Target = allegation.Scope, ExpectedQualificationRevision = receipt.QualificationRevision - 1,
-                AssignmentId = reviewer.Id, CaseId = allegation.Id, ExpectedCaseRevision = allegation.Revision,
+                OperationId = receipt.Id,
+                Target = allegation.Scope,
+                ExpectedQualificationRevision = receipt.QualificationRevision - 1,
+                AssignmentId = reviewer.Id,
+                CaseId = allegation.Id,
+                ExpectedCaseRevision = allegation.Revision,
                 ReviewerHumanId = reviewer.ReviewerHumanId
             }, token);
         var identityId = reviewer.IdentityEvidenceId!.Value;
@@ -244,17 +261,27 @@ public sealed partial class ModerationResourceQuarantineReleaseRepository
         await ProveAsync(ModerationQualificationSourceKind.Reviewer, reviewer.Id, null,
             identity.AssertedByHumanId, identity.RecordedAt, authority, receipt => new QualifyModerationReviewerController
             {
-                OperationId = receipt.Id, Target = allegation.Scope, ExpectedQualificationRevision = receipt.QualificationRevision - 1,
-                AssignmentId = reviewer.Id, ExpectedAssignmentRevision = receipt.ResultRevision - 1,
-                ControllerHumanId = reviewer.ControllerHumanId.Value, EvidenceId = identity.Id,
-                Justification = identity.Justification, QualifiedUntil = identity.ValidUntil!.Value
+                OperationId = receipt.Id,
+                Target = allegation.Scope,
+                ExpectedQualificationRevision = receipt.QualificationRevision - 1,
+                AssignmentId = reviewer.Id,
+                ExpectedAssignmentRevision = receipt.ResultRevision - 1,
+                ControllerHumanId = reviewer.ControllerHumanId.Value,
+                EvidenceId = identity.Id,
+                Justification = identity.Justification,
+                QualifiedUntil = identity.ValidUntil!.Value
             }, token);
         await ProveAsync(ModerationQualificationSourceKind.Reviewer, reviewer.Id, reviewer.Revision,
             conflict.AssertedByHumanId, conflict.RecordedAt, authority, receipt => new AssessModerationReviewerConflict
             {
-                OperationId = receipt.Id, Target = allegation.Scope, ExpectedQualificationRevision = receipt.QualificationRevision - 1,
-                AssignmentId = reviewer.Id, ExpectedAssignmentRevision = receipt.ResultRevision - 1,
-                State = ModerationReviewerConflictState.Independent, EvidenceId = conflict.Id, Justification = conflict.Justification
+                OperationId = receipt.Id,
+                Target = allegation.Scope,
+                ExpectedQualificationRevision = receipt.QualificationRevision - 1,
+                AssignmentId = reviewer.Id,
+                ExpectedAssignmentRevision = receipt.ResultRevision - 1,
+                State = ModerationReviewerConflictState.Independent,
+                EvidenceId = conflict.Id,
+                Justification = conflict.Justification
             }, token);
         return reviewer;
     }
@@ -292,10 +319,23 @@ public sealed partial class ModerationResourceQuarantineReleaseRepository
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("event.resource-safety-material.v1\n"
             + JsonSerializer.Serialize(new
             {
-                native.HostBindingId, native.TrustDomainId, native.TenantId, native.ResourceId, native.MaterialVersionId,
-                ResourceStamp = originalStamp ?? native.ResourceStamp, native.EventId, native.EventStamp, native.ActorId,
-                native.ActorStamp, native.OrganizerActorId, native.OrganizerActorStamp, native.DeliveryType,
-                native.StorageObjectId, native.StorageObjectStamp, native.StorageProviderBindingId, native.StorageProvider
+                native.HostBindingId,
+                native.TrustDomainId,
+                native.TenantId,
+                native.ResourceId,
+                native.MaterialVersionId,
+                ResourceStamp = originalStamp ?? native.ResourceStamp,
+                native.EventId,
+                native.EventStamp,
+                native.ActorId,
+                native.ActorStamp,
+                native.OrganizerActorId,
+                native.OrganizerActorStamp,
+                native.DeliveryType,
+                native.StorageObjectId,
+                native.StorageObjectStamp,
+                native.StorageProviderBindingId,
+                native.StorageProvider
             }))));
 
     private sealed record QualifiedSafety(

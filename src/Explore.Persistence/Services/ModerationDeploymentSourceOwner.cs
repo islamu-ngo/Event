@@ -106,30 +106,30 @@ public sealed class ModerationDeploymentSourceOwner(
         var rows = new List<ModerationDeploymentConsumer>();
         var retained = new List<(IModerationConsumerRuntimeSource Owner, ModerationConsumerRuntimeObservation Observation)>();
         foreach (var obligation in obligations)
-        foreach (var contract in obligation.Consumers.OrderBy(row => row.Id, StringComparer.Ordinal))
-        {
-            if (rows.Count >= 256) return null;
-            var owners = runtimeSources.Where(row => row.ConsumerId == contract.Id && row.Mode == mode).ToArray();
-            if (owners.Length != 1) return null;
-            var runtime = owners[0].ReadCurrent();
-            if (runtime is null || runtime.ConsumerId != contract.Id || runtime.Mode != mode
-                || runtime.InventoryFingerprint != inventory.Fingerprint
-                || runtime.ProductArtifactDigest is not { Length: 64 } artifact || !artifact.All(char.IsAsciiHexDigit)) return null;
-            var installation = await session.AcquireInstallationAsync(obligation.Binding, contract.Id, observedAt, token);
-            if (installation is null || installation.Binding != obligation.Binding || installation.ConsumerId != contract.Id
-                || installation.WriterGeneration != runtime.RuntimeGeneration || installation.ObservedAt != observedAt) return null;
-            var installed = await context.ModerationConsumerInstallations.AsNoTracking()
-                .SingleOrDefaultAsync(row => row.Id == installation.SourceId, token);
-            if (installed is null || installed.Revision != installation.Revision || installed.WithdrawnAt is not null
-                || installed.RuntimeGeneration != runtime.RuntimeGeneration || installed.ValidUntil != installation.ValidUntil
-                || installed.HostBindingId != native.Authority.Binding.Id || installed.TenantId != native.Authority.Tenant.Id
-                || installed.TrustDomainId != native.Authority.Binding.TrustDomainId
-                || owners[0].ReadCurrent() != runtime) return null;
-            rows.Add(ModerationDeploymentConsumer.Capture(sourceId, rows.Count, contract.Id,
-                ModerationPolicyPublicationProjection.Digest(obligation.Binding), ModerationPolicyPublicationProjection.Digest(contract),
-                installed.Id, installed.Revision, installed.WriterGeneration, runtime.RuntimeGeneration, artifact, installed.ValidUntil));
-            retained.Add((owners[0], runtime));
-        }
+            foreach (var contract in obligation.Consumers.OrderBy(row => row.Id, StringComparer.Ordinal))
+            {
+                if (rows.Count >= 256) return null;
+                var owners = runtimeSources.Where(row => row.ConsumerId == contract.Id && row.Mode == mode).ToArray();
+                if (owners.Length != 1) return null;
+                var runtime = owners[0].ReadCurrent();
+                if (runtime is null || runtime.ConsumerId != contract.Id || runtime.Mode != mode
+                    || runtime.InventoryFingerprint != inventory.Fingerprint
+                    || runtime.ProductArtifactDigest is not { Length: 64 } artifact || !artifact.All(char.IsAsciiHexDigit)) return null;
+                var installation = await session.AcquireInstallationAsync(obligation.Binding, contract.Id, observedAt, token);
+                if (installation is null || installation.Binding != obligation.Binding || installation.ConsumerId != contract.Id
+                    || installation.WriterGeneration != runtime.RuntimeGeneration || installation.ObservedAt != observedAt) return null;
+                var installed = await context.ModerationConsumerInstallations.AsNoTracking()
+                    .SingleOrDefaultAsync(row => row.Id == installation.SourceId, token);
+                if (installed is null || installed.Revision != installation.Revision || installed.WithdrawnAt is not null
+                    || installed.RuntimeGeneration != runtime.RuntimeGeneration || installed.ValidUntil != installation.ValidUntil
+                    || installed.HostBindingId != native.Authority.Binding.Id || installed.TenantId != native.Authority.Tenant.Id
+                    || installed.TrustDomainId != native.Authority.Binding.TrustDomainId
+                    || owners[0].ReadCurrent() != runtime) return null;
+                rows.Add(ModerationDeploymentConsumer.Capture(sourceId, rows.Count, contract.Id,
+                    ModerationPolicyPublicationProjection.Digest(obligation.Binding), ModerationPolicyPublicationProjection.Digest(contract),
+                    installed.Id, installed.Revision, installed.WriterGeneration, runtime.RuntimeGeneration, artifact, installed.ValidUntil));
+                retained.Add((owners[0], runtime));
+            }
         // All participating owners are reread after the complete read, not just after their own slot.
         if (await session.AcquirePrimaryDatabaseAsync(observedAt, token) != database
             || retained.Any(row => row.Owner.ReadCurrent() != row.Observation)
@@ -164,17 +164,28 @@ public sealed class ModerationDeploymentSourceOwner(
 
     internal static RecordModerationDeploymentSource RecordRequest(ModerationDeploymentSource source, AuthorityScope jurisdiction) => new()
     {
-        OperationId = Guid.Empty, Target = jurisdiction, ExpectedQualificationRevision = source.WriterGeneration - 1,
-        SourceId = source.Id, PolicyId = source.PolicyId, ExpectedPolicyRevision = source.PolicyRevision,
-        PublicationId = source.PublicationId, ProfileId = source.ProfileId, Mode = (ModerationNativeMode)source.ModeCode,
+        OperationId = Guid.Empty,
+        Target = jurisdiction,
+        ExpectedQualificationRevision = source.WriterGeneration - 1,
+        SourceId = source.Id,
+        PolicyId = source.PolicyId,
+        ExpectedPolicyRevision = source.PolicyRevision,
+        PublicationId = source.PublicationId,
+        ProfileId = source.ProfileId,
+        Mode = (ModerationNativeMode)source.ModeCode,
         ValidUntil = source.ValidUntil
     };
 
     internal static AdoptModerationDeploymentSource AdoptionRequest(ModerationDeploymentAdoption adoption, AuthorityScope jurisdiction) => new()
     {
-        OperationId = Guid.Empty, Target = jurisdiction, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-        SourceId = adoption.SourceId, ExpectedSourceRevision = adoption.SourceRevision,
-        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration, AdoptionId = adoption.Id, ValidUntil = adoption.ValidUntil
+        OperationId = Guid.Empty,
+        Target = jurisdiction,
+        ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+        SourceId = adoption.SourceId,
+        ExpectedSourceRevision = adoption.SourceRevision,
+        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
+        AdoptionId = adoption.Id,
+        ValidUntil = adoption.ValidUntil
     };
 
     private async Task<bool> HasReceiptAsync(ModerationNativeEvidenceAcquisition native, ModerationQualificationMutation template,

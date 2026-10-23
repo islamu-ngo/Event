@@ -27,11 +27,14 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
         using var fixture = await Fixture.CreateAsync(database, catalogue.Artifact);
         await using var context = database.Context();
         var clock = new ObservationClock();
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext
+        var http = new HttpContextAccessor
         {
-            User = new ClaimsPrincipal(new ClaimsIdentity(
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, database.AdministratorId.ToString())], "measured-operations"))
-        }};
+            }
+        };
         var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
             new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
             new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);

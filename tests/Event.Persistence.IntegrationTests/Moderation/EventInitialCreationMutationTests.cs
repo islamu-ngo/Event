@@ -308,15 +308,28 @@ public sealed partial class EventInitialCreationMutationTests
         var creation = await PrepareAsync(database, setup, "organization");
         var previousActor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.AdministratorId, Pii = new ActorPii { DisplayName = "Original image owner" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.AdministratorId,
+            Pii = new ActorPii { DisplayName = "Original image owner" }
         };
         var image = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, ActorId = previousActor.Id,
-            Actor = previousActor, FileTypeId = (int)FileTypeEnum.Image, FileType = null!, Provider = "legacy_external",
-            FullName = "Native event image", SafeDisplayName = "image.png", Extension = ".png", ContentType = "image/png",
-            Visibility = StorageObjectVisibilities.PublicImage, Purpose = StorageObjectPurposes.EventImage,
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            ActorId = previousActor.Id,
+            Actor = previousActor,
+            FileTypeId = (int)FileTypeEnum.Image,
+            FileType = null!,
+            Provider = "legacy_external",
+            FullName = "Native event image",
+            SafeDisplayName = "image.png",
+            Extension = ".png",
+            ContentType = "image/png",
+            Visibility = StorageObjectVisibilities.PublicImage,
+            Purpose = StorageObjectPurposes.EventImage,
             LifecycleState = StorageObjectLifecycleStates.Active
         };
         setup.Add(image);
@@ -403,27 +416,42 @@ public sealed partial class EventInitialCreationMutationTests
         Guid? groupId = null;
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.SubjectId, Pii = new ActorPii { DisplayName = "Initial event publisher" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.SubjectId,
+            Pii = new ActorPii { DisplayName = "Initial event publisher" }
         };
         if (publisher == "organization")
         {
             organizationId = Guid.CreateVersion7();
             var organization = new Organization
             {
-                Id = organizationId.Value, Pii = new OrganizationPii { FullName = "Native event organization" }
+                Id = organizationId.Value,
+                Pii = new OrganizationPii { FullName = "Native event organization" }
             };
             var participation = new OrganizationTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                OrganizationId = organization.Id, Organization = organization,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!, IsOrganizerEligible = true
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                OrganizationId = organization.Id,
+                Organization = organization,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!,
+                IsOrganizerEligible = true
             };
             context.OrganizationMembers.Add(new OrganizationMember
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                OrganizationTenantId = participation.Id, OrganizationTenant = participation,
-                UserId = database.SubjectId, User = null!, RoleId = (int)RoleEnum.OrganizationAdmin, Role = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                OrganizationTenantId = participation.Id,
+                OrganizationTenant = participation,
+                UserId = database.SubjectId,
+                User = null!,
+                RoleId = (int)RoleEnum.OrganizationAdmin,
+                Role = null!
             });
             actor.ActorTypeId = (int)ActorTypeEnum.Organization;
             actor.UserId = null;
@@ -437,14 +465,26 @@ public sealed partial class EventInitialCreationMutationTests
             var group = new Group { Id = groupId.Value, FullName = "Native event group" };
             var participation = new GroupTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, GroupId = group.Id, Group = group,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!, IsOrganizerEligible = true
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                GroupId = group.Id,
+                Group = group,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!,
+                IsOrganizerEligible = true
             };
             context.GroupMembers.Add(new GroupMember
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                GroupTenantId = participation.Id, GroupTenant = participation,
-                UserId = database.SubjectId, User = null!, RoleId = (int)RoleEnum.GroupAdmin, Role = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                GroupTenantId = participation.Id,
+                GroupTenant = participation,
+                UserId = database.SubjectId,
+                User = null!,
+                RoleId = (int)RoleEnum.GroupAdmin,
+                Role = null!
             });
             actor.ActorTypeId = (int)ActorTypeEnum.Group;
             actor.UserId = null;
@@ -479,15 +519,24 @@ public sealed partial class EventInitialCreationMutationTests
     {
         var parent = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = creation.EventId, TenantId = creation.TenantId, Tenant = null!,
-            ActorId = creation.PublisherActorId, Actor = null!,
+            Id = creation.EventId,
+            TenantId = creation.TenantId,
+            Tenant = null!,
+            ActorId = creation.PublisherActorId,
+            Actor = null!,
             OrganizerActorId = creation.CommunitySubmission ? null : creation.PublisherActorId,
             SubmittedByUserId = creation.CommunitySubmission ? creator : null,
-            Title = "Native initial event", PublicCode = creation.EventId.ToString("N")[..12],
+            Title = "Native initial event",
+            PublicCode = creation.EventId.ToString("N")[..12],
             EventProvenanceTypeId = (int)(creation.CommunitySubmission ? EventProvenanceTypeEnum.CommunityReported : EventProvenanceTypeEnum.OrganizerCreated),
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!, Timezone = "UTC",
-            CreatedAt = creation.CreatedAtUtc, CreatedBy = creator,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            Timezone = "UTC",
+            CreatedAt = creation.CreatedAtUtc,
+            CreatedBy = creator,
             ParticipationConfiguration = EventParticipationConfiguration.Create(creation.EventId, creation.TenantId,
                 (int)ParticipationHandlingModeEnum.InformationOnly, (int)AdvanceRegistrationObligationEnum.NotApplicable,
                 null, null, creation.CreatedAtUtc)
@@ -557,8 +606,14 @@ public sealed partial class EventInitialCreationMutationTests
         ExploreDbContext context, IPrivacyIdentityFenceAuthority? privacy = null, TimeProvider? clock = null)
     {
         clock ??= TimeProvider.System;
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, database.SubjectId.ToString("D"))], "initial-event-native")) } };
+        var http = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(
+            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, database.SubjectId.ToString("D"))], "initial-event-native"))
+            }
+        };
         var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
         return (new EventRoleAssignmentMutationBoundary(context, privacy ?? database.Privacy.Authority(context, clock),

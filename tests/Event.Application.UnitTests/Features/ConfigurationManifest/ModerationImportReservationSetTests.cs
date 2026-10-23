@@ -32,10 +32,16 @@ public sealed class ModerationImportReservationSetTests
         {
             "target" => second with { TargetTenantId = first.TargetTenantId },
             "operation" => second with { OperationId = first.OperationId },
-            "publication" => second with { Definition = new(null, second.Definition.PolicyId,
-                first.Definition.PublicationId, new string('a', 64), second.Definition.Profiles) },
-            "profile" => second with { Definition = new(null, second.Definition.PolicyId,
-                second.Definition.PublicationId, new string('a', 64), first.Definition.Profiles) },
+            "publication" => second with
+            {
+                Definition = new(null, second.Definition.PolicyId,
+                first.Definition.PublicationId, new string('a', 64), second.Definition.Profiles)
+            },
+            "profile" => second with
+            {
+                Definition = new(null, second.Definition.PolicyId,
+                second.Definition.PublicationId, new string('a', 64), first.Definition.Profiles)
+            },
             _ => second
         };
         IReadOnlyList<ModerationConfigurationReservedTarget> entries = attack switch

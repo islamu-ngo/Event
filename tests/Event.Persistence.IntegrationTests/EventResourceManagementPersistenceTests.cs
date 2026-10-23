@@ -135,8 +135,14 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         var user = Substitute.For<ICurrentUserService>();
         user.IsAuthenticated.Returns(true);
         user.UserId.Returns(actor);
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, actor.ToString("D"))], "event-resource-native")) } };
+        var http = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(
+            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, actor.ToString("D"))], "event-resource-native"))
+            }
+        };
         var identity = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
             NullLogger<AdminContext>.Instance);

@@ -84,7 +84,10 @@ public sealed class ModerationIntentSchemaTransformer :
             schema.Properties["ownerId"] = Identifier();
             schema.Properties["code"] = new OpenApiSchema
             {
-                Type = JsonSchemaType.String, MinLength = 1, MaxLength = 100, Pattern = "^[A-Za-z0-9._-]+$"
+                Type = JsonSchemaType.String,
+                MinLength = 1,
+                MaxLength = 100,
+                Pattern = "^[A-Za-z0-9._-]+$"
             };
             schema.Properties["revision"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Format = "int64" };
         }
@@ -104,7 +107,8 @@ public sealed class ModerationIntentSchemaTransformer :
             schema.Properties["rule"] = reference(typeof(ModerationRuleReference));
             schema.Properties["capabilities"] = new OpenApiSchema
             {
-                Type = JsonSchemaType.Array, MinItems = 1,
+                Type = JsonSchemaType.Array,
+                MinItems = 1,
                 Items = Strings(Enum.GetValues<ModerationCapability>()
                     .Where(capability => !EffectiveRestrictions.IsProtectedRemedy(capability))
                     .Select(capability => capability.ToString()))
@@ -112,15 +116,18 @@ public sealed class ModerationIntentSchemaTransformer :
             schema.Properties["startsAt"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "date-time" };
             schema.Properties["endsAt"] = new OpenApiSchema
             {
-                Type = JsonSchemaType.String | JsonSchemaType.Null, Format = "date-time"
+                Type = JsonSchemaType.String | JsonSchemaType.Null,
+                Format = "date-time"
             };
             schema.Properties["reviewAt"] = new OpenApiSchema
             {
-                Type = JsonSchemaType.String | JsonSchemaType.Null, Format = "date-time"
+                Type = JsonSchemaType.String | JsonSchemaType.Null,
+                Format = "date-time"
             };
             schema.Properties["requiredApprovals"] = new OpenApiSchema
             {
-                Type = JsonSchemaType.Integer, Enum = [JsonValue.Create(1)!, JsonValue.Create(2)!]
+                Type = JsonSchemaType.Integer,
+                Enum = [JsonValue.Create(1)!, JsonValue.Create(2)!]
             };
         }
     }
@@ -129,6 +136,7 @@ public sealed class ModerationIntentSchemaTransformer :
 
     private static OpenApiSchema Strings(IEnumerable<string> values) => new()
     {
-        Type = JsonSchemaType.String, Enum = values.Select(value => (JsonNode)JsonValue.Create(value)!).ToList()
+        Type = JsonSchemaType.String,
+        Enum = values.Select(value => (JsonNode)JsonValue.Create(value)!).ToList()
     };
 }

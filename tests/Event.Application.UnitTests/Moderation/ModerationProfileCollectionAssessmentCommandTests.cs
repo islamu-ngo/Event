@@ -12,9 +12,12 @@ public sealed class ModerationProfileCollectionAssessmentCommandTests
     [Arguments(true)]
     public async Task ExplicitEmptyAndCompleteRequirementsAreValidNominationsNotAuthority(bool complete)
     {
-        var command = Record() with { Required = complete
+        var command = Record() with
+        {
+            Required = complete
             ? [ModerationCollectionPrerequisiteKind.AccountEligibility, ModerationCollectionPrerequisiteKind.SubjectConsent,
-                ModerationCollectionPrerequisiteKind.GuardianConsent] : [] };
+                ModerationCollectionPrerequisiteKind.GuardianConsent] : []
+        };
         await Assert.That((await new ModerationProfileCollectionAssessmentCommandValidator<RecordModerationProfileCollectionAssessmentCommand>()
             .ValidateAsync(command)).IsValid).IsTrue();
         await Assert.That(command.ToRecord().Required.SequenceEqual(command.Required)).IsTrue();
@@ -129,26 +132,42 @@ public sealed class ModerationProfileCollectionAssessmentCommandTests
 
     private static RecordModerationProfileCollectionAssessmentCommand Record() => new()
     {
-        Original = Original(), SourceId = Id(7), ExpectedGeneration = 0, Required = [],
+        Original = Original(),
+        SourceId = Id(7),
+        ExpectedGeneration = 0,
+        Required = [],
         ValidUntil = new DateTimeOffset(2026, 10, 14, 12, 0, 0, TimeSpan.Zero)
     };
 
     private static AdoptModerationProfileCollectionAssessmentCommand Adopt() => new()
     {
-        Original = Original(), SourceId = Id(7), ExpectedSourceRevision = 1, ExpectedSourceGeneration = 1,
-        ExpectedGeneration = 1, AdoptionId = Id(8),
+        Original = Original(),
+        SourceId = Id(7),
+        ExpectedSourceRevision = 1,
+        ExpectedSourceGeneration = 1,
+        ExpectedGeneration = 1,
+        AdoptionId = Id(8),
         ValidUntil = new DateTimeOffset(2026, 10, 14, 12, 0, 0, TimeSpan.Zero)
     };
 
     private static ModerationProfileCollectionAssessmentOriginalIntent Original() => new()
     {
-        ObservationId = Id(1), ExpectedObservationRevision = 1, ExpectedObservationGeneration = 2,
+        ObservationId = Id(1),
+        ExpectedObservationRevision = 1,
+        ExpectedObservationGeneration = 2,
         Jurisdiction = AuthorityScope.Tenant(AuthorityScope.Instance(
             AuthorityScope.Solution(AuthorityScope.TrustDomain(Id(30)), Id(31)), Id(32)), Id(33)),
-        PolicyId = Id(2), PolicyRevision = 4, PublicationId = Id(3), ProfileId = Id(4),
-        Mode = ModerationNativeMode.Embedded, ProcedureSourceId = Id(5), ExpectedProcedureSourceRevision = 1,
-        ExpectedProcedureSourceWriterGeneration = 7, ProcedureAdoptionId = Id(6),
-        ExpectedProcedureAdoptionRevision = 1, ExpectedProcedureAdoptionWriterGeneration = 8
+        PolicyId = Id(2),
+        PolicyRevision = 4,
+        PublicationId = Id(3),
+        ProfileId = Id(4),
+        Mode = ModerationNativeMode.Embedded,
+        ProcedureSourceId = Id(5),
+        ExpectedProcedureSourceRevision = 1,
+        ExpectedProcedureSourceWriterGeneration = 7,
+        ProcedureAdoptionId = Id(6),
+        ExpectedProcedureAdoptionRevision = 1,
+        ExpectedProcedureAdoptionWriterGeneration = 8
     };
 
     private static Guid Id(int value) => Guid.Parse($"019a0000-0000-7000-8000-{value:x12}");

@@ -105,7 +105,8 @@ public sealed class ModerationRecoveryStoreStatePersistenceTests
         {
             await using var fileConnection = new SqliteConnection(new SqliteConnectionStringBuilder
             {
-                DataSource = path, Pooling = false
+                DataSource = path,
+                Pooling = false
             }.ToString());
             if (separateCommittedReader)
             {
@@ -119,7 +120,7 @@ public sealed class ModerationRecoveryStoreStatePersistenceTests
                 ? new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
                     .UseSqlite(fileConnection).UseSnakeCaseNamingConvention()
                     .AddInterceptors(Explore.Persistence.Database.SqliteNamedLockTransactionInterceptor.Instance).Options)
-                    { TenantContext = database }
+                { TenantContext = database }
                 : database.Context();
             var clock = new RecoveryClock();
             await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);

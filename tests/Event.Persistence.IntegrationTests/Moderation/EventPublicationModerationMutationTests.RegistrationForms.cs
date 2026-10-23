@@ -193,7 +193,8 @@ public sealed partial class EventPublicationModerationMutationTests
         var declared = ModerationPolicyPublicationProjection.RestoreHistory(adoption.Publication)!.Proposed;
         var retired = await PublishPolicyAsync(fixture, clock, adoption.Host, declared with
         {
-            PublicationId = Guid.CreateVersion7(), ExpectedRevision = adoption.Publication.Revision,
+            PublicationId = Guid.CreateVersion7(),
+            ExpectedRevision = adoption.Publication.Revision,
             SupportedProfiles = []
         }, adoption.Publication.Id);
         await Assert.That(retired.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
@@ -258,8 +259,11 @@ public sealed partial class EventPublicationModerationMutationTests
             var organizer = NativeUser(Guid.CreateVersion7());
             var actor = new Actor
             {
-                Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                UserId = organizer.Id, Pii = new ActorPii { DisplayName = "Independent form organizer" },
+                Id = Guid.CreateVersion7(),
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = organizer.Id,
+                Pii = new ActorPii { DisplayName = "Independent form organizer" },
                 CreatedAt = clock.Now.UtcDateTime
             };
             fixture.Context.Users.Add(organizer);
@@ -307,7 +311,9 @@ public sealed partial class EventPublicationModerationMutationTests
             Guid.CreateVersion7(), Guid.CreateVersion7(), maintenanceId);
         fixture.Context.ServicePrincipals.Add(new ServicePrincipal
         {
-            Id = maintenanceId, Code = $"form-publication-{maintenanceId:N}", DisplayName = "Form publication maintenance"
+            Id = maintenanceId,
+            Code = $"form-publication-{maintenanceId:N}",
+            DisplayName = "Form publication maintenance"
         });
         fixture.Context.ModerationHostBindings.Add(host);
         var tenant = await fixture.Context.Tenants.SingleAsync(row => row.Id == fixture.TenantId);

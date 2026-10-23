@@ -199,9 +199,12 @@ public sealed partial class ModerationCaseNativeProofTests
         var replacementId = Guid.CreateVersion7();
         await fixture.AcceptAsync(fixture.Original.Assessor, new RecordModerationResourceGenerationSource
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Original.Case.Scope,
-            ExpectedQualificationRevision = 1, SourceId = replacementId,
-            ResourceId = fixture.Database.ResourceId, ExpectedResourceRevision = original.Generation.Revision,
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Original.Case.Scope,
+            ExpectedQualificationRevision = 1,
+            SourceId = replacementId,
+            ResourceId = fixture.Database.ResourceId,
+            ExpectedResourceRevision = original.Generation.Revision,
             ValidUntil = original.Generation.ValidUntil
         });
         await using (var reader = fixture.Context())
@@ -229,10 +232,13 @@ public sealed partial class ModerationCaseNativeProofTests
         var original = await fixture.ReadOriginalResourceLineageAsync();
         await fixture.AcceptAsync(fixture.Original.Assessor, new RevokeModerationResourceTargetSource
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Finding.Scope,
-            ExpectedQualificationRevision = 1, AdoptionId = original.Adoption.Id,
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Finding.Scope,
+            ExpectedQualificationRevision = 1,
+            AdoptionId = original.Adoption.Id,
             ExpectedAdoptionRevision = original.Adoption.Revision,
-            CaseId = fixture.Original.Case.Id, ExpectedCaseRevision = fixture.Original.Case.Revision
+            CaseId = fixture.Original.Case.Id,
+            ExpectedCaseRevision = fixture.Original.Case.Revision
         });
         var result = await fixture.CompleteAsync();
         await Assert.That(result.Outcome).IsEqualTo(ModerationOriginalEffectCompletionOutcome.Pending);
@@ -255,10 +261,13 @@ public sealed partial class ModerationCaseNativeProofTests
         var original = await fixture.ReadOriginalResourceLineageAsync();
         await fixture.AcceptAsync(fixture.Original.Assessor, new RevokeModerationResourceTargetSource
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Finding.Scope,
-            ExpectedQualificationRevision = 1, AdoptionId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Finding.Scope,
+            ExpectedQualificationRevision = 1,
+            AdoptionId = Guid.CreateVersion7(),
             ExpectedAdoptionRevision = original.Adoption.Revision,
-            CaseId = fixture.Original.Case.Id, ExpectedCaseRevision = fixture.Original.Case.Revision
+            CaseId = fixture.Original.Case.Id,
+            ExpectedCaseRevision = fixture.Original.Case.Revision
         }, ModerationQualificationWriteOutcome.NotFound);
         await using (var reader = fixture.Context())
         {
@@ -321,12 +330,18 @@ public sealed partial class ModerationCaseNativeProofTests
             {
                 var result = await owner.ReviewAsync(new()
                 {
-                    OperationId = Guid.CreateVersion7(), QuarantineId = Guid.CreateVersion7(),
-                    ResourceId = original.Generation.ResourceId, MaterialVersionId = original.Generation.MaterialVersionId,
-                    CaseId = fixture.Original.Case.Id, ExpectedCaseRevision = fixture.Original.Case.Revision,
-                    ReviewerAssignmentId = reviewer.Id, ExpectedReviewerRevision = reviewer.Revision,
-                    Step = ResourceSafetyReviewStep.ProposePurpose, RequiredApprovals = 1,
-                    MaximumEvidenceLifetime = TimeSpan.FromSeconds(1), ValidUntil = original.Generation.ValidUntil
+                    OperationId = Guid.CreateVersion7(),
+                    QuarantineId = Guid.CreateVersion7(),
+                    ResourceId = original.Generation.ResourceId,
+                    MaterialVersionId = original.Generation.MaterialVersionId,
+                    CaseId = fixture.Original.Case.Id,
+                    ExpectedCaseRevision = fixture.Original.Case.Revision,
+                    ReviewerAssignmentId = reviewer.Id,
+                    ExpectedReviewerRevision = reviewer.Revision,
+                    Step = ResourceSafetyReviewStep.ProposePurpose,
+                    RequiredApprovals = 1,
+                    MaximumEvidenceLifetime = TimeSpan.FromSeconds(1),
+                    ValidUntil = original.Generation.ValidUntil
                 });
                 await Assert.That(result.Outcome).IsEqualTo(ModerationResourceSafetyOutcome.Unavailable);
                 await Assert.That(result.Receipt).IsNull();

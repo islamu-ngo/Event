@@ -56,12 +56,22 @@ public sealed class ModerationContentResponse
             throw new ArgumentException("A Content response requires its original approved representative occurrence and finite purpose.");
         var row = new ModerationContentResponse
         {
-            Id = operationId, HostBindingId = approval.HostBindingId, TrustDomainId = source.TrustDomainId,
-            TenantId = approval.TenantId, NoticeId = notice.Id, EffectId = source.EffectId, CaseId = approval.CaseId,
-            ContentSubjectId = source.SubjectId, RepresentativeHumanId = representative.HumanId,
-            AssignmentId = representative.AssignmentId, AssignmentRevision = representative.AssignmentRevision,
-            SnapshotHash = source.SnapshotHash, RequestDigest = requestDigest,
-            SubmittedAt = submittedAt, RetainUntil = ceiling, protectedStatement = ciphertext.ToArray()
+            Id = operationId,
+            HostBindingId = approval.HostBindingId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = approval.TenantId,
+            NoticeId = notice.Id,
+            EffectId = source.EffectId,
+            CaseId = approval.CaseId,
+            ContentSubjectId = source.SubjectId,
+            RepresentativeHumanId = representative.HumanId,
+            AssignmentId = representative.AssignmentId,
+            AssignmentRevision = representative.AssignmentRevision,
+            SnapshotHash = source.SnapshotHash,
+            RequestDigest = requestDigest,
+            SubmittedAt = submittedAt,
+            RetainUntil = ceiling,
+            protectedStatement = ciphertext.ToArray()
         };
         row.ValidatePersistedState();
         return row;

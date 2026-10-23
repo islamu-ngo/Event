@@ -72,25 +72,38 @@ public sealed class ModerationConsumerMeasurementChallengeWriterTests
         database.ConsumerRuntimeSources = [runtime];
         var installed = new InstallModerationConsumerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 1,
-            InstallationId = Guid.CreateVersion7(), ConsumerId = runtime.ConsumerId, Mode = runtime.Mode,
-            ExpectedRuntimeGeneration = runtime.Generation, ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 1,
+            InstallationId = Guid.CreateVersion7(),
+            ConsumerId = runtime.ConsumerId,
+            Mode = runtime.Mode,
+            ExpectedRuntimeGeneration = runtime.Generation,
+            ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
             ValidUntil = Now.AddMinutes(5)
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, installed)).IsSuccess).IsTrue();
         var publication = database.Publication(2, ModerationReferenceProfileId.CFG08);
-        publication = publication with { Proposed = publication.Proposed with
-            { Profiles = [publication.Proposed.Profiles[0] with { ScopeKinds = [ModerationScopeKind.Resource] }] } };
+        publication = publication with
+        {
+            Proposed = publication.Proposed with
+            { Profiles = [publication.Proposed.Profiles[0] with { ScopeKinds = [ModerationScopeKind.Resource] }] }
+        };
         await Assert.That((await database.PublishAsync(database.AdministratorId, publication)).Outcome)
             .IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         return (runtime, new()
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            ChallengeId = Guid.CreateVersion7(), InstallationId = installed.InstallationId, ExpectedInstallationRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            ChallengeId = Guid.CreateVersion7(),
+            InstallationId = installed.InstallationId,
+            ExpectedInstallationRevision = 1,
             ConsumerId = runtime.ConsumerId,
             Binding = new(publication.Proposed.PolicyId, 1, publication.Proposed.PublicationId, database.Scope,
                 publication.Proposed.Profiles[0].Rule, ModerationCapability.ReadResource, runtime.Mode),
-            ExpectedRuntimeGeneration = runtime.Generation, ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
+            ExpectedRuntimeGeneration = runtime.Generation,
+            ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
             ValidUntil = Now.AddMinutes(1)
         });
     }
@@ -114,8 +127,11 @@ public sealed class ModerationConsumerMeasurementChallengeWriterTests
         {
             var withdrawn = new WithdrawModerationConsumerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-                InstallationId = request.InstallationId, ExpectedInstallationRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 3,
+                InstallationId = request.InstallationId,
+                ExpectedInstallationRevision = 1
             };
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, withdrawn)).IsSuccess).IsTrue();
             request = request with { ExpectedQualificationRevision = 4 };

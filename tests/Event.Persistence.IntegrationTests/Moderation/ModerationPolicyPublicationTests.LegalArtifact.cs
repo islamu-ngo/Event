@@ -89,8 +89,10 @@ public sealed partial class ModerationPolicyPublicationTests
             return await applier.ApplyAsync(ConfigurationImportTarget.ForTenant(database.TenantId), bytes,
                 new ConfigurationImportPreviewRequest
                 {
-                    SelectedSectionKeys = ["tenant.legal_documents"], Mappings = new Dictionary<string, string>(),
-                    ApplyMode = ConfigurationImportApplyMode.ApplySelected, GrantedApprovalCodes = []
+                    SelectedSectionKeys = ["tenant.legal_documents"],
+                    Mappings = new Dictionary<string, string>(),
+                    ApplyMode = ConfigurationImportApplyMode.ApplySelected,
+                    GrantedApprovalCodes = []
                 }, database.AdminId, Now.UtcDateTime, ConfigurationImportDigest.ComputeBytes(bytes), new(), token, []);
         });
         await Assert.That(Apply).Throws<ConfigurationImportSessionException>();
@@ -120,7 +122,9 @@ public sealed partial class ModerationPolicyPublicationTests
                 {
                     ["TenantTerms"] = new()
                     {
-                        Kind = "TenantTerms", Audience = "Public", LifecycleIntent = "ReviewRequired",
+                        Kind = "TenantTerms",
+                        Audience = "Public",
+                        LifecycleIntent = "ReviewRequired",
                         AccountableIdentityReference = "Source author",
                         ProposedEffectiveAt = Now.UtcDateTime,
                         JurisdictionAssumptions = [],

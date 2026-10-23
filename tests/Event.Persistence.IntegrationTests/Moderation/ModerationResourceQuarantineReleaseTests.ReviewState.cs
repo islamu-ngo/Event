@@ -86,7 +86,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
     {
         await using var fixture = await InspectionFixture.CreateAsync();
         var evidence = fixture.Native.Intent(fixture.Native.Author, ResourceSafetyReviewStep.AttestMaterialSafety,
-            fixture.Intent.AdoptionId) with { Attestation = ResourceSafetyAttestation.IndependentlyInspectedSafeForCurrentAudience };
+            fixture.Intent.AdoptionId) with
+        { Attestation = ResourceSafetyAttestation.IndependentlyInspectedSafeForCurrentAudience };
         await fixture.Native.AcceptAsync(fixture.Native.Author, evidence);
         var approval = fixture.Native.Intent(fixture.Native.Approver, ResourceSafetyReviewStep.ApproveSafety, evidence.OperationId);
         await fixture.Native.AcceptAsync(fixture.Native.Approver, approval);
@@ -104,7 +105,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
     {
         await using var fixture = await InspectionFixture.CreateAsync();
         var evidence = fixture.Native.Intent(fixture.Native.Author, ResourceSafetyReviewStep.AttestMaterialSafety,
-            fixture.Intent.AdoptionId) with { Attestation = ResourceSafetyAttestation.IndependentlyInspectedSafeForCurrentAudience };
+            fixture.Intent.AdoptionId) with
+        { Attestation = ResourceSafetyAttestation.IndependentlyInspectedSafeForCurrentAudience };
         await fixture.Native.AcceptAsync(fixture.Native.Author, evidence);
         await using var session = fixture.Session();
         var pending = await session.PendingReviewStateAsync(ReviewStateIntent(fixture, fixture.Intent.AdoptionId, fixture.Native.Author));
@@ -153,12 +155,15 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
 
     private static ModerationResourceQuarantineReviewStateIntent ReviewStateIntent(
         InspectionFixture fixture, Guid tip, Guid human) => new()
-    {
-        ResourceId = fixture.Native.ResourceId, MaterialVersionId = fixture.Native.MaterialId,
-        QuarantineId = fixture.Native.CauseId, TipId = tip, CaseId = fixture.Native.CaseId,
-        ExpectedCaseRevision = fixture.Intent.ExpectedCaseRevision,
-        ReviewerAssignmentId = fixture.Native.Assignments[human],
-        ExpectedReviewerRevision = fixture.Intent.ExpectedReviewerRevision,
-        ExpectedQualificationRevision = fixture.Intent.ExpectedQualificationRevision
-    };
+        {
+            ResourceId = fixture.Native.ResourceId,
+            MaterialVersionId = fixture.Native.MaterialId,
+            QuarantineId = fixture.Native.CauseId,
+            TipId = tip,
+            CaseId = fixture.Native.CaseId,
+            ExpectedCaseRevision = fixture.Intent.ExpectedCaseRevision,
+            ReviewerAssignmentId = fixture.Native.Assignments[human],
+            ExpectedReviewerRevision = fixture.Intent.ExpectedReviewerRevision,
+            ExpectedQualificationRevision = fixture.Intent.ExpectedQualificationRevision
+        };
 }

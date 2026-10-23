@@ -33,8 +33,10 @@ public sealed partial class ModerationNoticeReadTests
             actorId = await setup.Events.Where(row => row.Id == eventId).Select(row => row.ActorId).SingleAsync();
             setup.Actors.Add(new Actor
             {
-                Id = replacementId, ActorTypeId = (int)ActorTypeEnum.User,
-                UserId = fixture.Database.ReviewerId, Pii = new ActorPii()
+                Id = replacementId,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                UserId = fixture.Database.ReviewerId,
+                Pii = new ActorPii()
             });
             await setup.SaveChangesAsync();
         }

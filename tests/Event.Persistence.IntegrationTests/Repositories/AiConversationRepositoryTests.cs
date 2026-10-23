@@ -501,8 +501,11 @@ public sealed class AiConversationRepositoryTests(PostgreSqlContainerFixture fix
             // The real confirmation handler's tool save must not persist its pending proposal decision.
             await repository.CreateToolExecutionAsync(new AiToolExecution
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantId, ProposedActionId = action.Id,
-                ToolName = "CreateEventDraft", StartedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantId,
+                ProposedActionId = action.Id,
+                ToolName = "CreateEventDraft",
+                StartedAt = DateTime.UtcNow
             }, default);
             var before = await context.AiProposedActions.AsNoTracking().SingleAsync(row => row.Id == action.Id);
             await Assert.That(before.Status).IsEqualTo(AiProposedActionStatus.Proposed);

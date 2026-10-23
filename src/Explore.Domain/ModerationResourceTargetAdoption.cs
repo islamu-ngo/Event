@@ -46,12 +46,23 @@ public sealed class ModerationResourceTargetAdoption
             throw new ArgumentException("Target adoption requires independent approval of the exact retained resource partition and generation.");
         var row = new ModerationResourceTargetAdoption
         {
-            Id = id, HostBindingId = selection.HostBindingId, TrustDomainId = selection.TrustDomainId,
-            TenantId = selection.TenantId, SelectionId = selection.Id, SelectionRevision = selection.Revision,
-            BindingOrdinal = binding.Ordinal, GenerationId = generation.Id, GenerationRevision = generation.Revision,
+            Id = id,
+            HostBindingId = selection.HostBindingId,
+            TrustDomainId = selection.TrustDomainId,
+            TenantId = selection.TenantId,
+            SelectionId = selection.Id,
+            SelectionRevision = selection.Revision,
+            BindingOrdinal = binding.Ordinal,
+            GenerationId = generation.Id,
+            GenerationRevision = generation.Revision,
             GenerationWriterGeneration = generation.WriterGeneration,
-            CaseId = selection.CaseId, CaseRevision = selection.CaseRevision, AdoptedByHumanId = humanId,
-            WriterGeneration = writerGeneration, Revision = 1, AdoptedAt = now.ToUniversalTime(), ValidUntil = validUntil
+            CaseId = selection.CaseId,
+            CaseRevision = selection.CaseRevision,
+            AdoptedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            AdoptedAt = now.ToUniversalTime(),
+            ValidUntil = validUntil
         };
         row.ValidatePersistedState();
         return row;

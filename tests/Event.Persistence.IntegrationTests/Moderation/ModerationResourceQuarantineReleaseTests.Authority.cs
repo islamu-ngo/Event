@@ -17,22 +17,31 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         await using var fixture = await Fixture.CreateAsync(prepare: false);
         await fixture.SourceAsync(fixture.Database.AdministratorId, new QualifyModerationReviewerController
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-            AssignmentId = fixture.Assignments[fixture.Approver], ExpectedAssignmentRevision = 3,
-            ControllerHumanId = fixture.Author, EvidenceId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Scope,
+            ExpectedQualificationRevision = 1,
+            AssignmentId = fixture.Assignments[fixture.Approver],
+            ExpectedAssignmentRevision = 3,
+            ControllerHumanId = fixture.Author,
+            EvidenceId = Guid.CreateVersion7(),
             Justification = "Native evidence identifies one controller behind both reviewer accounts.",
             QualifiedUntil = fixture.Clock.Now.AddMinutes(30)
         });
         await fixture.SourceAsync(fixture.Database.AdministratorId, new AssessModerationReviewerConflict
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-            AssignmentId = fixture.Assignments[fixture.Approver], ExpectedAssignmentRevision = 4,
-            State = ModerationReviewerConflictState.Independent, EvidenceId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Scope,
+            ExpectedQualificationRevision = 1,
+            AssignmentId = fixture.Assignments[fixture.Approver],
+            ExpectedAssignmentRevision = 4,
+            State = ModerationReviewerConflictState.Independent,
+            EvidenceId = Guid.CreateVersion7(),
             Justification = "Case conflict assessment does not make these two controllers independent."
         });
         var purpose = fixture.Intent(fixture.Author, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
         };
         await fixture.AcceptAsync(fixture.Author, purpose);
         var adopt = fixture.Intent(fixture.Approver, ResourceSafetyReviewStep.AdoptPurpose, purpose.OperationId) with
@@ -51,7 +60,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         await using var fixture = await Fixture.CreateAsync(prepare: false);
         var purpose = fixture.Intent(fixture.Author, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(1)
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(1)
         };
         await fixture.AcceptAsync(fixture.Author, purpose);
         var predecessor = purpose.OperationId;
@@ -94,16 +104,26 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
                 .Select(row => row.EventId).SingleAsync();
         await fixture.SourceAsync(fixture.Database.AdministratorId, new OpenModerationCaseSource
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope, ExpectedQualificationRevision = 1,
-            CaseId = urgencyCaseId, SubjectKind = ModerationSubjectKind.Content,
-            SubjectId = eventId, OccurrenceId = Guid.CreateVersion7()
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Database.Scope,
+            ExpectedQualificationRevision = 1,
+            CaseId = urgencyCaseId,
+            SubjectKind = ModerationSubjectKind.Content,
+            SubjectId = eventId,
+            OccurrenceId = Guid.CreateVersion7()
         });
         var policyId = Guid.CreateVersion7();
         await fixture.SourceAsync(fixture.Database.AdministratorId, new PublishModerationQualificationPolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope, ExpectedQualificationRevision = 1,
-            SourceId = policyId, CaseId = urgencyCaseId, ExpectedCaseRevision = 1, ExpectedSourceRevision = 0,
-            MaximumReviewerLifetime = TimeSpan.FromMinutes(10), MaximumUrgencyLifetime = TimeSpan.FromMinutes(1),
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Database.Scope,
+            ExpectedQualificationRevision = 1,
+            SourceId = policyId,
+            CaseId = urgencyCaseId,
+            ExpectedCaseRevision = 1,
+            ExpectedSourceRevision = 0,
+            MaximumReviewerLifetime = TimeSpan.FromMinutes(10),
+            MaximumUrgencyLifetime = TimeSpan.FromMinutes(1),
             ValidUntil = fixture.Clock.Now.AddMinutes(10)
         });
         long writerGeneration;
@@ -115,16 +135,26 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         }
         await fixture.SourceAsync(fixture.Database.UrgencyAssessorId, new AdoptModerationQualificationPolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope, ExpectedQualificationRevision = 1,
-            SourceId = policyId, ExpectedSourceRevision = 1, ExpectedWriterGeneration = writerGeneration,
-            AdoptionId = Guid.CreateVersion7(), CaseId = urgencyCaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Database.Scope,
+            ExpectedQualificationRevision = 1,
+            SourceId = policyId,
+            ExpectedSourceRevision = 1,
+            ExpectedWriterGeneration = writerGeneration,
+            AdoptionId = Guid.CreateVersion7(),
+            CaseId = urgencyCaseId,
+            ExpectedCaseRevision = 1,
             ValidUntil = fixture.Clock.Now.AddMinutes(5)
         });
         var evidenceId = Guid.CreateVersion7();
         await fixture.SourceAsync(fixture.Database.AdministratorId, new QualifyModerationCaseUrgency
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope, ExpectedQualificationRevision = 1,
-            CaseId = urgencyCaseId, ExpectedCaseRevision = 1, EvidenceId = evidenceId,
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Database.Scope,
+            ExpectedQualificationRevision = 1,
+            CaseId = urgencyCaseId,
+            ExpectedCaseRevision = 1,
+            EvidenceId = evidenceId,
             Justification = "Current urgency is a separate purpose, not a material-safety finding.",
             ValidUntil = fixture.Clock.Now.AddMinutes(1)
         });

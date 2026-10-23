@@ -40,8 +40,11 @@ public static class ModerationMeasurementProductManifest
             throw new ArgumentException("Runtime generation requires a native consumer, mode and exact pinned artifacts.");
         return Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
         {
-            format = "moderation-consumer-runtime-v1", consumerId, mode,
-            inventoryFingerprint, productArtifactDigest
+            format = "moderation-consumer-runtime-v1",
+            consumerId,
+            mode,
+            inventoryFingerprint,
+            productArtifactDigest
         })));
     }
 }

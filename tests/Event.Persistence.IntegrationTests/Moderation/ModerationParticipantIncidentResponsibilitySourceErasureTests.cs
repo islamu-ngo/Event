@@ -168,8 +168,10 @@ public sealed partial class ModerationCaseNativeProofTests
                     var organizerId = Guid.CreateVersion7();
                     var organizer = new Actor
                     {
-                        Id = organizerId, ActorTypeId = (int)ActorTypeEnum.User,
-                        ActorType = null!, UserId = unrelated,
+                        Id = organizerId,
+                        ActorTypeId = (int)ActorTypeEnum.User,
+                        ActorType = null!,
+                        UserId = unrelated,
                         Pii = new ActorPii { ActorId = organizerId, DisplayName = "Unrelated organizer" }
                     };
                     context.Actors.Add(organizer);
@@ -206,8 +208,11 @@ public sealed partial class ModerationCaseNativeProofTests
             var selected = Guid.CreateVersion7();
             context.Tenants.Add(new Tenant
             {
-                Id = selected, Slug = $"assessment-erasure-{selected:N}", FullName = "Other selected tenant",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = selected,
+                Slug = $"assessment-erasure-{selected:N}",
+                FullName = "Other selected tenant",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             });
             await context.SaveChangesAsync();
             await context.Tenants.Where(row => row.Id == database.TenantId)
@@ -255,9 +260,13 @@ public sealed partial class ModerationCaseNativeProofTests
 
     private static User AssessmentErasureHuman(Guid id) => new()
     {
-        Id = id, Pii = new UserPii
+        Id = id,
+        Pii = new UserPii
         {
-            UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Erasure", LastName = "Witness"
+            UserId = id,
+            Email = $"{id:N}@example.invalid",
+            FirstName = "Erasure",
+            LastName = "Witness"
         }
     };
 

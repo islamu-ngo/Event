@@ -200,15 +200,15 @@ public sealed class ModerationPolicyPublicationControllerTests
 
     private static ModerationPolicyPublicationController PublicationController(
         IModerationPolicyPublicationRepository repository) => new(new PublishModerationPolicyCommandHandler(repository))
-    {
-        ControllerContext = new() { HttpContext = new DefaultHttpContext() }
-    };
+        {
+            ControllerContext = new() { HttpContext = new DefaultHttpContext() }
+        };
 
     private static ModerationPolicyPublicationPreparationController PreparationController(
         IModerationPolicyPublicationRepository repository) => new(new PrepareModerationPolicyPublicationCommandHandler(repository))
-    {
-        ControllerContext = new() { HttpContext = new DefaultHttpContext() }
-    };
+        {
+            ControllerContext = new() { HttpContext = new DefaultHttpContext() }
+        };
 
     private static IModerationPolicyPublicationRepository RejectUnexpectedWrite()
     {
@@ -257,18 +257,40 @@ public sealed class ModerationPolicyPublicationControllerTests
 
     private static ModerationPolicyPublication Snapshot(ModerationPolicyPublicationRequest request) => new()
     {
-        Id = request.Proposed.PublicationId, PolicyId = request.Proposed.PolicyId, Revision = 1,
-        AdoptedRevision = null, PreviousPublicationId = null, HostBindingId = request.ExpectedHostBindingId,
+        Id = request.Proposed.PublicationId,
+        PolicyId = request.Proposed.PolicyId,
+        Revision = 1,
+        AdoptedRevision = null,
+        PreviousPublicationId = null,
+        HostBindingId = request.ExpectedHostBindingId,
         TrustDomainId = request.Proposed.Jurisdiction.Parent!.Parent!.Id,
-        SolutionId = request.Proposed.Jurisdiction.Parent.Id, InstanceId = request.Proposed.Jurisdiction.Id,
-        JurisdictionTenantId = null, TenantId = Guid.CreateVersion7(), PrincipalId = Guid.CreateVersion7(),
-        OperationId = request.OperationId, RequestDigest = new string('a', 64), DeclaredStateDigest = new string('b', 64),
-        AuthoritySourceId = request.ExpectedAuthoritySourceId, AuthorityRevision = 1, QualificationRevision = 2,
-        WriterGeneration = request.ExpectedWriterGeneration, CatalogueRevision = request.Proposed.CatalogueRevision,
-        InventoryRevision = request.Proposed.InventoryRevision, InventoryFingerprint = request.Proposed.InventoryFingerprint,
-        PublishedActive = false, PublishedAt = Now, EvidenceValidUntil = null,
-        MaximumFiniteDurationTicks = TimeSpan.FromDays(1).Ticks, MaximumReviewDelayTicks = TimeSpan.FromDays(1).Ticks,
-        MinimumApprovals = 0, MaximumApprovals = 2, MinimumContestationCalendarMonths = 6,
-        Classes = [], Reasons = [], Profiles = [], Modes = [], Evidence = []
+        SolutionId = request.Proposed.Jurisdiction.Parent.Id,
+        InstanceId = request.Proposed.Jurisdiction.Id,
+        JurisdictionTenantId = null,
+        TenantId = Guid.CreateVersion7(),
+        PrincipalId = Guid.CreateVersion7(),
+        OperationId = request.OperationId,
+        RequestDigest = new string('a', 64),
+        DeclaredStateDigest = new string('b', 64),
+        AuthoritySourceId = request.ExpectedAuthoritySourceId,
+        AuthorityRevision = 1,
+        QualificationRevision = 2,
+        WriterGeneration = request.ExpectedWriterGeneration,
+        CatalogueRevision = request.Proposed.CatalogueRevision,
+        InventoryRevision = request.Proposed.InventoryRevision,
+        InventoryFingerprint = request.Proposed.InventoryFingerprint,
+        PublishedActive = false,
+        PublishedAt = Now,
+        EvidenceValidUntil = null,
+        MaximumFiniteDurationTicks = TimeSpan.FromDays(1).Ticks,
+        MaximumReviewDelayTicks = TimeSpan.FromDays(1).Ticks,
+        MinimumApprovals = 0,
+        MaximumApprovals = 2,
+        MinimumContestationCalendarMonths = 6,
+        Classes = [],
+        Reasons = [],
+        Profiles = [],
+        Modes = [],
+        Evidence = []
     };
 }

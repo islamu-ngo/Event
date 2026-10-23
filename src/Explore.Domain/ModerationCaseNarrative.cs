@@ -48,12 +48,24 @@ public sealed class ModerationCaseNarrative
             throw new ArgumentException("Narrative capture requires exact current material and independent finite custody authority.");
         var row = new ModerationCaseNarrative
         {
-            Id = id, TenantId = receipt.TenantId, TrustDomainId = policy.TrustDomainId, HostBindingId = receipt.HostBindingId,
-            CaseId = caseId, ReporterUserId = receipt.CallerUserId, ReceiptId = receipt.Id, SourceId = receipt.SourceId,
-            SourceVersion = receipt.SourceVersion, MaterialFactId = receipt.MaterialFactId,
-            PolicySourceId = policy.Id, AdoptionId = adoption.Id, PolicyWriterGeneration = policy.WriterGeneration,
-            AdoptionWriterGeneration = adoption.WriterGeneration, QualificationEpochId = receipt.QualificationEpochId,
-            QualificationRevision = receipt.QualificationRevision, CapturedAt = now, PurgeAt = purgeAt,
+            Id = id,
+            TenantId = receipt.TenantId,
+            TrustDomainId = policy.TrustDomainId,
+            HostBindingId = receipt.HostBindingId,
+            CaseId = caseId,
+            ReporterUserId = receipt.CallerUserId,
+            ReceiptId = receipt.Id,
+            SourceId = receipt.SourceId,
+            SourceVersion = receipt.SourceVersion,
+            MaterialFactId = receipt.MaterialFactId,
+            PolicySourceId = policy.Id,
+            AdoptionId = adoption.Id,
+            PolicyWriterGeneration = policy.WriterGeneration,
+            AdoptionWriterGeneration = adoption.WriterGeneration,
+            QualificationEpochId = receipt.QualificationEpochId,
+            QualificationRevision = receipt.QualificationRevision,
+            CapturedAt = now,
+            PurgeAt = purgeAt,
             protectedMaterial = ciphertext.ToArray()
         };
         row.ValidatePersistedState();

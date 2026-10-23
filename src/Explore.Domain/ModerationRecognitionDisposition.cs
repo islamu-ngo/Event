@@ -80,18 +80,35 @@ public sealed class ModerationRecognitionDisposition
             row.RecordClass == ModerationRecognitionPrivacyRecordClass.DispositionAndReplayReceipt);
         var result = new ModerationRecognitionDisposition
         {
-            Id = id, IntentId = pending.IntentId, SubjectId = pending.SubjectId,
-            PolicyVersion = pending.PolicyVersion, ReasonCode = pending.ReasonCode, PendingRevision = pending.Revision,
-            OriginalMaterialReceipt = pending.MaterialReceipt, OriginalMaterialCount = pending.MaterialCount,
+            Id = id,
+            IntentId = pending.IntentId,
+            SubjectId = pending.SubjectId,
+            PolicyVersion = pending.PolicyVersion,
+            ReasonCode = pending.ReasonCode,
+            PendingRevision = pending.Revision,
+            OriginalMaterialReceipt = pending.MaterialReceipt,
+            OriginalMaterialCount = pending.MaterialCount,
             ObservedMaterialCommitment = MaterialCommitment(pending),
-            CoverageReceipt = coverageReceipt, CoverageCount = coverageCount, ObservedFailure = pending.Failure,
-            GroundsReceipt = FailureReceipt(pending), LegalMandateReceipt = MandateReceipt(source),
-            SourceId = source.Id, SourceRevision = source.Revision, SourceGeneration = source.WriterGeneration,
-            AdoptionId = adoption.Id, AdoptionRevision = adoption.Revision, AdoptionGeneration = adoption.WriterGeneration,
-            PrivacyOwnerHumanId = source.PrivacyOwnerHumanId, RecoveryOwnerHumanId = recoveryOwner,
-            Grounds = grounds, OriginalDeadline = pending.SettleBy, AssessedAt = now, ValidUntil = validUntil,
+            CoverageReceipt = coverageReceipt,
+            CoverageCount = coverageCount,
+            ObservedFailure = pending.Failure,
+            GroundsReceipt = FailureReceipt(pending),
+            LegalMandateReceipt = MandateReceipt(source),
+            SourceId = source.Id,
+            SourceRevision = source.Revision,
+            SourceGeneration = source.WriterGeneration,
+            AdoptionId = adoption.Id,
+            AdoptionRevision = adoption.Revision,
+            AdoptionGeneration = adoption.WriterGeneration,
+            PrivacyOwnerHumanId = source.PrivacyOwnerHumanId,
+            RecoveryOwnerHumanId = recoveryOwner,
+            Grounds = grounds,
+            OriginalDeadline = pending.SettleBy,
+            AssessedAt = now,
+            ValidUntil = validUntil,
             ReplayUntil = validUntil.AddTicks(checked(source.MaximumBackupHorizonTicks + source.BackupSafetyMarginTicks)),
-            RetainUntil = now.AddTicks(receipt.MaximumRetentionTicks), Revision = 1
+            RetainUntil = now.AddTicks(receipt.MaximumRetentionTicks),
+            Revision = 1
         };
         result.ValidatePersistedState();
         return result;
@@ -229,14 +246,26 @@ public sealed class ModerationRecognitionDisposition
     private static string FailureReceipt(ModerationRecognitionPending pending) =>
         Convert.ToHexStringLower(SHA256.HashData(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
         {
-            pending.IntentId, pending.Revision, pending.Failure, pending.MaterialCount,
-            pending.MaterialReceipt, pending.ReceivedAt, pending.SettleBy, pending.EscalateAt
+            pending.IntentId,
+            pending.Revision,
+            pending.Failure,
+            pending.MaterialCount,
+            pending.MaterialReceipt,
+            pending.ReceivedAt,
+            pending.SettleBy,
+            pending.EscalateAt
         })));
 
     private static string MandateReceipt(ModerationRecognitionPrivacySource source) =>
         Convert.ToHexStringLower(SHA256.HashData(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
         {
-            source.Id, source.Revision, source.WriterGeneration, source.PrivacyLegalMandateBasis,
-            source.RecoveryMandateBasis, source.IdentityAndIndependenceBasis, source.Terms, source.Ownership
+            source.Id,
+            source.Revision,
+            source.WriterGeneration,
+            source.PrivacyLegalMandateBasis,
+            source.RecoveryMandateBasis,
+            source.IdentityAndIndependenceBasis,
+            source.Terms,
+            source.Ownership
         })));
 }

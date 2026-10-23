@@ -14,9 +14,14 @@ public sealed record AcceptModerationConsumerMeasurementCommand : ModerationQual
     public required string SignedToken { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new AcceptModerationConsumerMeasurementSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
         OriginalEffect = OriginalEffect,
-        ReceiptId = ReceiptId, ChallengeId = ChallengeId, IssuerEnrollmentId = IssuerEnrollmentId,
-        Binding = Binding, SignedToken = SignedToken
+        ReceiptId = ReceiptId,
+        ChallengeId = ChallengeId,
+        IssuerEnrollmentId = IssuerEnrollmentId,
+        Binding = Binding,
+        SignedToken = SignedToken
     };
 }

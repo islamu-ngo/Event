@@ -32,9 +32,12 @@ public sealed class ModerationRecognitionKeyLifecyclePurge
             throw ModerationRecognitionKeyLifecycle.Unavailable();
         var result = new ModerationRecognitionKeyLifecyclePurge
         {
-            IntentId = pending.IntentId, TrustDomainId = obligations.First().TrustDomainId,
-            MaterialReceipt = pending.MaterialReceipt!, MaterialCount = pending.MaterialCount,
-            AuthoritySequence = sequence, PurgedAt = now,
+            IntentId = pending.IntentId,
+            TrustDomainId = obligations.First().TrustDomainId,
+            MaterialReceipt = pending.MaterialReceipt!,
+            MaterialCount = pending.MaterialCount,
+            AuthoritySequence = sequence,
+            PurgedAt = now,
             BackupObligationUntil = obligations.Max(row => row.ReadableUntil),
             RetainUntil = obligations.Min(row => row.ReceiptRetainUntil!.Value)
         };

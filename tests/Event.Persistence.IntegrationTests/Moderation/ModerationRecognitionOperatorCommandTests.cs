@@ -46,10 +46,15 @@ public sealed partial class ModerationPolicyPublicationTests
         var authorize = new AuthorizeRecognitionRecoveryCommandHandler(recovery, user);
         var command = new AssessRecognitionRecoveryCommand
         {
-            OperationId = Guid.CreateVersion7(), IntentId = pending.IntentId, SourceId = adoption.SourceId,
-            AdoptionId = adoption.Id, ExpectedPendingRevision = pending.Revision,
-            ExpectedSourceRevision = adoption.SourceRevision, ExpectedSourceGeneration = adoption.SourceWriterGeneration,
-            ExpectedAdoptionRevision = adoption.Revision, ExpectedAdoptionGeneration = adoption.WriterGeneration,
+            OperationId = Guid.CreateVersion7(),
+            IntentId = pending.IntentId,
+            SourceId = adoption.SourceId,
+            AdoptionId = adoption.Id,
+            ExpectedPendingRevision = pending.Revision,
+            ExpectedSourceRevision = adoption.SourceRevision,
+            ExpectedSourceGeneration = adoption.SourceWriterGeneration,
+            ExpectedAdoptionRevision = adoption.Revision,
+            ExpectedAdoptionGeneration = adoption.WriterGeneration,
             Grounds = ModerationRecognitionDispositionGrounds.OriginalKeyRecoveryUnavailable,
             ValidUntil = fixture.Clock.UtcNow.AddMinutes(5)
         };

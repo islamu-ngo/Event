@@ -293,7 +293,9 @@ public sealed class ModerationRecognitionKeyRingTests
         {
             Payload = new JsonObject
             {
-                ["version"] = 1, ["trustDomainId"] = TrustDomainId.ToString("D"), ["ringGeneration"] = 3,
+                ["version"] = 1,
+                ["trustDomainId"] = TrustDomainId.ToString("D"),
+                ["ringGeneration"] = 3,
                 ["issuedAt"] = Timestamp(Clock.Now.AddMinutes(-1)),
                 ["validUntil"] = Timestamp(Clock.Now.AddMinutes(10)),
                 ["keys"] = new JsonArray(Key("current", 2, Current, "active"), Key("previous", 1, Previous, "readable"))

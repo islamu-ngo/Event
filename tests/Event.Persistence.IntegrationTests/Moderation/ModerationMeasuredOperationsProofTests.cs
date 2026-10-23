@@ -103,8 +103,11 @@ public sealed class ModerationMeasuredOperationsProofTests
     {
         var scope = Scope() with
         {
-            RecognitionSourceId = Guid.CreateVersion7(), RecognitionAcceptanceId = Guid.CreateVersion7(),
-            RecognitionSourceGeneration = 7, RecognitionPurpose = 3, RecognitionBackupHorizon = TimeSpan.FromDays(3)
+            RecognitionSourceId = Guid.CreateVersion7(),
+            RecognitionAcceptanceId = Guid.CreateVersion7(),
+            RecognitionSourceGeneration = 7,
+            RecognitionPurpose = 3,
+            RecognitionBackupHorizon = TimeSpan.FromDays(3)
         };
         var key = new ModerationMeasuredOperationsKey("recognition-current", 4, new string('b', 64), Now.AddDays(4));
         var replicas = new[] { Guid.CreateVersion7(), Guid.CreateVersion7() };

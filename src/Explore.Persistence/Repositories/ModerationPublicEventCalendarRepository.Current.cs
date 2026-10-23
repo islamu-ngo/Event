@@ -114,12 +114,21 @@ public sealed partial class ModerationPublicEventCalendarRepository
                 || row.Interval.EventWindowEnd is not null)) return null;
         if (!await governance.HasReceiptAsync(provenance, new RecordModerationClassificationControlSelection
         {
-            OperationId = Guid.Empty, Target = target, ExpectedQualificationRevision = selected.WriterGeneration - 1,
-            SelectionId = selected.Id, MaterialSourceId = selected.SourceId, ExpectedMaterialSourceRevision = selected.SourceRevision,
-            ExpectedMaterialWriterGeneration = selected.SourceWriterGeneration, MaterialReviewId = selected.ReviewId,
-            ExpectedMaterialReviewRevision = selected.ReviewRevision, ExpectedReviewWriterGeneration = selected.ReviewWriterGeneration,
-            EventGenerationId = selected.GenerationId, ExpectedEventGenerationRevision = selected.GenerationRevision,
-            ExpectedEventWriterGeneration = selected.GenerationWriterGeneration, Contribution = contribution, ValidUntil = selected.ValidUntil
+            OperationId = Guid.Empty,
+            Target = target,
+            ExpectedQualificationRevision = selected.WriterGeneration - 1,
+            SelectionId = selected.Id,
+            MaterialSourceId = selected.SourceId,
+            ExpectedMaterialSourceRevision = selected.SourceRevision,
+            ExpectedMaterialWriterGeneration = selected.SourceWriterGeneration,
+            MaterialReviewId = selected.ReviewId,
+            ExpectedMaterialReviewRevision = selected.ReviewRevision,
+            ExpectedReviewWriterGeneration = selected.ReviewWriterGeneration,
+            EventGenerationId = selected.GenerationId,
+            ExpectedEventGenerationRevision = selected.GenerationRevision,
+            ExpectedEventWriterGeneration = selected.GenerationWriterGeneration,
+            Contribution = contribution,
+            ValidUntil = selected.ValidUntil
         }, ModerationQualificationSourceKind.ClassificationControlSelection, selected.Id, 1,
             selected.AuthoredByHumanId, selected.WriterGeneration, selected.RecordedAt, token)) return null;
 
@@ -143,10 +152,16 @@ public sealed partial class ModerationPublicEventCalendarRepository
                 || !await governance.AdministratorAsync(provenance, adoption.AdoptedByHumanId, provenance.Tenant, token)
                 || !await governance.HasReceiptAsync(provenance, new AdoptModerationClassificationEventTarget
                 {
-                    OperationId = Guid.Empty, Target = target, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-                    AdoptionId = adoption.Id, SelectionId = adoption.SelectionId, ExpectedSelectionRevision = adoption.SelectionRevision,
-                    BindingOrdinal = adoption.BindingOrdinal, EventGenerationId = adoption.GenerationId,
-                    ExpectedEventGenerationRevision = adoption.GenerationRevision, ValidUntil = adoption.ValidUntil
+                    OperationId = Guid.Empty,
+                    Target = target,
+                    ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+                    AdoptionId = adoption.Id,
+                    SelectionId = adoption.SelectionId,
+                    ExpectedSelectionRevision = adoption.SelectionRevision,
+                    BindingOrdinal = adoption.BindingOrdinal,
+                    EventGenerationId = adoption.GenerationId,
+                    ExpectedEventGenerationRevision = adoption.GenerationRevision,
+                    ValidUntil = adoption.ValidUntil
                 }, ModerationQualificationSourceKind.ClassificationEventTargetAdoption, adoption.Id, 1,
                     adoption.AdoptedByHumanId, adoption.WriterGeneration, adoption.AdoptedAt, token)) return null;
             adoptions.Add(adoption);
@@ -192,18 +207,37 @@ public sealed partial class ModerationPublicEventCalendarRepository
             || await session.AcquireNativeAsync(transactionId, observedAt, token) is null) return null;
         var fingerprint = ModerationPolicyPublicationProjection.Digest(new
         {
-            Host = provenance.Binding.Id, Epoch = provenance.Epoch.Id, provenance.Epoch.Revision,
-            publication.Id, publication.RequestDigest, publication.DeclaredStateDigest, publication.EvidenceValidUntil,
-            Material = material.Source.Id, MaterialWriter = material.Source.WriterGeneration,
-            Review = material.Acceptance.Id, ReviewWriter = material.Acceptance.WriterGeneration,
-            Generation = material.Generation.Id, GenerationRevision = material.Generation.Revision,
-            Taxonomy = material.Taxonomy.Source.Id, TaxonomyAdoption = material.Taxonomy.Adoption.Id,
-            Age = material.AgeSource.Id, AgeAdoption = material.AgeAdoption.Id,
-            Selection = selected.Id, selected.SelectionDigest,
+            Host = provenance.Binding.Id,
+            Epoch = provenance.Epoch.Id,
+            provenance.Epoch.Revision,
+            publication.Id,
+            publication.RequestDigest,
+            publication.DeclaredStateDigest,
+            publication.EvidenceValidUntil,
+            Material = material.Source.Id,
+            MaterialWriter = material.Source.WriterGeneration,
+            Review = material.Acceptance.Id,
+            ReviewWriter = material.Acceptance.WriterGeneration,
+            Generation = material.Generation.Id,
+            GenerationRevision = material.Generation.Revision,
+            Taxonomy = material.Taxonomy.Source.Id,
+            TaxonomyAdoption = material.Taxonomy.Adoption.Id,
+            Age = material.AgeSource.Id,
+            AgeAdoption = material.AgeAdoption.Id,
+            Selection = selected.Id,
+            selected.SelectionDigest,
             Adoptions = adoptions.Select(row => new { row.Id, row.Revision, row.WriterGeneration, row.BindingOrdinal, row.ValidUntil }),
             Event = new { entity.Id, entity.ConcurrencyStamp, entity.Title, entity.Content, entity.Description, entity.Slug },
-            Primary = new { primary.Id, primary.ConcurrencyStamp, primary.StartTime, primary.EndTime,
-                primary.SortOrder, primary.EventLocationId, primary.RoomId },
+            Primary = new
+            {
+                primary.Id,
+                primary.ConcurrencyStamp,
+                primary.StartTime,
+                primary.EndTime,
+                primary.SortOrder,
+                primary.EventLocationId,
+                primary.RoomId
+            },
             Sanctions = sanctions.OrderBy(row => row.Id).Select(row => new { row.Id, row.Revision }),
             Protective = protective.OrderBy(row => row.Id).Select(row => new { row.Id, row.Revision }),
             Until = until
@@ -240,7 +274,9 @@ public sealed partial class ModerationPublicEventCalendarRepository
         var consumerKeys = policy.Consumers.SelectMany(requirement => requirement.Consumers.Select(consumer =>
             ModerationPolicyPublicationProjection.Digest(new
             {
-                requirement.Binding, ConsumerId = consumer.Id, proposed.InventoryFingerprint
+                requirement.Binding,
+                ConsumerId = consumer.Id,
+                proposed.InventoryFingerprint
             }))).ToImmutableHashSet(StringComparer.Ordinal);
         if (publication.Evidence.Count != required.Count + consumerKeys.Count
             || publication.Evidence.Select(row => row.RequirementDigest).Distinct(StringComparer.Ordinal).Count() != publication.Evidence.Count)

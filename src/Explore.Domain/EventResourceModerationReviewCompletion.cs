@@ -70,10 +70,17 @@ public sealed class EventResourceModerationReviewCompletion : ITenantEntity
             throw new ArgumentException("The disposition requires independent controllers.");
         var result = new EventResourceModerationReviewCompletion
         {
-            Id = chain[^1].Id, TenantId = cause.TenantId, QuarantineId = cause.Id,
-            EventId = cause.EventId, EventResourceId = cause.EventResourceId, MaterialVersionId = cause.MaterialVersionId,
-            PurposeId = chain[0].Id, AttestationId = chain[2].Id, ApprovalId = chain[^1].Id,
-            Disposition = chain[2].Attestation!.Value, CompletedAt = chain[^1].RecordedAt
+            Id = chain[^1].Id,
+            TenantId = cause.TenantId,
+            QuarantineId = cause.Id,
+            EventId = cause.EventId,
+            EventResourceId = cause.EventResourceId,
+            MaterialVersionId = cause.MaterialVersionId,
+            PurposeId = chain[0].Id,
+            AttestationId = chain[2].Id,
+            ApprovalId = chain[^1].Id,
+            Disposition = chain[2].Attestation!.Value,
+            CompletedAt = chain[^1].RecordedAt
         };
         result.ValidatePersistedState();
         return result;

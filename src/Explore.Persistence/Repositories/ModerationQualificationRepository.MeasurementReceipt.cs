@@ -35,11 +35,17 @@ public sealed partial class ModerationQualificationRepository
         var preparation = new PrepareModerationConsumerMeasurementSource
         {
             OriginalEffect = source.OriginalEffect,
-            OperationId = Guid.Empty, Target = authority.Tenant, ExpectedQualificationRevision = challenge.WriterGeneration - 1,
-            ChallengeId = challenge.Id, InstallationId = challenge.InstallationId,
-            ExpectedInstallationRevision = challenge.InstallationRevision, ConsumerId = challenge.ConsumerId,
-            Binding = source.Binding, ExpectedRuntimeGeneration = challenge.RuntimeGeneration,
-            ExpectedInventoryFingerprint = challenge.InventoryFingerprint, ValidUntil = challenge.ValidUntil
+            OperationId = Guid.Empty,
+            Target = authority.Tenant,
+            ExpectedQualificationRevision = challenge.WriterGeneration - 1,
+            ChallengeId = challenge.Id,
+            InstallationId = challenge.InstallationId,
+            ExpectedInstallationRevision = challenge.InstallationRevision,
+            ConsumerId = challenge.ConsumerId,
+            Binding = source.Binding,
+            ExpectedRuntimeGeneration = challenge.RuntimeGeneration,
+            ExpectedInventoryFingerprint = challenge.InventoryFingerprint,
+            ValidUntil = challenge.ValidUntil
         };
         var (installed, contract, definitionId) = await ReadMeasurementPreparationAsync(preparation, authority, now, token);
         if (challenge.DefinitionId != definitionId)
@@ -86,19 +92,31 @@ public sealed partial class ModerationQualificationRepository
             throw new AbortQualification(ModerationQualificationWriteOutcome.Unavailable);
         await RequireTargetSourceReceiptAsync(new EnrollModerationMeasurementIssuerSource
         {
-            OperationId = Guid.Empty, Target = authority.Tenant, ExpectedQualificationRevision = issuer.WriterGeneration - 1,
-            EnrollmentId = issuer.Id, KeyId = issuer.KeyId, Issuer = issuer.Issuer, PublicKeySpkiBase64 = issuer.PublicKeySpkiBase64,
-            RunnerDigest = issuer.RunnerDigest, CatalogueDigest = issuer.CatalogueDigest,
-            TestBundleDigest = issuer.TestBundleDigest, ValidUntil = issuer.ValidUntil
+            OperationId = Guid.Empty,
+            Target = authority.Tenant,
+            ExpectedQualificationRevision = issuer.WriterGeneration - 1,
+            EnrollmentId = issuer.Id,
+            KeyId = issuer.KeyId,
+            Issuer = issuer.Issuer,
+            PublicKeySpkiBase64 = issuer.PublicKeySpkiBase64,
+            RunnerDigest = issuer.RunnerDigest,
+            CatalogueDigest = issuer.CatalogueDigest,
+            TestBundleDigest = issuer.TestBundleDigest,
+            ValidUntil = issuer.ValidUntil
         }, ModerationQualificationSourceKind.MeasurementIssuerEnrollment, issuer.Id, 1, issuer.ApprovedByHumanId,
             issuer.WriterGeneration, issuer.ApprovedAt, authority, token);
         var trust = new ModerationMeasurementTrustKey
         {
-            Issuer = issuer.Issuer, KeyId = issuer.KeyId,
+            Issuer = issuer.Issuer,
+            KeyId = issuer.KeyId,
             SubjectPublicKeyInfo = Convert.FromBase64String(issuer.PublicKeySpkiBase64).ToImmutableArray(),
-            HostBindingId = issuer.HostBindingId, TrustDomainId = issuer.TrustDomainId, TenantId = issuer.TenantId,
-            ApprovedRunnerDigest = issuer.RunnerDigest, ApprovedCatalogueDigest = issuer.CatalogueDigest,
-            ApprovedTestBundleDigest = issuer.TestBundleDigest, ValidUntil = issuer.ValidUntil
+            HostBindingId = issuer.HostBindingId,
+            TrustDomainId = issuer.TrustDomainId,
+            TenantId = issuer.TenantId,
+            ApprovedRunnerDigest = issuer.RunnerDigest,
+            ApprovedCatalogueDigest = issuer.CatalogueDigest,
+            ApprovedTestBundleDigest = issuer.TestBundleDigest,
+            ValidUntil = issuer.ValidUntil
         };
         var verified = measurementReceipts.Verify(source.SignedToken, trust, source.Binding, now);
         if (verified is not { Outcome: ModerationMeasurementVerificationOutcome.Known, Receipt: { } assertion })

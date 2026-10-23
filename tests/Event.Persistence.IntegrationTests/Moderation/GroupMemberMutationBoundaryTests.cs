@@ -63,13 +63,16 @@ public sealed partial class GroupMemberMutationBoundaryTests
             database, session.Boundary);
         var email = await context.Users.Where(row => row.Id == database.ReviewerId).Select(row => row.Pii!.Email).SingleAsync();
         var revision = await RevisionAsync(context);
-        var command = new AddGroupMemberCommand { AddGroupMemberDto = new()
-            { GroupId = groupId, Email = email!, Role = RoleEnum.GroupMember, GroupPositionId = 4 } };
+        var command = new AddGroupMemberCommand
+        {
+            AddGroupMemberDto = new()
+            { GroupId = groupId, Email = email!, Role = RoleEnum.GroupMember, GroupPositionId = 4 }
+        };
         await Assert.That(async () => await add.ExecuteAsync(command with
-            { AddGroupMemberDto = command.AddGroupMemberDto with { GroupId = Guid.CreateVersion7() } }, default))
+        { AddGroupMemberDto = command.AddGroupMemberDto with { GroupId = Guid.CreateVersion7() } }, default))
             .Throws<Explore.Application.Authorization.AuthorizationException>();
         await Assert.That((await add.ExecuteAsync(command with
-            { AddGroupMemberDto = command.AddGroupMemberDto with { Email = "missing@example.test" } }, default)).IsSuccess).IsFalse();
+        { AddGroupMemberDto = command.AddGroupMemberDto with { Email = "missing@example.test" } }, default)).IsSuccess).IsFalse();
         var created = await add.ExecuteAsync(command, default);
         await Assert.That(created.IsSuccess).IsTrue();
         var persisted = await context.GroupMembers.AsNoTracking().SingleAsync(row => row.Id == created.Id);
@@ -112,8 +115,11 @@ public sealed partial class GroupMemberMutationBoundaryTests
         var revision = await RevisionAsync(context);
         var handler = new UpdateGroupMemberRoleCommandHandler(new GroupMemberRepository(context),
             new UserContext(session.Http), database, session.Boundary);
-        var result = await handler.ExecuteAsync(new() { UpdateGroupMemberRoleDto = new()
-            { Id = target, Role = RoleEnum.GroupAdmin } }, default);
+        var result = await handler.ExecuteAsync(new()
+        {
+            UpdateGroupMemberRoleDto = new()
+            { Id = target, Role = RoleEnum.GroupAdmin }
+        }, default);
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(revision + 1);
     }
@@ -194,8 +200,11 @@ public sealed partial class GroupMemberMutationBoundaryTests
         var handler = new UpdateGroupMemberRoleCommandHandler(new GroupMemberRepository(context),
             new UserContext(session.Http), database, session.Boundary);
         var revision = await RevisionAsync(context);
-        var result = await handler.ExecuteAsync(new() { UpdateGroupMemberRoleDto = new()
-            { Id = administrator, Role = RoleEnum.GroupMember } }, default);
+        var result = await handler.ExecuteAsync(new()
+        {
+            UpdateGroupMemberRoleDto = new()
+            { Id = administrator, Role = RoleEnum.GroupMember }
+        }, default);
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id).IsEqualTo(administrator);
         await Assert.That(fault.Injected).IsTrue();
@@ -209,10 +218,28 @@ public sealed partial class GroupMemberMutationBoundaryTests
     {
         await using var context = database.Context();
         var group = new Group { Id = Guid.CreateVersion7(), FullName = "Native group authority" };
-        var participation = new GroupTenant { Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-            Group = group, GroupId = group.Id, ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null! };
-        GroupMember Member(Guid user, RoleEnum role) => new() { Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-            Tenant = null!, GroupTenant = participation, GroupTenantId = participation.Id, UserId = user, User = null!, RoleId = (int)role, Role = null! };
+        var participation = new GroupTenant
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            Group = group,
+            GroupId = group.Id,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+            ApprovalStatus = null!
+        };
+        GroupMember Member(Guid user, RoleEnum role) => new()
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            GroupTenant = participation,
+            GroupTenantId = participation.Id,
+            UserId = user,
+            User = null!,
+            RoleId = (int)role,
+            Role = null!
+        };
         var administrator = Member(database.AdministratorId, RoleEnum.GroupAdmin);
         var target = Member(database.SubjectId, RoleEnum.GroupMember);
         context.AddRange(group, participation, administrator, target);

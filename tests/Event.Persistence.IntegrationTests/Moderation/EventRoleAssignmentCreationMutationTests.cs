@@ -220,9 +220,13 @@ public sealed class EventRoleAssignmentCreationMutationTests
 
     private static AssignEventRoleCommand Request(Fixture fixture) => new()
     {
-        TenantId = fixture.TenantId, EventId = fixture.EventId, TargetUserId = fixture.Database.SubjectId,
-        RoleId = (int)RoleEnum.CheckInStaff, Status = EventRoleAssignmentStatus.Active,
-        StartsAtUtc = DateTime.UtcNow.AddHours(1), ExpiresAtUtc = DateTime.UtcNow.AddDays(2)
+        TenantId = fixture.TenantId,
+        EventId = fixture.EventId,
+        TargetUserId = fixture.Database.SubjectId,
+        RoleId = (int)RoleEnum.CheckInStaff,
+        Status = EventRoleAssignmentStatus.Active,
+        StartsAtUtc = DateTime.UtcNow.AddHours(1),
+        ExpiresAtUtc = DateTime.UtcNow.AddDays(2)
     };
 
     private static async Task<BaseCommandResponse<Guid>> ExecuteAsync(Fixture fixture, ExploreDbContext context,
@@ -239,8 +243,13 @@ public sealed class EventRoleAssignmentCreationMutationTests
         return await new AssignEventRoleByEmailCommandHandler(new UserRepository(context), handler, session.Identity,
             session.Machine, fixture.Database, session.Provider).ExecuteAsync(new()
             {
-                TenantId = request.TenantId, EventId = request.EventId, TargetUserEmail = targetEmail,
-                RoleId = request.RoleId, Status = request.Status, StartsAtUtc = request.StartsAtUtc, ExpiresAtUtc = request.ExpiresAtUtc
+                TenantId = request.TenantId,
+                EventId = request.EventId,
+                TargetUserEmail = targetEmail,
+                RoleId = request.RoleId,
+                Status = request.Status,
+                StartsAtUtc = request.StartsAtUtc,
+                ExpiresAtUtc = request.ExpiresAtUtc
             });
     }
 

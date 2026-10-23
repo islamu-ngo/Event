@@ -92,8 +92,12 @@ public sealed partial class ModerationQualificationRepository
             throw new AbortQualification(ModerationQualificationWriteOutcome.Conflict);
         await RequireTargetSourceReceiptAsync(new RecordModerationEventGenerationSource
         {
-            OperationId = Guid.Empty, Target = authority.Tenant, SourceId = generation.Id, EventId = generation.EventId,
-            ExpectedEventRevision = generation.Revision - 1, ExpectedQualificationRevision = generation.WriterGeneration - 1,
+            OperationId = Guid.Empty,
+            Target = authority.Tenant,
+            SourceId = generation.Id,
+            EventId = generation.EventId,
+            ExpectedEventRevision = generation.Revision - 1,
+            ExpectedQualificationRevision = generation.WriterGeneration - 1,
             ValidUntil = generation.ValidUntil
         }, ModerationQualificationSourceKind.EventGeneration, generation.Id, generation.Revision,
             generation.ObservedByHumanId, generation.WriterGeneration, generation.ObservedAt, authority, token);
@@ -102,11 +106,21 @@ public sealed partial class ModerationQualificationRepository
         await RelationalEntityRowFence.AcquireGlobalAsync<ModerationContributionSelection>(context, selected.Id, token);
         await RequireTargetSourceReceiptAsync(new RecordModerationContributionSelectionSource
         {
-            OperationId = Guid.Empty, Target = decision.Scope, ExpectedQualificationRevision = selected.WriterGeneration - 1,
-            SelectionId = selected.Id, EffectId = selected.EffectId, CaseId = selected.CaseId,
-            ExpectedCaseRevision = selected.CaseRevision, DecisionId = decision.Id, ExpectedDecisionRevision = selected.DecisionRevision,
-            PolicyId = selected.PolicyId, ExpectedPolicyRevision = selected.PolicyRevision, PublicationId = selected.PublicationId,
-            ProfileId = selected.ProfileId, Contribution = contribution, ValidUntil = selected.ValidUntil
+            OperationId = Guid.Empty,
+            Target = decision.Scope,
+            ExpectedQualificationRevision = selected.WriterGeneration - 1,
+            SelectionId = selected.Id,
+            EffectId = selected.EffectId,
+            CaseId = selected.CaseId,
+            ExpectedCaseRevision = selected.CaseRevision,
+            DecisionId = decision.Id,
+            ExpectedDecisionRevision = selected.DecisionRevision,
+            PolicyId = selected.PolicyId,
+            ExpectedPolicyRevision = selected.PolicyRevision,
+            PublicationId = selected.PublicationId,
+            ProfileId = selected.ProfileId,
+            Contribution = contribution,
+            ValidUntil = selected.ValidUntil
         }, ModerationQualificationSourceKind.ContributionSelection, selected.Id, selected.Revision,
             selected.AuthoredByHumanId, selected.WriterGeneration, selected.RecordedAt, authority, token);
         await using var slot = await RelationalNamedLock.AcquireTransactionAsync(

@@ -38,14 +38,27 @@ public sealed class ModerationDeploymentSource
     {
         var source = new ModerationDeploymentSource
         {
-            Id = id, HostBindingId = hostId, TrustDomainId = trustId, TenantId = tenantId,
-            PolicyId = policyId, PolicyRevision = policyRevision, PublicationId = publicationId,
-            DefinitionId = definitionId, ProfileId = profileId, ModeCode = modeCode,
-            ProposedStateDigest = proposedStateDigest, InventoryFingerprint = inventoryFingerprint,
-            DatabaseConfigurationDigest = databaseConfigurationDigest, DatabaseProviderCode = databaseProviderCode,
-            DatabaseProviderVersion = databaseProviderVersion, Consumers = consumers.ToList(),
-            RecordedByHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1,
-            RecordedAt = now, ValidUntil = validUntil
+            Id = id,
+            HostBindingId = hostId,
+            TrustDomainId = trustId,
+            TenantId = tenantId,
+            PolicyId = policyId,
+            PolicyRevision = policyRevision,
+            PublicationId = publicationId,
+            DefinitionId = definitionId,
+            ProfileId = profileId,
+            ModeCode = modeCode,
+            ProposedStateDigest = proposedStateDigest,
+            InventoryFingerprint = inventoryFingerprint,
+            DatabaseConfigurationDigest = databaseConfigurationDigest,
+            DatabaseProviderCode = databaseProviderCode,
+            DatabaseProviderVersion = databaseProviderVersion,
+            Consumers = consumers.ToList(),
+            RecordedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            RecordedAt = now,
+            ValidUntil = validUntil
         };
         source.ValidatePersistedState();
         return source;
@@ -102,10 +115,17 @@ public sealed class ModerationDeploymentConsumer
     {
         var row = new ModerationDeploymentConsumer
         {
-            SourceId = sourceId, Ordinal = ordinal, ConsumerId = consumerId, BindingDigest = bindingDigest,
-            ContractDigest = contractDigest, InstallationId = installationId, InstallationRevision = installationRevision,
-            InstallationWriterGeneration = installationWriterGeneration, RuntimeGeneration = runtimeGeneration,
-            ProductArtifactDigest = productArtifactDigest, ValidUntil = validUntil
+            SourceId = sourceId,
+            Ordinal = ordinal,
+            ConsumerId = consumerId,
+            BindingDigest = bindingDigest,
+            ContractDigest = contractDigest,
+            InstallationId = installationId,
+            InstallationRevision = installationRevision,
+            InstallationWriterGeneration = installationWriterGeneration,
+            RuntimeGeneration = runtimeGeneration,
+            ProductArtifactDigest = productArtifactDigest,
+            ValidUntil = validUntil
         };
         row.ValidatePersistedState();
         return row;

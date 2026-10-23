@@ -94,7 +94,7 @@ public sealed class ModerationPolicyAdministrationService(
             };
             var body = validUntil is { } deadline
                 ? JsonSerializer.Serialize(new PrepareModerationPolicyPublicationCommand
-                    { Request = request, ValidUntil = deadline }, Json)
+                { Request = request, ValidUntil = deadline }, Json)
                 : JsonSerializer.Serialize(new PublishModerationPolicyCommand { Request = request }, Json);
             return new(new(baseAddress, path, body, operationId, current.PolicyId,
                 intent.PublicationId, current.ExpectedRevision, validUntil), ModerationPolicyAdministrationFailure.None);

@@ -157,41 +157,100 @@ public sealed partial class RolePermissionMutationTests
     private static async Task SeedRoleReferenceAsync(Explore.Persistence.ExploreDbContext context, SourceDatabase database, int roleId, string kind)
     {
         if (kind == "platform")
-            context.PlatformUserRoles.Add(new PlatformUserRole { Id = Guid.CreateVersion7(), UserId = database.SubjectId,
-                User = null!, RoleId = roleId, Role = null!, GrantedAt = DateTime.UtcNow });
+            context.PlatformUserRoles.Add(new PlatformUserRole
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = database.SubjectId,
+                User = null!,
+                RoleId = roleId,
+                Role = null!,
+                GrantedAt = DateTime.UtcNow
+            });
         else if (kind is "tenant" or "revoked-tenant")
         {
             var membership = await context.TenantUsers.SingleAsync(row => row.UserId == database.SubjectId);
-            context.TenantUserRoleGrants.Add(new TenantUserRoleGrant { Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-                Tenant = null!, TenantUserId = membership.Id, TenantUser = null!, RoleId = roleId, Role = null!,
-                RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow.AddDays(-2),
-                RevokedAt = kind == "revoked-tenant" ? DateTime.UtcNow.AddDays(-1) : null });
+            context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = null!,
+                RoleId = roleId,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = DateTime.UtcNow.AddDays(-2),
+                RevokedAt = kind == "revoked-tenant" ? DateTime.UtcNow.AddDays(-1) : null
+            });
         }
         else if (kind is "invitation" or "expired-invitation")
         {
-            context.TenantInvitations.Add(new TenantInvitation { Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-                Tenant = null!, RoleId = roleId, Role = null!, Email = "role-reference@example.invalid",
-                Token = Guid.CreateVersion7().ToString("N"), ExpiresAt = DateTime.UtcNow.AddDays(kind == "invitation" ? 1 : -1) });
+            context.TenantInvitations.Add(new TenantInvitation
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                RoleId = roleId,
+                Role = null!,
+                Email = "role-reference@example.invalid",
+                Token = Guid.CreateVersion7().ToString("N"),
+                ExpiresAt = DateTime.UtcNow.AddDays(kind == "invitation" ? 1 : -1)
+            });
         }
         else if (kind == "organization")
         {
             var organization = new Organization { Id = Guid.CreateVersion7(), Pii = new OrganizationPii { FullName = "Retained role reference" } };
-            var participation = new OrganizationTenant { Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                OrganizationId = organization.Id, Organization = organization, ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
-                ApprovalStatus = null! };
-            context.OrganizationMembers.Add(new OrganizationMember { Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-                Tenant = null!, OrganizationTenantId = participation.Id, OrganizationTenant = participation,
-                UserId = database.SubjectId, User = null!, RoleId = roleId, Role = null! });
+            var participation = new OrganizationTenant
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                OrganizationId = organization.Id,
+                Organization = organization,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!
+            };
+            context.OrganizationMembers.Add(new OrganizationMember
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                OrganizationTenantId = participation.Id,
+                OrganizationTenant = participation,
+                UserId = database.SubjectId,
+                User = null!,
+                RoleId = roleId,
+                Role = null!
+            });
         }
         else if (kind == "past-event")
         {
-            var actor = new Actor { Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User,
-                ActorType = null!, UserId = database.SubjectId, Pii = new ActorPii { DisplayName = "Role reference" } };
-            var source = new Explore.Domain.Event(EventStatusEnum.Published) { Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-                Tenant = null!, Actor = actor, ActorId = actor.Id, OrganizerActorId = actor.Id, Title = "Retained role reference",
-                PublicCode = Guid.CreateVersion7().ToString("N")[..12], EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventFormatId = (int)EventFormatEnum.Local,
-                EventFormat = null!, EventStatus = null!, Timezone = "UTC" };
+            var actor = new Actor
+            {
+                Id = Guid.CreateVersion7(),
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = database.SubjectId,
+                Pii = new ActorPii { DisplayName = "Role reference" }
+            };
+            var source = new Explore.Domain.Event(EventStatusEnum.Published)
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                Actor = actor,
+                ActorId = actor.Id,
+                OrganizerActorId = actor.Id,
+                Title = "Retained role reference",
+                PublicCode = Guid.CreateVersion7().ToString("N")[..12],
+                EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                EventStatus = null!,
+                Timezone = "UTC"
+            };
             context.Events.Add(source);
             context.EventRoleAssignments.Add(EventRoleAssignment.Create(database.TenantId, source.Id, database.SubjectId, roleId,
                 EventRoleAssignmentStatus.Active, DateTime.UtcNow.AddDays(-2), DateTime.UtcNow.AddDays(-1), database.AdministratorId));
@@ -199,11 +258,29 @@ public sealed partial class RolePermissionMutationTests
         else
         {
             var group = new Group { Id = Guid.CreateVersion7(), FullName = "Retained role reference" };
-            var participation = new GroupTenant { Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                GroupId = group.Id, Group = group, ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null! };
-            context.GroupMembers.Add(new GroupMember { Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                GroupTenantId = participation.Id, GroupTenant = participation, UserId = database.SubjectId, User = null!,
-                RoleId = roleId, Role = null!, IsDeleted = kind == "deleted-group" });
+            var participation = new GroupTenant
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                GroupId = group.Id,
+                Group = group,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!
+            };
+            context.GroupMembers.Add(new GroupMember
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                GroupTenantId = participation.Id,
+                GroupTenant = participation,
+                UserId = database.SubjectId,
+                User = null!,
+                RoleId = roleId,
+                Role = null!,
+                IsDeleted = kind == "deleted-group"
+            });
         }
         await context.SaveChangesAsync();
     }

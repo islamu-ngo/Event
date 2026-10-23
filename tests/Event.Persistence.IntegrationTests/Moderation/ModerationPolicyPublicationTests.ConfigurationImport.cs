@@ -234,10 +234,14 @@ public sealed partial class ModerationPolicyPublicationTests
             Id = Guid.CreateVersion7(),
             Rule = ISLAMU.Moderation.Domain.ModerationRuleReference.Create(database.Scope.Id, old.Rule.Code, 2)
         };
-        next = next with { Proposed = next.Proposed with
+        next = next with
         {
-            Profiles = [old, added], SupportedProfiles = [added.Rule]
-        }};
+            Proposed = next.Proposed with
+            {
+                Profiles = [old, added],
+                SupportedProfiles = [added.Rule]
+            }
+        };
         await database.PublishAsync(next);
         await using var context = database.Context();
         var adapter = new ModerationConfigurationImportAdapter(database.Writer(context),
@@ -381,10 +385,13 @@ public sealed partial class ModerationPolicyPublicationTests
     {
         await using var database = await Database.CreateAsync(implementedInventory: true);
         var active = database.Request();
-        active = active with { Proposed = active.Proposed with
+        active = active with
         {
-            RequestedState = Explore.Application.Features.Moderation.Policy.ModerationPolicyRequestedState.Active
-        }};
+            Proposed = active.Proposed with
+            {
+                RequestedState = Explore.Application.Features.Moderation.Policy.ModerationPolicyRequestedState.Active
+            }
+        };
         active = await database.PrepareActiveAsync(active);
         ModerationPolicyPublicationResult result;
         await using (var writer = database.Context())

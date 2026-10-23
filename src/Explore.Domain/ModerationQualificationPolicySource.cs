@@ -28,12 +28,18 @@ public sealed class ModerationQualificationPolicySource
     {
         var source = new ModerationQualificationPolicySource
         {
-            Id = id, HostBindingId = hostBindingId, TrustDomainId = trustDomainId,
-            TenantId = tenantId, CaseId = caseId, CaseRevision = caseRevision,
-            Revision = 1, WriterGeneration = writerGeneration,
+            Id = id,
+            HostBindingId = hostBindingId,
+            TrustDomainId = trustDomainId,
+            TenantId = tenantId,
+            CaseId = caseId,
+            CaseRevision = caseRevision,
+            Revision = 1,
+            WriterGeneration = writerGeneration,
             MaximumReviewerLifetimeTicks = maximumReviewerLifetime.Ticks,
             MaximumUrgencyLifetimeTicks = maximumUrgencyLifetime.Ticks,
-            PublishedByHumanId = publishedByHumanId, PublishedAt = now.ToUniversalTime(),
+            PublishedByHumanId = publishedByHumanId,
+            PublishedAt = now.ToUniversalTime(),
             ValidUntil = validUntil.ToUniversalTime()
         };
         source.ValidatePersistedState();

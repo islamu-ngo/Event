@@ -349,7 +349,8 @@ public sealed class ModerationConfigurationDocumentTests
         var extra = new ModerationConfigurationDestinationMapping(Id(30), 0, Id(31), Context(),
             new Dictionary<ModerationConfigurationReference, Guid>
             {
-                [document.Profiles[0].Rule] = Id(200), [new("not.imported", 1)] = Id(201)
+                [document.Profiles[0].Rule] = Id(200),
+                [new("not.imported", 1)] = Id(201)
             });
         await Assert.That(() => ModerationConfigurationDocumentProjection.ToProposedState(document, extra, Registry))
             .Throws<ConfigurationPortabilityContractException>();
@@ -490,7 +491,8 @@ public sealed class ModerationConfigurationDocumentTests
         var reused = new ModerationConfigurationDestinationMapping(Id(30), 0, Id(31), Context(),
             new Dictionary<ModerationConfigurationReference, Guid>
             {
-                [source.Profiles[0].Rule] = Id(200), [second.Rule] = Id(200)
+                [source.Profiles[0].Rule] = Id(200),
+                [second.Rule] = Id(200)
             });
         await Assert.That(() => ModerationConfigurationDocumentProjection.ToProposedState(document, reused, Registry))
             .Throws<ConfigurationPortabilityContractException>();

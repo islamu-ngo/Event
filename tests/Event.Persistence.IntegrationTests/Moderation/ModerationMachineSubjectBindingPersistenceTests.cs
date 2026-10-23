@@ -53,7 +53,9 @@ public sealed class ModerationMachineSubjectBindingPersistenceTests
             .IsEqualTo(ModerationAuthoritySourceOutcome.Established);
         var otherService = new ServicePrincipal
         {
-            Id = Guid.CreateVersion7(), Code = "another-explicit-service", DisplayName = "Other service"
+            Id = Guid.CreateVersion7(),
+            Code = "another-explicit-service",
+            DisplayName = "Other service"
         };
         context.ServicePrincipals.Add(otherService);
         await context.SaveChangesAsync();
@@ -197,39 +199,55 @@ public sealed class ModerationMachineSubjectBindingPersistenceTests
             await context.Database.EnsureCreatedAsync();
             var status = new TenantStatus
             {
-                Id = (int)TenantStatusEnum.Active, MasterCode = "ACTIVE",
-                FullName = "Active", IsActiveState = true
+                Id = (int)TenantStatusEnum.Active,
+                MasterCode = "ACTIVE",
+                FullName = "Active",
+                IsActiveState = true
             };
             var tenant = new Tenant
             {
-                Id = database.TenantId, FullName = "Service binding tenant", Slug = $"bindings-{database.TenantId:N}",
-                TenantStatusId = status.Id, TenantStatus = status
+                Id = database.TenantId,
+                FullName = "Service binding tenant",
+                Slug = $"bindings-{database.TenantId:N}",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             };
             var user = new User
             {
                 Id = database.AdministratorId,
                 Pii = new UserPii
                 {
-                    UserId = database.AdministratorId, Email = $"{database.AdministratorId:N}@example.invalid",
-                    FirstName = "Binding", LastName = "Owner"
+                    UserId = database.AdministratorId,
+                    Email = $"{database.AdministratorId:N}@example.invalid",
+                    FirstName = "Binding",
+                    LastName = "Owner"
                 }
             };
             var role = new Role
             {
-                Id = (int)RoleEnum.Admin, MasterCode = "platform.admin",
-                FullName = "Admin", IsSystem = true, RoleScopeId = (int)RoleScopeEnum.Platform,
+                Id = (int)RoleEnum.Admin,
+                MasterCode = "platform.admin",
+                FullName = "Admin",
+                IsSystem = true,
+                RoleScopeId = (int)RoleScopeEnum.Platform,
                 RoleScope = new RoleScope
                 {
-                    Id = (int)RoleScopeEnum.Platform, MasterCode = "PLATFORM", FullName = "Platform"
+                    Id = (int)RoleScopeEnum.Platform,
+                    MasterCode = "PLATFORM",
+                    FullName = "Platform"
                 }
             };
             var maintenance = new ServicePrincipal
             {
-                Id = Guid.CreateVersion7(), Code = $"maintenance-{database.TenantId:N}", DisplayName = "Maintenance"
+                Id = Guid.CreateVersion7(),
+                Code = $"maintenance-{database.TenantId:N}",
+                DisplayName = "Maintenance"
             };
             var service = new ServicePrincipal
             {
-                Id = database.ServiceId, Code = $"service-{database.TenantId:N}", DisplayName = "Explicit service"
+                Id = database.ServiceId,
+                Code = $"service-{database.TenantId:N}",
+                DisplayName = "Explicit service"
             };
             var host = ModerationHostBinding.Establish(database.HostId, Guid.CreateVersion7(),
                 Guid.CreateVersion7(), Guid.CreateVersion7(), maintenance.Id);
@@ -238,17 +256,22 @@ public sealed class ModerationMachineSubjectBindingPersistenceTests
                 ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), host, tenant),
                 new ExternalApiKeyStatus
                 {
-                    Id = (int)ExternalApiKeyStatusEnum.Active, MasterCode = "ACTIVE",
-                    FullName = "Active", IsUsable = true
+                    Id = (int)ExternalApiKeyStatusEnum.Active,
+                    MasterCode = "ACTIVE",
+                    FullName = "Active",
+                    IsUsable = true
                 },
                 new ExternalApiKeyCreditPeriod
                 {
-                    Id = (int)ExternalApiKeyCreditPeriodEnum.None, MasterCode = "NONE", FullName = "None"
+                    Id = (int)ExternalApiKeyCreditPeriodEnum.None,
+                    MasterCode = "NONE",
+                    FullName = "None"
                 },
                 new ExternalApiKeyOwnerTypeLookup
                 {
                     Id = (int)ExternalApiKeyOwnerType.InstanceAdmin,
-                    MasterCode = "INSTANCE_ADMIN", FullName = "Instance Admin"
+                    MasterCode = "INSTANCE_ADMIN",
+                    FullName = "Instance Admin"
                 });
             await context.SaveChangesAsync();
             await database.AddKeyAsync("initial-service-key");
@@ -260,11 +283,17 @@ public sealed class ModerationMachineSubjectBindingPersistenceTests
             await using var context = Context();
             context.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), KeyId = keyId, Name = "Explicit service credential",
-                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()), Scopes = "events:read",
-                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = AdministratorId,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = 1, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                KeyId = keyId,
+                Name = "Explicit service credential",
+                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
+                Scopes = "events:read",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                OwnerId = AdministratorId,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = 1,
+                ExternalApiKeyCreditPeriod = null!
             });
             await context.SaveChangesAsync();
         }

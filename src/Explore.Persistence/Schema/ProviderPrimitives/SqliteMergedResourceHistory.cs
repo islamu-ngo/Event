@@ -86,7 +86,8 @@ internal static class SqliteMergedResourceHistory
         guard.Columns.Add(new AddColumnOperation { Name = "violation", Table = guardName, ClrType = typeof(int), IsNullable = false });
         guard.CheckConstraints.Add(new AddCheckConstraintOperation
         {
-            Name = "ck_sqlite_merged_resource_history", Table = guardName,
+            Name = "ck_sqlite_merged_resource_history",
+            Table = guardName,
             Sql = sql.DelimitIdentifier("violation") + " = 0"
         });
         string columns = string.Join(", ", sourceColumns.Select(Literal));
@@ -119,10 +120,10 @@ internal static class SqliteMergedResourceHistory
 
     private static bool IsNativeUp(IReadOnlyList<MigrationOperation> operations) => operations.Count == 4
         && operations.OfType<AddColumnOperation>().Count(column => column is
-            { Name: "material_version_id", Schema: null, IsNullable: true, DefaultValue: null, DefaultValueSql: null }
+        { Name: "material_version_id", Schema: null, IsNullable: true, DefaultValue: null, DefaultValueSql: null }
             && column.ClrType == typeof(Guid)) == 1
         && operations.OfType<AddColumnOperation>().Count(column => column is
-            { Name: "moderation_quarantine_count", Schema: null, IsNullable: false, DefaultValueSql: null }
+        { Name: "moderation_quarantine_count", Schema: null, IsNullable: false, DefaultValueSql: null }
             && column.ClrType == typeof(int) && Equals(column.DefaultValue, 0)) == 1
         && NativeChecks.All(name => operations.OfType<AddCheckConstraintOperation>()
             .Count(check => check.Name == name && check.Schema is null) == 1);

@@ -38,7 +38,9 @@ public sealed partial class EventPublicationModerationMutationTests
                 Guid.CreateVersion7(), Guid.CreateVersion7(), maintenanceId);
             fixture.Context.ServicePrincipals.Add(new ServicePrincipal
             {
-                Id = maintenanceId, Code = $"session-maintenance-{maintenanceId:N}", DisplayName = "Session maintenance"
+                Id = maintenanceId,
+                Code = $"session-maintenance-{maintenanceId:N}",
+                DisplayName = "Session maintenance"
             });
             fixture.Context.ModerationHostBindings.Add(host);
             fixture.Context.ModerationQualificationEpochs.Add(ModerationQualificationEpoch.Initialize(
@@ -113,7 +115,8 @@ public sealed partial class EventPublicationModerationMutationTests
         var declared = ModerationPolicyPublicationProjection.RestoreHistory(adoption.Publication)!.Proposed;
         var retired = await PublishPolicyAsync(fixture, clock, adoption.Host, declared with
         {
-            PublicationId = Guid.CreateVersion7(), ExpectedRevision = adoption.Publication.Revision,
+            PublicationId = Guid.CreateVersion7(),
+            ExpectedRevision = adoption.Publication.Revision,
             SupportedProfiles = []
         }, adoption.Publication.Id);
         await Assert.That(retired.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
@@ -135,8 +138,11 @@ public sealed partial class EventPublicationModerationMutationTests
         var publisher = NativeUser(Guid.CreateVersion7());
         var publisherActor = new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = publisher.Id, User = publisher,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = publisher.Id,
+            User = publisher,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
             Pii = new ActorPii { DisplayName = "Different session parent publisher" }
         };
         fixture.Context.Actors.Add(publisherActor);
@@ -260,10 +266,16 @@ public sealed partial class EventPublicationModerationMutationTests
         parent.Publish(clock.Now.UtcDateTime);
         var session = new EventSession(EventSessionStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent,
-            TenantId = fixture.TenantId, Tenant = null!, Title = "Native session publication regression",
-            SortOrder = 2, EventSessionKindId = (int)EventSessionKindEnum.Talk,
-            RegistrationModeId = 1, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            Title = "Native session publication regression",
+            SortOrder = 2,
+            EventSessionKindId = (int)EventSessionKindEnum.Talk,
+            RegistrationModeId = 1,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         if (scheduled)
         {

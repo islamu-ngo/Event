@@ -200,9 +200,11 @@ public sealed partial class ModerationCaseNarrativeCustodyTests
         await Assert.That(accepted.Outcome).IsEqualTo(ModerationCaseIntakeCommitOutcome.Accepted);
         await Assert.That(await fixture.Store(context).ReadAsync(request with
         {
-            Purpose = ModerationCaseAccessPurpose.ReadAllegation, OperationId = Guid.Empty,
+            Purpose = ModerationCaseAccessPurpose.ReadAllegation,
+            OperationId = Guid.Empty,
             CaseId = accepted.Acknowledgement!.CaseId,
-            ExpectedCaseRevision = accepted.Acknowledgement.CaseRevision, Narrative = default
+            ExpectedCaseRevision = accepted.Acknowledgement.CaseRevision,
+            Narrative = default
         }, default)).IsNull();
     }
 
@@ -313,7 +315,7 @@ public sealed partial class ModerationCaseNarrativeCustodyTests
             var options = (DbContextOptions<ExploreDbContext>)original.GetService<IDbContextOptions>();
             return new(new DbContextOptionsBuilder<ExploreDbContext>(options).AddInterceptors(interceptors)
                 .ReplaceService<IExecutionStrategyFactory, NarrativeRetryingStrategyFactory>().Options)
-                { TenantContext = new SelectedTenant(Scope.Id) };
+            { TenantContext = new SelectedTenant(Scope.Id) };
         }
 
         public void Identity(ExploreDbContext context)
@@ -365,24 +367,37 @@ public sealed partial class ModerationCaseNarrativeCustodyTests
                 await Assert.That((await QualifyAsync(database.UrgencyAssessorId,
                     new AdoptModerationCaseNarrativePolicySource
                     {
-                        OperationId = Guid.CreateVersion7(), Target = Scope, ExpectedQualificationRevision = 2,
-                        SourceId = source.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 2,
-                        AdoptionId = Guid.CreateVersion7(), ValidUntil = source.ValidUntil
+                        OperationId = Guid.CreateVersion7(),
+                        Target = Scope,
+                        ExpectedQualificationRevision = 2,
+                        SourceId = source.SourceId,
+                        ExpectedSourceRevision = 1,
+                        ExpectedSourceWriterGeneration = 2,
+                        AdoptionId = Guid.CreateVersion7(),
+                        ValidUntil = source.ValidUntil
                     })).IsSuccess).IsTrue();
             }
             var budget = new RecordModerationOperationalBudgetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = Scope, ExpectedQualificationRevision = policy ? 3 : 1,
-                SourceId = Guid.CreateVersion7(), OperatorHumanId = database.UrgencyAssessorId,
+                OperationId = Guid.CreateVersion7(),
+                Target = Scope,
+                ExpectedQualificationRevision = policy ? 3 : 1,
+                SourceId = Guid.CreateVersion7(),
+                OperatorHumanId = database.UrgencyAssessorId,
                 Terms = new(ModerationSubjectKind.Human, ModerationOperationalAction.SubmitReport, 8, TimeSpan.FromHours(1)),
                 ValidUntil = database.EvaluationTime.AddHours(2)
             };
             await Assert.That((await QualifyAsync(database.AdministratorId, budget)).IsSuccess).IsTrue();
             await Assert.That((await QualifyAsync(database.UrgencyAssessorId, new AdoptModerationOperationalBudgetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = Scope, ExpectedQualificationRevision = policy ? 4 : 2,
-                SourceId = budget.SourceId, ExpectedSourceRevision = 1,
-                ExpectedSourceWriterGeneration = policy ? 4 : 2, AdoptionId = Guid.CreateVersion7(), ValidUntil = budget.ValidUntil
+                OperationId = Guid.CreateVersion7(),
+                Target = Scope,
+                ExpectedQualificationRevision = policy ? 4 : 2,
+                SourceId = budget.SourceId,
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = policy ? 4 : 2,
+                AdoptionId = Guid.CreateVersion7(),
+                ValidUntil = budget.ValidUntil
             })).IsSuccess).IsTrue();
             await using var context = database.Context();
             Identity(context);
@@ -425,7 +440,8 @@ public sealed partial class ModerationCaseNarrativeCustodyTests
 
         public ModerationCaseAccessRequest Request(ModerationCaseIssuedReceipt receipt, string material) =>
             new(ModerationCaseAccessPurpose.SubmitAllegation, Guid.Empty, Guid.CreateVersion7(), 0,
-                receipt.Receipt.Id, receipt.Token) { Narrative = Encoding.UTF8.GetBytes(material) };
+                receipt.Receipt.Id, receipt.Token)
+            { Narrative = Encoding.UTF8.GetBytes(material) };
     }
 
     private sealed class NarrativeClock(SourceDatabase database) : TimeProvider

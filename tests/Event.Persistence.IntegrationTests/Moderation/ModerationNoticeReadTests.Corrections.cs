@@ -334,15 +334,19 @@ public sealed partial class ModerationNoticeReadTests
             templateEffect.PolicyRevision, templateEffect.QualificationRevision, capturedAt, null, null);
         var approval = ModerationNoticeDisclosureApproval.Approve(fixture.Approval.Intent with
         {
-            ApprovalId = Guid.CreateVersion7(), EffectId = effect.Id
+            ApprovalId = Guid.CreateVersion7(),
+            EffectId = effect.Id
         }, fixture.Database.HostId, effect.TrustDomainId, fixture.Database.TenantId,
             fixture.Database.AdministratorId, 1, capturedAt);
         var capture = template with
         {
             Notice = template.Notice! with
             {
-                EffectId = effect.Id, OperationId = effect.OperationId,
-                OperationKind = (int)ModerationOperationKind.Activate, CapturedAt = capturedAt, ApprovalId = approval.Id
+                EffectId = effect.Id,
+                OperationId = effect.OperationId,
+                OperationKind = (int)ModerationOperationKind.Activate,
+                CapturedAt = capturedAt,
+                ApprovalId = approval.Id
             }
         };
         var source = ModerationNoticeSource.Capture(effect, nullableTenantProjection ? null : fixture.Database.TenantId,

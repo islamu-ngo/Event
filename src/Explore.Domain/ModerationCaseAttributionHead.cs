@@ -48,12 +48,22 @@ public sealed class ModerationCaseAttributionHead
 
         var head = new ModerationCaseAttributionHead
         {
-            Id = id, CaseId = owner.Id, TenantId = source.TenantId, TrustDomainId = source.TrustDomainId,
-            HostBindingId = host.Id, SolutionId = host.SolutionId, InstanceId = host.InstanceId,
-            OccurrenceCaseId = owner.OccurrenceCaseId.Value, OccurrenceId = owner.OccurrenceId,
+            Id = id,
+            CaseId = owner.Id,
+            TenantId = source.TenantId,
+            TrustDomainId = source.TrustDomainId,
+            HostBindingId = host.Id,
+            SolutionId = host.SolutionId,
+            InstanceId = host.InstanceId,
+            OccurrenceCaseId = owner.OccurrenceCaseId.Value,
+            OccurrenceId = owner.OccurrenceId,
             OccurrenceEvidenceRevision = owner.OccurrenceEvidenceRevision.Value,
-            SubjectKind = owner.Subject.Kind, SubjectId = owner.Subject.Id,
-            OpeningSourceId = source.Id, SourceId = source.Id, Generation = 1, Revision = 1
+            SubjectKind = owner.Subject.Kind,
+            SubjectId = owner.Subject.Id,
+            OpeningSourceId = source.Id,
+            SourceId = source.Id,
+            Generation = 1,
+            Revision = 1
         };
         head.ValidatePersistedState();
         head.RequireOwner(owner, host);

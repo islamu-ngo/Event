@@ -19,10 +19,20 @@ public sealed record RecordModerationContributionSelectionCommand : ModerationQu
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationContributionSelectionSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SelectionId = SelectionId, EffectId = EffectId, CaseId = CaseId, ExpectedCaseRevision = ExpectedCaseRevision,
-        DecisionId = DecisionId, ExpectedDecisionRevision = ExpectedDecisionRevision, PolicyId = PolicyId,
-        ExpectedPolicyRevision = ExpectedPolicyRevision, PublicationId = PublicationId, ProfileId = ProfileId,
-        Contribution = Contribution, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SelectionId = SelectionId,
+        EffectId = EffectId,
+        CaseId = CaseId,
+        ExpectedCaseRevision = ExpectedCaseRevision,
+        DecisionId = DecisionId,
+        ExpectedDecisionRevision = ExpectedDecisionRevision,
+        PolicyId = PolicyId,
+        ExpectedPolicyRevision = ExpectedPolicyRevision,
+        PublicationId = PublicationId,
+        ProfileId = ProfileId,
+        Contribution = Contribution,
+        ValidUntil = ValidUntil
     };
 }

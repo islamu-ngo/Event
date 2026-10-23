@@ -50,12 +50,23 @@ public sealed class ModerationCaseTargetSource
             throw new ArgumentException("Material provenance requires exact native source coordinates and digests.");
         return new()
         {
-            Id = id, Version = version, TenantId = tenantId, TrustDomainId = trustDomainId,
-            EventId = eventId, EventVersion = eventVersion, Kind = kind, NativeKind = nativeKind,
-            NativeTargetId = nativeTargetId, NativeTargetVersion = nativeTargetVersion,
+            Id = id,
+            Version = version,
+            TenantId = tenantId,
+            TrustDomainId = trustDomainId,
+            EventId = eventId,
+            EventVersion = eventVersion,
+            Kind = kind,
+            NativeKind = nativeKind,
+            NativeTargetId = nativeTargetId,
+            NativeTargetVersion = nativeTargetVersion,
             NativeFactsDigest = nativeFactsDigest,
-            OccurrenceId = occurrenceId, OccurrenceVersion = occurrenceVersion, MaterialFactId = materialFactId,
-            OccurrenceDigest = occurrenceDigest, MaterialDigest = materialDigest, RecordedAt = now
+            OccurrenceId = occurrenceId,
+            OccurrenceVersion = occurrenceVersion,
+            MaterialFactId = materialFactId,
+            OccurrenceDigest = occurrenceDigest,
+            MaterialDigest = materialDigest,
+            RecordedAt = now
         };
     }
 

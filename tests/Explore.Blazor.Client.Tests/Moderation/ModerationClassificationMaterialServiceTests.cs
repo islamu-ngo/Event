@@ -235,9 +235,12 @@ public sealed class ModerationClassificationMaterialServiceTests
     [Arguments(true)]
     public async Task WrongReceiptIdentityOrFalseSuccessCannotConfirmMutation(bool falseSuccess)
     {
-        using var transport = new Transport { ReceiptBody = falseSuccess
+        using var transport = new Transport
+        {
+            ReceiptBody = falseSuccess
             ? """{"success":false,"id":null,"revision":null,"qualificationRevision":null}"""
-            : $$"""{"success":true,"id":"{{Id}}","revision":1,"qualificationRevision":23}""" };
+            : $$"""{"success":true,"id":"{{Id}}","revision":1,"qualificationRevision":23}"""
+        };
         using var http = Http(transport);
         var service = Service(http);
         var operation = service.CreateAcceptance((await service.ReadReviewAsync(SourceId)).View!, ReviewId, OperationId, Deadline).Operation!;
@@ -276,7 +279,8 @@ public sealed class ModerationClassificationMaterialServiceTests
     {
         using var transport = new Transport
         {
-            OverrideLink = true, Href = "https://event.example/api/moderation/classification-materials/reviews"
+            OverrideLink = true,
+            Href = "https://event.example/api/moderation/classification-materials/reviews"
         };
         using var http = Http(transport);
         var service = Service(http);

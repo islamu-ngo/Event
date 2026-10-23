@@ -188,7 +188,9 @@ public sealed partial class ModerationCaseNativeProofTests
         }
         var qualification = initial with
         {
-            OperationId = Guid.CreateVersion7(), ReadGrantId = grantId, ValidUntil = until
+            OperationId = Guid.CreateVersion7(),
+            ReadGrantId = grantId,
+            ValidUntil = until
         };
         return new(review, owner, source, new(owner.Id, owner.Revision, source.Id, 1, 1, qualification));
     }

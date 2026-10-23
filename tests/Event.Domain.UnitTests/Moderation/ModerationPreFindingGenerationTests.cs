@@ -273,7 +273,9 @@ internal sealed class ModerationPreFindingGenerationFixture
         Root = ModerationCase.OpenAllegation(Guid.CreateVersion7(), scope, material.Evidence(scope), Now);
         epoch = ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), Host, new Tenant
         {
-            Id = scope.Id, FullName = "Notice jurisdiction", Slug = "notice-jurisdiction",
+            Id = scope.Id,
+            FullName = "Notice jurisdiction",
+            Slug = "notice-jurisdiction",
             TenantStatus = new TenantStatus { Id = 1, MasterCode = "Active", FullName = "Active" }
         });
         policy = ModerationCaseTargetPolicy.Adopt(Guid.CreateVersion7(), scope.Id, scope.TrustDomainId,

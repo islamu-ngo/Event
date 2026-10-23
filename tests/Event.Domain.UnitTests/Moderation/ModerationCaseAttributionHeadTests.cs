@@ -309,7 +309,9 @@ public sealed class ModerationCaseAttributionHeadTests
             Root = ModerationCase.OpenAllegation(Guid.CreateVersion7(), scope, _material.Evidence(scope), Now);
             _epoch = ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), Host, new Tenant
             {
-                Id = scope.Id, FullName = "Attribution jurisdiction", Slug = "attribution-jurisdiction",
+                Id = scope.Id,
+                FullName = "Attribution jurisdiction",
+                Slug = "attribution-jurisdiction",
                 TenantStatus = new TenantStatus { Id = 1, MasterCode = "Active", FullName = "Active" }
             });
             _policy = ModerationCaseTargetPolicy.Adopt(Guid.CreateVersion7(), scope.Id, scope.TrustDomainId,

@@ -27,11 +27,17 @@ public sealed partial class ModerationContentResponseTests
             var host = await setup.ModerationHostBindings.SingleAsync();
             setup.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), KeyId = keyId, Name = "Content response purpose cleanup",
-                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()), Scopes = "events:read",
-                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = fixture.Database.AdministratorId,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                KeyId = keyId,
+                Name = "Content response purpose cleanup",
+                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
+                Scopes = "events:read",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                OwnerId = fixture.Database.AdministratorId,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                ExternalApiKeyCreditPeriod = null!
             });
             setup.ModerationMachineSubjectBindings.Add(ModerationMachineSubjectBinding.Establish(
                 Guid.CreateVersion7(), host.Id, ModerationMachineCredentialSource.Persisted, keyId, null,
@@ -43,7 +49,8 @@ public sealed partial class ModerationContentResponseTests
         {
             var machine = new MachinePrincipalAccessor(new HttpContextAccessor());
             machine.SetPrincipal(new ApiKeyPrincipalContext(keyId, null, ExternalApiKeyOwnerType.InstanceAdmin,
-                fixture.Database.AdministratorId, ["events:read"]) { CredentialSource = ApiKeyCredentialSource.Persisted });
+                fixture.Database.AdministratorId, ["events:read"])
+            { CredentialSource = ApiKeyCredentialSource.Persisted });
             var admin = new AdminContext(new HttpContextAccessor(), new PlatformUserRoleRepository(context),
                 new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
                 new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);

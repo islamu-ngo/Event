@@ -219,15 +219,26 @@ public sealed partial class EventResourceDiscoveryQueryTests
             "application/octet-stream", "generic.bin", ".bin", bytes.LongLength, bytes.LongLength), default);
         return new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = native.TenantId, Tenant = null!,
-            FileTypeId = native.FileTypeId, FileType = null!, Provider = written.Provider,
-            StorageProviderBindingId = binding.Id, ObjectKey = written.ObjectKey,
-            FullName = "generic.bin", SafeDisplayName = "generic.bin", Extension = ".bin",
-            ContentType = written.ContentType, Sha256Checksum = written.Sha256Checksum,
-            Size = written.SizeBytes, Purpose = StorageObjectPurposes.Document,
+            Id = Guid.CreateVersion7(),
+            TenantId = native.TenantId,
+            Tenant = null!,
+            FileTypeId = native.FileTypeId,
+            FileType = null!,
+            Provider = written.Provider,
+            StorageProviderBindingId = binding.Id,
+            ObjectKey = written.ObjectKey,
+            FullName = "generic.bin",
+            SafeDisplayName = "generic.bin",
+            Extension = ".bin",
+            ContentType = written.ContentType,
+            Sha256Checksum = written.Sha256Checksum,
+            Size = written.SizeBytes,
+            Purpose = StorageObjectPurposes.Document,
             Visibility = StorageObjectVisibilities.AuthenticatedTenant,
             LifecycleState = StorageObjectLifecycleStates.Active,
-            CreatedAt = Now, CreatedBy = uploader, ConcurrencyStamp = Guid.CreateVersion7()
+            CreatedAt = Now,
+            CreatedBy = uploader,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
     }
 

@@ -29,7 +29,9 @@ public sealed class ModerationNoticeOpenApiSecurityTests
         var operation = new OpenApiOperation();
         var context = new OpenApiOperationTransformerContext
         {
-            DocumentName = "v0.1", Document = document, ApplicationServices = services,
+            DocumentName = "v0.1",
+            Document = document,
+            ApplicationServices = services,
             Description = new ApiDescription
             {
                 ActionDescriptor = new ActionDescriptor
@@ -56,7 +58,9 @@ public sealed class ModerationNoticeOpenApiSecurityTests
         await new ModerationNoticeOpenApiSecurityTransformer().TransformAsync(operation,
             new OpenApiOperationTransformerContext
             {
-                DocumentName = "v0.1", Document = document, ApplicationServices = services,
+                DocumentName = "v0.1",
+                Document = document,
+                ApplicationServices = services,
                 Description = new ApiDescription
                 {
                     ActionDescriptor = new ActionDescriptor

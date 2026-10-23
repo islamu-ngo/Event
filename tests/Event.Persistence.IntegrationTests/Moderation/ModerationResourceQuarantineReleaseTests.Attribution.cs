@@ -41,7 +41,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             prepare: false, nativeAttribution: true, attributeSiblingResource: true);
         var intent = fixture.Intent(fixture.Author, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
         };
         await Assert.That((await fixture.ReviewAsync(fixture.Author, intent)).Outcome)
             .IsEqualTo(ModerationResourceSafetyOutcome.Unavailable);
@@ -84,7 +85,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         await using var fixture = await Fixture.CreateAsync(prepare: false, nativeAttribution: true);
         var intent = fixture.Intent(fixture.Author, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
         };
         if (defect == "resource") intent = intent with { ResourceId = Guid.CreateVersion7() };
         else if (defect == "material") intent = intent with { MaterialVersionId = Guid.CreateVersion7() };
@@ -171,7 +173,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         await using var fixture = await Fixture.CreateAsync(prepare: false, nativeAttribution: true);
         var intent = fixture.Intent(fixture.Author, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
         };
         var checkpoint = new AttributionSafetyCheckpoint(async context =>
         {
@@ -217,7 +220,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         }
         var intent = fixture.Intent(fixture.Author, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
         };
         await Assert.That((await fixture.ReviewAsync(fixture.Author, intent)).Outcome)
             .IsEqualTo(ModerationResourceSafetyOutcome.Unavailable);
@@ -232,7 +236,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         await fixture.GrantAttributionReadAsync(fixture.Clock.Now.AddMinutes(15));
         var intent = fixture.Intent(fixture.Author, ResourceSafetyReviewStep.ProposePurpose, null) with
         {
-            RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(10),
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetime = TimeSpan.FromMinutes(10),
             ValidUntil = fixture.Clock.Now.AddMinutes(5)
         };
         await Assert.That((await fixture.ReviewAsync(fixture.Author, intent)).Outcome)

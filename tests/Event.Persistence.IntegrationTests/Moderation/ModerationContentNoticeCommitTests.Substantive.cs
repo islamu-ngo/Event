@@ -49,7 +49,8 @@ public sealed partial class ModerationContentNoticeCommitTests
         var options = (DbContextOptions<ExploreDbContext>)baseline.GetService<IDbContextOptions>();
         await using var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>(options)
             .AddInterceptors(new ObserveContentCapture(checkpoint), new ContentCaptureFlush(checkpoint),
-                new ContentCaptureCommit(checkpoint)).Options) { TenantContext = database };
+                new ContentCaptureCommit(checkpoint)).Options)
+        { TenantContext = database };
         await using var shared = colocated
             ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context, new ContentCaptureCommit(checkpoint)) : null;
         var clock = new CommitClock(database);
@@ -138,9 +139,14 @@ public sealed partial class ModerationContentNoticeCommitTests
             : AuthorityScope.Resource(database.Scope, Guid.CreateVersion7());
         var request = new QualifyModerationCaseUrgency
         {
-            OperationId = Guid.CreateVersion7(), Target = wrongScope, ExpectedQualificationRevision = 2,
-            EvidenceId = Guid.CreateVersion7(), CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-            Justification = "A different target cannot borrow this Content case.", ValidUntil = Now.AddMinutes(2)
+            OperationId = Guid.CreateVersion7(),
+            Target = wrongScope,
+            ExpectedQualificationRevision = 2,
+            EvidenceId = Guid.CreateVersion7(),
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            Justification = "A different target cannot borrow this Content case.",
+            ValidUntil = Now.AddMinutes(2)
         };
         var outcome = await ExecuteContentSourceAsync(database, database.UrgencyAssessorId, request);
         await Assert.That(outcome.IsSuccess).IsFalse();
@@ -168,7 +174,10 @@ public sealed partial class ModerationContentNoticeCommitTests
             publisher = owner.ActorId;
             seed.Actors.Add(new Actor
             {
-                Id = replacement, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, UserId = database.ReviewerId,
+                Id = replacement,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = database.ReviewerId,
                 Pii = new ActorPii { ActorId = replacement, DisplayName = "Replacement prerequisite parent" }
             });
             await seed.SaveChangesAsync();
@@ -184,8 +193,12 @@ public sealed partial class ModerationContentNoticeCommitTests
             await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, token);
             var acquired = await new ModerationQualificationAuthority(context, admin, machine).AcquireAsync(new QualifyModerationCaseUrgency
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 2,
-                EvidenceId = Guid.CreateVersion7(), CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = 2,
+                EvidenceId = Guid.CreateVersion7(),
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
                 Justification = "A late native parent cannot replace the originally fenced Content ancestry.",
                 ValidUntil = Now.AddMinutes(2)
             }, token);
@@ -214,7 +227,8 @@ public sealed partial class ModerationContentNoticeCommitTests
         await using (var read = Read(database))
             request = new ApproveModerationNoticeDisclosureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = prepared.Operation.Target,
+                OperationId = Guid.CreateVersion7(),
+                Target = prepared.Operation.Target,
                 ExpectedQualificationRevision = (await read.ModerationQualificationEpochs.SingleAsync()).Revision,
                 Intent = (await read.ModerationNoticeDisclosureApprovals.SingleAsync(row => row.EffectId == prepared.Operation.EffectId)).Intent
             };
@@ -259,15 +273,26 @@ public sealed partial class ModerationContentNoticeCommitTests
             var original = await seed.Events.SingleAsync(row => row.Id == eventId);
             seed.Events.Add(new Explore.Domain.Event(EventStatusEnum.Draft)
             {
-                Id = unrelatedEventId, TenantId = database.TenantId, Tenant = original.Tenant,
-                ActorId = original.ActorId, Actor = original.Actor, Title = "Independent disclosure dependency",
-                SubmittedByUserId = database.SubjectId, EventProvenanceTypeId = original.EventProvenanceTypeId,
-                VisibilityTypeId = original.VisibilityTypeId, VisibilityType = null!,
-                EventFormatId = original.EventFormatId, EventFormat = null!, EventStatus = null!
+                Id = unrelatedEventId,
+                TenantId = database.TenantId,
+                Tenant = original.Tenant,
+                ActorId = original.ActorId,
+                Actor = original.Actor,
+                Title = "Independent disclosure dependency",
+                SubmittedByUserId = database.SubjectId,
+                EventProvenanceTypeId = original.EventProvenanceTypeId,
+                VisibilityTypeId = original.VisibilityTypeId,
+                VisibilityType = null!,
+                EventFormatId = original.EventFormatId,
+                EventFormat = null!,
+                EventStatus = null!
             });
             seed.Actors.Add(new Actor
             {
-                Id = replacementActorId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, UserId = database.UrgencyAssessorId,
+                Id = replacementActorId,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = database.UrgencyAssessorId,
                 Pii = new ActorPii { ActorId = replacementActorId, DisplayName = "Replacement capture parent" }
             });
             await seed.SaveChangesAsync();
@@ -276,64 +301,116 @@ public sealed partial class ModerationContentNoticeCommitTests
         var generationId = Guid.CreateVersion7();
         await WriteContentSourceAsync(database, database.AdministratorId, new RecordModerationResourceGenerationSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 1,
-            SourceId = generationId, ResourceId = resourceId, ExpectedResourceRevision = 0, ValidUntil = Now.AddMinutes(10)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 1,
+            SourceId = generationId,
+            ResourceId = resourceId,
+            ExpectedResourceRevision = 0,
+            ValidUntil = Now.AddMinutes(10)
         });
         var opened = database.OpenCase(scope) with
         { ExpectedQualificationRevision = 2, SubjectKind = ModerationSubjectKind.Content, SubjectId = eventId };
         await WriteContentSourceAsync(database, database.AdministratorId, opened);
         var publication = database.Publication(3, ModerationReferenceProfileId.CFG09);
-        publication = publication with { Proposed = publication.Proposed with
-        { Profiles = [publication.Proposed.Profiles.Single() with
-        { ScopeKinds = [ModerationScopeKind.Resource], SubjectKinds = [ModerationSubjectKind.Content] }] } };
+        publication = publication with
+        {
+            Proposed = publication.Proposed with
+            {
+                Profiles = [publication.Proposed.Profiles.Single() with
+        { ScopeKinds = [ModerationScopeKind.Resource], SubjectKinds = [ModerationSubjectKind.Content] }]
+            }
+        };
         await Assert.That((await database.PublishAsync(database.AdministratorId, publication)).Outcome)
             .IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         var profile = publication.Proposed.Profiles.Single();
         var proceduralId = Guid.CreateVersion7();
         await WriteContentSourceAsync(database, database.AdministratorId, new PublishModerationQualificationPolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 4,
-            SourceId = proceduralId, ExpectedSourceRevision = 0, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-            MaximumReviewerLifetime = TimeSpan.FromMinutes(30), MaximumUrgencyLifetime = TimeSpan.FromMinutes(5),
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 4,
+            SourceId = proceduralId,
+            ExpectedSourceRevision = 0,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            MaximumReviewerLifetime = TimeSpan.FromMinutes(30),
+            MaximumUrgencyLifetime = TimeSpan.FromMinutes(5),
             ValidUntil = Now.AddHours(1)
         });
         await WriteContentSourceAsync(database, database.UrgencyAssessorId, new AdoptModerationQualificationPolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 5,
-            SourceId = proceduralId, ExpectedSourceRevision = 1, ExpectedWriterGeneration = 5,
-            AdoptionId = Guid.CreateVersion7(), CaseId = opened.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddHours(1)
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 5,
+            SourceId = proceduralId,
+            ExpectedSourceRevision = 1,
+            ExpectedWriterGeneration = 5,
+            AdoptionId = Guid.CreateVersion7(),
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            ValidUntil = Now.AddHours(1)
         });
         var reviewerId = Guid.CreateVersion7();
         await WriteContentSourceAsync(database, database.AdministratorId, new AssignModerationReviewerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 6,
-            AssignmentId = reviewerId, CaseId = opened.CaseId, ExpectedCaseRevision = 1, ReviewerHumanId = database.ReviewerId
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 6,
+            AssignmentId = reviewerId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            ReviewerHumanId = database.ReviewerId
         });
         await WriteContentSourceAsync(database, database.AdministratorId, new QualifyModerationReviewerController
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 7,
-            AssignmentId = reviewerId, ExpectedAssignmentRevision = 1, ControllerHumanId = database.ReviewerId,
-            EvidenceId = Guid.CreateVersion7(), Justification = "Independent canonical reviewer control.", QualifiedUntil = Now.AddMinutes(5)
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 7,
+            AssignmentId = reviewerId,
+            ExpectedAssignmentRevision = 1,
+            ControllerHumanId = database.ReviewerId,
+            EvidenceId = Guid.CreateVersion7(),
+            Justification = "Independent canonical reviewer control.",
+            QualifiedUntil = Now.AddMinutes(5)
         });
         await WriteContentSourceAsync(database, database.AdministratorId, new AssessModerationReviewerConflict
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 8,
-            AssignmentId = reviewerId, ExpectedAssignmentRevision = 2, State = ModerationReviewerConflictState.Independent,
-            EvidenceId = Guid.CreateVersion7(), Justification = "Case-specific independent reviewer and controller."
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 8,
+            AssignmentId = reviewerId,
+            ExpectedAssignmentRevision = 2,
+            State = ModerationReviewerConflictState.Independent,
+            EvidenceId = Guid.CreateVersion7(),
+            Justification = "Case-specific independent reviewer and controller."
         });
         var evidenceId = Guid.CreateVersion7();
         await WriteContentSourceAsync(database, database.UrgencyAssessorId, new QualifyModerationCaseUrgency
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 9,
-            EvidenceId = evidenceId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-            Justification = "An independent native assessor qualifies the bounded urgent finding.", ValidUntil = Now.AddMinutes(4)
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 9,
+            EvidenceId = evidenceId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            Justification = "An independent native assessor qualifies the bounded urgent finding.",
+            ValidUntil = Now.AddMinutes(4)
         });
         var findingId = Guid.CreateVersion7();
         await WriteContentSourceAsync(database, database.ReviewerId, new FinalizeModerationFindingSource
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 10,
-            FindingId = findingId, CaseId = opened.CaseId, ExpectedCaseRevision = 1, PolicyId = publication.Proposed.PolicyId,
-            ExpectedPolicyRevision = 1, Rule = profile.Rule, Reason = profile.Reason, EvidenceId = evidenceId,
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 10,
+            FindingId = findingId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            PolicyId = publication.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            Rule = profile.Rule,
+            Reason = profile.Reason,
+            EvidenceId = evidenceId,
             Justification = "The independent reviewer finalizes the actual qualified urgency finding."
         });
         // Only the Proposed decision is a historical starting boundary; finding and every source above are native writes.
@@ -351,32 +428,52 @@ public sealed partial class ModerationContentNoticeCommitTests
             [new(null, target)]);
         await WriteContentSourceAsync(database, database.AdministratorId, new RecordModerationContributionSelectionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 11,
-            SelectionId = selectionId, EffectId = effectId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-            DecisionId = decision.Id, ExpectedDecisionRevision = 2, PolicyId = publication.Proposed.PolicyId,
-            ExpectedPolicyRevision = 1, PublicationId = publication.Proposed.PublicationId, ProfileId = profile.Id,
-            Contribution = contribution, ValidUntil = Now.AddMinutes(4)
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 11,
+            SelectionId = selectionId,
+            EffectId = effectId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            DecisionId = decision.Id,
+            ExpectedDecisionRevision = 2,
+            PolicyId = publication.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = publication.Proposed.PublicationId,
+            ProfileId = profile.Id,
+            Contribution = contribution,
+            ValidUntil = Now.AddMinutes(4)
         });
         long epoch = 12;
         foreach (var binding in ModerationContributionSelectionProjection.Bindings(selectionId, contribution))
             await WriteContentSourceAsync(database, database.UrgencyAssessorId, new AdoptModerationResourceTargetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = epoch++,
-                AdoptionId = Guid.CreateVersion7(), SelectionId = selectionId, BindingOrdinal = binding.Ordinal,
-                GenerationId = generationId, ExpectedGenerationRevision = 1, CaseId = opened.CaseId,
-                ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(4)
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = epoch++,
+                AdoptionId = Guid.CreateVersion7(),
+                SelectionId = selectionId,
+                BindingOrdinal = binding.Ordinal,
+                GenerationId = generationId,
+                ExpectedGenerationRevision = 1,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                ValidUntil = Now.AddMinutes(4)
             });
         var contentRepresentative = new ModerationNoticeContentRepresentative(representative.Id, representative.Version, database.SubjectId);
         await WriteContentSourceAsync(database, database.AdministratorId, new ApproveModerationNoticeDisclosureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = epoch,
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = epoch,
             Intent = new(Guid.CreateVersion7(), effectId, decision.Id, 2, opened.CaseId, 1,
                 publication.Proposed.PolicyId, 1, publication.Proposed.PublicationId, profile.Id, decision.Id,
                 ModerationNoticeSnapshotFactory.SelectionDigest(contribution),
                 new(publication.Proposed.Classes.Single().Meaning), new(publication.Proposed.Reasons.Single().Meaning),
                 [new("The actual native finding concerns this Content, not its representative.")], new("Protected response."),
                 new("Independent review."), new("A human reviewer made the finding."), new("Original finite custody."),
-                Now.AddMinutes(4), Now.AddYears(1)) { ContentRepresentatives = [contentRepresentative] }
+                Now.AddMinutes(4), Now.AddYears(1))
+            { ContentRepresentatives = [contentRepresentative] }
         });
         return new(ModerationOperation.Transition(ModerationOperationKind.AcceptFinding, decision.Subject, scope,
             Guid.CreateVersion7(), effectId, decision.Id, 1, 1, findingId), contentRepresentative, Now.AddMinutes(5),
@@ -402,8 +499,11 @@ public sealed partial class ModerationContentNoticeCommitTests
 
     private static (AdminContext Admin, MachinePrincipalAccessor Machine) ContentIdentity(ExploreDbContext context, Guid actor)
     {
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext
-        { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, actor.ToString())], "native-content-capture")) } };
+        var http = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, actor.ToString())], "native-content-capture")) }
+        };
         return (new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
             NullLogger<AdminContext>.Instance), new MachinePrincipalAccessor(http));

@@ -44,11 +44,18 @@ public sealed class ModerationNoticeNotificationReceipt
             throw new ArgumentException("Acknowledgement requires the original subject, proof and sufficient protected calendar time.");
         var receipt = new ModerationNoticeNotificationReceipt
         {
-            Id = operationId, NoticeId = notice.Id, EffectId = source.EffectId,
-            TrustDomainId = source.TrustDomainId, TenantId = tenantId, SubjectId = source.SubjectId,
-            SubjectKind = source.SubjectKind, AcknowledgedByHumanId = canonicalRecipientId,
-            SnapshotHash = expectedSnapshotHash, ContestationCalendarMonths = contestationCalendarMonths,
-            NotifiedAt = notifiedAt, RemedyUntil = notifiedAt.AddMonths(contestationCalendarMonths),
+            Id = operationId,
+            NoticeId = notice.Id,
+            EffectId = source.EffectId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = tenantId,
+            SubjectId = source.SubjectId,
+            SubjectKind = source.SubjectKind,
+            AcknowledgedByHumanId = canonicalRecipientId,
+            SnapshotHash = expectedSnapshotHash,
+            ContestationCalendarMonths = contestationCalendarMonths,
+            NotifiedAt = notifiedAt,
+            RemedyUntil = notifiedAt.AddMonths(contestationCalendarMonths),
             RetainUntil = retainUntil
         };
         receipt.ValidatePersistedState();

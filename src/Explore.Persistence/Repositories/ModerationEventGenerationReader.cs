@@ -44,11 +44,22 @@ internal static class ModerationEventGenerationReader
             return null;
         var result = new ModerationEventGeneration
         {
-            Id = id, HostBindingId = hostId, TrustDomainId = trustDomainId, TenantId = tenantId,
-            EventId = eventId, Revision = revision, ObservedByHumanId = observerId, WriterGeneration = writerGeneration,
-            ObservedAt = observedAt, ValidUntil = validUntil, EventStamp = owningEvent.ConcurrencyStamp,
-            ActorId = owningEvent.ActorId, ActorStamp = actorStamp.Value, OrganizerActorId = owningEvent.OrganizerActorId,
-            OrganizerActorStamp = organizerStamp, SubmittedByHumanId = owningEvent.SubmittedByUserId
+            Id = id,
+            HostBindingId = hostId,
+            TrustDomainId = trustDomainId,
+            TenantId = tenantId,
+            EventId = eventId,
+            Revision = revision,
+            ObservedByHumanId = observerId,
+            WriterGeneration = writerGeneration,
+            ObservedAt = observedAt,
+            ValidUntil = validUntil,
+            EventStamp = owningEvent.ConcurrencyStamp,
+            ActorId = owningEvent.ActorId,
+            ActorStamp = actorStamp.Value,
+            OrganizerActorId = owningEvent.OrganizerActorId,
+            OrganizerActorStamp = organizerStamp,
+            SubmittedByHumanId = owningEvent.SubmittedByUserId
         };
         result.ValidatePersistedState();
         return result;

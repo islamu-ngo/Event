@@ -248,23 +248,23 @@ public sealed partial class ModerationRecognitionErasureRepository(
                 if (contribution.Parent is null && retainUntil < pending.SettleBy || retainUntil <= now)
                     throw new CaptureUnavailable(ModerationRecognitionPendingFailure.SourceUnavailable);
                 foreach (var purpose in Purposes(contribution))
-                foreach (var binding in bindings)
-                {
-                    if (contribution.Parent is { } parent)
+                    foreach (var binding in bindings)
                     {
-                        items.Add(ModerationRecognitionCaptureItem.Recapture(Guid.CreateVersion7(), request.IntentId,
-                            request.SubjectId, parent, contribution.Binding!, contribution.Decision, contribution.Sanction,
-                            key.Compute(binding, purpose), key.VerificationTag, ring.RingGeneration, now));
-                        continue;
+                        if (contribution.Parent is { } parent)
+                        {
+                            items.Add(ModerationRecognitionCaptureItem.Recapture(Guid.CreateVersion7(), request.IntentId,
+                                request.SubjectId, parent, contribution.Binding!, contribution.Decision, contribution.Sanction,
+                                key.Compute(binding, purpose), key.VerificationTag, ring.RingGeneration, now));
+                            continue;
+                        }
+                        var material = new ModerationRecognitionCapturedMaterial(key.Compute(binding, purpose),
+                            key.VerificationTag, ModerationRecognitionContribution.Capture(
+                                contribution.Decision, contribution.Sanction, purpose, now, retainUntil));
+                        items.Add(ModerationRecognitionCaptureItem.Capture(Guid.CreateVersion7(), request.IntentId,
+                            contribution.Decision, material, contribution.Source.Id, contribution.Source.Revision,
+                            contribution.Source.WriterGeneration, contribution.Adoption.Id, contribution.Adoption.Revision,
+                            contribution.Adoption.WriterGeneration, ring.RingGeneration));
                     }
-                    var material = new ModerationRecognitionCapturedMaterial(key.Compute(binding, purpose),
-                        key.VerificationTag, ModerationRecognitionContribution.Capture(
-                            contribution.Decision, contribution.Sanction, purpose, now, retainUntil));
-                    items.Add(ModerationRecognitionCaptureItem.Capture(Guid.CreateVersion7(), request.IntentId,
-                        contribution.Decision, material, contribution.Source.Id, contribution.Source.Revision,
-                        contribution.Source.WriterGeneration, contribution.Adoption.Id, contribution.Adoption.Revision,
-                        contribution.Adoption.WriterGeneration, ring.RingGeneration));
-                }
             }
             // Validate the original borrowed identity at the terminal time, not only at resolution.
             using var terminal = ring.BorrowWritingKey(ring.TrustDomainId, writing.KeyId, writing.KeyGeneration);
@@ -441,15 +441,15 @@ public sealed partial class ModerationRecognitionErasureRepository(
                 }
                 // New native provider bindings cannot be omitted between compute and append.
                 foreach (var contribution in contributions)
-                foreach (var purpose in Purposes(contribution))
-                foreach (var binding in bindings)
-                {
-                    var original = surviving.First(row => row.SanctionId == contribution.Sanction.Id && row.Purpose == purpose);
-                    using var key = ring.BorrowReadableKey(original.TrustDomainId, original.KeyId, original.KeyGeneration);
-                    var computed = key.Compute(binding, purpose);
-                    if (!surviving.Any(row => row.SanctionId == contribution.Sanction.Id && row.Token == computed))
-                        return await FailAsync(pending, ModerationRecognitionPendingFailure.IncompleteMaterial, token);
-                }
+                    foreach (var purpose in Purposes(contribution))
+                        foreach (var binding in bindings)
+                        {
+                            var original = surviving.First(row => row.SanctionId == contribution.Sanction.Id && row.Purpose == purpose);
+                            using var key = ring.BorrowReadableKey(original.TrustDomainId, original.KeyId, original.KeyGeneration);
+                            var computed = key.Compute(binding, purpose);
+                            if (!surviving.Any(row => row.SanctionId == contribution.Sanction.Id && row.Token == computed))
+                                return await FailAsync(pending, ModerationRecognitionPendingFailure.IncompleteMaterial, token);
+                        }
             }
             catch (InvalidOperationException exception) when (
                 exception.Message.StartsWith("moderation_recognition_", StringComparison.Ordinal))

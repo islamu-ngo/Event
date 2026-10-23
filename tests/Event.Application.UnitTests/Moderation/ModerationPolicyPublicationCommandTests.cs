@@ -54,10 +54,16 @@ public sealed class ModerationPolicyPublicationCommandTests
             "classes" => request with { Proposed = proposed with { Classes = [] } },
             "reasons" => request with { Proposed = proposed with { Reasons = [] } },
             "profiles" => request with { Proposed = proposed with { Profiles = [] } },
-            "oversized_profiles" => request with { Proposed = proposed with
-                { Profiles = Enumerable.Repeat(proposed.Profiles[0], 257).ToImmutableArray() } },
-            "oversized_meaning" => request with { Proposed = proposed with
-                { Classes = [proposed.Classes[0] with { Meaning = new string('a', 4001) }] } },
+            "oversized_profiles" => request with
+            {
+                Proposed = proposed with
+                { Profiles = Enumerable.Repeat(proposed.Profiles[0], 257).ToImmutableArray() }
+            },
+            "oversized_meaning" => request with
+            {
+                Proposed = proposed with
+                { Classes = [proposed.Classes[0] with { Meaning = new string('a', 4001) }] }
+            },
             "fingerprint" => request with { Proposed = proposed with { InventoryFingerprint = new string('a', 65) } },
             _ => throw new ArgumentOutOfRangeException(nameof(change))
         };

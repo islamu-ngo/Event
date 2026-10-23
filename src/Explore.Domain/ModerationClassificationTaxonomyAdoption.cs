@@ -28,9 +28,18 @@ public sealed class ModerationClassificationTaxonomyAdoption
             throw new ArgumentException("Only the nominated independent reviewer can accept the exact finite taxonomy.");
         var result = new ModerationClassificationTaxonomyAdoption
         {
-            Id = id, HostBindingId = source.HostBindingId, TrustDomainId = source.TrustDomainId, TenantId = source.TenantId,
-            SourceId = source.Id, SourceRevision = source.Revision, SourceWriterGeneration = source.WriterGeneration,
-            AdoptedByHumanId = human, WriterGeneration = generation, Revision = 1, AdoptedAt = now, ValidUntil = until
+            Id = id,
+            HostBindingId = source.HostBindingId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = source.TenantId,
+            SourceId = source.Id,
+            SourceRevision = source.Revision,
+            SourceWriterGeneration = source.WriterGeneration,
+            AdoptedByHumanId = human,
+            WriterGeneration = generation,
+            Revision = 1,
+            AdoptedAt = now,
+            ValidUntil = until
         };
         result.ValidatePersistedState();
         return result;

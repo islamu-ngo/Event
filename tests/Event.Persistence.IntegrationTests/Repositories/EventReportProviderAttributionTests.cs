@@ -34,7 +34,7 @@ public sealed partial class EventReportPersistenceTests
         var currentStamp = reportCase.ConcurrencyStamp;
         var result = provider == EventReportExternalProvider.Coop
             ? await CreateCoopAdviceHandler(context, tenant.Id).ExecuteAsync(new ProcessCoopDecisionCallbackCommand
-                { Request = coop, IncomingWebhookMessageId = message.Id }, CancellationToken.None)
+            { Request = coop, IncomingWebhookMessageId = message.Id }, CancellationToken.None)
             : await new RecordOspreySignalCallbackCommandHandler(
                 new EventReportRepository(context), new EfCoreUnitOfWork(context), new StaticTenantContext(tenant.Id)).ExecuteAsync(
                 new RecordOspreySignalCallbackCommand { Request = osprey }, CancellationToken.None);
@@ -72,7 +72,7 @@ public sealed partial class EventReportPersistenceTests
         async Task<Explore.Application.Responses.BaseCommandResponse<Guid>> RecordAsync() =>
             provider == EventReportExternalProvider.Coop
                 ? await CreateCoopAdviceHandler(context, tenant.Id).ExecuteAsync(new ProcessCoopDecisionCallbackCommand
-                    { Request = coop, IncomingWebhookMessageId = message.Id }, CancellationToken.None)
+                { Request = coop, IncomingWebhookMessageId = message.Id }, CancellationToken.None)
                 : await new RecordOspreySignalCallbackCommandHandler(
                     new EventReportRepository(context), new EfCoreUnitOfWork(context), new StaticTenantContext(tenant.Id)).ExecuteAsync(
                     new RecordOspreySignalCallbackCommand { Request = osprey }, CancellationToken.None);
@@ -199,8 +199,10 @@ public sealed partial class EventReportPersistenceTests
             ? callback with { ExpectedCaseConcurrencyStamp = Guid.CreateVersion7() }
             : callback with
             {
-                ReportId = secondReport.Id, CaseId = secondCase.Id,
-                ProviderTargetScope = "instance", ProviderTargetId = "instance"
+                ReportId = secondReport.Id,
+                CaseId = secondCase.Id,
+                ProviderTargetScope = "instance",
+                ProviderTargetId = "instance"
             };
         var rejected = await handler.ExecuteAsync(command with { Request = substituted }, CancellationToken.None);
 
@@ -243,7 +245,8 @@ public sealed partial class EventReportPersistenceTests
         var stamp = reportCase.ConcurrencyStamp;
         var callback = CreateAttributionOspreyAdvice(report, reportCase) with
         {
-            ProviderTargetScope = scope, ProviderTargetId = target
+            ProviderTargetScope = scope,
+            ProviderTargetId = target
         };
         var handler = new RecordOspreySignalCallbackCommandHandler(
             new EventReportRepository(context), new EfCoreUnitOfWork(context), new StaticTenantContext(tenant.Id));
@@ -337,9 +340,14 @@ public sealed partial class EventReportPersistenceTests
 
     private static OspreySignalCallbackRequestDto CreateAttributionOspreyAdvice(EventReport report, EventReportCase reportCase) => new()
     {
-        TenantId = report.TenantId, EventId = report.EventId, ReportId = report.Id, CaseId = reportCase.Id,
-        ProviderSignalId = "provider-signal", CorrelationId = "dispatch",
-        ProviderTargetScope = "tenant", ProviderTargetId = report.TenantId.ToString("N"),
+        TenantId = report.TenantId,
+        EventId = report.EventId,
+        ReportId = report.Id,
+        CaseId = reportCase.Id,
+        ProviderSignalId = "provider-signal",
+        CorrelationId = "dispatch",
+        ProviderTargetScope = "tenant",
+        ProviderTargetId = report.TenantId.ToString("N"),
         Signals = [new OspreySignalCallbackItemDto
         {
             SignalType = "policy_match", PolicyCode = "spam", Verdict = "urgent",

@@ -222,16 +222,29 @@ public sealed class ModerationChildAgePolicySourceOwner(
 
     internal static RecordModerationChildAgePolicySource RecordRequest(ModerationChildAgePolicySource source, AuthorityScope jurisdiction) => new()
     {
-        OperationId = Guid.Empty, Target = jurisdiction, ExpectedQualificationRevision = source.WriterGeneration - 1,
-        SourceId = source.Id, PolicyId = source.PolicyId, ExpectedPolicyRevision = source.PolicyRevision,
-        PublicationId = source.PublicationId, ProfileId = source.ProfileId, Mode = (ModerationNativeMode)source.ModeCode,
-        Terms = source.Terms, Ownership = source.Ownership, ValidUntil = source.ValidUntil
+        OperationId = Guid.Empty,
+        Target = jurisdiction,
+        ExpectedQualificationRevision = source.WriterGeneration - 1,
+        SourceId = source.Id,
+        PolicyId = source.PolicyId,
+        ExpectedPolicyRevision = source.PolicyRevision,
+        PublicationId = source.PublicationId,
+        ProfileId = source.ProfileId,
+        Mode = (ModerationNativeMode)source.ModeCode,
+        Terms = source.Terms,
+        Ownership = source.Ownership,
+        ValidUntil = source.ValidUntil
     };
     internal static AdoptModerationChildAgePolicySource AdoptionRequest(ModerationChildAgePolicyAdoption adoption, AuthorityScope jurisdiction) => new()
     {
-        OperationId = Guid.Empty, Target = jurisdiction, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-        SourceId = adoption.SourceId, ExpectedSourceRevision = adoption.SourceRevision,
-        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration, AdoptionId = adoption.Id, ValidUntil = adoption.ValidUntil
+        OperationId = Guid.Empty,
+        Target = jurisdiction,
+        ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+        SourceId = adoption.SourceId,
+        ExpectedSourceRevision = adoption.SourceRevision,
+        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
+        AdoptionId = adoption.Id,
+        ValidUntil = adoption.ValidUntil
     };
     internal static string Slot(IModerationSourceProvenance authority, Guid publication, Guid profile, ModerationNativeMode mode) =>
         $"moderation.child-age-policy:{authority.Binding.Id:N}:{authority.Tenant.Id:N}:{publication:N}:{profile:N}:{(int)mode}";

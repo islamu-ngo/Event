@@ -35,9 +35,13 @@ public sealed partial class ModerationCaseNativeProofTests
             if (closed) allegation.Close(allegation.Revision, database.Clock.Now);
             setup.Users.Add(new User
             {
-                Id = otherId, Pii = new UserPii
+                Id = otherId,
+                Pii = new UserPii
                 {
-                    UserId = otherId, Email = $"{otherId:N}@example.invalid", FirstName = "Independent", LastName = "Reporter"
+                    UserId = otherId,
+                    Email = $"{otherId:N}@example.invalid",
+                    FirstName = "Independent",
+                    LastName = "Reporter"
                 }
             });
             var role = EventRoleAssignment.Create(database.TenantId, database.EventId, otherId,
@@ -55,7 +59,8 @@ public sealed partial class ModerationCaseNativeProofTests
         var secondReceipt = await intake.IssueSubmissionReceiptAsync(facts, default);
         await Assert.That(secondReceipt).IsNotNull();
         var secondCommand = Submission(secondReceipt!.Receipt.Id, secondReceipt.Token, facts.Material)
-            with { OperationId = firstCommand.OperationId };
+            with
+        { OperationId = firstCommand.OperationId };
         var otherHandler = new SubmitModerationAllegationCommandHandler(intake);
         var second = await otherHandler.ExecuteAsync(secondCommand);
         await Assert.That(second.IsSuccess).IsTrue();
@@ -132,7 +137,8 @@ public sealed partial class ModerationCaseNativeProofTests
         var committer = Committer(context, database);
         var request = new ModerationCaseAccessRequest(ModerationCaseAccessPurpose.SubmitAllegation,
             caseIdentity ? Guid.CreateVersion7() : Guid.Empty, Guid.CreateVersion7(),
-            caseIdentity ? 0 : 1, receipt.Receipt.Id, receipt.Token) { Narrative = database.Request().Material };
+            caseIdentity ? 0 : 1, receipt.Receipt.Id, receipt.Token)
+        { Narrative = database.Request().Material };
         await Assert.That(async () => await committer.SubmitAsync(request, default)).Throws<ArgumentException>();
         await using var verify = database.Context();
         await Assert.That(await verify.ModerationCases.AnyAsync()).IsFalse();

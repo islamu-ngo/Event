@@ -62,7 +62,10 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
                 intent, database.HostId, database.Scope.TrustDomainId, database.TenantId, database.AssessorId, 3, Now);
             var source = new ApproveModerationNoticeDisclosureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2, Intent = intent
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 2,
+                Intent = intent
             };
             // Native writer digest includes its closed mutation type, not just the JSON payload.
             var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(

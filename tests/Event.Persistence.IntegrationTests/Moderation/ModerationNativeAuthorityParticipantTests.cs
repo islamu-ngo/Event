@@ -200,13 +200,17 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
             var role = new Role
             {
                 Id = checked(await writer.Roles.MaxAsync(row => row.Id) + 1),
-                MasterCode = "platform.native-authority-witness", FullName = "Additional native role",
+                MasterCode = "platform.native-authority-witness",
+                FullName = "Additional native role",
                 RoleScopeId = (int)RoleScopeEnum.Platform
             };
             writer.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = database.IssuerId, User = null!,
-                RoleId = role.Id, Role = role
+                Id = Guid.CreateVersion7(),
+                UserId = database.IssuerId,
+                User = null!,
+                RoleId = role.Id,
+                Role = role
             });
             await writer.SaveChangesAsync();
         }
@@ -742,7 +746,7 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
         public ProceduralPolicyWithoutDeployment NativeSources { get; private set; } = null!;
         public ExploreDbContext Context(params IInterceptor[] interceptors) =>
             new(new DbContextOptionsBuilder<ExploreDbContext>(_options).AddInterceptors(interceptors).Options)
-                { TenantContext = this };
+            { TenantContext = this };
 
         public static async Task<NativeDatabase> CreateAsync(
             ModerationReferenceProfileId referenceId = ModerationReferenceProfileId.CFG06)
@@ -756,8 +760,11 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
             var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
             var tenant = new Tenant
             {
-                Id = database.TenantId, FullName = "Native lifecycle authority", Slug = $"native-{database.TenantId:N}",
-                TenantStatusId = status.Id, TenantStatus = status
+                Id = database.TenantId,
+                FullName = "Native lifecycle authority",
+                Slug = $"native-{database.TenantId:N}",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             };
             context.Tenants.Add(tenant);
             var role = await context.Roles.SingleAsync(row =>
@@ -767,26 +774,40 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
             {
                 var user = new User
                 {
-                    Id = id, Pii = new UserPii
+                    Id = id,
+                    Pii = new UserPii
                     {
-                        UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Native", LastName = "Authority"
+                        UserId = id,
+                        Email = $"{id:N}@example.invalid",
+                        FirstName = "Native",
+                        LastName = "Authority"
                     }
                 };
                 context.Users.Add(user);
                 context.TenantUsers.Add(new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, UserId = id, User = user,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant.Id,
+                    Tenant = tenant,
+                    UserId = id,
+                    User = user,
                     StatusId = (int)TenantUserStatusEnum.Active
                 });
                 if (id == database.IssuerId || id == database.AssessorId || id == database.UrgencyAssessorId)
                     context.PlatformUserRoles.Add(new PlatformUserRole
                     {
-                        Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role
+                        Id = Guid.CreateVersion7(),
+                        UserId = id,
+                        User = user,
+                        RoleId = role.Id,
+                        Role = role
                     });
             }
             var maintenance = new ServicePrincipal
             {
-                Id = database.MaintenanceId, Code = $"native-maintenance-{database.TenantId:N}", DisplayName = "Native maintenance"
+                Id = database.MaintenanceId,
+                Code = $"native-maintenance-{database.TenantId:N}",
+                DisplayName = "Native maintenance"
             };
             var host = ModerationHostBinding.Establish(database.HostId, database.Instance.TrustDomainId,
                 database.Instance.Parent!.Id, database.Instance.Id, maintenance.Id);
@@ -834,11 +855,13 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
             var previous = PublicationRequest;
             var next = previous with
             {
-                OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = epoch.Revision,
+                OperationId = Guid.CreateVersion7(),
+                ExpectedQualificationRevision = epoch.Revision,
                 ExpectedPublicationId = previous.Proposed.PublicationId,
                 Proposed = previous.Proposed with
                 {
-                    PublicationId = Guid.CreateVersion7(), ExpectedRevision = previous.Proposed.ExpectedRevision + 1,
+                    PublicationId = Guid.CreateVersion7(),
+                    ExpectedRevision = previous.Proposed.ExpectedRevision + 1,
                     SupportedProfiles = retire ? [] : previous.Proposed.SupportedProfiles
                 }
             };
@@ -953,15 +976,23 @@ public sealed partial class ModerationNativeAuthorityParticipantTests
             if (!maintenance)
                 context.ServicePrincipals.Add(new ServicePrincipal
                 {
-                    Id = serviceId, Code = $"unprivileged-{serviceId:N}", DisplayName = "Ordinary service"
+                    Id = serviceId,
+                    Code = $"unprivileged-{serviceId:N}",
+                    DisplayName = "Ordinary service"
                 });
             context.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), KeyId = keyId, Name = "Native maintenance credential",
-                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()), Scopes = "events:read",
-                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = owner,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                KeyId = keyId,
+                Name = "Native maintenance credential",
+                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
+                Scopes = "events:read",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                OwnerId = owner,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                ExternalApiKeyCreditPeriod = null!
             });
             context.ModerationMachineSubjectBindings.Add(ModerationMachineSubjectBinding.Establish(
                 Guid.CreateVersion7(), HostId, ModerationMachineCredentialSource.Persisted, keyId,

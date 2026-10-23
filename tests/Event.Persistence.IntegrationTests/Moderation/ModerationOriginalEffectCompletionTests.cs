@@ -63,12 +63,19 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         await SeedOriginalNoticeFactsAsync(fixture, acknowledge: true);
         var release = new EventResourceModerationQuarantineRelease
         {
-            Id = Guid.CreateVersion7(), TenantId = cause.TenantId, QuarantineId = cause.Id,
-            EventId = cause.EventId, EventResourceId = cause.EventResourceId,
-            MaterialVersionId = cause.MaterialVersionId, OriginalEffectId = cause.EffectId,
-            OriginalBindingOrdinal = cause.BindingOrdinal, OriginallyAppliedAt = cause.AppliedAt,
-            ApprovalId = review.ApprovalId, ReleasedByHumanId = fixture.Database.AdministratorId,
-            ReleasedAt = Now, RequestDigest = new string('A', 64)
+            Id = Guid.CreateVersion7(),
+            TenantId = cause.TenantId,
+            QuarantineId = cause.Id,
+            EventId = cause.EventId,
+            EventResourceId = cause.EventResourceId,
+            MaterialVersionId = cause.MaterialVersionId,
+            OriginalEffectId = cause.EffectId,
+            OriginalBindingOrdinal = cause.BindingOrdinal,
+            OriginallyAppliedAt = cause.AppliedAt,
+            ApprovalId = review.ApprovalId,
+            ReleasedByHumanId = fixture.Database.AdministratorId,
+            ReleasedAt = Now,
+            RequestDigest = new string('A', 64)
         };
         await using (var writer = fixture.Context())
         {

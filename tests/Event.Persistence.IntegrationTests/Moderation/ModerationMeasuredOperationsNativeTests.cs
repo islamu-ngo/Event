@@ -50,11 +50,15 @@ public sealed partial class ModerationPolicyPublicationTests
         var reviewer = Guid.CreateVersion7();
         var role = await context.Roles.SingleAsync(row =>
             row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
-        var user = new User { Id = reviewer, Pii = new UserPii
-            { UserId = reviewer, Email = $"{reviewer:N}@example.invalid", FirstName = "Measured", LastName = "Reviewer" } };
+        var user = new User
+        {
+            Id = reviewer,
+            Pii = new UserPii
+            { UserId = reviewer, Email = $"{reviewer:N}@example.invalid", FirstName = "Measured", LastName = "Reviewer" }
+        };
         context.Users.Add(user);
         context.PlatformUserRoles.Add(new PlatformUserRole
-            { Id = Guid.CreateVersion7(), UserId = reviewer, User = user, RoleId = role.Id, Role = role });
+        { Id = Guid.CreateVersion7(), UserId = reviewer, User = user, RoleId = role.Id, Role = role });
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
         ModerationQualificationRepository Writer(Guid human)
@@ -67,9 +71,15 @@ public sealed partial class ModerationPolicyPublicationTests
         var binding = policy.Consumers[0].Binding;
         var record = new RecordModerationMeasuredOperationsSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            SourceId = Guid.CreateVersion7(), Binding = binding, ProfileId = request.Proposed.Profiles.Single().Id,
-            ReviewerHumanId = reviewer, ReviewerControllerHumanId = reviewer, RecorderControllerHumanId = database.AdminId,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = Guid.CreateVersion7(),
+            Binding = binding,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            ReviewerHumanId = reviewer,
+            ReviewerControllerHumanId = reviewer,
+            RecorderControllerHumanId = database.AdminId,
             ValidUntil = Now.AddMinutes(5)
         };
         var writer = Writer(database.AdminId);
@@ -99,9 +109,14 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That((await writer.ExecuteAsync(record)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var accept = new AcceptModerationMeasuredOperationsSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 3,
-            AcceptanceId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(4)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 3,
+            AcceptanceId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(4)
         };
         await Assert.That((await writer.ExecuteAsync(accept)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
         if (change is "acceptance-expiry-after-save" or "acceptance-epoch-after-save" or "foreign-case-after-acceptance-save")
@@ -159,9 +174,11 @@ public sealed partial class ModerationPolicyPublicationTests
             if (change == "withdraw-role-after-save") flush.RevokeWithdrawer = database.AdminId;
             var withdrawal = new WithdrawModerationMeasuredOperationsAcceptance
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
                 ExpectedQualificationRevision = change == "withdraw-deselected" ? 5 : 4,
-                AcceptanceId = accept.AcceptanceId, ExpectedAcceptanceRevision = 1
+                AcceptanceId = accept.AcceptanceId,
+                ExpectedAcceptanceRevision = 1
             };
             var result = await writer.ExecuteAsync(withdrawal);
             var denied = change is "withdraw-receipt-missing" or "withdraw-role-after-save";

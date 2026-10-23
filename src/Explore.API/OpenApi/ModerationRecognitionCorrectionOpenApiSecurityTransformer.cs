@@ -33,7 +33,9 @@ public sealed class ModerationRecognitionCorrectionOpenApiSecurityTransformer :
 
     internal static OpenApiSecurityScheme CreateSecurityScheme() => new()
     {
-        Type = SecuritySchemeType.ApiKey, In = ParameterLocation.Header, Name = "Authorization",
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Header,
+        Name = "Authorization",
         Description = "Protected recognition correction only. Send Authorization: ErasureCorrectionReceipt <original-receipt>. Grants no account or ordinary erasure-status authority."
     };
 

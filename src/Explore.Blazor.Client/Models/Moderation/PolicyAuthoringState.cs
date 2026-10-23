@@ -17,8 +17,10 @@ public sealed class PolicyAuthoringState
         var history = current.Authoring;
         Proposed = new()
         {
-            PolicyId = current.PolicyId, ExpectedRevision = current.ExpectedRevision,
-            PublicationId = Guid.CreateVersion7(), Jurisdiction = Copy(current.Jurisdiction),
+            PolicyId = current.PolicyId,
+            ExpectedRevision = current.ExpectedRevision,
+            PublicationId = Guid.CreateVersion7(),
+            Jurisdiction = Copy(current.Jurisdiction),
             CatalogueRevision = history?.CatalogueRevision ?? current.InstalledCatalogueRevision,
             InventoryRevision = history?.InventoryRevision ?? current.InstalledInventoryRevision,
             InventoryFingerprint = history?.InventoryFingerprint ?? current.InstalledInventoryFingerprint,

@@ -86,14 +86,24 @@ public sealed class ModerationCaseNarrativePolicySource
         ownership.Validate(recorder);
         var source = new ModerationCaseNarrativePolicySource
         {
-            Id = id, HostBindingId = hostId, TrustDomainId = trustId, TenantId = tenantId, TargetKind = targetKind,
-            Purpose = terms.Purpose, MaximumRetentionTicks = terms.MaximumRetention.Ticks,
-            MaximumMaterialBytes = terms.MaximumMaterialBytes, PrivacyOwnerHumanId = ownership.PrivacyOwnerHumanId,
+            Id = id,
+            HostBindingId = hostId,
+            TrustDomainId = trustId,
+            TenantId = tenantId,
+            TargetKind = targetKind,
+            Purpose = terms.Purpose,
+            MaximumRetentionTicks = terms.MaximumRetention.Ticks,
+            MaximumMaterialBytes = terms.MaximumMaterialBytes,
+            PrivacyOwnerHumanId = ownership.PrivacyOwnerHumanId,
             PrivacyControllerHumanId = ownership.PrivacyControllerHumanId,
             GovernanceControllerHumanId = ownership.GovernanceControllerHumanId,
             IdentityAndIndependenceBasis = ownership.IdentityAndIndependenceBasis,
-            PrivacyLegalMandateBasis = ownership.PrivacyLegalMandateBasis, RecordedByHumanId = recorder,
-            WriterGeneration = writerGeneration, Revision = 1, RecordedAt = now, ValidUntil = validUntil
+            PrivacyLegalMandateBasis = ownership.PrivacyLegalMandateBasis,
+            RecordedByHumanId = recorder,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            RecordedAt = now,
+            ValidUntil = validUntil
         };
         source.ValidatePersistedState();
         return source;

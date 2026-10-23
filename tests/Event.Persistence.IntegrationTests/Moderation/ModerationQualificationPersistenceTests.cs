@@ -63,7 +63,9 @@ public sealed class ModerationQualificationPersistenceTests
         await using var database = await QualificationDatabase.Create();
         database.Context.Add(new ModerationPolicyPublicationScope
         {
-            PublicationId = Guid.CreateVersion7(), ProfileId = database.Profile.Id, Kind = ModerationScopeKind.Tenant
+            PublicationId = Guid.CreateVersion7(),
+            ProfileId = database.Profile.Id,
+            Kind = ModerationScopeKind.Tenant
         });
         await Assert.That(() => database.Context.SaveChangesAsync()).Throws<DbUpdateException>();
     }

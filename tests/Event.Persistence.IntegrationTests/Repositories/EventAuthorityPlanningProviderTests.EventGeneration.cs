@@ -38,43 +38,68 @@ public sealed partial class EventAuthorityPlanningProviderTests
         var token = timeout.Token;
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = $"generation-source-{Guid.CreateVersion7():N}",
-            FullName = "Generation source ordering", TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            Slug = $"generation-source-{Guid.CreateVersion7():N}",
+            FullName = "Generation source ordering",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var publisher = new User
         {
-            Id = Guid.CreateVersion7(), Pii = new UserPii
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii
             {
-                Email = $"publisher-{Guid.CreateVersion7():N}@example.test", FirstName = "Publisher", LastName = "Witness"
+                Email = $"publisher-{Guid.CreateVersion7():N}@example.test",
+                FirstName = "Publisher",
+                LastName = "Witness"
             }
         };
         var administrator = new User
         {
-            Id = Guid.CreateVersion7(), Pii = new UserPii
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii
             {
-                Email = $"administrator-{Guid.CreateVersion7():N}@example.test", FirstName = "Administrator", LastName = "Witness"
+                Email = $"administrator-{Guid.CreateVersion7():N}@example.test",
+                FirstName = "Administrator",
+                LastName = "Witness"
             }
         };
         var adopter = new User
         {
-            Id = Guid.CreateVersion7(), Pii = new UserPii
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii
             {
-                Email = $"adopter-{Guid.CreateVersion7():N}@example.test", FirstName = "Adopter", LastName = "Witness"
+                Email = $"adopter-{Guid.CreateVersion7():N}@example.test",
+                FirstName = "Adopter",
+                LastName = "Witness"
             }
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = publisher.Id, User = publisher,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, Pii = new ActorPii { DisplayName = "Before generation" }
+            Id = Guid.CreateVersion7(),
+            UserId = publisher.Id,
+            User = publisher,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            Pii = new ActorPii { DisplayName = "Before generation" }
         };
         var entity = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-            SubmittedByUserId = publisher.Id, Title = "Generation source ordering",
-            PublicCode = Guid.CreateVersion7().ToString("N")[..12], Timezone = "UTC",
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            ActorId = actor.Id,
+            Actor = actor,
+            SubmittedByUserId = publisher.Id,
+            Title = "Generation source ordering",
+            PublicCode = Guid.CreateVersion7().ToString("N")[..12],
+            Timezone = "UTC",
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Private, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!
+            VisibilityTypeId = (int)VisibilityTypeEnum.Private,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!
         };
         ModerationHostBinding? host;
         Guid maintenanceId;
@@ -87,24 +112,40 @@ public sealed partial class EventAuthorityPlanningProviderTests
             foreach (var human in new[] { administrator, adopter })
                 seed.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), UserId = human.Id, User = human, RoleId = role.Id, Role = role
+                    Id = Guid.CreateVersion7(),
+                    UserId = human.Id,
+                    User = human,
+                    RoleId = role.Id,
+                    Role = role
                 });
             foreach (var human in new[] { administrator, adopter, publisher })
                 seed.TenantUsers.Add(new TenantUser
-            {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                UserId = human.Id, User = human, StatusId = (int)TenantUserStatusEnum.Active
-            });
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant.Id,
+                    Tenant = tenant,
+                    UserId = human.Id,
+                    User = human,
+                    StatusId = (int)TenantUserStatusEnum.Active
+                });
             maintenanceId = host?.MaintenanceServicePrincipalId ?? Guid.CreateVersion7();
             if (host is null)
                 seed.ServicePrincipals.Add(new ServicePrincipal
                 {
-                    Id = maintenanceId, Code = $"generation-maintenance-{Guid.CreateVersion7():N}", DisplayName = "Generation maintenance"
+                    Id = maintenanceId,
+                    Code = $"generation-maintenance-{Guid.CreateVersion7():N}",
+                    DisplayName = "Generation maintenance"
                 });
             await seed.SaveChangesAsync(token);
         }
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, administrator.Id.ToString("D"))], "event-generation-witness")) } };
+        var http = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(
+            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, administrator.Id.ToString("D"))], "event-generation-witness"))
+            }
+        };
         AdminContext Identity(ExploreDbContext context) => new(http, new PlatformUserRoleRepository(context),
             new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
             new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
@@ -118,9 +159,13 @@ public sealed partial class EventAuthorityPlanningProviderTests
             var installed = await new EstablishModerationAuthoritySourcesCommandHandler(
                 new ModerationAuthoritySourceRepository(setup, Identity(setup), machine)).ExecuteAsync(new()
                 {
-                    HostBindingId = host?.Id ?? Guid.CreateVersion7(), TrustDomainId = trustDomainId,
-                    SolutionId = solutionId, InstanceId = instanceId, MaintenanceServicePrincipalId = maintenanceId,
-                    TenantId = tenant.Id, EpochId = epochId
+                    HostBindingId = host?.Id ?? Guid.CreateVersion7(),
+                    TrustDomainId = trustDomainId,
+                    SolutionId = solutionId,
+                    InstanceId = instanceId,
+                    MaintenanceServicePrincipalId = maintenanceId,
+                    TenantId = tenant.Id,
+                    EpochId = epochId
                 }, token);
             await Assert.That(installed.IsSuccess).IsTrue();
         }
@@ -138,10 +183,14 @@ public sealed partial class EventAuthorityPlanningProviderTests
             privacy.Authority(owner, clock), deploymentInventory: inventory);
         var source = new RecordModerationEventGenerationSource
         {
-            OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), EventId = entity.Id,
+            OperationId = Guid.CreateVersion7(),
+            SourceId = Guid.CreateVersion7(),
+            EventId = entity.Id,
             Target = AuthorityScope.Tenant(AuthorityScope.Instance(
                 AuthorityScope.Solution(AuthorityScope.TrustDomain(trustDomainId), solutionId), instanceId), tenant.Id),
-            ExpectedQualificationRevision = 1, ExpectedEventRevision = 0, ValidUntil = clock.GetUtcNow().AddMinutes(10)
+            ExpectedQualificationRevision = 1,
+            ExpectedEventRevision = 0,
+            ValidUntil = clock.GetUtcNow().AddMinutes(10)
         };
         ModerationQualificationMutation mutation = source;
         if (resourceObservation)
@@ -150,7 +199,8 @@ public sealed partial class EventAuthorityPlanningProviderTests
             var resource = EventResource.CreateDraft(resourceId, tenant.Id, entity.Id, null,
                 new EventResourceMetadata
                 {
-                    Title = "Resource generation ordering", Kind = EventResourceKindEnum.GeneralDocument,
+                    Title = "Resource generation ordering",
+                    Kind = EventResourceKindEnum.GeneralDocument,
                     DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                 }, EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(tenant.Id, entity.Id, resourceId, EventResourceAudienceKindEnum.Organizer)],
@@ -162,8 +212,12 @@ public sealed partial class EventAuthorityPlanningProviderTests
             await seed.SaveChangesAsync(token);
             mutation = new RecordModerationResourceGenerationSource
             {
-                OperationId = Guid.CreateVersion7(), SourceId = source.SourceId, ResourceId = resource.Id,
-                Target = source.Target, ExpectedQualificationRevision = 1, ExpectedResourceRevision = 0,
+                OperationId = Guid.CreateVersion7(),
+                SourceId = source.SourceId,
+                ResourceId = resource.Id,
+                Target = source.Target,
+                ExpectedQualificationRevision = 1,
+                ExpectedResourceRevision = 0,
                 ValidUntil = source.ValidUntil
             };
         }
@@ -180,9 +234,13 @@ public sealed partial class EventAuthorityPlanningProviderTests
             await Assert.That((await handler.ExecuteAsync(new(mutation), token)).IsSuccess).IsTrue();
             var opened = new OpenModerationCaseSource
             {
-                OperationId = Guid.CreateVersion7(), Target = source.Target, ExpectedQualificationRevision = 2,
-                CaseId = Guid.CreateVersion7(), SubjectKind = ModerationSubjectKind.Human,
-                SubjectId = publisher.Id, OccurrenceId = Guid.CreateVersion7()
+                OperationId = Guid.CreateVersion7(),
+                Target = source.Target,
+                ExpectedQualificationRevision = 2,
+                CaseId = Guid.CreateVersion7(),
+                SubjectKind = ModerationSubjectKind.Human,
+                SubjectId = publisher.Id,
+                OccurrenceId = Guid.CreateVersion7()
             };
             await Assert.That((await handler.ExecuteAsync(new(opened), token)).IsSuccess).IsTrue();
             var reference = ModerationReferenceCatalogue.GetProfile(ModerationReferenceProfileId.CFG06);
@@ -217,28 +275,51 @@ public sealed partial class EventAuthorityPlanningProviderTests
                 adoptedTargetId, 1, resourceObservation ? "resource.read" : "event.publish", null);
             var selection = new RecordModerationContributionSelectionSource
             {
-                OperationId = Guid.CreateVersion7(), Target = source.Target, ExpectedQualificationRevision = 4,
-                SelectionId = Guid.CreateVersion7(), EffectId = Guid.CreateVersion7(), CaseId = opened.CaseId,
-                ExpectedCaseRevision = 1, DecisionId = decision.Id, ExpectedDecisionRevision = 2,
-                PolicyId = proposed.PolicyId, ExpectedPolicyRevision = 1, PublicationId = published.Publication!.Id,
+                OperationId = Guid.CreateVersion7(),
+                Target = source.Target,
+                ExpectedQualificationRevision = 4,
+                SelectionId = Guid.CreateVersion7(),
+                EffectId = Guid.CreateVersion7(),
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                DecisionId = decision.Id,
+                ExpectedDecisionRevision = 2,
+                PolicyId = proposed.PolicyId,
+                ExpectedPolicyRevision = 1,
+                PublicationId = published.Publication!.Id,
                 ProfileId = profile.Id,
                 Contribution = new(decision.Id, decision.Rule, decision.Scope, decision.Subject.Kind, decision.Subject.Id,
                     decision.StartsAt, null, profile.Effects.Select(effect => new ModerationPolicyEffectTarget(effect, target)).ToImmutableArray(),
-                    [new(null, target)]), ValidUntil = source.ValidUntil
+                    [new(null, target)]),
+                ValidUntil = source.ValidUntil
             };
             await Assert.That((await handler.ExecuteAsync(new(selection), token)).IsSuccess).IsTrue();
             mutation = resourceObservation ? new AdoptModerationResourceTargetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = source.Target, ExpectedQualificationRevision = 5,
-                AdoptionId = Guid.CreateVersion7(), SelectionId = selection.SelectionId, BindingOrdinal = 0,
-                GenerationId = source.SourceId, ExpectedGenerationRevision = 1,
-                CaseId = opened.CaseId, ExpectedCaseRevision = 1, ValidUntil = now.AddMinutes(5)
+                OperationId = Guid.CreateVersion7(),
+                Target = source.Target,
+                ExpectedQualificationRevision = 5,
+                AdoptionId = Guid.CreateVersion7(),
+                SelectionId = selection.SelectionId,
+                BindingOrdinal = 0,
+                GenerationId = source.SourceId,
+                ExpectedGenerationRevision = 1,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                ValidUntil = now.AddMinutes(5)
             } : new AdoptModerationEventTargetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = source.Target, ExpectedQualificationRevision = 5,
-                AdoptionId = Guid.CreateVersion7(), SelectionId = selection.SelectionId, BindingOrdinal = 0,
-                GenerationId = source.SourceId, ExpectedGenerationRevision = 1,
-                CaseId = opened.CaseId, ExpectedCaseRevision = 1, ValidUntil = now.AddMinutes(5)
+                OperationId = Guid.CreateVersion7(),
+                Target = source.Target,
+                ExpectedQualificationRevision = 5,
+                AdoptionId = Guid.CreateVersion7(),
+                SelectionId = selection.SelectionId,
+                BindingOrdinal = 0,
+                GenerationId = source.SourceId,
+                ExpectedGenerationRevision = 1,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                ValidUntil = now.AddMinutes(5)
             };
             http.HttpContext!.User = new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, adopter.Id.ToString("D"))], "event-adoption-witness"));
@@ -253,9 +334,13 @@ public sealed partial class EventAuthorityPlanningProviderTests
                 privacy.Authority(setup, clock), deploymentInventory: inventory);
             var opened = new OpenModerationCaseSource
             {
-                OperationId = Guid.CreateVersion7(), Target = source.Target, ExpectedQualificationRevision = 1,
-                CaseId = Guid.CreateVersion7(), SubjectKind = ModerationSubjectKind.Content,
-                SubjectId = entity.Id, OccurrenceId = Guid.CreateVersion7()
+                OperationId = Guid.CreateVersion7(),
+                Target = source.Target,
+                ExpectedQualificationRevision = 1,
+                CaseId = Guid.CreateVersion7(),
+                SubjectKind = ModerationSubjectKind.Content,
+                SubjectId = entity.Id,
+                OccurrenceId = Guid.CreateVersion7()
             };
             await Assert.That((await new ApplyModerationQualificationCommandHandler(setupRepository)
                 .ExecuteAsync(new(opened), token)).IsSuccess).IsTrue();
@@ -293,7 +378,9 @@ public sealed partial class EventAuthorityPlanningProviderTests
             await setup.SaveChangesAsync(token);
             mutation = new ApproveModerationNoticeDisclosureSource
             {
-                OperationId = Guid.CreateVersion7(), Target = source.Target, ExpectedQualificationRevision = 3,
+                OperationId = Guid.CreateVersion7(),
+                Target = source.Target,
+                ExpectedQualificationRevision = 3,
                 Intent = new ModerationNoticeDisclosureIntent(Guid.CreateVersion7(), Guid.CreateVersion7(), decision.Id, 2,
                     opened.CaseId, 1, proposed.PolicyId, 1, published.Publication!.Id, profile.Id,
                     Guid.CreateVersion7(), new string('a', 64), new(classMeaning), new(reasonMeaning),

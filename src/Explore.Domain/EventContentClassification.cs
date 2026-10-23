@@ -81,11 +81,18 @@ public sealed class EventContentClassification
 
         return new(generation, material)
         {
-            Id = id, Revision = 1, State = ReviewState.Reviewed,
-            Categories = Array.AsReadOnly(categorySnapshot), RequiredChildren = Array.AsReadOnly(childSnapshot),
-            OwnerHumanId = ownerHumanId, OwnerControllerHumanId = ownerControllerHumanId,
-            ReviewerHumanId = reviewerHumanId, ReviewerControllerHumanId = reviewerControllerHumanId,
-            WriterGeneration = writerGeneration, ReviewedAt = now, ValidUntil = validUntil
+            Id = id,
+            Revision = 1,
+            State = ReviewState.Reviewed,
+            Categories = Array.AsReadOnly(categorySnapshot),
+            RequiredChildren = Array.AsReadOnly(childSnapshot),
+            OwnerHumanId = ownerHumanId,
+            OwnerControllerHumanId = ownerControllerHumanId,
+            ReviewerHumanId = reviewerHumanId,
+            ReviewerControllerHumanId = reviewerControllerHumanId,
+            WriterGeneration = writerGeneration,
+            ReviewedAt = now,
+            ValidUntil = validUntil
         };
     }
 

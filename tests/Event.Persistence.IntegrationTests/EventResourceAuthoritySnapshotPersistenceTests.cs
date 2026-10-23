@@ -402,13 +402,20 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             {
                 var key = new ExternalApiKey
                 {
-                    Id = Guid.CreateVersion7(), TenantId = scope.TenantAId,
-                    Name = "Public-only resource witness", KeyId = ApiKeyHashing.CreateKeyId(),
-                    SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()), Scopes = "events:read",
-                    OwnerType = ExternalApiKeyOwnerType.User, OwnerId = userId,
-                    ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = scope.TenantAId,
+                    Name = "Public-only resource witness",
+                    KeyId = ApiKeyHashing.CreateKeyId(),
+                    SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
+                    Scopes = "events:read",
+                    OwnerType = ExternalApiKeyOwnerType.User,
+                    OwnerId = userId,
+                    ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                    ExternalApiKeyStatus = null!,
                     ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
-                    ExternalApiKeyCreditPeriod = null!, CreatedAt = Now, ExpiresAt = Now.AddDays(1)
+                    ExternalApiKeyCreditPeriod = null!,
+                    CreatedAt = Now,
+                    ExpiresAt = Now.AddDays(1)
                 };
                 seed.ExternalApiKeys.Add(key);
                 principal = EventResourceMachinePrincipal.Capture(new(

@@ -33,9 +33,14 @@ public sealed class ModerationRecognitionContinuityBinding
             throw new ArgumentException("Continuity requires a distinct fresh subject and current original action contribution.");
         var binding = new ModerationRecognitionContinuityBinding
         {
-            Id = id, FreshSubjectId = freshSubjectId, CaptureItemId = item.Id,
-            CaptureMaterialReceipt = item.ComputeMaterialReceipt(), SanctionId = item.SanctionId,
-            FindingId = decision.FindingId!.Value, BoundAt = now, RetainUntil = item.RetainUntil
+            Id = id,
+            FreshSubjectId = freshSubjectId,
+            CaptureItemId = item.Id,
+            CaptureMaterialReceipt = item.ComputeMaterialReceipt(),
+            SanctionId = item.SanctionId,
+            FindingId = decision.FindingId!.Value,
+            BoundAt = now,
+            RetainUntil = item.RetainUntil
         };
         binding.ValidatePersistedState();
         return binding;

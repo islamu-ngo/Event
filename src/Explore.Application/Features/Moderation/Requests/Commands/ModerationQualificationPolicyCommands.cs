@@ -14,10 +14,16 @@ public sealed record PublishModerationQualificationPolicyCommand : ModerationQua
 
     internal override ModerationQualificationMutation ToMutation() => new PublishModerationQualificationPolicySource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, CaseId = CaseId, ExpectedCaseRevision = ExpectedCaseRevision,
-        ExpectedSourceRevision = ExpectedSourceRevision, MaximumReviewerLifetime = MaximumReviewerLifetime,
-        MaximumUrgencyLifetime = MaximumUrgencyLifetime, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        CaseId = CaseId,
+        ExpectedCaseRevision = ExpectedCaseRevision,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        MaximumReviewerLifetime = MaximumReviewerLifetime,
+        MaximumUrgencyLifetime = MaximumUrgencyLifetime,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -33,9 +39,16 @@ public sealed record AdoptModerationQualificationPolicyCommand : ModerationQuali
 
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationQualificationPolicySource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision, ExpectedWriterGeneration = ExpectedWriterGeneration,
-        AdoptionId = AdoptionId, CaseId = CaseId, ExpectedCaseRevision = ExpectedCaseRevision, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedWriterGeneration = ExpectedWriterGeneration,
+        AdoptionId = AdoptionId,
+        CaseId = CaseId,
+        ExpectedCaseRevision = ExpectedCaseRevision,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -50,8 +63,14 @@ public sealed record RevokeModerationQualificationPolicyAdoptionCommand : Modera
 
     internal override ModerationQualificationMutation ToMutation() => new RevokeModerationQualificationPolicyAdoption
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision, AdoptionId = AdoptionId,
-        ExpectedAdoptionRevision = ExpectedAdoptionRevision, CaseId = CaseId, ExpectedCaseRevision = ExpectedCaseRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision,
+        CaseId = CaseId,
+        ExpectedCaseRevision = ExpectedCaseRevision
     };
 }

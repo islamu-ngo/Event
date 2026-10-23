@@ -15,27 +15,48 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         var cause = applied.Receipt!;
         var approval = new EventResourceModerationQuarantineReview
         {
-            Id = Guid.CreateVersion7(), TenantId = cause.TenantId,
-            HostBindingId = fixture.Database.HostId, TrustDomainId = fixture.Database.Scope.TrustDomainId,
-            QuarantineId = cause.Id, EventId = cause.EventId, EventResourceId = cause.EventResourceId,
-            MaterialVersionId = cause.MaterialVersionId, CaseId = Guid.CreateVersion7(), CaseRevision = 1,
-            Step = ResourceSafetyReviewStep.ApproveSafety, PurposeId = Guid.CreateVersion7(),
-            PredecessorId = Guid.CreateVersion7(), HumanId = fixture.Database.AdministratorId,
-            ReviewerAssignmentId = Guid.CreateVersion7(), ReviewerRevision = 3,
-            ControllerHumanId = fixture.Database.AdministratorId, RequiredApprovals = 1,
-            MaximumEvidenceLifetimeTicks = TimeSpan.FromMinutes(1).Ticks, Attestation = null,
-            ResourceStamp = Guid.NewGuid(), NativeDigest = new string('A', 64),
-            RequestDigest = new string('B', 64), QualificationRevision = 1,
-            RecordedAt = Now, ValidUntil = Now.AddMinutes(1)
+            Id = Guid.CreateVersion7(),
+            TenantId = cause.TenantId,
+            HostBindingId = fixture.Database.HostId,
+            TrustDomainId = fixture.Database.Scope.TrustDomainId,
+            QuarantineId = cause.Id,
+            EventId = cause.EventId,
+            EventResourceId = cause.EventResourceId,
+            MaterialVersionId = cause.MaterialVersionId,
+            CaseId = Guid.CreateVersion7(),
+            CaseRevision = 1,
+            Step = ResourceSafetyReviewStep.ApproveSafety,
+            PurposeId = Guid.CreateVersion7(),
+            PredecessorId = Guid.CreateVersion7(),
+            HumanId = fixture.Database.AdministratorId,
+            ReviewerAssignmentId = Guid.CreateVersion7(),
+            ReviewerRevision = 3,
+            ControllerHumanId = fixture.Database.AdministratorId,
+            RequiredApprovals = 1,
+            MaximumEvidenceLifetimeTicks = TimeSpan.FromMinutes(1).Ticks,
+            Attestation = null,
+            ResourceStamp = Guid.NewGuid(),
+            NativeDigest = new string('A', 64),
+            RequestDigest = new string('B', 64),
+            QualificationRevision = 1,
+            RecordedAt = Now,
+            ValidUntil = Now.AddMinutes(1)
         };
         var release = new EventResourceModerationQuarantineRelease
         {
-            Id = Guid.CreateVersion7(), TenantId = cause.TenantId, QuarantineId = cause.Id,
-            EventId = cause.EventId, EventResourceId = cause.EventResourceId,
-            MaterialVersionId = cause.MaterialVersionId, OriginalEffectId = cause.EffectId,
-            OriginalBindingOrdinal = cause.BindingOrdinal, OriginallyAppliedAt = cause.AppliedAt,
-            ApprovalId = approval.Id, ReleasedByHumanId = fixture.Database.AdministratorId,
-            ReleasedAt = Now, RequestDigest = new string('A', 64)
+            Id = Guid.CreateVersion7(),
+            TenantId = cause.TenantId,
+            QuarantineId = cause.Id,
+            EventId = cause.EventId,
+            EventResourceId = cause.EventResourceId,
+            MaterialVersionId = cause.MaterialVersionId,
+            OriginalEffectId = cause.EffectId,
+            OriginalBindingOrdinal = cause.BindingOrdinal,
+            OriginallyAppliedAt = cause.AppliedAt,
+            ApprovalId = approval.Id,
+            ReleasedByHumanId = fixture.Database.AdministratorId,
+            ReleasedAt = Now,
+            RequestDigest = new string('A', 64)
         };
         await using (var writer = fixture.Context())
         {

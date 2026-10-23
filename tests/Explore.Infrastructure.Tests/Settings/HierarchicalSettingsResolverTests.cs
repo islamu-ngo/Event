@@ -461,7 +461,10 @@ public class HierarchicalSettingsResolverTests : IDisposable
         var deniedValue = key == GovernanceSettingKeys.Events.RequireApproval ? "true" : "false";
         SetupSystemSettings(new SystemSetting
         {
-            SettingKey = key, Value = initialValue, ValueType = SettingValueType.Boolean, IsLocked = false
+            SettingKey = key,
+            Value = initialValue,
+            ValueType = SettingValueType.Boolean,
+            IsLocked = false
         });
         SetupTenantSettings(tenantId, tenantOverride
             ? [new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = key, Value = initialValue }]
@@ -474,7 +477,10 @@ public class HierarchicalSettingsResolverTests : IDisposable
         else
             SetupSystemSettings(new SystemSetting
             {
-                SettingKey = key, Value = deniedValue, ValueType = SettingValueType.Boolean, IsLocked = false
+                SettingKey = key,
+                Value = deniedValue,
+                ValueType = SettingValueType.Boolean,
+                IsLocked = false
             });
         var refreshed = await _resolver.ResolveWithMetadataAsync(key, context);
         await Assert.That(initial!.Value).IsEqualTo(initialValue);

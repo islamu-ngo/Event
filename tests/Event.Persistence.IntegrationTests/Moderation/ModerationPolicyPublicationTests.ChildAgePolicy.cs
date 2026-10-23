@@ -81,8 +81,12 @@ public sealed partial class ModerationPolicyPublicationTests
             row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
         foreach (var id in new[] { reviewer, collection })
         {
-            var user = new User { Id = id, Pii = new UserPii
-            { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Governance", LastName = "Owner" } };
+            var user = new User
+            {
+                Id = id,
+                Pii = new UserPii
+                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Governance", LastName = "Owner" }
+            };
             context.Users.Add(user);
             context.PlatformUserRoles.Add(new PlatformUserRole
             { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
@@ -98,10 +102,17 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var record = new RecordModerationChildAgePolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(5), Terms = ChildAgeTerms(),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddMinutes(5),
+            Terms = ChildAgeTerms(),
             Ownership = new(reviewer, reviewer, collection, collection, database.AdminId,
                 "Distinct canonical controllers reviewed with conflicts excluded.",
                 "Independent privacy and legal purpose review mandate.",
@@ -159,9 +170,14 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var adopt = new AdoptModerationChildAgePolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 3,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(4)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 3,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(4)
         };
         await Assert.That((await writer.ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
         await Assert.That((await Writer(collection).ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
@@ -219,9 +235,11 @@ public sealed partial class ModerationPolicyPublicationTests
             clock.UtcNow = Now.AddMinutes(20);
             var withdraw = new WithdrawModerationChildAgePolicyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
                 ExpectedQualificationRevision = change == ChildAgeChange.WithdrawAfterExpiryAndOwnerDeparture ? 5 : 4,
-                AdoptionId = adopt.AdoptionId, ExpectedAdoptionRevision = 1
+                AdoptionId = adopt.AdoptionId,
+                ExpectedAdoptionRevision = 1
             };
             if (change == ChildAgeChange.WithdrawerRoleLostAfterSave) flush.RevokeWithdrawer = database.AdminId;
             else if (change == ChildAgeChange.WithdrawalEpochDriftAfterSave) flush.EpochDrift = change;

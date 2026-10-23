@@ -41,8 +41,11 @@ public sealed partial class ModerationCaseNarrativeCustodyTests
                 await Assert.That((await custody.QualifyAsync(database.AdministratorId,
                     new WithdrawModerationCaseNarrativeAdoption
                     {
-                        OperationId = Guid.CreateVersion7(), Target = custody.Scope, ExpectedQualificationRevision = 3,
-                        AdoptionId = adoption.Id, ExpectedAdoptionRevision = 1
+                        OperationId = Guid.CreateVersion7(),
+                        Target = custody.Scope,
+                        ExpectedQualificationRevision = 3,
+                        AdoptionId = adoption.Id,
+                        ExpectedAdoptionRevision = 1
                     })).IsSuccess).IsTrue();
             }
             await using var retiredTenant = second.Context();
@@ -183,8 +186,11 @@ public sealed partial class ModerationCaseNarrativeCustodyTests
             foreach (var id in Enumerable.Range(0, 101).Select(_ => Guid.CreateVersion7()).Append(tenantId))
                 context.Tenants.Add(new Tenant
                 {
-                    Id = id, Slug = $"erasure-{id:N}", FullName = "Narrative erasure tenant",
-                    TenantStatusId = status, TenantStatus = null!
+                    Id = id,
+                    Slug = $"erasure-{id:N}",
+                    FullName = "Narrative erasure tenant",
+                    TenantStatusId = status,
+                    TenantStatus = null!
                 });
             await context.SaveChangesAsync();
             var host = await context.ModerationHostBindings.AsNoTracking().SingleAsync();
@@ -193,9 +199,13 @@ public sealed partial class ModerationCaseNarrativeCustodyTests
                 new ModerationAuthoritySourceRepository(context, second.Admin(context), second.Machine))
                 .ExecuteAsync(new EstablishModerationAuthoritySourcesCommand
                 {
-                    HostBindingId = host.Id, TrustDomainId = host.TrustDomainId, SolutionId = host.SolutionId,
-                    InstanceId = host.InstanceId, MaintenanceServicePrincipalId = host.MaintenanceServicePrincipalId,
-                    TenantId = tenantId, EpochId = Guid.CreateVersion7()
+                    HostBindingId = host.Id,
+                    TrustDomainId = host.TrustDomainId,
+                    SolutionId = host.SolutionId,
+                    InstanceId = host.InstanceId,
+                    MaintenanceServicePrincipalId = host.MaintenanceServicePrincipalId,
+                    TenantId = tenantId,
+                    EpochId = Guid.CreateVersion7()
                 });
             await Assert.That(established.IsSuccess).IsTrue();
         }

@@ -52,20 +52,20 @@ public sealed partial class ModerationRecognitionErasureRepository
                 var sources = await RequiredEscalationSourcesAsync(authority, pending, action, ct);
                 var result = new List<Guid>();
                 foreach (var source in sources)
-                foreach (var recipient in new[] { source.PrivacyOwnerHumanId, source.RecoveryOwnerHumanId })
-                {
-                    var candidate = ModerationRecognitionEscalation.Require(
-                        Guid.CreateVersion7(), pending, action, source, recipient, clock.GetUtcNow());
-                    var existing = await Rows<ModerationRecognitionEscalation>().SingleOrDefaultAsync(row =>
-                        row.TargetId == candidate.TargetId && row.SourceId == source.Id
-                        && row.RecipientHumanId == recipient && row.Stage == candidate.Stage, ct);
-                    if (existing is null)
+                    foreach (var recipient in new[] { source.PrivacyOwnerHumanId, source.RecoveryOwnerHumanId })
                     {
-                        context.Set<ModerationRecognitionEscalation>().Add(candidate);
-                        result.Add(candidate.Id);
+                        var candidate = ModerationRecognitionEscalation.Require(
+                            Guid.CreateVersion7(), pending, action, source, recipient, clock.GetUtcNow());
+                        var existing = await Rows<ModerationRecognitionEscalation>().SingleOrDefaultAsync(row =>
+                            row.TargetId == candidate.TargetId && row.SourceId == source.Id
+                            && row.RecipientHumanId == recipient && row.Stage == candidate.Stage, ct);
+                        if (existing is null)
+                        {
+                            context.Set<ModerationRecognitionEscalation>().Add(candidate);
+                            result.Add(candidate.Id);
+                        }
+                        else if (existing.NotificationId is null) result.Add(existing.Id);
                     }
-                    else if (existing.NotificationId is null) result.Add(existing.Id);
-                }
                 await context.SaveChangesAsync(ct);
                 await CommitAsync(transaction, ct);
                 return result.ToArray();

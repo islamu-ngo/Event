@@ -101,7 +101,9 @@ public sealed class ModerationRecognitionKeyRing : IDisposable
 
             using var document = JsonDocument.Parse(secret.Value, new JsonDocumentOptions
             {
-                AllowTrailingCommas = false, CommentHandling = JsonCommentHandling.Disallow, MaxDepth = 4
+                AllowTrailingCommas = false,
+                CommentHandling = JsonCommentHandling.Disallow,
+                MaxDepth = 4
             });
             var root = document.RootElement;
             RequireProperties(root, ["version", "trustDomainId", "ringGeneration", "issuedAt", "validUntil", "keys"]);

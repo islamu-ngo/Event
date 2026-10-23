@@ -94,32 +94,37 @@ public sealed class ModerationNoticeSnapshotTests
             "approval_expired" => source with { Approval = source.Approval with { ValidUntil = Now } },
             "profile_source" => source with { CurrentProfileSource = source.CurrentProfileSource with { Revision = 2 } },
             "profile_generation" => source with
-                { CurrentProfileSource = source.CurrentProfileSource with { WriterGeneration = "generation-2" } },
+            { CurrentProfileSource = source.CurrentProfileSource with { WriterGeneration = "generation-2" } },
             "profile_id" => source with { Approval = source.Approval with { ProfileId = Id(91) } },
             "facts_missing" => source with { Approval = source.Approval with { Facts = [] } },
             "reason_meaning" => source with
-                { Approval = source.Approval with { ReasonMeaning = new("Unapproved substituted meaning") } },
+            { Approval = source.Approval with { ReasonMeaning = new("Unapproved substituted meaning") } },
             "targets_missing" => source with { Targets = [] },
             "target_source" => source with
-                { Targets = [target with { CurrentSource = target.CurrentSource with { Revision = 5 } }] },
+            { Targets = [target with { CurrentSource = target.CurrentSource with { Revision = 5 } }] },
             "target_expired" => source with { Targets = [target with { ValidUntil = Now }] },
-            "selection" => source with { SelectedContribution = source.SelectedContribution with
-                { Consequences = [new(null, target.Target with { TargetId = Id(92) })] } },
+            "selection" => source with
+            {
+                SelectedContribution = source.SelectedContribution with
+                { Consequences = [new(null, target.Target with { TargetId = Id(92) })] }
+            },
             "decision_revision" => source with
-                { Approval = source.Approval with { DecisionRevision = fixture.Decision.Revision + 1 } },
+            { Approval = source.Approval with { DecisionRevision = fixture.Decision.Revision + 1 } },
             "reviewer_case" => source with
-                { ReviewerQualification = source.ReviewerQualification with { CaseId = Id(93) } },
+            { ReviewerQualification = source.ReviewerQualification with { CaseId = Id(93) } },
             "reviewer_scope" => source with
-                { ReviewerQualification = source.ReviewerQualification with { Scope = fixture.Decision.Subject.Origin } },
+            { ReviewerQualification = source.ReviewerQualification with { Scope = fixture.Decision.Subject.Origin } },
             "reviewer_source" => source with
-                { ReviewerQualification = source.ReviewerQualification with
-                    { CurrentSource = source.ReviewerQualification.CurrentSource with { Revision = 2 } } },
+            {
+                ReviewerQualification = source.ReviewerQualification with
+                { CurrentSource = source.ReviewerQualification.CurrentSource with { Revision = 2 } }
+            },
             "reviewer_expired" => source with
-                { ReviewerQualification = source.ReviewerQualification with { ValidUntil = Now } },
+            { ReviewerQualification = source.ReviewerQualification with { ValidUntil = Now } },
             "reviewer_lifetime" => source with
-                { ReviewerQualification = source.ReviewerQualification with { MaximumLifetime = TimeSpan.Zero } },
+            { ReviewerQualification = source.ReviewerQualification with { MaximumLifetime = TimeSpan.Zero } },
             "rule_meaning" => source with
-                { Approval = source.Approval with { RuleMeaning = new("Unapproved structural rule meaning") } },
+            { Approval = source.Approval with { RuleMeaning = new("Unapproved structural rule meaning") } },
             _ => throw new ArgumentOutOfRangeException(nameof(change))
         };
         await Assert.That(Capture(fixture with { Source = changed }) is null).IsTrue();

@@ -277,7 +277,8 @@ public sealed partial class ModerationCaseNativeProofTests
     private static ModerationCaseAccessRequest BudgetSubmission(
         ModerationCaseIssuedReceipt receipt, ReadOnlyMemory<byte> material) => new(
             ModerationCaseAccessPurpose.SubmitAllegation, Guid.Empty, Guid.CreateVersion7(), 0,
-            receipt.Receipt.Id, receipt.Token) { Narrative = material };
+            receipt.Receipt.Id, receipt.Token)
+        { Narrative = material };
 
     private static async Task<ModerationCaseIssuedReceipt> IssueBudgetOccurrenceAsync(
         NativeDatabase database, string occurrence, string material)
@@ -309,10 +310,13 @@ public sealed partial class ModerationCaseNativeProofTests
         }
         var source = new RecordModerationOperationalBudgetSource
         {
-            OperationId = Guid.CreateVersion7(), Target = AuthorityScope.Tenant(
+            OperationId = Guid.CreateVersion7(),
+            Target = AuthorityScope.Tenant(
                 AuthorityScope.Instance(AuthorityScope.Solution(AuthorityScope.TrustDomain(database.TrustId),
                     host.SolutionId), host.InstanceId), database.TenantId),
-            ExpectedQualificationRevision = revision, SourceId = Guid.CreateVersion7(), OperatorHumanId = previous.OperatorHumanId,
+            ExpectedQualificationRevision = revision,
+            SourceId = Guid.CreateVersion7(),
+            OperatorHumanId = previous.OperatorHumanId,
             Terms = new(ModerationSubjectKind.Human, ModerationOperationalAction.SubmitReport, maximum, TimeSpan.FromHours(1)),
             ValidUntil = database.Clock.Now.Add(validity ?? TimeSpan.FromHours(2))
         };
@@ -320,9 +324,14 @@ public sealed partial class ModerationCaseNativeProofTests
         var adoptionId = Guid.CreateVersion7();
         await WriteAsync(new NativeCaller(source.OperatorHumanId), new AdoptModerationOperationalBudgetSource
         {
-            OperationId = Guid.CreateVersion7(), Target = source.Target, ExpectedQualificationRevision = revision + 1,
-            SourceId = source.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = revision + 1,
-            AdoptionId = adoptionId, ValidUntil = source.ValidUntil
+            OperationId = Guid.CreateVersion7(),
+            Target = source.Target,
+            ExpectedQualificationRevision = revision + 1,
+            SourceId = source.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = revision + 1,
+            AdoptionId = adoptionId,
+            ValidUntil = source.ValidUntil
         });
         return (source.SourceId, adoptionId, source.ValidUntil);
 

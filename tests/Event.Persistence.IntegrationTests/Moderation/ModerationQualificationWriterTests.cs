@@ -136,8 +136,12 @@ public sealed partial class ModerationQualificationWriterTests
         }
         var response = new RecordModerationCaseResponse
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            EvidenceId = Guid.CreateVersion7(), CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            EvidenceId = Guid.CreateVersion7(),
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
             Statement = "I dispute the recorded occurrence."
         };
         var accepted = await database.ExecuteAsync(database.SubjectId, response);
@@ -157,8 +161,12 @@ public sealed partial class ModerationQualificationWriterTests
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, opened)).IsSuccess).IsTrue();
         var denied = await database.ExecuteAsync(database.AdministratorId, new RecordModerationCaseResponse
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            EvidenceId = Guid.CreateVersion7(), CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            EvidenceId = Guid.CreateVersion7(),
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
             Statement = "An administrator cannot author this subject response."
         });
         await Assert.That(denied.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
@@ -177,7 +185,8 @@ public sealed partial class ModerationQualificationWriterTests
             .IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         var replacement = adoption with
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 2,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 2,
             ExpectedPublicationId = adoption.Proposed.PublicationId,
             Proposed = adoption.Proposed with { ExpectedRevision = 1, PublicationId = Guid.CreateVersion7() }
         };
@@ -185,11 +194,13 @@ public sealed partial class ModerationQualificationWriterTests
             .IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         var changed = replacement with
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 3,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 3,
             ExpectedPublicationId = replacement.Proposed.PublicationId,
             Proposed = replacement.Proposed with
             {
-                ExpectedRevision = 2, PublicationId = Guid.CreateVersion7(),
+                ExpectedRevision = 2,
+                PublicationId = Guid.CreateVersion7(),
                 Reasons = [replacement.Proposed.Reasons.Single() with { Meaning = "A silently changed adopted meaning." }]
             }
         };
@@ -249,22 +260,36 @@ public sealed partial class ModerationQualificationWriterTests
         var assignmentId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AssignModerationReviewerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            AssignmentId = assignmentId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            AssignmentId = assignmentId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
             ReviewerHumanId = database.ReviewerId
         })).IsSuccess).IsTrue();
         ModerationQualificationMutation Lease(bool urgent, long generation) => urgent
             ? new QualifyModerationCaseUrgency
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                CaseId = opened.CaseId, ExpectedCaseRevision = 1, EvidenceId = Guid.CreateVersion7(),
-                Justification = "Case urgency requires its own adopted lease.", ValidUntil = Now.AddMinutes(30)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                EvidenceId = Guid.CreateVersion7(),
+                Justification = "Case urgency requires its own adopted lease.",
+                ValidUntil = Now.AddMinutes(30)
             }
             : new QualifyModerationReviewerController
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                AssignmentId = assignmentId, ExpectedAssignmentRevision = 1, ControllerHumanId = database.ReviewerId,
-                EvidenceId = Guid.CreateVersion7(), Justification = "Controller qualification requires its own adopted lease.",
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                AssignmentId = assignmentId,
+                ExpectedAssignmentRevision = 1,
+                ControllerHumanId = database.ReviewerId,
+                EvidenceId = Guid.CreateVersion7(),
+                Justification = "Controller qualification requires its own adopted lease.",
                 QualifiedUntil = Now.AddMinutes(30)
             };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, Lease(!urgency, 4))).FailureCode)
@@ -296,9 +321,14 @@ public sealed partial class ModerationQualificationWriterTests
             database.GovernanceAvailable = false;
         var rejected = await database.ExecuteAsync(database.AdministratorId, new QualifyModerationCaseUrgency
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            CaseId = opened.CaseId, ExpectedCaseRevision = 1, EvidenceId = Guid.CreateVersion7(),
-            Justification = "Authoring cannot replace independent procedural adoption.", ValidUntil = Now.AddMinutes(10)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            EvidenceId = Guid.CreateVersion7(),
+            Justification = "Authoring cannot replace independent procedural adoption.",
+            ValidUntil = Now.AddMinutes(10)
         });
         await Assert.That(rejected.FailureCode).IsEqualTo("ModerationAuthorityUnavailable");
         await using var reader = database.Context();
@@ -318,9 +348,14 @@ public sealed partial class ModerationQualificationWriterTests
         var operationId = Guid.CreateVersion7();
         var rejected = await database.ExecuteAsync(database.AdministratorId, new QualifyModerationCaseUrgency
         {
-            OperationId = operationId, Target = database.Scope, ExpectedQualificationRevision = 2,
-            CaseId = opened.CaseId, ExpectedCaseRevision = 1, EvidenceId = Guid.CreateVersion7(),
-            Justification = "The missing owner cannot commit a flushed prefix.", ValidUntil = Now.AddMinutes(10)
+            OperationId = operationId,
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            EvidenceId = Guid.CreateVersion7(),
+            Justification = "The missing owner cannot commit a flushed prefix.",
+            ValidUntil = Now.AddMinutes(10)
         });
         await Assert.That(rejected.FailureCode).IsEqualTo("ModerationAuthorityUnavailable");
         await Assert.That(rejected.Revision).IsNull();
@@ -344,9 +379,14 @@ public sealed partial class ModerationQualificationWriterTests
         var operationId = Guid.CreateVersion7();
         var rejected = await database.ExecuteAsync(database.AdministratorId, new QualifyModerationCaseUrgency
         {
-            OperationId = operationId, Target = database.Scope, ExpectedQualificationRevision = 2,
-            CaseId = opened.CaseId, ExpectedCaseRevision = 1, EvidenceId = evidenceId,
-            Justification = "Acquired policy validity must survive the committing flush.", ValidUntil = Now.AddMinutes(10)
+            OperationId = operationId,
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            EvidenceId = evidenceId,
+            Justification = "Acquired policy validity must survive the committing flush.",
+            ValidUntil = Now.AddMinutes(10)
         });
         await Assert.That(rejected.FailureCode).IsEqualTo("ModerationAuthorityUnavailable");
         await Assert.That(rejected.Revision).IsNull();
@@ -367,24 +407,38 @@ public sealed partial class ModerationQualificationWriterTests
         var assignmentId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AssignModerationReviewerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            AssignmentId = assignmentId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            AssignmentId = assignmentId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
             ReviewerHumanId = database.ReviewerId
         })).IsSuccess).IsTrue();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new QualifyModerationReviewerController
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            AssignmentId = assignmentId, ExpectedAssignmentRevision = 1, ControllerHumanId = database.ReviewerId,
-            EvidenceId = Guid.CreateVersion7(), Justification = "The original controller qualification lasts thirty minutes.",
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            AssignmentId = assignmentId,
+            ExpectedAssignmentRevision = 1,
+            ControllerHumanId = database.ReviewerId,
+            EvidenceId = Guid.CreateVersion7(),
+            Justification = "The original controller qualification lasts thirty minutes.",
             QualifiedUntil = Now.AddMinutes(30)
         })).IsSuccess).IsTrue();
         database.EvaluationTime = Now.AddMinutes(25);
         database.ReviewerLifetime = database.ApprovedReviewerLifetime = TimeSpan.FromMinutes(10);
         var rejected = await database.ExecuteAsync(database.AdministratorId, new AssessModerationReviewerConflict
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            AssignmentId = assignmentId, ExpectedAssignmentRevision = 2, State = ModerationReviewerConflictState.Independent,
-            EvidenceId = Guid.CreateVersion7(), Justification = "Only five minutes remain, but the original lease exceeds current policy."
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            AssignmentId = assignmentId,
+            ExpectedAssignmentRevision = 2,
+            State = ModerationReviewerConflictState.Independent,
+            EvidenceId = Guid.CreateVersion7(),
+            Justification = "Only five minutes remain, but the original lease exceeds current policy."
         });
         await Assert.That(rejected.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
         await using var reader = database.Context();
@@ -408,33 +462,50 @@ public sealed partial class ModerationQualificationWriterTests
         var assignmentId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AssignModerationReviewerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            AssignmentId = assignmentId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            AssignmentId = assignmentId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
             ReviewerHumanId = database.ReviewerId
         })).IsSuccess).IsTrue();
         var identityId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new QualifyModerationReviewerController
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            AssignmentId = assignmentId, ExpectedAssignmentRevision = 1, ControllerHumanId = database.ReviewerId,
-            EvidenceId = identityId, Justification = "Independent qualification of the existing controller.",
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            AssignmentId = assignmentId,
+            ExpectedAssignmentRevision = 1,
+            ControllerHumanId = database.ReviewerId,
+            EvidenceId = identityId,
+            Justification = "Independent qualification of the existing controller.",
             QualifiedUntil = Now.AddMinutes(30)
         })).IsSuccess).IsTrue();
         if (assessed)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AssessModerationReviewerConflict
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-                AssignmentId = assignmentId, ExpectedAssignmentRevision = 2,
-                State = ModerationReviewerConflictState.Independent, EvidenceId = Guid.CreateVersion7(),
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 5,
+                AssignmentId = assignmentId,
+                ExpectedAssignmentRevision = 2,
+                State = ModerationReviewerConflictState.Independent,
+                EvidenceId = Guid.CreateVersion7(),
                 Justification = "Independent conflict assessment of the existing controller."
             })).IsSuccess).IsTrue();
         var operationId = Guid.CreateVersion7();
         var evidenceId = Guid.CreateVersion7();
         var denied = await database.ExecuteAsync(database.AdministratorId, new QualifyModerationReviewerController
         {
-            OperationId = operationId, Target = database.Scope, ExpectedQualificationRevision = assessed ? 6 : 5,
-            AssignmentId = assignmentId, ExpectedAssignmentRevision = assessed ? 3 : 2,
-            ControllerHumanId = database.AdministratorId, EvidenceId = evidenceId,
+            OperationId = operationId,
+            Target = database.Scope,
+            ExpectedQualificationRevision = assessed ? 6 : 5,
+            AssignmentId = assignmentId,
+            ExpectedAssignmentRevision = assessed ? 3 : 2,
+            ControllerHumanId = database.AdministratorId,
+            EvidenceId = evidenceId,
             Justification = "The proposed controller attempts to certify their own identity.",
             QualifiedUntil = Now.AddMinutes(30)
         });
@@ -462,15 +533,24 @@ public sealed partial class ModerationQualificationWriterTests
         var assignmentId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AssignModerationReviewerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            AssignmentId = assignmentId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            AssignmentId = assignmentId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
             ReviewerHumanId = database.ReviewerId
         })).IsSuccess).IsTrue();
         var denied = await database.ExecuteAsync(database.ReviewerId, new QualifyModerationReviewerController
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            AssignmentId = assignmentId, ExpectedAssignmentRevision = 1, ControllerHumanId = database.ReviewerId,
-            EvidenceId = Guid.CreateVersion7(), Justification = "Attempted self-qualification.",
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            AssignmentId = assignmentId,
+            ExpectedAssignmentRevision = 1,
+            ControllerHumanId = database.ReviewerId,
+            EvidenceId = Guid.CreateVersion7(),
+            Justification = "Attempted self-qualification.",
             QualifiedUntil = Now.AddMinutes(30)
         });
         await Assert.That(denied.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
@@ -510,14 +590,22 @@ public sealed partial class ModerationQualificationWriterTests
         var evidenceOperationId = Guid.CreateVersion7();
         ModerationQualificationMutation evidence = urgent ? new QualifyModerationCaseUrgency
         {
-            OperationId = evidenceOperationId, Target = database.Scope, ExpectedQualificationRevision = 3,
-            EvidenceId = responseId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+            OperationId = evidenceOperationId,
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            EvidenceId = responseId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
             Justification = "An independent native assessor qualifies the bounded urgent case.",
             ValidUntil = Now.AddMinutes(30)
         } : new RecordModerationCaseResponse
         {
-            OperationId = evidenceOperationId, Target = database.Scope, ExpectedQualificationRevision = 3,
-            EvidenceId = responseId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+            OperationId = evidenceOperationId,
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            EvidenceId = responseId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
             Statement = "The actual subject responds before the final finding."
         };
         await Assert.That((await database.ExecuteAsync(
@@ -525,24 +613,38 @@ public sealed partial class ModerationQualificationWriterTests
         var assignmentId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AssignModerationReviewerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            AssignmentId = assignmentId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            AssignmentId = assignmentId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
             ReviewerHumanId = database.ReviewerId
         })).IsSuccess).IsTrue();
         var controllerEvidenceId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new QualifyModerationReviewerController
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            AssignmentId = assignmentId, ExpectedAssignmentRevision = 1, ControllerHumanId = database.ReviewerId,
-            EvidenceId = controllerEvidenceId, Justification = "The independent native assessor records canonical control.",
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            AssignmentId = assignmentId,
+            ExpectedAssignmentRevision = 1,
+            ControllerHumanId = database.ReviewerId,
+            EvidenceId = controllerEvidenceId,
+            Justification = "The independent native assessor records canonical control.",
             QualifiedUntil = Now.AddMinutes(30)
         })).IsSuccess).IsTrue();
         var conflictEvidenceId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AssessModerationReviewerConflict
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-            AssignmentId = assignmentId, ExpectedAssignmentRevision = 2, State = ModerationReviewerConflictState.Independent,
-            EvidenceId = conflictEvidenceId, Justification = "The native assessor records the current case-specific independence."
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 6,
+            AssignmentId = assignmentId,
+            ExpectedAssignmentRevision = 2,
+            State = ModerationReviewerConflictState.Independent,
+            EvidenceId = conflictEvidenceId,
+            Justification = "The native assessor records the current case-specific independence."
         })).IsSuccess).IsTrue();
         if (withdrawnQualification != 0)
         {
@@ -561,7 +663,8 @@ public sealed partial class ModerationQualificationWriterTests
         {
             var replacement = adoption with
             {
-                OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 7,
+                OperationId = Guid.CreateVersion7(),
+                ExpectedQualificationRevision = 7,
                 ExpectedPublicationId = adoption.Proposed.PublicationId,
                 Proposed = adoption.Proposed with { ExpectedRevision = 1, PublicationId = Guid.CreateVersion7() }
             };
@@ -586,9 +689,14 @@ public sealed partial class ModerationQualificationWriterTests
         var rule = adoption.Proposed.Profiles.Single();
         var finalization = new FinalizeModerationFindingSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = findingGeneration,
-            FindingId = findingId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-            PolicyId = adoption.Proposed.PolicyId, ExpectedPolicyRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = findingGeneration,
+            FindingId = findingId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            PolicyId = adoption.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
             Rule = publicationChange == 2 ? rule.Reason : rule.Rule,
             Reason = publicationChange switch
             {
@@ -598,7 +706,8 @@ public sealed partial class ModerationQualificationWriterTests
                 9 => ModerationRuleReference.Create(rule.Reason.OwnerId, "different-reason", rule.Reason.Revision),
                 _ => rule.Reason
             },
-            EvidenceId = responseId, Justification = "The qualified native reviewer finalizes the adopted rule finding."
+            EvidenceId = responseId,
+            Justification = "The qualified native reviewer finalizes the adopted rule finding."
         };
         if (withdrawnQualification == 0 && publicationChange == 0)
         {
@@ -607,7 +716,8 @@ public sealed partial class ModerationQualificationWriterTests
             await Assert.That(selfAdjudication.IsSuccess).IsFalse();
             var foreignTenant = await database.ExecuteAsync(database.ReviewerId, finalization with
             {
-                OperationId = Guid.CreateVersion7(), Target = AuthorityScope.Tenant(database.Instance, Guid.CreateVersion7())
+                OperationId = Guid.CreateVersion7(),
+                Target = AuthorityScope.Tenant(database.Instance, Guid.CreateVersion7())
             });
             await Assert.That(foreignTenant.IsSuccess).IsFalse();
             await using var beforeFinding = database.Context();
@@ -652,11 +762,13 @@ public sealed partial class ModerationQualificationWriterTests
         };
         var replacementPublication = await database.PublishAsync(database.AdministratorId, adoption with
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 8,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 8,
             ExpectedPublicationId = adoption.Proposed.PublicationId,
             Proposed = adoption.Proposed with
             {
-                ExpectedRevision = 1, PublicationId = Guid.CreateVersion7(),
+                ExpectedRevision = 1,
+                PublicationId = Guid.CreateVersion7(),
                 Reasons = adoption.Proposed.Reasons.Add(adoption.Proposed.Reasons.Single() with
                 {
                     Reference = replacementReason,
@@ -673,8 +785,12 @@ public sealed partial class ModerationQualificationWriterTests
         var reversalId = Guid.CreateVersion7();
         var reversal = new ReverseModerationFindingSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 9,
-            FindingId = findingId, ExpectedFindingRevision = 1, ReversalReferenceId = reversalId,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 9,
+            FindingId = findingId,
+            ExpectedFindingRevision = 1,
+            ReversalReferenceId = reversalId,
             Justification = "The native correction preserves the adjudication and its response."
         };
         var selfReversal = await database.ExecuteAsync(database.SubjectId,
@@ -736,20 +852,29 @@ public sealed partial class ModerationQualificationWriterTests
                 FinalizeModerationFindingSource finding => await new FinalizeModerationFindingCommandHandler(repository)
                     .ExecuteAsync(new()
                     {
-                        OperationId = finding.OperationId, Target = finding.Target,
+                        OperationId = finding.OperationId,
+                        Target = finding.Target,
                         ExpectedQualificationRevision = finding.ExpectedQualificationRevision,
-                        FindingId = finding.FindingId, CaseId = finding.CaseId, ExpectedCaseRevision = finding.ExpectedCaseRevision,
-                        PolicyId = finding.PolicyId, ExpectedPolicyRevision = finding.ExpectedPolicyRevision,
-                        Rule = finding.Rule, Reason = finding.Reason, EvidenceId = finding.EvidenceId,
+                        FindingId = finding.FindingId,
+                        CaseId = finding.CaseId,
+                        ExpectedCaseRevision = finding.ExpectedCaseRevision,
+                        PolicyId = finding.PolicyId,
+                        ExpectedPolicyRevision = finding.ExpectedPolicyRevision,
+                        Rule = finding.Rule,
+                        Reason = finding.Reason,
+                        EvidenceId = finding.EvidenceId,
                         Justification = finding.Justification
                     }),
                 ReverseModerationFindingSource finding => await new ReverseModerationFindingCommandHandler(repository)
                     .ExecuteAsync(new()
                     {
-                        OperationId = finding.OperationId, Target = finding.Target,
+                        OperationId = finding.OperationId,
+                        Target = finding.Target,
                         ExpectedQualificationRevision = finding.ExpectedQualificationRevision,
-                        FindingId = finding.FindingId, ExpectedFindingRevision = finding.ExpectedFindingRevision,
-                        ReversalReferenceId = finding.ReversalReferenceId, Justification = finding.Justification
+                        FindingId = finding.FindingId,
+                        ExpectedFindingRevision = finding.ExpectedFindingRevision,
+                        ReversalReferenceId = finding.ReversalReferenceId,
+                        Justification = finding.Justification
                     }),
                 _ => await new ApplyModerationQualificationCommandHandler(repository).ExecuteAsync(new(mutation))
             };

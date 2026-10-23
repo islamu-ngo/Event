@@ -285,14 +285,18 @@ public sealed partial class ModerationPolicyPublicationTests
             await Assert.That((await fixture.Writer(fixture.Database.AdminId).ExecuteAsync(
                 new WithdrawModerationChildAgePolicyAdoption
                 {
-                    OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope,
-                    ExpectedQualificationRevision = 6, AdoptionId = fixture.ParentAdoption.AdoptionId,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = fixture.Database.Scope,
+                    ExpectedQualificationRevision = 6,
+                    AdoptionId = fixture.ParentAdoption.AdoptionId,
                     ExpectedAdoptionRevision = 1
                 })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         if (change == "latest-unadopted-procedure")
             await Assert.That((await fixture.Writer(fixture.OwnerId).ExecuteAsync(fixture.Record with
             {
-                OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), ExpectedQualificationRevision = 6
+                OperationId = Guid.CreateVersion7(),
+                SourceId = Guid.CreateVersion7(),
+                ExpectedQualificationRevision = 6
             })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         if (change == "original-source-changed")
             await context.Set<ModerationProfileCollectionProcedureSource>().Where(row => row.Id == fixture.Record.SourceId)
@@ -370,8 +374,11 @@ public sealed partial class ModerationPolicyPublicationTests
         new(fixture.Age.ProfileId, fixture.Age.Mode);
 
     private static HttpContextAccessor ObservationPrincipal(IndividualPolicyFixture fixture, bool provider) =>
-        new() { HttpContext = new DefaultHttpContext
-        { User = provider ? fixture.ProviderPrincipal() : IndividualPrincipal(fixture.SubjectId) } };
+        new()
+        {
+            HttpContext = new DefaultHttpContext
+            { User = provider ? fixture.ProviderPrincipal() : IndividualPrincipal(fixture.SubjectId) }
+        };
 
     private static ModerationProfileCollectionSubjectObservationOwner ObservationOwner(
         IndividualPolicyFixture fixture, HttpContextAccessor http, IPrivacyIdentityFenceAuthority? privacy = null) =>

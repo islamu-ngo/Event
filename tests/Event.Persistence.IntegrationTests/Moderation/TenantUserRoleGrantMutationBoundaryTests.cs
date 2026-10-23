@@ -255,8 +255,16 @@ public sealed class TenantUserRoleGrantMutationBoundaryTests
 
     private static TenantUserRoleGrant Grant(Guid tenant, Guid membership, int role, Guid actor) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, TenantUserId = membership, TenantUser = null!,
-        RoleId = role, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow, GrantedBy = actor
+        Id = Guid.CreateVersion7(),
+        TenantId = tenant,
+        Tenant = null!,
+        TenantUserId = membership,
+        TenantUser = null!,
+        RoleId = role,
+        Role = null!,
+        RoleScopeId = (int)RoleScopeEnum.Tenant,
+        GrantedAt = DateTime.UtcNow,
+        GrantedBy = actor
     };
 
     private static Task<long> RevisionAsync(ExploreDbContext context) => context.ModerationQualificationEpochs.AsNoTracking()

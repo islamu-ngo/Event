@@ -33,7 +33,8 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         await using var services = DrainServices(fixture, tenants, machines);
         await services.GetRequiredService<ModerationEffectOutboxDispatcher>().DispatchAsync(new OutboxMessage
         {
-            Id = fixture.EffectId, AggregateId = fixture.EffectId,
+            Id = fixture.EffectId,
+            AggregateId = fixture.EffectId,
             AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
             EventType = ModerationEffectOutboxMessageFactory.EventType
         });

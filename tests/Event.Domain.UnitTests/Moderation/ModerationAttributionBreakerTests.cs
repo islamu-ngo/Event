@@ -109,7 +109,10 @@ public class ModerationAttributionBreakerTests
             Id = id,
             Pii = new UserPii
             {
-                UserId = id, Email = "shared@example.invalid", FirstName = "Fixture", LastName = "Human"
+                UserId = id,
+                Email = "shared@example.invalid",
+                FirstName = "Fixture",
+                LastName = "Human"
             }
         };
     }

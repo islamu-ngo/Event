@@ -88,8 +88,10 @@ public sealed partial class ModerationPolicyPublicationTests
             .ObserveAsync(ObservationIntent(fixture)))!;
         var actor = change switch
         {
-            "subject" => fixture.SubjectId, "reviewer" => fixture.ReviewerId,
-            "administrator" => fixture.Database.AdminId, "other" => fixture.OtherSubjectId,
+            "subject" => fixture.SubjectId,
+            "reviewer" => fixture.ReviewerId,
+            "administrator" => fixture.Database.AdminId,
+            "other" => fixture.OtherSubjectId,
             _ => fixture.OwnerId
         };
         var request = AssessmentRecord(observation, []);
@@ -104,11 +106,17 @@ public sealed partial class ModerationPolicyPublicationTests
             "procedure-adoption" => request with { Original = original with { ProcedureAdoptionId = fixture.Adopt.AdoptionId } },
             "slot-cas" => request with { ExpectedGeneration = 1 },
             "null-required" => request with { Required = null! },
-            "duplicate-required" => request with { Required = [ModerationCollectionPrerequisiteKind.SubjectConsent,
-                ModerationCollectionPrerequisiteKind.SubjectConsent] },
+            "duplicate-required" => request with
+            {
+                Required = [ModerationCollectionPrerequisiteKind.SubjectConsent,
+                ModerationCollectionPrerequisiteKind.SubjectConsent]
+            },
             "unknown-required" => request with { Required = [(ModerationCollectionPrerequisiteKind)999] },
-            "too-many-required" => request with { Required = [.. AllAssessmentRequirements(),
-                ModerationCollectionPrerequisiteKind.SubjectConsent] },
+            "too-many-required" => request with
+            {
+                Required = [.. AllAssessmentRequirements(),
+                ModerationCollectionPrerequisiteKind.SubjectConsent]
+            },
             _ => request
         };
         await Assert.That(await ApplicabilityOwner(fixture, await ApplicabilityActorAsync(fixture, actor, false))
@@ -155,8 +163,10 @@ public sealed partial class ModerationPolicyPublicationTests
             .RecordAsync(AssessmentRecord(observation, [])))!;
         var actor = change switch
         {
-            "owner" => fixture.OwnerId, "subject" => fixture.SubjectId,
-            "administrator" => fixture.Database.AdminId, "other" => fixture.OtherSubjectId,
+            "owner" => fixture.OwnerId,
+            "subject" => fixture.SubjectId,
+            "administrator" => fixture.Database.AdminId,
+            "other" => fixture.OtherSubjectId,
             _ => fixture.ReviewerId
         };
         var request = AssessmentAdopt(observation, source);
@@ -187,8 +197,13 @@ public sealed partial class ModerationPolicyPublicationTests
         var firstIntent = AssessmentRecord(observation, []);
         var first = (await owner.RecordAsync(firstIntent))!;
         await Assert.That(await owner.RecordAsync(firstIntent with { SourceId = Guid.CreateVersion7() })).IsNull();
-        var secondIntent = firstIntent with { SourceId = Guid.CreateVersion7(), ExpectedGeneration = 1,
-            Required = [ModerationCollectionPrerequisiteKind.SubjectConsent], ValidUntil = Now.AddMinutes(2) };
+        var secondIntent = firstIntent with
+        {
+            SourceId = Guid.CreateVersion7(),
+            ExpectedGeneration = 1,
+            Required = [ModerationCollectionPrerequisiteKind.SubjectConsent],
+            ValidUntil = Now.AddMinutes(2)
+        };
         var second = (await owner.RecordAsync(secondIntent))!;
         await Assert.That(second.Generation).IsEqualTo(2L);
         var reviewer = ApplicabilityOwner(fixture, await ApplicabilityActorAsync(fixture, fixture.ReviewerId, false));
@@ -227,30 +242,42 @@ public sealed partial class ModerationPolicyPublicationTests
         // canonical controller is this non-admin subject, which must still forbid self-review.
         var age = fixture.Age with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), ExpectedQualificationRevision = 6,
+            OperationId = Guid.CreateVersion7(),
+            SourceId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 6,
             Ownership = fixture.Age.Ownership with { ReviewerControllerHumanId = fixture.SubjectId }
         };
         await Assert.That((await fixture.Writer(fixture.Database.AdminId).ExecuteAsync(age)).Outcome)
             .IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var parent = fixture.ParentAdoption with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = age.SourceId, ExpectedSourceWriterGeneration = 7,
-            ExpectedQualificationRevision = 7, AdoptionId = Guid.CreateVersion7()
+            OperationId = Guid.CreateVersion7(),
+            SourceId = age.SourceId,
+            ExpectedSourceWriterGeneration = 7,
+            ExpectedQualificationRevision = 7,
+            AdoptionId = Guid.CreateVersion7()
         };
         await Assert.That((await fixture.Writer(fixture.ReviewerId).ExecuteAsync(parent)).Outcome)
             .IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var procedure = fixture.Record with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), ExpectedQualificationRevision = 8,
-            ChildAgeSourceId = age.SourceId, ExpectedChildAgeSourceWriterGeneration = 7,
-            ChildAgeAdoptionId = parent.AdoptionId, ExpectedChildAgeAdoptionWriterGeneration = 8
+            OperationId = Guid.CreateVersion7(),
+            SourceId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 8,
+            ChildAgeSourceId = age.SourceId,
+            ExpectedChildAgeSourceWriterGeneration = 7,
+            ChildAgeAdoptionId = parent.AdoptionId,
+            ExpectedChildAgeAdoptionWriterGeneration = 8
         };
         await Assert.That((await fixture.Writer(fixture.OwnerId).ExecuteAsync(procedure)).Outcome)
             .IsEqualTo(ModerationQualificationWriteOutcome.Known);
         await Assert.That((await fixture.Writer(fixture.ReviewerId).ExecuteAsync(fixture.Adopt with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = procedure.SourceId, ExpectedSourceWriterGeneration = 9,
-            ExpectedQualificationRevision = 9, AdoptionId = Guid.CreateVersion7()
+            OperationId = Guid.CreateVersion7(),
+            SourceId = procedure.SourceId,
+            ExpectedSourceWriterGeneration = 9,
+            ExpectedQualificationRevision = 9,
+            AdoptionId = Guid.CreateVersion7()
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var observation = (await ObservationOwner(fixture, ObservationPrincipal(fixture, false))
             .ObserveAsync(ObservationIntent(fixture)))!;
@@ -299,8 +326,12 @@ public sealed partial class ModerationPolicyPublicationTests
         var adoption = (await reviewer.AdoptAsync(accept))!;
         fixture.Clock.UtcNow = Now.AddMinutes(1);
         await Assert.That(await reviewer.AdoptAsync(accept)).IsNull();
-        await Assert.That(await reviewer.AdoptAsync(accept with { AdoptionId = Guid.CreateVersion7(),
-            ExpectedGeneration = 2, ValidUntil = source.ValidUntil })).IsNull();
+        await Assert.That(await reviewer.AdoptAsync(accept with
+        {
+            AdoptionId = Guid.CreateVersion7(),
+            ExpectedGeneration = 2,
+            ValidUntil = source.ValidUntil
+        })).IsNull();
         await Assert.That(await ApplicabilityOwner(fixture, ownerHttp).RecordAsync(intent with
         { SourceId = Guid.CreateVersion7(), ExpectedGeneration = 2 })).IsNull();
         var retained = await fixture.Context.Set<ModerationProfileCollectionAssessmentAdoption>().AsNoTracking().SingleAsync();
@@ -504,8 +535,11 @@ public sealed partial class ModerationPolicyPublicationTests
         if (change == "parent")
             await Assert.That((await fixture.Writer(fixture.Database.AdminId).ExecuteAsync(new WithdrawModerationChildAgePolicyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope, ExpectedQualificationRevision = 8,
-                AdoptionId = fixture.ParentAdoption.AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Database.Scope,
+                ExpectedQualificationRevision = 8,
+                AdoptionId = fixture.ParentAdoption.AdoptionId,
+                ExpectedAdoptionRevision = 1
             })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         if (change == "privacy")
         {
@@ -556,14 +590,27 @@ public sealed partial class ModerationPolicyPublicationTests
 
     private static RecordModerationProfileCollectionAssessment AssessmentRecord(
         ModerationProfileCollectionSubjectObservation observation, IReadOnlyList<ModerationCollectionPrerequisiteKind> required) =>
-        new() { Original = AssessmentOriginal(observation), SourceId = Guid.CreateVersion7(),
-            ExpectedGeneration = 0, Required = required, ValidUntil = Now.AddMinutes(4) };
+        new()
+        {
+            Original = AssessmentOriginal(observation),
+            SourceId = Guid.CreateVersion7(),
+            ExpectedGeneration = 0,
+            Required = required,
+            ValidUntil = Now.AddMinutes(4)
+        };
 
     private static AdoptModerationProfileCollectionAssessment AssessmentAdopt(
         ModerationProfileCollectionSubjectObservation observation, ModerationProfileCollectionAssessmentSource source) =>
-        new() { Original = AssessmentOriginal(observation), SourceId = source.Id, ExpectedSourceRevision = source.Revision,
-            ExpectedSourceGeneration = source.Generation, ExpectedGeneration = source.Generation,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(3) };
+        new()
+        {
+            Original = AssessmentOriginal(observation),
+            SourceId = source.Id,
+            ExpectedSourceRevision = source.Revision,
+            ExpectedSourceGeneration = source.Generation,
+            ExpectedGeneration = source.Generation,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(3)
+        };
 
     private static ModerationProfileCollectionAssessmentRepository ApplicabilityOwner(
         IndividualPolicyFixture fixture, HttpContextAccessor http, IPrivacyIdentityFenceAuthority? privacy = null) =>
@@ -581,14 +628,21 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             fixture.Context.UserExternalLogins.Add(new()
             {
-                Id = Guid.CreateVersion7(), UserId = actor, User = null!,
-                AuthenticationProviderId = (int)account.ProviderKind, AuthenticationProvider = null!, ProviderKey = account.Value
+                Id = Guid.CreateVersion7(),
+                UserId = actor,
+                User = null!,
+                AuthenticationProviderId = (int)account.ProviderKind,
+                AuthenticationProvider = null!,
+                ProviderKey = account.Value
             });
             await fixture.Context.SaveChangesAsync();
             fixture.Context.ChangeTracker.Clear();
         }
-        return new() { HttpContext = new DefaultHttpContext
-        { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", subject), new Claim("iss", issuer)], "assessment-actor")) } };
+        return new()
+        {
+            HttpContext = new DefaultHttpContext
+            { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", subject), new Claim("iss", issuer)], "assessment-actor")) }
+        };
     }
 
     private static async Task AssessmentVocabularyAsync(IndividualPolicyFixture fixture, bool relationship = true, bool consent = true)
@@ -603,7 +657,9 @@ public sealed partial class ModerationPolicyPublicationTests
         if (consent) fields.Add(ModerationProfilePreliminaryFieldKind.GuardianConsentReference);
         var record = fixture.Record with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), ExpectedQualificationRevision = 6,
+            OperationId = Guid.CreateVersion7(),
+            SourceId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 6,
             Procedure = new(ModerationIndividualPurpose.ProfileCompletion,
                 ModerationProfileCollectionApplicability.NativeIndependentlyAcceptedAssessment, fields,
                 [ModerationProfileNormalFieldKind.DateOfBirth], "Independent relationship review.", "Independent manual qualification.")
@@ -611,8 +667,11 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That((await fixture.Writer(fixture.OwnerId).ExecuteAsync(record)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         await Assert.That((await fixture.Writer(fixture.ReviewerId).ExecuteAsync(fixture.Adopt with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = record.SourceId, ExpectedSourceWriterGeneration = 7,
-            ExpectedQualificationRevision = 7, AdoptionId = Guid.CreateVersion7()
+            OperationId = Guid.CreateVersion7(),
+            SourceId = record.SourceId,
+            ExpectedSourceWriterGeneration = 7,
+            ExpectedQualificationRevision = 7,
+            AdoptionId = Guid.CreateVersion7()
         })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
     }
 }

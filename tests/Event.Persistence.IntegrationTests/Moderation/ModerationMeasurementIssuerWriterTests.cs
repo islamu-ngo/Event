@@ -19,8 +19,11 @@ public sealed class ModerationMeasurementIssuerWriterTests
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, request)).IsSuccess).IsTrue();
         var revoke = new RevokeModerationMeasurementIssuerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            EnrollmentId = request.EnrollmentId, ExpectedEnrollmentRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            EnrollmentId = request.EnrollmentId,
+            ExpectedEnrollmentRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, revoke)).IsSuccess).IsTrue();
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, revoke)).IsSuccess).IsTrue();
@@ -71,8 +74,10 @@ public sealed class ModerationMeasurementIssuerWriterTests
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, request)).IsSuccess).IsTrue();
         var replacement = request with
         {
-            OperationId = Guid.CreateVersion7(), EnrollmentId = Guid.CreateVersion7(),
-            ExpectedQualificationRevision = 2, Issuer = "substituted-issuer"
+            OperationId = Guid.CreateVersion7(),
+            EnrollmentId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 2,
+            Issuer = "substituted-issuer"
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, replacement)).IsSuccess).IsFalse();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId,
@@ -99,8 +104,11 @@ public sealed class ModerationMeasurementIssuerWriterTests
         }
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RevokeModerationMeasurementIssuerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            EnrollmentId = request.EnrollmentId, ExpectedEnrollmentRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            EnrollmentId = request.EnrollmentId,
+            ExpectedEnrollmentRevision = 1
         })).IsSuccess).IsFalse();
         await using var reader = database.Context();
         reader.ModerationTrustDomainId = database.Scope.TrustDomainId;
@@ -109,13 +117,19 @@ public sealed class ModerationMeasurementIssuerWriterTests
 
     private static EnrollModerationMeasurementIssuerSource Enrollment(
         ModerationQualificationWriterTests.SourceDatabase database, ECDsa key) => new()
-    {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 1,
-        EnrollmentId = Guid.CreateVersion7(), KeyId = Guid.CreateVersion7(), Issuer = "native-measurement-runner",
-        PublicKeySpkiBase64 = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()),
-        RunnerDigest = new string('a', 64), CatalogueDigest = new string('b', 64), TestBundleDigest = new string('c', 64),
-        ValidUntil = Now.AddMinutes(5)
-    };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 1,
+            EnrollmentId = Guid.CreateVersion7(),
+            KeyId = Guid.CreateVersion7(),
+            Issuer = "native-measurement-runner",
+            PublicKeySpkiBase64 = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()),
+            RunnerDigest = new string('a', 64),
+            CatalogueDigest = new string('b', 64),
+            TestBundleDigest = new string('c', 64),
+            ValidUntil = Now.AddMinutes(5)
+        };
 
     [Test]
     public async Task RemainingTenantAdministration_CannotReplayOrRevokeDeploymentSignerApproval()
@@ -131,17 +145,26 @@ public sealed class ModerationMeasurementIssuerWriterTests
             var role = await writer.Roles.SingleAsync(row => row.Id == (int)RoleEnum.TenantAdmin);
             writer.TenantUserRoleGrants.Add(new()
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-                Tenant = await writer.Tenants.SingleAsync(), TenantUserId = membership.Id, TenantUser = membership,
-                RoleId = role.Id, RoleScopeId = (int)RoleScopeEnum.Tenant, Role = role, GrantedAt = Now.UtcDateTime
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = await writer.Tenants.SingleAsync(),
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = role.Id,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                Role = role,
+                GrantedAt = Now.UtcDateTime
             });
             await writer.SaveChangesAsync();
         }
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, request)).IsSuccess).IsFalse();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RevokeModerationMeasurementIssuerSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            EnrollmentId = request.EnrollmentId, ExpectedEnrollmentRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            EnrollmentId = request.EnrollmentId,
+            ExpectedEnrollmentRevision = 1
         })).IsSuccess).IsFalse();
         await using var reader = database.Context();
         reader.ModerationTrustDomainId = database.Scope.TrustDomainId;

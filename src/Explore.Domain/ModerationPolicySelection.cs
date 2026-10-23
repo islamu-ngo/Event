@@ -24,8 +24,10 @@ public sealed class ModerationPolicySelection
             throw new ArgumentException("Initial publication must start revision one.", nameof(publication));
         var selection = new ModerationPolicySelection
         {
-            Id = publication.PolicyId, HostBindingId = publication.HostBindingId,
-            TrustDomainId = publication.TrustDomainId, JurisdictionId = publication.Jurisdiction.Id,
+            Id = publication.PolicyId,
+            HostBindingId = publication.HostBindingId,
+            TrustDomainId = publication.TrustDomainId,
+            JurisdictionId = publication.Jurisdiction.Id,
             JurisdictionTenantId = publication.JurisdictionTenantId
         };
         selection.Replace(publication, 0, null);

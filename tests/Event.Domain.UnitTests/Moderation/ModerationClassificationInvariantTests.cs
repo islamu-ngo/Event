@@ -143,11 +143,22 @@ public sealed class ModerationClassificationInvariantTests
             Adoption = ModerationChildAgePolicyAdoption.Adopt(Guid.CreateVersion7(), Source, policyReviewer, 2, Now, Now.AddMinutes(9));
             Generation = new()
             {
-                Id = Guid.CreateVersion7(), HostBindingId = Source.HostBindingId, TrustDomainId = Source.TrustDomainId,
-                TenantId = Source.TenantId, EventId = Guid.NewGuid(), EventStamp = Guid.NewGuid(), Revision = 1,
-                ObservedByHumanId = Owner, WriterGeneration = 3, ObservedAt = Now, ValidUntil = Now.AddMinutes(8),
-                ActorId = Guid.NewGuid(), ActorStamp = Guid.NewGuid(), OrganizerActorId = null,
-                OrganizerActorStamp = null, SubmittedByHumanId = Owner
+                Id = Guid.CreateVersion7(),
+                HostBindingId = Source.HostBindingId,
+                TrustDomainId = Source.TrustDomainId,
+                TenantId = Source.TenantId,
+                EventId = Guid.NewGuid(),
+                EventStamp = Guid.NewGuid(),
+                Revision = 1,
+                ObservedByHumanId = Owner,
+                WriterGeneration = 3,
+                ObservedAt = Now,
+                ValidUntil = Now.AddMinutes(8),
+                ActorId = Guid.NewGuid(),
+                ActorStamp = Guid.NewGuid(),
+                OrganizerActorId = null,
+                OrganizerActorStamp = null,
+                SubmittedByHumanId = Owner
             };
         }
 

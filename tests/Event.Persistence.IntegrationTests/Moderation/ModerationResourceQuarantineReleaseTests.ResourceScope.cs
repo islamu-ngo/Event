@@ -22,8 +22,11 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             : fixture.Scope;
         var request = new OpenModerationCaseSource
         {
-            OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 1,
-            CaseId = caseId, OccurrenceId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = target,
+            ExpectedQualificationRevision = 1,
+            CaseId = caseId,
+            OccurrenceId = Guid.CreateVersion7(),
             SubjectKind = foreignTenant ? ModerationSubjectKind.Content : ModerationSubjectKind.Human,
             SubjectId = foreignTenant ? eventId : fixture.Database.SubjectId
         };
@@ -42,8 +45,12 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
         await using var fixture = await Fixture.CreateAsync(prepare: false);
         var request = new QualifyModerationCaseUrgency
         {
-            OperationId = Guid.CreateVersion7(), Target = fixture.Scope, ExpectedQualificationRevision = 1,
-            CaseId = fixture.CaseId, ExpectedCaseRevision = 1, EvidenceId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = fixture.Scope,
+            ExpectedQualificationRevision = 1,
+            CaseId = fixture.CaseId,
+            ExpectedCaseRevision = 1,
+            EvidenceId = Guid.CreateVersion7(),
             Justification = "An urgency request is not a fresh safety-review prerequisite.",
             ValidUntil = fixture.Clock.Now.AddMinutes(1)
         };

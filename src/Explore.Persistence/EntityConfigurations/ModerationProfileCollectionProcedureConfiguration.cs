@@ -49,7 +49,7 @@ public sealed class ModerationProfileCollectionProcedureSourceConfiguration
         builder.Ignore(row => row.ReviewerHumanId);
         builder.Ignore(row => row.ReviewerControllerHumanId);
         builder.HasIndex(row => new
-            { row.HostBindingId, row.TenantId, row.PublicationId, row.ProfileId, row.ModeCode, row.WriterGeneration })
+        { row.HostBindingId, row.TenantId, row.PublicationId, row.ProfileId, row.ModeCode, row.WriterGeneration })
             .IsUnique();
         builder.HasOne<ModerationChildAgePolicySource>().WithMany()
             .HasForeignKey(row => row.ChildAgeSourceId).OnDelete(DeleteBehavior.Restrict);

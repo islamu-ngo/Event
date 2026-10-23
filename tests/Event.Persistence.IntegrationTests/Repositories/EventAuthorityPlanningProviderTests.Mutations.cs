@@ -31,29 +31,48 @@ public sealed partial class EventAuthorityPlanningProviderTests
         var token = timeout.Token;
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = $"window-source-{Guid.CreateVersion7():N}",
-            FullName = "Window source ordering", TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            Slug = $"window-source-{Guid.CreateVersion7():N}",
+            FullName = "Window source ordering",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var publisher = new User
         {
-            Id = Guid.CreateVersion7(), Pii = new UserPii { Email = $"publisher-{Guid.CreateVersion7():N}@example.test", FirstName = "Publisher", LastName = "Witness" }
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii { Email = $"publisher-{Guid.CreateVersion7():N}@example.test", FirstName = "Publisher", LastName = "Witness" }
         };
         var manager = new User
         {
-            Id = Guid.CreateVersion7(), Pii = new UserPii { Email = $"manager-{Guid.CreateVersion7():N}@example.test", FirstName = "Manager", LastName = "Witness" }
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii { Email = $"manager-{Guid.CreateVersion7():N}@example.test", FirstName = "Manager", LastName = "Witness" }
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = publisher.Id, User = publisher, ActorTypeId = (int)ActorTypeEnum.User,
-            ActorType = null!, Pii = new ActorPii { DisplayName = "Before actor source update" }
+            Id = Guid.CreateVersion7(),
+            UserId = publisher.Id,
+            User = publisher,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            Pii = new ActorPii { DisplayName = "Before actor source update" }
         };
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-            OrganizerActorId = actor.Id, Title = "Window source ordering", PublicCode = Guid.CreateVersion7().ToString("N")[..12],
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            ActorId = actor.Id,
+            Actor = actor,
+            OrganizerActorId = actor.Id,
+            Title = "Window source ordering",
+            PublicCode = Guid.CreateVersion7().ToString("N")[..12],
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!, Timezone = "UTC"
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            Timezone = "UTC"
         };
         var now = DateTime.UtcNow;
         var target = EventRoleAssignment.Create(tenant.Id, entity.Id, manager.Id, (int)RoleEnum.CheckInStaff,
@@ -66,15 +85,23 @@ public sealed partial class EventAuthorityPlanningProviderTests
                 management = new Permission
                 {
                     Id = (await seed.Permissions.MaxAsync(row => (int?)row.Id, token) ?? 0) + 1,
-                    MasterCode = PermissionCodes.EventManageTeam, FullName = "Manage event team", ResourceKind = "event",
-                    Action = "manage-team", GroupName = "Events", Scope = RoleScopeEnum.Event, IsActive = true, IsFiltered = false
+                    MasterCode = PermissionCodes.EventManageTeam,
+                    FullName = "Manage event team",
+                    ResourceKind = "event",
+                    Action = "manage-team",
+                    GroupName = "Events",
+                    Scope = RoleScopeEnum.Event,
+                    IsActive = true,
+                    IsFiltered = false
                 };
                 seed.Permissions.Add(management);
             }
             var role = new Role
             {
                 Id = (await seed.Roles.MaxAsync(row => (int?)row.Id, token) ?? 0) + 1,
-                MasterCode = $"event.window-witness-{Guid.CreateVersion7():N}", FullName = "Window witness", Scope = RoleScopeEnum.Event
+                MasterCode = $"event.window-witness-{Guid.CreateVersion7():N}",
+                FullName = "Window witness",
+                Scope = RoleScopeEnum.Event
             };
             seed.AddRange(actor, manager, entity, role);
             if (!creating) seed.Add(target);
@@ -91,8 +118,14 @@ public sealed partial class EventAuthorityPlanningProviderTests
         await using var writer = fixture.CreateTenantContext(tenant.Id, beforeWriterTenant);
         await using var owner = fixture.CreateTenantContext(tenant.Id, beforeOwnerActor);
         await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, manager.Id.ToString("D"))], "window-source-witness")) } };
+        var http = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(
+            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, manager.Id.ToString("D"))], "window-source-witness"))
+            }
+        };
         var identity = new AdminContext(http, new PlatformUserRoleRepository(owner), new TenantUserRoleGrantRepository(owner),
             new OrganizationMemberRepository(owner), new GroupMemberRepository(owner), new UserExternalLoginRepository(owner), NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);
@@ -122,12 +155,20 @@ public sealed partial class EventAuthorityPlanningProviderTests
             await beforeWriterTenant.Reached.WaitAsync(Deadline, token);
             change = creating ? creator.ExecuteAsync(new()
             {
-                TenantId = tenant.Id, EventId = entity.Id, TargetUserId = manager.Id, RoleId = (int)RoleEnum.CheckInStaff,
-                StartsAtUtc = now.AddHours(1), ExpiresAtUtc = now.AddDays(2), Status = EventRoleAssignmentStatus.Pending
+                TenantId = tenant.Id,
+                EventId = entity.Id,
+                TargetUserId = manager.Id,
+                RoleId = (int)RoleEnum.CheckInStaff,
+                StartsAtUtc = now.AddHours(1),
+                ExpiresAtUtc = now.AddDays(2),
+                Status = EventRoleAssignmentStatus.Pending
             }, token) : handler.ExecuteAsync(new()
             {
-                TenantId = tenant.Id, EventId = entity.Id, AssignmentId = target.Id,
-                StartsAtUtc = target.StartsAtUtc, ExpiresAtUtc = now.AddDays(2)
+                TenantId = tenant.Id,
+                EventId = entity.Id,
+                AssignmentId = target.Id,
+                StartsAtUtc = target.StartsAtUtc,
+                ExpiresAtUtc = now.AddDays(2)
             }, token);
             await beforeOwnerActor.Reached.WaitAsync(Deadline, token);
             beforeWriterTenant.Release();

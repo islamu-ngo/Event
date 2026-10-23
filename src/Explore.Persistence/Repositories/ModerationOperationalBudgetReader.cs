@@ -85,18 +85,28 @@ internal sealed class ModerationOperationalBudgetReader(ExploreDbContext context
 
     internal static RecordModerationOperationalBudgetSource RecordRequest(
         ModerationOperationalBudgetSource source, AuthorityScope tenant) => new()
-    {
-        OperationId = Guid.Empty, Target = tenant, ExpectedQualificationRevision = source.WriterGeneration - 1,
-        SourceId = source.Id, Terms = source.Terms, OperatorHumanId = source.OperatorHumanId, ValidUntil = source.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = tenant,
+            ExpectedQualificationRevision = source.WriterGeneration - 1,
+            SourceId = source.Id,
+            Terms = source.Terms,
+            OperatorHumanId = source.OperatorHumanId,
+            ValidUntil = source.ValidUntil
+        };
 
     internal static AdoptModerationOperationalBudgetSource AdoptionRequest(
         ModerationOperationalBudgetAdoption adoption, AuthorityScope tenant) => new()
-    {
-        OperationId = Guid.Empty, Target = tenant, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-        SourceId = adoption.SourceId, ExpectedSourceRevision = adoption.SourceRevision,
-        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration, AdoptionId = adoption.Id, ValidUntil = adoption.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = tenant,
+            ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+            SourceId = adoption.SourceId,
+            ExpectedSourceRevision = adoption.SourceRevision,
+            ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
+            AdoptionId = adoption.Id,
+            ValidUntil = adoption.ValidUntil
+        };
 
     internal static string Slot(ModerationSourceAuthority authority, ModerationOperationalAction action) =>
         $"moderation.operational-budget-source:{authority.Binding.Id:N}:{authority.Tenant.Id:N}:{(int)ModerationSubjectKind.Human}:{(int)action}";

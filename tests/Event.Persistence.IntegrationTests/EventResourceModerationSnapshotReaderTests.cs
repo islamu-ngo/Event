@@ -330,7 +330,9 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload);
         var upload = database.Request() with
         {
-            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+            Action = "update",
+            RequiresUnquarantinedMaterial = true,
+            IsUploadMutation = true
         };
         await using var context = database.Context();
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -352,7 +354,9 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await database.StoreSanctionAsync(database.ServiceSubject, policy);
         var upload = database.Request() with
         {
-            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+            Action = "update",
+            RequiresUnquarantinedMaterial = true,
+            IsUploadMutation = true
         };
         await Assert.That(await database.ReadAsync(upload)).IsEqualTo(EventResourceModerationFacts.NotAdopted);
         await Assert.That((await database.ReadAsync(database.Request())).Outcome)
@@ -373,7 +377,9 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await database.RetireSupportAsync(policy);
         var facts = await database.ReadAsync(database.Request() with
         {
-            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+            Action = "update",
+            RequiresUnquarantinedMaterial = true,
+            IsUploadMutation = true
         });
         if (establishBinding)
             await Assert.That(facts.Outcome).IsEqualTo(ModerationRestrictionOutcome.Denied);
@@ -389,8 +395,10 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await using var database = await ReaderDatabase.CreateAsync();
         await AssertUnavailable(await database.ReadAsync(database.Request() with
         {
-            Action = action, IsEventCollection = collection,
-            RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+            Action = action,
+            IsEventCollection = collection,
+            RequiresUnquarantinedMaterial = true,
+            IsUploadMutation = true
         }));
     }
 
@@ -412,7 +420,9 @@ public sealed class EventResourceModerationSnapshotReaderTests
         }
         var request = database.Request() with
         {
-            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+            Action = "update",
+            RequiresUnquarantinedMaterial = true,
+            IsUploadMutation = true
         };
         var original = await database.ReadAsync(request);
         await using var context = database.Context();
@@ -427,8 +437,11 @@ public sealed class EventResourceModerationSnapshotReaderTests
             return successfulResult
                 ? BaseCommandResponse.Success(new StorageUploadSessionDto
                 {
-                    ContentType = "application/pdf", SafeDisplayName = "Resource document",
-                    Purpose = "event-resource", Visibility = "private-owner", Status = "reserved"
+                    ContentType = "application/pdf",
+                    SafeDisplayName = "Resource document",
+                    Purpose = "event-resource",
+                    Visibility = "private-owner",
+                    Status = "reserved"
                 })
                 : BaseCommandResponse.Failure<StorageUploadSessionDto>("upload_denied");
         }, CancellationToken.None);
@@ -456,7 +469,9 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload, startsAt);
         var request = database.Request() with
         {
-            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+            Action = "update",
+            RequiresUnquarantinedMaterial = true,
+            IsUploadMutation = true
         };
         var original = await database.ReadAsync(request);
         await Assert.That(original.Outcome).IsEqualTo(ModerationRestrictionOutcome.Unrestricted);
@@ -477,8 +492,11 @@ public sealed class EventResourceModerationSnapshotReaderTests
                 await context.SaveChangesAsync(token);
                 return BaseCommandResponse.Success(new StorageUploadSessionDto
                 {
-                    ContentType = "application/pdf", SafeDisplayName = "Resource document",
-                    Purpose = "event-resource", Visibility = "private-owner", Status = "reserved"
+                    ContentType = "application/pdf",
+                    SafeDisplayName = "Resource document",
+                    Purpose = "event-resource",
+                    Visibility = "private-owner",
+                    Status = "reserved"
                 });
             }, CancellationToken.None));
 
@@ -500,7 +518,9 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload, startsAt);
         var request = database.Request() with
         {
-            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+            Action = "update",
+            RequiresUnquarantinedMaterial = true,
+            IsUploadMutation = true
         };
         var original = await database.ReadAsync(request);
         var clock = new UploadClock();
@@ -519,8 +539,11 @@ public sealed class EventResourceModerationSnapshotReaderTests
                 checkpoint.Armed = true;
                 return BaseCommandResponse.Success(new StorageUploadSessionDto
                 {
-                    ContentType = "application/pdf", SafeDisplayName = "Resource document",
-                    Purpose = "event-resource", Visibility = "private-owner", Status = "reserved"
+                    ContentType = "application/pdf",
+                    SafeDisplayName = "Resource document",
+                    Purpose = "event-resource",
+                    Visibility = "private-owner",
+                    Status = "reserved"
                 });
             }, CancellationToken.None));
 
@@ -541,7 +564,9 @@ public sealed class EventResourceModerationSnapshotReaderTests
         await database.StoreSanctionAsync(database.ServiceSubject, policy, ModerationCapability.Upload, startsAt);
         var request = database.Request() with
         {
-            Action = "update", RequiresUnquarantinedMaterial = true, IsUploadMutation = true
+            Action = "update",
+            RequiresUnquarantinedMaterial = true,
+            IsUploadMutation = true
         };
         var original = await database.ReadAsync(request);
         var clock = new UploadClock();
@@ -562,8 +587,11 @@ public sealed class EventResourceModerationSnapshotReaderTests
                 clock.Now = startsAt;
                 return BaseCommandResponse.Success(new StorageUploadSessionDto
                 {
-                    ContentType = "application/pdf", SafeDisplayName = "Resource document",
-                    Purpose = "event-resource", Visibility = "private-owner", Status = "reserved"
+                    ContentType = "application/pdf",
+                    SafeDisplayName = "Resource document",
+                    Purpose = "event-resource",
+                    Visibility = "private-owner",
+                    Status = "reserved"
                 });
             }, CancellationToken.None));
 
@@ -714,7 +742,9 @@ public sealed class EventResourceModerationSnapshotReaderTests
             var declared = ModerationPolicyPublicationProjection.RestoreHistory(publication)!.Proposed;
             var result = await PublishPolicyAsync(declared with
             {
-                PublicationId = Guid.CreateVersion7(), ExpectedRevision = publication.Revision, SupportedProfiles = []
+                PublicationId = Guid.CreateVersion7(),
+                ExpectedRevision = publication.Revision,
+                SupportedProfiles = []
             }, publication.Id);
             await Assert.That(result.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         }
@@ -757,22 +787,32 @@ public sealed class EventResourceModerationSnapshotReaderTests
             await context.Database.EnsureCreatedAsync();
             var status = new TenantStatus
             {
-                Id = (int)TenantStatusEnum.Active, MasterCode = "ACTIVE",
-                FullName = "Active", IsActiveState = true
+                Id = (int)TenantStatusEnum.Active,
+                MasterCode = "ACTIVE",
+                FullName = "Active",
+                IsActiveState = true
             };
             var tenant = new Tenant
             {
-                Id = database.TenantId, FullName = "Resource reader tenant", Slug = $"reader-{database.TenantId:N}",
-                TenantStatusId = status.Id, TenantStatus = status
+                Id = database.TenantId,
+                FullName = "Resource reader tenant",
+                Slug = $"reader-{database.TenantId:N}",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             };
             var user = NativeUser(database.AdministratorId);
             var role = new Role
             {
-                Id = (int)RoleEnum.Admin, MasterCode = "platform.admin", FullName = "Admin",
-                IsSystem = true, RoleScopeId = (int)RoleScopeEnum.Platform,
+                Id = (int)RoleEnum.Admin,
+                MasterCode = "platform.admin",
+                FullName = "Admin",
+                IsSystem = true,
+                RoleScopeId = (int)RoleScopeEnum.Platform,
                 RoleScope = new RoleScope
                 {
-                    Id = (int)RoleScopeEnum.Platform, MasterCode = "PLATFORM", FullName = "Platform"
+                    Id = (int)RoleScopeEnum.Platform,
+                    MasterCode = "PLATFORM",
+                    FullName = "Platform"
                 }
             };
             await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -780,38 +820,58 @@ public sealed class EventResourceModerationSnapshotReaderTests
                 new ServicePrincipal
                 {
                     Id = database.Host.MaintenanceServicePrincipalId,
-                    Code = $"maintenance-{database.TenantId:N}", DisplayName = "Maintenance"
+                    Code = $"maintenance-{database.TenantId:N}",
+                    DisplayName = "Maintenance"
                 },
                 new ServicePrincipal
                 {
-                    Id = database.ServiceId, Code = $"reader-{database.TenantId:N}", DisplayName = "Explicit reader service"
+                    Id = database.ServiceId,
+                    Code = $"reader-{database.TenantId:N}",
+                    DisplayName = "Explicit reader service"
                 },
                 database.Host,
                 new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), UserId = user.Id, User = user, RoleId = role.Id, Role = role
+                    Id = Guid.CreateVersion7(),
+                    UserId = user.Id,
+                    User = user,
+                    RoleId = role.Id,
+                    Role = role
                 },
                 ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), database.Host, tenant),
                 new ExternalApiKeyStatus
                 {
-                    Id = (int)ExternalApiKeyStatusEnum.Active, MasterCode = "ACTIVE", FullName = "Active", IsUsable = true
+                    Id = (int)ExternalApiKeyStatusEnum.Active,
+                    MasterCode = "ACTIVE",
+                    FullName = "Active",
+                    IsUsable = true
                 },
                 new ExternalApiKeyCreditPeriod
                 {
-                    Id = (int)ExternalApiKeyCreditPeriodEnum.None, MasterCode = "NONE", FullName = "None"
+                    Id = (int)ExternalApiKeyCreditPeriodEnum.None,
+                    MasterCode = "NONE",
+                    FullName = "None"
                 },
                 new ExternalApiKeyOwnerTypeLookup
                 {
-                    Id = (int)ExternalApiKeyOwnerType.InstanceAdmin, MasterCode = "INSTANCE_ADMIN", FullName = "Instance Admin"
+                    Id = (int)ExternalApiKeyOwnerType.InstanceAdmin,
+                    MasterCode = "INSTANCE_ADMIN",
+                    FullName = "Instance Admin"
                 });
             await context.SaveChangesAsync();
             context.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), KeyId = KeyId, Name = "Native resource reader credential",
-                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()), Scopes = "events:read",
-                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = database.AdministratorId,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                KeyId = KeyId,
+                Name = "Native resource reader credential",
+                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
+                Scopes = "events:read",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                OwnerId = database.AdministratorId,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                ExternalApiKeyCreditPeriod = null!
             });
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -823,7 +883,10 @@ public sealed class EventResourceModerationSnapshotReaderTests
             Id = id,
             Pii = new UserPii
             {
-                UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Reader", LastName = "Fixture"
+                UserId = id,
+                Email = $"{id:N}@example.invalid",
+                FirstName = "Reader",
+                LastName = "Fixture"
             }
         };
 

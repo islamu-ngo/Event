@@ -102,8 +102,11 @@ internal sealed class ModerationOriginalRecipeAuthority
             || capture.HostSolutionId != authority.Binding.SolutionId || capture.HostInstanceId != authority.Binding.InstanceId
             || capture.AuthoritySourceId != authority.Epoch.Id || capture.QualificationRevision > authority.Epoch.Revision
             || capture.ValidUntil is not { } captureUntil || now >= captureUntil
-            || capture.Notice is not { ReferenceProfile: ModerationReferenceProfileId.CFG09,
-                SubjectKind: ModerationSubjectKind.Content } notice
+            || capture.Notice is not
+            {
+                ReferenceProfile: ModerationReferenceProfileId.CFG09,
+                SubjectKind: ModerationSubjectKind.Content
+            } notice
             || notice.RetainUntil != ceiling || notice.SubjectOrigin != ModerationNoticeScope.From(authority.Tenant))
             return null;
         await RelationalEntityRowFence.AcquireGlobalAsync<ModerationCase>(context, capture.Decision.CaseId, token);

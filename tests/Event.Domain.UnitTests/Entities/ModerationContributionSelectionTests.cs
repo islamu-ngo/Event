@@ -30,13 +30,22 @@ public sealed class ModerationContributionSelectionTests
         var original = selection.Bindings[0];
         var binding = new ModerationContributionBinding
         {
-            SelectionId = original.SelectionId, Ordinal = original.Ordinal, Kind = original.Kind,
-            EffectKind = original.EffectKind, EffectMode = original.EffectMode, EffectTarget = original.EffectTarget,
-            Capability = original.Capability, Execution = original.Execution,
+            SelectionId = original.SelectionId,
+            Ordinal = original.Ordinal,
+            Kind = original.Kind,
+            EffectKind = original.EffectKind,
+            EffectMode = original.EffectMode,
+            EffectTarget = original.EffectTarget,
+            Capability = original.Capability,
+            Execution = original.Execution,
             Strategy = invalid == 0 ? ModerationAdditiveStrategyKind.PublicationIntegrity : null,
-            Scope = original.Scope, SubjectKind = original.SubjectKind, SubjectId = original.SubjectId,
-            TargetId = original.TargetId, TargetRevision = invalid == 1 ? long.MaxValue : original.TargetRevision,
-            Operation = invalid == 2 ? "resource/read all" : original.Operation, WindowEnd = original.WindowEnd
+            Scope = original.Scope,
+            SubjectKind = original.SubjectKind,
+            SubjectId = original.SubjectId,
+            TargetId = original.TargetId,
+            TargetRevision = invalid == 1 ? long.MaxValue : original.TargetRevision,
+            Operation = invalid == 2 ? "resource/read all" : original.Operation,
+            WindowEnd = original.WindowEnd
         };
         await Assert.That(() => binding.ValidatePersistedState()).Throws<ArgumentException>();
     }
@@ -121,13 +130,28 @@ public sealed class ModerationContributionSelectionTests
         };
         var selection = new ModerationContributionSelection
         {
-            Id = id, EffectId = Guid.CreateVersion7(), DecisionId = Guid.CreateVersion7(), DecisionRevision = 2,
-            CaseId = Guid.CreateVersion7(), CaseRevision = 1, PolicyId = Guid.CreateVersion7(), PolicyRevision = 1,
-            PublicationId = Guid.CreateVersion7(), ProfileId = Guid.CreateVersion7(),
-            HostBindingId = Guid.CreateVersion7(), TrustDomainId = scope.TrustDomainId, TenantId = tenant.Id,
-            AuthoredByHumanId = Guid.CreateVersion7(), WriterGeneration = 2, Revision = 1,
-            SelectionDigest = new string('a', 64), StartsAt = Now, EventWindowEnd = null,
-            RecordedAt = Now, ValidUntil = Now.AddHours(1), Bindings = bindings
+            Id = id,
+            EffectId = Guid.CreateVersion7(),
+            DecisionId = Guid.CreateVersion7(),
+            DecisionRevision = 2,
+            CaseId = Guid.CreateVersion7(),
+            CaseRevision = 1,
+            PolicyId = Guid.CreateVersion7(),
+            PolicyRevision = 1,
+            PublicationId = Guid.CreateVersion7(),
+            ProfileId = Guid.CreateVersion7(),
+            HostBindingId = Guid.CreateVersion7(),
+            TrustDomainId = scope.TrustDomainId,
+            TenantId = tenant.Id,
+            AuthoredByHumanId = Guid.CreateVersion7(),
+            WriterGeneration = 2,
+            Revision = 1,
+            SelectionDigest = new string('a', 64),
+            StartsAt = Now,
+            EventWindowEnd = null,
+            RecordedAt = Now,
+            ValidUntil = Now.AddHours(1),
+            Bindings = bindings
         };
         return (selection, bindings);
     }

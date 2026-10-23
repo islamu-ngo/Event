@@ -24,8 +24,10 @@ public sealed partial class ModerationNoticeEmailTests
             originalActor = await setup.Events.Where(row => row.Id == eventId).Select(row => row.ActorId).SingleAsync();
             setup.Actors.Add(new Actor
             {
-                Id = replacement, ActorTypeId = (int)ActorTypeEnum.User,
-                UserId = fixture.Notice.Database.ReviewerId, Pii = new ActorPii()
+                Id = replacement,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                UserId = fixture.Notice.Database.ReviewerId,
+                Pii = new ActorPii()
             });
             await setup.SaveChangesAsync();
         }

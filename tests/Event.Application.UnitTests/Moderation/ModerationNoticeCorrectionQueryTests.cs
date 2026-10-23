@@ -25,7 +25,11 @@ public sealed class ModerationNoticeCorrectionQueryTests
         var id = Guid.Parse($"018e4e5c-7f00-7000-{variant}000-000000000001");
         var query = Request() with
         {
-            PendingEffectId = id, ApprovalId = id, GrantId = id, CaseId = id, OriginalNoticeId = id
+            PendingEffectId = id,
+            ApprovalId = id,
+            GrantId = id,
+            CaseId = id,
+            OriginalNoticeId = id
         };
         await Assert.That((await new ReadModerationNoticeCorrectionQueryValidator().ValidateAsync(query)).IsValid).IsTrue();
     }

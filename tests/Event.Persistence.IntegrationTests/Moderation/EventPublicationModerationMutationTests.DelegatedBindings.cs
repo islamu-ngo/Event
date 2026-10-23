@@ -511,21 +511,41 @@ public sealed partial class EventPublicationModerationMutationTests
                 binding.UpdatedBy, binding.UpdatedAt,
                 JsonSerializer.Serialize(new
                 {
-                    binding.TenantId, binding.RegistrationProviderConnectionId, binding.RegistrationFormId,
-                    binding.RegistrationFormVersionId, binding.ProviderSurveyId, binding.ProviderSurveyRevisionId,
-                    binding.ProviderWebhookId, binding.WebhookSecretBindingId, binding.PresentationModeId,
-                    binding.CollectionModeId, binding.CompletionModeId, binding.TrustLevelId, binding.CreatedBy,
-                    binding.IsDeleted, Tuple = binding.Connection!.TupleKey
+                    binding.TenantId,
+                    binding.RegistrationProviderConnectionId,
+                    binding.RegistrationFormId,
+                    binding.RegistrationFormVersionId,
+                    binding.ProviderSurveyId,
+                    binding.ProviderSurveyRevisionId,
+                    binding.ProviderWebhookId,
+                    binding.WebhookSecretBindingId,
+                    binding.PresentationModeId,
+                    binding.CollectionModeId,
+                    binding.CompletionModeId,
+                    binding.TrustLevelId,
+                    binding.CreatedBy,
+                    binding.IsDeleted,
+                    Tuple = binding.Connection!.TupleKey
                 }),
                 JsonSerializer.Serialize(binding.FieldMappings.OrderBy(row => row.Id).Select(row => new
                 {
-                    row.Id, row.TenantId, row.RegistrationProviderBindingId, row.PlatformFieldKey,
-                    row.ProviderFieldKey, row.IsRequired, row.IsDeleted
+                    row.Id,
+                    row.TenantId,
+                    row.RegistrationProviderBindingId,
+                    row.PlatformFieldKey,
+                    row.ProviderFieldKey,
+                    row.IsRequired,
+                    row.IsDeleted
                 })),
                 JsonSerializer.Serialize(binding.OptionMappings.OrderBy(row => row.Id).Select(row => new
                 {
-                    row.Id, row.TenantId, row.RegistrationProviderBindingId, row.RegistrationProviderFieldMappingId,
-                    row.PlatformOptionKey, row.ProviderOptionKey, row.IsDeleted
+                    row.Id,
+                    row.TenantId,
+                    row.RegistrationProviderBindingId,
+                    row.RegistrationProviderFieldMappingId,
+                    row.PlatformOptionKey,
+                    row.ProviderOptionKey,
+                    row.IsDeleted
                 })), form);
     }
 

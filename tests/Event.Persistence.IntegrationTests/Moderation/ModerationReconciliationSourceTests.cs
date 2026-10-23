@@ -560,12 +560,17 @@ public sealed class ModerationReconciliationSourceTests
             var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
             var tenant = new Tenant
             {
-                Id = database.TenantId, Slug = $"reconcile-{database.TenantId:N}", FullName = "Reconciliation",
-                TenantStatusId = status.Id, TenantStatus = status
+                Id = database.TenantId,
+                Slug = $"reconcile-{database.TenantId:N}",
+                FullName = "Reconciliation",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             };
             var service = new ServicePrincipal
             {
-                Id = database.MaintenanceId, Code = $"reconcile-{database.MaintenanceId:N}", DisplayName = "Maintenance"
+                Id = database.MaintenanceId,
+                Code = $"reconcile-{database.MaintenanceId:N}",
+                DisplayName = "Maintenance"
             };
             var host = ModerationHostBinding.Establish(database.HostId, database.Instance.TrustDomainId,
                 database.Instance.Parent!.Id, database.Instance.Id, service.Id);
@@ -575,24 +580,39 @@ public sealed class ModerationReconciliationSourceTests
             var administrator = new User
             {
                 Id = database.OwnerId,
-                Pii = new UserPii { UserId = database.OwnerId, Email = $"{database.OwnerId:N}@example.invalid",
-                    FirstName = "Recovery", LastName = "Administrator" }
+                Pii = new UserPii
+                {
+                    UserId = database.OwnerId,
+                    Email = $"{database.OwnerId:N}@example.invalid",
+                    FirstName = "Recovery",
+                    LastName = "Administrator"
+                }
             };
             context.Users.Add(administrator);
             context.PlatformUserRoles.Add(new PlatformUserRole
-                { Id = Guid.CreateVersion7(), UserId = administrator.Id, User = administrator, RoleId = role.Id, Role = role });
+            { Id = Guid.CreateVersion7(), UserId = administrator.Id, User = administrator, RoleId = role.Id, Role = role });
             context.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = tenant,
-                UserId = administrator.Id, User = administrator, StatusId = (int)TenantUserStatusEnum.Active
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = tenant,
+                UserId = administrator.Id,
+                User = administrator,
+                StatusId = (int)TenantUserStatusEnum.Active
             });
             context.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), KeyId = database.KeyId, Name = "Reconciliation",
-                SecretHash = ApiKeyHashing.ComputeHash(secret), Scopes = "events:read",
-                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = database.OwnerId,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                KeyId = database.KeyId,
+                Name = "Reconciliation",
+                SecretHash = ApiKeyHashing.ComputeHash(secret),
+                Scopes = "events:read",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                OwnerId = database.OwnerId,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                ExternalApiKeyCreditPeriod = null!
             });
             context.ModerationMachineSubjectBindings.Add(ModerationMachineSubjectBinding.Establish(
                 Guid.CreateVersion7(), host.Id, ModerationMachineCredentialSource.Persisted,
@@ -619,11 +639,14 @@ public sealed class ModerationReconciliationSourceTests
         public async Task PublishAsync(AuthorityScope jurisdiction, bool retire = false)
         {
             await using var context = Context();
-            var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext
+            var http = new HttpContextAccessor
             {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
                     [new Claim(ClaimTypes.NameIdentifier, OwnerId.ToString())], "reconciliation-publication"))
-            }};
+                }
+            };
             var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
                 new OrganizationMemberRepository(context), new GroupMemberRepository(context),
                 new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
@@ -632,11 +655,13 @@ public sealed class ModerationReconciliationSourceTests
             if (Publications.TryGetValue(jurisdiction, out var previous))
                 request = previous with
                 {
-                    OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = epoch.Revision,
+                    OperationId = Guid.CreateVersion7(),
+                    ExpectedQualificationRevision = epoch.Revision,
                     ExpectedPublicationId = previous.Proposed.PublicationId,
                     Proposed = previous.Proposed with
                     {
-                        PublicationId = Guid.CreateVersion7(), ExpectedRevision = previous.Proposed.ExpectedRevision + 1,
+                        PublicationId = Guid.CreateVersion7(),
+                        ExpectedRevision = previous.Proposed.ExpectedRevision + 1,
                         SupportedProfiles = retire ? [] : previous.Proposed.SupportedProfiles
                     }
                 };
@@ -706,7 +731,8 @@ public sealed class ModerationReconciliationSourceTests
             foreach (var human in new[] { subject.Id, issuer.Id, reviewer.Id, secondReviewer.Id })
                 context.Users.Add(new User
                 {
-                    Id = human, Pii = new UserPii { UserId = human, Email = $"{human:N}@example.invalid", FirstName = "Recovery", LastName = "Witness" }
+                    Id = human,
+                    Pii = new UserPii { UserId = human, Email = $"{human:N}@example.invalid", FirstName = "Recovery", LastName = "Witness" }
                 });
             context.AddRange(allegation, decision, sanction);
             await context.SaveChangesAsync();

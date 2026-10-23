@@ -30,9 +30,13 @@ public sealed class ModerationProposalJsonTests
             Guid.CreateVersion7());
         var command = new ProposeModerationDecisionCommand
         {
-            OperationId = Guid.CreateVersion7(), EffectId = Guid.CreateVersion7(), DecisionId = Guid.CreateVersion7(),
-            Subject = SubjectReference.Create(ModerationSubjectKind.Human, Guid.CreateVersion7(), target), Target = target,
-            ExpectedRevision = 4, ExpectedPolicyRevision = 6,
+            OperationId = Guid.CreateVersion7(),
+            EffectId = Guid.CreateVersion7(),
+            DecisionId = Guid.CreateVersion7(),
+            Subject = SubjectReference.Create(ModerationSubjectKind.Human, Guid.CreateVersion7(), target),
+            Target = target,
+            ExpectedRevision = 4,
+            ExpectedPolicyRevision = 6,
             Proposal = new(Guid.CreateVersion7(), ModerationRuleReference.Create(Guid.CreateVersion7(), "conduct.v1", 2),
                 [ModerationCapability.Upload, ModerationCapability.Publish, ModerationCapability.Publish],
                 Start, longTerm ? null : Start.AddDays(1), longTerm ? Start.AddDays(2) : null, longTerm ? 2 : 1)
@@ -73,8 +77,10 @@ public sealed class ModerationProposalJsonTests
         {
             caseId = Guid.CreateVersion7(),
             rule = new { ownerId = Guid.CreateVersion7(), code = "conduct", revision = 1 },
-            capabilities = new[] { "Publish" }, startsAt = Start,
-            endsAt = Start.AddDays(1), requiredApprovals = 1
+            capabilities = new[] { "Publish" },
+            startsAt = Start,
+            endsAt = Start.AddDays(1),
+            requiredApprovals = 1
         })!.AsObject();
         switch (change)
         {

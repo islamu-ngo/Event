@@ -21,7 +21,10 @@ public static class LegalConfigurationSnapshotProjection
             .OrderBy(row => row.LanguageTag, StringComparer.Ordinal)
             .Select(row => new ConfigurationManifestLegalDocumentLocalizedSourceV1Alpha2
             {
-                LanguageTag = row.LanguageTag, Title = row.Title, Summary = row.Summary, Markdown = row.Markdown
+                LanguageTag = row.LanguageTag,
+                Title = row.Title,
+                Summary = row.Summary,
+                Markdown = row.Markdown
             }).ToArray();
         ConfigurationManifestLegalTemplateProvenanceV1Alpha2? template = null;
         if (source.TemplateProvenance is { } portable)
@@ -32,15 +35,20 @@ public static class LegalConfigurationSnapshotProjection
                 portable.LicenseExpression, portable.ReviewReference);
             template = new()
             {
-                TemplateId = native.TemplateId, TemplateVersion = native.TemplateVersion,
-                SourceKind = native.SourceKind.ToString(), LicenseExpression = native.LicenseExpression,
+                TemplateId = native.TemplateId,
+                TemplateVersion = native.TemplateVersion,
+                SourceKind = native.SourceKind.ToString(),
+                LicenseExpression = native.LicenseExpression,
                 ReviewReference = native.ReviewReference
             };
         }
         return source with
         {
-            LifecycleIntent = "Draft", AccountableIdentityReference = null, ProposedEffectiveAt = null,
-            Localizations = localizations, TemplateProvenance = template
+            LifecycleIntent = "Draft",
+            AccountableIdentityReference = null,
+            ProposedEffectiveAt = null,
+            Localizations = localizations,
+            TemplateProvenance = template
         };
     }
 

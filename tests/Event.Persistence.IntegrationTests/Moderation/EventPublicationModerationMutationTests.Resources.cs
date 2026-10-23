@@ -139,7 +139,8 @@ public sealed partial class EventPublicationModerationMutationTests
         var declared = ModerationPolicyPublicationProjection.RestoreHistory(adoption.Publication)!.Proposed;
         var retired = await PublishPolicyAsync(fixture, clock, adoption.Host, declared with
         {
-            PublicationId = Guid.CreateVersion7(), ExpectedRevision = adoption.Publication.Revision,
+            PublicationId = Guid.CreateVersion7(),
+            ExpectedRevision = adoption.Publication.Revision,
             SupportedProfiles = []
         }, adoption.Publication.Id);
         await Assert.That(retired.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
@@ -193,8 +194,11 @@ public sealed partial class EventPublicationModerationMutationTests
             var other = NativeUser(Guid.CreateVersion7());
             var organizer = new Actor
             {
-                Id = Guid.CreateVersion7(), UserId = other.Id, User = other,
-                ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
+                Id = Guid.CreateVersion7(),
+                UserId = other.Id,
+                User = other,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
                 Pii = new ActorPii { DisplayName = "Independent resource organizer" }
             };
             fixture.Context.Actors.Add(organizer);
@@ -286,7 +290,9 @@ public sealed partial class EventPublicationModerationMutationTests
         var otherHuman = NativeUser(Guid.CreateVersion7());
         var organizer = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, UserId = otherHuman.Id,
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            UserId = otherHuman.Id,
             Pii = new ActorPii { DisplayName = "Independent timed publication organizer" }
         };
         fixture.Context.AddRange(otherHuman, organizer);
@@ -359,7 +365,8 @@ public sealed partial class EventPublicationModerationMutationTests
         var resourceId = Guid.CreateVersion7();
         var created = await workflow.CreateAsync(parent.Id, resourceId, new EventResourceDraftDto
         {
-            Title = "Native Human publication material", Kind = EventResourceKindEnum.GeneralDocument,
+            Title = "Native Human publication material",
+            Kind = EventResourceKindEnum.GeneralDocument,
             DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly,
             DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink,
             AudienceRules = [new(EventResourceAudienceKindEnum.Public)]
@@ -380,7 +387,9 @@ public sealed partial class EventPublicationModerationMutationTests
             Guid.CreateVersion7(), Guid.CreateVersion7(), maintenanceId);
         fixture.Context.ServicePrincipals.Add(new ServicePrincipal
         {
-            Id = maintenanceId, Code = $"resource-publication-{maintenanceId:N}", DisplayName = "Resource publication maintenance"
+            Id = maintenanceId,
+            Code = $"resource-publication-{maintenanceId:N}",
+            DisplayName = "Resource publication maintenance"
         });
         fixture.Context.ModerationHostBindings.Add(host);
         var tenant = await fixture.Context.Tenants.SingleAsync(row => row.Id == fixture.TenantId);

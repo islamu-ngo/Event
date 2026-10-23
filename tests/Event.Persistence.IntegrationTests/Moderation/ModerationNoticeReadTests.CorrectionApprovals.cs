@@ -214,8 +214,10 @@ public sealed partial class ModerationNoticeReadTests
         var pending = await PrepareCorrectionApprovalAsync(fixture);
         var ordinary = new ApproveModerationNoticeDisclosureSource
         {
-            OperationId = pending.Request.OperationId, Target = pending.Request.Target,
-            ExpectedQualificationRevision = pending.Request.ExpectedQualificationRevision, Intent = pending.Request.Intent
+            OperationId = pending.Request.OperationId,
+            Target = pending.Request.Target,
+            ExpectedQualificationRevision = pending.Request.ExpectedQualificationRevision,
+            Intent = pending.Request.Intent
         };
         var before = await CorrectionApprovalStateAsync(fixture, pending);
 

@@ -72,7 +72,8 @@ public sealed partial class ModerationPolicyPublicationRepository
                     {
                         Proposed = request.Proposed with
                         {
-                            PublicationId = definitionId, RequestedState = ModerationPolicyRequestedState.Draft
+                            PublicationId = definitionId,
+                            RequestedState = ModerationPolicyRequestedState.Draft
                         }
                     };
                     var compilation = ModerationPolicyProposedStateCompiler.Compile(definitionRequest.Proposed,

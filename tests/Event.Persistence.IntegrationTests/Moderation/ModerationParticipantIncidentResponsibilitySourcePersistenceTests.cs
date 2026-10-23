@@ -291,7 +291,8 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             var accepted = await Committer(intake, database).SubmitAsync(
                 new(ModerationCaseAccessPurpose.SubmitAllegation, Guid.Empty, Guid.CreateVersion7(), 0,
-                    issued.Receipt.Id, issued.Token) { Narrative = database.Request().Material }, default);
+                    issued.Receipt.Id, issued.Token)
+                { Narrative = database.Request().Material }, default);
             await Assert.That(accepted.Outcome).IsEqualTo(ModerationCaseIntakeCommitOutcome.Accepted);
             caseId = accepted.Acknowledgement!.CaseId;
         }
@@ -322,16 +323,24 @@ public sealed partial class ModerationCaseNativeProofTests
         var subjectId = Guid.CreateVersion7();
         var subject = new User
         {
-            Id = subjectId, Pii = new UserPii
+            Id = subjectId,
+            Pii = new UserPii
             {
-                UserId = subjectId, Email = $"{subjectId:N}@example.invalid", FirstName = "Alleged", LastName = "Subject"
+                UserId = subjectId,
+                Email = $"{subjectId:N}@example.invalid",
+                FirstName = "Alleged",
+                LastName = "Subject"
             }
         };
         var parent = await context.Events.SingleAsync(row => row.Id == database.EventId);
         var session = new EventSession
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent,
-            TenantId = database.TenantId, Tenant = null!, ConcurrencyStamp = Guid.NewGuid()
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = database.TenantId,
+            Tenant = null!,
+            ConcurrencyStamp = Guid.NewGuid()
         };
         context.AddRange(subject, session, custody, adoption);
         await context.SaveChangesAsync();

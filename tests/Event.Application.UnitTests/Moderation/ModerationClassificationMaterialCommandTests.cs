@@ -42,20 +42,38 @@ public sealed class ModerationClassificationMaterialCommandTests
             "future-head" => command with { ExpectedMaterialGeneration = command.ExpectedQualificationRevision + 1 },
             "default-materials" => command with { Materials = default },
             "empty-components" => command with { Components = [] },
-            "duplicate-material" => command with { Materials = [command.Materials[0], command.Materials[0] with
-                { ReviewId = Guid.CreateVersion7() }] },
-            "duplicate-review-id" => command with { Materials = [command.Materials[0], command.Materials[0] with
-                { Material = command.Materials[0].Material with { SessionId = Guid.NewGuid(), SessionStamp = Guid.NewGuid() } }] },
-            "duplicate-component" => command with { Components = [command.Components[0], command.Components[0] with
-                { Digest = new string('b', 64) }] },
+            "duplicate-material" => command with
+            {
+                Materials = [command.Materials[0], command.Materials[0] with
+                { ReviewId = Guid.CreateVersion7() }]
+            },
+            "duplicate-review-id" => command with
+            {
+                Materials = [command.Materials[0], command.Materials[0] with
+                { Material = command.Materials[0].Material with { SessionId = Guid.NewGuid(), SessionStamp = Guid.NewGuid() } }]
+            },
+            "duplicate-component" => command with
+            {
+                Components = [command.Components[0], command.Components[0] with
+                { Digest = new string('b', 64) }]
+            },
             "missing-category" => command with { Materials = [command.Materials[0] with { CategoryVersionIds = [] }] },
-            "duplicate-category" => command with { Materials = [command.Materials[0] with
-                { CategoryVersionIds = [command.Materials[0].CategoryVersionIds[0], command.Materials[0].CategoryVersionIds[0]] }] },
-            "unknown-component" => command with { Components = [command.Components[0] with
-                { Kind = (ModerationClassificationMaterialComponentKind)999 }] },
+            "duplicate-category" => command with
+            {
+                Materials = [command.Materials[0] with
+                { CategoryVersionIds = [command.Materials[0].CategoryVersionIds[0], command.Materials[0].CategoryVersionIds[0]] }]
+            },
+            "unknown-component" => command with
+            {
+                Components = [command.Components[0] with
+                { Kind = (ModerationClassificationMaterialComponentKind)999 }]
+            },
             "missing-digest" => command with { Components = [command.Components[0] with { Digest = "" }] },
-            "shared-controller" => command with { Mandate = command.Mandate with
-                { ReviewerControllerHumanId = command.Mandate.OwnerControllerHumanId } },
+            "shared-controller" => command with
+            {
+                Mandate = command.Mandate with
+                { ReviewerControllerHumanId = command.Mandate.OwnerControllerHumanId }
+            },
             "non-utc" => command with { ValidUntil = command.ValidUntil.ToOffset(TimeSpan.FromHours(1)) },
             _ => throw new ArgumentOutOfRangeException(nameof(defect))
         };
@@ -74,9 +92,14 @@ public sealed class ModerationClassificationMaterialCommandTests
         var record = Record();
         var command = new AcceptModerationClassificationMaterialCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = record.Target, ExpectedQualificationRevision = 3,
-            SourceId = record.SourceId, ReviewId = Guid.CreateVersion7(), ExpectedSourceRevision = 1,
-            ExpectedSourceWriterGeneration = 2, ValidUntil = record.ValidUntil
+            OperationId = Guid.CreateVersion7(),
+            Target = record.Target,
+            ExpectedQualificationRevision = 3,
+            SourceId = record.SourceId,
+            ReviewId = Guid.CreateVersion7(),
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 2,
+            ValidUntil = record.ValidUntil
         };
         command = defect switch
         {
@@ -101,8 +124,12 @@ public sealed class ModerationClassificationMaterialCommandTests
     {
         var command = new EndModerationClassificationMaterialCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = Record().Target, ExpectedQualificationRevision = 4,
-            ReviewId = Guid.CreateVersion7(), ExpectedReviewRevision = revision, End = ending,
+            OperationId = Guid.CreateVersion7(),
+            Target = Record().Target,
+            ExpectedQualificationRevision = 4,
+            ReviewId = Guid.CreateVersion7(),
+            ExpectedReviewRevision = revision,
+            End = ending,
             Grounds = "Accountable correction of exact reviewed material."
         };
         await Assert.That((await new ModerationClassificationMaterialCommandValidator<EndModerationClassificationMaterialCommand>()
@@ -116,14 +143,22 @@ public sealed class ModerationClassificationMaterialCommandTests
         var material = new ModerationClassificationMaterial(Guid.NewGuid(), Guid.NewGuid(), null, null, null, null);
         return new()
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 1,
             Target = AuthorityScope.Tenant(AuthorityScope.Instance(AuthorityScope.Solution(
                 AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()), Guid.CreateVersion7()),
                 Guid.CreateVersion7()),
-            SourceId = Guid.CreateVersion7(), ExpectedMaterialGeneration = 0, EventGenerationId = Guid.CreateVersion7(),
-            PolicyId = Guid.CreateVersion7(), ExpectedPolicyRevision = 1, PublicationId = Guid.CreateVersion7(),
-            ProfileId = Guid.CreateVersion7(), Mode = ModerationNativeMode.Embedded, TaxonomyId = Guid.CreateVersion7(),
-            ExpectedTaxonomySourceId = Guid.CreateVersion7(), ExpectedTaxonomyAdoptionId = Guid.CreateVersion7(),
+            SourceId = Guid.CreateVersion7(),
+            ExpectedMaterialGeneration = 0,
+            EventGenerationId = Guid.CreateVersion7(),
+            PolicyId = Guid.CreateVersion7(),
+            ExpectedPolicyRevision = 1,
+            PublicationId = Guid.CreateVersion7(),
+            ProfileId = Guid.CreateVersion7(),
+            Mode = ModerationNativeMode.Embedded,
+            TaxonomyId = Guid.CreateVersion7(),
+            ExpectedTaxonomySourceId = Guid.CreateVersion7(),
+            ExpectedTaxonomyAdoptionId = Guid.CreateVersion7(),
             Mandate = new(owner, owner, Guid.CreateVersion7(), 1, reviewer, reviewer,
                 "Current event ownership assignment.", "Independent material review mandate."),
             Materials = [new(Guid.CreateVersion7(), material, [Guid.CreateVersion7()])],

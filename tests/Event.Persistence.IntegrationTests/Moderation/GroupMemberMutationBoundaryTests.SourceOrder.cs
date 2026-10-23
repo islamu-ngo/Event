@@ -28,8 +28,11 @@ public sealed partial class GroupMemberMutationBoundaryTests
         {
             seed.Actors.Add(new Actor
             {
-                Id = actorId, GroupId = groupId, ActorTypeId = (int)ActorTypeEnum.Group,
-                ActorType = null!, Pii = new ActorPii { ActorId = actorId, DisplayName = "Native group" }
+                Id = actorId,
+                GroupId = groupId,
+                ActorTypeId = (int)ActorTypeEnum.Group,
+                ActorType = null!,
+                Pii = new ActorPii { ActorId = actorId, DisplayName = "Native group" }
             });
             await seed.SaveChangesAsync();
         }
@@ -40,8 +43,11 @@ public sealed partial class GroupMemberMutationBoundaryTests
         var handler = new UpdateGroupMemberRoleCommandHandler(new GroupMemberRepository(context),
             new UserContext(session.Http), database, session.Boundary);
         var revision = await RevisionAsync(context);
-        var result = await handler.ExecuteAsync(new() { UpdateGroupMemberRoleDto = new()
-            { Id = target, Role = RoleEnum.GroupAdmin } }, default);
+        var result = await handler.ExecuteAsync(new()
+        {
+            UpdateGroupMemberRoleDto = new()
+            { Id = target, Role = RoleEnum.GroupAdmin }
+        }, default);
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(order.ObservedTenant).IsTrue();
         await Assert.That(order.GroupWasHeld).IsTrue();

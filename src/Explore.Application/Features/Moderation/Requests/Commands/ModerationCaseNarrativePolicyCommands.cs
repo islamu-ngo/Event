@@ -15,8 +15,14 @@ public sealed record RecordModerationCaseNarrativePolicyCommand : ModerationQual
 
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationCaseNarrativePolicySource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, TargetKind = TargetKind, Terms = Terms, Ownership = Ownership, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        TargetKind = TargetKind,
+        Terms = Terms,
+        Ownership = Ownership,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -30,9 +36,14 @@ public sealed record AdoptModerationCaseNarrativePolicyCommand : ModerationQuali
 
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationCaseNarrativePolicySource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration, AdoptionId = AdoptionId, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration,
+        AdoptionId = AdoptionId,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -43,7 +54,10 @@ public sealed record WithdrawModerationCaseNarrativePolicyCommand : ModerationQu
 
     internal override ModerationQualificationMutation ToMutation() => new WithdrawModerationCaseNarrativeAdoption
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision
     };
 }

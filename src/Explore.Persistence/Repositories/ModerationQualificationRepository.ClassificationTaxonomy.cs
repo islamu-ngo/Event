@@ -89,12 +89,12 @@ public sealed partial class ModerationQualificationRepository
             // Stable lookup/code identity across every historical generation, even if a category
             // was omitted from the latest snapshot. Meanings/floors change only in new versions.
             if (await (from item in context.Set<ModerationClassificationTaxonomyCategory>().AsNoTracking()
-                join retained in context.Set<ModerationClassificationTaxonomySource>().AsNoTracking() on item.SourceId equals retained.Id
-                where retained.HostBindingId == authority.Binding.Id && retained.TenantId == authority.Tenant.Id
-                    && retained.TaxonomyId == request.TaxonomyId
-                    && (item.CategoryId == category.CategoryId && item.Code != category.Code
-                        || item.Code == category.Code && item.CategoryId != category.CategoryId)
-                select item.Id).AnyAsync(token))
+                       join retained in context.Set<ModerationClassificationTaxonomySource>().AsNoTracking() on item.SourceId equals retained.Id
+                       where retained.HostBindingId == authority.Binding.Id && retained.TenantId == authority.Tenant.Id
+                           && retained.TaxonomyId == request.TaxonomyId
+                           && (item.CategoryId == category.CategoryId && item.Code != category.Code
+                               || item.Code == category.Code && item.CategoryId != category.CategoryId)
+                       select item.Id).AnyAsync(token))
                 throw new AbortQualification(ModerationQualificationWriteOutcome.Conflict);
         }
         var source = ModerationClassificationTaxonomySource.Record(request.SourceId, request.TaxonomyId,

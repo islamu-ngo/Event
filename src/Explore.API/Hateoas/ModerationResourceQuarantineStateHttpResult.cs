@@ -60,9 +60,11 @@ public sealed class ModerationResourceQuarantineStateHttpResult(
             else if (!disclosed)
                 await new ObjectResult(new ProblemDetails
                 {
-                    Status = StatusCodes.Status404NotFound, Title = "Resource safety unavailable",
+                    Status = StatusCodes.Status404NotFound,
+                    Title = "Resource safety unavailable",
                     Detail = "The requested resource safety state is unavailable."
-                }) { StatusCode = StatusCodes.Status404NotFound }.ExecuteResultAsync(context);
+                })
+                { StatusCode = StatusCodes.Status404NotFound }.ExecuteResultAsync(context);
         }
         catch
         {

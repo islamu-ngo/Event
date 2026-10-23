@@ -36,8 +36,10 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That((await fixture.Writer(fixture.Database.AdminId).ExecuteAsync(
             new WithdrawModerationChildAgePolicyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = fixture.Database.Scope,
-                ExpectedQualificationRevision = 8, AdoptionId = fixture.ParentAdoption.AdoptionId,
+                OperationId = Guid.CreateVersion7(),
+                Target = fixture.Database.Scope,
+                ExpectedQualificationRevision = 8,
+                AdoptionId = fixture.ParentAdoption.AdoptionId,
                 ExpectedAdoptionRevision = 1
             })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         await fixture.Context.PlatformUserRoles.Where(row =>
@@ -325,8 +327,11 @@ public sealed partial class ModerationPolicyPublicationTests
         if (provider)
             await fixture.Context.UserExternalLogins.Where(row => row.Id == fixture.LoginId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.UserId, actor));
-        return new() { HttpContext = new DefaultHttpContext
-        { User = provider ? fixture.ProviderPrincipal() : IndividualPrincipal(actor) } };
+        return new()
+        {
+            HttpContext = new DefaultHttpContext
+            { User = provider ? fixture.ProviderPrincipal() : IndividualPrincipal(actor) }
+        };
     }
 
     private static ModerationProfileCollectionAssessmentRepository AssessmentWithdrawalOwner(

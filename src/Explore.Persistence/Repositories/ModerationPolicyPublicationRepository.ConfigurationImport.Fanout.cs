@@ -112,8 +112,10 @@ public sealed partial class ModerationPolicyPublicationRepository
                 CheckEpoch(after, item.Destination);
                 var unchangedAuthority = ModerationConfigurationImportAdapter.ComposeReserved(after with
                 {
-                    Epoch = item.Destination.Epoch, RequestEpoch = item.Destination.RequestEpoch,
-                    Selection = item.Destination.Selection, Current = item.Destination.Current,
+                    Epoch = item.Destination.Epoch,
+                    RequestEpoch = item.Destination.RequestEpoch,
+                    Selection = item.Destination.Selection,
+                    Current = item.Destination.Current,
                     Baseline = item.Destination.Baseline
                 }, item.Source.Document, inventory, item.Entry.Definition);
                 var restored = after.Current is null ? null : ModerationPolicyPublicationProjection.RestoreHistory(after.Current);

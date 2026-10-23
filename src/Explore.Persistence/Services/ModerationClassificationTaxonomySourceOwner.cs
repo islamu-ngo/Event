@@ -143,21 +143,35 @@ public sealed class ModerationClassificationTaxonomySourceOwner(
 
     internal static RecordModerationClassificationTaxonomySource RecordRequest(
         ModerationClassificationTaxonomySource source, AuthorityScope target) => new()
-    {
-        OperationId = Guid.Empty, Target = target, ExpectedQualificationRevision = source.WriterGeneration - 1,
-        SourceId = source.Id, TaxonomyId = source.TaxonomyId, ExpectedTaxonomyGeneration = source.PreviousGeneration,
-        PolicyId = source.PolicyId, ExpectedPolicyRevision = source.PolicyRevision, PublicationId = source.PublicationId,
-        ProfileId = source.ProfileId, Mode = (ModerationNativeMode)source.ModeCode, Mandate = source.Mandate,
-        Categories = source.Categories.Select(row => row.Terms).ToImmutableArray(), ValidUntil = source.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = target,
+            ExpectedQualificationRevision = source.WriterGeneration - 1,
+            SourceId = source.Id,
+            TaxonomyId = source.TaxonomyId,
+            ExpectedTaxonomyGeneration = source.PreviousGeneration,
+            PolicyId = source.PolicyId,
+            ExpectedPolicyRevision = source.PolicyRevision,
+            PublicationId = source.PublicationId,
+            ProfileId = source.ProfileId,
+            Mode = (ModerationNativeMode)source.ModeCode,
+            Mandate = source.Mandate,
+            Categories = source.Categories.Select(row => row.Terms).ToImmutableArray(),
+            ValidUntil = source.ValidUntil
+        };
 
     internal static AdoptModerationClassificationTaxonomySource AdoptionRequest(
         ModerationClassificationTaxonomyAdoption adoption, AuthorityScope target) => new()
-    {
-        OperationId = Guid.Empty, Target = target, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-        SourceId = adoption.SourceId, ExpectedSourceRevision = adoption.SourceRevision,
-        ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration, AdoptionId = adoption.Id, ValidUntil = adoption.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = target,
+            ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+            SourceId = adoption.SourceId,
+            ExpectedSourceRevision = adoption.SourceRevision,
+            ExpectedSourceWriterGeneration = adoption.SourceWriterGeneration,
+            AdoptionId = adoption.Id,
+            ValidUntil = adoption.ValidUntil
+        };
 
     internal static string Slot(IModerationSourceProvenance authority, Guid taxonomyId) =>
         $"moderation.classification-taxonomy:{authority.Binding.Id:N}:{authority.Tenant.Id:N}:{taxonomyId:N}";

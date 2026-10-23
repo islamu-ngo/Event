@@ -43,9 +43,12 @@ public sealed class ModerationRecognitionKeyLifecycleSnapshotTests
             using var ring = ModerationRecognitionKeyRing.Parse(new ResolvedSecret(
                 ModerationRecognitionKeyRing.SecretSettingKey, JsonSerializer.Serialize(new
                 {
-                    version = 1, trustDomainId = trust.ToString("D"), ringGeneration = lifecycle.RingGeneration,
+                    version = 1,
+                    trustDomainId = trust.ToString("D"),
+                    ringGeneration = lifecycle.RingGeneration,
                     issuedAt = clock.Now.ToString("O", CultureInfo.InvariantCulture),
-                    validUntil = clock.Now.AddMinutes(1).ToString("O", CultureInfo.InvariantCulture), keys = rows
+                    validUntil = clock.Now.AddMinutes(1).ToString("O", CultureInfo.InvariantCulture),
+                    keys = rows
                 }), SecretSourceType.EnvironmentVariable, SecretScope.Instance, null, clock.Now, "selected"),
                 trust, clock);
 
@@ -89,10 +92,12 @@ public sealed class ModerationRecognitionKeyLifecycleSnapshotTests
             using var ring = ModerationRecognitionKeyRing.Parse(new ResolvedSecret(
                 ModerationRecognitionKeyRing.SecretSettingKey, JsonSerializer.Serialize(new
                 {
-                    version = 1, trustDomainId = trust.ToString("D"),
+                    version = 1,
+                    trustDomainId = trust.ToString("D"),
                     ringGeneration = defect == "partial-overlap" ? 2 : 1,
                     issuedAt = clock.Now.ToString("O", CultureInfo.InvariantCulture),
-                    validUntil = clock.Now.AddMinutes(1).ToString("O", CultureInfo.InvariantCulture), keys = rows
+                    validUntil = clock.Now.AddMinutes(1).ToString("O", CultureInfo.InvariantCulture),
+                    keys = rows
                 }), SecretSourceType.EnvironmentVariable, SecretScope.Instance, null, clock.Now, "selected"),
                 trust, clock);
             if (defect == "expired") clock.Now = clock.Now.AddMinutes(1);

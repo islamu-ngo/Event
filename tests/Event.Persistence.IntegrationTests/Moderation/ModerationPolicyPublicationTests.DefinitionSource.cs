@@ -67,10 +67,12 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             var replacement = request with
             {
-                OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 2,
+                OperationId = Guid.CreateVersion7(),
+                ExpectedQualificationRevision = 2,
                 Proposed = request.Proposed with
                 {
-                    PublicationId = Guid.CreateVersion7(), RequestedState = ModerationPolicyRequestedState.Draft
+                    PublicationId = Guid.CreateVersion7(),
+                    RequestedState = ModerationPolicyRequestedState.Draft
                 }
             };
             await Assert.That((await publications.PublishAsync(replacement)).Outcome)

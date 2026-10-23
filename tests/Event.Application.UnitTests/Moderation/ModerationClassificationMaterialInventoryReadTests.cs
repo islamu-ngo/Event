@@ -105,7 +105,9 @@ public sealed class ModerationClassificationMaterialInventoryReadTests
         var reviewer = Guid.NewGuid();
         return new()
         {
-            EventGenerationId = Guid.CreateVersion7(), TaxonomyId = Guid.CreateVersion7(), ProfileId = Guid.CreateVersion7(),
+            EventGenerationId = Guid.CreateVersion7(),
+            TaxonomyId = Guid.CreateVersion7(),
+            ProfileId = Guid.CreateVersion7(),
             Mode = ModerationNativeMode.Embedded,
             Mandate = new(owner, owner, Guid.NewGuid(), 1, reviewer, reviewer,
                 "Current event ownership.", "Independent material review.")

@@ -52,8 +52,10 @@ public sealed class SettingsPersonalInfoTests : IDisposable
         transport.DeclaredAge = new
         {
             kind = declared ? "Declared" : "Unknown",
-            outcome = declared ? "AtLeastThreshold" : "Unknown", minimumAge = 18,
-            birthDateRevision = "1", evaluatedAt = DateTimeOffset.UtcNow,
+            outcome = declared ? "AtLeastThreshold" : "Unknown",
+            minimumAge = 18,
+            birthDateRevision = "1",
+            evaluatedAt = DateTimeOffset.UtcNow,
             validUntil = DateTimeOffset.UtcNow.AddMinutes(1)
         };
         var cut = _ctx.RenderMudComponent<SettingsPersonalInfo>();
@@ -194,14 +196,22 @@ public sealed class SettingsPersonalInfoTests : IDisposable
                 json = JsonSerializer.Serialize(new
                 {
                     options = (RefreshedAssessments ?? (multiple ? new[] { _firstAssessment, SecondAssessment } : new[] { _firstAssessment }))
-                        .Select(sourceId => new { assessment = new { sourceId, original = new { profileId = _profile } },
-                            validUntil = DateTimeOffset.UtcNow.AddMinutes(5), declaredAge = DeclaredAge }),
-                    birthDateStatus = new { revision = 0, hasDeclaration = false }, _links = links
+                        .Select(sourceId => new
+                        {
+                            assessment = new { sourceId, original = new { profileId = _profile } },
+                            validUntil = DateTimeOffset.UtcNow.AddMinutes(5),
+                            declaredAge = DeclaredAge
+                        }),
+                    birthDateStatus = new { revision = 0, hasDeclaration = false },
+                    _links = links
                 });
             }
             else json = JsonSerializer.Serialize(new
             {
-                id = _user, concurrencyStamp = Guid.CreateVersion7(), firstName = "Original", lastName = "User",
+                id = _user,
+                concurrencyStamp = Guid.CreateVersion7(),
+                firstName = "Original",
+                lastName = "User",
                 _links = image ? new Dictionary<string, object> { ["profile-image"] = new { href = "/profile-image", method = "PATCH" } } : []
             });
             return new HttpResponseMessage(HttpStatusCode.OK)

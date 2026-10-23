@@ -157,27 +157,58 @@ public sealed partial class ModerationPolicyPublicationTests
         var adopter = Guid.CreateVersion7();
         foreach (var human in new[] { owner, reviewer, adopter })
         {
-            context.Users.Add(new User { Id = human, Pii = new UserPii
-            { UserId = human, Email = $"{human:N}@example.invalid", FirstName = "Inventory", LastName = "Witness" } });
+            context.Users.Add(new User
+            {
+                Id = human,
+                Pii = new UserPii
+                { UserId = human, Email = $"{human:N}@example.invalid", FirstName = "Inventory", LastName = "Witness" }
+            });
             context.PlatformUserRoles.Add(new PlatformUserRole
             { Id = Guid.CreateVersion7(), UserId = human, User = null!, RoleId = (int)RoleEnum.Admin, Role = null! });
             context.TenantUsers.Add(new TenantUser
-            { Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, UserId = human, User = null!,
-                StatusId = (int)TenantUserStatusEnum.Active });
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                UserId = human,
+                User = null!,
+                StatusId = (int)TenantUserStatusEnum.Active
+            });
         }
         var actorId = Guid.CreateVersion7();
-        var actor = new Actor { Id = actorId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = owner, Pii = new ActorPii { ActorId = actorId, DisplayName = "Inventory publisher" } };
+        var actor = new Actor
+        {
+            Id = actorId,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = owner,
+            Pii = new ActorPii { ActorId = actorId, DisplayName = "Inventory publisher" }
+        };
         var owningEvent = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!, ActorId = actorId, Actor = actor,
-            Title = "Native inventory", SubmittedByUserId = owner,
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            ActorId = actorId,
+            Actor = actor,
+            Title = "Native inventory",
+            SubmittedByUserId = owner,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Private, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!
+            VisibilityTypeId = (int)VisibilityTypeEnum.Private,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!
         };
-        var child = new EventSession { Id = Guid.CreateVersion7(), EventId = owningEvent.Id, Event = owningEvent,
-            TenantId = database.TenantId, Tenant = null!, Title = "Original session" };
+        var child = new EventSession
+        {
+            Id = Guid.CreateVersion7(),
+            EventId = owningEvent.Id,
+            Event = owningEvent,
+            TenantId = database.TenantId,
+            Tenant = null!,
+            Title = "Original session"
+        };
         var ownership = EventRoleAssignment.Create(database.TenantId, owningEvent.Id, owner, (int)RoleEnum.EventOwner,
             EventRoleAssignmentStatus.Active, Now.AddHours(-1).UtcDateTime, Now.AddHours(1).UtcDateTime, database.AdminId);
         var form = RegistrationForm.Create(database.TenantId, owningEvent.Id, "event", "registration", "Inventory form", Now.UtcDateTime);
@@ -201,17 +232,35 @@ public sealed partial class ModerationPolicyPublicationTests
         var ownerAvailability = Guid.CreateVersion7();
         var reviewerAvailability = Guid.CreateVersion7();
         await Known(owner, new RecordModerationConstitutionAvailability
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            AvailabilityId = ownerAvailability, MaximumCaseload = 5, ValidUntil = Now.AddMinutes(9) });
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            AvailabilityId = ownerAvailability,
+            MaximumCaseload = 5,
+            ValidUntil = Now.AddMinutes(9)
+        });
         await Known(reviewer, new RecordModerationConstitutionAvailability
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            AvailabilityId = reviewerAvailability, MaximumCaseload = 5, ValidUntil = Now.AddMinutes(9) });
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            AvailabilityId = reviewerAvailability,
+            MaximumCaseload = 5,
+            ValidUntil = Now.AddMinutes(9)
+        });
         var constitution = new RecordModerationConstitutionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(8),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddMinutes(8),
             Terms = new(ModerationScopeKind.Tenant, ModerationConstitutionEvidence.QualifiedFindingsAndResponse,
                 ModerationConstitutionRemedies.RestrictedAuthenticationAndProofBoundRecovery,
                 ModerationConstitutionIndependence.DistinctControllersAndImplicatedPartyExclusion,
@@ -228,30 +277,59 @@ public sealed partial class ModerationPolicyPublicationTests
         await Known(database.AdminId, constitution);
         var governanceAdoption = Guid.CreateVersion7();
         await Known(adopter, new AdoptModerationConstitutionSource
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = constitution.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            AdoptionId = governanceAdoption, ValidUntil = Now.AddMinutes(7) });
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = constitution.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            AdoptionId = governanceAdoption,
+            ValidUntil = Now.AddMinutes(7)
+        });
         var age = new RecordModerationChildAgePolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), PolicyId = constitution.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = constitution.PublicationId, ProfileId = constitution.ProfileId, Mode = constitution.Mode,
-            ValidUntil = Now.AddMinutes(7), Terms = ChildAgeTerms(),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = constitution.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = constitution.PublicationId,
+            ProfileId = constitution.ProfileId,
+            Mode = constitution.Mode,
+            ValidUntil = Now.AddMinutes(7),
+            Terms = ChildAgeTerms(),
             Ownership = new(reviewer, reviewer, owner, owner, database.AdminId,
                 "Distinct controllers.", "Privacy mandate.", "Safeguarding mandate.", "Collection mandate.")
         };
         await Known(database.AdminId, age);
         var ageAdoption = Guid.CreateVersion7();
         await Known(reviewer, new AdoptModerationChildAgePolicySource
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = age.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            AdoptionId = ageAdoption, ValidUntil = Now.AddMinutes(6) });
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = age.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            AdoptionId = ageAdoption,
+            ValidUntil = Now.AddMinutes(6)
+        });
         var taxonomy = new RecordModerationClassificationTaxonomySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), TaxonomyId = Guid.CreateVersion7(), ExpectedTaxonomyGeneration = 0,
-            PolicyId = constitution.PolicyId, ExpectedPolicyRevision = 1, PublicationId = constitution.PublicationId,
-            ProfileId = constitution.ProfileId, Mode = constitution.Mode, ValidUntil = Now.AddMinutes(5),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            TaxonomyId = Guid.CreateVersion7(),
+            ExpectedTaxonomyGeneration = 0,
+            PolicyId = constitution.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = constitution.PublicationId,
+            ProfileId = constitution.ProfileId,
+            Mode = constitution.Mode,
+            ValidUntil = Now.AddMinutes(5),
             Mandate = new(owner, owner, reviewer, reviewer, "Taxonomy coordinator.", "Independent category meaning review."),
             Categories = [new(Guid.CreateVersion7(), 1, "debate", EventContentClassificationVersion.CategoryKind.Debate,
                 18, "Debate category.", "Adopted audience floor.")]
@@ -259,12 +337,26 @@ public sealed partial class ModerationPolicyPublicationTests
         await Known(owner, taxonomy);
         var taxonomyAdoption = Guid.CreateVersion7();
         await Known(reviewer, new AdoptModerationClassificationTaxonomySource
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = taxonomy.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = generation,
-            AdoptionId = taxonomyAdoption, ValidUntil = Now.AddMinutes(4) });
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = taxonomy.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = generation,
+            AdoptionId = taxonomyAdoption,
+            ValidUntil = Now.AddMinutes(4)
+        });
         var eventGeneration = new RecordModerationEventGenerationSource
-        { OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-            SourceId = Guid.CreateVersion7(), EventId = owningEvent.Id, ExpectedEventRevision = 0, ValidUntil = Now.AddMinutes(4) };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = generation,
+            SourceId = Guid.CreateVersion7(),
+            EventId = owningEvent.Id,
+            ExpectedEventRevision = 0,
+            ValidUntil = Now.AddMinutes(4)
+        };
         await Known(database.AdminId, eventGeneration);
         var mandate = new ModerationClassificationMaterialMandate(owner, owner, ownership.Id, 1, reviewer, reviewer,
             "Actual Event owner.", "Complete independently reviewed inventory.");
@@ -283,22 +375,38 @@ public sealed partial class ModerationPolicyPublicationTests
             proposalId = Guid.CreateVersion7();
             await Known(owner, new RecordModerationClassificationMaterialSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                SourceId = proposalId.Value, ExpectedMaterialGeneration = 0, EventGenerationId = eventGeneration.SourceId,
-                PolicyId = constitution.PolicyId, ExpectedPolicyRevision = 1, PublicationId = constitution.PublicationId,
-                ProfileId = constitution.ProfileId, Mode = constitution.Mode, TaxonomyId = taxonomy.TaxonomyId,
-                ExpectedTaxonomySourceId = taxonomy.SourceId, ExpectedTaxonomyAdoptionId = taxonomyAdoption,
-                Mandate = mandate, Materials = observed.Materials.Select(material => new ModerationClassificationMaterialSelection(
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = generation,
+                SourceId = proposalId.Value,
+                ExpectedMaterialGeneration = 0,
+                EventGenerationId = eventGeneration.SourceId,
+                PolicyId = constitution.PolicyId,
+                ExpectedPolicyRevision = 1,
+                PublicationId = constitution.PublicationId,
+                ProfileId = constitution.ProfileId,
+                Mode = constitution.Mode,
+                TaxonomyId = taxonomy.TaxonomyId,
+                ExpectedTaxonomySourceId = taxonomy.SourceId,
+                ExpectedTaxonomyAdoptionId = taxonomyAdoption,
+                Mandate = mandate,
+                Materials = observed.Materials.Select(material => new ModerationClassificationMaterialSelection(
                     Guid.CreateVersion7(), material, [taxonomy.Categories[0].VersionId])).ToImmutableArray(),
-                Components = observed.Components, ValidUntil = Now.AddMinutes(3)
+                Components = observed.Components,
+                ValidUntil = Now.AddMinutes(3)
             });
             expectedHead = generation;
             if (change == InventoryReadChange.AlreadyAccepted)
                 await Known(reviewer, new AcceptModerationClassificationMaterialSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = generation,
-                    SourceId = proposalId.Value, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = expectedHead,
-                    ReviewId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(2)
+                    OperationId = Guid.CreateVersion7(),
+                    Target = database.Scope,
+                    ExpectedQualificationRevision = generation,
+                    SourceId = proposalId.Value,
+                    ExpectedSourceRevision = 1,
+                    ExpectedSourceWriterGeneration = expectedHead,
+                    ReviewId = Guid.CreateVersion7(),
+                    ValidUntil = Now.AddMinutes(2)
                 });
         }
         var readerIdentity = DeploymentIdentity(context, change == InventoryReadChange.NonOwner ? database.AdminId : owner);
@@ -311,8 +419,12 @@ public sealed partial class ModerationPolicyPublicationTests
         if (change == InventoryReadChange.ForeignHuman) readRequest = readRequest with { HumanId = reviewer };
         if (change == InventoryReadChange.ForeignTenant) readRequest = readRequest with { RequestTenantId = Guid.CreateVersion7() };
         if (change == InventoryReadChange.NonOwner)
-            readRequest = readRequest with { HumanId = database.AdminId, Mandate = mandate with
-                { OwnerHumanId = database.AdminId, OwnerControllerHumanId = database.AdminId } };
+            readRequest = readRequest with
+            {
+                HumanId = database.AdminId,
+                Mandate = mandate with
+                { OwnerHumanId = database.AdminId, OwnerControllerHumanId = database.AdminId }
+            };
         if (change == InventoryReadChange.UnqualifiedReviewer)
             readRequest = readRequest with { Mandate = mandate with { ReviewerHumanId = adopter, ReviewerControllerHumanId = adopter } };
         if (change == InventoryReadChange.WrongProfile) readRequest = readRequest with { ProfileId = Guid.CreateVersion7() };

@@ -24,9 +24,15 @@ public sealed class EventTeamMutationIdentityTests
     {
         await using var database = await SourceDatabase.CreateAsync();
         await using var context = database.Context();
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
+        var http = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(
             new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, database.SubjectId.ToString("D"))],
-                failure == "anonymous" ? null : "event-team-native-witness")) } };
+                failure == "anonymous" ? null : "event-team-native-witness"))
+            }
+        };
         var identity = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
             NullLogger<AdminContext>.Instance);

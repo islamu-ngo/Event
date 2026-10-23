@@ -123,8 +123,15 @@ public sealed partial class ModerationOriginalEffectCompletionRepository
                 || !resource.ModerationQuarantines.Any(row => row.Id == cause.Id))
                 throw new CompletionPending(ModerationOriginalEffectCompletionPendingReason.OriginalCauseAccounting);
             facts.Add(Digest(cause));
-            facts.Add(Digest(new { generation.Id, generation.Revision, generation.WriterGeneration, AdoptionId = adoption.Id,
-                AdoptionRevision = adoption.Revision, adoption.ValidUntil }));
+            facts.Add(Digest(new
+            {
+                generation.Id,
+                generation.Revision,
+                generation.WriterGeneration,
+                AdoptionId = adoption.Id,
+                AdoptionRevision = adoption.Revision,
+                adoption.ValidUntil
+            }));
         }
         return until;
     }

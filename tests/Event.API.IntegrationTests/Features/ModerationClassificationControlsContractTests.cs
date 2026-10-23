@@ -56,8 +56,11 @@ public sealed class ModerationClassificationControlsContractTests
         };
         var action = await controller.Revoke(Guid.Empty, new RevokeModerationClassificationEventTargetCommand
         {
-            OperationId = adoption.OperationId, Target = adoption.Target, ExpectedQualificationRevision = 6,
-            AdoptionId = adoption.AdoptionId, ExpectedAdoptionRevision = 1,
+            OperationId = adoption.OperationId,
+            Target = adoption.Target,
+            ExpectedQualificationRevision = 6,
+            AdoptionId = adoption.AdoptionId,
+            ExpectedAdoptionRevision = 1,
             Grounds = "End the independently adopted material control."
         }, CancellationToken.None);
         var failure = (ObjectResult)action.Result!;
@@ -72,10 +75,16 @@ public sealed class ModerationClassificationControlsContractTests
             Guid.CreateVersion7());
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = AuthorityScope.Event(tenant, Guid.NewGuid()),
-            ExpectedQualificationRevision = 5, AdoptionId = Guid.CreateVersion7(), SelectionId = Guid.CreateVersion7(),
-            ExpectedSelectionRevision = 1, BindingOrdinal = 0, EventGenerationId = Guid.CreateVersion7(),
-            ExpectedEventGenerationRevision = 1, ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
+            OperationId = Guid.CreateVersion7(),
+            Target = AuthorityScope.Event(tenant, Guid.NewGuid()),
+            ExpectedQualificationRevision = 5,
+            AdoptionId = Guid.CreateVersion7(),
+            SelectionId = Guid.CreateVersion7(),
+            ExpectedSelectionRevision = 1,
+            BindingOrdinal = 0,
+            EventGenerationId = Guid.CreateVersion7(),
+            ExpectedEventGenerationRevision = 1,
+            ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
         };
     }
 }

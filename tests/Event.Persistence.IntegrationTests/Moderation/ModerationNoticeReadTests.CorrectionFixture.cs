@@ -340,15 +340,21 @@ public sealed partial class ModerationNoticeReadTests
         var epoch = await read.ModerationQualificationEpochs.AsNoTracking().SingleAsync();
         var intent = originalIntent with
         {
-            ApprovalId = Guid.CreateVersion7(), EffectId = effect.Id, ExpectedDecisionRevision = effect.DecisionRevision,
+            ApprovalId = Guid.CreateVersion7(),
+            EffectId = effect.Id,
+            ExpectedDecisionRevision = effect.DecisionRevision,
             RemainingActions = new("The named sanction is revoked; current rights must be recomputed independently."),
-            ValidUntil = fixture.Clock.GetUtcNow().AddSeconds(20), RetainUntil = original.Source.RetainUntil!.Value,
+            ValidUntil = fixture.Clock.GetUtcNow().AddSeconds(20),
+            RetainUntil = original.Source.RetainUntil!.Value,
             ContentRepresentatives = []
         };
         return new(original, effect, new ApproveModerationNoticeCorrectionDisclosureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = decision.Scope, ExpectedQualificationRevision = epoch.Revision,
-            Intent = intent, ExpectedPendingSnapshotHash = source.SnapshotHash,
+            OperationId = Guid.CreateVersion7(),
+            Target = decision.Scope,
+            ExpectedQualificationRevision = epoch.Revision,
+            Intent = intent,
+            ExpectedPendingSnapshotHash = source.SnapshotHash,
             ExpectedPendingEffectBindingHash = source.EffectBindingHash
         });
     }
@@ -377,8 +383,10 @@ public sealed partial class ModerationNoticeReadTests
             templateEffect.QualificationRevision, capturedAt, null, null);
         var intent = fixture.Approval.Intent with
         {
-            ApprovalId = Guid.CreateVersion7(), EffectId = effect.Id,
-            RuleMeaning = new(classification.Meaning), ReasonMeaning = new(reason.Meaning)
+            ApprovalId = Guid.CreateVersion7(),
+            EffectId = effect.Id,
+            RuleMeaning = new(classification.Meaning),
+            ReasonMeaning = new(reason.Meaning)
         };
         var approval = ModerationNoticeDisclosureApproval.Approve(intent, fixture.Database.HostId,
             effect.TrustDomainId, fixture.Database.TenantId, fixture.Database.AdministratorId, 1, capturedAt);
@@ -387,11 +395,16 @@ public sealed partial class ModerationNoticeReadTests
             Finding = template.Finding! with { Reason = new(profile.Reason.OwnerId, profile.Reason.Code, profile.Reason.Revision) },
             Notice = template.Notice! with
             {
-                EffectId = effect.Id, OperationId = effect.OperationId, OperationKind = (int)ModerationOperationKind.Activate,
-                CapturedAt = capturedAt, ApprovalId = approval.Id, CatalogueRevision = publication.CatalogueRevision,
+                EffectId = effect.Id,
+                OperationId = effect.OperationId,
+                OperationKind = (int)ModerationOperationKind.Activate,
+                CapturedAt = capturedAt,
+                ApprovalId = approval.Id,
+                CatalogueRevision = publication.CatalogueRevision,
                 ProfileSource = new(publication.Id, publication.Revision, publication.WriterGeneration),
                 Reason = new(profile.Reason.OwnerId, profile.Reason.Code, profile.Reason.Revision),
-                RuleMeaning = intent.RuleMeaning, ReasonMeaning = intent.ReasonMeaning
+                RuleMeaning = intent.RuleMeaning,
+                ReasonMeaning = intent.ReasonMeaning
             }
         };
         var source = ModerationNoticeSource.Capture(effect, fixture.Database.TenantId,

@@ -20,7 +20,8 @@ public sealed class ModerationReconciliationOptionsTests
     {
         var options = new ModerationReconciliationOptions
         {
-            Enabled = true, TenantId = Guid.CreateVersion7()
+            Enabled = true,
+            TenantId = Guid.CreateVersion7()
         };
         switch (invalid)
         {

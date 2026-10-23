@@ -81,13 +81,13 @@ public sealed class EventResourceQuarantineDisclosureTests
                     ? seed.PublicMaterialId : seed.PrivateMaterialId, surface);
         }
         foreach (var id in new[] { seed.PublicId, seed.PrivateId })
-        foreach (string suffix in new[] { "content", "access" })
-        {
-            using var denied = await client.GetAsync($"/api/eventresource/{id:D}/{suffix}", Token);
-            await Assert.That(denied.IsSuccessStatusCode).IsFalse();
-            await Assert.That(denied.Headers.Location).IsNull();
-            await Assert.That(denied.Content.Headers.ContentDisposition).IsNull();
-        }
+            foreach (string suffix in new[] { "content", "access" })
+            {
+                using var denied = await client.GetAsync($"/api/eventresource/{id:D}/{suffix}", Token);
+                await Assert.That(denied.IsSuccessStatusCode).IsFalse();
+                await Assert.That(denied.Headers.Location).IsNull();
+                await Assert.That(denied.Content.Headers.ContentDisposition).IsNull();
+            }
         if (seed.StorageId is { } storageId)
         {
             foreach (string suffix in new[] { "", "/content", "/presigned-url", "/public" })
@@ -232,17 +232,22 @@ public sealed class EventResourceQuarantineDisclosureTests
         {
             database.SystemSettings.AddRange(new SystemSetting
             {
-                SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider, Value = "\"local\"",
-                ValueType = SettingValueType.String, Category = "Security"
+                SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
+                Category = "Security"
             }, new SystemSetting
             {
-                SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments, Value = "true",
-                ValueType = SettingValueType.Boolean, Category = "EventResources"
+                SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
+                Value = "true",
+                ValueType = SettingValueType.Boolean,
+                Category = "EventResources"
             }, new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.ExternalOrigins,
                 Value = "[\"https://quarantined.example.test\"]",
-                ValueType = SettingValueType.Json, Category = "EventResources"
+                ValueType = SettingValueType.Json,
+                Category = "EventResources"
             });
             var user = await database.Users.SingleAsync(row => row.Pii!.Email == credentials.Identifier, Token);
             userId = user.Id;
@@ -250,17 +255,30 @@ public sealed class EventResourceQuarantineDisclosureTests
             var now = DateTime.UtcNow;
             database.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = user.Id, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = user.Id,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = now
             });
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Native quarantine disclosure", TenantId = PlatformDefaults.DefaultTenantId,
-                Tenant = null!, ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Native quarantine disclosure",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(now);
             database.Events.Add(parent);
@@ -271,9 +289,12 @@ public sealed class EventResourceQuarantineDisclosureTests
                 var resource = EventResource.CreateDraft(id, PlatformDefaults.DefaultTenantId, eventId, null,
                     new EventResourceMetadata
                     {
-                        Title = "Restricted embedded title", PublicTitle = isPublic ? "Public embedded title" : null,
-                        Description = "Private description", SensitiveNotes = "Private management note",
-                        LanguageCode = "en", AccessibilityNote = "Private accessibility note",
+                        Title = "Restricted embedded title",
+                        PublicTitle = isPublic ? "Public embedded title" : null,
+                        Description = "Private description",
+                        SensitiveNotes = "Private management note",
+                        LanguageCode = "en",
+                        AccessibilityNote = "Private accessibility note",
                         Kind = EventResourceKindEnum.GeneralDocument,
                         DisclosureMode = isPublic ? EventResourceDisclosureModeEnum.Public : EventResourceDisclosureModeEnum.EligibleOnly,
                         AccessibleAlternativeEventResourceId = isPublic ? privateId : null
@@ -288,14 +309,26 @@ public sealed class EventResourceQuarantineDisclosureTests
                     string checksum = Convert.ToHexString(SHA256.HashData("private bytes"u8));
                     var storage = new StorageObject
                     {
-                        Id = storageId, TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                        FileTypeId = (int)FileTypeEnum.Document, FileType = null!, Provider = StorageProviders.Local,
+                        Id = storageId,
+                        TenantId = PlatformDefaults.DefaultTenantId,
+                        Tenant = null!,
+                        FileTypeId = (int)FileTypeEnum.Document,
+                        FileType = null!,
+                        Provider = StorageProviders.Local,
                         ObjectKey = $"tenants/{PlatformDefaults.DefaultTenantId:N}/{storageId:N}.pdf",
-                        StorageProviderBindingId = binding.Id, FullName = "private-name.pdf", SafeDisplayName = "private-name.pdf",
-                        Extension = ".pdf", ContentType = EventResourceGovernancePolicy.PdfMediaType,
-                        Size = 13, Sha256Checksum = checksum, Purpose = StorageObjectPurposes.EventResource,
-                        Visibility = StorageObjectVisibilities.PrivateOwner, OwningResourceKind = StorageOwningResourceKinds.EventResource,
-                        OwningResourceId = id, LifecycleState = StorageObjectLifecycleStates.Active, CreatedBy = user.Id
+                        StorageProviderBindingId = binding.Id,
+                        FullName = "private-name.pdf",
+                        SafeDisplayName = "private-name.pdf",
+                        Extension = ".pdf",
+                        ContentType = EventResourceGovernancePolicy.PdfMediaType,
+                        Size = 13,
+                        Sha256Checksum = checksum,
+                        Purpose = StorageObjectPurposes.EventResource,
+                        Visibility = StorageObjectVisibilities.PrivateOwner,
+                        OwningResourceKind = StorageOwningResourceKinds.EventResource,
+                        OwningResourceId = id,
+                        LifecycleState = StorageObjectLifecycleStates.Active,
+                        CreatedBy = user.Id
                     };
                     storage.RecordEventResourceInspection(storageId, checksum);
                     database.StorageObjects.Add(storage);

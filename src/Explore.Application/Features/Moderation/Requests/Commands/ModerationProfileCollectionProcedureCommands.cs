@@ -20,13 +20,18 @@ public sealed record RecordModerationProfileCollectionProcedureCommand : Moderat
 
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationProfileCollectionProcedureSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ChildAgeSourceId = ChildAgeSourceId,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ChildAgeSourceId = ChildAgeSourceId,
         ExpectedChildAgeSourceRevision = ExpectedChildAgeSourceRevision,
         ExpectedChildAgeSourceWriterGeneration = ExpectedChildAgeSourceWriterGeneration,
-        ChildAgeAdoptionId = ChildAgeAdoptionId, ExpectedChildAgeAdoptionRevision = ExpectedChildAgeAdoptionRevision,
+        ChildAgeAdoptionId = ChildAgeAdoptionId,
+        ExpectedChildAgeAdoptionRevision = ExpectedChildAgeAdoptionRevision,
         ExpectedChildAgeAdoptionWriterGeneration = ExpectedChildAgeAdoptionWriterGeneration,
-        Procedure = Procedure, ValidUntil = ValidUntil
+        Procedure = Procedure,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -41,9 +46,14 @@ public sealed record AdoptModerationProfileCollectionProcedureCommand : Moderati
 
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationProfileCollectionProcedureSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration, AdoptionId = AdoptionId, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration,
+        AdoptionId = AdoptionId,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -55,7 +65,10 @@ public sealed record WithdrawModerationProfileCollectionProcedureCommand : Moder
 
     internal override ModerationQualificationMutation ToMutation() => new WithdrawModerationProfileCollectionProcedureAdoption
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision
     };
 }

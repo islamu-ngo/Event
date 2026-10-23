@@ -31,7 +31,10 @@ public sealed class ModerationRecognitionDispositionAcceptance
             throw new InvalidOperationException("Acceptance belongs to the exact independently authenticated owner operation.");
         return new()
         {
-            DispositionId = disposition.Id, Role = role, HumanId = human, AcceptedRevision = (long)role,
+            DispositionId = disposition.Id,
+            Role = role,
+            HumanId = human,
+            AcceptedRevision = (long)role,
             AcceptedAt = role == ModerationRecognitionDispositionAcceptanceRole.RecoveryOwner
                 ? disposition.AssessedAt : disposition.AuthorizedAt!.Value,
             RequestDigest = Digest(disposition, role)
@@ -62,12 +65,32 @@ public sealed class ModerationRecognitionDispositionAcceptance
     private static string Digest(ModerationRecognitionDisposition row, ModerationRecognitionDispositionAcceptanceRole role) =>
         Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
         {
-            row.Id, row.IntentId, row.SubjectId, row.PolicyVersion, row.ReasonCode, row.PendingRevision,
-            row.SourceId, row.SourceRevision, row.SourceGeneration, row.AdoptionId, row.AdoptionRevision,
-            row.AdoptionGeneration, row.PrivacyOwnerHumanId, row.RecoveryOwnerHumanId,
-            row.OriginalMaterialReceipt, row.OriginalMaterialCount, row.ObservedMaterialCommitment,
-            row.CoverageReceipt, row.CoverageCount, row.Grounds, row.ObservedFailure, row.GroundsReceipt,
-            row.LegalMandateReceipt, row.OriginalDeadline, row.AssessedAt, row.ValidUntil,
+            row.Id,
+            row.IntentId,
+            row.SubjectId,
+            row.PolicyVersion,
+            row.ReasonCode,
+            row.PendingRevision,
+            row.SourceId,
+            row.SourceRevision,
+            row.SourceGeneration,
+            row.AdoptionId,
+            row.AdoptionRevision,
+            row.AdoptionGeneration,
+            row.PrivacyOwnerHumanId,
+            row.RecoveryOwnerHumanId,
+            row.OriginalMaterialReceipt,
+            row.OriginalMaterialCount,
+            row.ObservedMaterialCommitment,
+            row.CoverageReceipt,
+            row.CoverageCount,
+            row.Grounds,
+            row.ObservedFailure,
+            row.GroundsReceipt,
+            row.LegalMandateReceipt,
+            row.OriginalDeadline,
+            row.AssessedAt,
+            row.ValidUntil,
             Role = role,
             AuthorizedAt = role == ModerationRecognitionDispositionAcceptanceRole.PrivacyOwner ? row.AuthorizedAt : null,
             AuthorityHighWater = role == ModerationRecognitionDispositionAcceptanceRole.PrivacyOwner

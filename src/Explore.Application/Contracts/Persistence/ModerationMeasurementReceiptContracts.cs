@@ -185,25 +185,39 @@ public sealed class ModerationMeasurementReceiptJsonConverter : JsonConverter<Mo
         return new()
         {
             Issuer = Text(root, "iss"),
-            ReceiptId = Id(root, "receiptId"), ChallengeId = Id(root, "challengeId"),
-            ChallengeNonce = Digest(root, "challengeNonce"), RunId = Id(root, "runId"),
-            HostBindingId = Id(root, "hostBindingId"), TrustDomainId = Id(root, "trustDomainId"), TenantId = Id(root, "tenantId"),
+            ReceiptId = Id(root, "receiptId"),
+            ChallengeId = Id(root, "challengeId"),
+            ChallengeNonce = Digest(root, "challengeNonce"),
+            RunId = Id(root, "runId"),
+            HostBindingId = Id(root, "hostBindingId"),
+            TrustDomainId = Id(root, "trustDomainId"),
+            TenantId = Id(root, "tenantId"),
             Binding = new(Id(binding, "policyId"), Revision(binding, "policyRevision"), Id(binding, "publicationId"),
                 scope, ruleReference, Named<ModerationCapability>(binding, "capability"), Named<ModerationNativeMode>(binding, "mode")),
-            ConsumerId = Text(root, "consumerId"), ConsumerContractDigest = Digest(root, "consumerContractDigest"),
-            InstallationId = Id(root, "installationId"), InstallationRevision = Revision(root, "installationRevision"),
+            ConsumerId = Text(root, "consumerId"),
+            ConsumerContractDigest = Digest(root, "consumerContractDigest"),
+            InstallationId = Id(root, "installationId"),
+            InstallationRevision = Revision(root, "installationRevision"),
             InstallationWriterGeneration = Revision(root, "installationWriterGeneration"),
-            RuntimeGeneration = Text(root, "runtimeGeneration"), InventoryFingerprint = Digest(root, "inventoryFingerprint"),
-            RunnerDigest = Digest(root, "runnerDigest"), CatalogueDigest = Digest(root, "catalogueDigest"),
-            TestBundleDigest = Digest(root, "testBundleDigest"), ProductArtifactDigest = Digest(root, "productArtifactDigest"),
-            ConfigurationDigest = Digest(root, "configurationDigest"), ProviderCode = Text(root, "providerCode"),
+            RuntimeGeneration = Text(root, "runtimeGeneration"),
+            InventoryFingerprint = Digest(root, "inventoryFingerprint"),
+            RunnerDigest = Digest(root, "runnerDigest"),
+            CatalogueDigest = Digest(root, "catalogueDigest"),
+            TestBundleDigest = Digest(root, "testBundleDigest"),
+            ProductArtifactDigest = Digest(root, "productArtifactDigest"),
+            ConfigurationDigest = Digest(root, "configurationDigest"),
+            ProviderCode = Text(root, "providerCode"),
             PrimaryConfigurationDigest = Digest(root, "primaryConfigurationDigest"),
             TestConfigurationDigest = Digest(root, "testConfigurationDigest"),
-            ProviderVersion = Text(root, "providerVersion"), CaseIds = identities.MoveToImmutable(),
-            ExecutedCount = executed, AttemptCount = PositiveInt(root, "attemptCount"),
+            ProviderVersion = Text(root, "providerVersion"),
+            CaseIds = identities.MoveToImmutable(),
+            ExecutedCount = executed,
+            AttemptCount = PositiveInt(root, "attemptCount"),
             ResultArtifactDigest = Digest(root, "resultArtifactDigest"),
-            StartedAt = Instant(root, "startedAt"), CompletedAt = Instant(root, "completedAt"),
-            IssuedAt = Instant(root, "issuedAt"), ValidUntil = Instant(root, "validUntil")
+            StartedAt = Instant(root, "startedAt"),
+            CompletedAt = Instant(root, "completedAt"),
+            IssuedAt = Instant(root, "issuedAt"),
+            ValidUntil = Instant(root, "validUntil")
         };
     }
 
@@ -213,38 +227,65 @@ public sealed class ModerationMeasurementReceiptJsonConverter : JsonConverter<Mo
         // Own the wire spelling independently of ambient serializer policies.
         JsonSerializer.Serialize(writer, new
         {
-            version = 1, iss = value.Issuer, aud = ModerationMeasurementReceipt.RequiredAudience,
-            receiptId = value.ReceiptId, challengeId = value.ChallengeId, challengeNonce = value.ChallengeNonce, runId = value.RunId,
-            hostBindingId = value.HostBindingId, trustDomainId = value.TrustDomainId, tenantId = value.TenantId,
+            version = 1,
+            iss = value.Issuer,
+            aud = ModerationMeasurementReceipt.RequiredAudience,
+            receiptId = value.ReceiptId,
+            challengeId = value.ChallengeId,
+            challengeNonce = value.ChallengeNonce,
+            runId = value.RunId,
+            hostBindingId = value.HostBindingId,
+            trustDomainId = value.TrustDomainId,
+            tenantId = value.TenantId,
             binding = new
             {
-                policyId = value.Binding.PolicyId, policyRevision = Decimal(value.Binding.PolicyRevision),
+                policyId = value.Binding.PolicyId,
+                policyRevision = Decimal(value.Binding.PolicyRevision),
                 publicationId = value.Binding.PublicationId,
                 jurisdiction = new
                 {
-                    kind = coordinates.Kind.ToString(), trustDomainId = coordinates.TrustDomainId,
-                    solutionId = coordinates.SolutionId, instanceId = coordinates.InstanceId, tenantId = coordinates.TenantId,
-                    communityId = coordinates.CommunityId, resourceId = coordinates.ResourceId,
+                    kind = coordinates.Kind.ToString(),
+                    trustDomainId = coordinates.TrustDomainId,
+                    solutionId = coordinates.SolutionId,
+                    instanceId = coordinates.InstanceId,
+                    tenantId = coordinates.TenantId,
+                    communityId = coordinates.CommunityId,
+                    resourceId = coordinates.ResourceId,
                     eventId = coordinates.EventId
                 },
                 rule = new
                 {
-                    ownerId = value.Binding.Rule.OwnerId, code = value.Binding.Rule.Code,
+                    ownerId = value.Binding.Rule.OwnerId,
+                    code = value.Binding.Rule.Code,
                     revision = Decimal(value.Binding.Rule.Revision)
                 },
-                capability = value.Binding.Capability.ToString(), mode = value.Binding.Mode.ToString()
+                capability = value.Binding.Capability.ToString(),
+                mode = value.Binding.Mode.ToString()
             },
-            consumerId = value.ConsumerId, consumerContractDigest = value.ConsumerContractDigest,
-            installationId = value.InstallationId, installationRevision = Decimal(value.InstallationRevision),
+            consumerId = value.ConsumerId,
+            consumerContractDigest = value.ConsumerContractDigest,
+            installationId = value.InstallationId,
+            installationRevision = Decimal(value.InstallationRevision),
             installationWriterGeneration = Decimal(value.InstallationWriterGeneration),
-            runtimeGeneration = value.RuntimeGeneration, inventoryFingerprint = value.InventoryFingerprint,
-            runnerDigest = value.RunnerDigest, catalogueDigest = value.CatalogueDigest,
-            testBundleDigest = value.TestBundleDigest, productArtifactDigest = value.ProductArtifactDigest,
-            configurationDigest = value.ConfigurationDigest, providerCode = value.ProviderCode, providerVersion = value.ProviderVersion,
-            primaryConfigurationDigest = value.PrimaryConfigurationDigest, testConfigurationDigest = value.TestConfigurationDigest,
-            caseIds = value.CaseIds, executedCount = value.ExecutedCount, attemptCount = value.AttemptCount,
-            resultArtifactDigest = value.ResultArtifactDigest, startedAt = Timestamp(value.StartedAt),
-            completedAt = Timestamp(value.CompletedAt), issuedAt = Timestamp(value.IssuedAt), validUntil = Timestamp(value.ValidUntil)
+            runtimeGeneration = value.RuntimeGeneration,
+            inventoryFingerprint = value.InventoryFingerprint,
+            runnerDigest = value.RunnerDigest,
+            catalogueDigest = value.CatalogueDigest,
+            testBundleDigest = value.TestBundleDigest,
+            productArtifactDigest = value.ProductArtifactDigest,
+            configurationDigest = value.ConfigurationDigest,
+            providerCode = value.ProviderCode,
+            providerVersion = value.ProviderVersion,
+            primaryConfigurationDigest = value.PrimaryConfigurationDigest,
+            testConfigurationDigest = value.TestConfigurationDigest,
+            caseIds = value.CaseIds,
+            executedCount = value.ExecutedCount,
+            attemptCount = value.AttemptCount,
+            resultArtifactDigest = value.ResultArtifactDigest,
+            startedAt = Timestamp(value.StartedAt),
+            completedAt = Timestamp(value.CompletedAt),
+            issuedAt = Timestamp(value.IssuedAt),
+            validUntil = Timestamp(value.ValidUntil)
         });
     }
 

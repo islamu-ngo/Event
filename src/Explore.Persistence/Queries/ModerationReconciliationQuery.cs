@@ -72,14 +72,34 @@ public sealed class ModerationReconciliationQuery(
                 orderby sanction.Id
                 select new
                 {
-                    sanction.Id, sanction.DecisionId, SanctionRevision = sanction.Revision, DecisionRevision = decision.Revision,
-                    sanction.SubjectKind, sanction.SubjectId, sanction.SubjectOriginKind, sanction.SubjectOriginTrustDomainId,
-                    sanction.SubjectOriginSolutionId, sanction.SubjectOriginInstanceId, sanction.SubjectOriginTenantId,
-                    sanction.SubjectOriginCommunityId, sanction.SubjectOriginResourceId, sanction.SubjectOriginEventId,
-                    sanction.ScopeKind, sanction.ScopeTrustDomainId, sanction.ScopeSolutionId, sanction.ScopeInstanceId,
-                    sanction.ScopeTenantId, sanction.ScopeCommunityId, sanction.ScopeResourceId, sanction.ScopeEventId,
-                    sanction.RuleOwnerId, sanction.RuleCode, sanction.RuleRevision,
-                    sanction.StartsAt, sanction.EndsAt, sanction.State
+                    sanction.Id,
+                    sanction.DecisionId,
+                    SanctionRevision = sanction.Revision,
+                    DecisionRevision = decision.Revision,
+                    sanction.SubjectKind,
+                    sanction.SubjectId,
+                    sanction.SubjectOriginKind,
+                    sanction.SubjectOriginTrustDomainId,
+                    sanction.SubjectOriginSolutionId,
+                    sanction.SubjectOriginInstanceId,
+                    sanction.SubjectOriginTenantId,
+                    sanction.SubjectOriginCommunityId,
+                    sanction.SubjectOriginResourceId,
+                    sanction.SubjectOriginEventId,
+                    sanction.ScopeKind,
+                    sanction.ScopeTrustDomainId,
+                    sanction.ScopeSolutionId,
+                    sanction.ScopeInstanceId,
+                    sanction.ScopeTenantId,
+                    sanction.ScopeCommunityId,
+                    sanction.ScopeResourceId,
+                    sanction.ScopeEventId,
+                    sanction.RuleOwnerId,
+                    sanction.RuleCode,
+                    sanction.RuleRevision,
+                    sanction.StartsAt,
+                    sanction.EndsAt,
+                    sanction.State
                 }).Take(batchSize).ToListAsync(cancellationToken);
             var targets = new List<ModerationReconciliationTarget>();
             foreach (var row in rows)

@@ -98,7 +98,8 @@ public sealed partial class ModerationRecognitionErasureRepository
         await RelationalEntityRowFence.AcquireGlobalAsync<ModerationRecognitionPending>(context, request.IntentId, token);
         var authority = new CaptureAuthority(host, humans)
         {
-            RecaptureBindings = recapture.Bindings, CaptureItems = recapture.Items
+            RecaptureBindings = recapture.Bindings,
+            CaptureItems = recapture.Items
         };
         await AcquireCaptureCanonicalAnchorsAsync(request.SubjectId, authority, token);
         return authority;

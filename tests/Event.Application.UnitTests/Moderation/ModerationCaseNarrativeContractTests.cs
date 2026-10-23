@@ -14,7 +14,8 @@ public sealed class ModerationCaseNarrativeContractTests
         var command = new SubmitModerationAllegationCommand
         {
             OperationId = Guid.CreateVersion7(),
-            ReceiptId = Guid.CreateVersion7(), PresentedToken = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32),
+            ReceiptId = Guid.CreateVersion7(),
+            PresentedToken = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32),
             Narrative = bytes
         };
         bytes.AsSpan().Clear();

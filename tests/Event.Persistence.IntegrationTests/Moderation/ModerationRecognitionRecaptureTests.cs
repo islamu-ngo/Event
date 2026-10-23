@@ -261,12 +261,17 @@ public sealed partial class ModerationPolicyPublicationTests
                     await fence.MatchAndBindAsync(account, subject, login, Database.Scope.Id, replacementProvisioning: true, ct);
                     if (provisioning) context.Users.Add(new User
                     {
-                        Id = subject, Pii = new UserPii { UserId = subject, FirstName = "Fresh", LastName = "Alias", Email = string.Empty }
+                        Id = subject,
+                        Pii = new UserPii { UserId = subject, FirstName = "Fresh", LastName = "Alias", Email = string.Empty }
                     });
                     context.UserExternalLogins.Add(new UserExternalLogin
                     {
-                        Id = login, UserId = subject, User = null!,
-                        AuthenticationProviderId = (int)account.ProviderKind, AuthenticationProvider = null!, ProviderKey = account.Value
+                        Id = login,
+                        UserId = subject,
+                        User = null!,
+                        AuthenticationProviderId = (int)account.ProviderKind,
+                        AuthenticationProvider = null!,
+                        ProviderKey = account.Value
                     });
                     await context.SaveChangesAsync(ct);
                     return true;

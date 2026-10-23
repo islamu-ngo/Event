@@ -201,7 +201,11 @@ public sealed partial class ModerationResourceQuarantineReleaseRepository
         var reviewers = await context.ModerationReviewerAssignments.AsNoTracking()
             .Where(row => ids.Contains(row.Id)).Select(row => new
             {
-                row.ReviewerHumanId, row.AssignedByHumanId, row.ControllerHumanId, row.QualifiedByHumanId, row.AssessedByHumanId
+                row.ReviewerHumanId,
+                row.AssignedByHumanId,
+                row.ControllerHumanId,
+                row.QualifiedByHumanId,
+                row.AssessedByHumanId
             }).ToArrayAsync(token);
         foreach (var row in reviewers)
             Add([row.ReviewerHumanId, row.AssignedByHumanId, row.ControllerHumanId, row.QualifiedByHumanId, row.AssessedByHumanId]);

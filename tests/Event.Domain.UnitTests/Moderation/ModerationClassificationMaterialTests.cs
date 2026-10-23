@@ -189,11 +189,22 @@ public sealed class ModerationClassificationMaterialTests
             TaxonomyAdoption = ModerationClassificationTaxonomyAdoption.Adopt(Guid.CreateVersion7(), Taxonomy, Reviewer, 8, Now, Now.AddMinutes(5));
             Generation = new()
             {
-                Id = Guid.CreateVersion7(), HostBindingId = Age.HostBindingId, TrustDomainId = Age.TrustDomainId,
-                TenantId = Age.TenantId, EventId = Guid.CreateVersion7(), EventStamp = Guid.NewGuid(),
-                ActorId = Guid.CreateVersion7(), ActorStamp = Guid.NewGuid(), OrganizerActorId = null, OrganizerActorStamp = null,
-                SubmittedByHumanId = Owner, ObservedByHumanId = recorder, Revision = 1, WriterGeneration = 3,
-                ObservedAt = Now, ValidUntil = Now.AddMinutes(8)
+                Id = Guid.CreateVersion7(),
+                HostBindingId = Age.HostBindingId,
+                TrustDomainId = Age.TrustDomainId,
+                TenantId = Age.TenantId,
+                EventId = Guid.CreateVersion7(),
+                EventStamp = Guid.NewGuid(),
+                ActorId = Guid.CreateVersion7(),
+                ActorStamp = Guid.NewGuid(),
+                OrganizerActorId = null,
+                OrganizerActorStamp = null,
+                SubmittedByHumanId = Owner,
+                ObservedByHumanId = recorder,
+                Revision = 1,
+                WriterGeneration = 3,
+                ObservedAt = Now,
+                ValidUntil = Now.AddMinutes(8)
             };
             Mandate = new(Owner, Owner, Guid.CreateVersion7(), 1, Reviewer, Reviewer,
                 "Owner-qualified complete Event proposal.", "Independent review of exact forms, purpose and material.");

@@ -119,7 +119,9 @@ public sealed class EventPublicationModerationSnapshotReaderCreationEpochTests
         epoch.Advance(original.QualificationRevision);
         var principal = new ServicePrincipal
         {
-            Id = Guid.CreateVersion7(), Code = $"replacement-{database.TenantId:N}", DisplayName = "Replacement maintenance"
+            Id = Guid.CreateVersion7(),
+            Code = $"replacement-{database.TenantId:N}",
+            DisplayName = "Replacement maintenance"
         };
         context.ServicePrincipals.Add(principal);
         await context.SaveChangesAsync();

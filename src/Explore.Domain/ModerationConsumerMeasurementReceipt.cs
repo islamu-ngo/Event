@@ -45,11 +45,21 @@ public sealed class ModerationConsumerMeasurementReceipt
     {
         var receipt = new ModerationConsumerMeasurementReceipt
         {
-            Id = id, HostBindingId = hostBindingId, TrustDomainId = trustDomainId, TenantId = tenantId,
-            ChallengeId = challengeId, IssuerEnrollmentId = issuerEnrollmentId, IssuerKeyId = issuerKeyId,
-            RunId = runId, SignedToken = signedToken, TokenDigest = tokenDigest,
-            AcceptedByHumanId = acceptedByHumanId, WriterGeneration = writerGeneration, Revision = 1,
-            AcceptedAt = acceptedAt.ToUniversalTime(), ValidUntil = validUntil.ToUniversalTime()
+            Id = id,
+            HostBindingId = hostBindingId,
+            TrustDomainId = trustDomainId,
+            TenantId = tenantId,
+            ChallengeId = challengeId,
+            IssuerEnrollmentId = issuerEnrollmentId,
+            IssuerKeyId = issuerKeyId,
+            RunId = runId,
+            SignedToken = signedToken,
+            TokenDigest = tokenDigest,
+            AcceptedByHumanId = acceptedByHumanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            AcceptedAt = acceptedAt.ToUniversalTime(),
+            ValidUntil = validUntil.ToUniversalTime()
         };
         receipt.ValidatePersistedState();
         return receipt;

@@ -38,7 +38,8 @@ public sealed class ModerationCaseNarrativeQualificationTests
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, allegation)).IsSuccess).IsTrue();
         var complaint = Request(database) with
         {
-            ExpectedQualificationRevision = 2, TargetKind = targetKind,
+            ExpectedQualificationRevision = 2,
+            TargetKind = targetKind,
             Terms = new(ModerationCaseNarrativePurpose.ProtectedContestation, TimeSpan.FromMinutes(20), 2048)
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, complaint)).IsSuccess).IsTrue();
@@ -52,7 +53,8 @@ public sealed class ModerationCaseNarrativeQualificationTests
         }
         var complaintAdoption = Adopt(complaint, database) with
         {
-            ExpectedQualificationRevision = 4, ExpectedSourceWriterGeneration = 3
+            ExpectedQualificationRevision = 4,
+            ExpectedSourceWriterGeneration = 3
         };
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, complaintAdoption)).IsSuccess).IsTrue();
         await using var context = database.Context();
@@ -79,7 +81,8 @@ public sealed class ModerationCaseNarrativeQualificationTests
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, allegation)).IsSuccess).IsTrue();
         var investigation = Request(database) with
         {
-            ExpectedQualificationRevision = 2, TargetKind = ModerationCaseTargetKind.ParticipantIncident,
+            ExpectedQualificationRevision = 2,
+            TargetKind = ModerationCaseTargetKind.ParticipantIncident,
             Terms = new(ModerationCaseNarrativePurpose.ParticipantInvestigation, TimeSpan.FromMinutes(30), 4096)
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, investigation)).IsSuccess).IsTrue();
@@ -87,7 +90,8 @@ public sealed class ModerationCaseNarrativeQualificationTests
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, allegationAdoption)).IsSuccess).IsTrue();
         var investigationAdoption = Adopt(investigation, database) with
         {
-            ExpectedQualificationRevision = 4, ExpectedSourceWriterGeneration = 3
+            ExpectedQualificationRevision = 4,
+            ExpectedSourceWriterGeneration = 3
         };
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, investigationAdoption)).IsSuccess).IsTrue();
         await using var context = database.Context();
@@ -194,8 +198,11 @@ public sealed class ModerationCaseNarrativeQualificationTests
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, adoption)).IsSuccess).IsTrue();
         var withdrawal = new WithdrawModerationCaseNarrativeAdoption
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            AdoptionId = adoption.AdoptionId, ExpectedAdoptionRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            AdoptionId = adoption.AdoptionId,
+            ExpectedAdoptionRevision = 1
         };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, withdrawal)).IsSuccess).IsTrue();
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, adoption)).IsSuccess).IsFalse();
@@ -203,8 +210,11 @@ public sealed class ModerationCaseNarrativeQualificationTests
 
     internal static RecordModerationCaseNarrativePolicySource Request(SourceDatabase database) => new()
     {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 1,
-        SourceId = Guid.CreateVersion7(), TargetKind = ModerationCaseTargetKind.Service,
+        OperationId = Guid.CreateVersion7(),
+        Target = database.Scope,
+        ExpectedQualificationRevision = 1,
+        SourceId = Guid.CreateVersion7(),
+        TargetKind = ModerationCaseTargetKind.Service,
         Terms = new(ModerationCaseNarrativePurpose.ConfidentialAllegation, TimeSpan.FromHours(1), 4096),
         Ownership = new(database.UrgencyAssessorId, database.ReviewerId, database.AdministratorId,
             "Separately accountable canonical controller review.",
@@ -214,9 +224,14 @@ public sealed class ModerationCaseNarrativeQualificationTests
 
     private static AdoptModerationCaseNarrativePolicySource Adopt(
         RecordModerationCaseNarrativePolicySource source, SourceDatabase database) => new()
-    {
-        OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-        SourceId = source.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 2,
-        AdoptionId = Guid.CreateVersion7(), ValidUntil = source.ValidUntil
-    };
+        {
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = source.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 2,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = source.ValidUntil
+        };
 }

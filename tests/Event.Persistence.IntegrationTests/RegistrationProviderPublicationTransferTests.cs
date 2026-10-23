@@ -131,14 +131,19 @@ public sealed class RegistrationProviderPublicationTransferTests
         var drop = new DropTableOperation { Name = publication.Name, Schema = publication.Schema };
         var restoreKey = new AddUniqueConstraintOperation
         {
-            Name = "ak_restore_publication", Table = BindingTable(publication.Name), Schema = publication.Schema,
+            Name = "ak_restore_publication",
+            Table = BindingTable(publication.Name),
+            Schema = publication.Schema,
             Columns = ["tenant_id", "id", "published_mapping_revision_hash_key"]
         };
         var restoreForeignKey = new AddForeignKeyOperation
         {
-            Name = "fk_restore_publication", Table = AttemptsTable(publication.Name), Schema = publication.Schema,
+            Name = "fk_restore_publication",
+            Table = AttemptsTable(publication.Name),
+            Schema = publication.Schema,
             Columns = ["tenant_id", "registration_provider_binding_id", "provider_mapping_revision_hash_key"],
-            PrincipalTable = restoreKey.Table, PrincipalSchema = restoreKey.Schema,
+            PrincipalTable = restoreKey.Table,
+            PrincipalSchema = restoreKey.Schema,
             PrincipalColumns = restoreKey.Columns
         };
         var prepared = Prepare(context, [drop, restoreKey, restoreForeignKey]);
@@ -164,12 +169,20 @@ public sealed class RegistrationProviderPublicationTransferTests
         var publication = PublicationTable(context);
         var alteration = new AlterColumnOperation
         {
-            Name = "published_mapping_revision_hash", Table = BindingTable(publication.Name), Schema = publication.Schema,
-            ClrType = typeof(string), ColumnType = "TEXT", MaxLength = 44, IsNullable = true,
+            Name = "published_mapping_revision_hash",
+            Table = BindingTable(publication.Name),
+            Schema = publication.Schema,
+            ClrType = typeof(string),
+            ColumnType = "TEXT",
+            MaxLength = 44,
+            IsNullable = true,
             Collation = provider switch { "PostgreSql" => "C", "SqlServer" => "Latin1_General_100_BIN2", "MySql" => "ascii_bin", _ => "BINARY" },
             OldColumn = new AddColumnOperation
             {
-                ClrType = typeof(string), ColumnType = "TEXT", MaxLength = 44, IsNullable = true
+                ClrType = typeof(string),
+                ColumnType = "TEXT",
+                MaxLength = 44,
+                IsNullable = true
             }
         };
         var prepared = Prepare(context, [alteration, publication]);
@@ -190,12 +203,20 @@ public sealed class RegistrationProviderPublicationTransferTests
         var publication = PublicationTable(context);
         var alteration = new AlterColumnOperation
         {
-            Name = "published_mapping_revision_hash", Table = BindingTable(publication.Name), Schema = publication.Schema,
-            ClrType = typeof(string), ColumnType = "varchar(44)", MaxLength = 44, IsNullable = true,
+            Name = "published_mapping_revision_hash",
+            Table = BindingTable(publication.Name),
+            Schema = publication.Schema,
+            ClrType = typeof(string),
+            ColumnType = "varchar(44)",
+            MaxLength = 44,
+            IsNullable = true,
             Collation = reverse ? null : "ascii_bin",
             OldColumn = new AddColumnOperation
             {
-                ClrType = typeof(string), ColumnType = "varchar(44)", MaxLength = 44, IsNullable = true,
+                ClrType = typeof(string),
+                ColumnType = "varchar(44)",
+                MaxLength = 44,
+                IsNullable = true,
                 Collation = reverse ? "ascii_bin" : null
             }
         };
@@ -274,7 +295,9 @@ public sealed class RegistrationProviderPublicationTransferTests
         var publication = PublicationTable(context);
         var restoreKey = new AddUniqueConstraintOperation
         {
-            Name = "ak_restore_publication", Table = BindingTable(publication.Name), Schema = publication.Schema,
+            Name = "ak_restore_publication",
+            Table = BindingTable(publication.Name),
+            Schema = publication.Schema,
             Columns = ["tenant_id", "id", "published_mapping_revision_hash_key"]
         };
         MigrationOperation[] inverse =
@@ -349,16 +372,22 @@ public sealed class RegistrationProviderPublicationTransferTests
             case "reverse-foreign-key":
                 publication.ForeignKeys.Add(new AddForeignKeyOperation
                 {
-                    Table = publication.Name, Name = "fk_cycle", Columns = ["tenant_id", "registration_provider_binding_id"],
-                    PrincipalTable = BindingTable(publication.Name), PrincipalColumns = ["tenant_id", "id"]
+                    Table = publication.Name,
+                    Name = "fk_cycle",
+                    Columns = ["tenant_id", "registration_provider_binding_id"],
+                    PrincipalTable = BindingTable(publication.Name),
+                    PrincipalColumns = ["tenant_id", "id"]
                 });
                 break;
             case "missing-column": publication.Columns.RemoveAt(0); break;
             case "changed-evidence":
                 operations.Add(new AlterColumnOperation
                 {
-                    Table = BindingTable(publication.Name), Schema = publication.Schema,
-                    Name = "published_at", ClrType = typeof(DateTime), IsNullable = true
+                    Table = BindingTable(publication.Name),
+                    Schema = publication.Schema,
+                    Name = "published_at",
+                    ClrType = typeof(DateTime),
+                    IsNullable = true
                 });
                 break;
             case "dropped-bindings":
@@ -379,7 +408,9 @@ public sealed class RegistrationProviderPublicationTransferTests
             case "changed-attempt-evidence":
                 operations.Add(new DropColumnOperation
                 {
-                    Table = AttemptsTable(publication.Name), Schema = publication.Schema, Name = "provider_mapping_revision_hash_key"
+                    Table = AttemptsTable(publication.Name),
+                    Schema = publication.Schema,
+                    Name = "provider_mapping_revision_hash_key"
                 });
                 break;
             case "unknown-raw-sql":
@@ -433,23 +464,32 @@ public sealed class RegistrationProviderPublicationTransferTests
         })
             table.Columns.Add(new AddColumnOperation
             {
-                Name = name, Table = table.Name, Schema = table.Schema, ClrType = type,
+                Name = name,
+                Table = table.Name,
+                Schema = table.Schema,
+                ClrType = type,
                 MaxLength = type == typeof(string) ? 44 : null
             });
         table.PrimaryKey = new AddPrimaryKeyOperation { Name = "pk_transfer_publication", Table = table.Name, Schema = table.Schema, Columns = ["id"] };
         table.UniqueConstraints.Add(new AddUniqueConstraintOperation
         {
-            Name = "ak_transfer_publication", Table = table.Name, Schema = table.Schema,
+            Name = "ak_transfer_publication",
+            Table = table.Name,
+            Schema = table.Schema,
             Columns = ["tenant_id", "registration_provider_binding_id", "mapping_revision_hash_key"]
         });
         table.UniqueConstraints.Add(new AddUniqueConstraintOperation
         {
-            Name = "ak_transfer_publication_time", Table = table.Name, Schema = table.Schema,
+            Name = "ak_transfer_publication_time",
+            Table = table.Name,
+            Schema = table.Schema,
             Columns = ["tenant_id", "registration_provider_binding_id", "mapping_revision_hash_key", "published_at"]
         });
         table.UniqueConstraints.Add(new AddUniqueConstraintOperation
         {
-            Name = "ak_transfer_publication_binding", Table = table.Name, Schema = table.Schema,
+            Name = "ak_transfer_publication_binding",
+            Table = table.Name,
+            Schema = table.Schema,
             Columns = ["tenant_id", "registration_provider_binding_id"]
         });
         return table;
@@ -457,10 +497,13 @@ public sealed class RegistrationProviderPublicationTransferTests
 
     private static AddForeignKeyOperation PublicationForeignKey(CreateTableOperation publication, string table, bool binding) => new()
     {
-        Name = binding ? "fk_binding_publication" : "fk_attempt_publication", Table = table, Schema = publication.Schema,
+        Name = binding ? "fk_binding_publication" : "fk_attempt_publication",
+        Table = table,
+        Schema = publication.Schema,
         Columns = binding ? ["tenant_id", "id", "published_mapping_revision_hash_key", "published_at"]
             : ["tenant_id", "registration_provider_binding_id", "provider_mapping_revision_hash_key"],
-        PrincipalTable = publication.Name, PrincipalSchema = publication.Schema,
+        PrincipalTable = publication.Name,
+        PrincipalSchema = publication.Schema,
         PrincipalColumns = binding ? ["tenant_id", "registration_provider_binding_id", "mapping_revision_hash_key", "published_at"]
             : ["tenant_id", "registration_provider_binding_id", "mapping_revision_hash_key"]
     };

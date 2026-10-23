@@ -15,8 +15,13 @@ public sealed record RecordModerationOperationalBudgetCommand : ModerationQualif
 
     internal override ModerationQualificationMutation ToMutation() => new RecordModerationOperationalBudgetSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, Terms = Terms, OperatorHumanId = OperatorHumanId, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        Terms = Terms,
+        OperatorHumanId = OperatorHumanId,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -31,9 +36,14 @@ public sealed record AdoptModerationOperationalBudgetCommand : ModerationQualifi
 
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationOperationalBudgetSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration, AdoptionId = AdoptionId, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceWriterGeneration = ExpectedSourceWriterGeneration,
+        AdoptionId = AdoptionId,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -45,7 +55,10 @@ public sealed record WithdrawModerationOperationalBudgetCommand : ModerationQual
 
     internal override ModerationQualificationMutation ToMutation() => new WithdrawModerationOperationalBudgetAdoption
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision
     };
 }

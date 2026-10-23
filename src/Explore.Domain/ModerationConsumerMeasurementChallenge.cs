@@ -46,16 +46,29 @@ public sealed class ModerationConsumerMeasurementChallenge
             throw new ArgumentException("Measurement preparation requires the exact live installation and its finite authority window.");
         var challenge = new ModerationConsumerMeasurementChallenge
         {
-            Id = id, HostBindingId = installed.HostBindingId, TrustDomainId = installed.TrustDomainId,
-            TenantId = installed.TenantId, InstallationId = installed.Id, InstallationRevision = installed.Revision,
-            InstallationWriterGeneration = installed.WriterGeneration, ConsumerId = installed.ConsumerId,
-            ModeCode = installed.ModeCode, RuntimeGeneration = installed.RuntimeGeneration,
-            InventoryFingerprint = installed.InventoryFingerprint, PublicationId = publicationId,
+            Id = id,
+            HostBindingId = installed.HostBindingId,
+            TrustDomainId = installed.TrustDomainId,
+            TenantId = installed.TenantId,
+            InstallationId = installed.Id,
+            InstallationRevision = installed.Revision,
+            InstallationWriterGeneration = installed.WriterGeneration,
+            ConsumerId = installed.ConsumerId,
+            ModeCode = installed.ModeCode,
+            RuntimeGeneration = installed.RuntimeGeneration,
+            InventoryFingerprint = installed.InventoryFingerprint,
+            PublicationId = publicationId,
             DefinitionId = definitionId,
-            BindingDigest = bindingDigest, ConsumerContractDigest = consumerContractDigest, Nonce = nonce,
-            PreparedByHumanId = humanId, WriterGeneration = writerGeneration, Revision = 1,
-            PreparedAt = now.ToUniversalTime(), ValidUntil = validUntil,
-            OriginalEffectId = originalEffectId, OriginalSnapshotHash = originalSnapshotHash,
+            BindingDigest = bindingDigest,
+            ConsumerContractDigest = consumerContractDigest,
+            Nonce = nonce,
+            PreparedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            PreparedAt = now.ToUniversalTime(),
+            ValidUntil = validUntil,
+            OriginalEffectId = originalEffectId,
+            OriginalSnapshotHash = originalSnapshotHash,
             OriginalEffectBindingHash = originalEffectBindingHash
         };
         challenge.ValidatePersistedState();

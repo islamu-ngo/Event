@@ -24,9 +24,15 @@ public sealed class ModerationProfileConfigurationObservationTests
         await using var owner = database;
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, new AdoptModerationProfileSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            AdoptionId = Guid.CreateVersion7(), SelectionId = targetSource.SelectionId, Mode = ModerationNativeMode.Embedded,
-            CaseId = targetSource.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(5)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            AdoptionId = Guid.CreateVersion7(),
+            SelectionId = targetSource.SelectionId,
+            Mode = ModerationNativeMode.Embedded,
+            CaseId = targetSource.CaseId,
+            ExpectedCaseRevision = 1,
+            ValidUntil = Now.AddMinutes(5)
         })).IsSuccess).IsTrue();
         ModerationDecision original;
         ModerationContributionSelection selection;
@@ -89,9 +95,15 @@ public sealed class ModerationProfileConfigurationObservationTests
         var adoptionId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, new AdoptModerationProfileSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            AdoptionId = adoptionId, SelectionId = targetSource.SelectionId, Mode = ModerationNativeMode.Embedded,
-            CaseId = targetSource.CaseId, ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(5)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            AdoptionId = adoptionId,
+            SelectionId = targetSource.SelectionId,
+            Mode = ModerationNativeMode.Embedded,
+            CaseId = targetSource.CaseId,
+            ExpectedCaseRevision = 1,
+            ValidUntil = Now.AddMinutes(5)
         })).IsSuccess).IsTrue();
         ModerationContributionSelection selection;
         ModerationDecision original;
@@ -106,8 +118,13 @@ public sealed class ModerationProfileConfigurationObservationTests
         if (change == 1)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RevokeModerationProfileSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-                AdoptionId = adoptionId, ExpectedAdoptionRevision = 1, CaseId = original.CaseId, ExpectedCaseRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 6,
+                AdoptionId = adoptionId,
+                ExpectedAdoptionRevision = 1,
+                CaseId = original.CaseId,
+                ExpectedCaseRevision = 1
             })).IsSuccess).IsTrue();
         if (change is 2 or 3 or 4 or 9)
         {

@@ -40,17 +40,32 @@ public sealed class ModerationClassificationTaxonomyCommandTests
             "overflow-head" => command with { ExpectedTaxonomyGeneration = long.MaxValue },
             "default-categories" => command with { Categories = default },
             "empty-categories" => command with { Categories = [] },
-            "duplicate-lookup" => command with { Categories = [command.Categories[0],
-                command.Categories[0] with { VersionId = Guid.CreateVersion7(), Code = "other" }] },
-            "duplicate-code" => command with { Categories = [command.Categories[0],
-                command.Categories[0] with { VersionId = Guid.CreateVersion7(), CategoryId = 2 }] },
-            "duplicate-version" => command with { Categories = [command.Categories[0],
-                command.Categories[0] with { CategoryId = 2, Code = "other" }] },
+            "duplicate-lookup" => command with
+            {
+                Categories = [command.Categories[0],
+                command.Categories[0] with { VersionId = Guid.CreateVersion7(), Code = "other" }]
+            },
+            "duplicate-code" => command with
+            {
+                Categories = [command.Categories[0],
+                command.Categories[0] with { VersionId = Guid.CreateVersion7(), CategoryId = 2 }]
+            },
+            "duplicate-version" => command with
+            {
+                Categories = [command.Categories[0],
+                command.Categories[0] with { CategoryId = 2, Code = "other" }]
+            },
             "invalid-code" => command with { Categories = [command.Categories[0] with { Code = "general " }] },
-            "unknown-kind" => command with { Categories = [command.Categories[0] with
-                { Kind = (EventContentClassificationVersion.CategoryKind)99 }] },
-            "shared-controller" => command with { Mandate = command.Mandate with
-                { ReviewerControllerHumanId = command.Mandate.OwnerControllerHumanId } },
+            "unknown-kind" => command with
+            {
+                Categories = [command.Categories[0] with
+                { Kind = (EventContentClassificationVersion.CategoryKind)99 }]
+            },
+            "shared-controller" => command with
+            {
+                Mandate = command.Mandate with
+                { ReviewerControllerHumanId = command.Mandate.OwnerControllerHumanId }
+            },
             "missing-meaning" => command with { Categories = [command.Categories[0] with { Meaning = "" }] },
             "non-utc" => command with { ValidUntil = command.ValidUntil.ToOffset(TimeSpan.FromHours(1)) },
             "overflow-policy" => command with { ExpectedPolicyRevision = long.MaxValue },
@@ -71,9 +86,14 @@ public sealed class ModerationClassificationTaxonomyCommandTests
         var record = Record();
         var command = new AdoptModerationClassificationTaxonomyCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = record.Target, ExpectedQualificationRevision = 3,
-            SourceId = record.SourceId, AdoptionId = Guid.CreateVersion7(), ExpectedSourceRevision = 1,
-            ExpectedSourceWriterGeneration = 2, ValidUntil = record.ValidUntil
+            OperationId = Guid.CreateVersion7(),
+            Target = record.Target,
+            ExpectedQualificationRevision = 3,
+            SourceId = record.SourceId,
+            AdoptionId = Guid.CreateVersion7(),
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 2,
+            ValidUntil = record.ValidUntil
         };
         command = defect switch
         {
@@ -96,8 +116,11 @@ public sealed class ModerationClassificationTaxonomyCommandTests
         var record = Record();
         var command = new WithdrawModerationClassificationTaxonomyCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = record.Target, ExpectedQualificationRevision = 4,
-            AdoptionId = Guid.CreateVersion7(), ExpectedAdoptionRevision = revision
+            OperationId = Guid.CreateVersion7(),
+            Target = record.Target,
+            ExpectedQualificationRevision = 4,
+            AdoptionId = Guid.CreateVersion7(),
+            ExpectedAdoptionRevision = revision
         };
         await Assert.That((await new ModerationClassificationTaxonomyCommandValidator<WithdrawModerationClassificationTaxonomyCommand>()
             .ValidateAsync(command)).IsValid).IsEqualTo(valid);
@@ -109,12 +132,18 @@ public sealed class ModerationClassificationTaxonomyCommandTests
         var reviewer = Guid.CreateVersion7();
         return new()
         {
-            OperationId = Guid.CreateVersion7(), ExpectedQualificationRevision = 1,
+            OperationId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 1,
             Target = AuthorityScope.Instance(AuthorityScope.Solution(
                 AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()), Guid.CreateVersion7()),
-            SourceId = Guid.CreateVersion7(), TaxonomyId = Guid.CreateVersion7(), ExpectedTaxonomyGeneration = 0,
-            PolicyId = Guid.CreateVersion7(), ExpectedPolicyRevision = 1, PublicationId = Guid.CreateVersion7(),
-            ProfileId = Guid.CreateVersion7(), Mode = ModerationNativeMode.Embedded,
+            SourceId = Guid.CreateVersion7(),
+            TaxonomyId = Guid.CreateVersion7(),
+            ExpectedTaxonomyGeneration = 0,
+            PolicyId = Guid.CreateVersion7(),
+            ExpectedPolicyRevision = 1,
+            PublicationId = Guid.CreateVersion7(),
+            ProfileId = Guid.CreateVersion7(),
+            Mode = ModerationNativeMode.Embedded,
             Mandate = new(owner, owner, reviewer, reviewer, "Accountable taxonomy ownership.",
                 "Independent content meaning and audience-floor review."),
             Categories = [new(Guid.CreateVersion7(), 1, "general", EventContentClassificationVersion.CategoryKind.General,

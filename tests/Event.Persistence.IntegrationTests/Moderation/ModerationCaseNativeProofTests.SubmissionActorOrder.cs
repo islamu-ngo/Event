@@ -46,12 +46,17 @@ public sealed partial class ModerationCaseNativeProofTests
             {
                 var service = new ServicePrincipal
                 {
-                    Id = Guid.CreateVersion7(), Code = $"receipt-plan-{id:N}", DisplayName = "Receipt publisher"
+                    Id = Guid.CreateVersion7(),
+                    Code = $"receipt-plan-{id:N}",
+                    DisplayName = "Receipt publisher"
                 };
                 seed.AddRange(service, new Actor
                 {
-                    Id = id, ActorTypeId = (int)ActorTypeEnum.Bot, ActorType = null!,
-                    ServicePrincipalId = service.Id, Pii = new ActorPii { ActorId = id, DisplayName = "Receipt publisher" }
+                    Id = id,
+                    ActorTypeId = (int)ActorTypeEnum.Bot,
+                    ActorType = null!,
+                    ServicePrincipalId = service.Id,
+                    Pii = new ActorPii { ActorId = id, DisplayName = "Receipt publisher" }
                 });
             }
             (await seed.Events.SingleAsync(row => row.Id == database.EventId)).OrganizerActorId = organizerId;

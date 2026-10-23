@@ -131,8 +131,11 @@ public sealed class EventResourceModerationReviewDutyTests
             rows.Add(new EventResourceModerationQuarantineReview
             {
                 Id = index == 0 ? purpose : index == 4 && defect == "duplicate-identity" ? rows[2].Id : Guid.CreateVersion7(),
-                TenantId = cause.TenantId, QuarantineId = cause.Id, EventId = cause.EventId,
-                EventResourceId = cause.EventResourceId, MaterialVersionId = cause.MaterialVersionId,
+                TenantId = cause.TenantId,
+                QuarantineId = cause.Id,
+                EventId = cause.EventId,
+                EventResourceId = cause.EventResourceId,
+                MaterialVersionId = cause.MaterialVersionId,
                 HostBindingId = index == 3 && defect == "host" ? Guid.CreateVersion7() : host,
                 TrustDomainId = index == 3 && defect == "trust" ? Guid.CreateVersion7() : trust,
                 CaseId = index == 3 && defect == "case" ? Guid.CreateVersion7() : caseId,
@@ -151,13 +154,16 @@ public sealed class EventResourceModerationReviewDutyTests
                 HumanId = index == 3 && defect == "human" ? rows[2].HumanId
                     : index == 3 && defect == "cross-controller" ? rows[2].ControllerHumanId : Guid.CreateVersion7(),
                 ControllerHumanId = index == 3 && defect == "controller" ? rows[2].ControllerHumanId : Guid.CreateVersion7(),
-                ReviewerAssignmentId = Guid.CreateVersion7(), ReviewerRevision = 3,
-                QualificationRevision = 1, RequiredApprovals = approvals,
+                ReviewerAssignmentId = Guid.CreateVersion7(),
+                ReviewerRevision = 3,
+                QualificationRevision = 1,
+                RequiredApprovals = approvals,
                 MaximumEvidenceLifetimeTicks = TimeSpan.FromHours(index == 3 && defect == "evidence-lifetime" ? 2 : 1).Ticks,
                 Attestation = index != 2 ? null : unsafeMaterial
                     ? ResourceSafetyAttestation.IndependentlyInspectedUnsafeForCurrentAudience
                     : ResourceSafetyAttestation.IndependentlyInspectedSafeForCurrentAudience,
-                NativeDigest = new string('A', 64), RequestDigest = new string('B', 64),
+                NativeDigest = new string('A', 64),
+                RequestDigest = new string('B', 64),
                 RecordedAt = Now.AddMinutes(index == 1 && defect == "backward-time" ? 3 : index),
                 ValidUntil = Now.AddHours(index == 1 && defect == "extended-validity" ? 2 : 1)
             });

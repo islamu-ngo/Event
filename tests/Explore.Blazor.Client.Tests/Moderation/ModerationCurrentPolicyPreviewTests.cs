@@ -59,8 +59,12 @@ public sealed class ModerationCurrentPolicyPreviewTests
 
     private static HalResourceOfModerationCurrentPolicyView Policy() => new()
     {
-        PolicyId = Guid.CreateVersion7(), Scope = "tenant", State = "uninitialized",
-        ExpectedRevision = 7, InstalledInventoryRevision = 9, Authoring = null
+        PolicyId = Guid.CreateVersion7(),
+        Scope = "tenant",
+        State = "uninitialized",
+        ExpectedRevision = 7,
+        InstalledInventoryRevision = 9,
+        Authoring = null
     };
 
     private static ModerationCurrentPolicyAuthoringState Authoring()
@@ -73,7 +77,8 @@ public sealed class ModerationCurrentPolicyPreviewTests
         var unselected = Rule("unselected.profile");
         return new()
         {
-            HistoricalExpectedRevision = 6, InventoryRevision = 3,
+            HistoricalExpectedRevision = 6,
+            InventoryRevision = 3,
             Classes = [new() { Reference = classRule, Meaning = "Retained class meaning." }],
             Reasons = [new() { Reference = reason, Class = classRule, Meaning = "Retained reason meaning." }],
             SelectedProfiles = [selected],
@@ -95,12 +100,18 @@ public sealed class ModerationCurrentPolicyPreviewTests
 
     private static ModerationConsequenceModes Plan() => new()
     {
-        Content = ModerationContentMode.PreserveSafePublished, Management = ModerationManagementMode.CurrentAuthority,
-        Resources = ModerationResourceReadMode.CurrentAudience, NewAdmission = ModerationNewAdmissionMode.CurrentEligibility,
-        ExistingAdmission = ModerationExistingAdmissionMode.CurrentEligibility, PrivateDisclosure = ModerationPrivateDisclosureMode.CurrentAudience,
-        Settlement = ModerationSettlementMode.NoBookingChange, Capacity = ModerationCapacityMode.NoSeatChange,
-        Credentials = ModerationCredentialMode.CurrentCredentialLifecycle, Notifications = ModerationNotificationMode.DurableSafeSubjectAndAdmin,
-        Recognition = ModerationRecognitionMode.NoCaptureFromThisControl, PendingWork = ModerationPendingWorkMode.RecheckCurrentEffectAtUseAndDispatch,
+        Content = ModerationContentMode.PreserveSafePublished,
+        Management = ModerationManagementMode.CurrentAuthority,
+        Resources = ModerationResourceReadMode.CurrentAudience,
+        NewAdmission = ModerationNewAdmissionMode.CurrentEligibility,
+        ExistingAdmission = ModerationExistingAdmissionMode.CurrentEligibility,
+        PrivateDisclosure = ModerationPrivateDisclosureMode.CurrentAudience,
+        Settlement = ModerationSettlementMode.NoBookingChange,
+        Capacity = ModerationCapacityMode.NoSeatChange,
+        Credentials = ModerationCredentialMode.CurrentCredentialLifecycle,
+        Notifications = ModerationNotificationMode.DurableSafeSubjectAndAdmin,
+        Recognition = ModerationRecognitionMode.NoCaptureFromThisControl,
+        PendingWork = ModerationPendingWorkMode.RecheckCurrentEffectAtUseAndDispatch,
         Restoration = ModerationRestorationMode.RecomputeCurrentRightsOnly
     };
 }

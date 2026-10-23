@@ -100,8 +100,10 @@ public sealed partial class ModerationAuthorityParticipant
         receipt.ValidatePersistedState();
         var accepted = new ApproveModerationNoticeDisclosureSource
         {
-            OperationId = receipt.Id, Target = decision.Scope,
-            ExpectedQualificationRevision = approval.WriterGeneration - 1, Intent = approval.Intent
+            OperationId = receipt.Id,
+            Target = decision.Scope,
+            ExpectedQualificationRevision = approval.WriterGeneration - 1,
+            Intent = approval.Intent
         };
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
             accepted.GetType().FullName + "\n" + JsonSerializer.Serialize(accepted))));

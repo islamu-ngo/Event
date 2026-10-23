@@ -26,7 +26,8 @@ public sealed record SubmitModerationAllegationCommand : ICommand<ModerationAlle
 
     internal ModerationCaseAccessRequest ToRequest() => new(
         ModerationCaseAccessPurpose.SubmitAllegation, Guid.Empty, OperationId, 0,
-        ReceiptId, PresentedToken) { Narrative = Narrative };
+        ReceiptId, PresentedToken)
+    { Narrative = Narrative };
 
     public override string ToString() => nameof(SubmitModerationAllegationCommand);
 }

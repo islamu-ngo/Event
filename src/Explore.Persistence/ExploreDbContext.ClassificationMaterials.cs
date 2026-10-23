@@ -18,25 +18,46 @@ public partial class ExploreDbContext
     // No caller can add a kind or assert that an omitted path is complete.
     private static readonly IReadOnlyDictionary<Type, Kind> ClassificationCarriers = new Dictionary<Type, Kind>
     {
-        [typeof(Event)] = Kind.Event, [typeof(EventSession)] = Kind.Session, [typeof(EventResource)] = Kind.Resource,
-        [typeof(EventResourceAudienceRule)] = Kind.ResourceAudience, [typeof(RegistrationForm)] = Kind.Form,
-        [typeof(RegistrationFormVersion)] = Kind.FormVersion, [typeof(RegistrationFormSection)] = Kind.FormSection,
-        [typeof(RegistrationFormField)] = Kind.FormField, [typeof(RegistrationFormFieldOption)] = Kind.FormOption,
-        [typeof(RegistrationFormRule)] = Kind.FormRule, [typeof(RegistrationProviderBinding)] = Kind.ProviderBinding,
-        [typeof(RegistrationProviderConnection)] = Kind.ProviderConnection, [typeof(RegistrationProviderApprovedOrigin)] = Kind.ProviderOrigin,
-        [typeof(RegistrationProviderFieldMapping)] = Kind.ProviderField, [typeof(RegistrationProviderOptionMapping)] = Kind.ProviderOption,
-        [typeof(RegistrationProviderCapability)] = Kind.ProviderCapability, [typeof(RegistrationProviderSchemaRevision)] = Kind.ProviderSchema,
-        [typeof(RegistrationWorkflow)] = Kind.Workflow, [typeof(RegistrationRequirement)] = Kind.Requirement,
-        [typeof(RegistrationChannel)] = Kind.Channel, [typeof(EventParticipationConfiguration)] = Kind.Participation,
-        [typeof(ParticipationRequirementAttachment)] = Kind.Attachment, [typeof(EventCustomPropertyDefinition)] = Kind.EventProperty,
-        [typeof(EventCustomPropertyOption)] = Kind.EventOption, [typeof(EventCustomPropertyValue)] = Kind.EventValue,
-        [typeof(EventSessionCustomPropertyDefinition)] = Kind.SessionProperty, [typeof(EventSessionCustomPropertyOption)] = Kind.SessionOption,
-        [typeof(EventSessionCustomPropertyValue)] = Kind.SessionValue, [typeof(EventPublicAction)] = Kind.PublicAction,
-        [typeof(EventAgendaItem)] = Kind.Agenda, [typeof(EventDay)] = Kind.Day, [typeof(EventSessionGroup)] = Kind.SessionGroup,
-        [typeof(EventSessionGroupSession)] = Kind.SessionGroupMember, [typeof(EventSessionSpeaker)] = Kind.Speaker,
-        [typeof(StorageObject)] = Kind.Storage, [typeof(Actor)] = Kind.Actor,
-        [typeof(EventIslamicAspect)] = Kind.EventIslamic, [typeof(EventTechAspect)] = Kind.EventTech,
-        [typeof(EventSessionIslamicAspect)] = Kind.SessionIslamic, [typeof(EventLocation)] = Kind.Location,
+        [typeof(Event)] = Kind.Event,
+        [typeof(EventSession)] = Kind.Session,
+        [typeof(EventResource)] = Kind.Resource,
+        [typeof(EventResourceAudienceRule)] = Kind.ResourceAudience,
+        [typeof(RegistrationForm)] = Kind.Form,
+        [typeof(RegistrationFormVersion)] = Kind.FormVersion,
+        [typeof(RegistrationFormSection)] = Kind.FormSection,
+        [typeof(RegistrationFormField)] = Kind.FormField,
+        [typeof(RegistrationFormFieldOption)] = Kind.FormOption,
+        [typeof(RegistrationFormRule)] = Kind.FormRule,
+        [typeof(RegistrationProviderBinding)] = Kind.ProviderBinding,
+        [typeof(RegistrationProviderConnection)] = Kind.ProviderConnection,
+        [typeof(RegistrationProviderApprovedOrigin)] = Kind.ProviderOrigin,
+        [typeof(RegistrationProviderFieldMapping)] = Kind.ProviderField,
+        [typeof(RegistrationProviderOptionMapping)] = Kind.ProviderOption,
+        [typeof(RegistrationProviderCapability)] = Kind.ProviderCapability,
+        [typeof(RegistrationProviderSchemaRevision)] = Kind.ProviderSchema,
+        [typeof(RegistrationWorkflow)] = Kind.Workflow,
+        [typeof(RegistrationRequirement)] = Kind.Requirement,
+        [typeof(RegistrationChannel)] = Kind.Channel,
+        [typeof(EventParticipationConfiguration)] = Kind.Participation,
+        [typeof(ParticipationRequirementAttachment)] = Kind.Attachment,
+        [typeof(EventCustomPropertyDefinition)] = Kind.EventProperty,
+        [typeof(EventCustomPropertyOption)] = Kind.EventOption,
+        [typeof(EventCustomPropertyValue)] = Kind.EventValue,
+        [typeof(EventSessionCustomPropertyDefinition)] = Kind.SessionProperty,
+        [typeof(EventSessionCustomPropertyOption)] = Kind.SessionOption,
+        [typeof(EventSessionCustomPropertyValue)] = Kind.SessionValue,
+        [typeof(EventPublicAction)] = Kind.PublicAction,
+        [typeof(EventAgendaItem)] = Kind.Agenda,
+        [typeof(EventDay)] = Kind.Day,
+        [typeof(EventSessionGroup)] = Kind.SessionGroup,
+        [typeof(EventSessionGroupSession)] = Kind.SessionGroupMember,
+        [typeof(EventSessionSpeaker)] = Kind.Speaker,
+        [typeof(StorageObject)] = Kind.Storage,
+        [typeof(Actor)] = Kind.Actor,
+        [typeof(EventIslamicAspect)] = Kind.EventIslamic,
+        [typeof(EventTechAspect)] = Kind.EventTech,
+        [typeof(EventSessionIslamicAspect)] = Kind.SessionIslamic,
+        [typeof(EventLocation)] = Kind.Location,
         [typeof(ActorPii)] = Kind.ActorProfile
     };
 
@@ -141,8 +162,10 @@ public partial class ExploreDbContext
         materials.AddRange(sessions.Select(row => eventMaterial with { SessionId = row.Id, SessionStamp = row.ConcurrencyStamp }));
         materials.AddRange(resources.Select(row => eventMaterial with
         {
-            SessionId = row.EventSessionId, SessionStamp = sessions.SingleOrDefault(session => session.Id == row.EventSessionId)?.ConcurrencyStamp,
-            ResourceId = row.Id, ResourceStamp = row.ConcurrencyStamp
+            SessionId = row.EventSessionId,
+            SessionStamp = sessions.SingleOrDefault(session => session.Id == row.EventSessionId)?.ConcurrencyStamp,
+            ResourceId = row.Id,
+            ResourceStamp = row.ConcurrencyStamp
         }));
         return materials.Count <= 4096 ? new(materials.ToImmutableArray(), components.ToImmutableArray()) : null;
 

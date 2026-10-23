@@ -138,8 +138,12 @@ public sealed partial class ModerationPolicyPublicationTests
             row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
         foreach (var id in new[] { owner, reviewer })
         {
-            var human = new User { Id = id, Pii = new UserPii
-            { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Procedure", LastName = "Owner" } };
+            var human = new User
+            {
+                Id = id,
+                Pii = new UserPii
+                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Procedure", LastName = "Owner" }
+            };
             context.Users.Add(human);
             context.PlatformUserRoles.Add(new PlatformUserRole
             { Id = Guid.CreateVersion7(), UserId = id, User = human, RoleId = role.Id, Role = role });
@@ -155,37 +159,58 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var age = new RecordModerationChildAgePolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(8), Terms = ChildAgeTerms(),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddMinutes(8),
+            Terms = ChildAgeTerms(),
             Ownership = new(reviewer, reviewer, owner, owner, database.AdminId,
                 "Distinct controllers.", "Independent privacy mandate.", "Child-risk mandate.", "Collection owner mandate.")
         };
         await Assert.That((await Writer(database.AdminId).ExecuteAsync(age)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var parentAdoption = new AdoptModerationChildAgePolicySource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            SourceId = age.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 3,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(7)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            SourceId = age.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 3,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(7)
         };
         await Assert.That((await Writer(reviewer).ExecuteAsync(parentAdoption)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var record = new RecordModerationProfileCollectionProcedureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            SourceId = Guid.CreateVersion7(), ChildAgeSourceId = age.SourceId,
-            ExpectedChildAgeSourceRevision = 1, ExpectedChildAgeSourceWriterGeneration = 3,
-            ChildAgeAdoptionId = parentAdoption.AdoptionId, ExpectedChildAgeAdoptionRevision = 1,
-            ExpectedChildAgeAdoptionWriterGeneration = 4, Procedure = ProcedureVocabulary(),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            SourceId = Guid.CreateVersion7(),
+            ChildAgeSourceId = age.SourceId,
+            ExpectedChildAgeSourceRevision = 1,
+            ExpectedChildAgeSourceWriterGeneration = 3,
+            ChildAgeAdoptionId = parentAdoption.AdoptionId,
+            ExpectedChildAgeAdoptionRevision = 1,
+            ExpectedChildAgeAdoptionWriterGeneration = 4,
+            Procedure = ProcedureVocabulary(),
             ValidUntil = Now.AddMinutes(6)
         };
         if (change == ProcedureChange.ProcedureStringBoundary)
         {
             var grounds = string.Concat(Enumerable.Repeat("\U0001F642", 1024));
-            record = record with { Procedure = new(ModerationIndividualPurpose.ProfileCompletion,
+            record = record with
+            {
+                Procedure = new(ModerationIndividualPurpose.ProfileCompletion,
                 ModerationProfileCollectionApplicability.NativeIndependentlyAcceptedAssessment,
                 [ModerationProfilePreliminaryFieldKind.ApplicabilityDeclaration],
-                [ModerationProfileNormalFieldKind.DateOfBirth], grounds, grounds) };
+                [ModerationProfileNormalFieldKind.DateOfBirth], grounds, grounds)
+            };
         }
         flush.ParentId = parentAdoption.AdoptionId;
         flush.ParentReceiptId = parentAdoption.OperationId;
@@ -270,9 +295,14 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var adopt = new AdoptModerationProfileCollectionProcedureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 5,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(5)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 5,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(5)
         };
         if (change is ProcedureChange.WrongReviewer or ProcedureChange.AdoptionRenewal)
         {
@@ -309,8 +339,11 @@ public sealed partial class ModerationPolicyPublicationTests
             if (change == ProcedureChange.WithdrawAfterExpiry) clock.UtcNow = Now.AddMinutes(20);
             var withdrawal = new WithdrawModerationProfileCollectionProcedureAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-                AdoptionId = adopt.AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 6,
+                AdoptionId = adopt.AdoptionId,
+                ExpectedAdoptionRevision = 1
             };
             if (change == ProcedureChange.WithdrawAfterExpiry)
             {
@@ -320,8 +353,11 @@ public sealed partial class ModerationPolicyPublicationTests
             }
             else await Assert.That((await Writer(database.AdminId).ExecuteAsync(new WithdrawModerationChildAgePolicyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-                AdoptionId = parentAdoption.AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 6,
+                AdoptionId = parentAdoption.AdoptionId,
+                ExpectedAdoptionRevision = 1
             })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         }
         if (change == ProcedureChange.ParentSuperseded)

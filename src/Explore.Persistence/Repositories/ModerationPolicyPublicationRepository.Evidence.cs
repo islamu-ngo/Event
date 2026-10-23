@@ -63,10 +63,15 @@ public sealed partial class ModerationPolicyPublicationRepository
                 throw new AbortPublication(ModerationPolicyPublicationOutcome.Unavailable);
             result.Add(new()
             {
-                PublicationId = draft.Publication.PublicationId, RequirementDigest = key,
-                ApprovalId = approval.ApprovalId, ApprovalRevision = approval.ApprovalRevision,
-                SourceId = source.SourceId, SourceRevision = source.Revision, WriterGeneration = source.WriterGeneration,
-                ObservedAt = observedAt, ValidUntil = approval.ValidUntil
+                PublicationId = draft.Publication.PublicationId,
+                RequirementDigest = key,
+                ApprovalId = approval.ApprovalId,
+                ApprovalRevision = approval.ApprovalRevision,
+                SourceId = source.SourceId,
+                SourceRevision = source.Revision,
+                WriterGeneration = source.WriterGeneration,
+                ObservedAt = observedAt,
+                ValidUntil = approval.ValidUntil
             });
         }
         var validUntil = result.Min(row => row.ValidUntil);
@@ -99,10 +104,14 @@ public sealed partial class ModerationPolicyPublicationRepository
                 {
                     PublicationId = draft.Publication.PublicationId,
                     RequirementDigest = ModerationPolicyPublicationProjection.Digest(new
-                        { requirement.Binding, source.ConsumerId, draft.Proposed.InventoryFingerprint }),
-                    ApprovalId = null, ApprovalRevision = null,
-                    SourceId = source.SourceId, SourceRevision = source.Revision, WriterGeneration = source.WriterGeneration,
-                    ObservedAt = observedAt, ValidUntil = validUntil
+                    { requirement.Binding, source.ConsumerId, draft.Proposed.InventoryFingerprint }),
+                    ApprovalId = null,
+                    ApprovalRevision = null,
+                    SourceId = source.SourceId,
+                    SourceRevision = source.Revision,
+                    WriterGeneration = source.WriterGeneration,
+                    ObservedAt = observedAt,
+                    ValidUntil = validUntil
                 });
             }
         }

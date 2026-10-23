@@ -60,9 +60,14 @@ public sealed partial class ModerationPolicyPublicationTests
             var runtime = runtimes.Single(row => row.ConsumerId == id);
             var installed = new InstallModerationConsumerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch++,
-                InstallationId = Guid.CreateVersion7(), ConsumerId = id, Mode = ModerationNativeMode.Embedded,
-                ExpectedRuntimeGeneration = runtime.Generation, ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch++,
+                InstallationId = Guid.CreateVersion7(),
+                ConsumerId = id,
+                Mode = ModerationNativeMode.Embedded,
+                ExpectedRuntimeGeneration = runtime.Generation,
+                ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
                 ValidUntil = Now.AddMinutes(10)
             };
             await Assert.That((await writer.ExecuteAsync(installed)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
@@ -70,30 +75,48 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var record = new RecordModerationDeploymentSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch++,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(5)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = epoch++,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddMinutes(5)
         };
         await Assert.That((await writer.ExecuteAsync(record)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         await Assert.That((await writer.ExecuteAsync(record)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var adopt = new AdoptModerationDeploymentSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
-            SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = epoch,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(4)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = epoch,
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = epoch,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(4)
         };
         await Assert.That((await writer.ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
         var approverId = Guid.CreateVersion7();
         var role = await context.Roles.SingleAsync(row =>
             row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
-        var approver = new User { Id = approverId, Pii = new UserPii
+        var approver = new User
         {
-            UserId = approverId, Email = $"{approverId:N}@example.invalid", FirstName = "Deployment", LastName = "Adopter"
-        }};
+            Id = approverId,
+            Pii = new UserPii
+            {
+                UserId = approverId,
+                Email = $"{approverId:N}@example.invalid",
+                FirstName = "Deployment",
+                LastName = "Adopter"
+            }
+        };
         context.Users.Add(approver);
         context.PlatformUserRoles.Add(new PlatformUserRole
-            { Id = Guid.CreateVersion7(), UserId = approverId, User = approver, RoleId = role.Id, Role = role });
+        { Id = Guid.CreateVersion7(), UserId = approverId, User = approver, RoleId = role.Id, Role = role });
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
         var (secondAdmin, secondMachine) = DeploymentIdentity(context, approverId);
@@ -132,7 +155,9 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             await Assert.That((await writer.ExecuteAsync(record with
             {
-                OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(), ExpectedQualificationRevision = epoch
+                OperationId = Guid.CreateVersion7(),
+                SourceId = Guid.CreateVersion7(),
+                ExpectedQualificationRevision = epoch
             })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         }
         if (change == 7) clock.UtcNow = Now.AddMinutes(4);
@@ -141,8 +166,11 @@ public sealed partial class ModerationPolicyPublicationTests
             clock.UtcNow = Now.AddMinutes(10);
             var withdrawal = new WithdrawModerationDeploymentAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
-                AdoptionId = adopt.AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch,
+                AdoptionId = adopt.AdoptionId,
+                ExpectedAdoptionRevision = 1
             };
             await Assert.That((await writer.ExecuteAsync(withdrawal)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
             await Assert.That((await writer.ExecuteAsync(withdrawal)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
@@ -189,10 +217,15 @@ public sealed partial class ModerationPolicyPublicationTests
             new FixedClock(), database.Privacy.Authority(context, new FixedClock()), deploymentInventory: database.Inventory);
         var result = await writer.ExecuteAsync(new RecordModerationDeploymentSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId,
-            ExpectedPolicyRevision = 1, PublicationId = request.Proposed.PublicationId,
-            ProfileId = request.Proposed.Profiles.Single().Id, Mode = ModerationNativeMode.Embedded,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
             ValidUntil = Now.AddMinutes(5)
         });
         await Assert.That(result.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Unavailable);
@@ -220,11 +253,14 @@ public sealed partial class ModerationPolicyPublicationTests
 
     private static (AdminContext Admin, MachinePrincipalAccessor Machine) DeploymentIdentity(ExploreDbContext context, Guid userId)
     {
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext
+        var http = new HttpContextAccessor
         {
-            User = new ClaimsPrincipal(new ClaimsIdentity(
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, userId.ToString())], "deployment-witness"))
-        }};
+            }
+        };
         return (new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context),
             new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance), new MachinePrincipalAccessor(http));

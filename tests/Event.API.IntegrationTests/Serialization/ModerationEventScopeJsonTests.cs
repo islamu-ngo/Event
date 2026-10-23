@@ -22,8 +22,11 @@ public sealed class ModerationEventScopeJsonTests
         var scope = AuthorityScope.Event(tenant, Guid.CreateVersion7());
         var command = new ApproveModerationDecisionCommand
         {
-            OperationId = Guid.CreateVersion7(), EffectId = Guid.CreateVersion7(),
-            DecisionId = Guid.CreateVersion7(), ExpectedRevision = 2, ExpectedPolicyRevision = 3,
+            OperationId = Guid.CreateVersion7(),
+            EffectId = Guid.CreateVersion7(),
+            DecisionId = Guid.CreateVersion7(),
+            ExpectedRevision = 2,
+            ExpectedPolicyRevision = 3,
             Subject = SubjectReference.Create(ModerationSubjectKind.Content, Guid.CreateVersion7(), scope),
             Target = scope
         };
@@ -54,7 +57,8 @@ public sealed class ModerationEventScopeJsonTests
         };
         var json = new JsonObject
         {
-            ["kind"] = "Event", ["id"] = Guid.CreateVersion7().ToString("D"),
+            ["kind"] = "Event",
+            ["id"] = Guid.CreateVersion7().ToString("D"),
             ["parent"] = JsonSerializer.SerializeToNode(parent, Options)
         };
         await Assert.That(() => JsonSerializer.Deserialize<AuthorityScope>(json.ToJsonString(), Options))

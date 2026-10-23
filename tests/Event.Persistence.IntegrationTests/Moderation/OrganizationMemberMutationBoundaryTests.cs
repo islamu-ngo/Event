@@ -83,8 +83,12 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         var before = await RevisionAsync(context);
         var add = new AddOrganizationMemberCommandHandler(members, new OrganizationRepository(context),
             new OrganizationTenantRepository(context), new UserRepository(context), new UserContext(session.Http), session.Boundary);
-        var invited = await add.ExecuteAsync(new() { TenantId = database.TenantId, AddOrganizationMemberDto = new()
-            { OrganizationId = organizationId, Email = email!, Role = RoleEnum.OrgMember } }, default);
+        var invited = await add.ExecuteAsync(new()
+        {
+            TenantId = database.TenantId,
+            AddOrganizationMemberDto = new()
+            { OrganizationId = organizationId, Email = email!, Role = RoleEnum.OrgMember }
+        }, default);
         await Assert.That(invited.IsSuccess).IsTrue();
         await Assert.That(await RevisionAsync(context)).IsEqualTo(before + 1);
         var outsiderDecline = new DeclineInvitationCommandHandler(members, new UserContext(session.Http), session.Boundary);
@@ -159,8 +163,11 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         var handler = new UpdateOrganizationMemberRoleCommandHandler(new OrganizationMemberRepository(context),
             new OrganizationRepository(context), new UserContext(session.Http), session.Boundary);
         var before = await RevisionAsync(context);
-        var result = await handler.ExecuteAsync(new() { UpdateOrganizationMemberRoleDto = new()
-            { Id = administrator, Role = RoleEnum.OrgMember } }, default);
+        var result = await handler.ExecuteAsync(new()
+        {
+            UpdateOrganizationMemberRoleDto = new()
+            { Id = administrator, Role = RoleEnum.OrgMember }
+        }, default);
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id).IsEqualTo(administrator);
         await Assert.That(fault.Injected).IsTrue();
@@ -208,8 +215,11 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
         var handler = new UpdateOrganizationMemberRoleCommandHandler(new OrganizationMemberRepository(context),
             new OrganizationRepository(context), new UserContext(session.Http), session.Boundary);
         var before = await RevisionAsync(context);
-        await Assert.That(async () => await handler.ExecuteAsync(new() { UpdateOrganizationMemberRoleDto = new()
-            { Id = target, Role = RoleEnum.OrgAdmin } }, default))
+        await Assert.That(async () => await handler.ExecuteAsync(new()
+        {
+            UpdateOrganizationMemberRoleDto = new()
+            { Id = target, Role = RoleEnum.OrgAdmin }
+        }, default))
             .Throws<TenantUserRoleGrantMutationBoundaryTests.LostRoleCommitException>();
         await Assert.That(fault.Injected).IsTrue();
         await Assert.That(await context.OrganizationMembers.Where(row => row.Id == target).Select(row => row.RoleId).SingleAsync())
@@ -222,12 +232,28 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
     {
         await using var context = database.Context();
         var organization = new Organization { Id = Guid.CreateVersion7(), Pii = new() { FullName = "Native authority organization" } };
-        var participation = new OrganizationTenant { Id = Guid.CreateVersion7(), TenantId = database.TenantId,
-            Tenant = null!, OrganizationId = organization.Id, Organization = organization,
-            ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null! };
-        OrganizationMember Member(Guid user, RoleEnum role) => new() { Id = Guid.CreateVersion7(),
-            TenantId = database.TenantId, Tenant = null!, OrganizationTenantId = participation.Id,
-            OrganizationTenant = participation, UserId = user, User = null!, RoleId = (int)role, Role = null! };
+        var participation = new OrganizationTenant
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            OrganizationId = organization.Id,
+            Organization = organization,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+            ApprovalStatus = null!
+        };
+        OrganizationMember Member(Guid user, RoleEnum role) => new()
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            OrganizationTenantId = participation.Id,
+            OrganizationTenant = participation,
+            UserId = user,
+            User = null!,
+            RoleId = (int)role,
+            Role = null!
+        };
         var administrator = Member(database.AdministratorId, RoleEnum.OrgAdmin);
         var target = Member(database.SubjectId, RoleEnum.OrgMember);
         context.AddRange(organization, participation, administrator, target);
@@ -245,8 +271,14 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
     internal static (OrganizationMemberMutationBoundary Boundary, HttpContextAccessor Http) CreateBoundary(
         ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy, Guid actor, bool allowed = true)
     {
-        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.NameIdentifier, actor.ToString())], "organization-membership-witness")) } };
+        var http = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, actor.ToString())], "organization-membership-witness"))
+            }
+        };
         var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
             NullLogger<AdminContext>.Instance);

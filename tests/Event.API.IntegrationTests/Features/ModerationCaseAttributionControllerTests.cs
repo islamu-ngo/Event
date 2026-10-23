@@ -19,9 +19,12 @@ public sealed class ModerationCaseAttributionControllerTests
         var controller = Controller();
         var request = new RenewModerationCaseAttributionCommand
         {
-            CaseId = Guid.CreateVersion7(), ExpectedCaseRevision = 1,
-            ExpectedSourceId = Guid.CreateVersion7(), ExpectedGeneration = 1,
-            ExpectedHeadRevision = 1, Qualification = Qualification()
+            CaseId = Guid.CreateVersion7(),
+            ExpectedCaseRevision = 1,
+            ExpectedSourceId = Guid.CreateVersion7(),
+            ExpectedGeneration = 1,
+            ExpectedHeadRevision = 1,
+            Qualification = Qualification()
         };
         var result = await controller.Renew(
             wrongVersion ? Guid.NewGuid() : Guid.Empty, request, default);
@@ -40,7 +43,9 @@ public sealed class ModerationCaseAttributionControllerTests
         var controller = Controller();
         var request = new WithdrawModerationCaseAttributionCommand
         {
-            SourceId = Guid.CreateVersion7(), OperationId = Guid.CreateVersion7(), ExpectedSourceRevision = 1
+            SourceId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            ExpectedSourceRevision = 1
         };
         var result = await controller.Withdraw(
             wrongVersion ? Guid.NewGuid() : Guid.Empty, request, default);
@@ -65,10 +70,15 @@ public sealed class ModerationCaseAttributionControllerTests
 
     private static AttributeModerationCaseCommand Qualification() => new()
     {
-        OperationId = Guid.CreateVersion7(), OccurrenceCaseId = Guid.CreateVersion7(),
-        ExpectedCaseRevision = 1, EvidenceCaseRevision = 1, ReadGrantId = Guid.CreateVersion7(),
-        Basis = ModerationResponsibilityBasis.EventContent, SubjectKind = ModerationSubjectKind.Content,
-        SubjectId = Guid.CreateVersion7(), ValidUntil = new(2026, 10, 12, 14, 0, 0, TimeSpan.Zero)
+        OperationId = Guid.CreateVersion7(),
+        OccurrenceCaseId = Guid.CreateVersion7(),
+        ExpectedCaseRevision = 1,
+        EvidenceCaseRevision = 1,
+        ReadGrantId = Guid.CreateVersion7(),
+        Basis = ModerationResponsibilityBasis.EventContent,
+        SubjectKind = ModerationSubjectKind.Content,
+        SubjectId = Guid.CreateVersion7(),
+        ValidUntil = new(2026, 10, 12, 14, 0, 0, TimeSpan.Zero)
     };
 
     private sealed class InvalidSelectorRepository : IModerationCaseAttributionRepository

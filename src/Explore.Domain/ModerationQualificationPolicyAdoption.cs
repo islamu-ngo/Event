@@ -35,13 +35,21 @@ public sealed class ModerationQualificationPolicyAdoption
             throw new ArgumentException("Adoption requires the current finite source and cannot outlive it.");
         var adoption = new ModerationQualificationPolicyAdoption
         {
-            Id = id, SourceId = source.Id, SourceRevision = source.Revision, WriterGeneration = source.WriterGeneration,
-            HostBindingId = source.HostBindingId, TrustDomainId = source.TrustDomainId, TenantId = source.TenantId,
-            CaseId = source.CaseId, CaseRevision = source.CaseRevision,
+            Id = id,
+            SourceId = source.Id,
+            SourceRevision = source.Revision,
+            WriterGeneration = source.WriterGeneration,
+            HostBindingId = source.HostBindingId,
+            TrustDomainId = source.TrustDomainId,
+            TenantId = source.TenantId,
+            CaseId = source.CaseId,
+            CaseRevision = source.CaseRevision,
             MaximumReviewerLifetimeTicks = source.MaximumReviewerLifetimeTicks,
             MaximumUrgencyLifetimeTicks = source.MaximumUrgencyLifetimeTicks,
-            AdoptedByHumanId = adoptedByHumanId, AdoptedAt = now.ToUniversalTime(),
-            ValidUntil = validUntil.ToUniversalTime(), Revision = 1
+            AdoptedByHumanId = adoptedByHumanId,
+            AdoptedAt = now.ToUniversalTime(),
+            ValidUntil = validUntil.ToUniversalTime(),
+            Revision = 1
         };
         adoption.ValidatePersistedState();
         return adoption;

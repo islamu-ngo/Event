@@ -61,9 +61,14 @@ public sealed class ModerationOperationalBudgetQualificationTests
     {
         var command = new AdoptModerationOperationalBudgetCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = Tenant, ExpectedQualificationRevision = 2,
-            SourceId = Guid.CreateVersion7(), ExpectedSourceRevision = 1,
-            ExpectedSourceWriterGeneration = 2, AdoptionId = Guid.CreateVersion7(), ValidUntil = Until
+            OperationId = Guid.CreateVersion7(),
+            Target = Tenant,
+            ExpectedQualificationRevision = 2,
+            SourceId = Guid.CreateVersion7(),
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 2,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Until
         };
         command = change switch
         {
@@ -78,7 +83,12 @@ public sealed class ModerationOperationalBudgetQualificationTests
 
     private static RecordModerationOperationalBudgetCommand Record(ModerationOperationalBudgetTerms terms) => new()
     {
-        OperationId = Guid.CreateVersion7(), Target = Tenant, ExpectedQualificationRevision = 1,
-        SourceId = Guid.CreateVersion7(), Terms = terms, OperatorHumanId = Guid.CreateVersion7(), ValidUntil = Until
+        OperationId = Guid.CreateVersion7(),
+        Target = Tenant,
+        ExpectedQualificationRevision = 1,
+        SourceId = Guid.CreateVersion7(),
+        Terms = terms,
+        OperatorHumanId = Guid.CreateVersion7(),
+        ValidUntil = Until
     };
 }

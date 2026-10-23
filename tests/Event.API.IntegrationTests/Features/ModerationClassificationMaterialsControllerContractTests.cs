@@ -120,7 +120,8 @@ public sealed class ModerationClassificationMaterialsControllerContractTests
                 new string('a', 64))).ToImmutableArray(),
             Mandate = command.Mandate with
             {
-                OwnershipGrounds = new string('\u4e00', 2048), ReviewGrounds = new string('\u4e00', 2048)
+                OwnershipGrounds = new string('\u4e00', 2048),
+                ReviewGrounds = new string('\u4e00', 2048)
             }
         };
         var limit = ((IRequestSizeLimitMetadata)typeof(ModerationClassificationMaterialsController)
@@ -140,27 +141,46 @@ public sealed class ModerationClassificationMaterialsControllerContractTests
         {
             "record" => new RecordModerationClassificationMaterialCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 1,
-                SourceId = Guid.CreateVersion7(), ExpectedMaterialGeneration = 0, EventGenerationId = Guid.CreateVersion7(),
-                PolicyId = Guid.CreateVersion7(), ExpectedPolicyRevision = 1, PublicationId = Guid.CreateVersion7(),
-                ProfileId = Guid.CreateVersion7(), Mode = ModerationNativeMode.Embedded, TaxonomyId = Guid.CreateVersion7(),
-                ExpectedTaxonomySourceId = Guid.CreateVersion7(), ExpectedTaxonomyAdoptionId = Guid.CreateVersion7(),
+                OperationId = Guid.CreateVersion7(),
+                Target = target,
+                ExpectedQualificationRevision = 1,
+                SourceId = Guid.CreateVersion7(),
+                ExpectedMaterialGeneration = 0,
+                EventGenerationId = Guid.CreateVersion7(),
+                PolicyId = Guid.CreateVersion7(),
+                ExpectedPolicyRevision = 1,
+                PublicationId = Guid.CreateVersion7(),
+                ProfileId = Guid.CreateVersion7(),
+                Mode = ModerationNativeMode.Embedded,
+                TaxonomyId = Guid.CreateVersion7(),
+                ExpectedTaxonomySourceId = Guid.CreateVersion7(),
+                ExpectedTaxonomyAdoptionId = Guid.CreateVersion7(),
                 Mandate = new(owner, owner, Guid.CreateVersion7(), 1, reviewer, reviewer,
                     "Actual event assignment.", "Independent material review."),
                 Materials = [new(Guid.CreateVersion7(), material, [Guid.CreateVersion7()])],
                 Components = [new(ModerationClassificationMaterialComponentKind.Event, material.EventId, material.EventStamp,
-                    new string('a', 64))], ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
+                    new string('a', 64))],
+                ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
             },
             "accept" => new AcceptModerationClassificationMaterialCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 2,
-                SourceId = Guid.CreateVersion7(), ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 2,
-                ReviewId = Guid.CreateVersion7(), ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
+                OperationId = Guid.CreateVersion7(),
+                Target = target,
+                ExpectedQualificationRevision = 2,
+                SourceId = Guid.CreateVersion7(),
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = 2,
+                ReviewId = Guid.CreateVersion7(),
+                ValidUntil = new(2026, 10, 14, 12, 5, 0, TimeSpan.Zero)
             },
             "end" => new EndModerationClassificationMaterialCommand
             {
-                OperationId = Guid.CreateVersion7(), Target = target, ExpectedQualificationRevision = 3,
-                ReviewId = Guid.CreateVersion7(), ExpectedReviewRevision = 1, End = ModerationClassificationMaterialEnd.Corrected,
+                OperationId = Guid.CreateVersion7(),
+                Target = target,
+                ExpectedQualificationRevision = 3,
+                ReviewId = Guid.CreateVersion7(),
+                ExpectedReviewRevision = 1,
+                End = ModerationClassificationMaterialEnd.Corrected,
                 Grounds = "Current accountable correction."
             },
             _ => throw new ArgumentOutOfRangeException(nameof(kind))

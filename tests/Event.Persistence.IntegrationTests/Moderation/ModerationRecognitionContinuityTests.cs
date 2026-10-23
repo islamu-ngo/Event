@@ -252,8 +252,12 @@ public sealed partial class ModerationPolicyPublicationTests
                 {
                     await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, inner);
                     if (!await context.Users.AnyAsync(row => row.Id == FreshSubject, inner))
-                        context.Users.Add(new User { Id = FreshSubject, Pii = new UserPii
-                        { UserId = FreshSubject, Email = $"{FreshSubject:N}@example.invalid", FirstName = "Fresh", LastName = "Subject" } });
+                        context.Users.Add(new User
+                        {
+                            Id = FreshSubject,
+                            Pii = new UserPii
+                            { UserId = FreshSubject, Email = $"{FreshSubject:N}@example.invalid", FirstName = "Fresh", LastName = "Subject" }
+                        });
                     var result = await service.MatchAndBindAsync(new(account ?? Account, FreshSubject, Fixture.Database.Scope.Id), inner);
                     if (commit && !result.AdmissionExcluded && result.ActionFailure == ModerationRecognitionContinuityFailure.None
                         && result.AdmissionFailure == ModerationRecognitionContinuityFailure.None)
@@ -287,7 +291,8 @@ public sealed partial class ModerationPolicyPublicationTests
                     : SecretResolutionResult.Unavailable);
             var scenario = new ContinuityScenario
             {
-                Fixture = fixture, Keys = keys,
+                Fixture = fixture,
+                Keys = keys,
                 Account = new((AuthenticationProviderKind)login.AuthenticationProviderId, login.ProviderKey)
             };
             context.ChangeTracker.Clear();
@@ -335,14 +340,28 @@ public sealed partial class ModerationPolicyPublicationTests
         {
             if (!Available) throw new InvalidOperationException("moderation_recognition_ring_unavailable");
             var entries = new List<object>();
-            if (IncludeOriginal) entries.Add(new { kid = "original", generation = 1,
-                k = Encode(original), status = Rotated ? "readable" : "active" });
-            if (Rotated || CandidateOnly) entries.Add(new { kid = "replacement", generation = 2,
-                k = Encode(replacement), status = CandidateOnly ? "readable" : "active" });
+            if (IncludeOriginal) entries.Add(new
+            {
+                kid = "original",
+                generation = 1,
+                k = Encode(original),
+                status = Rotated ? "readable" : "active"
+            });
+            if (Rotated || CandidateOnly) entries.Add(new
+            {
+                kid = "replacement",
+                generation = 2,
+                k = Encode(replacement),
+                status = CandidateOnly ? "readable" : "active"
+            });
             var json = JsonSerializer.Serialize(new
             {
-                version = 1, trustDomainId = trust.ToString("D"), ringGeneration = Rotated ? 3 : CandidateOnly ? 2 : 1,
-                issuedAt = clock.UtcNow.ToString("O"), validUntil = clock.UtcNow.AddMinutes(5).ToString("O"), keys = entries
+                version = 1,
+                trustDomainId = trust.ToString("D"),
+                ringGeneration = Rotated ? 3 : CandidateOnly ? 2 : 1,
+                issuedAt = clock.UtcNow.ToString("O"),
+                validUntil = clock.UtcNow.AddMinutes(5).ToString("O"),
+                keys = entries
             });
             return new ResolvedSecret(
                 ModerationRecognitionKeyRing.SecretSettingKey, json, SecretSourceType.EnvironmentVariable,

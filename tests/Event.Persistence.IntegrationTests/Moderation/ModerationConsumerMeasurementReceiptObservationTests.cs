@@ -49,22 +49,33 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
         if (change is 2 or 12)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new WithdrawModerationConsumerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 8,
-                InstallationId = fixture.Receipt.InstallationId, ExpectedInstallationRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 8,
+                InstallationId = fixture.Receipt.InstallationId,
+                ExpectedInstallationRevision = 1
             })).IsSuccess).IsTrue();
         if (change == 3)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RevokeModerationMeasurementIssuerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 8,
-                EnrollmentId = fixture.EnrollmentId, ExpectedEnrollmentRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 8,
+                EnrollmentId = fixture.EnrollmentId,
+                ExpectedEnrollmentRevision = 1
             })).IsSuccess).IsTrue();
         if (change == 12)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new InstallModerationConsumerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 9,
-                InstallationId = Guid.CreateVersion7(), ConsumerId = fixture.Runtime.ConsumerId, Mode = fixture.Runtime.Mode,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 9,
+                InstallationId = Guid.CreateVersion7(),
+                ConsumerId = fixture.Runtime.ConsumerId,
+                Mode = fixture.Runtime.Mode,
                 ExpectedRuntimeGeneration = fixture.Runtime.Generation,
-                ExpectedInventoryFingerprint = database.Inventory.Fingerprint, ValidUntil = Now.AddMinutes(5)
+                ExpectedInventoryFingerprint = database.Inventory.Fingerprint,
+                ValidUntil = Now.AddMinutes(5)
             })).IsSuccess).IsTrue();
         if (change is >= 4 and <= 11)
         {
@@ -74,8 +85,10 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
             {
                 var id = change switch
                 {
-                    4 => fixture.Receipt.InstallationId, 5 => fixture.Receipt.ChallengeId,
-                    6 => fixture.EnrollmentId, _ => fixture.Receipt.ReceiptId
+                    4 => fixture.Receipt.InstallationId,
+                    5 => fixture.Receipt.ChallengeId,
+                    6 => fixture.EnrollmentId,
+                    _ => fixture.Receipt.ReceiptId
                 };
                 writer.ModerationQualificationMutationReceipts.Remove(await writer.ModerationQualificationMutationReceipts
                     .SingleAsync(row => row.SourceId == id));
@@ -84,7 +97,9 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
             {
                 var human = change switch
                 {
-                    8 => database.AdministratorId, 9 => database.UrgencyAssessorId, _ => database.ReviewerId
+                    8 => database.AdministratorId,
+                    9 => database.UrgencyAssessorId,
+                    _ => database.ReviewerId
                 };
                 writer.PlatformUserRoles.Remove(await writer.PlatformUserRoles.SingleAsync(row => row.UserId == human));
                 if (change == 10)
@@ -92,9 +107,14 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
                     var membership = await writer.TenantUsers.SingleAsync(row => row.UserId == human);
                     writer.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                     {
-                        Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                        TenantUserId = membership.Id, TenantUser = membership,
-                        RoleId = (int)RoleEnum.TenantAdmin, RoleScopeId = (int)RoleScopeEnum.Tenant, Role = null!
+                        Id = Guid.CreateVersion7(),
+                        TenantId = database.TenantId,
+                        Tenant = null!,
+                        TenantUserId = membership.Id,
+                        TenantUser = membership,
+                        RoleId = (int)RoleEnum.TenantAdmin,
+                        RoleScopeId = (int)RoleScopeEnum.Tenant,
+                        Role = null!
                     });
                 }
             }
@@ -278,7 +298,9 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
             static string Encode(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
             string input = Encode(JsonSerializer.SerializeToUtf8Bytes(new
             {
-                alg = "ES256", typ = ModerationMeasurementReceiptVerifier.RequiredType, kid = id.ToString("D")
+                alg = "ES256",
+                typ = ModerationMeasurementReceiptVerifier.RequiredType,
+                kid = id.ToString("D")
             })) + "." + Encode(JsonSerializer.SerializeToUtf8Bytes(assertion));
             return input + "." + Encode(signingKey.SignData(Encoding.ASCII.GetBytes(input), HashAlgorithmName.SHA256,
                 DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
@@ -297,11 +319,17 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
             var enrollmentId = Guid.CreateVersion7();
             await Assert.That((await database.ExecuteAsync(database.ReviewerId, new EnrollModerationMeasurementIssuerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-                EnrollmentId = enrollmentId, KeyId = keyId, Issuer = "native-observation-runner",
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 4,
+                EnrollmentId = enrollmentId,
+                KeyId = keyId,
+                Issuer = "native-observation-runner",
                 PublicKeySpkiBase64 = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()),
-                RunnerDigest = new string('a', 64), CatalogueDigest = catalogue?.Digest ?? new string('b', 64),
-                TestBundleDigest = new string('c', 64), ValidUntil = Now.AddMinutes(2)
+                RunnerDigest = new string('a', 64),
+                CatalogueDigest = catalogue?.Digest ?? new string('b', 64),
+                TestBundleDigest = new string('c', 64),
+                ValidUntil = Now.AddMinutes(2)
             })).IsSuccess).IsTrue();
             ModerationConsumerMeasurementChallenge challenge;
             await using (var reader = database.Context())
@@ -311,19 +339,39 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
             }
             var receipt = new ModerationMeasurementReceipt
             {
-                Issuer = "native-observation-runner", ReceiptId = Guid.CreateVersion7(), ChallengeId = challenge.Id,
-                ChallengeNonce = challenge.Nonce, RunId = Guid.CreateVersion7(), HostBindingId = database.HostId,
-                TrustDomainId = database.Scope.TrustDomainId, TenantId = database.TenantId, Binding = preparation.Binding,
-                ConsumerId = challenge.ConsumerId, ConsumerContractDigest = challenge.ConsumerContractDigest.ToLowerInvariant(),
-                InstallationId = challenge.InstallationId, InstallationRevision = challenge.InstallationRevision,
-                InstallationWriterGeneration = challenge.InstallationWriterGeneration, RuntimeGeneration = challenge.RuntimeGeneration,
-                InventoryFingerprint = challenge.InventoryFingerprint.ToLowerInvariant(), RunnerDigest = new string('a', 64),
-                CatalogueDigest = new string('b', 64), TestBundleDigest = new string('c', 64),
-                ProductArtifactDigest = new string('d', 64), ConfigurationDigest = new string('e', 64),
-                PrimaryConfigurationDigest = new string('1', 64), TestConfigurationDigest = new string('2', 64),
-                ProviderCode = "sqlite", ProviderVersion = "10.0", CaseIds = ImmutableArray.Create("case.observation"),
-                ExecutedCount = 1, AttemptCount = 1, ResultArtifactDigest = new string('f', 64),
-                StartedAt = Now, CompletedAt = Now, IssuedAt = Now, ValidUntil = Now.AddSeconds(30)
+                Issuer = "native-observation-runner",
+                ReceiptId = Guid.CreateVersion7(),
+                ChallengeId = challenge.Id,
+                ChallengeNonce = challenge.Nonce,
+                RunId = Guid.CreateVersion7(),
+                HostBindingId = database.HostId,
+                TrustDomainId = database.Scope.TrustDomainId,
+                TenantId = database.TenantId,
+                Binding = preparation.Binding,
+                ConsumerId = challenge.ConsumerId,
+                ConsumerContractDigest = challenge.ConsumerContractDigest.ToLowerInvariant(),
+                InstallationId = challenge.InstallationId,
+                InstallationRevision = challenge.InstallationRevision,
+                InstallationWriterGeneration = challenge.InstallationWriterGeneration,
+                RuntimeGeneration = challenge.RuntimeGeneration,
+                InventoryFingerprint = challenge.InventoryFingerprint.ToLowerInvariant(),
+                RunnerDigest = new string('a', 64),
+                CatalogueDigest = new string('b', 64),
+                TestBundleDigest = new string('c', 64),
+                ProductArtifactDigest = new string('d', 64),
+                ConfigurationDigest = new string('e', 64),
+                PrimaryConfigurationDigest = new string('1', 64),
+                TestConfigurationDigest = new string('2', 64),
+                ProviderCode = "sqlite",
+                ProviderVersion = "10.0",
+                CaseIds = ImmutableArray.Create("case.observation"),
+                ExecutedCount = 1,
+                AttemptCount = 1,
+                ResultArtifactDigest = new string('f', 64),
+                StartedAt = Now,
+                CompletedAt = Now,
+                IssuedAt = Now,
+                ValidUntil = Now.AddSeconds(30)
             };
             if (catalogue is not null)
             {
@@ -343,16 +391,25 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
             string signedToken = Sign(receipt, keyId, key);
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new AcceptModerationConsumerMeasurementSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-                ReceiptId = receipt.ReceiptId, ChallengeId = receipt.ChallengeId, IssuerEnrollmentId = enrollmentId,
-                Binding = receipt.Binding, SignedToken = signedToken
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 5,
+                ReceiptId = receipt.ReceiptId,
+                ChallengeId = receipt.ChallengeId,
+                IssuerEnrollmentId = enrollmentId,
+                Binding = receipt.Binding,
+                SignedToken = signedToken
             })).IsSuccess).IsTrue();
             var opened = database.OpenCase() with { ExpectedQualificationRevision = 6 };
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, opened)).IsSuccess).IsTrue();
             await Assert.That((await database.ExecuteAsync(database.SubjectId, new RecordModerationCaseResponse
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 7,
-                CaseId = opened.CaseId, ExpectedCaseRevision = 1, EvidenceId = Guid.CreateVersion7(),
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 7,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                EvidenceId = Guid.CreateVersion7(),
                 Statement = "The actual subject records the response required by this acquisition."
             })).IsSuccess).IsTrue();
             var decision = ModerationDecision.Propose(Guid.CreateVersion7(), opened.CaseId,

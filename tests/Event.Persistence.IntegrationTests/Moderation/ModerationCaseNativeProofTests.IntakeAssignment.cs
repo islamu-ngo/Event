@@ -36,9 +36,12 @@ public sealed partial class ModerationCaseNativeProofTests
         var result = await fixture.Repository(context, fixture.Assessor).ExecuteAsync(
             new AssignModerationReviewerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = root.Scope,
-                ExpectedQualificationRevision = epoch.Revision, AssignmentId = assignmentId,
-                CaseId = root.Id, ExpectedCaseRevision = root.Revision + (state == "stale" ? 1 : 0),
+                OperationId = Guid.CreateVersion7(),
+                Target = root.Scope,
+                ExpectedQualificationRevision = epoch.Revision,
+                AssignmentId = assignmentId,
+                CaseId = root.Id,
+                ExpectedCaseRevision = root.Revision + (state == "stale" ? 1 : 0),
                 ReviewerHumanId = fixture.Review.Caller.UserId!.Value
             }, default);
 
@@ -70,10 +73,14 @@ public sealed partial class ModerationCaseNativeProofTests
             var rejected = await fixture.Repository(qualify, fixture.Assessor).ExecuteAsync(
                 new QualifyModerationReviewerController
                 {
-                    OperationId = Guid.CreateVersion7(), Target = root.Scope,
-                    ExpectedQualificationRevision = current.Revision, AssignmentId = assignmentId,
-                    ExpectedAssignmentRevision = 1, ControllerHumanId = assignment.ReviewerHumanId,
-                    EvidenceId = Guid.CreateVersion7(), Justification = "Triage is not responsibility attribution.",
+                    OperationId = Guid.CreateVersion7(),
+                    Target = root.Scope,
+                    ExpectedQualificationRevision = current.Revision,
+                    AssignmentId = assignmentId,
+                    ExpectedAssignmentRevision = 1,
+                    ControllerHumanId = assignment.ReviewerHumanId,
+                    EvidenceId = Guid.CreateVersion7(),
+                    Justification = "Triage is not responsibility attribution.",
                     QualifiedUntil = database.Clock.Now.AddSeconds(10)
                 }, default);
             await Assert.That(rejected.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
@@ -84,8 +91,10 @@ public sealed partial class ModerationCaseNativeProofTests
             var withdrawn = await fixture.Repository(withdraw, fixture.Assessor).ExecuteAsync(
                 new WithdrawModerationReviewerSource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = root.Scope,
-                    ExpectedQualificationRevision = current.Revision, AssignmentId = assignmentId,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = root.Scope,
+                    ExpectedQualificationRevision = current.Revision,
+                    AssignmentId = assignmentId,
                     ExpectedAssignmentRevision = 1
                 }, default);
             await Assert.That(withdrawn.Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);

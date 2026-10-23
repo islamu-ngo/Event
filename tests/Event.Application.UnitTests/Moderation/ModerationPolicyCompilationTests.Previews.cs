@@ -40,7 +40,8 @@ public sealed partial class ModerationPolicyCompilationTests
         var registry = SourceImplementedInventory();
         var state = State(ModerationReferenceProfileId.CFG05) with
         {
-            InventoryFingerprint = registry.Fingerprint, RequestedState = ModerationPolicyRequestedState.Active
+            InventoryFingerprint = registry.Fingerprint,
+            RequestedState = ModerationPolicyRequestedState.Active
         };
         var result = ModerationPolicyProposedStateCompiler.Compile(state, Context(), registry);
         var preview = result.Previews.Single();

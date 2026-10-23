@@ -180,7 +180,8 @@ public sealed partial class ModerationCaseNativeProofTests
         fixture.Database.Clock.Now = InvestigationFixture.CapturedAt.AddSeconds(10);
         var updated = fixture.Request with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            SourceId = Guid.CreateVersion7(),
             ExpectedQualificationRevision = fixture.Request.ExpectedQualificationRevision + 1,
             ValidUntil = fixture.Request.ValidUntil.AddSeconds(10),
             PurgeAt = fixture.Request.PurgeAt.AddSeconds(10),
@@ -194,7 +195,8 @@ public sealed partial class ModerationCaseNativeProofTests
         var renewal = new ModerationCaseAttributionRenewalRequest(subjectCase!.Id, subjectCase.Revision,
             originalRequest.OperationId, 1, 1, originalRequest with
             {
-                OperationId = Guid.CreateVersion7(), InvestigationSourceId = updated.SourceId,
+                OperationId = Guid.CreateVersion7(),
+                InvestigationSourceId = updated.SourceId,
                 ValidUntil = updated.ValidUntil
             });
         var renewed = await writer.RenewAsync(renewal, default);
@@ -247,16 +249,23 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             setup.Users.Add(new User
             {
-                Id = reviewer.UserId!.Value, Pii = new UserPii
+                Id = reviewer.UserId!.Value,
+                Pii = new UserPii
                 {
-                    UserId = reviewer.UserId.Value, Email = $"{reviewer.UserId:N}@example.invalid",
-                    FirstName = "Independent", LastName = "Observer"
+                    UserId = reviewer.UserId.Value,
+                    Email = $"{reviewer.UserId:N}@example.invalid",
+                    FirstName = "Independent",
+                    LastName = "Observer"
                 }
             });
             setup.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = reviewer.UserId.Value, RoleId = (int)RoleEnum.Admin,
-                User = null!, Role = null!, GrantedAt = fixture.Database.Clock.Now.UtcDateTime
+                Id = Guid.CreateVersion7(),
+                UserId = reviewer.UserId.Value,
+                RoleId = (int)RoleEnum.Admin,
+                User = null!,
+                Role = null!,
+                GrantedAt = fixture.Database.Clock.Now.UtcDateTime
             });
             await setup.SaveChangesAsync();
         }
@@ -296,7 +305,8 @@ public sealed partial class ModerationCaseNativeProofTests
         fixture.Database.Clock.Now = InvestigationFixture.CapturedAt.AddSeconds(10);
         var replacement = fixture.Request with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            SourceId = Guid.CreateVersion7(),
             ExpectedQualificationRevision = fixture.Request.ExpectedQualificationRevision + 1,
             ValidUntil = fixture.Request.ValidUntil.AddSeconds(10),
             PurgeAt = fixture.Request.PurgeAt.AddSeconds(10)
@@ -306,7 +316,8 @@ public sealed partial class ModerationCaseNativeProofTests
         var result = await writer.RenewAsync(new(subjectCase!.Id, subjectCase.Revision,
             original.OperationId, 1, 1, original with
             {
-                OperationId = Guid.CreateVersion7(), InvestigationSourceId = replacement.SourceId,
+                OperationId = Guid.CreateVersion7(),
+                InvestigationSourceId = replacement.SourceId,
                 ValidUntil = replacement.ValidUntil
             }), default);
         await Assert.That(result).IsNull();

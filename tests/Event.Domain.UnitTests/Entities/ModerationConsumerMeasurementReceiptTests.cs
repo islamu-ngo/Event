@@ -141,8 +141,13 @@ public sealed class ModerationConsumerMeasurementReceiptTests
         await Assert.That(() => Accept(human: change == 0 ? Guid.Empty : Guid.NewGuid(),
             generation: change switch { 1 => 0, 2 => -1, 3 => long.MaxValue, _ => 4 },
             acceptedAt: change switch { 4 => DateTimeOffset.MinValue, 5 => DateTimeOffset.MaxValue, _ => Now },
-            validUntil: change switch { 6 => Now, 7 => Now.AddTicks(-1), 8 => DateTimeOffset.MaxValue,
-                _ => Now.AddMinutes(1) })).Throws<ArgumentException>();
+            validUntil: change switch
+            {
+                6 => Now,
+                7 => Now.AddTicks(-1),
+                8 => DateTimeOffset.MaxValue,
+                _ => Now.AddMinutes(1)
+            })).Throws<ArgumentException>();
     }
 
     [Test]

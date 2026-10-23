@@ -67,9 +67,14 @@ public sealed class ModerationRecognitionPrivacyCommandTests
         var recovery = Guid.CreateVersion7();
         return new()
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 2,
-            SourceId = Guid.CreateVersion7(), PolicyId = Guid.CreateVersion7(), ExpectedPolicyRevision = 1,
-            PublicationId = Guid.CreateVersion7(), ProfileId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = Guid.CreateVersion7(),
+            ExpectedPolicyRevision = 1,
+            PublicationId = Guid.CreateVersion7(),
+            ProfileId = Guid.CreateVersion7(),
             Mode = Explore.Application.Services.Moderation.ModerationNativeMode.Embedded,
             ValidUntil = new DateTimeOffset(2026, 10, 10, 12, 5, 0, TimeSpan.Zero),
             Terms = new(ModerationRecognitionPrivacyPurpose.ScopedActionContinuity, ModerationScopeKind.Tenant,

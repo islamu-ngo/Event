@@ -97,8 +97,12 @@ public sealed partial class ModerationPolicyPublicationTests
             row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
         foreach (var id in new[] { reviewer, continuity, settlement, controller })
         {
-            var user = new User { Id = id, Pii = new UserPii
-            { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Governance", LastName = "Owner" } };
+            var user = new User
+            {
+                Id = id,
+                Pii = new UserPii
+                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Governance", LastName = "Owner" }
+            };
             context.Users.Add(user);
             if (id != controller)
                 context.PlatformUserRoles.Add(new PlatformUserRole
@@ -115,10 +119,17 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var record = new RecordModerationEventRightsSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(5), Terms = EventRightsTerms(),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddMinutes(5),
+            Terms = EventRightsTerms(),
             Ownership = new(reviewer, controller, continuity, continuity, settlement, settlement, database.AdminId,
                 "Distinct canonical controllers reviewed with conflicts excluded.",
                 "Independent event rights and premises review mandate.",
@@ -129,12 +140,15 @@ public sealed partial class ModerationPolicyPublicationTests
         if (change is EventRightsChange.MissingRightsMandate or EventRightsChange.MissingContinuityMandate
             or EventRightsChange.MissingSettlementMandate)
         {
-            record = record with { Ownership = change switch
+            record = record with
             {
-                EventRightsChange.MissingRightsMandate => record.Ownership with { RightsReviewMandateGrounds = "" },
-                EventRightsChange.MissingContinuityMandate => record.Ownership with { ContinuityMappingMandateGrounds = "" },
-                _ => record.Ownership with { SettlementMappingMandateGrounds = "" }
-            }};
+                Ownership = change switch
+                {
+                    EventRightsChange.MissingRightsMandate => record.Ownership with { RightsReviewMandateGrounds = "" },
+                    EventRightsChange.MissingContinuityMandate => record.Ownership with { ContinuityMappingMandateGrounds = "" },
+                    _ => record.Ownership with { SettlementMappingMandateGrounds = "" }
+                }
+            };
             await Assert.That(async () => await writer.ExecuteAsync(record)).Throws<ArgumentException>();
             context.ModerationTrustDomainId = database.Scope.TrustDomainId;
             await Assert.That(await context.Set<ModerationEventRightsSource>().CountAsync()).IsEqualTo(0);
@@ -191,9 +205,14 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var adopt = new AdoptModerationEventRightsSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            SourceId = record.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 3,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(4)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            SourceId = record.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 3,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(4)
         };
         foreach (var human in new[] { database.AdminId, continuity, settlement })
             await Assert.That((await Writer(human).ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Denied);
@@ -215,7 +234,7 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That((await Writer(reviewer).ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         await Assert.That((await Writer(reviewer).ExecuteAsync(adopt)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         await Assert.That((await writer.ExecuteAsync(record with
-            { Terms = record.Terms with { SettlementMappingGrounds = "Different substantive mandate." } })).Outcome)
+        { Terms = record.Terms with { SettlementMappingGrounds = "Different substantive mandate." } })).Outcome)
             .IsEqualTo(ModerationQualificationWriteOutcome.Conflict);
         context.ModerationTrustDomainId = database.Scope.TrustDomainId;
         await Assert.That(await context.ModerationPolicySelections.CountAsync()).IsEqualTo(0);
@@ -265,10 +284,12 @@ public sealed partial class ModerationPolicyPublicationTests
             clock.UtcNow = Now.AddMinutes(20);
             var withdraw = new WithdrawModerationEventRightsAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
                 ExpectedQualificationRevision = change is EventRightsChange.WithdrawAfterExpiryReplacementAndOwnerDeparture
                     or EventRightsChange.WithdrawalAfterDeselection ? 5 : 4,
-                AdoptionId = adopt.AdoptionId, ExpectedAdoptionRevision = 1
+                AdoptionId = adopt.AdoptionId,
+                ExpectedAdoptionRevision = 1
             };
             if (change == EventRightsChange.WithdrawerRoleLostAfterSave) flush.RevokeWithdrawer = database.AdminId;
             else if (change == EventRightsChange.WithdrawalEpochDriftAfterSave) flush.EpochDrift = change;

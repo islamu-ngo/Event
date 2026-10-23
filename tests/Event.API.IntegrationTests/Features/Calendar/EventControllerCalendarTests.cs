@@ -262,14 +262,27 @@ public sealed class EventControllerCalendarTests
         {
             Event = new(EventStatusEnum.Published)
             {
-                Id = export.EventId, TenantId = Guid.NewGuid(), Title = export.Title, Content = export.Description,
-                Slug = export.Slug, Actor = null!, Tenant = null!, VisibilityType = null!, EventStatus = null!,
-                EventFormat = null!, VisibilityTypeId = (int)VisibilityTypeEnum.Public
+                Id = export.EventId,
+                TenantId = Guid.NewGuid(),
+                Title = export.Title,
+                Content = export.Description,
+                Slug = export.Slug,
+                Actor = null!,
+                Tenant = null!,
+                VisibilityType = null!,
+                EventStatus = null!,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public
             };
             PrimarySession = new(EventSessionStatusEnum.Published)
             {
-                Id = Guid.NewGuid(), EventId = Event.Id, Event = Event, TenantId = Event.TenantId, Tenant = null!,
-                StartTime = export.StartsAtUtc, EndTime = export.EndsAtUtc
+                Id = Guid.NewGuid(),
+                EventId = Event.Id,
+                Event = Event,
+                TenantId = Event.TenantId,
+                Tenant = null!,
+                StartTime = export.StartsAtUtc,
+                EndTime = export.EndsAtUtc
             };
             PrimarySession.AssignEventLocation(EventLocation.CreateToBeAnnounced(
                 Event.TenantId, Event.Id, Guid.NewGuid(), new CalendarClock().GetUtcNow().UtcDateTime));

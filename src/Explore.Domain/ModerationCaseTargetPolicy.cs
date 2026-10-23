@@ -29,7 +29,10 @@ public sealed class ModerationCaseTargetPolicy
             throw new ArgumentException("Native tenant ancestry and target kind are required.");
         var policy = new ModerationCaseTargetPolicy
         {
-            Id = id, TenantId = tenantId, TrustDomainId = trustDomainId, TargetKind = kind
+            Id = id,
+            TenantId = tenantId,
+            TrustDomainId = trustDomainId,
+            TargetKind = kind
         };
         policy.Change(0, submissionLifetime, readLifetime, true, changedBy);
         return policy;

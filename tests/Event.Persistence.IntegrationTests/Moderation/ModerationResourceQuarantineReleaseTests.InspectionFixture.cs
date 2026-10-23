@@ -80,8 +80,11 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
                             .Select(row => row.Actor.ActorTypeId).SingleAsync();
                         var storageActor = new Actor
                         {
-                            Id = Guid.CreateVersion7(), ActorTypeId = eventActorType, ActorType = null!,
-                            UserId = native.Author, Pii = null!
+                            Id = Guid.CreateVersion7(),
+                            ActorTypeId = eventActorType,
+                            ActorType = null!,
+                            UserId = native.Author,
+                            Pii = null!
                         };
                         context.Actors.Add(storageActor);
                         storage.ActorId = storageActor.Id;
@@ -117,7 +120,8 @@ public sealed partial class ModerationResourceQuarantineReleaseTests
             }
             var purpose = native.Intent(native.Author, ResourceSafetyReviewStep.ProposePurpose, null) with
             {
-                RequiredApprovals = 1, MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
+                RequiredApprovals = 1,
+                MaximumEvidenceLifetime = TimeSpan.FromMinutes(10)
             };
             await native.AcceptAsync(native.Author, purpose);
             fixture.PurposeId = purpose.OperationId;

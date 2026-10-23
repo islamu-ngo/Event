@@ -151,16 +151,27 @@ public sealed partial class ModerationCaseNativeProofTests
             var fixture = new InvestigationFixture(database, review, privacy);
             await using var context = database.Context();
             var subject = Guid.CreateVersion7();
-            context.Users.Add(new User { Id = subject, Pii = new UserPii
+            context.Users.Add(new User
             {
-                UserId = subject, Email = $"{subject:N}@example.invalid", FirstName = "Alleged", LastName = "Subject"
-            }});
+                Id = subject,
+                Pii = new UserPii
+                {
+                    UserId = subject,
+                    Email = $"{subject:N}@example.invalid",
+                    FirstName = "Alleged",
+                    LastName = "Subject"
+                }
+            });
             var session = new EventSession(EventSessionStatusEnum.Draft)
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                EventId = database.EventId, Event = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                EventId = database.EventId,
+                Event = null!,
                 ConcurrencyStamp = Guid.NewGuid(),
-                StartTime = database.Clock.Now.AddMinutes(-10), EndTime = database.Clock.Now
+                StartTime = database.Clock.Now.AddMinutes(-10),
+                EndTime = database.Clock.Now
             };
             context.EventSessions.Add(session);
             await context.SaveChangesAsync();
@@ -171,33 +182,49 @@ public sealed partial class ModerationCaseNativeProofTests
             var epoch = await context.ModerationQualificationEpochs.SingleAsync();
             var source = new RecordModerationCaseNarrativePolicySource
             {
-                OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = epoch.Revision,
-                SourceId = Guid.CreateVersion7(), TargetKind = ModerationCaseTargetKind.ParticipantIncident,
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
+                ExpectedQualificationRevision = epoch.Revision,
+                SourceId = Guid.CreateVersion7(),
+                TargetKind = ModerationCaseTargetKind.ParticipantIncident,
                 Terms = new(ModerationCaseNarrativePurpose.ParticipantInvestigation, TimeSpan.FromMinutes(1), 4096),
-                Ownership = originalPolicy.Ownership, ValidUntil = database.Clock.Now.AddHours(1)
+                Ownership = originalPolicy.Ownership,
+                ValidUntil = database.Clock.Now.AddHours(1)
             };
             await Assert.That((await fixture.ExecuteMutationAsync(database.Caller, source)).Outcome)
                 .IsEqualTo(ModerationQualificationWriteOutcome.Known);
             await Assert.That((await fixture.ExecuteMutationAsync(new NativeCaller(source.Ownership.PrivacyOwnerHumanId),
                 new AdoptModerationCaseNarrativePolicySource
                 {
-                    OperationId = Guid.CreateVersion7(), Target = scope,
+                    OperationId = Guid.CreateVersion7(),
+                    Target = scope,
                     ExpectedQualificationRevision = source.ExpectedQualificationRevision + 1,
-                    SourceId = source.SourceId, ExpectedSourceRevision = 1,
+                    SourceId = source.SourceId,
+                    ExpectedSourceRevision = 1,
                     ExpectedSourceWriterGeneration = source.ExpectedQualificationRevision + 1,
-                    AdoptionId = Guid.CreateVersion7(), ValidUntil = source.ValidUntil
+                    AdoptionId = Guid.CreateVersion7(),
+                    ValidUntil = source.ValidUntil
                 })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
             var material = await context.ModerationCaseTargetSources.SingleAsync();
             fixture.Request = new()
             {
-                OperationId = Guid.CreateVersion7(), Target = scope,
+                OperationId = Guid.CreateVersion7(),
+                Target = scope,
                 ExpectedQualificationRevision = source.ExpectedQualificationRevision + 2,
-                SourceId = Guid.CreateVersion7(), OccurrenceCaseId = review.RootId,
-                ExpectedCaseRevision = 1, EvidenceCaseRevision = 1, ReadGrantId = review.GrantId,
-                EvidenceSourceId = material.Id, EvidenceSourceVersion = material.Version,
-                SubjectHumanId = subject, SessionId = session.Id, ExpectedSessionGeneration = session.ConcurrencyStamp,
-                IncidentWindowFrom = database.Clock.Now.AddMinutes(-5), IncidentWindowUntil = database.Clock.Now.AddMinutes(-1),
-                ValidUntil = database.Clock.Now.AddSeconds(30), PurgeAt = database.Clock.Now.AddSeconds(45),
+                SourceId = Guid.CreateVersion7(),
+                OccurrenceCaseId = review.RootId,
+                ExpectedCaseRevision = 1,
+                EvidenceCaseRevision = 1,
+                ReadGrantId = review.GrantId,
+                EvidenceSourceId = material.Id,
+                EvidenceSourceVersion = material.Version,
+                SubjectHumanId = subject,
+                SessionId = session.Id,
+                ExpectedSessionGeneration = session.ConcurrencyStamp,
+                IncidentWindowFrom = database.Clock.Now.AddMinutes(-5),
+                IncidentWindowUntil = database.Clock.Now.AddMinutes(-1),
+                ValidUntil = database.Clock.Now.AddSeconds(30),
+                PurgeAt = database.Clock.Now.AddSeconds(45),
                 Grounds = new("Direct recognition during the named session, not the roster link.",
                     "Observed incident-specific interference during that window.",
                     "First-hand original intake and identified session observation.",

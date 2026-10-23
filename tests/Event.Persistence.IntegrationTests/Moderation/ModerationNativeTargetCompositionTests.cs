@@ -57,7 +57,9 @@ public sealed class ModerationNativeTargetCompositionTests
             foreach (var (id, human) in new[] { (storageActorId, database.ReviewerId), (replacementActorId, database.UrgencyAssessorId) })
                 writer.Actors.Add(new Actor
                 {
-                    Id = id, ActorTypeId = (int)Explore.Domain.Enums.ActorTypeEnum.User, UserId = human,
+                    Id = id,
+                    ActorTypeId = (int)Explore.Domain.Enums.ActorTypeEnum.User,
+                    UserId = human,
                     Pii = new ActorPii { FullName = "Native target ancestry" }
                 });
             await writer.SaveChangesAsync();
@@ -72,14 +74,24 @@ public sealed class ModerationNativeTargetCompositionTests
         var resourceGenerationId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RecordModerationResourceGenerationSource
         {
-            OperationId = Guid.CreateVersion7(), SourceId = resourceGenerationId, Target = database.Scope,
-            ExpectedQualificationRevision = 1, ResourceId = resourceId, ExpectedResourceRevision = 0, ValidUntil = Now.AddMinutes(10)
+            OperationId = Guid.CreateVersion7(),
+            SourceId = resourceGenerationId,
+            Target = database.Scope,
+            ExpectedQualificationRevision = 1,
+            ResourceId = resourceId,
+            ExpectedResourceRevision = 0,
+            ValidUntil = Now.AddMinutes(10)
         })).IsSuccess).IsTrue();
         var eventGenerationId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RecordModerationEventGenerationSource
         {
-            OperationId = Guid.CreateVersion7(), SourceId = eventGenerationId, Target = database.Scope,
-            ExpectedQualificationRevision = 2, EventId = eventId, ExpectedEventRevision = 0, ValidUntil = Now.AddMinutes(10)
+            OperationId = Guid.CreateVersion7(),
+            SourceId = eventGenerationId,
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            EventId = eventId,
+            ExpectedEventRevision = 0,
+            ValidUntil = Now.AddMinutes(10)
         })).IsSuccess).IsTrue();
         var opened = database.OpenCase() with { ExpectedQualificationRevision = 3 };
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, opened)).IsSuccess).IsTrue();
@@ -105,14 +117,24 @@ public sealed class ModerationNativeTargetCompositionTests
         var effectId = Guid.CreateVersion7();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RecordModerationContributionSelectionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            SelectionId = selectionId, EffectId = effectId, CaseId = opened.CaseId, ExpectedCaseRevision = 1,
-            DecisionId = original.Id, ExpectedDecisionRevision = 2, PolicyId = request.Proposed.PolicyId,
-            ExpectedPolicyRevision = 1, PublicationId = publication.Publication!.Id, ProfileId = profile.Id,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            SelectionId = selectionId,
+            EffectId = effectId,
+            CaseId = opened.CaseId,
+            ExpectedCaseRevision = 1,
+            DecisionId = original.Id,
+            ExpectedDecisionRevision = 2,
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = publication.Publication!.Id,
+            ProfileId = profile.Id,
             Contribution = new(original.Id, original.Rule, original.Scope, original.Subject.Kind, original.Subject.Id,
                 original.StartsAt, null,
                 profile.Effects.Select(effect => new ModerationPolicyEffectTarget(effect, resourceTarget)).ToImmutableArray(),
-                [new(null, eventTarget)]), ValidUntil = Now.AddMinutes(10)
+                [new(null, eventTarget)]),
+            ValidUntil = Now.AddMinutes(10)
         })).IsSuccess).IsTrue();
         ModerationContributionSelection selection;
         await using (var reader = database.Context())
@@ -125,10 +147,17 @@ public sealed class ModerationNativeTargetCompositionTests
         {
             await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, new AdoptModerationResourceTargetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch++,
-                AdoptionId = Guid.CreateVersion7(), SelectionId = selectionId, BindingOrdinal = binding.Ordinal,
-                GenerationId = resourceGenerationId, ExpectedGenerationRevision = 1, CaseId = opened.CaseId,
-                ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(5)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch++,
+                AdoptionId = Guid.CreateVersion7(),
+                SelectionId = selectionId,
+                BindingOrdinal = binding.Ordinal,
+                GenerationId = resourceGenerationId,
+                ExpectedGenerationRevision = 1,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                ValidUntil = Now.AddMinutes(5)
             })).IsSuccess).IsTrue();
         }
         var eventAdoptionId = Guid.CreateVersion7();
@@ -136,16 +165,24 @@ public sealed class ModerationNativeTargetCompositionTests
         {
             await Assert.That((await database.ExecuteAsync(database.UrgencyAssessorId, new AdoptModerationEventTargetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch++,
-                AdoptionId = eventAdoptionId, SelectionId = selectionId,
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch++,
+                AdoptionId = eventAdoptionId,
+                SelectionId = selectionId,
                 BindingOrdinal = selection.Bindings.Single(row => row.TargetId == eventId).Ordinal,
-                GenerationId = eventGenerationId, ExpectedGenerationRevision = 1, CaseId = opened.CaseId,
-                ExpectedCaseRevision = 1, ValidUntil = Now.AddMinutes(4)
+                GenerationId = eventGenerationId,
+                ExpectedGenerationRevision = 1,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1,
+                ValidUntil = Now.AddMinutes(4)
             })).IsSuccess).IsTrue();
         }
         await Assert.That((await database.ExecuteAsync(database.ReviewerId, new ApproveModerationNoticeDisclosureSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch++,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = epoch++,
             Intent = new(Guid.CreateVersion7(), effectId, original.Id, 2, original.CaseId, 1,
                 selection.PolicyId, 1, publication.Publication.Id, selection.ProfileId, original.Id, selection.SelectionDigest,
                 new("Native source classification."), new("Current source authority and protected response."),
@@ -156,8 +193,13 @@ public sealed class ModerationNativeTargetCompositionTests
         if (change == 2)
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RevokeModerationEventTargetSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = epoch,
-                AdoptionId = eventAdoptionId, ExpectedAdoptionRevision = 1, CaseId = opened.CaseId, ExpectedCaseRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = epoch,
+                AdoptionId = eventAdoptionId,
+                ExpectedAdoptionRevision = 1,
+                CaseId = opened.CaseId,
+                ExpectedCaseRevision = 1
             })).IsSuccess).IsTrue();
         if (change is 3 or 4)
         {
@@ -179,17 +221,24 @@ public sealed class ModerationNativeTargetCompositionTests
             var serviceActorId = Guid.CreateVersion7();
             writer.Actors.Add(new Actor
             {
-                Id = serviceActorId, ActorTypeId = (int)ActorTypeEnum.System,
+                Id = serviceActorId,
+                ActorTypeId = (int)ActorTypeEnum.System,
                 ServicePrincipalId = host.MaintenanceServicePrincipalId,
                 Pii = new ActorPii { FullName = "Installed maintenance actor" }
             });
             writer.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), KeyId = keyId, Name = "Native target maintenance credential",
-                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()), Scopes = "events:read",
-                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = database.AdministratorId,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                KeyId = keyId,
+                Name = "Native target maintenance credential",
+                SecretHash = ApiKeyHashing.ComputeHash(ApiKeyHashing.CreateSecret()),
+                Scopes = "events:read",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                OwnerId = database.AdministratorId,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = (int)ExternalApiKeyCreditPeriodEnum.None,
+                ExternalApiKeyCreditPeriod = null!
             });
             writer.ModerationMachineSubjectBindings.Add(ModerationMachineSubjectBinding.Establish(
                 Guid.CreateVersion7(), host.Id, ModerationMachineCredentialSource.Persisted, keyId, null,
@@ -197,7 +246,7 @@ public sealed class ModerationNativeTargetCompositionTests
             await writer.SaveChangesAsync();
             expectedActors.Add(serviceActorId);
             principal = new(keyId, null, ExternalApiKeyOwnerType.InstanceAdmin, database.AdministratorId, [])
-                { CredentialSource = ApiKeyCredentialSource.Persisted };
+            { CredentialSource = ApiKeyCredentialSource.Persisted };
         }
         var checkpoint = new NativeParentsBeforeTenant(resourceId, eventId, replacementActorId, change);
         await using var context = database.Context(change >= 6 ? checkpoint : null);

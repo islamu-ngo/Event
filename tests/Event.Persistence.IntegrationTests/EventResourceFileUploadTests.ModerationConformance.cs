@@ -314,8 +314,10 @@ public sealed partial class EventResourceFileUploadTests
         using var content = new MemoryStream(Pdf);
         return await workflow.FinalizeAsync(new FinalizeStorageUploadSessionCommand
         {
-            UploadSessionId = scenario.SessionId, Content = content,
-            ContentLength = Pdf.Length, ContentType = "application/pdf"
+            UploadSessionId = scenario.SessionId,
+            Content = content,
+            ContentLength = Pdf.Length,
+            ContentType = "application/pdf"
         }, default);
     }
 

@@ -62,7 +62,8 @@ public sealed class ModerationClassificationMaterialInventoryContractTests
         {
             Mandate = query.Mandate with
             {
-                OwnershipGrounds = new string('\u4e00', 2048), ReviewGrounds = new string('\u4e00', 2048)
+                OwnershipGrounds = new string('\u4e00', 2048),
+                ReviewGrounds = new string('\u4e00', 2048)
             }
         };
         await Assert.That(JsonSerializer.SerializeToUtf8Bytes(query, Options).LongLength <= limit).IsTrue();
@@ -74,7 +75,9 @@ public sealed class ModerationClassificationMaterialInventoryContractTests
         var reviewer = Guid.NewGuid();
         return new()
         {
-            EventGenerationId = Guid.CreateVersion7(), TaxonomyId = Guid.CreateVersion7(), ProfileId = Guid.CreateVersion7(),
+            EventGenerationId = Guid.CreateVersion7(),
+            TaxonomyId = Guid.CreateVersion7(),
+            ProfileId = Guid.CreateVersion7(),
             Mode = ModerationNativeMode.Embedded,
             Mandate = new(owner, owner, Guid.NewGuid(), 1, reviewer, reviewer,
                 "Current event assignment.", "Independent material review.")

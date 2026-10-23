@@ -29,10 +29,14 @@ public sealed partial class ModerationCaseNativeProofTests
         var request = database.Request();
         var receipt = await new IssueModerationSubmissionReceiptCommandHandler(intake).ExecuteAsync(new()
         {
-            Kind = request.Kind, NativeKind = request.NativeKind, EventId = request.EventId,
-            NativeTargetId = request.NativeTargetId, RelationshipKind = request.RelationshipKind,
+            Kind = request.Kind,
+            NativeKind = request.NativeKind,
+            EventId = request.EventId,
+            NativeTargetId = request.NativeTargetId,
+            RelationshipKind = request.RelationshipKind,
             RelationshipSourceId = request.RelationshipSourceId,
-            OccurrenceMaterial = request.OccurrenceMaterial, Material = request.Material
+            OccurrenceMaterial = request.OccurrenceMaterial,
+            Material = request.Material
         });
         await Assert.That(receipt.IsSuccess).IsTrue();
         await Assert.That(receipt.Id).IsNotEqualTo(Guid.Empty);
@@ -59,7 +63,9 @@ public sealed partial class ModerationCaseNativeProofTests
         var command = new SubmitModerationAllegationCommand
         {
             OperationId = Guid.CreateVersion7(),
-            ReceiptId = receipt.Id, PresentedToken = expectedToken, Narrative = request.Material
+            ReceiptId = receipt.Id,
+            PresentedToken = expectedToken,
+            Narrative = request.Material
         };
         var submit = new SubmitModerationAllegationCommandHandler(intake);
         var acceptance = await submit.ExecuteAsync(command);

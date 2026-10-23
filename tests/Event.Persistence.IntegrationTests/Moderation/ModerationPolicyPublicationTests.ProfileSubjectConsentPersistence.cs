@@ -263,15 +263,19 @@ public sealed partial class ModerationPolicyPublicationTests
             "Independent native guardian relationship review.", "Independent native manual issuer qualification.");
         var record = fixture.Record with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = Guid.CreateVersion7(),
-            ExpectedQualificationRevision = 6, Procedure = procedure
+            OperationId = Guid.CreateVersion7(),
+            SourceId = Guid.CreateVersion7(),
+            ExpectedQualificationRevision = 6,
+            Procedure = procedure
         };
         await Assert.That((await fixture.Writer(fixture.OwnerId).ExecuteAsync(record)).Outcome)
             .IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var adopt = fixture.Adopt with
         {
-            OperationId = Guid.CreateVersion7(), SourceId = record.SourceId,
-            ExpectedQualificationRevision = 7, ExpectedSourceWriterGeneration = 7,
+            OperationId = Guid.CreateVersion7(),
+            SourceId = record.SourceId,
+            ExpectedQualificationRevision = 7,
+            ExpectedSourceWriterGeneration = 7,
             AdoptionId = Guid.CreateVersion7()
         };
         await Assert.That((await fixture.Writer(fixture.ReviewerId).ExecuteAsync(adopt)).Outcome)

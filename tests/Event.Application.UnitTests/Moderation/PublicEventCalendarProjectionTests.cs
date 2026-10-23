@@ -218,9 +218,15 @@ public sealed class PublicEventCalendarProjectionTests
     {
         private readonly Explore.Domain.Event value = new(EventStatusEnum.Published)
         {
-            Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), Title = "Reviewed Event",
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, Actor = null!, Tenant = null!,
-            VisibilityType = null!, EventStatus = null!, EventFormat = null!
+            Id = Guid.NewGuid(),
+            TenantId = Guid.NewGuid(),
+            Title = "Reviewed Event",
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            Actor = null!,
+            Tenant = null!,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormat = null!
         };
         public Explore.Domain.Event Event => ThrowOnPayloadRead ? throw new ObjectDisposedException(nameof(Lease)) : value;
         public EventSession PrimarySession { get; }
@@ -232,8 +238,13 @@ public sealed class PublicEventCalendarProjectionTests
         public Action? OnRevalidate { get; set; }
         public Lease() => PrimarySession = new()
         {
-            Id = Guid.NewGuid(), EventId = Event.Id, Event = Event, TenantId = Event.TenantId, Tenant = null!,
-            StartTime = Now.AddDays(1), EndTime = Now.AddDays(1).AddHours(1)
+            Id = Guid.NewGuid(),
+            EventId = Event.Id,
+            Event = Event,
+            TenantId = Event.TenantId,
+            Tenant = null!,
+            StartTime = Now.AddDays(1),
+            EndTime = Now.AddDays(1).AddHours(1)
         };
         public Task<ModerationPublicEventCalendarOutcome> RevalidateAsync(CancellationToken cancellationToken)
         {

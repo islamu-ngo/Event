@@ -86,11 +86,13 @@ public sealed class EventPublicationModerationSnapshotReaderTests
                 Classes = request.Proposed.Classes.Select(row => row with { Reference = Rebase(row.Reference) }).ToImmutableArray(),
                 Reasons = request.Proposed.Reasons.Select(row => row with
                 {
-                    Reference = Rebase(row.Reference), Class = Rebase(row.Class)
+                    Reference = Rebase(row.Reference),
+                    Class = Rebase(row.Class)
                 }).ToImmutableArray(),
                 Profiles = request.Proposed.Profiles.Select(row => row with
                 {
-                    Rule = Rebase(row.Rule), Reason = Rebase(row.Reason),
+                    Rule = Rebase(row.Rule),
+                    Reason = Rebase(row.Reason),
                     ScopeKinds = tenantProfile ? [ModerationScopeKind.Tenant] : [ModerationScopeKind.Instance]
                 }).ToImmutableArray(),
                 SupportedProfiles = []
@@ -171,7 +173,8 @@ public sealed class EventPublicationModerationSnapshotReaderTests
             ExpectedPublicationId = publication.Id,
             Proposed = declared with
             {
-                PublicationId = Guid.CreateVersion7(), ExpectedRevision = publication.Revision,
+                PublicationId = Guid.CreateVersion7(),
+                ExpectedRevision = publication.Revision,
                 SupportedProfiles = []
             }
         };

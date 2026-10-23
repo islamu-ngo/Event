@@ -37,12 +37,24 @@ public sealed class ModerationProfileAdoption
             throw new ArgumentException("Profile adoption requires independent approval of the exact live selection.");
         var row = new ModerationProfileAdoption
         {
-            Id = id, HostBindingId = selection.HostBindingId, TrustDomainId = selection.TrustDomainId,
-            TenantId = selection.TenantId, SelectionId = selection.Id, SelectionRevision = selection.Revision,
-            SelectionWriterGeneration = selection.WriterGeneration, PublicationId = selection.PublicationId,
-            ProfileId = selection.ProfileId, CaseId = selection.CaseId, CaseRevision = selection.CaseRevision,
-            ModeCode = modeCode, PrerequisiteMask = prerequisiteMask, AdoptedByHumanId = humanId,
-            WriterGeneration = writerGeneration, Revision = 1, AdoptedAt = now.ToUniversalTime(), ValidUntil = validUntil
+            Id = id,
+            HostBindingId = selection.HostBindingId,
+            TrustDomainId = selection.TrustDomainId,
+            TenantId = selection.TenantId,
+            SelectionId = selection.Id,
+            SelectionRevision = selection.Revision,
+            SelectionWriterGeneration = selection.WriterGeneration,
+            PublicationId = selection.PublicationId,
+            ProfileId = selection.ProfileId,
+            CaseId = selection.CaseId,
+            CaseRevision = selection.CaseRevision,
+            ModeCode = modeCode,
+            PrerequisiteMask = prerequisiteMask,
+            AdoptedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            AdoptedAt = now.ToUniversalTime(),
+            ValidUntil = validUntil
         };
         row.ValidatePersistedState();
         return row;

@@ -27,8 +27,11 @@ public sealed class ModerationClassificationMaterialService(
             return new(null, ModerationClassificationMaterialFailure.InvalidIntent);
         var intent = new GetModerationClassificationMaterialInventoryQuery
         {
-            EventGenerationId = query.EventGenerationId, TaxonomyId = query.TaxonomyId,
-            ProfileId = query.ProfileId, Mode = query.Mode, Mandate = CopyMandate(query.Mandate)
+            EventGenerationId = query.EventGenerationId,
+            TaxonomyId = query.TaxonomyId,
+            ProfileId = query.ProfileId,
+            Mode = query.Mode,
+            Mandate = CopyMandate(query.Mandate)
         };
         try
         {
@@ -106,26 +109,42 @@ public sealed class ModerationClassificationMaterialService(
             return new(null, ModerationClassificationMaterialFailure.InvalidIntent);
         var command = new RecordModerationClassificationMaterialCommand
         {
-            OperationId = operationId, Target = new() { Kind = view.Target.Kind, Id = view.Target.Id },
-            ExpectedQualificationRevision = view.ExpectedQualificationRevision, SourceId = sourceId,
-            ExpectedMaterialGeneration = view.ExpectedMaterialGeneration, EventGenerationId = view.EventGenerationId,
-            PolicyId = view.PolicyId, ExpectedPolicyRevision = view.ExpectedPolicyRevision, PublicationId = view.PublicationId,
-            ProfileId = view.ProfileId, Mode = view.Mode, TaxonomyId = view.TaxonomyId,
-            ExpectedTaxonomySourceId = view.ExpectedTaxonomySourceId, ExpectedTaxonomyAdoptionId = view.ExpectedTaxonomyAdoptionId,
-            Mandate = CopyMandate(mandate), ValidUntil = validUntil,
+            OperationId = operationId,
+            Target = new() { Kind = view.Target.Kind, Id = view.Target.Id },
+            ExpectedQualificationRevision = view.ExpectedQualificationRevision,
+            SourceId = sourceId,
+            ExpectedMaterialGeneration = view.ExpectedMaterialGeneration,
+            EventGenerationId = view.EventGenerationId,
+            PolicyId = view.PolicyId,
+            ExpectedPolicyRevision = view.ExpectedPolicyRevision,
+            PublicationId = view.PublicationId,
+            ProfileId = view.ProfileId,
+            Mode = view.Mode,
+            TaxonomyId = view.TaxonomyId,
+            ExpectedTaxonomySourceId = view.ExpectedTaxonomySourceId,
+            ExpectedTaxonomyAdoptionId = view.ExpectedTaxonomyAdoptionId,
+            Mandate = CopyMandate(mandate),
+            ValidUntil = validUntil,
             Materials = selections.Select(selection => new ModerationClassificationMaterialSelection
             {
-                ReviewId = selection.ReviewId, CategoryVersionIds = selection.CategoryVersionIds.ToArray(),
+                ReviewId = selection.ReviewId,
+                CategoryVersionIds = selection.CategoryVersionIds.ToArray(),
                 Material = new()
                 {
-                    EventId = selection.Material.EventId, EventStamp = selection.Material.EventStamp,
-                    SessionId = selection.Material.SessionId, SessionStamp = selection.Material.SessionStamp,
-                    ResourceId = selection.Material.ResourceId, ResourceStamp = selection.Material.ResourceStamp
+                    EventId = selection.Material.EventId,
+                    EventStamp = selection.Material.EventStamp,
+                    SessionId = selection.Material.SessionId,
+                    SessionStamp = selection.Material.SessionStamp,
+                    ResourceId = selection.Material.ResourceId,
+                    ResourceStamp = selection.Material.ResourceStamp
                 }
             }).ToArray(),
             Components = view.Components.Select(component => new ModerationClassificationMaterialComponentVersion
             {
-                Kind = component.Kind, NativeId = component.NativeId, NativeStamp = component.NativeStamp, Digest = component.Digest
+                Kind = component.Kind,
+                NativeId = component.NativeId,
+                NativeStamp = component.NativeStamp,
+                Digest = component.Digest
             }).ToArray()
         };
         return new(new(http.BaseAddress!, path, JsonSerializer.Serialize(command, Json), operationId, sourceId),
@@ -147,11 +166,14 @@ public sealed class ModerationClassificationMaterialService(
             return new(null, ModerationClassificationMaterialFailure.InvalidIntent);
         var command = new AcceptModerationClassificationMaterialCommand
         {
-            SourceId = view.SourceId, ExpectedSourceRevision = view.ExpectedSourceRevision,
+            SourceId = view.SourceId,
+            ExpectedSourceRevision = view.ExpectedSourceRevision,
             ExpectedSourceWriterGeneration = view.ExpectedSourceWriterGeneration,
             ExpectedQualificationRevision = view.ExpectedQualificationRevision,
             Target = new() { Kind = view.Target.Kind, Id = view.Target.Id },
-            OperationId = operationId, ReviewId = reviewId, ValidUntil = validUntil
+            OperationId = operationId,
+            ReviewId = reviewId,
+            ValidUntil = validUntil
         };
         return new(new(http.BaseAddress!, path, JsonSerializer.Serialize(command, Json), operationId, reviewId),
             ModerationClassificationMaterialFailure.None);
@@ -207,10 +229,14 @@ public sealed class ModerationClassificationMaterialService(
 
     private static ModerationClassificationMaterialMandate CopyMandate(ModerationClassificationMaterialMandate mandate) => new()
     {
-        OwnerHumanId = mandate.OwnerHumanId, OwnerControllerHumanId = mandate.OwnerControllerHumanId,
-        OwnerAssignmentId = mandate.OwnerAssignmentId, OwnerAssignmentRevision = mandate.OwnerAssignmentRevision,
-        ReviewerHumanId = mandate.ReviewerHumanId, ReviewerControllerHumanId = mandate.ReviewerControllerHumanId,
-        OwnershipGrounds = mandate.OwnershipGrounds, ReviewGrounds = mandate.ReviewGrounds
+        OwnerHumanId = mandate.OwnerHumanId,
+        OwnerControllerHumanId = mandate.OwnerControllerHumanId,
+        OwnerAssignmentId = mandate.OwnerAssignmentId,
+        OwnerAssignmentRevision = mandate.OwnerAssignmentRevision,
+        ReviewerHumanId = mandate.ReviewerHumanId,
+        ReviewerControllerHumanId = mandate.ReviewerControllerHumanId,
+        OwnershipGrounds = mandate.OwnershipGrounds,
+        ReviewGrounds = mandate.ReviewGrounds
     };
 
     private static (Guid, Guid, Guid?, Guid?, Guid?, Guid?) Key(ModerationClassificationMaterial material) =>

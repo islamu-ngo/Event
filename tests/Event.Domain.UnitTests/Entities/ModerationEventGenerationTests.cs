@@ -66,23 +66,44 @@ public sealed class ModerationEventGenerationTests
 
     private static ModerationEventGeneration Generation() => new()
     {
-        Id = Guid.CreateVersion7(), HostBindingId = Guid.CreateVersion7(), TrustDomainId = Guid.CreateVersion7(),
-        TenantId = Guid.CreateVersion7(), EventId = Guid.CreateVersion7(), Revision = 1,
-        ObservedByHumanId = Guid.CreateVersion7(), WriterGeneration = 2, ObservedAt = Now, ValidUntil = Now.AddMinutes(10),
-        EventStamp = Guid.NewGuid(), ActorId = Guid.CreateVersion7(), ActorStamp = Guid.NewGuid(),
-        OrganizerActorId = null, OrganizerActorStamp = null, SubmittedByHumanId = Guid.CreateVersion7()
+        Id = Guid.CreateVersion7(),
+        HostBindingId = Guid.CreateVersion7(),
+        TrustDomainId = Guid.CreateVersion7(),
+        TenantId = Guid.CreateVersion7(),
+        EventId = Guid.CreateVersion7(),
+        Revision = 1,
+        ObservedByHumanId = Guid.CreateVersion7(),
+        WriterGeneration = 2,
+        ObservedAt = Now,
+        ValidUntil = Now.AddMinutes(10),
+        EventStamp = Guid.NewGuid(),
+        ActorId = Guid.CreateVersion7(),
+        ActorStamp = Guid.NewGuid(),
+        OrganizerActorId = null,
+        OrganizerActorStamp = null,
+        SubmittedByHumanId = Guid.CreateVersion7()
     };
 
     private static ModerationEventGeneration Copy(
         ModerationEventGeneration row, long? revision = null, DateTimeOffset? observedAt = null,
         DateTimeOffset? validUntil = null, Guid? eventStamp = null, Guid? actorStamp = null,
         Guid? submittedBy = null, Guid? eventId = null, Guid? organizerId = null) => new()
-    {
-        Id = Guid.CreateVersion7(), HostBindingId = row.HostBindingId, TrustDomainId = row.TrustDomainId, TenantId = row.TenantId,
-        EventId = eventId ?? row.EventId, Revision = revision ?? row.Revision, ObservedByHumanId = row.ObservedByHumanId,
-        WriterGeneration = row.WriterGeneration, ObservedAt = observedAt ?? row.ObservedAt, ValidUntil = validUntil ?? row.ValidUntil,
-        EventStamp = eventStamp ?? row.EventStamp, ActorId = row.ActorId, ActorStamp = actorStamp ?? row.ActorStamp,
-        OrganizerActorId = organizerId ?? row.OrganizerActorId, OrganizerActorStamp = row.OrganizerActorStamp,
-        SubmittedByHumanId = submittedBy ?? row.SubmittedByHumanId
-    };
+        {
+            Id = Guid.CreateVersion7(),
+            HostBindingId = row.HostBindingId,
+            TrustDomainId = row.TrustDomainId,
+            TenantId = row.TenantId,
+            EventId = eventId ?? row.EventId,
+            Revision = revision ?? row.Revision,
+            ObservedByHumanId = row.ObservedByHumanId,
+            WriterGeneration = row.WriterGeneration,
+            ObservedAt = observedAt ?? row.ObservedAt,
+            ValidUntil = validUntil ?? row.ValidUntil,
+            EventStamp = eventStamp ?? row.EventStamp,
+            ActorId = row.ActorId,
+            ActorStamp = actorStamp ?? row.ActorStamp,
+            OrganizerActorId = organizerId ?? row.OrganizerActorId,
+            OrganizerActorStamp = row.OrganizerActorStamp,
+            SubmittedByHumanId = submittedBy ?? row.SubmittedByHumanId
+        };
 }

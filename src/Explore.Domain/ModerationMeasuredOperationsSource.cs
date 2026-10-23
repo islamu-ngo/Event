@@ -50,15 +50,31 @@ public sealed class ModerationMeasuredOperationsSource
         ArgumentNullException.ThrowIfNull(evidence);
         var source = new ModerationMeasuredOperationsSource
         {
-            Id = id, HostBindingId = hostId, TrustDomainId = trustId, TenantId = tenantId,
-            PolicyId = policyId, PolicyRevision = policyRevision, PublicationId = publicationId,
-            DefinitionId = definitionId, ProfileId = profileId, ModeCode = modeCode,
-            BindingDigest = bindingDigest, ProposedStateDigest = proposedDigest,
-            EvidenceJson = JsonSerializer.Serialize(evidence), ReviewerHumanId = reviewer,
-            ReviewerControllerHumanId = reviewerController, RecorderControllerHumanId = recorderController,
-            RecordedByHumanId = recorder, WriterGeneration = generation, Revision = 1, RecordedAt = now, ValidUntil = validUntil,
-            OriginalEffectId = originalEffectId, OriginalSnapshotHash = originalSnapshotHash,
-            OriginalEffectBindingHash = originalEffectBindingHash, OriginalCustodyUntil = originalCustodyUntil
+            Id = id,
+            HostBindingId = hostId,
+            TrustDomainId = trustId,
+            TenantId = tenantId,
+            PolicyId = policyId,
+            PolicyRevision = policyRevision,
+            PublicationId = publicationId,
+            DefinitionId = definitionId,
+            ProfileId = profileId,
+            ModeCode = modeCode,
+            BindingDigest = bindingDigest,
+            ProposedStateDigest = proposedDigest,
+            EvidenceJson = JsonSerializer.Serialize(evidence),
+            ReviewerHumanId = reviewer,
+            ReviewerControllerHumanId = reviewerController,
+            RecorderControllerHumanId = recorderController,
+            RecordedByHumanId = recorder,
+            WriterGeneration = generation,
+            Revision = 1,
+            RecordedAt = now,
+            ValidUntil = validUntil,
+            OriginalEffectId = originalEffectId,
+            OriginalSnapshotHash = originalSnapshotHash,
+            OriginalEffectBindingHash = originalEffectBindingHash,
+            OriginalCustodyUntil = originalCustodyUntil
         };
         source.ValidatePersistedState();
         return source;

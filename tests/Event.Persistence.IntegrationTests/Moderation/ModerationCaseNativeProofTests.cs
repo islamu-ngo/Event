@@ -107,9 +107,13 @@ public sealed partial class ModerationCaseNativeProofTests
                 var id = Guid.CreateVersion7();
                 mutation.Users.Add(new User
                 {
-                    Id = id, Pii = new UserPii
+                    Id = id,
+                    Pii = new UserPii
                     {
-                        UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Unrelated", LastName = "Reporter"
+                        UserId = id,
+                        Email = $"{id:N}@example.invalid",
+                        FirstName = "Unrelated",
+                        LastName = "Reporter"
                     }
                 });
                 await mutation.SaveChangesAsync();
@@ -162,9 +166,13 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             setup.Users.Add(new User
             {
-                Id = unrelatedId, Pii = new UserPii
+                Id = unrelatedId,
+                Pii = new UserPii
                 {
-                    UserId = unrelatedId, Email = $"{unrelatedId:N}@example.invalid", FirstName = "Unrelated", LastName = "Reporter"
+                    UserId = unrelatedId,
+                    Email = $"{unrelatedId:N}@example.invalid",
+                    FirstName = "Unrelated",
+                    LastName = "Reporter"
                 }
             });
             await setup.SaveChangesAsync();
@@ -288,9 +296,11 @@ public sealed partial class ModerationCaseNativeProofTests
             new ModerationCaseTargetProofOwner(context, caller, database.Machine, database.Clock), database.Clock)
             .ReadAsync(request with
             {
-                Purpose = ModerationCaseAccessPurpose.ReadAllegation, ExpectedCaseRevision = 1,
+                Purpose = ModerationCaseAccessPurpose.ReadAllegation,
+                ExpectedCaseRevision = 1,
                 CaseId = accepted.Acknowledgement!.CaseId,
-                OperationId = Guid.Empty, Narrative = ReadOnlyMemory<byte>.Empty
+                OperationId = Guid.Empty,
+                Narrative = ReadOnlyMemory<byte>.Empty
             }, default)).IsNull();
     }
 
@@ -349,16 +359,25 @@ public sealed partial class ModerationCaseNativeProofTests
                 .SetProperty(row => row.ConcurrencyStamp, Guid.CreateVersion7()));
         context.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-            UserId = publisher.Id, User = publisher, ActorId = actor.Id, Actor = actor,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            UserId = publisher.Id,
+            User = publisher,
+            ActorId = actor.Id,
+            Actor = actor,
             StatusId = (int)TenantUserStatusEnum.Active
         });
         var reporterId = Guid.CreateVersion7();
         context.Users.Add(new User
         {
-            Id = reporterId, Pii = new UserPii
+            Id = reporterId,
+            Pii = new UserPii
             {
-                UserId = reporterId, Email = $"{reporterId:N}@example.invalid", FirstName = "Public", LastName = "Reporter"
+                UserId = reporterId,
+                Email = $"{reporterId:N}@example.invalid",
+                FirstName = "Public",
+                LastName = "Reporter"
             }
         });
         await context.SaveChangesAsync();
@@ -678,13 +697,23 @@ public sealed partial class ModerationCaseNativeProofTests
             var binding = StorageProviderBinding.Local(Path.GetTempPath());
             var storage = new StorageObject
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                FileTypeId = await context.FileTypes.Select(row => row.Id).FirstAsync(), FileType = null!,
-                Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
-                ObjectKey = $"moderation-test/{Guid.CreateVersion7():N}", FullName = "source.pdf", SafeDisplayName = "source.pdf",
-                Extension = ".pdf", ContentType = "application/pdf", Size = 1,
-                Visibility = StorageObjectVisibilities.PrivateOwner, Purpose = StorageObjectPurposes.EventResource,
-                OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = database.ResourceId,
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                FileTypeId = await context.FileTypes.Select(row => row.Id).FirstAsync(),
+                FileType = null!,
+                Provider = StorageProviders.Local,
+                StorageProviderBindingId = binding.Id,
+                ObjectKey = $"moderation-test/{Guid.CreateVersion7():N}",
+                FullName = "source.pdf",
+                SafeDisplayName = "source.pdf",
+                Extension = ".pdf",
+                ContentType = "application/pdf",
+                Size = 1,
+                Visibility = StorageObjectVisibilities.PrivateOwner,
+                Purpose = StorageObjectPurposes.EventResource,
+                OwningResourceKind = StorageOwningResourceKinds.EventResource,
+                OwningResourceId = database.ResourceId,
                 LifecycleState = StorageObjectLifecycleStates.Active
             };
             storageId = storage.Id;
@@ -935,7 +964,9 @@ public sealed partial class ModerationCaseNativeProofTests
             .AddInterceptors(interceptors)
             .UseSnakeCaseNamingConvention().Options)
         {
-            TenantContext = new SelectedTenant(TenantId), CurrentUserService = Caller, ModerationTrustDomainId = TrustId
+            TenantContext = new SelectedTenant(TenantId),
+            CurrentUserService = Caller,
+            ModerationTrustDomainId = TrustId
         };
 
         public ExploreDbContext RetryingContext(params IInterceptor[] interceptors) => new(
@@ -945,7 +976,9 @@ public sealed partial class ModerationCaseNativeProofTests
                 .AddInterceptors(interceptors)
                 .UseSnakeCaseNamingConvention().Options)
         {
-            TenantContext = new SelectedTenant(TenantId), CurrentUserService = Caller, ModerationTrustDomainId = TrustId
+            TenantContext = new SelectedTenant(TenantId),
+            CurrentUserService = Caller,
+            ModerationTrustDomainId = TrustId
         };
 
         public ModerationCaseTargetProofOwner Owner(ExploreDbContext context) => new(context, Caller, Machine, Clock);
@@ -1002,34 +1035,54 @@ public sealed partial class ModerationCaseNativeProofTests
                 var now = database.Clock.Now.UtcDateTime;
                 var tenant = new Tenant
                 {
-                    Id = database.TenantId, Slug = $"native-{database.TenantId:N}", FullName = "Native target proof",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = database.TenantId,
+                    Slug = $"native-{database.TenantId:N}",
+                    FullName = "Native target proof",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 };
-                var user = new User { Id = database.CallerId, Pii = new UserPii
+                var user = new User
                 {
-                    UserId = database.CallerId, Email = $"{database.CallerId:N}@example.invalid",
-                    FirstName = "Native", LastName = "Reporter"
-                }};
+                    Id = database.CallerId,
+                    Pii = new UserPii
+                    {
+                        UserId = database.CallerId,
+                        Email = $"{database.CallerId:N}@example.invalid",
+                        FirstName = "Native",
+                        LastName = "Reporter"
+                    }
+                };
                 var maintenance = new ServicePrincipal
                 {
-                    Id = Guid.CreateVersion7(), Code = $"maintenance-{Guid.CreateVersion7():N}", DisplayName = "Maintenance"
+                    Id = Guid.CreateVersion7(),
+                    Code = $"maintenance-{Guid.CreateVersion7():N}",
+                    DisplayName = "Maintenance"
                 };
                 var publisher = new ServicePrincipal
                 {
-                    Id = database.ServiceId, Code = $"publisher-{Guid.CreateVersion7():N}", DisplayName = "Publisher"
+                    Id = database.ServiceId,
+                    Code = $"publisher-{Guid.CreateVersion7():N}",
+                    DisplayName = "Publisher"
                 };
                 var host = ModerationHostBinding.Establish(Guid.CreateVersion7(), database.TrustId,
                     Guid.CreateVersion7(), Guid.CreateVersion7(), maintenance.Id);
                 var epoch = ModerationQualificationEpoch.Initialize(Guid.CreateVersion7(), host, tenant);
                 var actor = new Actor
                 {
-                    Id = database.ActorId, ActorTypeId = (int)ActorTypeEnum.Bot, ActorType = null!,
-                    ServicePrincipalId = publisher.Id, Pii = new ActorPii { ActorId = database.ActorId, DisplayName = "Native publisher" }
+                    Id = database.ActorId,
+                    ActorTypeId = (int)ActorTypeEnum.Bot,
+                    ActorType = null!,
+                    ServicePrincipalId = publisher.Id,
+                    Pii = new ActorPii { ActorId = database.ActorId, DisplayName = "Native publisher" }
                 };
                 var admin = new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), UserId = user.Id, User = user, RoleId = (int)RoleEnum.Admin,
-                    Role = null!, GrantedAt = now
+                    Id = Guid.CreateVersion7(),
+                    UserId = user.Id,
+                    User = user,
+                    RoleId = (int)RoleEnum.Admin,
+                    Role = null!,
+                    GrantedAt = now
                 };
                 database.AdminId = admin.Id;
                 context.AddRange(tenant, user, maintenance, publisher, host, epoch, admin);
@@ -1039,11 +1092,19 @@ public sealed partial class ModerationCaseNativeProofTests
                 {
                     var parent = new DomainEvent(EventStatusEnum.Draft)
                     {
-                        Id = database.EventId, TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-                        Title = "Private draft", SubmittedByUserId = user.Id,
+                        Id = database.EventId,
+                        TenantId = tenant.Id,
+                        Tenant = tenant,
+                        ActorId = actor.Id,
+                        Actor = actor,
+                        Title = "Private draft",
+                        SubmittedByUserId = user.Id,
                         EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                        VisibilityTypeId = (int)VisibilityTypeEnum.Private, VisibilityType = null!,
-                        EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!
+                        VisibilityTypeId = (int)VisibilityTypeEnum.Private,
+                        VisibilityType = null!,
+                        EventFormatId = (int)EventFormatEnum.Local,
+                        EventFormat = null!,
+                        EventStatus = null!
                     };
                     var role = EventRoleAssignment.Create(tenant.Id, parent.Id, user.Id, (int)RoleEnum.EventOwner,
                         EventRoleAssignmentStatus.Active, now.AddHours(-1), now.AddHours(1), user.Id);
@@ -1062,7 +1123,8 @@ public sealed partial class ModerationCaseNativeProofTests
                     var resource = EventResource.CreateDraft(resourceId, tenant.Id, parent.Id, null,
                         new EventResourceMetadata
                         {
-                            Title = "Protected destination", Kind = EventResourceKindEnum.GeneralDocument,
+                            Title = "Protected destination",
+                            Kind = EventResourceKindEnum.GeneralDocument,
                             DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                         }, EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
                         [EventResourceAudienceRule.Create(tenant.Id, parent.Id, resourceId, EventResourceAudienceKindEnum.Organizer)],

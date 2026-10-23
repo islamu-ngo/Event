@@ -45,9 +45,14 @@ public sealed class ModerationCaseNarrativePolicyCommandTests
         var source = Record();
         var command = new AdoptModerationCaseNarrativePolicyCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = source.Target, ExpectedQualificationRevision = 2,
-            SourceId = source.SourceId, AdoptionId = Guid.CreateVersion7(), ExpectedSourceRevision = 1,
-            ExpectedSourceWriterGeneration = 2, ValidUntil = source.ValidUntil
+            OperationId = Guid.CreateVersion7(),
+            Target = source.Target,
+            ExpectedQualificationRevision = 2,
+            SourceId = source.SourceId,
+            AdoptionId = Guid.CreateVersion7(),
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 2,
+            ValidUntil = source.ValidUntil
         };
         var validator = new ModerationCaseNarrativePolicyCommandValidator<AdoptModerationCaseNarrativePolicyCommand>();
         await Assert.That((await validator.ValidateAsync(command)).IsValid).IsTrue();
@@ -61,8 +66,11 @@ public sealed class ModerationCaseNarrativePolicyCommandTests
         var source = Record();
         var command = new WithdrawModerationCaseNarrativePolicyCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = source.Target, ExpectedQualificationRevision = 3,
-            AdoptionId = Guid.CreateVersion7(), ExpectedAdoptionRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = source.Target,
+            ExpectedQualificationRevision = 3,
+            AdoptionId = Guid.CreateVersion7(),
+            ExpectedAdoptionRevision = 1
         };
         var validator = new ModerationCaseNarrativePolicyCommandValidator<WithdrawModerationCaseNarrativePolicyCommand>();
         await Assert.That((await validator.ValidateAsync(command)).IsValid).IsTrue();
@@ -75,7 +83,9 @@ public sealed class ModerationCaseNarrativePolicyCommandTests
         Target = AuthorityScope.Tenant(AuthorityScope.Instance(
             AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()),
             Guid.CreateVersion7()), Guid.CreateVersion7()),
-        ExpectedQualificationRevision = 1, SourceId = Guid.CreateVersion7(), TargetKind = ModerationCaseTargetKind.Service,
+        ExpectedQualificationRevision = 1,
+        SourceId = Guid.CreateVersion7(),
+        TargetKind = ModerationCaseTargetKind.Service,
         Terms = new(ModerationCaseNarrativePurpose.ConfidentialAllegation, TimeSpan.FromHours(1), 4096),
         Ownership = new(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
             "Independent canonical controllers.", "Finite confidential custody and independent ordinary erasure."),

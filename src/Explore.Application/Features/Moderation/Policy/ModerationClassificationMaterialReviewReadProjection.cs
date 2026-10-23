@@ -40,7 +40,8 @@ public sealed class ModerationClassificationMaterialReviewReadProjection : IAsyn
             lease.Observation.Taxonomy.Categories.Select(category => new ModerationClassificationMaterialCategoryView(
                 category.Id, category.CategoryId, category.Revision, category.Code, category.Kind,
                 category.MinimumAge, category.Meaning, category.ReviewRationale)).ToImmutableArray(),
-            source.ValidUntil) { NativeReviewerQualified = true };
+            source.ValidUntil)
+        { NativeReviewerQualified = true };
         var representation = await prepare(view, token);
         token.ThrowIfCancellationRequested();
         var current = await lease.RevalidateAsync(token);

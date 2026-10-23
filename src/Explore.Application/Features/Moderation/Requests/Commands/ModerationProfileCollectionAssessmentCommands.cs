@@ -52,8 +52,11 @@ public sealed record RecordModerationProfileCollectionAssessmentCommand : IComma
 
     public RecordModerationProfileCollectionAssessment ToRecord() => new()
     {
-        Original = Original.ToOriginal(), SourceId = SourceId, ExpectedGeneration = ExpectedGeneration,
-        Required = Required, ValidUntil = ValidUntil
+        Original = Original.ToOriginal(),
+        SourceId = SourceId,
+        ExpectedGeneration = ExpectedGeneration,
+        Required = Required,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -70,8 +73,12 @@ public sealed record AdoptModerationProfileCollectionAssessmentCommand : IComman
 
     public AdoptModerationProfileCollectionAssessment ToAdoption() => new()
     {
-        Original = Original.ToOriginal(), SourceId = SourceId, ExpectedSourceRevision = ExpectedSourceRevision,
-        ExpectedSourceGeneration = ExpectedSourceGeneration, ExpectedGeneration = ExpectedGeneration,
-        AdoptionId = AdoptionId, ValidUntil = ValidUntil
+        Original = Original.ToOriginal(),
+        SourceId = SourceId,
+        ExpectedSourceRevision = ExpectedSourceRevision,
+        ExpectedSourceGeneration = ExpectedSourceGeneration,
+        ExpectedGeneration = ExpectedGeneration,
+        AdoptionId = AdoptionId,
+        ValidUntil = ValidUntil
     };
 }

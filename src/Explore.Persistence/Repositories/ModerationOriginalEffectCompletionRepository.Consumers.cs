@@ -35,8 +35,16 @@ public sealed partial class ModerationOriginalEffectCompletionRepository
         {
             until = new[] { until, registration.ValidUntil,
                 currentSources.Single(row => row.ConsumerId == registration.Contract.Id).ValidUntil }.Min();
-            facts.Add(Digest(new { registration.Binding, registration.Contract, registration.InventoryFingerprint,
-                registration.SourceId, registration.SourceRevision, registration.WriterGeneration, registration.ValidUntil }));
+            facts.Add(Digest(new
+            {
+                registration.Binding,
+                registration.Contract,
+                registration.InventoryFingerprint,
+                registration.SourceId,
+                registration.SourceRevision,
+                registration.WriterGeneration,
+                registration.ValidUntil
+            }));
         }
         var approvals = new HashSet<Guid>();
         var sourceIds = new HashSet<Guid>();
@@ -55,8 +63,18 @@ public sealed partial class ModerationOriginalEffectCompletionRepository
                 || !approvals.Add(proof.ApprovalId) || !sourceIds.Add(proof.SourceId))
                 throw new CompletionPending(ModerationOriginalEffectCompletionPendingReason.NativePurposeProof);
             until = until < proof.ValidUntil ? until : proof.ValidUntil;
-            facts.Add(Digest(new { proof.Binding, proof.Prerequisite, proof.ApprovalId, proof.ApprovalRevision,
-                proof.SourceId, proof.CurrentSourceRevision, proof.CurrentWriterGeneration, proof.AdoptedAt, proof.ValidUntil }));
+            facts.Add(Digest(new
+            {
+                proof.Binding,
+                proof.Prerequisite,
+                proof.ApprovalId,
+                proof.ApprovalRevision,
+                proof.SourceId,
+                proof.CurrentSourceRevision,
+                proof.CurrentWriterGeneration,
+                proof.AdoptedAt,
+                proof.ValidUntil
+            }));
         }
         return until;
     }

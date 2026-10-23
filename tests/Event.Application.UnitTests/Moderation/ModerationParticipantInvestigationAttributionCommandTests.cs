@@ -56,7 +56,8 @@ public sealed class ModerationParticipantInvestigationAttributionCommandTests
         await Assert.That((await validator.ValidateAsync(command with { InvestigationSourceRevision = null })).IsValid).IsFalse();
         await Assert.That((await validator.ValidateAsync(command with
         {
-            InvestigationSourceId = null, InvestigationSourceRevision = null
+            InvestigationSourceId = null,
+            InvestigationSourceRevision = null
         })).IsValid).IsTrue();
     }
 
@@ -86,11 +87,17 @@ public sealed class ModerationParticipantInvestigationAttributionCommandTests
 
     private static AttributeModerationCaseCommand Command() => new()
     {
-        OperationId = Guid.CreateVersion7(), OccurrenceCaseId = Guid.CreateVersion7(),
-        ExpectedCaseRevision = 1, EvidenceCaseRevision = 1, ReadGrantId = Guid.CreateVersion7(),
-        Basis = ModerationResponsibilityBasis.ParticipantInvestigation, SubjectKind = ModerationSubjectKind.Human,
-        SubjectId = Guid.CreateVersion7(), ValidUntil = new(2026, 10, 13, 12, 2, 0, TimeSpan.Zero),
-        InvestigationSourceId = Guid.CreateVersion7(), InvestigationSourceRevision = 1
+        OperationId = Guid.CreateVersion7(),
+        OccurrenceCaseId = Guid.CreateVersion7(),
+        ExpectedCaseRevision = 1,
+        EvidenceCaseRevision = 1,
+        ReadGrantId = Guid.CreateVersion7(),
+        Basis = ModerationResponsibilityBasis.ParticipantInvestigation,
+        SubjectKind = ModerationSubjectKind.Human,
+        SubjectId = Guid.CreateVersion7(),
+        ValidUntil = new(2026, 10, 13, 12, 2, 0, TimeSpan.Zero),
+        InvestigationSourceId = Guid.CreateVersion7(),
+        InvestigationSourceRevision = 1
     };
 
     private sealed class IntentRepository : IModerationCaseAttributionRepository

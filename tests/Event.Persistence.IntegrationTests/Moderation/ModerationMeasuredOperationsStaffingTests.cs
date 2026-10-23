@@ -36,11 +36,15 @@ public sealed partial class ModerationPolicyPublicationTests
         var role = await context.Roles.SingleAsync(row => row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
         foreach (var id in ids)
         {
-            var user = new User { Id = id, Pii = new UserPii
-                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Actual", LastName = "Staffing" } };
+            var user = new User
+            {
+                Id = id,
+                Pii = new UserPii
+                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Actual", LastName = "Staffing" }
+            };
             context.Users.Add(user);
             context.PlatformUserRoles.Add(new PlatformUserRole
-                { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
+            { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
         }
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
@@ -53,16 +57,26 @@ public sealed partial class ModerationPolicyPublicationTests
         }
         var availability = new RecordModerationConstitutionAvailability
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-            AvailabilityId = Guid.CreateVersion7(), MaximumCaseload = 1, ValidUntil = Now.AddMinutes(8)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 2,
+            AvailabilityId = Guid.CreateVersion7(),
+            MaximumCaseload = 1,
+            ValidUntil = Now.AddMinutes(8)
         };
         await Assert.That((await Writer(ids[0]).ExecuteAsync(availability)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var constitution = new RecordModerationConstitutionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddMinutes(5),
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 3,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddMinutes(5),
             Terms = new(ModerationScopeKind.Tenant, ModerationConstitutionEvidence.QualifiedFindingsAndResponse,
                 ModerationConstitutionRemedies.RestrictedAuthenticationAndProofBoundRecovery,
                 ModerationConstitutionIndependence.DistinctControllersAndImplicatedPartyExclusion,
@@ -75,16 +89,27 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That((await Writer(database.AdminId).ExecuteAsync(constitution)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var adopted = new AdoptModerationConstitutionSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-            SourceId = constitution.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 4,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = Now.AddMinutes(4)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 4,
+            SourceId = constitution.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 4,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = Now.AddMinutes(4)
         };
         await Assert.That((await Writer(ids[1]).ExecuteAsync(adopted)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         var record = new RecordModerationMeasuredOperationsSource
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            SourceId = Guid.CreateVersion7(), ProfileId = constitution.ProfileId, Binding = policy.Consumers[0].Binding,
-            ReviewerHumanId = ids[1], ReviewerControllerHumanId = ids[1], RecorderControllerHumanId = database.AdminId,
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            SourceId = Guid.CreateVersion7(),
+            ProfileId = constitution.ProfileId,
+            Binding = policy.Consumers[0].Binding,
+            ReviewerHumanId = ids[1],
+            ReviewerControllerHumanId = ids[1],
+            RecorderControllerHumanId = database.AdminId,
             ValidUntil = Now.AddMinutes(3)
         };
         await Assert.That((await Writer(database.AdminId).ExecuteAsync(record)).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
@@ -94,8 +119,11 @@ public sealed partial class ModerationPolicyPublicationTests
         if (change == "withdrawn")
             await Assert.That((await Writer(ids[0]).ExecuteAsync(new WithdrawModerationConstitutionAvailability
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-                AvailabilityId = availability.AvailabilityId, ExpectedAvailabilityRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 6,
+                AvailabilityId = availability.AvailabilityId,
+                ExpectedAvailabilityRevision = 1
             })).Outcome).IsEqualTo(ModerationQualificationWriteOutcome.Known);
         if (change == "superseded")
             await Assert.That((await Writer(ids[0]).ExecuteAsync(availability with

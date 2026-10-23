@@ -100,7 +100,8 @@ public sealed class GroupCreationMutationTests
         var checkpoint = new ChangeCreatorOnEpochSave(database.ReviewerId);
         await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(baseline.Database.GetDbConnection()).UseSnakeCaseNamingConvention()
-            .AddInterceptors(checkpoint).Options) { TenantContext = database };
+            .AddInterceptors(checkpoint).Options)
+        { TenantContext = database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
         var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
             (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.SubjectId);
@@ -182,7 +183,8 @@ public sealed class GroupCreationMutationTests
         var checkpoint = new HierarchyBeforeTenant(database.TenantId);
         await using var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(baseline.Database.GetDbConnection()).UseSnakeCaseNamingConvention()
-            .AddInterceptors(checkpoint).Options) { TenantContext = database };
+            .AddInterceptors(checkpoint).Options)
+        { TenantContext = database };
         await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
         var session = GroupMemberMutationBoundaryTests.CreateBoundary(context,
             (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.SubjectId);

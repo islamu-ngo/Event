@@ -77,13 +77,21 @@ internal static class ModerationProfileSubjectConsentSnapshot
             throw new ArgumentException("Consent snapshot requires original Human ProfileCompletion metadata.");
         return new()
         {
-            ["TargetKind"] = (int)binding.Target.Kind, ["SubjectKind"] = (int)subject.Kind, ["SubjectId"] = subject.Id,
-            ["Origin"] = ScopeRow(subject.Origin), ["Jurisdiction"] = ScopeRow(binding.Jurisdiction),
-            ["PolicyId"] = binding.PolicyId, ["PolicyRevision"] = binding.PolicyRevision, ["Purpose"] = (int)binding.Purpose,
-            ["SourceId"] = binding.SourceId, ["SourceRevision"] = binding.SourceRevision,
-            ["SourceGeneration"] = binding.SourceGeneration, ["ObservationStamp"] = binding.ObservationStamp,
+            ["TargetKind"] = (int)binding.Target.Kind,
+            ["SubjectKind"] = (int)subject.Kind,
+            ["SubjectId"] = subject.Id,
+            ["Origin"] = ScopeRow(subject.Origin),
+            ["Jurisdiction"] = ScopeRow(binding.Jurisdiction),
+            ["PolicyId"] = binding.PolicyId,
+            ["PolicyRevision"] = binding.PolicyRevision,
+            ["Purpose"] = (int)binding.Purpose,
+            ["SourceId"] = binding.SourceId,
+            ["SourceRevision"] = binding.SourceRevision,
+            ["SourceGeneration"] = binding.SourceGeneration,
+            ["ObservationStamp"] = binding.ObservationStamp,
             ["ObservationSequence"] = binding.ObservationSequence,
-            ["ObservedAt"] = binding.ObservedAt, ["ValidUntil"] = binding.ValidUntil
+            ["ObservedAt"] = binding.ObservedAt,
+            ["ValidUntil"] = binding.ValidUntil
         };
     }
 
@@ -116,8 +124,10 @@ internal static class ModerationProfileSubjectConsentSnapshot
             throw new ArgumentException("Consent scopes must be exact native instance or tenant coordinates.");
         return new()
         {
-            ["Kind"] = (int)scope.Kind, ["TrustDomainId"] = coordinates.TrustDomainId,
-            ["SolutionId"] = coordinates.SolutionId, ["InstanceId"] = coordinates.InstanceId,
+            ["Kind"] = (int)scope.Kind,
+            ["TrustDomainId"] = coordinates.TrustDomainId,
+            ["SolutionId"] = coordinates.SolutionId,
+            ["InstanceId"] = coordinates.InstanceId,
             ["TenantId"] = coordinates.TenantId
         };
     }

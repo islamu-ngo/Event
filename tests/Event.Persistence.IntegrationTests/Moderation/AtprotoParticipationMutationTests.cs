@@ -28,8 +28,15 @@ public sealed class AtprotoParticipationMutationTests
         await using (var setup = database.Context())
         {
             var user = await setup.Users.SingleAsync(row => row.Id == database.SubjectId);
-            setup.Actors.Add(new Actor { Id = personalId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                UserId = user.Id, User = user, Pii = new ActorPii { DisplayName = "Personal onboarding witness" } });
+            setup.Actors.Add(new Actor
+            {
+                Id = personalId,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = user.Id,
+                User = user,
+                Pii = new ActorPii { DisplayName = "Personal onboarding witness" }
+            });
             await setup.SaveChangesAsync();
         }
         long initial;
@@ -205,13 +212,31 @@ public sealed class AtprotoParticipationMutationTests
     {
         var id = Guid.CreateVersion7();
         if (seed.Organization)
-            context.OrganizationMembers.Add(new OrganizationMember { Id = id, TenantId = database.TenantId, Tenant = null!,
-                OrganizationTenantId = seed.ParticipationId, OrganizationTenant = null!, UserId = userId, User = null!,
-                RoleId = (int)RoleEnum.OrgAdmin, Role = null! });
+            context.OrganizationMembers.Add(new OrganizationMember
+            {
+                Id = id,
+                TenantId = database.TenantId,
+                Tenant = null!,
+                OrganizationTenantId = seed.ParticipationId,
+                OrganizationTenant = null!,
+                UserId = userId,
+                User = null!,
+                RoleId = (int)RoleEnum.OrgAdmin,
+                Role = null!
+            });
         else
-            context.GroupMembers.Add(new GroupMember { Id = id, TenantId = database.TenantId, Tenant = null!,
-                GroupTenantId = seed.ParticipationId, GroupTenant = null!, UserId = userId, User = null!,
-                RoleId = (int)RoleEnum.GroupAdmin, Role = null! });
+            context.GroupMembers.Add(new GroupMember
+            {
+                Id = id,
+                TenantId = database.TenantId,
+                Tenant = null!,
+                GroupTenantId = seed.ParticipationId,
+                GroupTenant = null!,
+                UserId = userId,
+                User = null!,
+                RoleId = (int)RoleEnum.GroupAdmin,
+                Role = null!
+            });
         await context.SaveChangesAsync(token);
         return id;
     }
@@ -221,27 +246,61 @@ public sealed class AtprotoParticipationMutationTests
         await using var context = database.Context();
         var account = PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(AtprotoDid.Parse($"did:plc:{Guid.CreateVersion7():N}"));
         var loginId = Guid.CreateVersion7();
-        context.UserExternalLogins.Add(new UserExternalLogin { Id = loginId, UserId = database.SubjectId, User = null!,
-            AuthenticationProviderId = (int)AuthenticationProviderKind.Atproto, AuthenticationProvider = null!, ProviderKey = account.Value });
-        var actor = new Actor { Id = Guid.CreateVersion7(), ActorType = null!,
-            ActorTypeId = (int)(organization ? ActorTypeEnum.Organization : ActorTypeEnum.Group), Pii = new ActorPii { DisplayName = "Verified membership witness" } };
+        context.UserExternalLogins.Add(new UserExternalLogin
+        {
+            Id = loginId,
+            UserId = database.SubjectId,
+            User = null!,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Atproto,
+            AuthenticationProvider = null!,
+            ProviderKey = account.Value
+        });
+        var actor = new Actor
+        {
+            Id = Guid.CreateVersion7(),
+            ActorType = null!,
+            ActorTypeId = (int)(organization ? ActorTypeEnum.Organization : ActorTypeEnum.Group),
+            Pii = new ActorPii { DisplayName = "Verified membership witness" }
+        };
         var participationId = Guid.CreateVersion7();
         if (organization)
         {
             var owner = new Organization { Id = Guid.CreateVersion7(), Pii = new OrganizationPii { FullName = "Verified organization" } };
             actor.Organization = owner; actor.OrganizationId = owner.Id;
-            context.OrganizationTenants.Add(new OrganizationTenant { Id = participationId, Organization = owner, OrganizationId = owner.Id,
-                TenantId = database.TenantId, Tenant = null!, ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null! });
+            context.OrganizationTenants.Add(new OrganizationTenant
+            {
+                Id = participationId,
+                Organization = owner,
+                OrganizationId = owner.Id,
+                TenantId = database.TenantId,
+                Tenant = null!,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                ApprovalStatus = null!
+            });
         }
         else
         {
             var owner = new Group { Id = Guid.CreateVersion7(), FullName = "Verified group" };
             actor.Group = owner; actor.GroupId = owner.Id;
-            context.GroupTenants.Add(new GroupTenant { Id = participationId, Group = owner, GroupId = owner.Id,
-                TenantId = database.TenantId, Tenant = null!, ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null! });
+            context.GroupTenants.Add(new GroupTenant
+            {
+                Id = participationId,
+                Group = owner,
+                GroupId = owner.Id,
+                TenantId = database.TenantId,
+                Tenant = null!,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                ApprovalStatus = null!
+            });
         }
-        context.AtprotoIdentities.Add(new AtprotoIdentity(AtprotoDid.Parse(account.Value)) { Id = Guid.CreateVersion7(), Actor = actor,
-            ActorId = actor.Id, PdsHost = "https://pds.example.test", IsActive = true });
+        context.AtprotoIdentities.Add(new AtprotoIdentity(AtprotoDid.Parse(account.Value))
+        {
+            Id = Guid.CreateVersion7(),
+            Actor = actor,
+            ActorId = actor.Id,
+            PdsHost = "https://pds.example.test",
+            IsActive = true
+        });
         await context.SaveChangesAsync();
         return new(account, loginId, actor.Id, participationId, organization);
     }

@@ -221,11 +221,15 @@ public sealed partial class ModerationPolicyPublicationTests
             row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
         foreach (var id in new[] { privacy, recovery })
         {
-            var user = new User { Id = id, Pii = new UserPii
-                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Independent", LastName = "Owner" } };
+            var user = new User
+            {
+                Id = id,
+                Pii = new UserPii
+                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Independent", LastName = "Owner" }
+            };
             context.Users.Add(user);
             context.PlatformUserRoles.Add(new PlatformUserRole
-                { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
+            { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
         }
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
@@ -263,10 +267,17 @@ public sealed partial class ModerationPolicyPublicationTests
         epoch = await context.Set<ModerationQualificationEpoch>().AsNoTracking().SingleAsync(row => row.Id == database.EpochId);
         var source = new RecordModerationRecognitionPrivacySource
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = epoch.Revision,
-            SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-            PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-            Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddDays(8), Terms = original.Terms,
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = epoch.Revision,
+            SourceId = Guid.CreateVersion7(),
+            PolicyId = request.Proposed.PolicyId,
+            ExpectedPolicyRevision = 1,
+            PublicationId = request.Proposed.PublicationId,
+            ProfileId = request.Proposed.Profiles.Single().Id,
+            Mode = ModerationNativeMode.Embedded,
+            ValidUntil = Now.AddDays(8),
+            Terms = original.Terms,
             Ownership = new(privacy, privacy, recovery, recovery, database.AdminId,
                 "Distinct independently qualified controllers for the second contribution.",
                 "Independent privacy mandate covering only the second policy.",
@@ -280,9 +291,13 @@ public sealed partial class ModerationPolicyPublicationTests
             .AsNoTracking().SingleAsync(row => row.Id == source.SourceId);
         if ((await Writer(privacy).ExecuteAsync(new AdoptModerationRecognitionPrivacySource
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = epoch.Revision,
-            SourceId = source.SourceId, ExpectedSourceRevision = persisted.Revision,
-            ExpectedSourceWriterGeneration = persisted.WriterGeneration, AdoptionId = Guid.CreateVersion7(),
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = epoch.Revision,
+            SourceId = source.SourceId,
+            ExpectedSourceRevision = persisted.Revision,
+            ExpectedSourceWriterGeneration = persisted.WriterGeneration,
+            AdoptionId = Guid.CreateVersion7(),
             ValidUntil = Now.AddDays(7)
         })).Outcome != ModerationQualificationWriteOutcome.Known)
             throw new InvalidOperationException("Second independent privacy owner must genuinely adopt its source.");

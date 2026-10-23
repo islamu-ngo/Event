@@ -72,15 +72,21 @@ public sealed partial class ModerationPolicyPublicationTests
         await using var database = await Database.CreateAsync();
         var request = database.Request();
         var proposed = request.Proposed;
-        request = request with { Proposed = change switch
+        request = request with
         {
-            "meaning" => proposed with
+            Proposed = change switch
+            {
+                "meaning" => proposed with
                 { Classes = [proposed.Classes[0] with { Meaning = new string('a', 4001) }] },
-            "effects" => proposed with { Profiles = [proposed.Profiles[0] with
-                { Effects = Enumerable.Repeat(proposed.Profiles[0].Effects[0], 27).ToImmutableArray() }] },
-            "fingerprint" => proposed with { InventoryFingerprint = new string('a', 65) },
-            _ => throw new ArgumentOutOfRangeException(nameof(change))
-        }};
+                "effects" => proposed with
+                {
+                    Profiles = [proposed.Profiles[0] with
+                { Effects = Enumerable.Repeat(proposed.Profiles[0].Effects[0], 27).ToImmutableArray() }]
+                },
+                "fingerprint" => proposed with { InventoryFingerprint = new string('a', 65) },
+                _ => throw new ArgumentOutOfRangeException(nameof(change))
+            }
+        };
         await Assert.That((await database.PublishAsync(request)).Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Invalid);
         await database.AssertCountsAsync(0, 0, 1);
     }
@@ -111,10 +117,13 @@ public sealed partial class ModerationPolicyPublicationTests
         await using var database = await Database.CreateAsync();
         var request = database.Request();
         await Assert.That((await database.PublishAsync(request)).Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
-        var changed = request with { Proposed = request.Proposed with
+        var changed = request with
         {
-            Reasons = [request.Proposed.Reasons[0] with { Meaning = "Different semantic reason." }]
-        }};
+            Proposed = request.Proposed with
+            {
+                Reasons = [request.Proposed.Reasons[0] with { Meaning = "Different semantic reason." }]
+            }
+        };
         await Assert.That((await database.PublishAsync(changed)).Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Conflict);
         await database.AssertCountsAsync(1, 1, 2);
     }
@@ -142,12 +151,15 @@ public sealed partial class ModerationPolicyPublicationTests
         var request = database.Request();
         await Assert.That((await database.PublishAsync(request)).Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         var next = database.Next(request);
-        next = next with { Proposed = change switch
+        next = next with
         {
-            0 => next.Proposed with { Classes = [next.Proposed.Classes[0] with { Meaning = "Silently rewritten class." }] },
-            1 => next.Proposed with { Reasons = [next.Proposed.Reasons[0] with { Meaning = "Silently rewritten reason." }] },
-            _ => next.Proposed with { Profiles = [next.Proposed.Profiles[0] with { Id = Guid.CreateVersion7() }] }
-        }};
+            Proposed = change switch
+            {
+                0 => next.Proposed with { Classes = [next.Proposed.Classes[0] with { Meaning = "Silently rewritten class." }] },
+                1 => next.Proposed with { Reasons = [next.Proposed.Reasons[0] with { Meaning = "Silently rewritten reason." }] },
+                _ => next.Proposed with { Profiles = [next.Proposed.Profiles[0] with { Id = Guid.CreateVersion7() }] }
+            }
+        };
         await Assert.That((await database.PublishAsync(next)).Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Invalid);
         await database.AssertCountsAsync(1, 1, 2);
     }
@@ -162,17 +174,21 @@ public sealed partial class ModerationPolicyPublicationTests
         ModerationRuleReference Revised(ModerationRuleReference reference) =>
             ModerationRuleReference.Create(reference.OwnerId, reference.Code, reference.Revision + 1);
         var classification = first.Proposed.Classes[0] with
-            { Reference = Revised(first.Proposed.Classes[0].Reference), Meaning = "New explicitly revised meaning." };
+        { Reference = Revised(first.Proposed.Classes[0].Reference), Meaning = "New explicitly revised meaning." };
         var reason = first.Proposed.Reasons[0] with
-            { Reference = Revised(first.Proposed.Reasons[0].Reference), Class = classification.Reference, Meaning = "New explicitly revised reason." };
+        { Reference = Revised(first.Proposed.Reasons[0].Reference), Class = classification.Reference, Meaning = "New explicitly revised reason." };
         var profile = first.Proposed.Profiles[0] with
-            { Id = Guid.CreateVersion7(), Rule = Revised(first.Proposed.Profiles[0].Rule), Reason = reason.Reference };
-        next = next with { Proposed = next.Proposed with
+        { Id = Guid.CreateVersion7(), Rule = Revised(first.Proposed.Profiles[0].Rule), Reason = reason.Reference };
+        next = next with
         {
-            Classes = [first.Proposed.Classes[0], classification],
-            Reasons = [first.Proposed.Reasons[0], reason],
-            Profiles = [first.Proposed.Profiles[0], profile], SupportedProfiles = [profile.Rule]
-        }};
+            Proposed = next.Proposed with
+            {
+                Classes = [first.Proposed.Classes[0], classification],
+                Reasons = [first.Proposed.Reasons[0], reason],
+                Profiles = [first.Proposed.Profiles[0], profile],
+                SupportedProfiles = [profile.Rule]
+            }
+        };
         var result = await database.PublishAsync(next);
         await Assert.That(result.Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Known);
         var restored = ModerationPolicyPublicationProjection.Restore(result.Publication!, database.Inventory)!;
@@ -211,10 +227,13 @@ public sealed partial class ModerationPolicyPublicationTests
         await using var database = await Database.CreateAsync();
         var request = database.Request();
         await Assert.That((await database.PublishAsync(request, machine: true)).Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Denied);
-        var foreign = request with { Proposed = request.Proposed with
+        var foreign = request with
         {
-            Jurisdiction = AuthorityScope.Tenant(database.Scope.Parent!, Guid.CreateVersion7())
-        }};
+            Proposed = request.Proposed with
+            {
+                Jurisdiction = AuthorityScope.Tenant(database.Scope.Parent!, Guid.CreateVersion7())
+            }
+        };
         await Assert.That((await database.PublishAsync(foreign)).Outcome).IsEqualTo(ModerationPolicyPublicationOutcome.Denied);
         await database.AssertCountsAsync(0, 0, 1);
     }

@@ -56,16 +56,33 @@ public sealed class ModerationClassificationEventTargetAdoption
             throw new ArgumentException("Adoption requires an independent human and the exact selected Content/Event generation and ordinal.");
         var row = new ModerationClassificationEventTargetAdoption
         {
-            Id = id, HostBindingId = selection.HostBindingId, TrustDomainId = selection.TrustDomainId, TenantId = selection.TenantId,
-            SelectionId = selection.Id, SelectionRevision = selection.Revision, SelectionWriterGeneration = selection.WriterGeneration,
-            BindingOrdinal = bindingOrdinal, GenerationId = generation.Id, GenerationRevision = generation.Revision,
-            GenerationWriterGeneration = generation.WriterGeneration, EventId = generation.EventId, EventStamp = generation.EventStamp,
-            OwnerHumanId = selection.OwnerHumanId, OwnerControllerHumanId = selection.OwnerControllerHumanId,
-            ReviewerHumanId = selection.ReviewerHumanId, ReviewerControllerHumanId = selection.ReviewerControllerHumanId,
-            SelectionAuthoredByHumanId = selection.AuthoredByHumanId, AdoptedByHumanId = humanId,
-            WriterGeneration = writerGeneration, Revision = 1, SelectionRecordedAt = selection.RecordedAt,
-            SelectionValidUntil = selection.ValidUntil, GenerationObservedAt = generation.ObservedAt,
-            GenerationValidUntil = generation.ValidUntil, AdoptedAt = now, ValidUntil = validUntil
+            Id = id,
+            HostBindingId = selection.HostBindingId,
+            TrustDomainId = selection.TrustDomainId,
+            TenantId = selection.TenantId,
+            SelectionId = selection.Id,
+            SelectionRevision = selection.Revision,
+            SelectionWriterGeneration = selection.WriterGeneration,
+            BindingOrdinal = bindingOrdinal,
+            GenerationId = generation.Id,
+            GenerationRevision = generation.Revision,
+            GenerationWriterGeneration = generation.WriterGeneration,
+            EventId = generation.EventId,
+            EventStamp = generation.EventStamp,
+            OwnerHumanId = selection.OwnerHumanId,
+            OwnerControllerHumanId = selection.OwnerControllerHumanId,
+            ReviewerHumanId = selection.ReviewerHumanId,
+            ReviewerControllerHumanId = selection.ReviewerControllerHumanId,
+            SelectionAuthoredByHumanId = selection.AuthoredByHumanId,
+            AdoptedByHumanId = humanId,
+            WriterGeneration = writerGeneration,
+            Revision = 1,
+            SelectionRecordedAt = selection.RecordedAt,
+            SelectionValidUntil = selection.ValidUntil,
+            GenerationObservedAt = generation.ObservedAt,
+            GenerationValidUntil = generation.ValidUntil,
+            AdoptedAt = now,
+            ValidUntil = validUntil
         };
         row.ValidatePersistedState();
         return row;

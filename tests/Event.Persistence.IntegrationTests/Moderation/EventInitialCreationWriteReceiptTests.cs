@@ -187,9 +187,13 @@ public sealed class EventInitialCreationWriteReceiptTests
             await receipt.InitializeAsync(CancellationToken.None);
             context.AuditLogs.Add(new AuditLog
             {
-                Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-                EntityType = nameof(Explore.Domain.Event), EntityId = eventId.ToString("D"),
-                Action = "unspecified-creation-source", Timestamp = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = database.TenantId,
+                Tenant = null!,
+                EntityType = nameof(Explore.Domain.Event),
+                EntityId = eventId.ToString("D"),
+                Action = "unspecified-creation-source",
+                Timestamp = DateTime.UtcNow
             });
             await context.SaveChangesAsync();
             await context.FlushDisclosureAsync(CancellationToken.None);
@@ -224,11 +228,21 @@ public sealed class EventInitialCreationWriteReceiptTests
 
     private static Explore.Domain.Event NewEvent(SourceDatabase database, Guid eventId, Guid actorId, Guid imageId) => new(EventStatusEnum.Draft)
     {
-        Id = eventId, TenantId = database.TenantId, Tenant = null!, ActorId = actorId, Actor = null!,
-        OrganizerActorId = actorId, Title = "Invocation-owned Event", PublicCode = Guid.CreateVersion7().ToString("N")[..12],
+        Id = eventId,
+        TenantId = database.TenantId,
+        Tenant = null!,
+        ActorId = actorId,
+        Actor = null!,
+        OrganizerActorId = actorId,
+        Title = "Invocation-owned Event",
+        PublicCode = Guid.CreateVersion7().ToString("N")[..12],
         EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-        VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-        EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!, Timezone = "UTC",
+        VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+        VisibilityType = null!,
+        EventFormatId = (int)EventFormatEnum.Local,
+        EventFormat = null!,
+        EventStatus = null!,
+        Timezone = "UTC",
         FeaturedImageId = imageId,
         ParticipationConfiguration = EventParticipationConfiguration.Create(eventId, database.TenantId,
             (int)ParticipationHandlingModeEnum.InformationOnly, (int)AdvanceRegistrationObligationEnum.NotApplicable,
@@ -237,8 +251,14 @@ public sealed class EventInitialCreationWriteReceiptTests
 
     private static EventDay NewDay(SourceDatabase database, Guid eventId, Guid dayId) => new()
     {
-        Id = dayId, EventId = eventId, Event = null!, TenantId = database.TenantId, Tenant = null!,
-        LocalDate = new DateOnly(2026, 10, 19), Label = "Observed early day", IsPublished = true
+        Id = dayId,
+        EventId = eventId,
+        Event = null!,
+        TenantId = database.TenantId,
+        Tenant = null!,
+        LocalDate = new DateOnly(2026, 10, 19),
+        Label = "Observed early day",
+        IsPublished = true
     };
 
     private static void AddOwner(ExploreDbContext context, SourceDatabase database, Guid eventId) =>
@@ -250,15 +270,26 @@ public sealed class EventInitialCreationWriteReceiptTests
         await using var context = database.Context();
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = database.AdministratorId, Pii = new ActorPii { DisplayName = "Creation receipt actor" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = database.AdministratorId,
+            Pii = new ActorPii { DisplayName = "Creation receipt actor" }
         };
         var image = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = database.TenantId, Tenant = null!,
-            FileTypeId = (int)FileTypeEnum.Image, FileType = null!, Provider = "legacy_external",
-            FullName = "Original image", SafeDisplayName = "image.png", Extension = ".png", ContentType = "image/png",
-            Visibility = StorageObjectVisibilities.PublicImage, Purpose = StorageObjectPurposes.EventImage,
+            Id = Guid.CreateVersion7(),
+            TenantId = database.TenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Image,
+            FileType = null!,
+            Provider = "legacy_external",
+            FullName = "Original image",
+            SafeDisplayName = "image.png",
+            Extension = ".png",
+            ContentType = "image/png",
+            Visibility = StorageObjectVisibilities.PublicImage,
+            Purpose = StorageObjectPurposes.EventImage,
             LifecycleState = StorageObjectLifecycleStates.Active
         };
         context.AddRange(actor, image);

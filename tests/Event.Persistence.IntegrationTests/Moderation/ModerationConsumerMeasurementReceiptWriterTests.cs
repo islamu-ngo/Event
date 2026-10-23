@@ -68,8 +68,11 @@ public sealed class ModerationConsumerMeasurementReceiptWriterTests
         {
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RevokeModerationMeasurementIssuerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-                EnrollmentId = fixture.EnrollmentId, ExpectedEnrollmentRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 5,
+                EnrollmentId = fixture.EnrollmentId,
+                ExpectedEnrollmentRevision = 1
             })).IsSuccess).IsTrue();
             request = request with { ExpectedQualificationRevision = 6 };
         }
@@ -114,16 +117,23 @@ public sealed class ModerationConsumerMeasurementReceiptWriterTests
         public ModerationMeasurementReceipt Receipt { get; } = receipt;
         public AcceptModerationConsumerMeasurementSource Request() => new()
         {
-            OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 5,
-            ReceiptId = Receipt.ReceiptId, ChallengeId = preparation.ChallengeId, IssuerEnrollmentId = EnrollmentId,
-            Binding = preparation.Binding, SignedToken = Sign(Receipt)
+            OperationId = Guid.CreateVersion7(),
+            Target = database.Scope,
+            ExpectedQualificationRevision = 5,
+            ReceiptId = Receipt.ReceiptId,
+            ChallengeId = preparation.ChallengeId,
+            IssuerEnrollmentId = EnrollmentId,
+            Binding = preparation.Binding,
+            SignedToken = Sign(Receipt)
         };
         public string Sign(ModerationMeasurementReceipt value, ECDsa? signingKey = null)
         {
             static string Encode(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
             var header = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                alg = "ES256", typ = "islamu-moderation-conformance+jwt", kid = keyId.ToString("D")
+                alg = "ES256",
+                typ = "islamu-moderation-conformance+jwt",
+                kid = keyId.ToString("D")
             });
             var input = Encode(header) + "." + Encode(JsonSerializer.SerializeToUtf8Bytes(value));
             return input + "." + Encode((signingKey ?? key).SignData(Encoding.ASCII.GetBytes(input), HashAlgorithmName.SHA256,
@@ -138,11 +148,17 @@ public sealed class ModerationConsumerMeasurementReceiptWriterTests
             var keyId = Guid.CreateVersion7();
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new EnrollModerationMeasurementIssuerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 4,
-                EnrollmentId = enrollmentId, KeyId = keyId, Issuer = "native-test-runner",
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 4,
+                EnrollmentId = enrollmentId,
+                KeyId = keyId,
+                Issuer = "native-test-runner",
                 PublicKeySpkiBase64 = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()),
-                RunnerDigest = new string('a', 64), CatalogueDigest = new string('b', 64),
-                TestBundleDigest = new string('c', 64), ValidUntil = Now.AddMinutes(2)
+                RunnerDigest = new string('a', 64),
+                CatalogueDigest = new string('b', 64),
+                TestBundleDigest = new string('c', 64),
+                ValidUntil = Now.AddMinutes(2)
             })).IsSuccess).IsTrue();
             await using var reader = database.Context();
             reader.ModerationTrustDomainId = database.Scope.TrustDomainId;
@@ -150,19 +166,39 @@ public sealed class ModerationConsumerMeasurementReceiptWriterTests
             var host = await reader.ModerationHostBindings.SingleAsync();
             var receipt = new ModerationMeasurementReceipt
             {
-                Issuer = "native-test-runner", ReceiptId = Guid.CreateVersion7(), ChallengeId = challenge.Id,
-                ChallengeNonce = challenge.Nonce, RunId = Guid.CreateVersion7(), HostBindingId = host.Id,
-                TrustDomainId = database.Scope.TrustDomainId, TenantId = database.TenantId, Binding = preparation.Binding,
-                ConsumerId = challenge.ConsumerId, ConsumerContractDigest = challenge.ConsumerContractDigest.ToLowerInvariant(),
-                InstallationId = challenge.InstallationId, InstallationRevision = challenge.InstallationRevision,
-                InstallationWriterGeneration = challenge.InstallationWriterGeneration, RuntimeGeneration = challenge.RuntimeGeneration,
-                InventoryFingerprint = challenge.InventoryFingerprint.ToLowerInvariant(), RunnerDigest = new string('a', 64),
-                CatalogueDigest = new string('b', 64), TestBundleDigest = new string('c', 64),
-                ProductArtifactDigest = new string('d', 64), ConfigurationDigest = new string('e', 64),
-                PrimaryConfigurationDigest = new string('1', 64), TestConfigurationDigest = new string('2', 64),
-                ProviderCode = "sqlite", ProviderVersion = "10.0", CaseIds = ImmutableArray.Create("case.fixture"),
-                ExecutedCount = 1, AttemptCount = 1, ResultArtifactDigest = new string('f', 64),
-                StartedAt = Now, CompletedAt = Now, IssuedAt = Now, ValidUntil = Now.AddSeconds(30)
+                Issuer = "native-test-runner",
+                ReceiptId = Guid.CreateVersion7(),
+                ChallengeId = challenge.Id,
+                ChallengeNonce = challenge.Nonce,
+                RunId = Guid.CreateVersion7(),
+                HostBindingId = host.Id,
+                TrustDomainId = database.Scope.TrustDomainId,
+                TenantId = database.TenantId,
+                Binding = preparation.Binding,
+                ConsumerId = challenge.ConsumerId,
+                ConsumerContractDigest = challenge.ConsumerContractDigest.ToLowerInvariant(),
+                InstallationId = challenge.InstallationId,
+                InstallationRevision = challenge.InstallationRevision,
+                InstallationWriterGeneration = challenge.InstallationWriterGeneration,
+                RuntimeGeneration = challenge.RuntimeGeneration,
+                InventoryFingerprint = challenge.InventoryFingerprint.ToLowerInvariant(),
+                RunnerDigest = new string('a', 64),
+                CatalogueDigest = new string('b', 64),
+                TestBundleDigest = new string('c', 64),
+                ProductArtifactDigest = new string('d', 64),
+                ConfigurationDigest = new string('e', 64),
+                PrimaryConfigurationDigest = new string('1', 64),
+                TestConfigurationDigest = new string('2', 64),
+                ProviderCode = "sqlite",
+                ProviderVersion = "10.0",
+                CaseIds = ImmutableArray.Create("case.fixture"),
+                ExecutedCount = 1,
+                AttemptCount = 1,
+                ResultArtifactDigest = new string('f', 64),
+                StartedAt = Now,
+                CompletedAt = Now,
+                IssuedAt = Now,
+                ValidUntil = Now.AddSeconds(30)
             };
             return new(key, database, enrollmentId, keyId, preparation, runtime, receipt);
         }
@@ -182,8 +218,11 @@ public sealed class ModerationConsumerMeasurementReceiptWriterTests
         else
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, new RevokeModerationMeasurementIssuerSource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 6,
-                EnrollmentId = fixture.EnrollmentId, ExpectedEnrollmentRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 6,
+                EnrollmentId = fixture.EnrollmentId,
+                ExpectedEnrollmentRevision = 1
             })).IsSuccess).IsTrue();
         await Assert.That((await database.ExecuteAsync(database.AdministratorId, request)).IsSuccess).IsFalse();
         await using var reader = database.Context();

@@ -182,8 +182,11 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                 return false;
             var owner = await resources.GetTenantUserAsync(
                 ownerTenantId, principal.OwnerId, cancellationToken);
-            if (owner is not { IsDeleted: false, StatusId: (int)TenantUserStatusEnum.Active,
-                User: { IsDeleted: false } })
+            if (owner is not
+                {
+                    IsDeleted: false, StatusId: (int)TenantUserStatusEnum.Active,
+                    User: { IsDeleted: false }
+                })
                 return false;
         }
         else if (principal.OwnerType == ExternalApiKeyOwnerType.InstanceAdmin)

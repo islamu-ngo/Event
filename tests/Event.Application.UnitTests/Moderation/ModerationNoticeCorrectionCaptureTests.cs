@@ -142,8 +142,14 @@ public sealed class ModerationNoticeCorrectionCaptureTests
             "qualification_revision" => capture with { QualificationRevision = 2 },
             "decision_id" => capture with { Decision = decision with { Id = Id(90) } },
             "decision_revision" => capture with { Decision = decision with { Revision = decision.Revision + 1 } },
-            "scope_kind" => capture with { Decision = decision with { Scope = decision.Scope with
-                { Kind = ModerationScopeKind.Instance } } },
+            "scope_kind" => capture with
+            {
+                Decision = decision with
+                {
+                    Scope = decision.Scope with
+                    { Kind = ModerationScopeKind.Instance }
+                }
+            },
             "scope_id" => capture with { Decision = decision with { Scope = decision.Scope with { Id = Id(90) } } },
             "subject_kind" => capture with { Decision = decision with { SubjectKind = ModerationSubjectKind.Service } },
             "subject_id" => capture with { Decision = decision with { SubjectId = Id(90) } },
@@ -302,8 +308,11 @@ public sealed class ModerationNoticeCorrectionCaptureTests
         var fixture = Fixture();
         var effect = Effect(fixture.Pending.Decision, fixture.Effect.SanctionId,
             fixture.Effect.SanctionRevision, operation);
-        var capture = fixture.Pending with { Decision = fixture.Pending.Decision with
-            { SupersededSanctionId = effect.SupersededSanctionId } };
+        var capture = fixture.Pending with
+        {
+            Decision = fixture.Pending.Decision with
+            { SupersededSanctionId = effect.SupersededSanctionId }
+        };
 
         await Assert.That(capture.Matches(effect)).IsFalse();
     }
@@ -328,9 +337,15 @@ public sealed class ModerationNoticeCorrectionCaptureTests
         var fixture = Fixture();
         var pending = fixture.Pending.PendingCorrection!;
         var subjectOnly = fixture.Pending with { PendingCorrection = pending with { Recipients = [pending.Recipients[0]] } };
-        var sharedHuman = fixture.Pending with { PendingCorrection = pending with { Recipients =
+        var sharedHuman = fixture.Pending with
+        {
+            PendingCorrection = pending with
+            {
+                Recipients =
             [pending.Recipients[0], pending.Recipients[1], pending.Recipients[2] with
-                { RecipientSubjectId = pending.Recipients[1].RecipientSubjectId }] } };
+                { RecipientSubjectId = pending.Recipients[1].RecipientSubjectId }]
+            }
+        };
 
         await Assert.That(subjectOnly.Matches(fixture.Effect)).IsTrue();
         await Assert.That(sharedHuman.Matches(fixture.Effect)).IsTrue();
@@ -359,8 +374,11 @@ public sealed class ModerationNoticeCorrectionCaptureTests
         await Assert.That(fixture.Original.Matches(fixture.OriginalEffect)).IsTrue();
         await Assert.That(fixture.Original.HasNoSubstantiveWork).IsFalse();
         await Assert.That(fixture.Original.RetainUntil).IsEqualTo(fixture.Original.Notice!.RetainUntil);
-        var changed = fixture.Original with { PendingCorrection = fixture.Pending.PendingCorrection! with
-            { RetainUntil = Now.AddYears(2) } };
+        var changed = fixture.Original with
+        {
+            PendingCorrection = fixture.Pending.PendingCorrection! with
+            { RetainUntil = Now.AddYears(2) }
+        };
 
         await Assert.That(changed.Matches(fixture.OriginalEffect)).IsFalse();
         await Assert.That(changed.RetainUntil).IsEqualTo(fixture.Original.Notice.RetainUntil);

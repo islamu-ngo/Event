@@ -27,10 +27,16 @@ public sealed class KeyReplica
         if (now < lifecycle.ChangedAt) throw ModerationRecognitionKeyLifecycle.Unavailable();
         var acknowledgement = new KeyReplica
         {
-            Id = id, TrustDomainId = lifecycle.Id, RuntimeReplicaId = runtimeReplicaId,
+            Id = id,
+            TrustDomainId = lifecycle.Id,
+            RuntimeReplicaId = runtimeReplicaId,
             Sequence = checked(lifecycle.AcknowledgementSequence + 1),
-            RingGeneration = lifecycle.RingGeneration, RingCommitment = lifecycle.Commitment,
-            BindingRevision = bindingRevision, Source = source, VerifiedAt = now, ValidUntil = validUntil
+            RingGeneration = lifecycle.RingGeneration,
+            RingCommitment = lifecycle.Commitment,
+            BindingRevision = bindingRevision,
+            Source = source,
+            VerifiedAt = now,
+            ValidUntil = validUntil
         };
         acknowledgement.ValidatePersistedState();
         acknowledgement.Sequence = lifecycle.AllocateAcknowledgement();

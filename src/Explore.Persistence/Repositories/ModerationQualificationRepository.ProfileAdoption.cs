@@ -61,11 +61,21 @@ public sealed partial class ModerationQualificationRepository
         await RelationalEntityRowFence.AcquireGlobalAsync<ModerationContributionSelection>(context, selection.Id, token);
         await RequireTargetSourceReceiptAsync(new RecordModerationContributionSelectionSource
         {
-            OperationId = Guid.Empty, Target = decision.Scope, ExpectedQualificationRevision = selection.WriterGeneration - 1,
-            SelectionId = selection.Id, EffectId = selection.EffectId, CaseId = selection.CaseId,
-            ExpectedCaseRevision = selection.CaseRevision, DecisionId = decision.Id, ExpectedDecisionRevision = selection.DecisionRevision,
-            PolicyId = selection.PolicyId, ExpectedPolicyRevision = selection.PolicyRevision, PublicationId = selection.PublicationId,
-            ProfileId = selection.ProfileId, Contribution = contribution, ValidUntil = selection.ValidUntil
+            OperationId = Guid.Empty,
+            Target = decision.Scope,
+            ExpectedQualificationRevision = selection.WriterGeneration - 1,
+            SelectionId = selection.Id,
+            EffectId = selection.EffectId,
+            CaseId = selection.CaseId,
+            ExpectedCaseRevision = selection.CaseRevision,
+            DecisionId = decision.Id,
+            ExpectedDecisionRevision = selection.DecisionRevision,
+            PolicyId = selection.PolicyId,
+            ExpectedPolicyRevision = selection.PolicyRevision,
+            PublicationId = selection.PublicationId,
+            ProfileId = selection.ProfileId,
+            Contribution = contribution,
+            ValidUntil = selection.ValidUntil
         }, ModerationQualificationSourceKind.ContributionSelection, selection.Id, selection.Revision,
             selection.AuthoredByHumanId, selection.WriterGeneration, selection.RecordedAt, authority, token);
         await using var slot = await RelationalNamedLock.AcquireTransactionAsync(

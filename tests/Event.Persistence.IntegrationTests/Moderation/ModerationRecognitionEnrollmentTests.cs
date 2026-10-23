@@ -99,9 +99,11 @@ public sealed partial class ModerationPolicyPublicationTests
                 });
                 context.UserExternalLogins.Add(new UserExternalLogin
                 {
-                    Id = loginId, UserId = scenario.FreshSubject,
+                    Id = loginId,
+                    UserId = scenario.FreshSubject,
                     User = null!,
-                    AuthenticationProviderId = (int)scenario.Account.ProviderKind, AuthenticationProvider = null!,
+                    AuthenticationProviderId = (int)scenario.Account.ProviderKind,
+                    AuthenticationProvider = null!,
                     ProviderKey = scenario.Account.Value
                 });
                 await context.SaveChangesAsync(ct);
@@ -180,8 +182,12 @@ public sealed partial class ModerationPolicyPublicationTests
                 });
                 context.UserExternalLogins.Add(new UserExternalLogin
                 {
-                    Id = changeBinding ? Guid.CreateVersion7() : loginId, UserId = scenario.FreshSubject, User = null!,
-                    AuthenticationProviderId = (int)scenario.Account.ProviderKind, AuthenticationProvider = null!, ProviderKey = scenario.Account.Value
+                    Id = changeBinding ? Guid.CreateVersion7() : loginId,
+                    UserId = scenario.FreshSubject,
+                    User = null!,
+                    AuthenticationProviderId = (int)scenario.Account.ProviderKind,
+                    AuthenticationProvider = null!,
+                    ProviderKey = scenario.Account.Value
                 });
                 if (!changeBinding) scenario.Fixture.Clock.UtcNow = Now.AddMinutes(6);
                 return true;
@@ -215,8 +221,12 @@ public sealed partial class ModerationPolicyPublicationTests
                 });
                 context.UserExternalLogins.Add(new UserExternalLogin
                 {
-                    Id = loginId, UserId = scenario.FreshSubject, User = null!,
-                    AuthenticationProviderId = (int)scenario.Account.ProviderKind, AuthenticationProvider = null!, ProviderKey = scenario.Account.Value
+                    Id = loginId,
+                    UserId = scenario.FreshSubject,
+                    User = null!,
+                    AuthenticationProviderId = (int)scenario.Account.ProviderKind,
+                    AuthenticationProvider = null!,
+                    ProviderKey = scenario.Account.Value
                 });
                 return true;
             }, fence.EnsureCurrentAsync, token), CancellationToken.None);
@@ -239,8 +249,11 @@ public sealed partial class ModerationPolicyPublicationTests
         Guid loginId = Guid.CreateVersion7();
         context.UserExternalLogins.Add(new UserExternalLogin
         {
-            Id = loginId, UserId = scenario.FreshSubject, User = null!,
-            AuthenticationProviderId = (int)scenario.Account.ProviderKind, AuthenticationProvider = null!,
+            Id = loginId,
+            UserId = scenario.FreshSubject,
+            User = null!,
+            AuthenticationProviderId = (int)scenario.Account.ProviderKind,
+            AuthenticationProvider = null!,
             ProviderKey = scenario.Account.Value
         });
         await context.SaveChangesAsync();

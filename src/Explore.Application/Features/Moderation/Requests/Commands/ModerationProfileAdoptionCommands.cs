@@ -13,9 +13,15 @@ public sealed record AdoptModerationProfileCommand : ModerationQualificationComm
     public required DateTimeOffset ValidUntil { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new AdoptModerationProfileSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, SelectionId = SelectionId, Mode = Mode, CaseId = CaseId,
-        ExpectedCaseRevision = ExpectedCaseRevision, ValidUntil = ValidUntil
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        SelectionId = SelectionId,
+        Mode = Mode,
+        CaseId = CaseId,
+        ExpectedCaseRevision = ExpectedCaseRevision,
+        ValidUntil = ValidUntil
     };
 }
 
@@ -27,8 +33,12 @@ public sealed record RevokeModerationProfileCommand : ModerationQualificationCom
     public required long ExpectedCaseRevision { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RevokeModerationProfileSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        AdoptionId = AdoptionId, ExpectedAdoptionRevision = ExpectedAdoptionRevision, CaseId = CaseId,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        AdoptionId = AdoptionId,
+        ExpectedAdoptionRevision = ExpectedAdoptionRevision,
+        CaseId = CaseId,
         ExpectedCaseRevision = ExpectedCaseRevision
     };
 }

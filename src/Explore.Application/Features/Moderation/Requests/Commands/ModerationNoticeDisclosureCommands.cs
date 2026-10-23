@@ -8,7 +8,9 @@ public sealed record ApproveModerationNoticeDisclosureCommand : ModerationQualif
     public required ModerationNoticeDisclosureIntent Intent { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new ApproveModerationNoticeDisclosureSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
         Intent = Intent
     };
 }
@@ -21,8 +23,12 @@ public sealed record RevokeModerationNoticeDisclosureCommand : ModerationQualifi
     public required long ExpectedApprovalRevision { get; init; }
     internal override ModerationQualificationMutation ToMutation() => new RevokeModerationNoticeDisclosureSource
     {
-        OperationId = OperationId, Target = Target, ExpectedQualificationRevision = ExpectedQualificationRevision,
-        ApprovalId = ApprovalId, CaseId = CaseId, ExpectedCaseRevision = ExpectedCaseRevision,
+        OperationId = OperationId,
+        Target = Target,
+        ExpectedQualificationRevision = ExpectedQualificationRevision,
+        ApprovalId = ApprovalId,
+        CaseId = CaseId,
+        ExpectedCaseRevision = ExpectedCaseRevision,
         ExpectedApprovalRevision = ExpectedApprovalRevision
     };
 }

@@ -89,9 +89,17 @@ public sealed partial class ModerationPolicyPublicationTests
             setup.TenantContext = new ExportTenantContext(target.Id);
             var epoch = await setup.ModerationQualificationEpochs.SingleAsync();
             var request = RebindExportRequest(database.Request(), AuthorityScope.Tenant(database.Scope.Parent!, target.Id))
-                with { ExpectedAuthoritySourceId = epoch.Id };
-            request = request with { Proposed = request.Proposed with { SupportedProfiles = request.Proposed.Profiles
-                .Select(profile => profile.Rule).ToImmutableArray(), RequestedState = ModerationPolicyRequestedState.Active } };
+                with
+            { ExpectedAuthoritySourceId = epoch.Id };
+            request = request with
+            {
+                Proposed = request.Proposed with
+                {
+                    SupportedProfiles = request.Proposed.Profiles
+                .Select(profile => profile.Rule).ToImmutableArray(),
+                    RequestedState = ModerationPolicyRequestedState.Active
+                }
+            };
             var owner = new EvidenceOwner(database, setup);
             var writer = database.Writer(setup, owner);
             var candidate = await writer.PrepareAsync(request, Now.AddHours(2));
@@ -211,8 +219,11 @@ public sealed partial class ModerationPolicyPublicationTests
         var status = await context.TenantStatuses.SingleAsync(row => row.IsActiveState);
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = $"instance-import-{Guid.CreateVersion7():N}",
-            FullName = "Instance import destination", TenantStatusId = status.Id, TenantStatus = status
+            Id = Guid.CreateVersion7(),
+            Slug = $"instance-import-{Guid.CreateVersion7():N}",
+            FullName = "Instance import destination",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         context.Tenants.Add(tenant);
         if (installEpoch)

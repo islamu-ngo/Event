@@ -23,7 +23,8 @@ public sealed partial class ModerationContentResponseTests
         using var original = fixture.Database.Context();
         var options = (DbContextOptions<ExploreDbContext>)original.GetService<IDbContextOptions>();
         var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>(options)
-            .AddInterceptors(witness).Options) { TenantContext = fixture.Database };
+            .AddInterceptors(witness).Options)
+        { TenantContext = fixture.Database };
         await using var session = new ResponseSession(fixture, fixture.Database.SubjectId, context);
         await Assert.That((await session.Handler.ExecuteAsync(Command(fixture))).IsSuccess).IsFalse();
         var released = false;

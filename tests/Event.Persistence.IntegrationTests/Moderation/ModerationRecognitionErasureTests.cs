@@ -174,8 +174,11 @@ public sealed partial class ModerationPolicyPublicationTests
             if (!Available) throw new InvalidOperationException("moderation_recognition_ring_unavailable");
             var json = JsonSerializer.Serialize(new
             {
-                version = 1, trustDomainId = trust.ToString("D"), ringGeneration = Generation,
-                issuedAt = clock.UtcNow.ToString("O"), validUntil = clock.UtcNow.AddMinutes(5).ToString("O"),
+                version = 1,
+                trustDomainId = trust.ToString("D"),
+                ringGeneration = Generation,
+                issuedAt = clock.UtcNow.ToString("O"),
+                validUntil = clock.UtcNow.AddMinutes(5).ToString("O"),
                 keys = new[] { new { kid = "original", generation = Generation,
                     k = Convert.ToBase64String(material).TrimEnd('=').Replace('+', '-').Replace('/', '_'), status = "active" } }
             });
@@ -226,8 +229,11 @@ public sealed partial class ModerationPolicyPublicationTests
                 Clock, Retained.Repository, deploymentInventory: Database.Inventory);
             var result = await writer.ExecuteAsync(new WithdrawModerationRecognitionPrivacyAdoption
             {
-                OperationId = Guid.CreateVersion7(), Target = Database.Scope, ExpectedQualificationRevision = 4,
-                AdoptionId = AdoptionId, ExpectedAdoptionRevision = 1
+                OperationId = Guid.CreateVersion7(),
+                Target = Database.Scope,
+                ExpectedQualificationRevision = 4,
+                AdoptionId = AdoptionId,
+                ExpectedAdoptionRevision = 1
             });
             if (result.Outcome != ModerationQualificationWriteOutcome.Known)
                 throw new InvalidOperationException("Native privacy adoption withdrawal failed.");
@@ -251,12 +257,15 @@ public sealed partial class ModerationPolicyPublicationTests
             await using var context = database.Context();
             var request = database.Request(capabilities.IsDefault && actionScope is null
                 ? ModerationReferenceProfileId.CFG05 : reference.Id);
-            request = request with { Proposed = request.Proposed with
+            request = request with
             {
-                RequestedState = ModerationPolicyRequestedState.Active,
-                Profiles = [request.Proposed.Profiles.Single() with
+                Proposed = request.Proposed with
+                {
+                    RequestedState = ModerationPolicyRequestedState.Active,
+                    Profiles = [request.Proposed.Profiles.Single() with
                 { Recognition = ModerationReferenceRecognition.SeparatelyQualifiedFinalAction, ScopeKinds = [scope.Kind] }]
-            }};
+                }
+            };
             var (admin, machine) = DeploymentIdentity(context, database.AdminId);
             var publications = new ModerationPolicyPublicationRepository(context, admin, machine, database.Inventory, null, clock);
             var prepared = await publications.PrepareAsync(request, Now.AddDays(10));
@@ -269,15 +278,21 @@ public sealed partial class ModerationPolicyPublicationTests
                 row.RoleScopeId == (int)RoleScopeEnum.Platform && row.MasterCode == "platform.admin");
             foreach (var id in new[] { privacy, recovery, subject })
             {
-                var user = new User { Id = id, Pii = new UserPii
-                { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Capture", LastName = "Witness" } };
+                var user = new User
+                {
+                    Id = id,
+                    Pii = new UserPii
+                    { UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Capture", LastName = "Witness" }
+                };
                 context.Users.Add(user);
                 if (id != subject) context.PlatformUserRoles.Add(new PlatformUserRole
                 { Id = Guid.CreateVersion7(), UserId = id, User = user, RoleId = role.Id, Role = role });
             }
             context.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = subject, User = null!,
+                Id = Guid.CreateVersion7(),
+                UserId = subject,
+                User = null!,
                 AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
                 AuthenticationProvider = null!,
                 ProviderKey = $"https://issuer.example.invalid|{Guid.CreateVersion7():D}"
@@ -293,10 +308,16 @@ public sealed partial class ModerationPolicyPublicationTests
             }
             var source = new RecordModerationRecognitionPrivacySource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 2,
-                SourceId = Guid.CreateVersion7(), PolicyId = request.Proposed.PolicyId, ExpectedPolicyRevision = 1,
-                PublicationId = request.Proposed.PublicationId, ProfileId = request.Proposed.Profiles.Single().Id,
-                Mode = ModerationNativeMode.Embedded, ValidUntil = Now.AddDays(8),
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 2,
+                SourceId = Guid.CreateVersion7(),
+                PolicyId = request.Proposed.PolicyId,
+                ExpectedPolicyRevision = 1,
+                PublicationId = request.Proposed.PublicationId,
+                ProfileId = request.Proposed.Profiles.Single().Id,
+                Mode = ModerationNativeMode.Embedded,
+                ValidUntil = Now.AddDays(8),
                 Terms = lawfulDeadline is { } deadline
                     ? RecognitionPrivacyTerms() with { LawfulRequestDeadline = deadline, EscalationAfter = TimeSpan.FromMinutes(5) }
                     : RecognitionPrivacyTerms(),
@@ -319,9 +340,14 @@ public sealed partial class ModerationPolicyPublicationTests
             var adoptionId = Guid.CreateVersion7();
             if ((await Writer(privacy).ExecuteAsync(new AdoptModerationRecognitionPrivacySource
             {
-                OperationId = Guid.CreateVersion7(), Target = database.Scope, ExpectedQualificationRevision = 3,
-                SourceId = source.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 3,
-                AdoptionId = adoptionId, ValidUntil = Now.AddDays(7)
+                OperationId = Guid.CreateVersion7(),
+                Target = database.Scope,
+                ExpectedQualificationRevision = 3,
+                SourceId = source.SourceId,
+                ExpectedSourceRevision = 1,
+                ExpectedSourceWriterGeneration = 3,
+                AdoptionId = adoptionId,
+                ValidUntil = Now.AddDays(7)
             })).Outcome != ModerationQualificationWriteOutcome.Known)
                 throw new InvalidOperationException("Native recognition privacy adoption failed.");
             var instance = database.Scope.Parent!;
@@ -360,9 +386,15 @@ public sealed partial class ModerationPolicyPublicationTests
                 .InitializeAsync(database.Scope.TrustDomainId, CancellationToken.None);
             return new()
             {
-                Database = database, Clock = clock, Keys = keys, Subject = subject, SanctionId = sanction.Id,
+                Database = database,
+                Clock = clock,
+                Keys = keys,
+                Subject = subject,
+                SanctionId = sanction.Id,
                 AdoptionId = adoptionId,
-                Retained = retained, LifecycleFixture = lifecycleFixture, SelectedSecrets = secrets,
+                Retained = retained,
+                LifecycleFixture = lifecycleFixture,
+                SelectedSecrets = secrets,
                 Request = PrivacyErasureRequest.Create(Guid.CreateVersion7(), PrivacyErasureSubjectKind.User,
                     subject, PrivacyErasureReasonCode.AccountDeletion, 1)
             };

@@ -33,7 +33,8 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             var accepted = await IssuanceCommitter(context, database, database.Caller).SubmitAsync(new(
                 ModerationCaseAccessPurpose.SubmitAllegation, Guid.Empty, Guid.CreateVersion7(), 0,
-                submission.Receipt.Id, submission.Token) { Narrative = database.Request().Material }, default);
+                submission.Receipt.Id, submission.Token)
+            { Narrative = database.Request().Material }, default);
             await Assert.That(accepted.Outcome).IsEqualTo(ModerationCaseIntakeCommitOutcome.Accepted);
             caseId = accepted.Acknowledgement!.CaseId;
         }
@@ -179,8 +180,11 @@ public sealed partial class ModerationCaseNativeProofTests
             host.InstanceId), database.TenantId);
         var command = new WithdrawModerationCaseNarrativePolicyCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 5,
-            AdoptionId = adoption.Id, ExpectedAdoptionRevision = 1
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 5,
+            AdoptionId = adoption.Id,
+            ExpectedAdoptionRevision = 1
         };
         var handler = new WithdrawModerationCaseNarrativePolicyCommandHandler(
             NativeNarrativePolicyWriter(context, database, database.Caller, privacy.Authority(context, database.Clock)));
@@ -224,14 +228,22 @@ public sealed partial class ModerationCaseNativeProofTests
             foreach (var id in new[] { privacyOwnerId, governanceControllerId })
                 context.Users.Add(new User
                 {
-                    Id = id, Pii = new UserPii
+                    Id = id,
+                    Pii = new UserPii
                     {
-                        UserId = id, Email = $"{id:N}@example.invalid", FirstName = "Independent", LastName = "Controller"
+                        UserId = id,
+                        Email = $"{id:N}@example.invalid",
+                        FirstName = "Independent",
+                        LastName = "Controller"
                     }
                 });
             context.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = privacyOwnerId, User = null!, RoleId = (int)RoleEnum.Admin, Role = null!,
+                Id = Guid.CreateVersion7(),
+                UserId = privacyOwnerId,
+                User = null!,
+                RoleId = (int)RoleEnum.Admin,
+                Role = null!,
                 GrantedAt = database.Clock.Now.UtcDateTime
             });
             await context.SaveChangesAsync();
@@ -242,8 +254,11 @@ public sealed partial class ModerationCaseNativeProofTests
         }
         var source = new RecordModerationCaseNarrativePolicyCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 1,
-            SourceId = Guid.CreateVersion7(), TargetKind = kind,
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 1,
+            SourceId = Guid.CreateVersion7(),
+            TargetKind = kind,
             Terms = new(ModerationCaseNarrativePurpose.ConfidentialAllegation, TimeSpan.FromMinutes(30), 4096),
             Ownership = new(privacyOwnerId, privacyOwnerId, governanceControllerId,
                 "Separate canonical privacy and governance controllers.",
@@ -253,24 +268,37 @@ public sealed partial class ModerationCaseNativeProofTests
         await Assert.That((await ExecuteAsync(database.Caller, source)).IsSuccess).IsTrue();
         await Assert.That((await ExecuteAsync(new NativeCaller(privacyOwnerId), new AdoptModerationCaseNarrativePolicyCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 2,
-            SourceId = source.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 2,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = source.ValidUntil
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 2,
+            SourceId = source.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 2,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = source.ValidUntil
         })).IsSuccess).IsTrue();
 
         var budget = new RecordModerationOperationalBudgetCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 3,
-            SourceId = Guid.CreateVersion7(), OperatorHumanId = privacyOwnerId,
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 3,
+            SourceId = Guid.CreateVersion7(),
+            OperatorHumanId = privacyOwnerId,
             Terms = new(ModerationSubjectKind.Human, ModerationOperationalAction.SubmitReport, 8, TimeSpan.FromHours(1)),
             ValidUntil = source.ValidUntil
         };
         await Assert.That((await ExecuteAsync(database.Caller, budget)).IsSuccess).IsTrue();
         await Assert.That((await ExecuteAsync(new NativeCaller(privacyOwnerId), new AdoptModerationOperationalBudgetCommand
         {
-            OperationId = Guid.CreateVersion7(), Target = scope, ExpectedQualificationRevision = 4,
-            SourceId = budget.SourceId, ExpectedSourceRevision = 1, ExpectedSourceWriterGeneration = 4,
-            AdoptionId = Guid.CreateVersion7(), ValidUntil = budget.ValidUntil
+            OperationId = Guid.CreateVersion7(),
+            Target = scope,
+            ExpectedQualificationRevision = 4,
+            SourceId = budget.SourceId,
+            ExpectedSourceRevision = 1,
+            ExpectedSourceWriterGeneration = 4,
+            AdoptionId = Guid.CreateVersion7(),
+            ValidUntil = budget.ValidUntil
         })).IsSuccess).IsTrue();
 
         async Task<ModerationQualificationResponse> ExecuteAsync(

@@ -63,10 +63,16 @@ public sealed class ModerationOperationalBudgetTests
         var occurrence = Occurrence(Guid.CreateVersion7());
         occurrence = change switch
         {
-            "subject" => occurrence with { Subject = SubjectReference.Create(
-                ModerationSubjectKind.Human, Guid.CreateVersion7(), Instance) },
-            "origin" => occurrence with { Subject = SubjectReference.Create(
-                ModerationSubjectKind.Human, Human.Id, otherInstance) },
+            "subject" => occurrence with
+            {
+                Subject = SubjectReference.Create(
+                ModerationSubjectKind.Human, Guid.CreateVersion7(), Instance)
+            },
+            "origin" => occurrence with
+            {
+                Subject = SubjectReference.Create(
+                ModerationSubjectKind.Human, Human.Id, otherInstance)
+            },
             "scope" => occurrence with { Scope = AuthorityScope.Tenant(Instance, Guid.CreateVersion7()) },
             "mandate" => occurrence with { MandateId = Guid.CreateVersion7() },
             _ => occurrence with { Action = ModerationOperationalAction.PublishEvent }
@@ -97,12 +103,15 @@ public sealed class ModerationOperationalBudgetTests
     public async Task Unreliable_occurrence_time_cannot_certify_remaining_capacity(string change)
     {
         var first = Occurrence(Guid.CreateVersion7());
-        var second = first with { RecordedAt = change switch
+        var second = first with
         {
-            "future" => Now.AddTicks(1),
-            "offset" => Now.ToOffset(TimeSpan.FromHours(1)),
-            _ => Now.AddTicks(-1)
-        } };
+            RecordedAt = change switch
+            {
+                "future" => Now.AddTicks(1),
+                "offset" => Now.ToOffset(TimeSpan.FromHours(1)),
+                _ => Now.AddTicks(-1)
+            }
+        };
         await Assert.That(() => Budget().Assess(Guid.CreateVersion7(), Now, [first, second]))
             .Throws<ArgumentException>();
     }

@@ -62,11 +62,19 @@ public sealed class ModerationRecognitionPending
             throw new ArgumentException("A received request requires original identity, owners and finite lawful deadlines.");
         return new()
         {
-            IntentId = intentId, SubjectId = subjectId, PolicyVersion = policyVersion, ReasonCode = reasonCode,
-            PrivacyOwnerHumanId = privacyOwner, RecoveryOwnerHumanId = recoveryOwner,
-            ReceivedAt = receivedAt, SettleBy = settleBy, EscalateAt = escalateAt,
-            ReceiptHash = receiptHash.ToArray(), ReceiptExpiresAt = receiptExpiresAt,
-            Revision = 1, State = ModerationRecognitionPendingState.Received
+            IntentId = intentId,
+            SubjectId = subjectId,
+            PolicyVersion = policyVersion,
+            ReasonCode = reasonCode,
+            PrivacyOwnerHumanId = privacyOwner,
+            RecoveryOwnerHumanId = recoveryOwner,
+            ReceivedAt = receivedAt,
+            SettleBy = settleBy,
+            EscalateAt = escalateAt,
+            ReceiptHash = receiptHash.ToArray(),
+            ReceiptExpiresAt = receiptExpiresAt,
+            Revision = 1,
+            State = ModerationRecognitionPendingState.Received
         };
     }
 
@@ -235,16 +243,52 @@ public sealed class ModerationRecognitionPending
         Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
             rows.OrderBy(row => row.Id).Select(row => new
             {
-                row.Id, row.IntentId, row.ErasureSubjectId, row.SubjectId, row.SubjectSolutionId, row.SubjectInstanceId,
-                row.FindingId, row.ParentCaptureItemId, row.ContinuityBindingId, row.OriginalCapturedAt,
-                row.SourceId, row.SourceRevision, row.SourceGeneration,
-                row.AdoptionId, row.AdoptionRevision, row.AdoptionGeneration, row.RingGeneration,
-                row.TrustDomainId, row.ProviderKind, row.Purpose, row.KeyId, row.KeyGeneration,
-                row.SerializationVersion, row.Digest, row.KeyVerificationTag,
-                row.SanctionId, row.SanctionRevision, row.DecisionId, row.DecisionRevision,
-                row.RuleOwnerId, row.RuleCode, row.RuleRevision, row.OriginalCapabilityMask, row.PurposeCapabilityMask,
-                row.ScopeKind, row.ScopeSolutionId, row.ScopeInstanceId, row.ScopeTenantId, row.ScopeCommunityId,
-                row.ScopeResourceId, row.ScopeEventId, row.StartsAt, row.EndsAt, row.ReviewAt, row.CapturedAt, row.RetainUntil
+                row.Id,
+                row.IntentId,
+                row.ErasureSubjectId,
+                row.SubjectId,
+                row.SubjectSolutionId,
+                row.SubjectInstanceId,
+                row.FindingId,
+                row.ParentCaptureItemId,
+                row.ContinuityBindingId,
+                row.OriginalCapturedAt,
+                row.SourceId,
+                row.SourceRevision,
+                row.SourceGeneration,
+                row.AdoptionId,
+                row.AdoptionRevision,
+                row.AdoptionGeneration,
+                row.RingGeneration,
+                row.TrustDomainId,
+                row.ProviderKind,
+                row.Purpose,
+                row.KeyId,
+                row.KeyGeneration,
+                row.SerializationVersion,
+                row.Digest,
+                row.KeyVerificationTag,
+                row.SanctionId,
+                row.SanctionRevision,
+                row.DecisionId,
+                row.DecisionRevision,
+                row.RuleOwnerId,
+                row.RuleCode,
+                row.RuleRevision,
+                row.OriginalCapabilityMask,
+                row.PurposeCapabilityMask,
+                row.ScopeKind,
+                row.ScopeSolutionId,
+                row.ScopeInstanceId,
+                row.ScopeTenantId,
+                row.ScopeCommunityId,
+                row.ScopeResourceId,
+                row.ScopeEventId,
+                row.StartsAt,
+                row.EndsAt,
+                row.ReviewAt,
+                row.CapturedAt,
+                row.RetainUntil
             }))));
 
     public override string ToString() => nameof(ModerationRecognitionPending);

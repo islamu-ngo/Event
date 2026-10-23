@@ -324,8 +324,13 @@ public sealed partial class ModerationQualificationRepository
             review.AcceptedAt, authority, token);
         await RequireTargetSourceReceiptAsync(new RecordModerationEventGenerationSource
         {
-            OperationId = Guid.Empty, Target = authority.Tenant, ExpectedQualificationRevision = generation.WriterGeneration - 1,
-            SourceId = generation.Id, EventId = generation.EventId, ExpectedEventRevision = generation.Revision - 1, ValidUntil = generation.ValidUntil
+            OperationId = Guid.Empty,
+            Target = authority.Tenant,
+            ExpectedQualificationRevision = generation.WriterGeneration - 1,
+            SourceId = generation.Id,
+            EventId = generation.EventId,
+            ExpectedEventRevision = generation.Revision - 1,
+            ValidUntil = generation.ValidUntil
         }, ModerationQualificationSourceKind.EventGeneration, generation.Id, generation.Revision, generation.ObservedByHumanId,
             generation.WriterGeneration, generation.ObservedAt, authority, token);
         await RequireTargetSourceReceiptAsync(ClassificationControlRecordRequest(selection, contribution,
@@ -340,23 +345,38 @@ public sealed partial class ModerationQualificationRepository
 
     private static RecordModerationClassificationControlSelection ClassificationControlRecordRequest(
         ModerationClassificationControlSelection selection, ModerationPolicyContribution contribution, AuthorityScope target) => new()
-    {
-        OperationId = Guid.Empty, Target = target, ExpectedQualificationRevision = selection.WriterGeneration - 1,
-        SelectionId = selection.Id, MaterialSourceId = selection.SourceId, ExpectedMaterialSourceRevision = selection.SourceRevision,
-        ExpectedMaterialWriterGeneration = selection.SourceWriterGeneration, MaterialReviewId = selection.ReviewId,
-        ExpectedMaterialReviewRevision = selection.ReviewRevision, ExpectedReviewWriterGeneration = selection.ReviewWriterGeneration,
-        EventGenerationId = selection.GenerationId, ExpectedEventGenerationRevision = selection.GenerationRevision,
-        ExpectedEventWriterGeneration = selection.GenerationWriterGeneration, Contribution = contribution, ValidUntil = selection.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = target,
+            ExpectedQualificationRevision = selection.WriterGeneration - 1,
+            SelectionId = selection.Id,
+            MaterialSourceId = selection.SourceId,
+            ExpectedMaterialSourceRevision = selection.SourceRevision,
+            ExpectedMaterialWriterGeneration = selection.SourceWriterGeneration,
+            MaterialReviewId = selection.ReviewId,
+            ExpectedMaterialReviewRevision = selection.ReviewRevision,
+            ExpectedReviewWriterGeneration = selection.ReviewWriterGeneration,
+            EventGenerationId = selection.GenerationId,
+            ExpectedEventGenerationRevision = selection.GenerationRevision,
+            ExpectedEventWriterGeneration = selection.GenerationWriterGeneration,
+            Contribution = contribution,
+            ValidUntil = selection.ValidUntil
+        };
 
     private static AdoptModerationClassificationEventTarget ClassificationControlAdoptionRequest(
         ModerationClassificationEventTargetAdoption adoption, AuthorityScope target) => new()
-    {
-        OperationId = Guid.Empty, Target = target, ExpectedQualificationRevision = adoption.WriterGeneration - 1,
-        AdoptionId = adoption.Id, SelectionId = adoption.SelectionId, ExpectedSelectionRevision = adoption.SelectionRevision,
-        BindingOrdinal = adoption.BindingOrdinal, EventGenerationId = adoption.GenerationId,
-        ExpectedEventGenerationRevision = adoption.GenerationRevision, ValidUntil = adoption.ValidUntil
-    };
+        {
+            OperationId = Guid.Empty,
+            Target = target,
+            ExpectedQualificationRevision = adoption.WriterGeneration - 1,
+            AdoptionId = adoption.Id,
+            SelectionId = adoption.SelectionId,
+            ExpectedSelectionRevision = adoption.SelectionRevision,
+            BindingOrdinal = adoption.BindingOrdinal,
+            EventGenerationId = adoption.GenerationId,
+            ExpectedEventGenerationRevision = adoption.GenerationRevision,
+            ValidUntil = adoption.ValidUntil
+        };
 
     private async Task VerifyClassificationControlBeforeSaveAsync(ModerationQualificationMutation request,
         ModerationConsumerEvidenceSession? session, ModerationSourceAuthority authority, CancellationToken token)

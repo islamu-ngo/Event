@@ -34,8 +34,11 @@ public sealed partial class ModerationPolicyPublicationTests
             Rule = ISLAMU.Moderation.Domain.ModerationRuleReference.Create(
                 database.Scope.Id, priorProfile.Rule.Code, 2)
         };
-        next = next with { Proposed = next.Proposed with
-            { Profiles = [priorProfile, added], SupportedProfiles = [added.Rule] } };
+        next = next with
+        {
+            Proposed = next.Proposed with
+            { Profiles = [priorProfile, added], SupportedProfiles = [added.Rule] }
+        };
         await database.PublishAsync(next);
         await using var apply = database.Context();
         var unit = new EfCoreUnitOfWork(apply);
@@ -68,7 +71,8 @@ public sealed partial class ModerationPolicyPublicationTests
             Metadata = new() { Name = "import-policy", Source = new() { TenantName = "source-tenant" } },
             Spec = new()
             {
-                DisplayName = "Imported policy", Settings = new Dictionary<string, System.Text.Json.JsonElement>(),
+                DisplayName = "Imported policy",
+                Settings = new Dictionary<string, System.Text.Json.JsonElement>(),
                 Documents = new Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(),
                 LegalDocuments = new Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>(),
                 Moderation = ModerationConfigurationImportSections.ToWire(incoming)

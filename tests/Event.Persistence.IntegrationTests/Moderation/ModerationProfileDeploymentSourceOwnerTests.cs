@@ -117,7 +117,6 @@ public sealed class ModerationProfileDeploymentSourceOwnerTests
         var runtimes = compiled.Consumers.SelectMany(row => row.Consumers).Select(row => row.Id).Distinct()
             .Select(id => new HostRuntime(id, database.Inventory.Fingerprint)).ToArray();
         database.ConsumerRuntimeSources = runtimes;
-        var installations = new List<InstallModerationConsumerSource>();
         foreach (var runtime in runtimes)
         {
             var installation = new InstallModerationConsumerSource
@@ -133,7 +132,6 @@ public sealed class ModerationProfileDeploymentSourceOwnerTests
                 ValidUntil = Now.AddMinutes(10)
             };
             await Assert.That((await database.ExecuteAsync(database.AdministratorId, installation)).IsSuccess).IsTrue();
-            installations.Add(installation);
         }
         var record = new RecordModerationDeploymentSource
         {

@@ -78,6 +78,8 @@ public sealed class ModerationReviewerAssignment
         RequireCurrent(expectedRevision, now);
         if (controllerHumanId == Guid.Empty || controllerHumanId == SubjectHumanId
             || identityEvidenceId == Guid.Empty || qualifiedByHumanId == Guid.Empty
+            || qualifiedByHumanId == ReviewerHumanId || qualifiedByHumanId == controllerHumanId
+            || qualifiedByHumanId == SubjectHumanId
             || qualifiedUntil <= now)
         {
             throw new ArgumentException("Current controller qualification requires independent source evidence and bounded validity.");
@@ -162,6 +164,8 @@ public sealed class ModerationReviewerAssignment
             || hasController != (QualifiedUntil is not null)
             || ControllerHumanId == Guid.Empty || ControllerHumanId is not null && ControllerHumanId == SubjectHumanId
             || IdentityEvidenceId == Guid.Empty || QualifiedByHumanId == Guid.Empty
+            || QualifiedByHumanId is not null && (QualifiedByHumanId == ReviewerHumanId
+                || QualifiedByHumanId == ControllerHumanId || QualifiedByHumanId == SubjectHumanId)
             || QualifiedUntil is not null && QualifiedUntil <= CreatedAt
             || hasAssessment && !hasController
             || hasAssessment != (ConflictEvidenceId is not null)

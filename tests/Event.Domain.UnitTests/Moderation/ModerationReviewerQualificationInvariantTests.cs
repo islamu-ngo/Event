@@ -75,6 +75,26 @@ public class ModerationReviewerQualificationInvariantTests
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task DistinctControllersCannotSupplyQuorumWhenOneControlsTheOtherReviewer(bool firstControlsSecond)
+    {
+        var moderationCase = Case();
+        var first = Assign(moderationCase);
+        var second = Assign(moderationCase);
+        Qualify(first, firstControlsSecond ? second.ReviewerHumanId : Guid.CreateVersion7());
+        Qualify(second, firstControlsSecond ? Guid.CreateVersion7() : first.ReviewerHumanId);
+
+        await Assert.That(first.IsQualifiedAt(Now)).IsTrue();
+        await Assert.That(second.IsQualifiedAt(Now)).IsTrue();
+        await Assert.That(first.ControllerHumanId).IsNotEqualTo(second.ControllerHumanId);
+        await Assert.That(first.IsIndependentOf(second, Now)).IsFalse();
+        await Assert.That(second.IsIndependentOf(first, Now)).IsFalse();
+        first.ValidatePersistedState();
+        second.ValidatePersistedState();
+    }
+
+    [Test]
     public async Task IndependentQualifiedHumansAreCaseSpecific()
     {
         var moderationCase = Case();
@@ -134,6 +154,33 @@ public class ModerationReviewerQualificationInvariantTests
         await Assert.That(() => assignment.QualifyController(1, subject.Id,
             Guid.CreateVersion7(), Guid.CreateVersion7(), Now.AddHours(1), Now)).Throws<ArgumentException>();
         await Assert.That(assignment.Revision).IsEqualTo(1L);
+    }
+
+    [Test]
+    [Arguments("reviewer")]
+    [Arguments("controller")]
+    [Arguments("subject")]
+    public async Task InterestedHumansCannotCertifyControllerIdentity(string interestedParty)
+    {
+        var assignment = Assign(Case());
+        var controller = Guid.CreateVersion7();
+        var qualifier = interestedParty switch
+        {
+            "reviewer" => assignment.ReviewerHumanId,
+            "controller" => controller,
+            "subject" => assignment.SubjectHumanId!.Value,
+            _ => throw new ArgumentOutOfRangeException(nameof(interestedParty))
+        };
+
+        await Assert.That(() => assignment.QualifyController(1, controller, Guid.CreateVersion7(),
+            qualifier, Now.AddHours(1), Now)).Throws<ArgumentException>();
+
+        await Assert.That(assignment.Revision).IsEqualTo(1L);
+        await Assert.That(assignment.ControllerHumanId).IsNull();
+        await Assert.That(assignment.QualifiedByHumanId).IsNull();
+        await Assert.That(assignment.IdentityEvidenceId).IsNull();
+        await Assert.That(assignment.IsQualifiedAt(Now)).IsFalse();
+        assignment.ValidatePersistedState();
     }
 
     [Test]

@@ -121,6 +121,12 @@ module initializer intercepts only the exact first child flag, preserving
 TUnit's generated entry point. Ordinary discovery allocates no child process,
 temporary directory, network connection or application resource.
 
+PID files support read-only termination assertions only; cleanup never kills a
+process selected from a PID file. Synthetic descendants expire after fifteen
+seconds if a runner regression leaks them. Cancellation assertions must finish
+within ten seconds, so self-expiry cannot substitute for the runner's actual
+process-tree termination.
+
 Harness cases require no AppHost, k6 executable, network or Docker. See
 the [contributor guide](../../public/documentation/readme/contributing/load-testing.md)
 for operator expectations.

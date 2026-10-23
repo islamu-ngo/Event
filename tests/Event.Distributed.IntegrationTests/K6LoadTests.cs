@@ -150,6 +150,7 @@ public sealed class K6LoadProcessHarnessTests
     {
         using var root = new OwnedProcessDirectory();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+        var elapsed = Stopwatch.StartNew();
         var run = RunChildAsync(root, "tree", useDeadline ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(10), cancellation.Token);
         try
         {
@@ -157,6 +158,7 @@ public sealed class K6LoadProcessHarnessTests
             if (!useDeadline)
                 await cancellation.CancelAsync();
             await Assert.That(async () => await run).Throws<OperationCanceledException>();
+            await Assert.That(elapsed.Elapsed.TotalSeconds).IsLessThan(10);
             await Assert.That(IsRunning(root.Path, "parent.pid")).IsFalse();
             await Assert.That(IsRunning(root.Path, "descendant.pid")).IsFalse();
             await Assert.That(File.Exists(System.IO.Path.Combine(root.Path, "summary.json"))).IsFalse();
@@ -166,11 +168,6 @@ public sealed class K6LoadProcessHarnessTests
             await cancellation.CancelAsync();
             try { await run; }
             catch (OperationCanceledException) { }
-            finally
-            {
-                KillRecordedChild(root.Path, "descendant.pid");
-                KillRecordedChild(root.Path, "parent.pid");
-            }
         }
     }
 
@@ -223,16 +220,6 @@ public sealed class K6LoadProcessHarnessTests
             return !process.HasExited;
         }
         catch (ArgumentException) { return false; }
-    }
-
-    private static void KillRecordedChild(string root, string name)
-    {
-        if (!IsRunning(root, name))
-            return;
-        int id = int.Parse(File.ReadAllText(System.IO.Path.Combine(root, name)), CultureInfo.InvariantCulture);
-        using var process = Process.GetProcessById(id);
-        process.Kill(entireProcessTree: true);
-        process.WaitForExit(5000);
     }
 
     private sealed class OwnedProcessDirectory : IDisposable
@@ -321,12 +308,13 @@ internal static class K6LoadHarnessChild
                 descendantStart.RedirectStandardError = false;
                 using var descendant = Process.Start(descendantStart)
                     ?? throw new InvalidOperationException("load_child_descendant_start_failed");
-                await descendant.WaitForExitAsync();
+                await descendant.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(20));
             }
             else
             {
                 await File.WriteAllTextAsync(System.IO.Path.Combine(root, "descendant.ready"), "ready");
-                await Task.Delay(Timeout.InfiniteTimeSpan);
+                // Bound synthetic descendants even if a process-cleanup regression leaves one alive.
+                await Task.Delay(TimeSpan.FromSeconds(15));
             }
             return 74;
         }

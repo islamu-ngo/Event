@@ -52,7 +52,8 @@ public partial class FallbackAuthorizationService
         for (var i = 0; i < checks.Count; i++)
         {
             var check = checks[i];
-            if (check.ResourceKind == ResourceKinds.RegistrationOrder
+            if (check.ResourceKind == ResourceKinds.GroupMember
+                || check.ResourceKind == ResourceKinds.RegistrationOrder
                 || (check.ResourceKind == ResourceKinds.Organization
                 && check.Action is AuthorizationActions.Organizations.SubmitEvidence
                     or AuthorizationActions.Organizations.ViewEvidence
@@ -215,7 +216,6 @@ public partial class FallbackAuthorizationService
             "islamuevent_organization_member" => IsAdminForOrgScope(profile, resourceAttributes, resourceId),
             "islamuevent_organization_review" => action is "create" or "view" || IsAdminForOrgScope(profile, resourceAttributes, resourceId),
             "islamuevent_group" => action is "view" || IsAdminForOrgScope(profile, resourceAttributes, resourceId),
-            "islamuevent_group_member" => action is "view" or "create" || IsAdminForOrgScope(profile, resourceAttributes, resourceId),
             "islamuevent_event" when action is "create" => IsEventCreateAllowedForProfile(profile, resourceAttributes),
             "islamuevent_event" when action is AuthorizationActions.Events.ManageRegistrations
                 or AuthorizationActions.Events.ManageRegistrationWorkflow

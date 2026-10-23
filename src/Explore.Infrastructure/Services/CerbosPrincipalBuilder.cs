@@ -91,6 +91,20 @@ public class CerbosPrincipalBuilder
             userId,
             PermissionCodes.EventManageFinance,
             cancellationToken) ?? [];
+        var memberships = await _groupMemberRepository.GetMembershipsByUser(userId, cancellationToken);
+        var groupMemberCreateScopes = await MembershipScopesAsync(PermissionCodes.GroupMemberCreate);
+        var groupMemberUpdateScopes = await MembershipScopesAsync(PermissionCodes.GroupMemberUpdate);
+        var groupMemberDeleteScopes = await MembershipScopesAsync(PermissionCodes.GroupMemberDelete);
+
+        async Task<AttributeValue[]> MembershipScopesAsync(string permission)
+        {
+            var permitted = (await _groupMemberRepository.GetGroupIdsWhereUserHasPermission(
+                userId, permission, cancellationToken) ?? []).Concat(adminGroupIds).ToHashSet();
+            return memberships.Where(member => permitted.Contains(member.GroupTenant.GroupId))
+                .Select(member => $"{member.TenantId:D}/{member.GroupTenant.GroupId:D}")
+                .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)
+                .Select(AttributeValue.StringValue).ToArray();
+        }
 
         var tenantMemberships = adminTenantIds
             .ToDictionary(id => id.ToString(), _ => AttributeValue.StringValue("admin"));
@@ -106,6 +120,9 @@ public class CerbosPrincipalBuilder
             .WithAttribute("tenantMemberships", AttributeValue.MapValue(tenantMemberships))
             .WithAttribute("orgMemberships", AttributeValue.MapValue(orgMemberships))
             .WithAttribute("groupMemberships", AttributeValue.MapValue(groupMemberships))
+            .WithAttribute("groupMemberCreateScopes", AttributeValue.ListValue(groupMemberCreateScopes))
+            .WithAttribute("groupMemberUpdateScopes", AttributeValue.ListValue(groupMemberUpdateScopes))
+            .WithAttribute("groupMemberDeleteScopes", AttributeValue.ListValue(groupMemberDeleteScopes))
             .WithAttribute("eventCreateOrganizations", AttributeValue.ListValue(
                 eventCreateOrganizationIds.Select(id => AttributeValue.StringValue(id.ToString())).ToArray()))
             .WithAttribute("eventCreateGroups", AttributeValue.ListValue(
@@ -136,12 +153,29 @@ public class CerbosPrincipalBuilder
             .Select(AttributeValue.StringValue)
             .ToArray();
 
+        var membershipScopes = Array.Empty<AttributeValue>();
+        if (machineContext.TenantId is { } membershipTenant)
+        {
+            var groups = machineContext.OwnerType switch
+            {
+                ExternalApiKeyOwnerType.Group => new[] { machineContext.OwnerId },
+                ExternalApiKeyOwnerType.User => (await _adminContext.GetAdminGroupIdsAsync(
+                    machineContext.OwnerId, membershipTenant, cancellationToken)).ToArray(),
+                _ => Array.Empty<Guid>()
+            };
+            membershipScopes = groups.Distinct().Order()
+                .Select(group => AttributeValue.StringValue($"{membershipTenant:D}/{group:D}")).ToArray();
+        }
+
         var principal = Principal
             .NewInstance($"api_key:{machineContext.KeyId}", "islamuevent_authenticated_user")
             .WithAttribute("isInstanceAdmin", AttributeValue.BoolValue(isInstanceAdmin))
             .WithAttribute("tenantMemberships", AttributeValue.MapValue(tenantMemberships))
             .WithAttribute("orgMemberships", AttributeValue.MapValue(orgMemberships))
             .WithAttribute("groupMemberships", AttributeValue.MapValue(groupMemberships))
+            .WithAttribute("groupMemberCreateScopes", AttributeValue.ListValue(membershipScopes))
+            .WithAttribute("groupMemberUpdateScopes", AttributeValue.ListValue(membershipScopes))
+            .WithAttribute("groupMemberDeleteScopes", AttributeValue.ListValue(membershipScopes))
             .WithAttribute("eventCreateOrganizations", AttributeValue.ListValue([]))
             .WithAttribute("eventCreateGroups", AttributeValue.ListValue([]))
             .WithAttribute("eventFinanceOrganizations", AttributeValue.ListValue([]))

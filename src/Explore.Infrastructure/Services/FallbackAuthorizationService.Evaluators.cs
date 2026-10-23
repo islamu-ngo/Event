@@ -986,10 +986,30 @@ public partial class FallbackAuthorizationService
         IDictionary<string, object>? resourceAttributes,
         CancellationToken cancellationToken)
     {
-        if (action is "view" or "create")
+        if (action == AuthorizationActions.View)
             return true;
 
-        return await EvaluateOrgScopedAccessAsync("islamuevent_group_member", resourceId, action, resourceAttributes, cancellationToken);
+        var permission = action switch
+        {
+            AuthorizationActions.Create => PermissionCodes.GroupMemberCreate,
+            AuthorizationActions.Update => PermissionCodes.GroupMemberUpdate,
+            AuthorizationActions.Delete => PermissionCodes.GroupMemberDelete,
+            _ => null
+        };
+        if (permission is null
+            || !TryResolveGuidAttribute(resourceAttributes, "tenantId", out var tenantId)
+            || tenantId == Guid.Empty || tenantId != _tenantContext.TenantId
+            || !TryResolveGuidAttribute(resourceAttributes, "groupId", out var groupId)
+            || groupId == Guid.Empty)
+            return false;
+
+        if (await _adminContext.IsTenantAdminAsync(tenantId, cancellationToken)
+            || await _adminContext.IsGroupAdminAsync(groupId, cancellationToken))
+            return true;
+
+        var userId = await _adminContext.ResolveUserIdAsync(cancellationToken);
+        return userId is { } actor && actor != Guid.Empty
+            && await _groupMemberRepository.HasPermissionInGroup(groupId, actor, permission);
     }
 
     private async Task<bool> EvaluateContactShareConsentAccessAsync(

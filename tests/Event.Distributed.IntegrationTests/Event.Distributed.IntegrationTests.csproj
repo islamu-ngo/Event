@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="ExternalDataProtectionTestAuthority.cs" />
     <ProjectReference Include="../../src/Explore.AppHost/Explore.AppHost.csproj" />
+    <ProjectReference Include="../../src/Explore.Persistence/Explore.Persistence.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj" IsAspireProjectResource="false" />
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Microsoft.Playwright" />

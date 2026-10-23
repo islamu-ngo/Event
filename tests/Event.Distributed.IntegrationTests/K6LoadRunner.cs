@@ -66,58 +66,17 @@ internal static class K6LoadRunner
         foreach (string mode in new[] { "closed", "open" })
         {
             string summaryPath = Path.Combine(ownedDirectory, $"{mode}.json");
-            using var process = new Process();
-            process.StartInfo = StartInfo(executable);
+            var startInfo = StartInfo(executable);
             foreach (string argument in new[] { "run", "--config", configurationPath, "--quiet", "--no-color", "--no-usage-report", "--include-system-env-vars=true", script })
-                process.StartInfo.ArgumentList.Add(argument);
-            process.StartInfo.WorkingDirectory = ownedDirectory;
-            process.StartInfo.Environment["LOAD_ORIGIN"] = ownedOrigin.AbsoluteUri.TrimEnd('/');
-            process.StartInfo.Environment["LOAD_TARGET"] = target.AbsoluteUri;
-            process.StartInfo.Environment["LOAD_DIGEST"] = expectedDigest!;
-            process.StartInfo.Environment["LOAD_MODE"] = mode;
-            process.StartInfo.Environment["LOAD_SUMMARY"] = summaryPath;
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            deadline.CancelAfter(TimeSpan.FromSeconds(30));
-            var wall = Stopwatch.StartNew();
-            process.Start();
-            Task output = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
-            Task error = process.StandardError.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
-            int samples = 0;
-            long peakRss = 0;
-            double peakCpuRatio = 0;
-            double previousSeconds = 0;
-            TimeSpan previousCpu = TimeSpan.Zero;
-            try
-            {
-                while (!process.HasExited)
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(100), deadline.Token);
-                    process.Refresh();
-                    if (process.HasExited)
-                        break;
-                    double seconds = wall.Elapsed.TotalSeconds;
-                    TimeSpan cpu = process.TotalProcessorTime;
-                    peakCpuRatio = Math.Max(peakCpuRatio,
-                        (cpu - previousCpu).TotalSeconds / (seconds - previousSeconds) / Environment.ProcessorCount);
-                    peakRss = Math.Max(peakRss, process.WorkingSet64);
-                    samples++;
-                    previousCpu = cpu;
-                    previousSeconds = seconds;
-                }
-                await process.WaitForExitAsync(deadline.Token);
-            }
-            finally
-            {
-                if (!process.HasExited)
-                    process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
-                await Task.WhenAll(output, error).WaitAsync(TimeSpan.FromSeconds(5));
-            }
-            wall.Stop();
-            if (process.ExitCode != 0 || !File.Exists(summaryPath) || new FileInfo(summaryPath).Length > 4096)
-                throw new InvalidOperationException("load_process_or_summary_failed");
-            var summary = ParseSummary(await File.ReadAllTextAsync(summaryPath, cancellationToken), mode);
-            ValidateGenerator(samples, peakCpuRatio, peakRss);
+                startInfo.ArgumentList.Add(argument);
+            startInfo.WorkingDirectory = ownedDirectory;
+            startInfo.Environment["LOAD_ORIGIN"] = ownedOrigin.AbsoluteUri.TrimEnd('/');
+            startInfo.Environment["LOAD_TARGET"] = target.AbsoluteUri;
+            startInfo.Environment["LOAD_DIGEST"] = expectedDigest!;
+            startInfo.Environment["LOAD_MODE"] = mode;
+            startInfo.Environment["LOAD_SUMMARY"] = summaryPath;
+            var measurement = await RunOwnedProcessAsync(startInfo, summaryPath, mode, TimeSpan.FromSeconds(30), cancellationToken);
+            ValidateGenerator(measurement.GeneratorSamples, measurement.GeneratorPeakCpuRatio, measurement.GeneratorPeakRssBytes);
             string evidenceDirectory = Path.Combine(Path.GetTempPath(), "testing-assurance-modernization", "continuation", "load", fixture.RunId);
             Directory.CreateDirectory(evidenceDirectory);
             if (!OperatingSystem.IsWindows())
@@ -130,9 +89,9 @@ internal static class K6LoadRunner
                 VirtualUsers = mode == "closed" ? VirtualUsers : (int?)null,
                 OfferedRate = mode == "open" ? OfferedRate : (int?)null,
                 MaximumVirtualUsers = VirtualUsers,
-                WarmupMilliseconds = warmup, Summary = summary,
-                WallMilliseconds = wall.Elapsed.TotalMilliseconds, GeneratorSamples = samples,
-                GeneratorPeakCpuRatio = peakCpuRatio, GeneratorPeakRssBytes = peakRss,
+                WarmupMilliseconds = warmup, measurement.Summary,
+                measurement.WallMilliseconds, measurement.GeneratorSamples,
+                measurement.GeneratorPeakCpuRatio, measurement.GeneratorPeakRssBytes,
                 GeneratorCpuBudgetRatio = 0.8, GeneratorMemoryBudgetBytes = MemoryBudgetBytes,
                 LogicalProcessors = Environment.ProcessorCount, TotalAvailableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
                 Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
@@ -147,6 +106,54 @@ internal static class K6LoadRunner
             await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, $"load-{topology}-{mode}.json"),
                 JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
         }
+    }
+
+    internal static async Task<K6ProcessMeasurement> RunOwnedProcessAsync(ProcessStartInfo startInfo,
+        string summaryPath, string mode, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        using var process = new Process { StartInfo = startInfo };
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+        var wall = Stopwatch.StartNew();
+        process.Start();
+        Task output = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
+        Task error = process.StandardError.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
+        int samples = 0;
+        long peakRss = 0;
+        double peakCpuRatio = 0;
+        double previousSeconds = 0;
+        TimeSpan previousCpu = TimeSpan.Zero;
+        try
+        {
+            while (!process.HasExited)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100), deadline.Token);
+                process.Refresh();
+                if (process.HasExited)
+                    break;
+                double seconds = wall.Elapsed.TotalSeconds;
+                TimeSpan cpu = process.TotalProcessorTime;
+                peakCpuRatio = Math.Max(peakCpuRatio,
+                    (cpu - previousCpu).TotalSeconds / (seconds - previousSeconds) / Environment.ProcessorCount);
+                peakRss = Math.Max(peakRss, process.WorkingSet64);
+                samples++;
+                previousCpu = cpu;
+                previousSeconds = seconds;
+            }
+            await process.WaitForExitAsync(deadline.Token);
+        }
+        finally
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.WhenAll(output, error).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        wall.Stop();
+        if (process.ExitCode != 0 || !File.Exists(summaryPath) || new FileInfo(summaryPath).Length > 4096)
+            throw new InvalidOperationException("load_process_or_summary_failed");
+        var summary = ParseSummary(await File.ReadAllTextAsync(summaryPath, cancellationToken), mode);
+        return new K6ProcessMeasurement(summary, wall.Elapsed.TotalMilliseconds, samples, peakCpuRatio, peakRss);
     }
 
     internal static Uri ValidateTarget(Uri ownedOrigin, Uri target)
@@ -215,7 +222,7 @@ internal static class K6LoadRunner
             throw new InvalidOperationException("load_generator_pressure_invalidates_measurement");
     }
 
-    private static ProcessStartInfo StartInfo(string executable)
+    internal static ProcessStartInfo StartInfo(string executable)
     {
         var info = new ProcessStartInfo(executable)
         {
@@ -224,6 +231,7 @@ internal static class K6LoadRunner
         info.Environment.Clear();
         info.Environment["K6_NO_USAGE_REPORT"] = "true";
         info.Environment["NO_PROXY"] = "*";
+        info.Environment[OperatingSystem.IsWindows() ? "TEMP" : "TMPDIR"] = Path.GetTempPath();
         return info;
     }
 
@@ -257,3 +265,6 @@ internal static class K6LoadRunner
 internal sealed record K6Summary(string Mode, long Attempts, long Responses, long Correct,
     long Iterations, long HttpRequests, double CorrectnessRate, double HttpFailureRate,
     long DroppedIterations, double P95Milliseconds);
+
+internal sealed record K6ProcessMeasurement(K6Summary Summary, double WallMilliseconds,
+    int GeneratorSamples, double GeneratorPeakCpuRatio, long GeneratorPeakRssBytes);

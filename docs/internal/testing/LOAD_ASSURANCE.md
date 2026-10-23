@@ -83,7 +83,8 @@ executable. It is not a secret. The test verifies its reported version and
 records its executable SHA-256. Release integrity must be verified during
 installation; a version string alone is not a signature check. The external
 executable is not downloaded, vendored, packaged, or distributed by this lane.
-The runner clears the child environment, supplies only workload parameters,
+The runner clears the child environment, supplies only workload parameters and
+the selected temporary directory,
 disables usage reporting, provides an empty owned configuration file, starts no
 k6 management listener, and permits no remote imports, cloud execution, metric
 export, or external target traffic.
@@ -100,7 +101,7 @@ After building `tests/Event.Distributed.IntegrationTests` in Release, the pure
 parser/admission tests require no network, Docker, k6 executable or AppHost:
 
 ```bash
-dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter '/*/*/K6LoadHarnessTests/*' --minimum-expected-tests 29
+dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter '/*/*/K6Load*HarnessTests/*' --minimum-expected-tests 37
 ```
 
 The explicit runtime category requires the real owned environment and external
@@ -110,7 +111,17 @@ k6 executable. It runs both topologies, two workload modes each:
 dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter '/*/*/K6LoadTests/*' --minimum-expected-tests 2
 ```
 
-No resource is started during test discovery or by the Harness category. See
+The Harness category also starts controlled copies of its own executable to
+exercise the actual process boundary: full stdout/stderr pipes, cancellation
+and deadline cleanup of a parent and descendant, nonzero exit, absent or
+oversized summaries, and an inherited secret canary. The controlled child mode
+accepts only seven fixed scenarios and an owned temporary directory with a
+matching marker; it cannot select arbitrary commands or delete files. A guarded
+module initializer intercepts only the exact first child flag, preserving
+TUnit's generated entry point. Ordinary discovery allocates no child process,
+temporary directory, network connection or application resource.
+
+Harness cases require no AppHost, k6 executable, network or Docker. See
 the [contributor guide](../../public/documentation/readme/contributing/load-testing.md)
 for operator expectations.
 

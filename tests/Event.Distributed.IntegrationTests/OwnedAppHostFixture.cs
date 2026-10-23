@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Collections.Frozen;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
@@ -191,6 +194,37 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             ObjectDisposedException.ThrowIf(disposal is not null, this);
             return runningStartup ??= StartCoreAsync(cancellationToken);
         }
+    }
+
+    internal async Task<Guid> AuthenticateBootstrapAsync(HttpClient api, CancellationToken cancellationToken)
+    {
+        using var initial = await api.PostAsJsonAsync("/api/auth/local/login", new
+        {
+            identifier = BootstrapIdentifier, password = BootstrapPassword
+        }, cancellationToken);
+        initial.EnsureSuccessStatusCode();
+        using var challenge = JsonDocument.Parse(await initial.Content.ReadAsStringAsync(cancellationToken));
+        api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            challenge.RootElement.GetProperty("replacementChallenge").GetProperty("token").GetString());
+        using (var replacement = await api.PostAsJsonAsync("/api/auth/local/credential-replacement",
+            new { newPassword = BootstrapReplacementPassword }, cancellationToken))
+            await Assert.That(replacement.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
+        api.DefaultRequestHeaders.Authorization = null;
+        using var login = await api.PostAsJsonAsync("/api/auth/local/login", new
+        {
+            identifier = BootstrapIdentifier, password = BootstrapReplacementPassword
+        }, cancellationToken);
+        login.EnsureSuccessStatusCode();
+        using var authenticated = JsonDocument.Parse(await login.Content.ReadAsStringAsync(cancellationToken));
+        await Assert.That(authenticated.RootElement.GetProperty("emailVerified").GetBoolean()).IsTrue();
+        api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            authenticated.RootElement.GetProperty("token").GetString());
+        using var current = await api.GetAsync("/api/user", cancellationToken);
+        current.EnsureSuccessStatusCode();
+        using var user = JsonDocument.Parse(await current.Content.ReadAsStringAsync(cancellationToken));
+        Guid userId = user.RootElement.GetProperty("id").GetGuid();
+        await Assert.That(userId).IsEqualTo(authenticated.RootElement.GetProperty("userId").GetGuid());
+        return userId;
     }
 
     private async Task StartCoreAsync(CancellationToken cancellationToken)

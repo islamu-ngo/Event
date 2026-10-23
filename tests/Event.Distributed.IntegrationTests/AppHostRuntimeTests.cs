@@ -1,5 +1,7 @@
 using Explore.AppHost;
 using System.Diagnostics;
+using System.Net;
+using System.Text.Json;
 
 namespace Event.Distributed.IntegrationTests;
 
@@ -137,11 +139,37 @@ public sealed partial class AppHostRuntimeTests
     public async Task ConcurrentOwnersRemainHealthyWhenTheirNeighbourStops()
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(6));
-        await using var first = await OwnedAppHostFixture.CreateAsync("Split", deadline.Token);
-        await using var second = await OwnedAppHostFixture.CreateAsync("Standalone", deadline.Token);
+        await using var first = await OwnedAppHostFixture.CreateAsync("Split", deadline.Token, configuredAdministrator: true);
+        await using var second = await OwnedAppHostFixture.CreateAsync("Standalone", deadline.Token, configuredAdministrator: true);
         await Task.WhenAll(first.StartAsync(deadline.Token), second.StartAsync(deadline.Token));
         await Assert.That(first.Root).IsNotEqualTo(second.Root);
+        using var firstApi = first.CreateHttpClient("explore-api");
+        using var secondApi = second.CreateHttpClient("event-standalone");
+        Guid firstUserId = await first.AuthenticateBootstrapAsync(firstApi, deadline.Token);
+        Guid secondUserId = await second.AuthenticateBootstrapAsync(secondApi, deadline.Token);
+        var firstAuthorization = firstApi.DefaultRequestHeaders.Authorization;
+        var secondAuthorization = secondApi.DefaultRequestHeaders.Authorization;
+        firstApi.DefaultRequestHeaders.Authorization = secondAuthorization;
+        using (var foreign = await firstApi.GetAsync("/api/user", deadline.Token))
+            await Assert.That(foreign.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        firstApi.DefaultRequestHeaders.Authorization = firstAuthorization;
+        secondApi.DefaultRequestHeaders.Authorization = firstAuthorization;
+        using (var foreign = await secondApi.GetAsync("/api/user", deadline.Token))
+            await Assert.That(foreign.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        secondApi.DefaultRequestHeaders.Authorization = secondAuthorization;
+        using (var own = await firstApi.GetAsync("/api/user", deadline.Token))
+        {
+            own.EnsureSuccessStatusCode();
+            using var body = JsonDocument.Parse(await own.Content.ReadAsStringAsync(deadline.Token));
+            await Assert.That(body.RootElement.GetProperty("id").GetGuid()).IsEqualTo(firstUserId);
+        }
         await first.DisposeAsync();
+        using (var own = await secondApi.GetAsync("/api/user", deadline.Token))
+        {
+            own.EnsureSuccessStatusCode();
+            using var body = JsonDocument.Parse(await own.Content.ReadAsStringAsync(deadline.Token));
+            await Assert.That(body.RootElement.GetProperty("id").GetGuid()).IsEqualTo(secondUserId);
+        }
         using var client = second.CreateHttpClient("event-standalone", "operations");
         using var response = await client.GetAsync("/health", deadline.Token);
         await Assert.That(response.IsSuccessStatusCode).IsTrue();

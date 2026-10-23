@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.RegistrationForms;
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
@@ -17,7 +18,8 @@ public sealed class RegistrationFormAuthoringCommandService(
     ICurrentUserService currentUserService,
     RegistrationFormPublishPreflightService preflight,
     FormSchemaArtifactPublicationService publication,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IEventPublicationMutationBoundary publicationBoundary)
 {
     public async Task<BaseCommandResponse<Guid>> CreateWorkflowAsync(
         CreateRegistrationWorkflowCommand request,
@@ -374,22 +376,38 @@ public sealed class RegistrationFormAuthoringCommandService(
         PublishRegistrationFormVersionCommand request,
         CancellationToken cancellationToken)
     {
-        RegistrationFormVersion version = await Version(request.EventId, request.FormId, request.VersionId, cancellationToken);
-        EnsureStamp(version.ConcurrencyStamp, request.ExpectedConcurrencyStamp, nameof(RegistrationFormVersion), version.Id);
-        var result = preflight.Check(version);
-        if (!result.CanPublish)
+        Guid tenantId = tenantContext.TenantId;
+        DateTime publishedAt = UtcNow();
+        BaseCommandResponse<Guid> response = await publicationBoundary.ExecuteAsync(request.EventId, async token =>
         {
-            return BaseCommandResponse.Failure<Guid>(
-                "registration_form_preflight_failed",
-                "Registration form publication preflight failed.",
-                result.Issues.Select(issue => $"{issue.Code}: {issue.Message}"),
-                version.Id);
-        }
+            RegistrationFormVersion version = await Version(request.EventId, request.FormId, request.VersionId, token);
+            if (version.TenantId != tenantId)
+                throw new NotFoundException(nameof(RegistrationFormVersion), request.VersionId);
+            EnsureStamp(version.ConcurrencyStamp, request.ExpectedConcurrencyStamp, nameof(RegistrationFormVersion), version.Id);
+            var result = preflight.Check(version);
+            if (!result.CanPublish)
+            {
+                return BaseCommandResponse.Failure<Guid>(
+                    "registration_form_preflight_failed",
+                    "Registration form publication preflight failed.",
+                    result.Issues.Select(issue => $"{issue.Code}: {issue.Message}"),
+                    version.Id);
+            }
 
-        publication.Publish(version, UtcNow());
-        version.UpdatedBy = currentUserService.UserId;
-        await repository.UpdateVersionAsync(version, cancellationToken);
-        return Success(version.Id, "Registration form version published.");
+            publication.Publish(version, publishedAt);
+            version.UpdatedBy = currentUserService.UserId;
+            await repository.UpdateVersionAsync(version, token);
+            return Success(version.Id, "Registration form version published.");
+        }, cancellationToken);
+
+        return response.FailureCode switch
+        {
+            "event_publish_restricted" => BaseCommandResponse.Failure<Guid>(
+                "registration_form_publish_restricted", response.Message, response.Errors, request.VersionId),
+            "event_publish_authority_unavailable" => BaseCommandResponse.Failure<Guid>(
+                "registration_form_publish_authority_unavailable", response.Message, response.Errors, request.VersionId),
+            _ => response
+        };
     }
 
     private async Task<RegistrationWorkflow> Workflow(Guid eventId, Guid workflowId, CancellationToken cancellationToken)

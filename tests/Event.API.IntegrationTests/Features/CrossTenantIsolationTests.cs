@@ -534,7 +534,8 @@ public class CrossTenantIsolationTests : IAsyncDisposable
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             using var scope = _serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await using var dbContext = await scope.ServiceProvider
+                .GetRequiredService<IGlobalExploreDbContextFactory>().CreateDbContextAsync(cancellationToken);
 
             foreach ((Guid tenantId, string slug) in new[] { (TenantA, TenantASlug), (TenantB, TenantBSlug) })
             {

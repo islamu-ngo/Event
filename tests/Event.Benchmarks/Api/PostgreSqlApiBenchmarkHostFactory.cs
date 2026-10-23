@@ -1,9 +1,11 @@
+using Event.Testing.DataProtection;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
 using Explore.Persistence;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Seed;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -21,52 +23,43 @@ namespace Event.Benchmarks.Api;
 
 internal sealed class PostgreSqlApiBenchmarkHostFactory(string connectionString) : WebApplicationFactory<global::Program>
 {
+    private readonly ExternalDataProtectionTestAuthority _dataProtection = new("api");
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-
-        builder.ConfigureAppConfiguration((_, config) =>
+        builder.UseSolutionRelativeContentRoot("src/Explore.API", "Explore.slnx");
+        builder.UseSetting("SecretProvider:Provider", "Environment");
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            var benchmarkConfig = new Dictionary<string, string?>
-            {
-                ["Keycloak:Authority"] = "https://auth.benchmark.invalid",
-                ["Keycloak:Realm"] = "ISLAMU",
-                ["Keycloak:Audience"] = "islamu-event-api",
-                ["Keycloak:RequireHttpsMetadata"] = "false",
-                ["Keycloak:MetadataAddress"] = "https://auth.benchmark.invalid/.well-known/openid-configuration",
-                ["Testing:UseRealDatabase"] = "true",
-                ["Testing:ApplyMigrations"] = "false",
-                ["Testing:SkipJwtAuthorityWarmup"] = "true",
-                ["SecretRefresh:Enabled"] = "false",
-                ["PdsSync:Enabled"] = "false",
-                ["OutboxProcessor:Enabled"] = "false",
-                ["EmailDispatchProcessor:Enabled"] = "false",
-                ["S3Settings:Region"] = "us-east-1",
-                ["S3Settings:BucketName"] = "benchmark-bucket",
-                ["S3Settings:AccessKeyId"] = "benchmark-key",
-                ["S3Settings:SecretAccessKey"] = "benchmark-secret",
-                ["S3Settings:Endpoint"] = "https://s3.benchmark.invalid",
-                ["Deployment:Mode"] = "SingleTenant",
-                ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
-                ["PublicBaseUrl"] = "https://benchmark.event.local"
-            };
-
-            BenchmarkDatabaseConfiguration.AddPostgreSql(benchmarkConfig, connectionString);
-
-            config.AddInMemoryCollection(benchmarkConfig);
-        });
+            ["SecretProvider:Provider"] = "Environment",
+            ["Authentication:Provider"] = "keycloak",
+            ["Keycloak:Authority"] = "https://auth.benchmark.invalid",
+            ["Keycloak:Realm"] = "benchmark",
+            ["Keycloak:Audience"] = "islamu-event-api",
+            ["Keycloak:RequireHttpsMetadata"] = "false",
+            ["Keycloak:MetadataAddress"] = "https://auth.benchmark.invalid/.well-known/openid-configuration",
+            ["Testing:ApplyMigrations"] = "false",
+            ["Testing:SkipJwtAuthorityWarmup"] = "true",
+            ["SecretRefresh:Enabled"] = "false",
+            ["PdsSync:Enabled"] = "false",
+            ["OutboxProcessor:Enabled"] = "false",
+            ["EmailDispatchProcessor:Enabled"] = "false",
+            ["Deployment:Mode"] = "SingleTenant",
+            ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
+            ["PublicBaseUrl"] = "https://benchmark.event.local"
+        }));
 
         builder.ConfigureServices(services =>
         {
+            // Only the benchmark request context uses PostgreSQL; production-purpose factories are outside this profile.
             services.RemoveExploreDbContextRegistrations();
-
             services.AddDbContext<ExploreDbContext>(options =>
             {
                 options.UseNpgsql(connectionString);
                 options.UseSnakeCaseNamingConvention();
                 options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
             });
-
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
             services.RemoveAll<IOutputCacheStore>();
@@ -77,18 +70,15 @@ internal sealed class PostgreSqlApiBenchmarkHostFactory(string connectionString)
         builder.ConfigureTestServices(services =>
         {
             services.RemoveProductHostedServices();
-
+            services.RemoveAll<IExternalDataProtectionSource>();
+            services.AddSingleton<IExternalDataProtectionSource>(_dataProtection);
             services.AddAuthentication(options =>
             {
                 options.DefaultScheme = ApiBenchmarkAuthHandler.SchemeName;
                 options.DefaultAuthenticateScheme = ApiBenchmarkAuthHandler.SchemeName;
                 options.DefaultChallengeScheme = ApiBenchmarkAuthHandler.SchemeName;
                 options.DefaultForbidScheme = ApiBenchmarkAuthHandler.SchemeName;
-            })
-            .AddScheme<AuthenticationSchemeOptions, ApiBenchmarkAuthHandler>(
-                ApiBenchmarkAuthHandler.SchemeName,
-                _ => { });
-
+            }).AddScheme<AuthenticationSchemeOptions, ApiBenchmarkAuthHandler>(ApiBenchmarkAuthHandler.SchemeName, _ => { });
             services.PostConfigure<AuthenticationOptions>(options =>
             {
                 options.DefaultScheme = ApiBenchmarkAuthHandler.SchemeName;
@@ -96,7 +86,6 @@ internal sealed class PostgreSqlApiBenchmarkHostFactory(string connectionString)
                 options.DefaultChallengeScheme = ApiBenchmarkAuthHandler.SchemeName;
                 options.DefaultForbidScheme = ApiBenchmarkAuthHandler.SchemeName;
             });
-
             services.RemoveAll<IAuthorizationProvider>();
             services.AddSingleton<IAuthorizationProvider>(ApiBenchmarkAuthorizationProvider.AllowAll);
             services.RemoveAll<ISetupSecretProvider>();
@@ -104,25 +93,23 @@ internal sealed class PostgreSqlApiBenchmarkHostFactory(string connectionString)
         });
     }
 
-    private sealed class PostgreSqlBenchmarkSeedingHostedService(
-        IServiceProvider serviceProvider,
-        IHostEnvironment environment) : IHostedService
+    private sealed class PostgreSqlBenchmarkSeedingHostedService(IServiceProvider serviceProvider, IHostEnvironment environment) : IHostedService
     {
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             using var scope = serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-
+            if (!dbContext.Database.IsNpgsql())
+                throw new InvalidOperationException("benchmark_postgres_request_provider_required");
             await dbContext.Database.EnsureCreatedAsync(cancellationToken);
             await PostgresModelConstraintApplier.ApplyAsync(dbContext, cancellationToken);
             await DatabaseSeeder.SeedAsync(dbContext, environment, cancellationToken: cancellationToken);
             await BenchmarkApiSeedData.SeedAsync(dbContext, cancellationToken);
-
+            if (await dbContext.Events.CountAsync(evt => evt.Slug != null && evt.Slug.StartsWith("benchmark-api-event-"), cancellationToken) != 24)
+                throw new InvalidOperationException("benchmark_postgres_dataset_invalid");
             var lookupCache = scope.ServiceProvider.GetService<ILookupDataCache>();
             if (lookupCache is not null)
-            {
                 await lookupCache.RefreshAsync(cancellationToken);
-            }
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

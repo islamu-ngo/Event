@@ -1,5 +1,4 @@
 using BenchmarkDotNet.Attributes;
-using Event.Benchmarks.Api;
 using Event.Benchmarks.Configuration;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -25,12 +24,7 @@ public class EfCoreQueryBenchmarks : IDisposable
     public void GlobalSetup()
     {
         var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseNpgsql(BenchmarkDatabaseConfiguration.BuildPostgreSqlConnectionString(
-                host: "localhost",
-                port: 5432,
-                database: "explore_benchmarks",
-                username: "benchmark",
-                password: "benchmark"))
+            .UseNpgsql()
             .Options;
 
         _dbContext = new ExploreDbContext(options);
@@ -38,15 +32,12 @@ public class EfCoreQueryBenchmarks : IDisposable
     }
 
     [GlobalCleanup]
-    public void GlobalCleanup()
-    {
-        _dbContext.Dispose();
-    }
+    public void GlobalCleanup() => _dbContext.Dispose();
 
     [Benchmark(Baseline = true)]
-    public IQueryable<DomainEvent> QueryConstruction_WithTracking()
+    public void QueryConstruction_WithTracking()
     {
-        return _dbContext.Events
+        GC.KeepAlive(_dbContext.Events
             .Include(e => e.EventType)
             .Include(e => e.AudienceGender)
             .Include(e => e.Actor)
@@ -55,13 +46,13 @@ public class EfCoreQueryBenchmarks : IDisposable
             .AsSplitQuery()
             .Where(e => e.TenantId == _tenantId)
             .OrderByDescending(e => e.CreatedAt)
-            .Take(50);
+            .Take(50));
     }
 
     [Benchmark]
-    public IQueryable<DomainEvent> QueryConstruction_WithNoTracking()
+    public void QueryConstruction_WithNoTracking()
     {
-        return _dbContext.Events
+        GC.KeepAlive(_dbContext.Events
             .AsNoTracking()
             .Include(e => e.EventType)
             .Include(e => e.AudienceGender)
@@ -71,13 +62,14 @@ public class EfCoreQueryBenchmarks : IDisposable
             .AsSplitQuery()
             .Where(e => e.TenantId == _tenantId)
             .OrderByDescending(e => e.CreatedAt)
-            .Take(50);
+            .Take(50));
     }
 
     [Benchmark]
-    public IAsyncEnumerable<DomainEvent> CompiledQuery_Invocation()
+    public void CompiledQuery_Invocation()
     {
-        return CompiledEventQuery(_dbContext, _tenantId);
+        // Preserve deferred invocation without enumerating the result or executing SQL.
+        GC.KeepAlive(CompiledEventQuery(_dbContext, _tenantId));
     }
 
     public void Dispose()

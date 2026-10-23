@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M6CAZCB4VSVXHJ347BY82T
+Title: "Retain resource upload authority through the owning commit"
+Type: fix
+Scope: storage
+Summary: "Join upload mutations to the native privacy fence and requalify the original moderation snapshot at the actual commit boundary."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: mitigated
+    Detail: "The upload owner keeps privacy, subject and tenant sources through the owning transaction and checks the original qualified facts before commit. This source checkpoint is not executed provider assurance."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable

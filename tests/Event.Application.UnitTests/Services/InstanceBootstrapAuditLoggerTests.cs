@@ -44,8 +44,8 @@ public class InstanceBootstrapAuditLoggerTests
         string exported = JsonSerializer.Serialize(entry);
         foreach (string canary in new[] { actorUserId.ToString("D"), actorUserId.ToString("N"), realm, clientId })
         {
-            await Assert.That(entry.Message).DoesNotContain(canary);
-            await Assert.That(exported).DoesNotContain(canary);
+            await Assert.That(entry.Message.Contains(canary, StringComparison.Ordinal)).IsFalse();
+            await Assert.That(exported.Contains(canary, StringComparison.Ordinal)).IsFalse();
         }
     }
 

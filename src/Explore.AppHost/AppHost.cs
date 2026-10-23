@@ -5,6 +5,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DotNetEnv;
 using Explore.Application.Configuration;
+using Explore.AppHost;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Webhooks;
 using Explore.Secrets.Abstractions;
@@ -16,11 +17,16 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 const string DefaultInstanceAdminHost = "admin.localhost";
 const int DefaultInstanceAdminPort = 7002;
+var testingInputs = new ConfigurationBuilder().AddEnvironmentVariables().AddCommandLine(args).Build();
+var testingIsolation = TestingResourceIsolation.Admit(testingInputs);
+using var testingClaim = testingIsolation?.Claim();
 var repositoryRoot = FindRepositoryRoot(Directory.GetCurrentDirectory());
 var dotenvPath = Path.Combine(repositoryRoot, ".env");
-if (File.Exists(dotenvPath))
+if (testingIsolation is null && File.Exists(dotenvPath))
     Env.NoClobber().Load(dotenvPath);
 var builder = DistributedApplication.CreateBuilder(args);
+if (testingIsolation is not null)
+    TestingResourceIsolation.ConfigureOwnedInputs(builder.Configuration, args);
 var runMode = AspireRunModeExtensions.Parse(builder.Configuration["ISLAMU_ASPIRE_MODE"]);
 var agentBrowserProfile = runMode == AspireRunMode.AgentBrowser
     ? AgentBrowserProfileSettings.Create()
@@ -62,7 +68,13 @@ SecretProviderType configuredSecretProvider =
     SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration, builder.Environment.EnvironmentName);
 // AppHost never authenticates to a runtime vault. Operators provision provider
 // infrastructure outside the application identity, then inject resource inputs.
-var operatorInputBuilder = new ConfigurationBuilder().AddEnvironmentVariables();
+var operatorInputBuilder = new ConfigurationBuilder();
+if (testingIsolation is null)
+    operatorInputBuilder.AddEnvironmentVariables();
+else
+    operatorInputBuilder.AddInMemoryCollection(builder.Configuration
+        .GetRequiredSection("TestingEnvironment").AsEnumerable(makePathsRelative: true)
+        .Where(pair => pair.Value is not null));
 if (configuredSecretProvider == SecretProviderType.UserSecrets)
 {
     if (!SecretAuthorityConfiguration.IsDevelopmentOrTesting(builder.Environment.EnvironmentName))
@@ -72,6 +84,11 @@ if (configuredSecretProvider == SecretProviderType.UserSecrets)
 }
 IConfiguration operatorInputs = operatorInputBuilder.Build();
 builder.Configuration.AddConfiguration(operatorInputs);
+if (testingIsolation is not null)
+{
+    builder.Configuration.AddCommandLine(args);
+    TestingResourceIsolation.ValidateProfile(builder.Configuration);
+}
 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
     ["SecretProvider:Provider"] = configuredSecretProvider.ToString()
@@ -141,9 +158,11 @@ var cerbosPolicyPackagePath = Path.Combine(repositoryRoot, "cerbos", "policies")
 var cerbosConfigPath = Path.Combine(repositoryRoot, "cerbos", "config", ".cerbos.yaml");
 var cerbosSchemaPath = Path.Combine(repositoryRoot, "cerbos", "init", "cerbos-schema.sql");
 var coopNginxConfigPath = Path.Combine(appHostConfigRoot, "coop", "nginx.conf");
-var localStorageRootPath = Path.Combine(repositoryRoot, agentBrowserProfile?.LocalStorageRelativePath ?? "storage-data/aspire-local");
+var localStorageRootPath = testingIsolation is null
+    ? Path.Combine(repositoryRoot, agentBrowserProfile?.LocalStorageRelativePath ?? "storage-data/aspire-local")
+    : Path.Combine(testingIsolation.Root, "storage");
 var embeddedPrivacyErasureAuthorityPath = Path.Combine(
-    repositoryRoot,
+    testingIsolation?.Root ?? repositoryRoot,
     agentBrowserProfile?.PrivacyErasureRelativePath
         ?? "privacy-erasure-authority-data/aspire-local/privacy_erasure_authority.db");
 var embeddedPrivacyErasureAuthorityDirectory = Path.GetDirectoryName(embeddedPrivacyErasureAuthorityPath)!;
@@ -166,7 +185,8 @@ var publicBaseUrl = agentBrowserProfile?.DefaultTenantOrigin
 Directory.CreateDirectory(localStorageRootPath);
 if (usesEmbeddedPrivacyErasureAuthority)
     Directory.CreateDirectory(embeddedPrivacyErasureAuthorityDirectory);
-Directory.CreateDirectory(grafanaDashboardPath);
+if (testingIsolation is null)
+    Directory.CreateDirectory(grafanaDashboardPath);
 
 Console.WriteLine("===========================================");
 Console.WriteLine("Explore AppHost - Local Development Orchestrator");
@@ -176,7 +196,7 @@ Console.WriteLine("local-agent: isolated browser authentication; local-full: ful
 Console.WriteLine("===========================================");
 
 // Ordinary profiles retain the compatibility delay; agent readiness follows real dependencies.
-if (runMode != AspireRunMode.AgentBrowser)
+if (runMode != AspireRunMode.AgentBrowser && testingIsolation is null)
 {
     var startAfter = DateTime.Now.AddSeconds(30);
     builder.Services.AddHealthChecks().AddCheck("startup-delay", () =>
@@ -741,6 +761,7 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 "AUTHENTICATION_PROVIDER", "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION", "GOOGLE_CLIENT_ID",
                 "IDENTITYCORRELATION__TRUSTEDISSUERS__0", "ATPROTO_LOGIN_ENABLED",
                 "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER", "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
+                "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", "INSTANCE_BOOTSTRAP_ADMIN_EMAIL",
                 "AGENT_BROWSER_SEED_ENABLED", "AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD",
                 "AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES", "AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH",
                 "AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256", "AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS",
@@ -856,9 +877,24 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
         }
         RuntimeSecretEnvironment.Apply(context.EnvironmentVariables, operatorInputs,
             Environment.GetEnvironmentVariables().Keys.Cast<string>(), consumer, configuredSecretProvider);
+        if (testingIsolation is not null)
+        {
+            string? partition = consumer switch
+            {
+                SecretConsumer.Api => "API", SecretConsumer.Bff => "BFF",
+                SecretConsumer.Combined => "COMBINED", _ => null
+            };
+            if (partition is not null)
+                foreach (string suffix in new[] { "RING", "ADMISSION", "ADMISSION_SHA256", "MINIMUM_GENERATION" })
+                {
+                    string key = $"EVENT_DP_{partition}_{suffix}";
+                    context.EnvironmentVariables[key] = RequiredConfiguredValue(operatorInputs, key);
+                }
+        }
     });
 }
 
+testingIsolation?.Apply(builder);
 await builder.Build().RunAsync();
 
 static LocalPlatformResources AddLocalPlatform(
@@ -965,10 +1001,13 @@ static LocalPlatformResources AddLocalPlatform(
         .WithHttpEndpoint(targetPort: 9001, port: 9006, name: "console")
         .WithHttpHealthCheck("/minio/health/live", endpointName: "api");
     var minioBootstrap = builder.AddContainer("minio-bootstrap", "minio/mc", "latest")
+        .WithEnvironment("MINIO_ROOT_USER", configuration["STORAGE_S3_ACCESS_KEY_ID"] ?? string.Empty)
+        .WithEnvironment("MINIO_ROOT_PASSWORD", configuration["STORAGE_S3_SECRET_ACCESS_KEY"] ?? string.Empty)
+        .WithEnvironment("MINIO_BUCKET", configuration["STORAGE_S3_BUCKET_NAME"] ?? "explore")
         .WithEntrypoint("sh")
         .WithArgs(
             "-c",
-            $"mc alias set local {BuildHttpUri("minio", 9000)} {configuration["STORAGE_S3_ACCESS_KEY_ID"] ?? string.Empty} {configuration["STORAGE_S3_SECRET_ACCESS_KEY"] ?? string.Empty} && (mc mb -p local/{configuration["STORAGE_S3_BUCKET_NAME"] ?? "explore"} || mc ls local/{configuration["STORAGE_S3_BUCKET_NAME"] ?? "explore"} >/dev/null)")
+            $"mc alias set local {BuildHttpUri("minio", 9000)} \"$MINIO_ROOT_USER\" \"$MINIO_ROOT_PASSWORD\" && (mc mb -p \"local/$MINIO_BUCKET\" || mc ls \"local/$MINIO_BUCKET\" >/dev/null)")
         .WaitFor(minio);
 
     IResourceBuilder<ContainerResource>? svixDb = null;

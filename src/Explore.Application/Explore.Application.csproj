@@ -43,6 +43,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="../../schemas/moderation-capabilities.json"
+                      LogicalName="Explore.Application.Moderation.Capabilities" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="DTOs\AudienceAge\Validators\" />
     <Folder Include="DTOs\AudienceGender\Validators\" />
     <Folder Include="DTOs\EventType\Validators\" />

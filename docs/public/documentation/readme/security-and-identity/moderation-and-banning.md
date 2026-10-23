@@ -614,8 +614,10 @@ before copying attempts and removes publication evidence only after rebuilding t
 owners. Generation warnings remain recorded. All 65 root-correction cases remain
 UNRUN/unbuilt. A final bounded SQLite source/artifact review found no additional
 concrete defect; these are not executed transfer or provider-assurance results.
-SQL Server also retains a separately recorded, unresolved downgrade-FK
-discrepancy; generated files must not be mistaken for approved deployment scripts.
+The separately recorded SQL Server downgrade-FK discrepancy now has a targeted
+generator correction that retains non-cascading moderation evidence. Regenerate
+older rollback scripts; generated files are not approved deployment scripts or
+executed provider assurance.
 Domain compilation passed with 146 warnings
 and no errors; initial Persistence compilation passed with 62 warnings and no
 errors before the final ownership-guard correction. No migration has been applied.
@@ -1088,8 +1090,9 @@ client and policy captures matched. All four provider migration families have
 been generated, not applied; static review found no grant-table defect, not a
 working-provider certificate. All four generated migration assemblies compiled,
 and bounded upgrade/downgrade SQL was emitted and inspected without connecting to
-or updating a database. An unrelated SQL Server rollback discrepancy is still
-open; these artifacts are not a safe-downgrade certificate. The 189 regression cases
+or updating a database. The separate SQL Server evidence-FK rollback discrepancy
+is corrected at the generator, without rewriting historical migrations or the
+approved private-PII cascade. These artifacts are not a safe-downgrade certificate. The 189 regression cases
 are **UNRUN/unbuilt**; no database has been updated or operational permission flow
 certified.
 

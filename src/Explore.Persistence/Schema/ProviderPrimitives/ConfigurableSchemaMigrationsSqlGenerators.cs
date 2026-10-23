@@ -78,6 +78,27 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
     ICommandBatchPreparer commandBatchPreparer)
     : SqlServerMigrationsSqlGenerator(dependencies, commandBatchPreparer)
 {
+    protected override void Generate(
+        AddForeignKeyOperation operation,
+        IModel? model,
+        MigrationCommandListBuilder builder,
+        bool terminate = true)
+    {
+        // Historical Down metadata requests a cascade absent from the physical evidence predecessor.
+        var deleteAction = operation.OnDelete;
+        if (operation.Name == "fk_moderation_case_evidence_moderation_cases_case_id"
+            && deleteAction == ReferentialAction.Cascade)
+            operation.OnDelete = ReferentialAction.NoAction;
+        try
+        {
+            base.Generate(operation, model, builder, terminate);
+        }
+        finally
+        {
+            operation.OnDelete = deleteAction;
+        }
+    }
+
     public override IReadOnlyList<MigrationCommand> Generate(
         IReadOnlyList<MigrationOperation> operations,
         Microsoft.EntityFrameworkCore.Metadata.IModel? model = null,

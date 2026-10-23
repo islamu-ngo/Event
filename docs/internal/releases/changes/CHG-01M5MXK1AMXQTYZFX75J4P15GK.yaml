@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5MXK1AMXQTYZFX75J4P15GK
+Title: "Keep moderation evidence non-cascading during SQL Server rollback"
+Type: fix
+Scope: database
+Summary: "Generate NO ACTION for the retained moderation case-evidence foreign key when immutable historical Down metadata requests a cascade, without changing historical migration files or the separately approved private-PII cascade."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "The SQL Server generator preserves the physical non-cascading case-evidence relationship during rollback. The independently approved private-PII receipt cascade remains unchanged; database execution and provider assurance remain pending."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Correct SQL generation for three historical Down operations without rewriting immutable migrations, snapshots or operation metadata. No migration is applied by this change."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Use the corrected native generator for SQL Server rollback artifacts. This targeted storage correction does not certify the complete downgrade path or recover already lost evidence."

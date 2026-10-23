@@ -81,8 +81,23 @@ SQL copies the existing material/quarantine values into the replacement table;
 it does not reconstruct evidence that an earlier unsafe rebuild already lost.
 Use an exclusive migration window and stop on any preflight or constraint error.
 Neither the migration nor its SQL was executed during merge integration. Provider
-upgrade/rollback assurance, including the separately recorded SQL Server
-case-evidence downgrade discrepancy, remains open.
+upgrade/rollback assurance remains open.
+
+## SQL Server case-evidence rollback
+
+Three immutable historical `Down` operations request `CASCADE` for
+`fk_moderation_case_evidence_moderation_cases_case_id`, although its physical
+source-owner predecessor used `NO ACTION`. The SQL Server migration generator
+now emits the predecessor's non-cascading relationship for that named constraint
+and restores the operation metadata after generation. It does not rewrite
+historical migrations or change the separate private-birth-date receipt cascade
+needed for PII erasure. Regenerate rollback scripts with the corrected generator;
+do not reuse older scripts that introduce the evidence cascade.
+
+Generation regressions cover the three affected historical operations, repeatable
+generation without metadata mutation, and retention of the approved PII cascade.
+Those test sources remain unbuilt/unrun locally. SQL generation is not database
+execution or certification of the complete upgrade/downgrade path.
 
 ## Native PostgreSQL login identity
 

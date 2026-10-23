@@ -1973,8 +1973,11 @@ instants, ordinal hashes and exact grant relationships. SQL files are under
 `.artifacts/migrations/AddAdjudicatedCaseReadGrants/`; emitting them is not executing
 their checks or proving provider behavior. MariaDB shares the MySQL migration
 family but has no separate engine witness here. The existing
-unrelated SQL Server CaseEvidence rollback discrepancy remains an unresolved
-gate; these artifacts do not certify that downgrade or provider behavior.
+SQL Server CaseEvidence rollback discrepancy is corrected separately at the
+native SQL-generator boundary: the named evidence FK retains its physical
+predecessor's `NO ACTION`, without rewriting migration history or the approved
+private-PII cascade. These artifacts still do not certify that downgrade or
+provider behavior; see `BACKUP_RESTORE_UPGRADE.md`.
 This permission owner does not implement independently approved
 correction text, disclosure, delivery, effect completion or deleted-subject
 claimant verification.

@@ -1,8 +1,11 @@
+using System.Data;
 using System.Linq.Expressions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Repositories;
 
@@ -51,6 +54,28 @@ public sealed class RegistrationProviderRepository(ExploreDbContext dbContext) :
         }
 
         return binding;
+    }
+
+    public async Task<RegistrationProviderBinding?> GetBindingForPublicationAsync(Guid tenantId, Guid bindingId,
+        Guid connectionId, Guid formId, Guid formVersionId, CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty || bindingId == Guid.Empty || connectionId == Guid.Empty || formId == Guid.Empty
+            || formVersionId == Guid.Empty || dbContext.TenantContext?.TenantId != tenantId
+            || dbContext.IsTenantFilterBypassed || !dbContext.Database.IsRelational()
+            || dbContext.Database.CurrentTransaction is not { } transaction
+            || transaction.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Binding publication sources require native tenant serializable settlement.");
+
+        // Fence the original identities before reloading; never follow a replacement source under retained locks.
+        await RelationalEntityRowFence.AcquireAsync<RegistrationProviderConnection>(dbContext, tenantId,
+            row => row.Id, connectionId, cancellationToken);
+        await RelationalEntityRowFence.AcquireAsync<RegistrationForm>(dbContext, tenantId,
+            row => row.Id, formId, cancellationToken);
+        await RelationalEntityRowFence.AcquireAsync<RegistrationFormVersion>(dbContext, tenantId,
+            row => row.Id, formVersionId, cancellationToken);
+        await RelationalEntityRowFence.AcquireAsync<RegistrationProviderBinding>(dbContext, tenantId,
+            row => row.Id, bindingId, cancellationToken);
+        return await GetBindingAsync(tenantId, bindingId, cancellationToken);
     }
 
     public Task<bool> FormVersionBelongsToEventAsync(Guid tenantId, Guid eventId, Guid formId, Guid formVersionId, CancellationToken cancellationToken) =>

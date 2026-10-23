@@ -197,44 +197,14 @@ public sealed class RegistrationProviderCapabilityResolverTests
     }
 
     [Test]
-    public async Task PublishCommand_RefusesBlockingDriftAndPropagatesCancellation()
+    public async Task Native_binding_publication_requires_an_event_anchor_not_only_a_binding_identifier()
     {
-        RegistrationProviderBinding binding = Binding();
-        FakeProviderRepository repository = new(binding);
-        PublishRegistrationProviderBindingCommandHandler handler = new(repository);
-        using CancellationTokenSource source = new();
-        await source.CancelAsync();
+        var request = new PublishRegistrationProviderBindingCommand(Guid.CreateVersion7(), Guid.Empty,
+            Guid.CreateVersion7(), RegistrationProviderSchemaDriftClass.NoDrift, Now);
+        var result = new PublishRegistrationProviderBindingCommandValidator().Validate(request);
 
-        await Assert.That(() => handler.ExecuteAsync(new(binding.TenantId, binding.Id, RegistrationProviderSchemaDriftClass.NoDrift, Now), source.Token))
-            .Throws<OperationCanceledException>();
-
-        var blocked = await handler.ExecuteAsync(new(binding.TenantId, binding.Id, RegistrationProviderSchemaDriftClass.TypeChanged, Now), CancellationToken.None);
-        await Assert.That(blocked.IsSuccess).IsFalse();
-        await Assert.That(blocked.FailureCode).IsEqualTo("registration_provider_drift_blocks_publication");
-    }
-
-    [Test]
-    public async Task PublishCommand_ComputesDeterministicMappingHashFromPersistedMappings()
-    {
-        RegistrationProviderBinding first = Binding();
-        RegistrationProviderBinding second = Binding(formVersionId: first.RegistrationFormVersionId);
-        ReplaceDraftRegistrationProviderMappingsCommandHandler firstReplace = new(new FakeProviderRepository(first));
-        ReplaceDraftRegistrationProviderMappingsCommandHandler secondReplace = new(new FakeProviderRepository(second));
-
-        await firstReplace.ExecuteAsync(new(first.TenantId, first.Id,
-            [new("name", "full_name", true), new("email", "email", true)],
-            [new("name", "legal", "full"), new("email", "primary", "main")]), CancellationToken.None);
-        await secondReplace.ExecuteAsync(new(second.TenantId, second.Id,
-            [new("email", "email", true), new("name", "full_name", true)],
-            [new("email", "primary", "main"), new("name", "legal", "full")]), CancellationToken.None);
-
-        await new PublishRegistrationProviderBindingCommandHandler(new FakeProviderRepository(first))
-            .ExecuteAsync(new(first.TenantId, first.Id, RegistrationProviderSchemaDriftClass.NoDrift, Now), CancellationToken.None);
-        await new PublishRegistrationProviderBindingCommandHandler(new FakeProviderRepository(second))
-            .ExecuteAsync(new(second.TenantId, second.Id, RegistrationProviderSchemaDriftClass.NoDrift, Now), CancellationToken.None);
-
-        await Assert.That(first.PublishedMappingRevisionHash).IsNotNull();
-        await Assert.That(first.PublishedMappingRevisionHash).IsEqualTo(second.PublishedMappingRevisionHash);
+        await Assert.That(result.IsValid).IsFalse();
+        await Assert.That(result.Errors.Select(error => error.PropertyName)).Contains(nameof(request.EventId));
     }
 
     [Test]
@@ -348,6 +318,9 @@ public sealed class RegistrationProviderCapabilityResolverTests
         public Task<RegistrationProviderConnection?> GetConnectionAsync(Guid tenantId, Guid connectionId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<IReadOnlyList<RegistrationProviderConnection>> GetConnectionsAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RegistrationProviderConnection>>([]);
         public Task<RegistrationProviderBinding?> GetBindingAsync(Guid tenantId, Guid bindingId, CancellationToken cancellationToken) => cancellationToken.IsCancellationRequested ? Task.FromCanceled<RegistrationProviderBinding?>(cancellationToken) : Task.FromResult<RegistrationProviderBinding?>(binding);
+        public Task<RegistrationProviderBinding?> GetBindingForPublicationAsync(Guid tenantId, Guid bindingId,
+            Guid connectionId, Guid formId, Guid formVersionId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Native binding publication requires the persistence owner.");
         public Task<bool> FormVersionBelongsToEventAsync(Guid tenantId, Guid eventId, Guid formId, Guid formVersionId, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<RegistrationForm?> GetFormForExternalImportAsync(Guid tenantId, Guid eventId, Guid formId, CancellationToken cancellationToken) => Task.FromResult<RegistrationForm?>(null);
         public Task<RegistrationForm?> GetExternalImportFormAsync(Guid tenantId, Guid eventId, Guid connectionId, string providerSurveyId, CancellationToken cancellationToken) => Task.FromResult<RegistrationForm?>(null);

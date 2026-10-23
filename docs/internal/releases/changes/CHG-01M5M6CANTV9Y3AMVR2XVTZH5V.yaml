@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5M6CANTV9Y3AMVR2XVTZH5V
+Title: "Fence delegated binding publication against its original sources"
+Type: fix
+Scope: registration
+Summary: "Use one native publication owner for delegated binding commands and retain the exact connection, form and version sources through commit."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Native low-level publication requests require the original event identifier; use the unified owner for both command types rather than the removed forwarding handler."
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "The selected human delegated path holds original connection, form, version and binding rows through native settlement. Authored regressions remain unrun; managed remote and machine paths are not newly certified."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable

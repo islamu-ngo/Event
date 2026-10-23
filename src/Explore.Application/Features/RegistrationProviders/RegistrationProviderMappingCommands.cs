@@ -1,6 +1,9 @@
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
+using Explore.Application.Exceptions;
 using Explore.Application.Responses;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
@@ -8,6 +11,7 @@ using Explore.Domain.Enums;
 using FluentValidation;
 using System.Security.Cryptography;
 using System.Text;
+using static Explore.Application.Features.RegistrationProviders.Commands.RegistrationProviderManagementHandlerHelpers;
 
 namespace Explore.Application.Features.RegistrationProviders.Commands;
 
@@ -26,6 +30,7 @@ public sealed record ReplaceDraftRegistrationProviderMappingsCommand(
 
 public sealed record PublishRegistrationProviderBindingCommand(
     Guid TenantId,
+    Guid EventId,
     Guid BindingId,
     RegistrationProviderSchemaDriftClass DriftClass,
     DateTime PublishedAt) : ICommand<BaseCommandResponse<Guid>>;
@@ -116,23 +121,112 @@ public sealed class ReplaceDraftRegistrationProviderMappingsCommandHandler(IRegi
     private static string Normalize(string value) => value.Trim();
 }
 
-public sealed class PublishRegistrationProviderBindingCommandHandler(IRegistrationProviderRepository repository)
-    : ICommandHandler<PublishRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
+public sealed class PublishRegistrationProviderBindingCommandHandler(
+    IRegistrationProviderRepository repository,
+    IRegistrationProviderRegistry registry,
+    IRegistrationProviderManagedPublishPreflight preflight,
+    TimeProvider clock,
+    IMachinePrincipalAccessor machine,
+    IEventPublicationMutationBoundary publicationBoundary)
+    : ICommandHandler<PublishRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>,
+      ICommandHandler<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
 {
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishEventRegistrationProviderBindingCommand request,
+        CancellationToken cancellationToken = default)
+    {
+        RequireEventScope(request.TenantId, request.EventId);
+        var binding = await repository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
+        if (binding is null || !await repository.FormVersionBelongsToEventAsync(request.TenantId, request.EventId,
+                binding.RegistrationFormId, binding.RegistrationFormVersionId, cancellationToken))
+            return Missing(request.BindingId);
+
+        async Task<BaseCommandResponse<Guid>> PublishReadyAsync(RegistrationProviderBinding current, CancellationToken token)
+        {
+            var readiness = await preflight.RunAsync(request.TenantId, request.EventId, current, token);
+            if (!readiness.Succeeded)
+            {
+                string code = readiness.FailureCode ?? "registration_provider_preflight_failed";
+                return BaseCommandResponse.Failure<Guid>(code, code, readiness.Errors, request.BindingId);
+            }
+            return await PublishAsync(current, ToSchemaDriftClass((RegistrationProviderDriftClassEnum)current.DriftClassId),
+                clock.GetUtcNow().UtcDateTime, token);
+        }
+
+        return machine.Current is null && IsLocalDelegated(binding)
+            ? await ExecuteSelectedAsync(request.EventId, binding, PublishReadyAsync, cancellationToken)
+            : await PublishReadyAsync(binding, cancellationToken);
+    }
+
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
     {
         await new PublishRegistrationProviderBindingCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
         RegistrationProviderBinding? binding = await repository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
-        if (binding is null) return RegistrationProviderCommandResponses.Failure(request.BindingId, "registration_provider_binding_not_found");
-        if (SchemaDriftClassifier.BlocksPublication(request.DriftClass))
-        {
-            return RegistrationProviderCommandResponses.Failure(request.BindingId, "registration_provider_drift_blocks_publication");
-        }
+        if (binding is null) return Missing(request.BindingId);
+        return machine.Current is null && IsLocalDelegated(binding)
+            ? await ExecuteSelectedAsync(request.EventId, binding,
+                (current, token) => PublishAsync(current, request.DriftClass, request.PublishedAt, token), cancellationToken)
+            : await PublishAsync(binding, request.DriftClass, request.PublishedAt, cancellationToken);
+    }
 
-        binding.SetDriftClass(ToDomain(request.DriftClass));
-        binding.Publish(ComputeMappingRevisionHash(binding), request.PublishedAt);
+    private async Task<BaseCommandResponse<Guid>> ExecuteSelectedAsync(Guid eventId, RegistrationProviderBinding original,
+        Func<RegistrationProviderBinding, CancellationToken, Task<BaseCommandResponse<Guid>>> publish,
+        CancellationToken cancellationToken)
+    {
+        var plan = PublicationPlan.From(eventId, original);
+        if (original.Connection?.TenantId != original.TenantId || !await repository.FormVersionBelongsToEventAsync(
+                plan.TenantId, eventId, plan.FormId, plan.VersionId, cancellationToken))
+            return Missing(original.Id);
+
+        var result = await publicationBoundary.ExecuteAsync(eventId, async token =>
+        {
+            var current = await repository.GetBindingForPublicationAsync(plan.TenantId, plan.BindingId,
+                plan.ConnectionId, plan.FormId, plan.VersionId, token);
+            if (current is null || current.Connection?.TenantId != plan.TenantId
+                || !IsLocalDelegated(current) || PublicationPlan.From(eventId, current) != plan
+                || !await repository.FormVersionBelongsToEventAsync(plan.TenantId, eventId, plan.FormId, plan.VersionId, token))
+                throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
+                    "The registration provider publication target changed.");
+            return await publish(current, token);
+        }, cancellationToken);
+
+        return result.FailureCode switch
+        {
+            "event_publish_restricted" => BaseCommandResponse.Failure<Guid>("registration_provider_binding_publish_restricted",
+                result.Message, result.Errors, plan.BindingId),
+            "event_publish_authority_unavailable" => BaseCommandResponse.Failure<Guid>("registration_provider_binding_publish_authority_unavailable",
+                result.Message, result.Errors, plan.BindingId),
+            _ => result
+        };
+    }
+
+    private bool IsLocalDelegated(RegistrationProviderBinding binding)
+    {
+        if (binding.Connection is not { } connection) return false;
+        var descriptor = registry.TryResolve(TupleFromConnection(connection));
+        return descriptor is IRegistrationProviderDelegatedAutomation
+            && !descriptor.ProvenCapabilities.FormProvision && !descriptor.ProvenCapabilities.SubscriptionManagement;
+    }
+
+    private async Task<BaseCommandResponse<Guid>> PublishAsync(RegistrationProviderBinding binding,
+        RegistrationProviderSchemaDriftClass driftClass, DateTime publishedAt, CancellationToken cancellationToken)
+    {
+        if (SchemaDriftClassifier.BlocksPublication(driftClass))
+            return RegistrationProviderCommandResponses.Failure(binding.Id, "registration_provider_drift_blocks_publication");
+        binding.SetDriftClass(ToDomain(driftClass));
+        binding.Publish(ComputeMappingRevisionHash(binding), publishedAt);
         await repository.SaveChangesAsync(cancellationToken);
         return RegistrationProviderCommandResponses.Success(binding.Id, "Registration provider binding published.");
+    }
+
+    private static BaseCommandResponse<Guid> Missing(Guid bindingId) =>
+        RegistrationProviderCommandResponses.Failure(bindingId, "registration_provider_binding_not_found");
+
+    private sealed record PublicationPlan(Guid TenantId, Guid EventId, Guid BindingId, Guid FormId, Guid VersionId,
+        Guid ConnectionId, RegistrationProviderTuple Tuple)
+    {
+        internal static PublicationPlan From(Guid eventId, RegistrationProviderBinding binding) => new(binding.TenantId,
+            eventId, binding.Id, binding.RegistrationFormId, binding.RegistrationFormVersionId,
+            binding.RegistrationProviderConnectionId, TupleFromConnection(binding.Connection!));
     }
 
     private static RegistrationEvidenceHash ComputeMappingRevisionHash(RegistrationProviderBinding binding)
@@ -218,6 +312,7 @@ public sealed class PublishRegistrationProviderBindingCommandValidator : Abstrac
     public PublishRegistrationProviderBindingCommandValidator()
     {
         RuleFor(command => command.TenantId).NotEmpty();
+        RuleFor(command => command.EventId).NotEmpty();
         RuleFor(command => command.BindingId).NotEmpty();
         RuleFor(command => command.PublishedAt).Must(value => value.Kind == DateTimeKind.Utc && value != default);
     }

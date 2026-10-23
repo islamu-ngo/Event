@@ -663,37 +663,6 @@ public sealed class DeleteRegistrationProviderBindingCommandHandler(IRegistratio
     }
 }
 
-public sealed class PublishEventRegistrationProviderBindingCommandHandler(
-    IRegistrationProviderRepository providerRepository,
-    ICommandHandler<PublishRegistrationProviderBindingCommand, BaseCommandResponse<Guid>> publishBindingHandler,
-    IRegistrationProviderManagedPublishPreflight managedPublishPreflight,
-    TimeProvider timeProvider)
-    : ICommandHandler<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
-{
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishEventRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
-    {
-        RequireEventScope(request.TenantId, request.EventId);
-        RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
-        if (binding is null || !await BindingBelongsToEventAsync(providerRepository, request.TenantId, request.EventId, request.BindingId, cancellationToken))
-            return Failure(request.BindingId, "registration_provider_binding_not_found", "Registration provider binding was not found.");
-        RegistrationProviderManagedPublishPreflightResult preflight = await managedPublishPreflight.RunAsync(
-            request.TenantId,
-            request.EventId,
-            binding,
-            cancellationToken);
-        if (!preflight.Succeeded)
-        {
-            string code = preflight.FailureCode ?? "registration_provider_preflight_failed";
-            return BaseCommandResponse.Failure<Guid>(code, code, preflight.Errors, request.BindingId);
-        }
-        return await publishBindingHandler.ExecuteAsync(new PublishRegistrationProviderBindingCommand(
-            request.TenantId,
-            request.BindingId,
-            ToSchemaDriftClass((RegistrationProviderDriftClassEnum)binding.DriftClassId),
-            timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
-    }
-}
-
 public sealed class ReplaceEventDraftRegistrationProviderMappingsCommandHandler(
     IRegistrationProviderRepository providerRepository,
     ICommandHandler<ReplaceDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>> replaceMappingsHandler)

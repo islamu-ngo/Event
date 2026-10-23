@@ -32,7 +32,7 @@ public class CerbosAuthorizationServiceTests : IAsyncDisposable
 {
     private const string ArtifactRelativePath = ".omo/start-work/artifacts/authorization-platform-redesign/phase0-task02/cerbos-provider-scenarios.json";
     private const string FixedUserId = "11111111-1111-1111-1111-111111111111";
-    private const string FixedTenantId = "22222222-2222-2222-2222-222222222222";
+    private static readonly string FixedTenantId = Guid.CreateVersion7().ToString("D");
     private const string FixedEventId = "33333333-3333-3333-3333-333333333333";
     private readonly CurrentHumanPrincipalFixture _human = new(Guid.Parse(FixedUserId), Guid.Parse(FixedTenantId));
 

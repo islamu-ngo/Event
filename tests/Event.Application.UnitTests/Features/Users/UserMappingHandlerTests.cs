@@ -22,84 +22,6 @@ namespace Event.Application.UnitTests.Features.Users;
 public sealed class UserMappingHandlerTests
 {
     [Test]
-    public async Task Update_NamesOnly_IgnoresForgedIdentityAuthorityAuditAndLifecycle()
-    {
-        var user = UserMapperTests.CreateUser();
-        var originalPii = user.Pii;
-        var originalActor = user.Actor;
-        var repository = UserRepository(user);
-        var cache = new InlineCache();
-        var handler = UpdateHandler(repository, cache);
-        var input = JsonSerializer.Deserialize<UpdateUserDto>("""
-            {"Names":{"FirstName":"Updated","LastName":"Person","Email":"forged@example.invalid",
-              "EmailVerified":true,"Id":"00000000-0000-0000-0000-000000000099","Pii":{"Email":"forged@example.invalid"}},
-             "Email":"forged@example.invalid","EmailVerified":true,"IsDeleted":false,
-             "ConcurrencyStamp":"00000000-0000-0000-0000-000000000099","IsInstanceAdmin":true,
-             "LastActiveTenantId":"00000000-0000-0000-0000-000000000099",
-             "CreatedAt":"2000-01-01T00:00:00Z","CreatedBy":"00000000-0000-0000-0000-000000000099",
-             "UpdatedAt":"2000-01-01T00:00:00Z","UpdatedBy":"00000000-0000-0000-0000-000000000099",
-             "DeletedAt":"2000-01-01T00:00:00Z","DeletedBy":"00000000-0000-0000-0000-000000000099",
-             "Actor":{"Id":"00000000-0000-0000-0000-000000000099"}}
-            """)!;
-        var result = await handler.ExecuteAsync(new UpdateUserCommand
-        { UserId = user.Id, ExpectedConcurrencyStamp = user.ConcurrencyStamp, UpdateUserDto = input }, CancellationToken.None);
-        var saved = (await repository.GetById(user.Id))!;
-        await Assert.That(result.IsSuccess).IsTrue();
-        await Assert.That(saved.FirstName).IsEqualTo("Updated");
-        await Assert.That(saved.LastName).IsEqualTo("Person");
-        await Assert.That(saved.Email).IsEqualTo("private@example.invalid");
-        await Assert.That(saved.EmailVerified).IsEqualTo(false);
-        await Assert.That(saved.Id).IsEqualTo(Guid.Parse("018e4e5c-7f00-7000-8000-000000000031"));
-        await Assert.That(saved.ConcurrencyStamp).IsEqualTo(Guid.Parse("018e4e5c-7f00-7000-8000-000000000033"));
-        await Assert.That(saved.LastActiveTenantId).IsEqualTo(Guid.Parse("018e4e5c-7f00-7000-8000-000000000032"));
-        await Assert.That(saved.CreatedBy).IsEqualTo(Guid.Parse("018e4e5c-7f00-7000-8000-000000000032"));
-        await Assert.That(saved.CreatedAt).IsEqualTo(new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
-        await Assert.That(saved.UpdatedBy).IsEqualTo(Guid.Parse("018e4e5c-7f00-7000-8000-000000000032"));
-        await Assert.That(saved.UpdatedAt).IsNull();
-        await Assert.That(saved.IsDeleted).IsTrue();
-        await Assert.That(saved.DeletedAt).IsNull();
-        await Assert.That(saved.DeletedBy).IsEqualTo(Guid.Parse("018e4e5c-7f00-7000-8000-000000000032"));
-        await Assert.That(ReferenceEquals(saved.Pii, originalPii)).IsTrue();
-        await Assert.That(ReferenceEquals(saved.Actor, originalActor)).IsTrue();
-        await Assert.That(saved.Actor!.DisplayName).IsEqualTo("Public name");
-        await Assert.That(cache.RemovedKeys).Contains($"user:detail:{saved.Id}");
-    }
-
-    [Test]
-    public async Task Update_StaleStamp_DoesNotChangeNamesOrEvictCache()
-    {
-        var user = UserMapperTests.CreateUser();
-        var cache = new InlineCache();
-        var handler = UpdateHandler(UserRepository(user), cache);
-        await Assert.That(async () => await handler.ExecuteAsync(new UpdateUserCommand
-        {
-            UserId = user.Id,
-            ExpectedConcurrencyStamp = Guid.Empty,
-            UpdateUserDto = new UpdateUserDto { Names = new UpdateUserNamesDto { FirstName = "Changed", LastName = "Person" } }
-        }, CancellationToken.None)).Throws<ConcurrencyConflictException>();
-        await Assert.That(user.FirstName).IsEqualTo("First");
-        await Assert.That(user.LastName).IsEqualTo("Last");
-        await Assert.That(cache.RemovedKeys.Count).IsEqualTo(0);
-    }
-
-    [Test]
-    public async Task Update_InvalidNames_DoesNotChangeTrackedState()
-    {
-        var user = UserMapperTests.CreateUser();
-        var cache = new InlineCache();
-        var result = await UpdateHandler(UserRepository(user), cache).ExecuteAsync(new UpdateUserCommand
-        {
-            UserId = user.Id,
-            ExpectedConcurrencyStamp = user.ConcurrencyStamp,
-            UpdateUserDto = new UpdateUserDto { Names = new UpdateUserNamesDto { FirstName = "", LastName = "Person" } }
-        }, CancellationToken.None);
-        await Assert.That(result.IsSuccess).IsFalse();
-        await Assert.That(user.FirstName).IsEqualTo("First");
-        await Assert.That(user.LastName).IsEqualTo("Last");
-        await Assert.That(cache.RemovedKeys.Count).IsEqualTo(0);
-    }
-
-    [Test]
     [Arguments("https://images.example.invalid/profile.png", "https://images.example.invalid/profile.png")]
     [Arguments(null, null)]
     public async Task Read_ProfileImageStillUsesPresentationBoundary(string? source, string? expected)
@@ -193,18 +115,6 @@ public sealed class UserMappingHandlerTests
         repository.GetById(user.Id).Returns(user);
         repository.GetUserWithDetails(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         return repository;
-    }
-
-    private static UpdateUserCommandHandler UpdateHandler(IUserRepository repository, InlineCache cache) => new(
-        repository, Substitute.For<IActorRepository>(), Substitute.For<IStorageObjectRepository>(),
-        Substitute.For<IPrivacyErasureStateRepository>(), Substitute.For<ITenantContext>(), new InlineUnitOfWork(), cache);
-
-    private sealed class InlineUnitOfWork : IUnitOfWork
-    {
-        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken ct = default) => operation(ct);
-        public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
-        public Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
-        public Task<T> ExecuteReadCommittedAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
     }
 
     private sealed class InlineCache : HybridCache

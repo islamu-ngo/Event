@@ -202,8 +202,6 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
             if (resolution.Decision == IdentityCorrelationDecision.RecoveryRequired)
                 return ExplicitBindingRequired();
             User? user = resolution.User;
-            if (user is not null && providerKind != AuthenticationProviderKind.Local)
-                await _identityFence.EnsureSubjectMayEnrollAsync(user.Id, cancellationToken);
 
             // IDs generated before lambda — captured via closure for retry safety
             var newUserId = Guid.CreateVersion7();
@@ -246,6 +244,9 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 {
                     return ExplicitBindingRequired();
                 }
+
+                await _identityFence.MatchAndBindAsync(accountKey, user?.Id ?? newUserId, currentLogin?.Id ?? loginId,
+                    _tenantContext.TenantId, replacementProvisioning: currentLogin is null, ct);
 
                 if (user == null)
                 {
@@ -316,7 +317,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
             // Only the internal lifecycle receipt opts into the native store's existing transaction.
             // Both paths execute the same binding recheck and mirror writer; no second persistence boundary.
             var synchronization = request.LocalLifecycleSynchronization is null
-                ? await _unitOfWork.ExecuteBootstrapConvergenceAsync(SynchronizeAsync, cancellationToken)
+                ? await _unitOfWork.ExecuteRecognitionEnrollmentAsync(SynchronizeAsync,
+                    _identityFence.EnsureCurrentAsync, cancellationToken)
                 : await SynchronizeAsync(cancellationToken);
 
             if (synchronization.IsSuccess && request.LocalLifecycleSynchronization is null)

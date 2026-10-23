@@ -1,0 +1,302 @@
+@page "/moderation/policies"
+@using Microsoft.AspNetCore.Authorization
+@using Explore.Blazor.Client.Components.Moderation
+@using Explore.Blazor.Client.Models.Moderation
+@using Explore.Blazor.Client.Services.Moderation
+@attribute [Authorize]
+@rendermode InteractiveAuto
+@implements IDisposable
+
+<PageTitle>Moderation policy administration</PageTitle>
+
+<div class="policy-administration" aria-busy="@busy.ToString().ToLowerInvariant()">
+    <header class="policy-administration__header">
+        <h1>Moderation policy administration</h1>
+        <p>Define a complete policy, publish a draft or prepare a measurement candidate.
+            Native authority, deployment, prerequisites and conformance are separate from these declarations.</p>
+    </header>
+    <div class="policy-administration__toolbar">
+        <div>
+            <label for="policy-scope">Request scope</label>
+            <select id="policy-scope" value="@scope" @onchange="ChangeScopeAsync" disabled="@(!CanChangeScope)" aria-describedby="scope-help">
+                <option value="Tenant">Current request tenant</option>
+                <option value="Instance">Current request instance</option>
+            </select>
+            <p id="scope-help">Scope comes from the authenticated request context. Finish or explicitly replace local work before changing scope.</p>
+        </div>
+        <div>
+            <label for="policy-mode">Presentation</label>
+            <select id="policy-mode" @bind="displayMode" aria-describedby="mode-help">
+                <option value="Simple">Simple</option>
+                <option value="Advanced">Advanced</option>
+            </select>
+            <p id="mode-help">Advanced reveals coordinates. It never changes policy, rights, selections or deployment mode.</p>
+        </div>
+        <button id="read-current" type="button" disabled="@busy" @onclick="() => ReadAsync(true)">Read latest native observation</button>
+        @if (busy)
+        {
+            <button id="cancel-operation" type="button" @onclick="() => cancellation?.Cancel()">Cancel current request</button>
+        }
+    </div>
+    <p id="policy-status" role="status">@status</p>
+    @if (failure != ModerationPolicyAdministrationFailure.None)
+    {
+        <p id="policy-failure" role="alert" data-failure="@failure">@Explain(failure)</p>
+    }
+    @if (baseline is { } view)
+    {
+        <details class="policy-administration__observation">
+            <summary>Displayed current policy and every retained consequence plan</summary>
+            <ModerationCurrentPolicyPreview Policy="@view.Current" ShowAdvanced="@Advanced" />
+        </details>
+        @if (observed is { } latest)
+        {
+            <section class="policy-administration__panel" aria-labelledby="latest-heading">
+                <h2 id="latest-heading">Latest observation, separate from your editing baseline</h2>
+                <p>Policy @latest.Current.PolicyId, revision @latest.Current.ExpectedRevision, state @latest.Current.State.
+                    No local definition has been replaced.</p>
+                <details><summary>Compare latest complete policy</summary>
+                    <ModerationCurrentPolicyPreview Policy="@latest.Current" ShowAdvanced="@Advanced" />
+                </details>
+                <input id="confirm-replacement" type="checkbox" @bind="confirmReplacement" aria-describedby="replacement-help" />
+                <label for="confirm-replacement">Discard local work and any receipt recovery when starting from this observation</label>
+                <p id="replacement-help">Keep the exact receipt identity below before discarding. If commit status is uncertain, recover it first.</p>
+                <button id="replace-baseline" type="button" disabled="@(!confirmReplacement || busy)" @onclick="ReplaceFromObservation">
+                    Start again from latest observation
+                </button>
+            </section>
+        }
+        @if (state is null)
+        {
+            <section class="policy-administration__panel">
+                <h2>Uninitialized policy slot</h2>
+                <p>The prospective policy ID is unreserved. Reading does not create a policy. Local draft UUIDs are not native grants.</p>
+                <button id="create-policy" type="button" disabled="@busy" @onclick="CreatePolicy">Create a local policy proposal</button>
+            </section>
+        }
+        else
+        {
+            <fieldset class="policy-administration__editor" disabled="@EditingLocked">
+                <legend>Complete proposed policy</legend>
+                <p id="authoring-help">Every retained class, reason and profile is kept, including unselected definitions.
+                    Meaning changes append immutable semantic revisions. No template proves deployed support or activation readiness.</p>
+                <section class="policy-administration__panel">
+                    <h2>Inventory and native mode declaration</h2>
+                    <p>Proposal catalogue revision @state.Proposed.CatalogueRevision; inventory revision @state.Proposed.InventoryRevision.
+                        Installed catalogue @view.Current.InstalledCatalogueRevision; inventory @view.Current.InstalledInventoryRevision.</p>
+                    @if (Advanced)
+                    {
+                        <p>Proposal inventory fingerprint: @state.Proposed.InventoryFingerprint</p>
+                        <p>Installed inventory fingerprint: @view.Current.InstalledInventoryFingerprint</p>
+                    }
+                    <button id="align-inventory" type="button" @onclick="AlignInventory">Explicitly align proposal inventory coordinates</button>
+                    <p id="native-mode-help">Declare intended native modes independently of presentation. Remote strict requires native deployment
+                        and measurement; selecting it neither deploys a service nor proves it supported.</p>
+                    @foreach (var mode in Enum.GetValues<ModerationNativeMode>())
+                    {
+                        var id = $"native-mode-{mode}";
+                        <div><input id="@id" type="checkbox" checked="@state.Proposed.Modes.Contains(mode)"
+                            @onchange="args => ToggleMode(mode, args)" aria-describedby="native-mode-help" />
+                            <label for="@id">@mode</label></div>
+                    }
+                    <details>
+                        <summary>Native authoring ceilings and procedural floors</summary>
+                        <dl class="policy-administration__facts">
+                            <dt>Scope ceiling</dt><dd>@string.Join(", ", view.Current.AuthoringBounds.ScopeKinds)</dd>
+                            <dt>Subject ceiling</dt><dd>@string.Join(", ", view.Current.AuthoringBounds.SubjectKinds)</dd>
+                            <dt>Timing kinds</dt><dd>@string.Join(", ", view.Current.AuthoringBounds.TimingKinds)</dd>
+                            <dt>Maximum finite duration</dt><dd>@view.Current.AuthoringBounds.MaximumFiniteDuration</dd>
+                            <dt>Maximum review delay</dt><dd>@view.Current.AuthoringBounds.MaximumReviewDelay</dd>
+                            <dt>Approval bounds</dt><dd>@view.Current.AuthoringBounds.MinimumApprovals to @view.Current.AuthoringBounds.MaximumApprovals</dd>
+                            <dt>Contestation floor</dt><dd>@view.Current.AuthoringBounds.MinimumContestationCalendarMonths calendar months</dd>
+                        </dl>
+                        <p>These limits constrain selected declarations. Native validation, not this display, determines admissibility.</p>
+                    </details>
+                </section>
+                <section class="policy-administration__panel">
+                    <h2>Classes and immutable meanings</h2>
+                    <button id="add-class" type="button" disabled="@HasPendingEdit" @onclick="() => EditClass(null)">Add class</button>
+                    @foreach (var definition in state.Proposed.Classes)
+                    {
+                        <article class="policy-administration__definition" data-authoring-class="@definition.Reference.Code">
+                            <h3>@definition.Reference.Code, revision @definition.Reference.Revision</h3>
+                            <p>@definition.Meaning</p>
+                            <p>@definition.Ground / @definition.Basis</p>
+                            <button type="button" data-revise-class disabled="@HasPendingEdit" @onclick="() => EditClass(definition)">Append revised class meaning</button>
+                        </article>
+                    }
+                    @if (classOpen)
+                    {
+                        <form class="policy-administration__form" @onsubmit="SaveClass" @onsubmit:preventDefault>
+                            <h3>New class revision</h3>
+                            <label for="class-code">Class rule code</label>
+                            <input id="class-code" @bind="classCode" readonly="@(originalClass is not null)" required maxlength="100"
+                                pattern="[A-Za-z0-9._\x2D]+" aria-describedby="class-help edit-error" />
+                            <label for="class-meaning">Class meaning</label>
+                            <textarea id="class-meaning" @bind="classMeaning" required maxlength="4000" aria-describedby="class-help edit-error"></textarea>
+                            @if (originalClass is null)
+                            {
+                                <label for="class-template">Ground and basis pair from reference recipe</label>
+                                <select id="class-template" @bind="classTemplate" required aria-describedby="class-help edit-error">
+                                    <option value="">Choose ground and basis</option>
+                                    @foreach (var reference in view.ReferenceCatalogue.Profiles)
+                                    {
+                                        <option value="@reference.Id">@reference.Code - @reference.Ground / @reference.Basis</option>
+                                    }
+                                </select>
+                            }
+                            <p id="class-help">Ground and basis are immutable within a class family. A different pair requires a new code.</p>
+                            <p id="edit-error" role="alert">@editError</p>
+                            <button id="save-class" type="submit">Save class revision</button>
+                            <button type="button" @onclick="CancelEdit">Cancel class edit</button>
+                        </form>
+                    }
+                </section>
+                <section class="policy-administration__panel">
+                    <h2>Reasons and class links</h2>
+                    <button id="add-reason" type="button" disabled="@HasPendingEdit" @onclick="() => EditReason(null)">Add reason</button>
+                    @foreach (var definition in state.Proposed.Reasons)
+                    {
+                        <article class="policy-administration__definition" data-authoring-reason="@definition.Reference.Code">
+                            <h3>@definition.Reference.Code, revision @definition.Reference.Revision</h3>
+                            <p>@definition.Meaning</p>
+                            <p>Class @definition.Class.Code, revision @definition.Class.Revision</p>
+                            <button type="button" data-revise-reason disabled="@HasPendingEdit" @onclick="() => EditReason(definition)">Append revised reason meaning</button>
+                        </article>
+                    }
+                    @if (reasonOpen)
+                    {
+                        <form class="policy-administration__form" @onsubmit="SaveReason" @onsubmit:preventDefault>
+                            <h3>New reason revision</h3>
+                            <label for="reason-code">Reason rule code</label>
+                            <input id="reason-code" @bind="reasonCode" readonly="@(originalReason is not null)" required maxlength="100"
+                                pattern="[A-Za-z0-9._\x2D]+" aria-describedby="reason-help edit-error" />
+                            <label for="reason-meaning">Reason meaning</label>
+                            <textarea id="reason-meaning" @bind="reasonMeaning" required maxlength="4000" aria-describedby="reason-help edit-error"></textarea>
+                            <label for="reason-class">Class revision</label>
+                            <select id="reason-class" @bind="reasonClass" required aria-describedby="reason-help edit-error">
+                                <option value="">Choose class revision</option>
+                                @foreach (var classification in ReasonClasses)
+                                {
+                                    <option value="@PolicyAuthoringState.Key(classification.Reference)">@classification.Reference.Code, revision @classification.Reference.Revision</option>
+                                }
+                            </select>
+                            <p id="reason-help">A revised reason stays in its existing class family. To change family, add a new reason code.</p>
+                            <p id="edit-error" role="alert">@editError</p>
+                            <button id="save-reason" type="submit">Save reason revision</button>
+                            <button type="button" @onclick="CancelEdit">Cancel reason edit</button>
+                        </form>
+                    }
+                </section>
+                <section class="policy-administration__panel">
+                    <h2>All profile definitions and selected declarations</h2>
+                    <p id="selection-help">Selection is a supported-profile declaration only, not support evidence or active readiness.
+                        Original selected revisions stay selected when you append a revision unless you deliberately unselect them.</p>
+                    <button id="add-profile" type="button" disabled="@HasPendingEdit" @onclick="() => EditProfile(null)">Add complete profile</button>
+                    @foreach (var definition in state.Proposed.Profiles)
+                    {
+                        var id = $"select-profile-{definition.Id:D}";
+                        <article class="policy-administration__definition" data-authoring-profile="@definition.Rule.Code">
+                            <h3>@definition.Rule.Code, revision @definition.Rule.Revision</h3>
+                            <input id="@id" type="checkbox" checked="@state.Selected(definition.Rule)"
+                                @onchange="args => state.Select(definition.Rule, args.Value is true)" aria-describedby="selection-help" />
+                            <label for="@id">Declare this exact profile revision selected</label>
+                            <dl class="policy-administration__facts">
+                                <dt>Reference recipe</dt><dd>@definition.ReferenceProfile, revision @definition.ReferenceRevision</dd>
+                                <dt>Reason</dt><dd>@definition.Reason.Code, revision @definition.Reason.Revision</dd>
+                                <dt>Response</dt><dd>@definition.Grade / @definition.Timing.Kind / @definition.Timing.Duration</dd>
+                                <dt>Approvals</dt><dd>@definition.RequiredApprovals</dd>
+                                <dt>Contestation</dt><dd>@definition.ContestationCalendarMonths calendar months</dd>
+                                <dt>Scope coverage</dt><dd>@string.Join(", ", definition.ScopeKinds)</dd>
+                                <dt>Subject coverage</dt><dd>@string.Join(", ", definition.SubjectKinds)</dd>
+                                <dt>Recognition</dt><dd>@definition.Recognition</dd>
+                                <dt>Base bundle</dt><dd>@definition.Bundle</dd>
+                                <dt>Protective purpose</dt><dd>@definition.ProtectionPurpose</dd>
+                                <dt>All additive strategies</dt><dd>@string.Join(", ", definition.Strategies)</dd>
+                            </dl>
+                            <ul>
+                                @foreach (var effect in definition.Effects)
+                                {
+                                    <li>@effect.Kind / @effect.Mode / @effect.Target / @effect.Execution</li>
+                                }
+                            </ul>
+                            <button type="button" data-revise-profile disabled="@HasPendingEdit" @onclick="() => EditProfile(definition)">Append revised profile</button>
+                        </article>
+                    }
+                    @if (profileOpen)
+                    {
+                        <PolicyAuthoringProfile @key="originalProfile" State="@state" Catalogue="@view.ReferenceCatalogue"
+                            Bounds="@view.Current.AuthoringBounds" Original="@originalProfile" ShowAdvanced="@Advanced"
+                            Saved="SaveProfile" Cancelled="CancelEdit" />
+                    }
+                </section>
+            </fieldset>
+            <section class="policy-administration__panel" aria-labelledby="publication-heading">
+                <h2 id="publication-heading">Publish a draft or prepare a candidate</h2>
+                <p id="publication-help">The native service rechecks authority. Preparation is a separate operation for measurement;
+                    it never adopts or activates policy. No automatic refresh, rebase or retry occurs.</p>
+                @if (view.CanPublishDraft)
+                {
+                    <button id="publish-draft" type="button" disabled="@(EditingLocked || HasPendingEdit)" @onclick="() => PublishAsync(false)">Publish complete draft</button>
+                }
+                @if (view.CanPreparePublication)
+                {
+                    <label for="candidate-deadline">Candidate deadline with explicit UTC or offset</label>
+                    <input id="candidate-deadline" type="text" @bind="deadline" placeholder="2030-01-01T00:00:00Z"
+                        disabled="@EditingLocked" aria-describedby="publication-help policy-status" />
+                    <button id="prepare-publication" type="button" disabled="@(EditingLocked || HasPendingEdit)" @onclick="() => PublishAsync(true)">Prepare measurement candidate</button>
+                }
+                @if (!view.CanPublishDraft && !view.CanPreparePublication)
+                {
+                    <p>The current representation exposes neither action. Local drafting does not confer mutation authority.</p>
+                }
+            </section>
+        }
+    }
+    @if (operation is { } receipt)
+    {
+        <section class="policy-administration__panel" aria-labelledby="receipt-heading">
+            <h2 id="receipt-heading">Exact operation and receipt recovery</h2>
+            <dl class="policy-administration__facts">
+                <dt>Operation ID</dt><dd>@receipt.OperationId</dd>
+                <dt>Policy ID</dt><dd>@receipt.PolicyId</dd>
+                <dt>Publication or candidate ID</dt><dd>@receipt.PublicationId</dd>
+                <dt>Expected policy revision</dt><dd>@receipt.ExpectedRevision</dd>
+                <dt>Candidate deadline</dt><dd>@receipt.ValidUntil</dd>
+            </dl>
+            @if (result?.Publication is { } publication)
+            {
+                <p data-publication="@publication.Value.PublicationId">Draft publication observed: revision @publication.Value.Revision.
+                    Published active: @publication.Value.PublishedActive. This is a publication-instant observation.</p>
+            }
+            else if (result?.Candidate is { } candidate)
+            {
+                <p data-candidate="@candidate.Value.Id">Measurement candidate revision @candidate.Value.Revision,
+                    valid until @candidate.Value.ValidUntil. Not adopted and not active.</p>
+            }
+            else if (attempted)
+            {
+                <p data-operation-failure="@submissionFailure">@Explain(submissionFailure)</p>
+                <p>Edits are frozen while receipt recovery is open. Retry sends only the exact retained operation,
+                    including its original request body and identities; it never creates a new intent.</p>
+                <button id="retry-receipt" type="button" disabled="@busy" @onclick="RetryAsync">Deliberately recover this exact receipt</button>
+                @if (CanResumeAuthoring)
+                {
+                    <button id="resume-authoring" type="button" @onclick="ResumeAuthoring">Keep work and resume editing a new intent</button>
+                }
+            }
+        </section>
+    }
+    @if (rejectedOperations.Count > 0)
+    {
+        <details class="policy-administration__observation">
+            <summary>Retained previous operation identities</summary>
+            @foreach (var previous in rejectedOperations)
+            {
+                <p data-receipt-publication="@previous.PublicationId">Operation @previous.OperationId, policy @previous.PolicyId,
+                    publication/candidate @previous.PublicationId, expected revision @previous.ExpectedRevision.
+                    This identity is separate from any new editing intent.</p>
+            }
+        </details>
+    }
+</div>

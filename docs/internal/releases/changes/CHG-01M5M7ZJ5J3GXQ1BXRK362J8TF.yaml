@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5M7ZJ5J3GXQ1BXRK362J8TF
+Title: "author policy revisions without losing retained meanings"
+Type: feat
+Scope: access
+Summary: "Provide guided append-only policy editing and HAL-qualified draft or preparation submissions with frozen receipt identities and explicit retry, never implicit activation. Included service and component tests are unrun."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Policy authorship retains append-only meanings, HAL-qualified same-origin actions and frozen operation identities; exact retry is deliberate and preparation never activates a policy. Included service/component tests are UNRUN; provider assurance remains pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete shared authenticated registration/routes and matched generated contracts before deployment. Draft publication and measurement preparation do not certify activation; main owns public/internal administrative guidance and verification."

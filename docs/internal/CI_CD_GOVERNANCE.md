@@ -17,6 +17,21 @@ Do not symlink `.github` to `.ci`. GitHub discovers workflows from `.github/work
 
 Workflow YAML defines what runs; repository settings define which checks are required, which environments require approval, and which organization security features are enabled.
 
+## Native build and test selection
+
+`Build & Test` consumes `select-build-test-changes` from the existing release
+engineering executable. The workflow accepts exactly eight unique boolean
+decisions and rejects malformed, missing or inconsistent output before exporting
+job outputs. The native selector independently chooses Architecture for both
+configuration schema artifacts and their generator; only root README and public
+Markdown qualify for a complete no-op. Unknown paths, shared fixtures, central
+build/CI inputs, AppHost, benchmarks and uncertain diff inputs select every lane.
+Known project changes retain their affected subsystem lanes and conservatively
+include the Setup gate when its shared application, persistence or UI contracts
+can change. The fast reusable workflow runs the distributed project's pure
+`Harness` category; real `Distributed` and browser execution require their
+separate runtime evidence and are never inferred from Harness results.
+
 ## Security integration fixture execution
 
 The security workflow runs the complete `Category=Security` selection with

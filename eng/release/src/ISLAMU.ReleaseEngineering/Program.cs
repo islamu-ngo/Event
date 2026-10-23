@@ -43,6 +43,11 @@ public static class Program
             return SecurityChangeSelection.Run(args, output);
         }
 
+        if (string.Equals(args[0], "select-build-test-changes", StringComparison.Ordinal))
+        {
+            return SecurityChangeSelection.RunBuildTest(args, output);
+        }
+
         if (string.Equals(args[0], "verify-security-register", StringComparison.Ordinal))
         {
             return SecurityControlRegister.Run(args, output);

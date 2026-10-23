@@ -3,6 +3,121 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class SecurityChangeSelectionTests
 {
     [Test]
+    [Arguments("README.md\ndocs/public/guide.md\n", "")]
+    [Arguments("schemas/configuration-manifest-v1alpha2.schema.json", "architecture")]
+    [Arguments("schemas/tenant-configuration-package-v1alpha2.schema.json", "architecture")]
+    [Arguments("eng/configuration-manifest-schema/Program.cs", "architecture")]
+    [Arguments("src/Explore.Domain/Entities/Event.cs", "app,domain,architecture,setup,infrastructure")]
+    [Arguments("tests/Event.Domain.UnitTests/Entities/EventTests.cs", "app,domain,architecture,setup,infrastructure")]
+    [Arguments("src/Explore.Application/Features/EventQuery.cs", "app,architecture,setup,infrastructure")]
+    [Arguments("tests/Event.API.IntegrationTests/Features/EventTests.cs", "app,architecture,setup,infrastructure")]
+    [Arguments("src/Explore.Persistence/ExploreDbContext.cs", "architecture,setup,infrastructure")]
+    [Arguments("src/Explore.Infrastructure/Services/EventService.cs", "architecture,setup,infrastructure")]
+    [Arguments("src/Explore.Secrets/Services/SecretResolver.cs", "architecture,setup,infrastructure,secrets")]
+    [Arguments("src/Explore.Blazor.Client/Pages/Event.razor", "architecture,setup,blazor")]
+    [Arguments("src/Event.Web.BffHosting/Hosting.cs", "architecture,setup,blazor")]
+    [Arguments("src/Event.Wire.Contracts/SetupLive/SetupRequest.cs", "architecture,setup")]
+    [Arguments("tests/Event.Wire.Contracts.UnitTests/Fixtures/Configurator/settings.json", "architecture,setup")]
+    [Arguments("tests/Explore.GeneratedContracts.Tests/ContractTests.cs", "architecture")]
+    [Arguments("src/Explore.Diagnostic/Program.cs", "architecture")]
+    [Arguments("src/Event.Standalone/Program.cs", "architecture,setup,infrastructure,blazor")]
+    [Arguments("tests/Event.Architecture.Tests/ConfigurationManifestSchemaArtifactTests.cs", "architecture")]
+    [Arguments("src/Explore.AppHost/AppHost.cs", "all")]
+    [Arguments("tests/Event.Benchmarks/Program.cs", "all")]
+    [Arguments("tests/Event.Distributed.IntegrationTests/OwnedAppHostFixture.cs", "all")]
+    [Arguments("tests/Shared/ExternalDataProtectionTestAuthority.cs", "all")]
+    [Arguments("tests/Event.Persistence.IntegrationTests/Fixtures/SharedContract.cs\nsrc/Event.Wire.Contracts/SharedContract.cs", "architecture,setup,infrastructure")]
+    [Arguments("Directory.Build.targets", "all")]
+    [Arguments("src/Explore.Application/Explore.Application.csproj", "all")]
+    [Arguments("src/Explore.Application/packages.lock.json", "all")]
+    [Arguments("eng/configuration-manifest-schema/ISLAMU.ConfigurationManifestSchema.csproj", "all")]
+    [Arguments("tests/Event.Domain.UnitTests/Directory.Build.props", "all")]
+    [Arguments("Directory.Packages.props", "all")]
+    [Arguments("global.json", "all")]
+    [Arguments("NuGet.Config", "all")]
+    [Arguments("Explore.slnx", "all")]
+    [Arguments(".github/workflows/test.yml", "all")]
+    [Arguments(".ci/scripts/check.cs", "all")]
+    [Arguments("cerbos/policies/event.yaml", "all")]
+    [Arguments("docker/keycloak/realm.json", "all")]
+    [Arguments("unknown/component", "all")]
+    [Arguments("docs/public/../../src/Contract.md", "all")]
+    [Arguments("docs/public//guide.md", "all")]
+    [Arguments("docs/public/guide\\example.md", "all")]
+    [Arguments("docs/public/guide.md ", "all")]
+    [Arguments("README.md\nunknown/component", "all")]
+    [Arguments("README.md\n\nschemas/configuration-manifest-v1alpha2.schema.json", "all")]
+    [Arguments("", "all")]
+    [Arguments("\n", "all")]
+    public async Task BuildCommandEmitsExactIndependentLaneDecisions(string paths, string expectedLanes)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"build-selection-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string file = Path.Combine(directory, "changed-paths.txt");
+            await File.WriteAllTextAsync(file, paths);
+            await AssertBuildCommand(["select-build-test-changes", file], expectedLanes);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    [Arguments("missing")]
+    [Arguments("directory")]
+    [Arguments("invalid-utf8")]
+    [Arguments("invalid-path")]
+    [Arguments("no-arguments")]
+    [Arguments("extra-arguments")]
+    public async Task UncertainBuildInputsSelectEveryLane(string variant)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"build-selection-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string file = Path.Combine(directory, "changed-paths.txt");
+            if (variant == "invalid-utf8")
+            {
+                await File.WriteAllBytesAsync(file, [.. System.Text.Encoding.UTF8.GetBytes("docs/public/"), 0xFF, 0x0A]);
+            }
+
+            string[] arguments = variant switch
+            {
+                "directory" => ["select-build-test-changes", directory],
+                "invalid-path" => ["select-build-test-changes", "invalid\0path"],
+                "no-arguments" => ["select-build-test-changes"],
+                "extra-arguments" => ["select-build-test-changes", file, "extra"],
+                _ => ["select-build-test-changes", file]
+            };
+            await AssertBuildCommand(arguments, "all");
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static async Task AssertBuildCommand(string[] arguments, string expectedLanes)
+    {
+        using var output = new StringWriter();
+        int code = Program.Run(arguments, output);
+        await Assert.That(code).IsEqualTo(Program.Success);
+
+        string[] lines = output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        await Assert.That(lines.Length).IsEqualTo(8);
+        Dictionary<string, string> decisions = lines.Select(line => line.Split('=')).ToDictionary(parts => parts[0], parts => parts[1]);
+        await Assert.That(decisions["run-tests"]).IsEqualTo(expectedLanes.Length > 0 ? "true" : "false");
+        foreach (string lane in new[] { "app", "domain", "architecture", "setup", "infrastructure", "blazor", "secrets" })
+        {
+            bool expected = expectedLanes == "all" || expectedLanes.Split(',').Contains(lane, StringComparer.Ordinal);
+            await Assert.That(decisions[$"run-{lane}-tests"]).IsEqualTo(expected ? "true" : "false");
+        }
+    }
+
+    [Test]
     [Arguments("src/Explore.API/Hosting/ApiHostApplicationExtensions.cs")]
     [Arguments("src/Explore.API/Authentication/DynamicJwtBearerPostConfigureOptions.cs")]
     [Arguments("src/Event.Standalone/Hosting/StandaloneHostApplicationExtensions.cs")]

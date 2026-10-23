@@ -139,7 +139,8 @@ static void GenerateSqliteCorrectiveMigration(
     Assembly relational, object model, IServiceProvider contextServices, Type generatorType, object generator,
     Type contextType, string migrationDirectory, string migrationId)
 {
-    if (!Regex.IsMatch(migrationId, @"\A[0-9]{14}_[A-Za-z_][A-Za-z0-9_]*\z"))
+    if (!Regex.IsMatch(migrationId, @"\A[0-9]{14}_[A-Za-z_][A-Za-z0-9_]*\z",
+            RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))
         throw new ArgumentException("Supply an explicit timestamped migration ID with a simple C# identifier.");
     Type idType = relational.GetType("Microsoft.EntityFrameworkCore.Migrations.IMigrationsIdGenerator", throwOnError: true)!;
     object ids = contextServices.GetService(idType)

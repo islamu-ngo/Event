@@ -87,6 +87,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEventSessionService, EventSessionService>();
         services.AddScoped<IEventOrganizerClaimService, EventOrganizerClaimService>();
         services.AddScoped<IEventModerationService, EventModerationService>();
+        services.AddScoped<Explore.Blazor.Client.Services.Moderation.PreFindingNoticeService>();
+        services.AddScoped(provider => new Explore.Blazor.Client.Services.Moderation.ModerationClassificationMaterialService(
+            provider.GetRequiredService<Explore.Blazor.Client.Clients.IModerationClassificationMaterialInventoryClient>(),
+            provider.GetRequiredService<Explore.Blazor.Client.Clients.IModerationClassificationMaterialReviewClient>(),
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(Explore.Blazor.Client.Clients.IModerationClassificationMaterialInventoryClient))));
+        services.AddScoped(provider => new Explore.Blazor.Client.Services.Moderation.ModerationPolicyAdministrationService(
+            provider.GetRequiredService<Explore.Blazor.Client.Clients.IModerationCurrentPolicyClient>(),
+            provider.GetRequiredService<Explore.Blazor.Client.Clients.IModerationReferenceCatalogueClient>(),
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(Explore.Blazor.Client.Clients.IModerationCurrentPolicyClient))));
         services.AddScoped<IRegistrationOrderService, RegistrationOrderService>();
         services.AddScoped<IAnonymousRegistrationChallengeSolver, AnonymousRegistrationChallengeSolver>();
         services.AddScoped<IRegistrationPaymentService, RegistrationPaymentService>();
@@ -110,6 +119,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<Explore.Blazor.Client.Services.EventTemplateSync.IEventTemplateSyncService, EventTemplateSyncService>();
         services.AddScoped<Explore.Blazor.Client.Services.EventSessionTemplateSync.IEventSessionTemplateSyncService, EventSessionTemplateSyncService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IUserProfileCompletionService, UserProfileCompletionService>();
         services.AddScoped<ISupportAccessClientService, SupportAccessClientService>();
         services.AddScoped<IAiAssistantClientService, AiAssistantClientService>();
         services.AddScoped<IOrganizationReviewService, OrganizationReviewService>();

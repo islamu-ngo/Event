@@ -18,7 +18,7 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 
 [RequiresRetainingReadDatabase]
 [NotInParallel("PrimaryDatabaseProviderBehaviorContract")]
-public sealed class EventAuthorityPlanningProviderTests
+public sealed partial class EventAuthorityPlanningProviderTests
 {
     private static readonly DateTime Now = new(2040, 1, 1, 12, 0, 0, DateTimeKind.Utc);
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(30);
@@ -173,7 +173,111 @@ public sealed class EventAuthorityPlanningProviderTests
         }
     }
 
-    private sealed class BeforeFence(Type entityType) : DbCommandInterceptor
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task A_role_source_writer_can_finish_before_the_planner_takes_its_role_anchor(bool multipleHumans)
+    {
+        var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
+        await fixture.PrepareAsync();
+        using var timeout = new CancellationTokenSource(Deadline);
+        var token = timeout.Token;
+        var tenant = new Tenant
+        {
+            Id = Guid.CreateVersion7(), Slug = $"role-planning-{Guid.CreateVersion7():N}", FullName = "Role planning",
+            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+        };
+        var user = new User
+        {
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii { Email = $"role-planning-{Guid.CreateVersion7():N}@example.test", FirstName = "Role", LastName = "Planner" }
+        };
+        var actor = new Actor
+        {
+            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, User = user,
+            Pii = new ActorPii { DisplayName = "Role planner" }
+        };
+        var entity = new Explore.Domain.Event(EventStatusEnum.Published)
+        {
+            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
+            OrganizerActorId = actor.Id, Title = "Before role-source write", PublicCode = Guid.CreateVersion7().ToString("N")[..12],
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!, Timezone = "UTC"
+        };
+        var second = new User
+        {
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii { Email = $"second-role-{Guid.CreateVersion7():N}@example.test", FirstName = "Second", LastName = "Planner" }
+        };
+        int protectedRole = (int)(multipleHumans ? RoleEnum.EventOwner : RoleEnum.EventManager);
+        Guid protectedUser = multipleHumans ? second.Id : user.Id;
+        var assignment = EventRoleAssignment.Create(tenant.Id, entity.Id, protectedUser, protectedRole,
+            EventRoleAssignmentStatus.Active, Now.AddDays(-1), Now.AddDays(1), user.Id);
+        await using (var seed = fixture.CreateSystemContext())
+        {
+            seed.Add(entity);
+            if (multipleHumans)
+            {
+                seed.Add(second);
+                seed.Add(EventRoleAssignment.Create(tenant.Id, entity.Id, user.Id, (int)RoleEnum.EventManager,
+                    EventRoleAssignmentStatus.Active, Now.AddDays(-1), Now.AddDays(1), user.Id));
+            }
+            seed.Add(assignment);
+            await seed.SaveChangesAsync(token);
+        }
+        var beforeRole = new BeforeFence(typeof(Role), protectedRole);
+        await using var writer = fixture.CreateTenantContext(tenant.Id);
+        await using var reviewer = fixture.CreateTenantContext(tenant.Id, beforeRole);
+        var roleHeld = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var continueWriter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task write = new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>
+        {
+            await Explore.Persistence.Database.RelationalEntityRowFence.AcquireLookupAsync<Role>(
+                writer, [protectedRole], ct);
+            roleHeld.TrySetResult();
+            await continueWriter.Task.WaitAsync(Deadline, ct);
+            var detached = await writer.Events.AsNoTracking().SingleAsync(row => row.Id == entity.Id, ct);
+            detached.Title = "After role-source write";
+            await new EventRepository(writer).Update(detached);
+            var grant = await writer.EventRoleAssignments.SingleAsync(row => row.Id == assignment.Id, ct);
+            grant.Revoke(user.Id, Now);
+            await writer.SaveChangesAsync(ct);
+            return true;
+        }, token);
+        Task<EventAuthoritySnapshot>? review = null;
+        try
+        {
+            await roleHeld.Task.WaitAsync(Deadline, token);
+            review = new EfCoreUnitOfWork(reviewer).ExecuteSerializableAsync(async ct =>
+            {
+                var service = new EventAuthoritySnapshotService(reviewer);
+                if (!multipleHumans)
+                    return await service.GetCommitBoundForUserAndEventsAsync(tenant.Id, user.Id, [entity.Id], Now, ct);
+                var all = await service.GetCommitBoundForUsersAndEventsAsync(
+                    tenant.Id, [user.Id, second.Id], [entity.Id], Now, ct);
+                return all[protectedUser];
+            }, token);
+            await beforeRole.Reached.WaitAsync(Deadline, token);
+            continueWriter.TrySetResult();
+            // Role-before-Actor writers must not wait on an Actor retained by this planner.
+            await write.WaitAsync(Deadline, token);
+        }
+        finally
+        {
+            continueWriter.TrySetResult();
+            beforeRole.Release();
+            await Task.WhenAll(write, (Task?)review ?? Task.CompletedTask).WaitAsync(Deadline);
+        }
+        var snapshot = await review!;
+        await Assert.That(snapshot.Events[entity.Id].IsManager).IsFalse();
+        await Assert.That(snapshot.Events[entity.Id].IsOwner).IsFalse();
+        await using var current = fixture.CreateTenantContext(tenant.Id);
+        await Assert.That((await current.Events.SingleAsync(row => row.Id == entity.Id, token)).Title)
+            .IsEqualTo("After role-source write");
+    }
+
+    private sealed class BeforeFence(Type entityType, int? sourceKey = null) : DbCommandInterceptor
     {
         private readonly TaskCompletionSource _reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -191,6 +295,7 @@ public sealed class EventAuthorityPlanningProviderTests
             string table = context.GetService<ISqlGenerationHelper>()
                 .DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
             if (!command.CommandText.Contains(table, StringComparison.Ordinal)
+                || sourceKey is { } key && !command.Parameters.Cast<DbParameter>().Any(parameter => parameter.Value is int value && value == key)
                 || !(command.CommandText.StartsWith($"UPDATE {table}", StringComparison.Ordinal)
                     || command.CommandText.Contains("FOR UPDATE", StringComparison.Ordinal)
                     || command.CommandText.Contains("UPDLOCK", StringComparison.Ordinal)))

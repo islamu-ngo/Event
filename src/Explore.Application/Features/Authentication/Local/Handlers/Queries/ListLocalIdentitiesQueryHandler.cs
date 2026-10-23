@@ -1,8 +1,6 @@
 
-using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Authentication.Local.Requests.Queries;
 using FluentValidation.Results;
@@ -11,36 +9,27 @@ namespace Explore.Application.Features.Authentication.Local.Handlers.Queries;
 
 public sealed class ListLocalIdentitiesQueryHandler(
     IAdminContext adminContext,
-    IPlatformUserRoleRepository platformUserRoles,
-    ILocalCredentialAdministration credentialAdministration) : IQueryHandler<ListLocalIdentitiesQuery, LocalIdentityPage>
+    ILocalHumanCredentialAdministration credentialAdministration,
+    ILocalAdministrationPreparation preparation) : IQueryHandler<ListLocalIdentitiesQuery, LocalIdentityPage>
 {
     public async Task<LocalIdentityPage> QueryAsync(ListLocalIdentitiesQuery request, CancellationToken cancellationToken = default)
     {
-        Guid? actor = await LocalCredentialAdministrator.ResolveAsync(
-            adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
+        var original = await LocalCredentialAdministrator.ResolveAsync(
+            adminContext, preparation, request, cancellationToken)
             .ConfigureAwait(false);
-        if (actor is null)
+        if (original is null)
         {
             throw new AuthorizationException(message: "Instance credential administration is required.");
         }
-        LocalIdentityListRequest read;
         try
         {
-            read = new LocalIdentityListRequest(pageNumber: request.PageNumber, pageSize: request.PageSize);
+            _ = new LocalIdentityListRequest(pageNumber: request.PageNumber, pageSize: request.PageSize);
         }
         catch (Exception exception) when (exception is ArgumentOutOfRangeException or OverflowException)
         {
             throw new ValidationException(new ValidationResult(
                 [new ValidationFailure(propertyName: nameof(request.PageNumber), errorMessage: "Pagination is outside its permitted bounds.")]));
         }
-        LocalIdentityPage page = await credentialAdministration.ListAsync(read, cancellationToken).ConfigureAwait(false);
-        Guid? current = await LocalCredentialAdministrator.ResolveAsync(
-            adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-        if (current != actor)
-        {
-            throw new AuthorizationException(message: "Instance credential administration is required.");
-        }
-        return page;
+        return await credentialAdministration.ListAsync(original, request, cancellationToken).ConfigureAwait(false);
     }
 }

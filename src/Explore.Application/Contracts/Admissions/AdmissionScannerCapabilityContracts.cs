@@ -23,7 +23,7 @@ public sealed record AdmissionScannerCapabilityIssueRequest(
     IReadOnlyList<AdmissionCheckInAction> Actions,
     string DeviceLabel,
     DateTimeOffset ExpiresAtUtc,
-    Guid IssuedByActorId);
+    Guid IssuedByUserId);
 
 public sealed record AdmissionScannerCapabilityReadRequest(
     Guid TenantId,
@@ -33,7 +33,7 @@ public sealed record AdmissionScannerCapabilityRevokeRequest(
     Guid TenantId,
     Guid EventId,
     Guid ScannerCapabilityId,
-    Guid RevokedByActorId,
+    Guid RevokedByUserId,
     string Reason);
 
 public sealed record AdmissionScannerCapabilityMaterialRequest(
@@ -186,10 +186,6 @@ public interface IAdmissionScannerCapabilityRepository
         Guid tenantId,
         Guid eventId,
         Guid targetId,
-        CancellationToken cancellationToken);
-
-    Task<AdmissionScannerCapability?> FindByDigestCandidatesAsync(
-        IReadOnlyList<AdmissionScannerCapabilityDigestCandidate> candidates,
         CancellationToken cancellationToken);
 
     Task<AdmissionScannerCapability> UpdateAsync(

@@ -3,9 +3,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
-using Explore.Application.Authorization;
+using Event.Api.IntegrationTests.Seeds;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Webhooks;
+using Explore.Application.Services.Webhooks;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Infrastructure.Configuration;
@@ -134,6 +135,266 @@ public sealed class WebhookPortalHttpContainmentTests
     }
 
     [Test]
+    [Arguments(false, "owner")]
+    [Arguments(true, "owner")]
+    [Arguments(false, "provider")]
+    [Arguments(true, "provider")]
+    [Arguments(false, "binding")]
+    [Arguments(true, "binding")]
+    [Arguments(false, "replacement")]
+    [Arguments(true, "replacement")]
+    [Arguments(false, "missing")]
+    [Arguments(true, "missing")]
+    [Arguments(false, "repair")]
+    [Arguments(true, "repair")]
+    [Arguments(false, "capabilities")]
+    [Arguments(true, "capabilities")]
+    [Arguments(false, "disabled")]
+    [Arguments(true, "disabled")]
+    public async Task PersistedCustodyChangesWhileProviderPaused_ReturnNoPortalData(
+        bool pauseCreation,
+        string mutation)
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var svixClient = Substitute.For<ISvixWebhookClient>();
+        await using var factory = CreateFactory(svixClient);
+        using var client = factory.CreateClient();
+        var binding = (await SeedConsumerAsync(factory, includeBinding: true))!;
+        ConfigureVerifiedProvider(svixClient, binding);
+        var verifiedApplication = new SvixApplicationBindingResult(
+            binding.ExternalApplicationId!,
+            binding.ApplicationUid,
+            new Dictionary<string, string>
+            {
+                ["islamu.tenant_id"] = TenantId.ToString("D"),
+                ["islamu.consumer_id"] = ConsumerId.ToString("D"),
+                ["islamu.owner_id"] = TenantId.ToString("D"),
+                ["islamu.owner_kind_id"] = ((int)WebhookConsumerKind.Tenant)
+                    .ToString(System.Globalization.CultureInfo.InvariantCulture)
+            });
+        var providerToken = Guid.CreateVersion7().ToString("N");
+        var creationEntered = false;
+        svixClient.GetApplicationAsync(binding.ExternalApplicationId!, Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                if (!pauseCreation)
+                {
+                    entered.TrySetResult();
+                    await release.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+
+                return verifiedApplication;
+            });
+        svixClient.CreateAppPortalAccessAsync(
+                Arg.Any<SvixAppPortalAccessRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                creationEntered = true;
+                if (pauseCreation)
+                {
+                    entered.TrySetResult();
+                    await release.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+
+                return new SvixAppPortalAccessResult(PortalUrl, providerToken);
+            });
+
+        var responseTask = SendPortalRequestAsync(client);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await ChangePersistedCustodyAsync(factory, mutation);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        using var response = await responseTask.WaitAsync(TimeSpan.FromSeconds(10));
+        var body = await response.Content.ReadAsStringAsync();
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+        await AssertSafeProblemAsync(response, body);
+        await Assert.That(body).DoesNotContain(providerToken, StringComparison.Ordinal);
+        await Assert.That(creationEntered).IsEqualTo(pauseCreation);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PersistedCustodyUnchangedWhileProviderPaused_ReleasesPortalData(bool pauseCreation)
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var svixClient = Substitute.For<ISvixWebhookClient>();
+        await using var factory = CreateFactory(svixClient);
+        using var client = factory.CreateClient();
+        var binding = (await SeedConsumerAsync(factory, includeBinding: true))!;
+        ConfigureVerifiedProvider(svixClient, binding);
+        var verifiedApplication = await svixClient.GetApplicationAsync(
+            binding.ExternalApplicationId!, CancellationToken.None);
+        var providerToken = Guid.CreateVersion7().ToString("N");
+        svixClient.GetApplicationAsync(binding.ExternalApplicationId!, Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                if (!pauseCreation)
+                {
+                    entered.TrySetResult();
+                    await release.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+
+                return verifiedApplication;
+            });
+        svixClient.CreateAppPortalAccessAsync(
+                Arg.Any<SvixAppPortalAccessRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                if (pauseCreation)
+                {
+                    entered.TrySetResult();
+                    await release.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+
+                return new SvixAppPortalAccessResult(PortalUrl, providerToken);
+            });
+
+        var responseTask = SendPortalRequestAsync(client);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await ChangePersistedCustodyAsync(factory, "name");
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        using var response = await responseTask.WaitAsync(TimeSpan.FromSeconds(10));
+        var body = await response.Content.ReadAsStringAsync();
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+        await Assert.That(body).Contains(providerToken, StringComparison.Ordinal);
+    }
+
+    private static async Task ChangePersistedCustodyAsync(PortalFactory factory, string mutation)
+    {
+        await using var peerScope = factory.Services.CreateAsyncScope();
+        var database = peerScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var consumer = await database.WebhookConsumers.SingleAsync(row => row.Id == ConsumerId);
+        var binding = await database.WebhookConsumerProviderBindings
+            .SingleAsync(row => row.WebhookConsumerId == ConsumerId);
+        switch (mutation)
+        {
+            case "owner":
+                var newOwner = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(database);
+                consumer.ConsumerKind = WebhookConsumerKind.User;
+                consumer.OwnerUserId = newOwner.UserId;
+                break;
+            case "provider":
+                consumer.ChangeProviderMode(WebhookProviderMode.Composite, DateTime.UtcNow);
+                break;
+            case "binding":
+                binding.Disable();
+                break;
+            case "replacement":
+                database.WebhookConsumerProviderBindings.Remove(binding);
+                await database.SaveChangesAsync();
+                var replacement = WebhookConsumerProviderBinding.CreatePending(
+                    binding.TenantId,
+                    binding.WebhookConsumerId,
+                    binding.InstanceId,
+                    binding.ProviderEnvironment,
+                    WebhookProviderCapabilityProfile.Create(
+                        binding.ProviderKind,
+                        binding.ProviderVersion,
+                        binding.Capabilities,
+                        binding.CapabilityResolutionVersion,
+                        binding.CapabilitiesResolvedAtUtc),
+                    binding.GovernanceAllowedCapabilities);
+                replacement.VerifyOwnership(
+                    TenantId, ConsumerId, binding.ExternalApplicationId!, DateTimeOffset.UtcNow);
+                database.WebhookConsumerProviderBindings.Add(replacement);
+                break;
+            case "missing":
+                database.WebhookConsumerProviderBindings.Remove(binding);
+                break;
+            case "repair":
+                binding.RepairAndVerifyOwnership(
+                    binding.InstanceId,
+                    TenantId,
+                    ConsumerId,
+                    binding.ExternalApplicationId!,
+                    WebhookProviderCapabilityProfile.Create(
+                        binding.ProviderKind,
+                        binding.ProviderVersion,
+                        binding.Capabilities,
+                        binding.CapabilityResolutionVersion,
+                        DateTimeOffset.UtcNow),
+                    binding.GovernanceAllowedCapabilities,
+                    DateTimeOffset.UtcNow);
+                break;
+            case "capabilities":
+                binding.ReplaceCapabilityResolution(
+                    WebhookProviderCapabilityProfile.Create(
+                        binding.ProviderKind,
+                        binding.ProviderVersion,
+                        binding.Capabilities,
+                        binding.CapabilityResolutionVersion,
+                        DateTimeOffset.UtcNow),
+                    WebhookProviderCapability.AppPortal);
+                break;
+            case "disabled":
+                consumer.Status = WebhookConsumerStatus.Disabled;
+                break;
+            case "name":
+                consumer.Name = "Renamed without changing portal authority";
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+
+        await database.SaveChangesAsync();
+    }
+
+    [Test]
+    [Arguments("owner")]
+    [Arguments("binding")]
+    [Arguments("capabilities")]
+    public async Task PersistedCustodyChangesDuringAudit_ReturnNoPortalData(string mutation)
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var svixClient = Substitute.For<ISvixWebhookClient>();
+        await using var factory = CreateFactory(svixClient, afterAudit: async () =>
+        {
+            entered.TrySetResult();
+            await release.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        });
+        using var client = factory.CreateClient();
+        var binding = (await SeedConsumerAsync(factory, includeBinding: true))!;
+        ConfigureVerifiedProvider(svixClient, binding);
+        var responseTask = SendPortalRequestAsync(client);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await ChangePersistedCustodyAsync(factory, mutation);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        using var response = await responseTask.WaitAsync(TimeSpan.FromSeconds(10));
+        var body = await response.Content.ReadAsStringAsync();
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+        await AssertSafeProblemAsync(response, body);
+    }
+
+    [Test]
     public async Task AuditFailure_ReturnsNoPortalData()
     {
         var svixClient = Substitute.For<ISvixWebhookClient>();
@@ -156,7 +417,8 @@ public sealed class WebhookPortalHttpContainmentTests
 
     private static PortalFactory CreateFactory(
         ISvixWebhookClient svixClient,
-        IWebhookAuditEventWriter? auditWriter = null)
+        IWebhookAuditEventWriter? auditWriter = null,
+        Func<Task>? afterAudit = null)
     {
         var authorizationProvider = Substitute.For<IAuthorizationProvider>();
         authorizationProvider.AuthorizeAsync(
@@ -171,7 +433,7 @@ public sealed class WebhookPortalHttpContainmentTests
                     .Select(_ => AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local))
                     .ToArray()));
 
-        var factory = new PortalFactory(svixClient, auditWriter)
+        var factory = new PortalFactory(svixClient, auditWriter, afterAudit)
         {
             AuthorizationProviderOverride = authorizationProvider,
             SeedActiveDefaultTenant = true
@@ -294,7 +556,8 @@ public sealed class WebhookPortalHttpContainmentTests
 
     private sealed class PortalFactory(
         ISvixWebhookClient svixClient,
-        IWebhookAuditEventWriter? auditWriter) : AuthenticatedWebApplicationFactory
+        IWebhookAuditEventWriter? auditWriter,
+        Func<Task>? afterAudit) : AuthenticatedWebApplicationFactory
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -309,7 +572,32 @@ public sealed class WebhookPortalHttpContainmentTests
                     services.RemoveAll<IWebhookAuditEventWriter>();
                     services.AddScoped(_ => auditWriter);
                 }
+                else if (afterAudit is not null)
+                {
+                    services.RemoveAll<IWebhookAuditEventWriter>();
+                    services.AddScoped<IWebhookAuditEventWriter>(provider => new PausingAuditWriter(
+                        ActivatorUtilities.CreateInstance<WebhookAuditEventWriter>(provider),
+                        afterAudit));
+                }
             });
+        }
+    }
+
+    private sealed class PausingAuditWriter(
+        IWebhookAuditEventWriter writer,
+        Func<Task> afterAudit) : IWebhookAuditEventWriter
+    {
+        public async Task<WebhookAuditEvent> AppendAsync(
+            WebhookAuditWriteRequest request,
+            CancellationToken cancellationToken)
+        {
+            var auditEvent = await writer.AppendAsync(request, cancellationToken);
+            if (request.Action == WebhookAuditAction.PortalAccessIssued)
+            {
+                await afterAudit();
+            }
+
+            return auditEvent;
         }
     }
 }

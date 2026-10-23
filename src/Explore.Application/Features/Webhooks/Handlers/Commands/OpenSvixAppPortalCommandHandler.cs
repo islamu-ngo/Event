@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;
@@ -12,7 +13,9 @@ namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 public sealed class OpenSvixAppPortalCommandHandler(
     IWebhookProviderPortalService portalService,
     IWebhookAuditEventWriter auditWriter,
-    IWebhookConsumerRepository consumerRepository)
+    IWebhookConsumerRepository consumerRepository,
+    IHumanWebhookMutationPreparation preparation,
+    IMachinePrincipalAccessor machinePrincipalAccessor)
     : ICommandHandler<OpenSvixAppPortalCommand, WebhookProviderPortalAccessCommandResponse>
 {
     private const string ValidationFailure = "webhook_portal_validation_failed";
@@ -31,6 +34,9 @@ public sealed class OpenSvixAppPortalCommandHandler(
                 validationErrors);
         }
 
+        var requester = machinePrincipalAccessor.Current is null
+            ? await preparation.PreparePortalAsync(request, cancellationToken)
+            : null;
         var consumer = await consumerRepository.GetByIdForOwnerOperationAsync(
             request.ConsumerId,
             forUpdate: false,
@@ -44,12 +50,25 @@ public sealed class OpenSvixAppPortalCommandHandler(
                 ["Webhook consumer was not found."]);
         }
 
-        var result = await portalService.CreateAccessAsync(
-            new WebhookProviderPortalAccessInput(
-                request.ConsumerId,
-                request.SessionId,
-                request.ExpiresInSeconds is { } seconds ? TimeSpan.FromSeconds(seconds) : null),
-            cancellationToken);
+        var input = new WebhookProviderPortalAccessInput(
+            request.ConsumerId,
+            request.SessionId,
+            request.ExpiresInSeconds is { } seconds ? TimeSpan.FromSeconds(seconds) : null,
+            requester?.Consumer ?? WebhookPortalConsumerCustody.From(consumer))
+        {
+            OriginalCommand = requester is null ? null : request,
+            OriginalRequester = requester
+        };
+        var result = await portalService.CreateAccessAsync(input, cancellationToken);
+        if (requester is not null)
+            await requester.ValidateAsync(request, cancellationToken);
+
+        if (result.Succeeded && !await portalService.IsCurrentAsync(input, result, cancellationToken))
+        {
+            result = WebhookProviderPortalAccessResult.Failure(
+                "webhook_provider_binding_mismatched",
+                isRetryable: false);
+        }
 
         if (!result.Succeeded)
         {
@@ -64,6 +83,8 @@ public sealed class OpenSvixAppPortalCommandHandler(
                 "provider_failure",
                 failureCategory);
 
+            if (requester is not null)
+                await requester.ValidateAsync(request, cancellationToken);
             return Failure(
                 ResolveFailureMessage(failureCategory),
                 failureCategory,
@@ -72,6 +93,27 @@ public sealed class OpenSvixAppPortalCommandHandler(
         }
 
         await CreateAuditAsync(request, consumer, result, "issued", failureCategory: null);
+
+        // Audit persistence is another await; it cannot authorize release of a stale remote token.
+        if (!await portalService.IsCurrentAsync(input, result, cancellationToken))
+        {
+            var rejected = WebhookProviderPortalAccessResult.Failure(
+                "webhook_provider_binding_mismatched",
+                isRetryable: false);
+            await CreateAuditAsync(
+                request,
+                consumer,
+                rejected,
+                "custody_lost",
+                rejected.FailureCategory);
+            if (requester is not null)
+                await requester.ValidateAsync(request, cancellationToken);
+            return Failure(
+                ResolveFailureMessage(rejected.FailureCategory!),
+                rejected.FailureCategory!,
+                isRetryable: false,
+                [rejected.FailureCategory!]);
+        }
 
         var access = new WebhookProviderPortalAccessDto
         {

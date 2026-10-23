@@ -8,6 +8,62 @@ description: Walkthrough of administrative consoles and management workflows for
 
 This guide walks administrators through the web consoles in the Blazor management interface, covering instance-level controls, tenant provisioning, monetization, branding, and organization governance.
 
+### Event creation scope
+
+Select the intended tenant before creating an event. Event creation derives its
+authorization scope from that server-selected tenant, not a tenant identifier
+in the event body. The requested organization and group identify the owning
+context, and their membership checks still apply. A missing tenant selection
+is denied rather than treated as instance-wide creation; an existing event ID
+cannot substitute for the new-event creation identity.
+
+### User tenant navigation and database authority
+
+The API resolves navigation for the authenticated user only. It uses a saved
+tenant preference only when that tenant is still in the user's active membership
+list; otherwise it selects the latest active membership or no destination. A
+navigation result is a convenience, not permission to enter a tenant, and does
+not change the saved preference.
+
+The configured Global database login can read the user's identifier, deleted flag,
+preferred tenant identifier and preference-update audit timestamp/user through EF Core.
+The preference profile permits updates only to the preferred tenant and those two audit
+fields. The API still changes only the authenticated user's preference, verifies active
+membership, and commits the preference and audit image together; a suspended tenant
+is not excluded when membership remains active. Runtime gains no User-table access
+from this feature, and private profile fields remain outside these rights.
+
+Global is an API database purpose, not an administrator's human role. Protect its
+credentials: their holder can enumerate these associations and directly change the
+permitted preference/audit columns outside the API's self-selection checks. Database
+row-level security does not authenticate a human using stolen application credentials.
+Other explicitly configured storage purposes have their own separately checked rights.
+
+The old preference write/image routines and capability roles are no longer installed.
+Use a fresh isolated development PostgreSQL cluster without those obsolete roles, or
+have an operator check dependencies and decommission them explicitly. Starting only
+a new database in the same cluster does not remove cluster-global roles. Startup does
+not repair obsolete installations or delete their data automatically.
+
+This pre-release cutover removes the old navigation routine and its capability
+roles. Startup refuses leftover `user_tenant_navigation_read` routines or
+`event_user_navigation_owner`, `event_user_navigation_global` and
+`event_user_navigation_migrator` roles rather than automatically deleting them or
+repairing permissions. For disposable development, use a fresh isolated PostgreSQL
+cluster; a new database in the same cluster does not remove shared roles. If data
+or shared roles must survive, arrange a reviewed dependency-checked transition
+before deployment. No new environment key or entity migration is needed; do not
+delete retained user data or broaden grants to bypass readiness.
+
+### Setup credentials and bearer tokens
+
+On setup-protected routes, an invalid bearer token returns `401` even when the
+setup secret is valid. Send an access token with the correct purpose, or omit
+the Authorization header for an explicitly supported setup-only operation
+while setup is active. A valid bearer token does not override an invalid setup
+secret supplied in the same request. Rejected credentials never authorize a
+credential-provider call through the other channel.
+
 ---
 
 ## 1. Administrative Consoles & Routes
@@ -22,6 +78,74 @@ This guide walks administrators through the web consoles in the Blazor managemen
 ---
 
 ## 2. Instance Administration
+
+### Offline migration scaffolding
+
+Development/Testing application migrations can be scaffolded without acquiring
+database credentials by explicitly passing `--DesignTime:ModelOnly=true` after
+the EF command's `--` separator, together with `--Database:Provider=<provider>`.
+MySQL/MariaDB also require the intended server version. This mode configures the
+provider model and catalog but supplies no connection string. Applying migrations
+or inspecting an existing database still uses the ordinary, explicitly selected
+secret-authority workflow; model scaffolding is not database admission.
+
+### Tenant deletion settlement
+
+Tenant deletion reserves discovery before retaining the administrator's source
+authority on one transaction. Tenant removal and discovery cleanup commit
+together; late grant, binding or credential changes roll both back and retain
+other tenants. Slug-cache refresh occurs after acknowledged deletion.
+These authored controls await executable security-programme assurance.
+
+### Registration provider connections
+
+Creating or updating a provider connection, replacing approved origins and
+deleting an unused connection retain the original administrator's authority
+through the same transaction. Late credential expiration or grant revocation
+rejects the whole change, including origin rows. Existing input validation and
+the refusal to delete a connection still used by bindings remain.
+These authored controls await executable security-programme assurance.
+
+### Governance update settlement
+
+Module, organization, branding, domain, tenant-delegation, admin-portal, MCP,
+AI and render-policy patches retain their original administrator authority
+through settlement. Supplied values and locks commit together with required
+default-tenant projections or SMTP revision changes; a rejected specialized
+write aborts the whole patch. Lock-only changes preserve existing stored values.
+Branding cache invalidation and notifications occur after acknowledged commit.
+These authored controls await executable security-programme assurance.
+
+### Operator identity editing and import
+
+Configuration import session creation, preview, cancellation and rollback
+snapshot preparation retain the original administrator's credentials, grants
+and support boundary through settlement. A rejected storage operation cannot
+leave a partial session or artifact merely because its error was caught.
+Results are returned only after the original owner acknowledges commit.
+Uploaded bytes and preview choices are captured before asynchronous processing;
+unfinished setup and background expiration retain separate ownership.
+These source controls await the security programme's executable assurance.
+
+Saving the operator identity or importing its portable manifest now retains the
+original administrator's current credentials and grants through database
+settlement. Expired credentials/support sessions, changed authority, stale
+revision or altered effects reject the whole operation. Import audit and
+identity changes commit together; successful notifications follow settlement.
+Manifest import does not transfer official registry authority.
+
+Unfinished setup uses its real setup ticket and secret, with the same pending
+state throughout. It does not turn a signed human into a setup principal or
+grant administrator access. Completion's initial operator seed remains separate
+from later editing.
+
+PostgreSQL editor source now has a dedicated enrolled data capability using the
+existing database identities. It verifies installed native ownership and
+privileges and rejects drift without automatic repair. Storage representation
+is fixed before the operation begins; strict final comparisons and full-precision
+credential deadlines remain. The native installer hooks and regression source
+are authored, but executable provider, concurrency and setup-HTTP assurance is
+still pending under the security programme.
 
 Use `/settings/instance` or `/admin/instance` to open the unified console.
 SingleTenant deployments show **Administration**, combining instance infrastructure
@@ -44,6 +168,294 @@ The authentication provider card names Local when Local Identity is selected,
 alongside any enabled external sign-in providers. An SMTP warning means the
 instance's saved host or sender settings are missing; running a development
 Mailpit service alone does not configure or enable platform email delivery.
+
+### Tenant resolver configuration
+
+Updating tenant resolver settings through
+`PATCH /api/instance/settings/resolver-config` requires a signed-in instance
+administrator. A setup secret or configured startup routing reader does not
+authorize this editor. Header forwarding remains enabled; supplied path/domain
+settings retain their existing validation and normalization rules.
+
+The server validates each patch against the current complete resolver
+configuration, then commits its supplied settings together. It rechecks the
+original account, credential, administrator and support-session authority, as
+well as the exact stored values and metadata, before committing. A rejected or
+expired request rolls back the entire patch. The local configuration cache is
+invalidated only after acknowledged commit.
+
+The source implementation covers SQLite and a dedicated PostgreSQL resolver
+contract. PostgreSQL installation belongs to the existing migration identity,
+not the runtime administrator: fixed functions and a private source lock
+protect the complete configuration, including settings that do not yet exist.
+Missing or altered native authority is rejected rather than repaired at runtime.
+PostgreSQL operator-identity editing does not grant resolver editing.
+
+SQL Server, MySQL/MariaDB and other unsupported providers still reject this
+editor. Programme SQL installation, concurrency, authentication and provider
+checks remain pending; this describes authored source rather than a validated
+deployment guarantee.
+
+### Authentication and authorization provider configuration
+
+Provider configuration retains the first validated settings and binding
+snapshot through writing. Administrator requests, accepted initial setup and
+configured startup retain distinct authority; one does not grant another.
+Changes to those sources, participation requirements or original account/
+credential/support authority reject the complete update. Endpoint verification
+runs outside database locks, and caches activate only after acknowledged commit.
+
+SQLite and PostgreSQL paths are authored. PostgreSQL requires its dedicated
+migration-installed provider contract and rejects missing or altered authority
+instead of repairing it at runtime. Other provider custody paths remain
+unsupported. SQL installation, authentication, concurrency and provider checks
+are still pending under the programme's verification freeze.
+
+### Combined ordinary and specialized settings batches
+
+A batch containing Email and other settings, or ordinary and specialized
+non-Email settings, retains the original account,
+credential, support session and stored configuration through one database commit.
+Each accepted setting must be completed by its own secured writer. Changed
+authority, expired credentials, replaced configuration or an omitted write rolls
+back the entire accepted group. BestEffort may skip invalid inputs before that
+group is compiled; it cannot partially commit after those failures.
+
+Category and scope restrictions still apply. An instance TenantDelegation batch
+can include `TenantDelegation.LockSmtp` and `TenantDelegation.LockAnalytics`;
+this does not grant tenant administrators access to instance-only settings.
+Caches and notifications activate only after acknowledged commit. PostgreSQL
+requires its independent migration-installed mixed contract, without new database
+credentials or borrowed provider/storage privileges. SQLite/PostgreSQL paths and
+72 regression cases are authored, but installation and runtime checks remain
+pending under the programme's verification freeze.
+
+For example, an Events batch changing the ordinary maximum session count and
+publication approval uses this combined owner rather than borrowing two
+independent write approvals. If either accepted effect loses its original
+source or is changed outside its actual writer, both effects roll back and
+no change notification is emitted. Two additional instance-level controls
+cover the unchanged source and a changed effect; they remain unrun.
+
+Standalone ordinary Settings writes have a separate SQLite implementation:
+existing row identity, creation audit and definition metadata are preserved;
+new metadata comes from the setting registry rather than posted entity fields.
+A rejected writer remains rejected even if its caller catches the exception.
+The separate PostgreSQL ordinary contract, adapter and installation hooks are
+now authored, including native omission and post-completion expiry controls.
+Callbacks verify their current effects; only settlement completes the native
+attempt, before the original human deadlines are checked. Installation and
+runtime acceptance remain unrun. SQL Server/MySQL ordinary mutations still
+fail closed; no provider status here authorizes a fallback account.
+
+### Original authority for administrative changes
+
+Creating, updating or deleting tenant templates and custom-property definitions,
+and creating a tenant-plan draft,
+retain the original authenticated account, policy question and support-session
+horizon through commit. A credential, binding, policy route or supporting role
+change before commit rejects the whole transaction, including earlier effects.
+Extending a support session during the operation cannot extend its original
+deadline. The existing instance/tenant administrator rules still apply.
+
+These seven action owners and their production registration are source-integrated;
+62 Local-authentication controls are authored but unrun. Template and definition
+changes keep their existing validation, quotas, concurrency checks and cache
+invalidation after successful commit. This status does not
+certify all administrative actions or provider acceptance.
+The retained administrative regression fixture now uses real Local login for
+27 tenant cases; all 94 existing cases remain active and unrun. A rolled-back
+human attempt is not automatically replayed with its original authority.
+
+Tenant API-key policy updates now retain the original human and persisted key
+owner through commit, using a single transaction attempt. Seven new real-body
+controls are authored and unrun. A wider source audit identified additional
+definition, session-template, projection, room, plan and direct governance owners
+still requiring implementation or genuine regression integration; earlier repairs
+do not certify those neighboring actions.
+
+Tenant definition purge and Event definition creation are now source-reviewed.
+Purge retains dependency checks and atomic audit; creation retains parent ownership
+and quotas. Revoked original authority rejects their entire transaction. Twenty
+genuine controls are authored but unrun. The full sixteen-owner definition,
+value and session-template packet is now source-reviewed, preserving validation,
+quotas, concurrency and cache invalidation after acknowledgment. All 281 new/
+retained invocations remain unrun, so this is not provider acceptance.
+
+Human managed-provider provisioning is being separated from worker provisioning.
+Its command now selects the original instance control-plane database owner before
+constructing services and rejects worker-operation payloads. This does not grant
+generic cross-tenant writes: the fixed provisioning contracts and compilers are
+source-reviewed, while physical settlement integration remains under review. Seventeen source/routing
+controls are authored but unrun; this is not a completed provisioning feature or
+a provider-readiness claim.
+Its enrollment settlement foundation queues follow-up work until the original
+database owner acknowledges commit and releases its transaction. An uncertain
+acknowledgement is not an ordinary rejection or permission to retry. Ten controls
+for that foundation are authored and unrun. Human provisioning integration is now
+source-reviewed; its actual-handler and retained linkage controls remain unrun.
+Malformed Local linkage refuses provisioning without creating tenant state.
+Customer replay preserves the existing result shape and leaves its stored
+organizer membership intact. This does not certify provider readiness.
+The PostgreSQL/SQLite provisioning registration now explicitly requires co-located
+identity sources. Installation hooks are written but have not been executed.
+Direct governance PATCH actions now select their joined Settings owner before
+constructing services; their exact producers are authored and under review.
+The 87 governance and 34 provisioning DATA cases remain unrun, so this is source
+progress rather than operational or provider acceptance.
+The provisioning compiler owns the complete tenant, mandatory documents,
+administrator linkage and optional organizer graph. Local linkage does not
+change credentials. Rejected attempts roll back the whole graph; an exact
+customer replay does not create another tenant or consume another capacity slot.
+Both PostgreSQL and SQLite require their original physical owner and terminal
+completion seal. These DATA sources are reviewed, but none of their 34 controls
+has been executed.
+
+The PostgreSQL provisioning writer now checks the exact shared source writers
+installed by other administrative protocols. A disabled, replaced or partially
+installed writer rejects admission rather than silently weakening protection.
+Only the declared migrator may install provisioning while later prerequisites
+are wholly absent; application traffic requires the complete selected contract.
+Independent Identity deployments do not install this co-located provisioning
+protocol, and neighboring administrative guards permit that whole absence.
+Any partial provisioning footprint is still rejected. These checks and their
+regression controls are source-complete, not yet tested on PostgreSQL.
+
+Tenant-plan cloning, version creation/update/publication/archive and assignment
+switch/rollback now retain the original instance administrator through their
+committing transaction. Revoked credentials, grants or support authority reject
+all of that attempt's effects. Existing published-content protection, pinned
+assignments, explicit settings application and exact rollback eligibility remain.
+These seven owners are source-reviewed; their 36 new Local controls and retained
+HTTP cases have not been executed.
+
+Tenant role-grant and organization/group member changes now retain the original
+account and support-session horizon through one committing transaction. Protected
+membership results are released only after final admission. Intentional
+self-demotion or revocation remains allowed when the existing rules allow it,
+including preserving the last administrator; unrelated role/binding changes
+reject the operation. Group permissions and public Group views are unchanged.
+Read-only support cannot perform a Group membership write. Thirty-seven genuine
+login controls are authored but unrun; this is not blanket account-administration
+or provider acceptance.
+
+Event team assignment, email assignment and revocation now retain the original
+account, Event decision and support deadline through assignment and audit commit.
+Team and assignable-role results are released only after final admission. Email
+resolution cannot substitute another target or replay its inner assignment.
+An authorized self-revocation remains possible; unrelated new authority rejects
+the transaction. Existing role delegation limits and the separate ownership
+transfer requirement still apply.
+
+Thirty-eight genuine-login controls are authored but unrun. Production service
+composition and PostgreSQL contract source are integrated; installation and
+provider acceptance remain unverified. The changed contract requires explicit
+migrator installation before traffic and rejects stale readiness. This does not
+certify other account or ownership-transfer operations.
+
+Local identity create, reset, reconciliation and list/status disclosure now
+retain original administrator and support authority through each actual Identity
+transaction. An authorized self-reset can complete its exact credential change
+without acquiring new authority. If later binding fails, an already committed
+pending identity remains recoverable by a newly authorized request. An unknown
+commit/rollback result does not disclose credentials or authorize automatic replay.
+
+The delivered human administration path currently supports co-located SQLite
+only. PostgreSQL integration is in progress; external Identity and other database
+providers remain refused. Twenty-six genuine-login controls are authored but
+unrun. This is not complete topology or lifecycle acceptance.
+
+The PostgreSQL Local administration capability and co-located migration hooks
+are authored, but not installed or accepted. The dedicated Runtime executor
+has no direct lifecycle-table grants. Its fixed operations enforce the exact
+creation, binding, activation and reset group; activation preserves the password
+hash and reset preserves original verification provenance. The managed Identity
+bridge now retains configured validators/hashing and completes every physical
+stage on the selected Runtime connection before checking original deadlines.
+It withholds temporary credential issuance after failed or unknown settlement
+or a changed expected credential image. All 60 native controls remain unrun;
+these source paths do not establish provider acceptance. External Identity,
+SQL Server and MySQL remain unsupported by this administrative adapter.
+
+With External Identity selected, human Local reconciliation rejects before
+changing credentials or creating application bindings. Independent external
+authentication/Core capabilities are not evidence of that administrative owner.
+Use a supported co-located topology for this adapter; no automatic cross-database
+fallback or retry is introduced.
+
+Support-session start, own-stop, force-stop and protected list/audit results now
+retain original authenticated authority through session and lifecycle-audit
+settlement. Ending your own forwarded session permits its intended terminal
+change without renewing the original support deadline. Existing administrator,
+ownership and separate force-stop rules still apply.
+
+This source path now includes SQLite and co-located PostgreSQL. The PostgreSQL
+capability writes only the intended session/audit group on the original Runtime
+connection, and forwarding/current-session discovery uses bounded execute-only
+reads. Migration and DI hooks are authored, not executed. All 71 native and
+57 prior SQLite lifecycle/precision controls remain unrun; native-provider
+acceptance and external Identity remain open. Post-response request auditing is a separate
+boundary, not part of the retained lifecycle transaction.
+
+Instance event-policy patches, onboarding policies, reporting intake and applying
+an existing tenant-plan assignment have closed original-operation source paths.
+Plan application retains the selected assignment/version and applies Email,
+visitor, publication and ordinary settings plus assignment audit together.
+A later failure rolls back earlier groups and Email revisions; notifications
+follow commit. A target substituted after selecting another tenant is rejected.
+Quotas validate the instance ceiling rather than creating quota rows. The plan's
+22 genuine-login and 22 native controls, installation and provider acceptance
+remain unrun; deployments must use the current migration-installed contract,
+not silently repair stale database authority.
+
+### Updating Administrative API Clients
+
+Deploy regenerated clients with the matching API version. Provider credentials
+belong in the selected deployment secret authority, not administrative JSON:
+AI model creation and instance AI patches no longer accept `apiKey`, and
+authentication-provider patches no longer accept `googleClientSecret`.
+Tenant onboarding settings and completion no longer carry `aiAssistantApiKey`.
+Settings and onboarding reads no longer disclose the removed plaintext
+authentication secrets or the former AI/Cerbos credential-status properties;
+update automation that consumed those fields.
+
+The internal authentication-provider onboarding GET
+`/api/instanceonboarding/auth-provider-configuration/internal` is removed.
+Use the supported settings and onboarding operations exposed by the current
+client contract. Do not recover credentials by restoring an internal route.
+
+AI proposed-action confirmation now requires its request body. Registration
+order creation requires `Idempotency-Key`; retain the same key when retrying
+the same intent after an uncertain response. A rollback must preserve secret
+isolation and operation-key continuity, not restore plaintext fields or create
+a second order by generating a new key.
+
+### Static Localization Bundles
+
+Instance administrators can import a static translation bundle with
+`POST /api/admin/localization/bundle`, supplying `languageCode` and a flat
+`translations` object. Use a supported language and unique keys starting with
+`ui.`, `lookup.` or `payment.`. Duplicate fields/keys, unknown envelope fields,
+null values, arrays and nested objects are rejected; no last-value-wins import
+is performed. Text such as `{{name}}` or HTML remains literal translation data,
+not a server-executed template.
+
+Keep the JSON artifact and persisted output within 4 MiB (the POST request allows
+an additional 1 KiB of envelope overhead). A bundle allows 16,384 entries, keys
+of up to 512 characters, values of up to 16,384 characters, and at most 524,288
+combined key/value UTF-16 characters. Empty text values are allowed.
+
+The published OpenAPI import schema requires both `languageCode` and
+`translations` and describes translations as a bounded dictionary of strings.
+Generated clients can therefore construct the same envelope. Server validation
+also enforces duplicate-key rejection, supported languages and the combined
+text budget; satisfying the schema alone does not authorize or validate an import.
+
+An invalid import preserves the existing file and caches. Correct or split the
+bundle before retrying. Invalid manually mounted writable files are ignored in
+favor of embedded defaults, not partially merged. File validation completes
+before the writer opens its temporary output. Multi-instance deployments still
+need a shared persistent bundle volume.
 
 ### Getting Started After Setup
 
@@ -124,6 +536,20 @@ a newly created account may be on a later page rather than page one.
 If refreshing account details fails, further resets remain unavailable until a
 refresh succeeds; the current password handover stays visible.
 
+### Locked publication overrides
+
+Publication workflows that already select locked-override cleanup remove the
+tenant's override and reveal the locked instance value. The server recompiles
+the complete reporting-intake, approval and submission policy before saving;
+an unsafe combination is rejected. Ordinary locked-setting rejection remains.
+Unlocked settings are saved as values, not deleted. Cleanup retains the original
+administrator's target: a foreign tenant, an instance-shaped tenant update or a
+tenant-shaped instance update is rejected before deriving effects. Supplied
+payloads cannot replace the original prepared changes. Cleanup also retains the
+administrator, credential and support-session authority through commit, and
+expiry rolls it back. Source and regression changes are authored; runtime checks
+remain pending under the security programme's verification freeze.
+
 ### Event resource governance
 
 Resource policy uses the existing native settings and configuration-manifest
@@ -191,6 +617,13 @@ retention zero removes existing rows on the next sweep. Subject erasure clears
 manager attribution without deleting shared event resources. Keep the scheduler
 enabled while retained audit data remains.
 
+On PostgreSQL, install the current audit-owner discovery capability before
+enabling cleanup. Discovery returns tenant identities only; every deletion batch
+uses that tenant's ordinary database authority and current retention policy.
+Suspended tenants remain eligible when they own audit rows. A missing capability
+or invalid policy fails cleanup visibly; restore the declared authority or
+policy rather than granting broad Global access to private audit data.
+
 ### Resource-policy deployment activation (operator API)
 
 Remote event-resource policies use a deployment-level activation fence. This
@@ -236,6 +669,22 @@ Replica counts and convergence are operator attestations, not measurements
 inferred from an upload response. Do not treat the local epoch as a remote policy
 revision. Manage these bindings only through this protocol, not generic settings
 editing or configuration-manifest import.
+
+Every control command now retains its original authenticated administrator and
+database selection until the binding document and activation row have committed
+together. A changed binding, activation stamp, relevant configuration row or
+missing-row observation rejects that attempt; retry by reloading current state,
+not by reusing an earlier receipt. Unrelated pending settings are not saved with
+the operation.
+
+In-app policy synchronization selects and validates its original target before
+closing the deployment. No schema, policy or reload request is sent until that
+closure is acknowledged as committed and its local lock is released. An unknown
+commit outcome is a failure, even when the database might have committed: inspect
+current state and begin a new operation. A setup secret can publish only to a
+validated unbound target; a bound resource deployment requires current human
+instance-administrator authority. Inspect-only performs no activation change,
+and each foreground upload still requires a fresh one-time Admin credential pair.
 
 ### Background Scheduler
 

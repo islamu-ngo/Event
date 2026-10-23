@@ -6,6 +6,7 @@ namespace Explore.Application.Features.AiAssistant.Prompting;
 
 public sealed class AiStructuredActionParser
 {
+    public const int MaximumCallsPerTurn = 8;
     private readonly IAiToolContractRegistry _toolRegistry;
 
     public AiStructuredActionParser()
@@ -20,6 +21,9 @@ public sealed class AiStructuredActionParser
 
     public AiStructuredActionParseResult Parse(IReadOnlyList<AiProposedActionCandidate> candidates)
     {
+        if (candidates.Count > MaximumCallsPerTurn)
+            return AiStructuredActionParseResult.Failure(
+                "tool_call_limit_exceeded", "AI tool-call budget exceeded.");
         var actions = new List<AiParsedProposedAction>(candidates.Count);
 
         foreach (var candidate in candidates)

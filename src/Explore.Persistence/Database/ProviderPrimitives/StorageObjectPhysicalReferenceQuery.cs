@@ -13,6 +13,15 @@ internal static class StorageObjectPhysicalReferenceQuery
         Guid storageObjectId,
         CancellationToken cancellationToken)
     {
+        var sql = dbContext.GetService<ISqlGenerationHelper>();
+        string query = $"SELECT CASE WHEN {BuildPredicate(dbContext, "{0}")} THEN 1 ELSE 0 END AS {sql.DelimitIdentifier("Value")}";
+        return await dbContext.Database.SqlQueryRaw<int>(query, storageObjectId)
+            .SingleAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>The identity expression is supplied only by compiled persistence SQL.</summary>
+    internal static string BuildPredicate(ExploreDbContext dbContext, string storageObjectIdSql)
+    {
         var storage = dbContext.Model.FindEntityType(typeof(StorageObject))!;
         var id = storage.FindProperty(nameof(StorageObject.Id))!;
         var sql = dbContext.GetService<ISqlGenerationHelper>();
@@ -39,17 +48,10 @@ internal static class StorageObjectPhysicalReferenceQuery
                 predicates.Add(
                     $"EXISTS (SELECT 1 FROM {sql.DelimitIdentifier(constraint.Table.Name, constraint.Table.Schema)} owner " +
                     $"INNER JOIN {sql.DelimitIdentifier(constraint.PrincipalTable.Name, constraint.PrincipalTable.Schema)} source ON {join} " +
-                    $"WHERE source.{sql.DelimitIdentifier(idColumn)} = {{0}})");
+                    $"WHERE source.{sql.DelimitIdentifier(idColumn)} = {storageObjectIdSql})");
             }
         }
 
-        if (predicates.Count == 0)
-            return false;
-
-        // Only model-owned, provider-delimited identifiers enter SQL. The object
-        // identity is parameterized; no owner row or cross-tenant name is returned.
-        string query = $"SELECT CASE WHEN {string.Join(" OR ", predicates)} THEN 1 ELSE 0 END AS {sql.DelimitIdentifier("Value")}";
-        return await dbContext.Database.SqlQueryRaw<int>(query, storageObjectId)
-            .SingleAsync(cancellationToken) == 1;
+        return predicates.Count == 0 ? "1 = 0" : string.Join(" OR ", predicates);
     }
 }

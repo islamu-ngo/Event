@@ -15,23 +15,39 @@ public class CreateTenantUserRoleGrantCommandHandler : ICommandHandler<CreateTen
     private readonly ITenantUserRepository _tenantUserRepository;
     private readonly IRoleRepository _roleRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly ICurrentUserService _currentUserService;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
+    private readonly ISerializableAttemptOwner _owner;
 
     public CreateTenantUserRoleGrantCommandHandler(
         ITenantUserRoleGrantRepository tenantUserRoleGrantRepository,
         ITenantUserRepository tenantUserRepository,
         IRoleRepository roleRepository,
         ITenantContext tenantContext,
-        ICurrentUserService currentUserService)
+        IHumanAccountAdministrativeActionPreparation preparation,
+        ISerializableAttemptOwner owner)
     {
         _tenantUserRoleGrantRepository = tenantUserRoleGrantRepository;
         _tenantUserRepository = tenantUserRepository;
         _roleRepository = roleRepository;
         _tenantContext = tenantContext;
-        _currentUserService = currentUserService;
+        _preparation = preparation;
+        _owner = owner;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateTenantUserRoleGrantCommand request, CancellationToken cancellationToken)
+    {
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        return await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, token);
+            var result = await ExecuteBodyAsync(request, prepared, token);
+            if (result.IsSuccess) prepared.Complete(result.Id);
+            return result;
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(CreateTenantUserRoleGrantCommand request,
+        IPreparedHumanAccountAdministrativeAction prepared, CancellationToken cancellationToken)
     {
         var dto = request.TenantUserRoleGrantDto;
 
@@ -81,8 +97,8 @@ public class CreateTenantUserRoleGrantCommandHandler : ICommandHandler<CreateTen
             RoleId = dto.RoleId,
             Role = null!,
             RoleScopeId = (int)RoleScopeEnum.Tenant,
-            GrantedAt = DateTime.UtcNow,
-            GrantedBy = _currentUserService.UserId
+            GrantedAt = prepared.ChangedAt,
+            GrantedBy = prepared.PrincipalId
         };
 
         tenantUserRoleGrant = await _tenantUserRoleGrantRepository.Create(tenantUserRoleGrant);

@@ -11,7 +11,7 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
 [NotInParallel("PersistenceDb")]
-public sealed class NotificationFanoutRunLeaseRepositoryTests(PostgreSqlContainerFixture fixture)
+public sealed partial class NotificationFanoutRunLeaseRepositoryTests(PostgreSqlContainerFixture fixture)
 {
     private const int BacklogHighWatermark = 1000;
     private const int BacklogLowWatermark = 500;

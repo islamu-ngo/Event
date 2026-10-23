@@ -113,6 +113,7 @@ public sealed class LegalDocumentsControllerTests
             services.AddSingleton<ITenantRepository, TenantRepository>();
             services.AddSingleton<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
             services.AddSingleton<IPlatformUserRoleRepository, PlatformUserRoleRepository>();
+            services.AddSingleton(NSubstitute.Substitute.For<IAdministrativeAuthorityRepository>());
             services.AddSingleton<ITenantUserRoleGrantRepository, TenantUserRoleGrantRepository>();
             services.AddSingleton<IOrganizationMemberRepository, OrganizationMemberRepository>();
             services.AddSingleton<IGroupMemberRepository, GroupMemberRepository>();

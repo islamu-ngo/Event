@@ -1,4 +1,5 @@
 using Explore.Application;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Operations;
@@ -12,6 +13,7 @@ public sealed class OperationCompositionTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton(NSubstitute.Substitute.For<IMachinePrincipalAccessor>());
         services.AddScoped<OwnedState>();
         services.AddSingleton<IAuthorizationProvider>(new OperationAuthorizationTests.Policy(AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)));
         services.AddNativeOperations(types);
@@ -96,6 +98,7 @@ public sealed class OperationCompositionTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton(NSubstitute.Substitute.For<IMachinePrincipalAccessor>());
         services.AddScoped<OwnedState>();
         services.AddSingleton<IAuthorizationProvider>(new OperationAuthorizationTests.Policy(AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)));
         services.AddScoped<StatefulHandler>();

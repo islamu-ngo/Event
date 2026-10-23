@@ -1,13 +1,11 @@
 namespace Event.Persistence.IntegrationTests.Onboarding;
 
+using Explore.Persistence.Services;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Exceptions;
-using Explore.Application.Responses;
-using Explore.Application.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +35,8 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
         await using ExploreDbContext context = fixture.CreateDbContext(saveObserver);
         var repository = new SystemSettingRepository(
             context,
-            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)),
+            new HumanSettingsDataBoundary(new NoOperatorMutationServices()));
         var candidate = new SystemSetting
         {
             SettingKey = InstanceOperatorIdentitySettingKeys.OperatorIdentity,
@@ -84,7 +83,8 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
         await using (ExploreDbContext context = fixture.CreateDbContext(saveObserver))
         {
             var repository = new TenantSettingRepository(context,
-                new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+                new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)),
+                new HumanSettingsDataBoundary(new NoOperatorMutationServices()));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() => repository.SetValueAsync(
                 tenantId,
@@ -100,53 +100,6 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
                 setting.TenantId == tenantId
                 && setting.SettingKey == InstanceOperatorIdentitySettingKeys.OperatorIdentity))
             .IsFalse();
-    }
-
-    [Test]
-    public async Task DedicatedServiceSave_RoundTripsDocumentAndRotatesRevisionUnderRealTransaction()
-    {
-        await fixture.ResetAsync();
-        await using ExploreDbContext context = fixture.CreateDbContext();
-        var unitOfWork = new EfCoreUnitOfWork(context);
-        var service = new InstanceOperatorIdentityService(
-            new SystemSettingRepository(context, new RelationalSettingMutationLock(context, unitOfWork)),
-            unitOfWork,
-            new OutboxRepository(context));
-
-        BaseCommandResponse<InstanceOperatorIdentitySavedDocument> first =
-            await service.SaveAsync(ValidCandidate(), expectedRevision: null);
-
-        await Assert.That(first.IsSuccess).IsTrue();
-        InstanceOperatorIdentitySavedDocument firstSaved = first.Id
-            ?? throw new InvalidOperationException("Operator identity save returned no document.");
-        await Assert.That(firstSaved.PublicDisclosure.IsReady).IsTrue();
-        await Assert.That(firstSaved.PaidCommerce.IsReady).IsTrue();
-        Guid firstRevision = firstSaved.Revision;
-
-        InstanceOperatorIdentityDocument document = await service.GetCurrentAsync();
-        await Assert.That(document.Settings).IsNotNull();
-        await Assert.That(document.Settings!.OperatorId!.Value.Version).IsEqualTo(7);
-        await Assert.That(document.Settings.Revision).IsEqualTo(firstRevision);
-        await Assert.That(document.Settings.PublicName).IsEqualTo("Independent Operator");
-        await Assert.That(document.PublicDisclosure.IsReady).IsTrue();
-        await Assert.That(document.PaidCommerce.IsReady).IsTrue();
-        await Assert.That(document.PublicDisclosure.Identity).IsNotNull();
-        await Assert.That(document.PublicDisclosure.DocumentRevision).IsEqualTo(firstRevision);
-
-        BaseCommandResponse<InstanceOperatorIdentitySavedDocument> second =
-            await service.SaveAsync(ValidCandidate() with { PublicName = "Updated Operator" }, firstRevision);
-
-        await Assert.That(second.IsSuccess).IsTrue();
-        InstanceOperatorIdentitySavedDocument secondSaved = second.Id
-            ?? throw new InvalidOperationException("Updated operator identity save returned no document.");
-        await Assert.That(secondSaved.Revision).IsNotEqualTo(firstRevision);
-
-        InstanceOperatorIdentityDocument updated = await service.GetCurrentAsync();
-        await Assert.That(updated.Settings!.Revision).IsEqualTo(secondSaved.Revision);
-        await Assert.That(updated.Settings.PublicName).IsEqualTo("Updated Operator");
-
-        await Assert.ThrowsAsync<ConcurrencyConflictException>(
-            () => service.SaveAsync(ValidCandidate(), firstRevision));
     }
 
     [Test]
@@ -252,20 +205,11 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
         UpsertLock
     }
 
-    private static InstanceOperatorIdentitySettings ValidCandidate() => new()
+    private sealed class NoOperatorMutationServices : IServiceProvider
     {
-        PublicName = "Independent Operator",
-        LegalName = "Independent Operator ASBL",
-        OperatorKindCode = "registered_organization",
-        JurisdictionCountryCode = "BE",
-        RegistrationIdentifier = "BE 0123.456.789",
-        PublicContactEmail = "contact@example.test",
-        WebsiteUrl = "https://example.test",
-        LegalNoticeUrl = "https://example.test/legal",
-        TermsUrl = "https://example.test/terms",
-        PrivacyUrl = "https://example.test/privacy",
-        OfficialOrigin = "https://event.example.org"
-    };
+        public object? GetService(Type serviceType) =>
+            throw new UnauthorizedAccessException("This native scope guard fixture cannot issue mutation authority.");
+    }
 
     private sealed class SaveObserver : SaveChangesInterceptor
     {

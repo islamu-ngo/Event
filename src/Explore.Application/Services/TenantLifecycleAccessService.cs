@@ -8,7 +8,7 @@ using Explore.Domain.ValueObjects;
 namespace Explore.Application.Services;
 
 public sealed class TenantLifecycleAccessService(ITenantRepository tenants, IAdminContext adminContext,
-    IInstanceBootstrapStateRepository bootstrapRepository)
+    IInstanceBootstrapStateRepository bootstrapRepository, ITenantLookupSource publicDirectory)
     : ITenantLifecycleAccessService
 {
     public async Task<bool> IsPublicAsync(Guid? tenantId, CancellationToken cancellationToken = default)
@@ -16,8 +16,8 @@ public sealed class TenantLifecycleAccessService(ITenantRepository tenants, IAdm
         if (tenantId is not { } id || id == Guid.Empty)
             return false;
 
-        var tenant = await tenants.GetByIdAsNoTrackingAsync(id, cancellationToken);
-        return TenantLifecycleAccessPolicy.AllowsPublic(tenant?.TenantStatusId);
+        var activeTenants = await publicDirectory.GetTenantLookupsAsync(cancellationToken);
+        return activeTenants.Any(tenant => tenant.TenantId == id);
     }
 
     public async Task<bool> CanAttemptConfiguredAdministratorSyncAsync(Guid? tenantId, CancellationToken cancellationToken = default)

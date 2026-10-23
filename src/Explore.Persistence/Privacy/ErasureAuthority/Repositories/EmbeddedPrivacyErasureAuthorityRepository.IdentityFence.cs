@@ -1,4 +1,5 @@
 using System.Data;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain;
 using Explore.Persistence.Privacy.ErasureAuthority.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
@@ -6,9 +7,17 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 
-public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
+public sealed partial class EmbeddedPrivacyErasureAuthorityRepository : IOriginalPrivacyIdentityFenceAuthority
 {
     private readonly AsyncLocal<EmbeddedPrivacyErasureAuthorityDbContext?> _identityGate = new();
+
+    public Task<T> ExecuteOriginalEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    {
+        if (_identityGate.Value is not null)
+            throw new InvalidOperationException("Original enrollment cannot borrow another identity gate.");
+        return ExecuteSerializedAsync(operation, cancellationToken);
+    }
 
     public async Task<T> ExecuteSerializedAsync<T>(
         Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
@@ -45,6 +54,9 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
                 if (applicationContext!.StorageReferenceTransactionFailed)
                     throw new InvalidOperationException("The storage reference transaction has failed.");
                 await applicationContext.FlushDisclosureAsync(cancellationToken);
+                await applicationContext.ValidateTrustedSetupSettingsSourcesAsync(cancellationToken);
+                await applicationContext.ValidateHumanCommitAdmissionsAsync(cancellationToken);
+                applicationContext.ValidateTrustedSetupSettingsTimes();
             }
             await transaction.CommitAsync(cancellationToken);
             storage?.HardenCompanionFiles();
@@ -66,6 +78,8 @@ public sealed partial class EmbeddedPrivacyErasureAuthorityRepository
             {
                 applicationContext!.IdentityFenceOwnsTransaction = false;
                 applicationContext.IdentityFenceTransactionFailed = false;
+                applicationContext.ResetHumanCommitAdmissions();
+                applicationContext.ResetTrustedSetupSettingsAdmissions();
                 await applicationEnlistment.DisposeAsync();
             }
         }

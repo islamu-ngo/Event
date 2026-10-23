@@ -14,6 +14,7 @@ namespace Explore.Infrastructure.Tests.Payments.Stripe;
 public sealed class StripeRefundAdapterTests
 {
     private static readonly Guid AttemptId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000101");
+    private static readonly DateTime Now = new(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
     private static readonly string PlatformSecret = $"sk_test_{Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}";
 
     [Test]
@@ -55,7 +56,7 @@ public sealed class StripeRefundAdapterTests
     }
 
     [Test]
-    public async Task CreateAsync_TimeoutAfterPossibleHandoffIsUnknownAndSdkRetriesKeepOneIdempotencyKey()
+    public async Task CreateAsync_TimeoutAfterPossibleHandoffIsUnknownWithoutSdkRetry()
     {
         var handler = new RecordingHandler(_ => throw new OperationCanceledException());
 
@@ -63,7 +64,7 @@ public sealed class StripeRefundAdapterTests
 
         await Assert.That(result.Outcome).IsEqualTo(RefundProviderOutcome.Unknown);
         await Assert.That(result.Failure!.ProviderHandoffStarted).IsTrue();
-        await Assert.That(handler.Requests).Count().IsEqualTo(3);
+        await Assert.That(handler.Requests).Count().IsEqualTo(1);
         await Assert.That(handler.Requests.Select(request => request.IdempotencyKey!).Distinct()).IsEquivalentTo(["refund:stable"]);
     }
 
@@ -126,7 +127,7 @@ public sealed class StripeRefundAdapterTests
         await Assert.That(result.Outcome).IsEqualTo(RefundProviderOutcome.Unknown);
         await Assert.That(result.Failure!.Code).IsEqualTo("refund_provider_rejected");
         await Assert.That(handler.Requests.Select(request => request.IdempotencyKey).Distinct())
-            .IsEquivalentTo(["refund:stable"]);
+            .IsEquivalentTo(new string?[] { "refund:stable" });
     }
 
     [Test]
@@ -160,12 +161,14 @@ public sealed class StripeRefundAdapterTests
     }
 
     [Test]
-    public async Task CreateAsync_DefinitiveFeeRefundFailureStillReturnsProvenBuyerRefundEvidence()
+    public async Task OwnedFeeHandoff_DefinitiveFailureStillReturnsProvenBuyerRefundEvidence()
     {
         var handler = new RecordingHandler(request => request.RequestUri!.AbsolutePath switch
         {
             "/v1/charges/ch_original" => Json(HttpStatusCode.OK,
-                """{"id":"ch_original","object":"charge","application_fee":"fee_original"}""", "req_charge"),
+                """{"id":"ch_original","object":"charge","payment_intent":"pi_original","application_fee":"fee_original"}""", "req_charge"),
+            "/v1/application_fees/fee_original/refunds" when request.Method == HttpMethod.Get => Json(HttpStatusCode.OK,
+                """{"object":"list","data":[],"has_more":false}""", "req_fee_list"),
             "/v1/application_fees/fee_original/refunds" => Json(HttpStatusCode.BadRequest,
                 """{"error":{"type":"invalid_request_error","code":"fee_refund_invalid"}}""", "req_fee"),
             _ => Json(HttpStatusCode.OK,
@@ -173,7 +176,7 @@ public sealed class StripeRefundAdapterTests
                 "req_refund")
         });
 
-        RefundProviderResult result = await Adapter(handler).CreateAsync(CreateRequest(), CancellationToken.None);
+        RefundProviderResult result = await Adapter(handler).RetrieveAsync(FeeRequest(), CancellationToken.None);
 
         await Assert.That(result.Outcome).IsEqualTo(RefundProviderOutcome.Observed);
         await Assert.That(result.Observation!.Status).IsEqualTo(RefundProviderStatus.Succeeded);
@@ -183,9 +186,111 @@ public sealed class StripeRefundAdapterTests
             .IsEqualTo("refund_provider_fee_rejected");
     }
 
+    [Test]
+    public async Task BuyerHandoffDoesNotAlsoDispatchApplicationFee()
+    {
+        var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK,
+            """{"id":"re_123","object":"refund","payment_intent":"pi_original","charge":"ch_original","amount":500,"currency":"eur","status":"succeeded"}""",
+            "req_buyer"));
+        RefundProviderResult result = await Adapter(handler).CreateAsync(CreateRequest(), CancellationToken.None);
+        await Assert.That(result.Observation!.Status).IsEqualTo(RefundProviderStatus.Succeeded);
+        await Assert.That(result.Observation.ApplicationFeeRefundAmountMinor).IsNull();
+        await Assert.That(handler.Requests.Count).IsEqualTo(1);
+        await Assert.That(handler.Requests.Single().Path).IsEqualTo("/v1/refunds");
+    }
+
+    [Test]
+    public async Task ExpiredMutationWindowFailsBeforeAnyBuyerHandoff()
+    {
+        var handler = new RecordingHandler(_ => throw new InvalidOperationException("No provider request is permitted."));
+        RefundProviderResult result = await Adapter(handler).CreateAsync(
+            CreateRequest() with { MutationExpiresAt = Now }, CancellationToken.None);
+        await Assert.That(result.Failure!.Code).IsEqualTo("refund_provider_retention_expired");
+        await Assert.That(result.Failure.ProviderHandoffStarted).IsFalse();
+        await Assert.That(handler.Requests).IsEmpty();
+    }
+
+    [Test]
+    public async Task LostBuyerAcknowledgementUsesNativeMetadataObservationWithoutMutation()
+    {
+        var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK,
+            $$$"""{"object":"list","data":[{"id":"re_unrelated","object":"refund","payment_intent":"pi_original","amount":500,"currency":"eur","status":"pending","metadata":{"islamu_refund_attempt_id":"another"}},{"id":"re_recovered","object":"refund","payment_intent":"pi_original","amount":500,"currency":"eur","status":"pending","metadata":{"islamu_refund_attempt_id":"{{{AttemptId:D}}}"}}],"has_more":false}""",
+            "req_recovery"));
+        RefundProviderResult result = await Adapter(handler).RetrieveAsync(
+            RefundRetrieveRequest.Create("stripe", "acct_original", "pi_original", string.Empty, "refund:stable", 500, "EUR", 38)
+                with
+            { RefundAttemptId = AttemptId, MutationExpiresAt = Now.AddHours(23) },
+            CancellationToken.None);
+        await Assert.That(result.Observation!.ProviderRefundId).IsEqualTo("re_recovered");
+        await Assert.That(handler.Requests.Single().Method).IsEqualTo(HttpMethod.Get);
+        await Assert.That(handler.Requests.Single().StripeAccount).IsEqualTo("acct_original");
+        await Assert.That(handler.Requests.Single().IdempotencyKey).IsNull();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task FeeRecoveryCannotMutateWithoutFreshOwnershipEvenWhenProviderListIsEmpty(bool expired)
+    {
+        var handler = new RecordingHandler(request => request.RequestUri!.AbsolutePath switch
+        {
+            "/v1/charges/ch_original" => Json(HttpStatusCode.OK,
+                """{"id":"ch_original","object":"charge","payment_intent":"pi_original","application_fee":"fee_original"}""", "req_charge"),
+            "/v1/application_fees/fee_original/refunds" => Json(HttpStatusCode.OK,
+                """{"object":"list","data":[],"has_more":false}""", "req_list"),
+            _ => Json(HttpStatusCode.OK,
+                """{"id":"re_123","object":"refund","payment_intent":"pi_original","charge":"ch_original","amount":500,"currency":"eur","status":"succeeded"}""", "req_refund")
+        });
+        RefundProviderResult result = await Adapter(handler).RetrieveAsync(
+            FeeRequest() with { AllowApplicationFeeMutation = false, MutationExpiresAt = expired ? Now : Now.AddHours(23) },
+            CancellationToken.None);
+        await Assert.That(handler.Requests.All(request => request.Method == HttpMethod.Get)).IsTrue();
+        await Assert.That(result.Observation!.Status).IsEqualTo(RefundProviderStatus.Succeeded);
+        await Assert.That(result.Observation.ApplicationFeeRefundAmountMinor).IsNull();
+        await Assert.That(result.Observation.ApplicationFeeRefundFailureCode)
+            .IsEqualTo(expired ? "refund_provider_retention_expired" : null);
+    }
+
+    [Test]
+    public async Task ExistingFeeEvidenceRecoversAfterRetentionWithoutRepeatingMutation()
+    {
+        var handler = new RecordingHandler(request => request.RequestUri!.AbsolutePath switch
+        {
+            "/v1/charges/ch_original" => Json(HttpStatusCode.OK,
+                """{"id":"ch_original","object":"charge","payment_intent":"pi_original","application_fee":"fee_original"}""", "req_charge"),
+            "/v1/application_fees/fee_original/refunds" => Json(HttpStatusCode.OK,
+                """{"object":"list","data":[{"id":"fr_original","object":"fee_refund","amount":38,"currency":"eur","fee":"fee_original","metadata":{"islamu_refund_id":"re_123"}}],"has_more":false}""", "req_list"),
+            _ => Json(HttpStatusCode.OK,
+                """{"id":"re_123","object":"refund","payment_intent":"pi_original","charge":"ch_original","amount":500,"currency":"eur","status":"succeeded"}""", "req_refund")
+        });
+        RefundProviderResult result = await Adapter(handler).RetrieveAsync(
+            FeeRequest() with { AllowApplicationFeeMutation = false, MutationExpiresAt = Now }, CancellationToken.None);
+        await Assert.That(result.Observation!.ApplicationFeeRefundAmountMinor).IsEqualTo(38L);
+        await Assert.That(result.Observation.ApplicationFeeRefundFailureCode).IsNull();
+        await Assert.That(handler.Requests.All(request => request.Method == HttpMethod.Get)).IsTrue();
+    }
+
+    [Test]
+    public async Task WrongReturnedRefundIdentityCannotReachApplicationFeeMutation()
+    {
+        var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK,
+            """{"id":"re_someone_else","object":"refund","payment_intent":"pi_original","charge":"ch_original","amount":500,"currency":"eur","status":"succeeded"}""",
+            "req_wrong_identity"));
+        RefundProviderResult result = await Adapter(handler).RetrieveAsync(FeeRequest(), CancellationToken.None);
+        await Assert.That(result.Outcome).IsEqualTo(RefundProviderOutcome.Unknown);
+        await Assert.That(result.Failure!.Code).IsEqualTo("refund_provider_identity_mismatch");
+        await Assert.That(handler.Requests.Single().Method).IsEqualTo(HttpMethod.Get);
+    }
+
+    private static RefundRetrieveRequest FeeRequest() =>
+        RefundRetrieveRequest.Create("stripe", "acct_original", "pi_original", "re_123", "refund:stable", 500, "EUR", 38)
+            with
+        { RefundAttemptId = AttemptId, AllowApplicationFeeMutation = true, MutationExpiresAt = Now.AddHours(23) };
+
     private static RefundCreateRequest CreateRequest(long amountMinor = 500) => RefundCreateRequest.Create(
         AttemptId, "stripe", "acct_original", "pi_original", "refund:stable", amountMinor, "EUR",
-        applicationFeeRefundAmountMinor: 38);
+        applicationFeeRefundAmountMinor: 38) with
+    { MutationExpiresAt = Now.AddHours(23) };
 
     private static StripeRefundAdapter Adapter(RecordingHandler handler, ISecretResolver? secrets = null)
     {
@@ -203,7 +308,7 @@ public sealed class StripeRefundAdapterTests
         return new(
             new SingleClientFactory(new HttpClient(handler) { BaseAddress = new Uri("https://api.stripe.example.test") }),
             secrets,
-            Options.Create(new StripePaymentOptions()));
+            Options.Create(new StripePaymentOptions()), new FixedClock());
     }
 
     private static HttpResponseMessage Json(HttpStatusCode status, string body, string requestId)
@@ -217,7 +322,7 @@ public sealed class StripeRefundAdapterTests
         request.RequestUri!.AbsolutePath switch
         {
             "/v1/charges/ch_original" => Json(HttpStatusCode.OK,
-                """{"id":"ch_original","object":"charge","application_fee":"fee_original"}""", "req_charge"),
+                """{"id":"ch_original","object":"charge","payment_intent":"pi_original","application_fee":"fee_original"}""", "req_charge"),
             "/v1/application_fees/fee_original/refunds" => Json(HttpStatusCode.OK,
                 """{"id":"fr_123","object":"fee_refund","amount":38,"currency":"eur","fee":"fee_original"}""", "req_fee"),
             _ => Json(HttpStatusCode.OK,
@@ -249,5 +354,10 @@ public sealed class StripeRefundAdapterTests
         public HttpClient CreateClient(string name) => name == StripeRefundAdapter.HttpClientName
             ? client
             : throw new InvalidOperationException("Unexpected HttpClient name.");
+    }
+
+    private sealed class FixedClock : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(Now);
     }
 }

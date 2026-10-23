@@ -9,6 +9,7 @@ public sealed class AiProviderResponseResolver
     private const string DefaultFailureCode = "invalid_tool_arguments";
     private const string DefaultFailureMessage = "AI provider returned invalid action payload JSON.";
     private const string InvalidResponseFailureCode = "invalid_response";
+    private const int MaximumCallsPerRun = 16;
 
     private readonly IAiChatProvider _chatProvider;
     private readonly AiStructuredActionParser _structuredActionParser;
@@ -25,11 +26,14 @@ public sealed class AiProviderResponseResolver
         AiChatPayload providerPayload,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var firstAttempt = await SendAndParseAsync(providerPayload, cancellationToken);
         if (firstAttempt.Succeeded)
         {
             return firstAttempt;
         }
+        if (firstAttempt.FailureCode == "tool_call_limit_exceeded")
+            return firstAttempt;
 
         if (firstAttempt.ParseResult is not null)
         {
@@ -40,7 +44,8 @@ public sealed class AiProviderResponseResolver
                     .ToList()
             };
 
-            return await SendAndParseAsync(correctionPayload, cancellationToken);
+            return await SendAndParseAsync(correctionPayload, cancellationToken,
+                firstAttempt.Response?.ProposedActions.Count ?? 0);
         }
 
         if (!ShouldRetryEmptyProviderResponse(firstAttempt))
@@ -55,14 +60,18 @@ public sealed class AiProviderResponseResolver
                 .ToList()
         };
 
-        return await SendAndParseAsync(emptyResponseCorrectionPayload, cancellationToken);
+        return await SendAndParseAsync(emptyResponseCorrectionPayload, cancellationToken,
+            firstAttempt.Response?.ProposedActions.Count ?? 0);
     }
 
     private async Task<AiProviderResponseResolution> SendAndParseAsync(
         AiChatPayload providerPayload,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int callsAlreadyObserved = 0)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var providerResult = await _chatProvider.SendAsync(providerPayload, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!providerResult.Succeeded || providerResult.Response is null)
         {
             return AiProviderResponseResolution.Failure(
@@ -70,6 +79,8 @@ public sealed class AiProviderResponseResolver
                 providerResult.Error?.Message ?? "AI provider failed.");
         }
 
+        if (providerResult.Response.ProposedActions.Count > MaximumCallsPerRun - callsAlreadyObserved)
+            return AiProviderResponseResolution.Failure("tool_call_limit_exceeded", "AI tool-call budget exceeded.");
         var parseResult = _structuredActionParser.Parse(providerResult.Response.ProposedActions);
         if (!parseResult.Succeeded)
         {

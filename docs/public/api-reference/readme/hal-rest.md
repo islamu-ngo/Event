@@ -81,7 +81,33 @@ Use the HTTP method and target from HAL. Where the endpoint documents replay pro
 Idempotency-Key: 0198f4a6-7b8c-7def-8123-456789abcdef
 ```
 
-The platform scopes retained write replays by tenant and key for a bounded window. A new business action needs a new key. Idempotency does not replace optimistic concurrency, resource-version checks, provider reconciliation, or domain validation.
+The platform binds a key to the tenant, caller authority, method, target and
+request content. A new business action needs a new key; changing an existing
+operation's request under the same key returns `409 idempotency_key_reuse`.
+Idempotency does not replace optimistic concurrency, resource-version checks,
+provider reconciliation, or domain validation.
+
+Generic response replay retains at most 1 MiB and normally lasts 24 hours;
+feature-specific protected disclosure may expire sooner. Oversized or streamed
+output still reaches the first client without losing its initial bytes, but no
+generic response replay is promised. If the operation may have committed and its
+response is unavailable, a matching retry returns `409` with problem code
+`idempotency_response_unavailable`. The response is private and `no-store`.
+An overlapping request may instead receive `idempotency_request_in_progress`.
+
+On a timeout, connection abort, serialization failure, error response or
+response-unavailable conflict, check current authorized resource/operation status
+and use the feature's documented recovery path. Do not automatically use a new
+key to repeat the same business effect. The old identity remains fenced even
+after its cached response expires; 24 hours is a disclosure window, not permission
+to run an uncertain operation again. Current authentication, authorization and
+tenant lifecycle restrictions still apply before replay or recovery. One-time
+credentials, including API-key issuance, are never stored by generic replay.
+
+For cacheable JSON reads, weak ETags are generated only when the complete response
+fits within 256 KiB. Larger, streaming and non-JSON output has no generated
+validator. HEAD and conditional 304 remain bodyless, and response compression
+does not change the represented content.
 
 ## ProblemDetails
 

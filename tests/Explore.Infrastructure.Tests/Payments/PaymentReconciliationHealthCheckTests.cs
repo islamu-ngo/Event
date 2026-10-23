@@ -11,7 +11,7 @@ public sealed class PaymentReconciliationHealthCheckTests
     [Test]
     public async Task CheckHealthAsync_ReportsOnlyBoundedAggregateFields()
     {
-        var repository = Substitute.For<IRegistrationPaymentAttemptRepository>();
+        var repository = Substitute.For<IPaymentReconciliationAdmission>();
         repository.GetReconciliationHealthAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(new PaymentReconciliationHealth(3, 2, 1, new DateTime(2026, 8, 20, 12, 0, 0, DateTimeKind.Utc), 2));
         var services = new ServiceCollection();
@@ -36,7 +36,7 @@ public sealed class PaymentReconciliationHealthCheckTests
     [Test]
     public async Task CheckHealthAsync_DuplicateSucceededOrdersAreDegradedWithBoundedCode()
     {
-        var repository = Substitute.For<IRegistrationPaymentAttemptRepository>();
+        var repository = Substitute.For<IPaymentReconciliationAdmission>();
         repository.GetReconciliationHealthAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(new PaymentReconciliationHealth(0, 0, 0, null, 0, 1));
         var services = new ServiceCollection();

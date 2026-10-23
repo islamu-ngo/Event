@@ -7,8 +7,8 @@ using Microsoft.Extensions.Options;
 namespace Explore.Infrastructure;
 
 public sealed class EmailDispatchRetentionCleanupService(
-    IEmailDispatchOutboxRepository repository,
-    IUnitOfWork unitOfWork,
+    IEmailRetentionTenantDiscoveryRepository discovery,
+    IEmailRetentionExecutionScopeFactory executionScopes,
     IOptions<EmailDispatchRetentionSettings> settings,
     ILogger<EmailDispatchRetentionCleanupService> logger) : IEmailDispatchRetentionCleanupService
 {
@@ -19,7 +19,7 @@ public sealed class EmailDispatchRetentionCleanupService(
         CancellationToken cancellationToken = default)
     {
         var cutoffUtc = utcNow.AddDays(-_settings.RetentionDays);
-        var tenantIds = await repository.GetRetentionTenantIds(
+        var tenantIds = await discovery.GetTenantIdsAsync(
             cutoffUtc,
             _settings.MaxTenantsPerPass,
             cancellationToken);
@@ -33,8 +33,8 @@ public sealed class EmailDispatchRetentionCleanupService(
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var tenantEligibleCount = await repository.CountRetentionRedactionEligible(
-                    tenantId,
+                await using var scope = await executionScopes.CreateAsync(tenantId, cancellationToken);
+                var tenantEligibleCount = await scope.CountEligibleAsync(
                     cutoffUtc,
                     _settings.BatchSize,
                     cancellationToken);
@@ -42,14 +42,8 @@ public sealed class EmailDispatchRetentionCleanupService(
 
                 if (!_settings.DryRun && tenantEligibleCount > 0)
                 {
-                    redactedCount += await unitOfWork.ExecuteInTransactionAsync(
-                        ct => repository.RedactRetentionEligible(
-                            tenantId,
-                            cutoffUtc,
-                            utcNow,
-                            _settings.BatchSize,
-                            ct),
-                        cancellationToken);
+                    redactedCount += await scope.RedactAsync(
+                        cutoffUtc, utcNow, _settings.BatchSize, cancellationToken);
                 }
 
                 succeededTenantCount++;
@@ -58,10 +52,11 @@ public sealed class EmailDispatchRetentionCleanupService(
             {
                 throw;
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 failedTenantCount++;
-                logger.LogWarning("Email dispatch retention cleanup failed for one tenant: {ExceptionType}", exception.GetType().Name);
+                logger.LogWarning("Email dispatch retention cleanup failed for one tenant. FailureCategory={FailureCategory}",
+                    "retention_cleanup_failed");
             }
         }
 

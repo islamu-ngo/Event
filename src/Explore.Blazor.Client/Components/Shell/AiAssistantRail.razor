@@ -1187,11 +1187,18 @@
             return;
         }
 
+        string? expectedVersion = action.Version;
+        if (string.IsNullOrWhiteSpace(expectedVersion))
+        {
+            ConversationState.SetError("Reload the conversation and review the action before confirming.");
+            return;
+        }
         await RunActionAsync(actionId, async () =>
         {
             var result = await ClientService.ConfirmProposedActionAsync(
                 conversationId,
                 actionId,
+                expectedVersion,
                 $"blazor-ai-confirm-{Guid.CreateVersion7()}");
 
             if (!result.Success)

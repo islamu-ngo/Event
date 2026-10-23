@@ -1,7 +1,6 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Infrastructure.HealthChecks;
 using Explore.Infrastructure.WebPush;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -65,20 +64,19 @@ public sealed class WebPushDispatchHealthCheckTests
         await Assert.That(result.Description).Contains("terminal");
     }
 
-    private static (WebPushDispatchHealthCheck HealthCheck, IWebPushDispatchOutboxRepository Repository) CreateHealthCheck(
+    private static (WebPushDispatchHealthCheck HealthCheck, IWebPushDispatchAdmission Repository) CreateHealthCheck(
         WebPushSettings? settings = null,
         int dueDispatchCount = 0,
         int retryScheduledCount = 0,
         int staleProcessingCount = 0,
         int terminalFailureCount = 0)
     {
-        var repository = Substitute.For<IWebPushDispatchOutboxRepository>();
+        var repository = Substitute.For<IWebPushDispatchAdmission>();
         repository.CountDueDispatchAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(dueDispatchCount);
         repository.CountRetryScheduledAsync(Arg.Any<CancellationToken>()).Returns(retryScheduledCount);
         repository.CountStaleProcessingAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(staleProcessingCount);
         repository.CountTerminalFailureAsync(Arg.Any<CancellationToken>()).Returns(terminalFailureCount);
 
-        var services = new ServiceCollection().AddSingleton(repository).BuildServiceProvider();
         return (new WebPushDispatchHealthCheck(
             Options.Create(settings ?? new WebPushSettings
             {
@@ -90,6 +88,6 @@ public sealed class WebPushDispatchHealthCheckTests
                 HealthStaleProcessingWarningThreshold = 1,
                 HealthTerminalFailureWarningThreshold = 1
             }),
-            services.GetRequiredService<IServiceScopeFactory>()), repository);
+            repository), repository);
     }
 }

@@ -1,0 +1,31 @@
+Change-Id: CHG-01M523RJK79MAESYZWAVN95ZTP
+Title: "Reject retired database default passwords"
+Type: fix
+Scope: self-hosting
+Summary: "Reject the retired explore password and role-name passwords before constructing server database connections; preserve independent password bytes."
+Group: database-default-password-rejection
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Rotate retired default and login-name passwords before restarting server-provider deployments.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Reject known deployment-default and username-equivalent credentials without altering other password bytes.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: .env.example
+    Disposition: documented
+    Detail: Server database role passwords must pass validation before connection construction.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Change the database password and selected secret authority together before restarting; rotation is not automatic.

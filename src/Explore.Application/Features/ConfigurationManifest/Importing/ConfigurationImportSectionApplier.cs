@@ -12,6 +12,7 @@ using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Notifications;
 using Explore.Application.Settings;
 using Explore.Domain;
+using Explore.Domain.Settings;
 using Explore.Domain.Settings.Documents;
 
 public sealed class ConfigurationImportSectionApplier(
@@ -26,7 +27,61 @@ public sealed class ConfigurationImportSectionApplier(
     ITenantSettingsDocumentRepository tenantDocuments,
     ILegalDocumentRepository legalDocuments)
 {
-    public async Task<ImmutableArray<SettingChangedNotification>> ApplyAsync(
+    internal async Task<OriginalSections> CaptureOriginalApplyAsync(
+        Guid operationId, ConfigurationImportTarget target, ReadOnlyMemory<byte> sourceBytes,
+        ConfigurationImportPreviewRequest request, HumanConfigurationImportAuthority authority,
+        DateTime occurredAt, string artifactDigest, ConfigurationImportArtifactParser parser,
+        IHumanConfigurationImportPublicationFactory publicationFactory,
+        OriginalLockGroups originalLocks,
+        CancellationToken cancellationToken)
+    {
+        if (authority.Target != target)
+            throw new UnauthorizedAccessException("Import observation must retain the original target.");
+        var compiled = await CompileSectionsAsync(target, sourceBytes, request, authority.Subject,
+            authority.Subject.PrincipalId, occurredAt, artifactDigest, parser, cancellationToken,
+            effects => publicationFactory.ObservePublicationAsync(authority, operationId, artifactDigest,
+                effects, occurredAt, cancellationToken), originalLocks.Targets);
+        return new(this, operationId, authority.Subject, target, artifactDigest, compiled);
+    }
+
+    internal HumanConfigurationImportApply PrepareAdmittedApply(
+        OriginalSections original, Func<CancellationToken, Task> validateSources)
+    {
+        if (!ReferenceEquals(original.Compiler, this) || Interlocked.Exchange(ref original.Consumed, 1) != 0)
+            throw new UnauthorizedAccessException("Only the original section compiler may admit its observation once.");
+        var compiled = original.Compiled;
+        var publications = compiled.PublicationStore is null ? ImmutableArray<HumanConfigurationImportPublication>.Empty
+            : compiled.Effects.Where(effect => PublicationPolicySettingKeys.All.Contains(effect.Key, StringComparer.Ordinal)
+                    && effect.Kind == HumanSettingsMutationKind.SetValue)
+                .GroupBy(effect => effect.TenantId)
+                .Select(group => new HumanConfigurationImportPublication(original.OperationId, original.Subject,
+                    original.Target, original.Digest, group.Key,
+                    group.Select(effect => new PublicationPolicySettingMutation(effect.Key,
+                        PublicationPolicyMutationKind.Set, effect.Value, group.Key,
+                        group.Key.HasValue ? null : false)).ToImmutableArray(), compiled.PublicationStore))
+                .ToImmutableArray();
+        return new(original.OperationId, original.Subject, original.Target, original.Digest,
+            compiled.Effects, validateSources, token => compiled.Apply(publications, token),
+            publications, compiled.PublicationStore);
+    }
+
+    public Task<ImmutableArray<SettingChangedNotification>> ApplyAsync(
+        ConfigurationImportTarget target,
+        ReadOnlyMemory<byte> sourceBytes,
+        ConfigurationImportPreviewRequest request,
+        HumanCommitSubject subject,
+        Guid actorUserId,
+        DateTime occurredAt,
+        string artifactDigest,
+        ConfigurationImportArtifactParser parser,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        return ApplyCoreAsync(target, sourceBytes, request, subject, actorUserId,
+            occurredAt, artifactDigest, parser, cancellationToken);
+    }
+
+    internal Task<ImmutableArray<SettingChangedNotification>> ApplySetupLiveAsync(
         ConfigurationImportTarget target,
         ReadOnlyMemory<byte> sourceBytes,
         ConfigurationImportPreviewRequest request,
@@ -36,55 +91,167 @@ public sealed class ConfigurationImportSectionApplier(
         ConfigurationImportArtifactParser parser,
         CancellationToken cancellationToken)
     {
+        if (target.Scope != ConfigurationImportScope.Tenant
+            || target.GetSessionStorageKey() == target.AuthorityKey)
+            throw new InvalidOperationException("Setup sections require the enrollment-bound target.");
+        return ApplyCoreAsync(target, sourceBytes, request, null, actorUserId,
+            occurredAt, artifactDigest, parser, cancellationToken);
+    }
+
+    private async Task<ImmutableArray<SettingChangedNotification>> ApplyCoreAsync(
+        ConfigurationImportTarget target,
+        ReadOnlyMemory<byte> sourceBytes,
+        ConfigurationImportPreviewRequest request,
+        HumanCommitSubject? subject,
+        Guid actorUserId,
+        DateTime occurredAt,
+        string artifactDigest,
+        ConfigurationImportArtifactParser parser,
+        CancellationToken cancellationToken)
+    {
+        var compiled = await CompileSectionsAsync(target, sourceBytes, request, subject, actorUserId,
+            occurredAt, artifactDigest, parser, cancellationToken);
+        return await compiled.Apply([], cancellationToken);
+    }
+
+    private async Task<CompiledSections> CompileSectionsAsync(
+        ConfigurationImportTarget target, ReadOnlyMemory<byte> sourceBytes,
+        ConfigurationImportPreviewRequest request, HumanCommitSubject? subject, Guid actorUserId,
+        DateTime occurredAt, string artifactDigest, ConfigurationImportArtifactParser parser,
+        CancellationToken cancellationToken,
+        Func<ImmutableArray<HumanConfigurationImportSettingEffect>, Task<IHumanConfigurationImportPublicationStore>>?
+            observePublication = null,
+        ImmutableDictionary<string, Guid>? originalTargets = null)
+    {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(parser);
-        var selected = request.SelectedSectionKeys.ToHashSet(StringComparer.Ordinal);
-        var deferredNotifications =
-            ImmutableArray.CreateBuilder<SettingChangedNotification>();
+        // Parse a private byte snapshot and persist the very same parsed objects and target IDs
+        // used for effect compilation. Neither caller memory nor a later mapping lookup can
+        // broaden the active proof after its artifact digest has been checked.
+        sourceBytes = sourceBytes.ToArray();
+        var selected = request.SelectedSectionKeys.ToImmutableHashSet(StringComparer.Ordinal);
+        var mappings = request.Mappings.ToImmutableDictionary(StringComparer.Ordinal);
+        SettingsMutationOperation operation = target.Scope == ConfigurationImportScope.Instance
+            ? SettingsMutationOperation.ConfigurationInstanceImport
+            : SettingsMutationOperation.ConfigurationTenantImport;
+        ConfigurationManifestInstanceV1Alpha2? instance = null;
+        var tenantSections = ImmutableArray.CreateBuilder<(Guid TenantId, ConfigurationManifestTenantSpecV1Alpha2 Spec)>();
+        var effects = ImmutableArray.CreateBuilder<HumanConfigurationImportSettingEffect>();
         if (target.Scope == ConfigurationImportScope.Instance)
         {
-            ConfigurationManifestV1Alpha2 manifest = parser.Parse(sourceBytes).Manifest;
-            await ApplyInstanceAsync(
-                manifest.Spec.Instance,
-                selected,
-                actorUserId,
-                occurredAt,
-                artifactDigest,
-                deferredNotifications,
-                cancellationToken);
-            await ApplyManifestTenantsAsync(
-                manifest.Spec.Tenants,
-                selected,
-                request.Mappings,
-                actorUserId,
-                occurredAt,
-                artifactDigest,
-                deferredNotifications,
-                cancellationToken);
-            return deferredNotifications.ToImmutable();
+            var parsed = parser.Parse(sourceBytes);
+            RequireDigest(parsed.Sha256Digest);
+            instance = parsed.Manifest.Spec.Instance;
+            if (selected.Contains("instance.settings"))
+                AddEffects(null, instance.Settings);
+            if (selected.Any(section => section.StartsWith("tenant.", StringComparison.Ordinal)))
+            {
+                var sources = parsed.Manifest.Spec.Tenants;
+                string[] slugs = sources.Select(source => ResolveTargetSlug(source.Metadata.Name, mappings)).ToArray();
+                if (slugs.Distinct(StringComparer.Ordinal).Count() != slugs.Length)
+                    throw Blocked("configuration_import_mapping_target_duplicate");
+                var bySlug = originalTargets ?? (await tenants.GetBySlugsAsNoTrackingAsync(slugs, cancellationToken))
+                    .ToImmutableDictionary(tenant => tenant.Slug, tenant => tenant.Id, StringComparer.Ordinal);
+                foreach (var source in sources)
+                {
+                    if (!bySlug.TryGetValue(ResolveTargetSlug(source.Metadata.Name, mappings), out Guid tenantId))
+                        throw Blocked("configuration_import_mapping_target_missing");
+                    tenantSections.Add((tenantId, source.Spec));
+                }
+            }
+        }
+        else
+        {
+            var parsed = parser.ParseTenantPackage(sourceBytes);
+            RequireDigest(parsed.Sha256Digest);
+            var spec = parsed.Package.Spec;
+            tenantSections.Add((target.TenantId
+                ?? throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.TargetMismatch),
+                new ConfigurationManifestTenantSpecV1Alpha2
+                {
+                    DisplayName = spec.DisplayName,
+                    Settings = spec.Settings,
+                    Documents = spec.Documents,
+                    LegalDocuments = spec.LegalDocuments
+                }));
+        }
+        var resolvedTenants = tenantSections.ToImmutable();
+        if (selected.Contains("tenant.settings"))
+            foreach (var tenant in resolvedTenants)
+                AddEffects(tenant.TenantId, tenant.Spec.Settings);
+
+        var frozenEffects = effects.ToImmutable();
+        var publicationEffects = frozenEffects.Where(effect =>
+            PublicationPolicySettingKeys.All.Contains(effect.Key, StringComparer.Ordinal)).ToImmutableArray();
+        var publicationStore = observePublication is not null && !publicationEffects.IsEmpty
+            ? await observePublication(publicationEffects) : null;
+        return new(frozenEffects, publicationStore, async (publications, token) =>
+        {
+            var notifications = ImmutableArray.CreateBuilder<SettingChangedNotification>();
+            if (instance is not null)
+                await ApplyInstanceAsync(instance, selected, subject!, operation, actorUserId,
+                    occurredAt, artifactDigest, notifications, token,
+                    publications.SingleOrDefault(publication => publication.TenantId is null));
+            foreach (var tenant in resolvedTenants)
+                await ApplyTenantAsync(tenant.TenantId, tenant.Spec.DisplayName, tenant.Spec.Settings,
+                    tenant.Spec.Documents, tenant.Spec.LegalDocuments, selected, subject, operation,
+                    actorUserId, occurredAt, artifactDigest, notifications, token,
+                    publications.SingleOrDefault(publication => publication.TenantId == tenant.TenantId));
+            return notifications.ToImmutable();
+        });
+
+        void RequireDigest(string digest)
+        {
+            if (!string.Equals(digest, artifactDigest, StringComparison.Ordinal))
+                throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.ArtifactIntegrityInvalid);
         }
 
-        TenantConfigurationPackageV1Alpha2 package =
-            parser.ParseTenantPackage(sourceBytes).Package;
-        await ApplyTenantAsync(
-            target.TenantId
-                ?? throw new ConfigurationImportSessionException(
-                    ConfigurationImportFailureCodes.TargetMismatch),
-            package.Spec.DisplayName,
-            package.Spec.Settings,
-            package.Spec.Documents,
-            package.Spec.LegalDocuments,
-            selected,
-            actorUserId,
-            occurredAt,
-            artifactDigest,
-            deferredNotifications,
-            cancellationToken);
-        return deferredNotifications.ToImmutable();
+        void AddEffects(Guid? tenantId, IReadOnlyDictionary<string, JsonElement> settings)
+        {
+            var scope = tenantId.HasValue ? SettingScope.Tenant : SettingScope.Instance;
+            foreach (var pair in settings.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                effects.Add(new(scope, tenantId, pair.Key, HumanSettingsMutationKind.SetValue, pair.Value.GetRawText()));
+                // These exact import boundaries replace the lock field with false. Resource
+                // value writes and tenant coordinated writes preserve it and get no lock grant.
+                if (!EventResourceSettingMutationGuard.Handles(pair.Key)
+                    && (!tenantId.HasValue
+                        || !ConfigurationManifestCatalog.TenantSettings[pair.Key].Definition.RequiresCoordinatedMutation))
+                    effects.Add(new(scope, tenantId, pair.Key, HumanSettingsMutationKind.SetLock, IsLocked: false));
+            }
+        }
+    }
+
+    internal sealed record CompiledSections(ImmutableArray<HumanConfigurationImportSettingEffect> Effects,
+        IHumanConfigurationImportPublicationStore? PublicationStore,
+        Func<ImmutableArray<HumanConfigurationImportPublication>, CancellationToken,
+            Task<ImmutableArray<SettingChangedNotification>>> Apply);
+
+    internal sealed class OriginalSections(ConfigurationImportSectionApplier compiler, Guid operationId,
+        HumanCommitSubject subject, ConfigurationImportTarget target, string digest, CompiledSections compiled)
+    {
+        internal ConfigurationImportSectionApplier Compiler => compiler;
+        internal Guid OperationId => operationId;
+        internal HumanCommitSubject Subject => subject;
+        internal ConfigurationImportTarget Target => target;
+        internal string Digest => digest;
+        internal CompiledSections Compiled => compiled;
+        internal int Consumed;
     }
 
     public async Task<IReadOnlyList<IReadOnlyList<string>>> CompileLockGroupsAsync(
+        ConfigurationImportTarget target,
+        ReadOnlyMemory<byte> sourceBytes,
+        ConfigurationImportPreviewRequest request,
+        ConfigurationImportArtifactParser parser,
+        CancellationToken cancellationToken) =>
+        (await CaptureLockGroupsAsync(target, sourceBytes, request, parser, cancellationToken)).Groups;
+
+    internal sealed record OriginalLockGroups(IReadOnlyList<IReadOnlyList<string>> Groups,
+        ImmutableDictionary<string, Guid> Targets);
+
+    internal async Task<OriginalLockGroups> CaptureLockGroupsAsync(
         ConfigurationImportTarget target,
         ReadOnlyMemory<byte> sourceBytes,
         ConfigurationImportPreviewRequest request,
@@ -93,6 +260,7 @@ public sealed class ConfigurationImportSectionApplier(
     {
         ArgumentNullException.ThrowIfNull(target);
         var resources = new HashSet<string>(StringComparer.Ordinal);
+        var retainedTargets = ImmutableDictionary<string, Guid>.Empty;
         var selected = request.SelectedSectionKeys.ToHashSet(StringComparer.Ordinal);
         if (target.Scope == ConfigurationImportScope.Instance)
         {
@@ -127,6 +295,7 @@ public sealed class ConfigurationImportSectionApplier(
                     tenant => tenant.Slug,
                     tenant => tenant.Id,
                     StringComparer.Ordinal);
+                retainedTargets = targetIds.ToImmutableDictionary(StringComparer.Ordinal);
                 foreach (ConfigurationManifestTenantV1Alpha2 tenant in manifest.Spec.Tenants)
                 {
                     string targetSlug = ResolveTargetSlug(
@@ -155,21 +324,24 @@ public sealed class ConfigurationImportSectionApplier(
                 target.TenantId!.Value);
         }
 
-        return new IReadOnlyList<string>[]
+        return new(new IReadOnlyList<string>[]
         {
             [$"!configuration-import:{target.AuthorityKey}"],
             [.. resources.Order(StringComparer.Ordinal)]
-        };
+        }, retainedTargets);
     }
 
     private async Task ApplyInstanceAsync(
         ConfigurationManifestInstanceV1Alpha2 source,
         IReadOnlySet<string> selected,
+        HumanCommitSubject subject,
+        SettingsMutationOperation operation,
         Guid actorUserId,
         DateTime occurredAt,
         string artifactDigest,
         ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        HumanConfigurationImportPublication? publication = null)
     {
         if (selected.Contains("instance.settings") && source.Settings.Count > 0)
         {
@@ -187,6 +359,8 @@ public sealed class ConfigurationImportSectionApplier(
                                 pair.Key,
                                 EventResourceSettingMutationKind.SetValue,
                                 pair.Value.GetRawText()))],
+                        subject,
+                        operation,
                         actorUserId,
                         cancellationToken);
                 EnsureResourceAccepted(resourceResult);
@@ -196,11 +370,18 @@ public sealed class ConfigurationImportSectionApplier(
 
             ConfigurationManifestInstanceSettingMutation[] remaining =
             [.. source.Settings
-                .Where(pair => !EventResourceSettingMutationGuard.Handles(pair.Key))
+                .Where(pair => !EventResourceSettingMutationGuard.Handles(pair.Key)
+                    && (publication is null || !PublicationPolicySettingKeys.All.Contains(pair.Key, StringComparer.Ordinal)))
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => new ConfigurationManifestInstanceSettingMutation(
                     pair.Key,
                     pair.Value.GetRawText()))];
+            if (publication is not null)
+            {
+                var published = await publicationPolicy.ApplyImportInCurrentTransactionAsync(publication, cancellationToken);
+                Ensure(published.Success, published.FailureCode, published.Message);
+                deferredNotifications.AddRange(published.DeferredNotifications);
+            }
             if (remaining.Length > 0)
             {
                 ConfigurationManifestInstanceSettingMutationResult result =
@@ -240,48 +421,8 @@ public sealed class ConfigurationImportSectionApplier(
                 tenantId: null,
                 source.LegalDocuments,
                 artifactDigest,
-                occurredAt,
-                cancellationToken);
-        }
-    }
-
-    private async Task ApplyManifestTenantsAsync(
-        IReadOnlyList<ConfigurationManifestTenantV1Alpha2> sourceTenants,
-        IReadOnlySet<string> selected,
-        IReadOnlyDictionary<string, string> mappings,
-        Guid actorUserId,
-        DateTime occurredAt,
-        string artifactDigest,
-        ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
-        CancellationToken cancellationToken)
-    {
-        if (!selected.Any(section => section.StartsWith("tenant.", StringComparison.Ordinal)))
-            return;
-        string[] targetSlugs = sourceTenants
-            .Select(tenant => ResolveTargetSlug(tenant.Metadata.Name, mappings))
-            .ToArray();
-        if (targetSlugs.Distinct(StringComparer.Ordinal).Count() != targetSlugs.Length)
-            throw Blocked("configuration_import_mapping_target_duplicate");
-        IReadOnlyList<Tenant> existing = await tenants.GetBySlugsAsNoTrackingAsync(
-            targetSlugs,
-            cancellationToken);
-        var bySlug = existing.ToDictionary(tenant => tenant.Slug, StringComparer.Ordinal);
-        foreach (ConfigurationManifestTenantV1Alpha2 source in sourceTenants)
-        {
-            string targetSlug = ResolveTargetSlug(source.Metadata.Name, mappings);
-            if (!bySlug.TryGetValue(targetSlug, out Tenant? target))
-                throw Blocked("configuration_import_mapping_target_missing");
-            await ApplyTenantAsync(
-                target.Id,
-                source.Spec.DisplayName,
-                source.Spec.Settings,
-                source.Spec.Documents,
-                source.Spec.LegalDocuments,
-                selected,
                 actorUserId,
                 occurredAt,
-                artifactDigest,
-                deferredNotifications,
                 cancellationToken);
         }
     }
@@ -293,11 +434,14 @@ public sealed class ConfigurationImportSectionApplier(
         IReadOnlyDictionary<string, ConfigurationManifestDocumentV1Alpha2> documents,
         IReadOnlyDictionary<string, ConfigurationManifestLegalDocumentV1Alpha2> legal,
         IReadOnlySet<string> selected,
+        HumanCommitSubject? subject,
+        SettingsMutationOperation operation,
         Guid actorUserId,
         DateTime occurredAt,
         string artifactDigest,
         ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        HumanConfigurationImportPublication? publication = null)
     {
         if (selected.Contains("tenant.settings"))
         {
@@ -315,8 +459,9 @@ public sealed class ConfigurationImportSectionApplier(
                 .ToArray();
             if (guarded.Length > 0)
             {
-                PublicationPolicyMutationResult result =
-                    await publicationPolicy.ApplyTenantInCurrentTransactionAsync(
+                PublicationPolicyMutationResult result = publication is not null
+                    ? await publicationPolicy.ApplyImportInCurrentTransactionAsync(publication, cancellationToken)
+                    : await publicationPolicy.ApplyTenantInCurrentTransactionAsync(
                         new PublicationPolicyTenantMutationRequest(
                             tenantId,
                             actorUserId,
@@ -331,6 +476,7 @@ public sealed class ConfigurationImportSectionApplier(
                             PublicationPolicyLockedSystemBehavior.Reject),
                         cancellationToken);
                 Ensure(result.Success, result.FailureCode, result.Message);
+                deferredNotifications.AddRange(result.DeferredNotifications);
             }
 
             EventResourceSettingMutation[] resourceMutations = settings
@@ -344,11 +490,11 @@ public sealed class ConfigurationImportSectionApplier(
                 .ToArray();
             if (resourceMutations.Length > 0)
             {
-                EventResourceSettingsWriteResult resourceResult =
-                    await eventResourceSettingsWriter.ApplyAsync(
-                        [.. resourceMutations],
-                        actorUserId,
-                        cancellationToken);
+                EventResourceSettingsWriteResult resourceResult = subject is null
+                    ? await eventResourceSettingsWriter.ApplyInternalAsync(
+                        [.. resourceMutations], actorUserId, cancellationToken)
+                    : await eventResourceSettingsWriter.ApplyAsync(
+                        [.. resourceMutations], subject, operation, actorUserId, cancellationToken);
                 EnsureResourceAccepted(resourceResult);
                 deferredNotifications.AddRange(
                     resourceResult.DeferredNotifications);
@@ -385,6 +531,7 @@ public sealed class ConfigurationImportSectionApplier(
                 tenantId,
                 legal,
                 artifactDigest,
+                actorUserId,
                 occurredAt,
                 cancellationToken);
         }
@@ -405,34 +552,14 @@ public sealed class ConfigurationImportSectionApplier(
                 ConfigurationManifestCatalog.TenantDocuments[
                     SettingsDocumentKeys.Tenant.Branding];
             string payload = branding.Payload.GetRawText();
-            TenantSettingsDocument? current =
-                await tenantDocuments.GetTrackedByTenantAndDocumentKey(
-                    tenantId,
-                    SettingsDocumentKeys.Tenant.Branding,
-                    cancellationToken);
-            if (current is null)
-            {
-                current = TenantSettingsDocument.Create(
-                    tenantId,
-                    SettingsDocumentKeys.Tenant.Branding,
-                    branding.SchemaVersion,
-                    catalog.DefaultsVersion!,
-                    payload);
-                current.Id = Guid.CreateVersion7();
-                current.CreatedAt = occurredAt;
-                current.CreatedBy = actorUserId;
-                await tenantDocuments.Create(current);
-            }
-            else
-            {
-                current.UpdatePayload(
-                    branding.SchemaVersion,
-                    catalog.DefaultsVersion!,
-                    payload);
-                current.UpdatedAt = occurredAt;
-                current.UpdatedBy = actorUserId;
-                await tenantDocuments.Update(current);
-            }
+            await tenantDocuments.ApplyBrandingImportAsync(
+                tenantId,
+                branding.SchemaVersion,
+                catalog.DefaultsVersion!,
+                payload,
+                actorUserId,
+                occurredAt,
+                cancellationToken);
         }
 
         if (documents.TryGetValue(
@@ -459,17 +586,19 @@ public sealed class ConfigurationImportSectionApplier(
         Guid? tenantId,
         IReadOnlyDictionary<string, ConfigurationManifestLegalDocumentV1Alpha2> source,
         string artifactDigest,
+        Guid actorUserId,
         DateTime occurredAt,
         CancellationToken cancellationToken)
     {
         foreach ((string code, ConfigurationManifestLegalDocumentV1Alpha2 portable)
                  in source.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
-            if (!LegalDocumentKindCatalog.TryGet(
+            if (!Enum.TryParse<LegalDocumentKind>(
                     code,
-                    out LegalDocumentKindDescriptor? descriptor)
-                || descriptor is null
-                || descriptor.Scope != scope
+                    ignoreCase: false,
+                    out LegalDocumentKind kind)
+                || !Enum.IsDefined(kind)
+                || LegalDocumentKindCatalog.Get(kind).Scope != scope
                 || !Enum.TryParse(
                     portable.Audience,
                     ignoreCase: false,
@@ -499,23 +628,23 @@ public sealed class ConfigurationImportSectionApplier(
             LegalDocument? current = await legalDocuments.GetForUpdateAsync(
                 scope,
                 tenantId,
-                descriptor.Kind,
+                kind,
                 cancellationToken);
             string sourceOrigin = $"sha256:{artifactDigest}";
             if (current is null)
             {
-                await legalDocuments.AddAsync(
-                    LegalDocument.CreateImportedDraft(
-                        scope,
-                        tenantId,
-                        descriptor.Kind,
-                        audience,
-                        localizations,
-                        provenance,
-                        sourceOrigin,
-                        portable.RequiresFreshAcceptance,
-                        occurredAt),
-                    cancellationToken);
+                current = LegalDocument.CreateImportedDraft(
+                    scope,
+                    tenantId,
+                    kind,
+                    audience,
+                    localizations,
+                    provenance,
+                    sourceOrigin,
+                    portable.RequiresFreshAcceptance,
+                    occurredAt);
+                current.CreatedBy = actorUserId;
+                await legalDocuments.AddAsync(current, cancellationToken);
             }
             else
             {
@@ -526,7 +655,9 @@ public sealed class ConfigurationImportSectionApplier(
                     sourceOrigin,
                     portable.RequiresFreshAcceptance,
                     occurredAt);
+                current.UpdatedBy = actorUserId;
             }
+            await legalDocuments.SaveImportedAsync(current, cancellationToken);
         }
     }
 
@@ -609,6 +740,8 @@ public sealed class ConfigurationImportSectionApplier(
         ISet<string> resources,
         IEnumerable<string> settingKeys)
     {
+        if (settingKeys.Any(key => PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal)))
+            resources.UnionWith(PublicationPolicySettingKeys.All);
         if (settingKeys.Any(EventResourceSettingMutationGuard.Handles))
             resources.UnionWith(EventResourceSettingMutationGuard.Keys);
     }

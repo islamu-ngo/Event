@@ -13,7 +13,6 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IO;
@@ -237,6 +236,43 @@ public class IdempotencyMiddlewareTests
         await Assert.That(result.NextCallCount).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task ReceiptStore_WhenDescriptorMismatches_DoesNotExposeExistingReceipt()
+    {
+        var repository = new InMemoryIdempotencyRepository();
+        var now = DateTime.UtcNow;
+        var record = new IdempotencyRecord
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = Guid.CreateVersion7(),
+            Key = "receipt-store-key",
+            UserId = "test-user",
+            RequestMethod = HttpMethods.Post,
+            RequestTarget = "/api/idempotency-test",
+            RequestContentType = "application/json",
+            RequestBodyHash = "original-body-hash",
+            PrincipalFingerprint = "principal-fingerprint",
+            StatusCode = IdempotencyRecord.InProgressStatusCode,
+            CreatedAt = now,
+            ExpiresAt = now.AddHours(1)
+        };
+
+        var claim = await repository.TryClaimAsync(record);
+        using var owner = claim.Owner;
+        var matching = await repository.LookupAsync(
+            IdempotencyRequestDescriptor.FromRecord(record),
+            now);
+        var mismatch = await repository.LookupAsync(
+            IdempotencyRequestDescriptor.FromRecord(record) with { RequestTarget = "/api/other" },
+            now);
+
+        await Assert.That(claim.IsOwner).IsTrue();
+        await Assert.That(matching.Outcome).IsEqualTo(IdempotencyLookupOutcome.Existing);
+        await Assert.That(matching.Record).IsEqualTo(record);
+        await Assert.That(mismatch.Outcome).IsEqualTo(IdempotencyLookupOutcome.RequestMismatch);
+        await Assert.That(mismatch.Record).IsNull();
+    }
+
     private static async Task<MiddlewareResult> InvokeAsync(
         string? idempotencyKey,
         bool requiresIdempotencyKey = true,
@@ -249,7 +285,7 @@ public class IdempotencyMiddlewareTests
         var services = new ServiceCollection()
             .AddSingleton<ITenantContext>(new StaticTenantContext(tenantId ?? Guid.CreateVersion7()))
             .AddSingleton(idempotencyRepository)
-            .AddSingleton<IProblemDetailsService, IdempotencyMiddlewareRealRuntimeTests.JsonProblemDetailsService>()
+            .AddSingleton<IProblemDetailsService, IdempotencyMiddlewareReceiptStateTests.JsonProblemDetailsService>()
             .BuildServiceProvider();
         var nextCallCount = 0;
         var context = new DefaultHttpContext
@@ -311,80 +347,180 @@ public class IdempotencyMiddlewareTests
     private sealed class InMemoryIdempotencyRepository : IIdempotencyRepository
     {
         private readonly object _sync = new();
-        private readonly Dictionary<(Guid TenantId, string Key), IdempotencyRecord> _records = [];
+        private readonly Dictionary<(Guid TenantId, string Key), Receipt> _receipts = [];
 
-        public Task<IdempotencyRecord?> FindAsync(string key, Guid tenantId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(_records.GetValueOrDefault((tenantId, key)));
-
-        public Task SaveAsync(IdempotencyRecord record, CancellationToken cancellationToken = default)
+        public Task<IdempotencyLookup> LookupAsync(
+            IdempotencyRequestDescriptor request,
+            DateTime utcNow,
+            CancellationToken cancellationToken = default)
         {
-            _records[(record.TenantId, record.Key)] = record;
-            return Task.CompletedTask;
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_sync)
+            {
+                return Task.FromResult(Lookup(request, utcNow));
+            }
         }
 
         public Task<IdempotencyClaim> TryClaimAsync(
             IdempotencyRecord record,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lock (_sync)
             {
-                if (_records.TryGetValue((record.TenantId, record.Key), out var existing))
+                var descriptor = IdempotencyRequestDescriptor.FromRecord(record);
+                if (_receipts.ContainsKey((record.TenantId, record.Key)))
                 {
-                    return Task.FromResult(new IdempotencyClaim(existing, IsOwner: false));
+                    return Task.FromResult(new IdempotencyClaim(
+                        Lookup(descriptor, record.CreatedAt),
+                        Owner: null));
                 }
 
-                _records[(record.TenantId, record.Key)] = record;
-                return Task.FromResult(new IdempotencyClaim(record, IsOwner: true));
+                var receipt = new Receipt(record, descriptor);
+                var owner = new ReceiptOwner(this, descriptor, record.Id);
+                receipt.Owner = owner;
+                _receipts.Add((record.TenantId, record.Key), receipt);
+                return Task.FromResult(new IdempotencyClaim(
+                    new IdempotencyLookup(IdempotencyLookupOutcome.Absent, record),
+                    owner));
             }
         }
 
         public Task<bool> CompleteAsync(
-            Guid recordId,
+            IIdempotencyClaimOwner owner,
             int statusCode,
             string? responseBody,
             string? contentType,
             CancellationToken cancellationToken = default)
         {
-            var record = _records.Values.FirstOrDefault(candidate => candidate.Id == recordId);
-            if (record is null || record.StatusCode != IdempotencyRecord.InProgressStatusCode)
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_sync)
             {
-                return Task.FromResult(false);
-            }
+                if (owner is not ReceiptOwner receiptOwner
+                    || !_receipts.TryGetValue(
+                        (receiptOwner.Descriptor.TenantId, receiptOwner.Descriptor.Key),
+                        out var receipt)
+                    || !ReferenceEquals(receipt.Owner, receiptOwner)
+                    || !receiptOwner.CanComplete(this, receipt.Descriptor, receipt.Record.Id)
+                    || receipt.Record.StatusCode != IdempotencyRecord.InProgressStatusCode)
+                {
+                    return Task.FromResult(false);
+                }
 
-            record.StatusCode = statusCode;
-            record.ResponseBody = responseBody;
-            record.ContentType = contentType;
-            return Task.FromResult(true);
+                receipt.Record.StatusCode = statusCode;
+                receipt.Record.ResponseBody = responseBody;
+                receipt.Record.ContentType = contentType;
+                receiptOwner.Spend();
+                return Task.FromResult(true);
+            }
         }
 
-        public Task<bool> ReleaseAsync(Guid recordId, CancellationToken cancellationToken = default)
+        public Task<int> CountExpiredAsync(DateTime expiresBeforeUtc, int batchSize, CancellationToken cancellationToken = default)
         {
-            var pair = _records.FirstOrDefault(candidate => candidate.Value.Id == recordId);
-            if (pair.Value is null || pair.Value.StatusCode != IdempotencyRecord.InProgressStatusCode)
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_sync)
             {
-                return Task.FromResult(false);
+                return Task.FromResult(_receipts.Values
+                    .Select(receipt => receipt.Record)
+                    .Where(record => record.ExpiresAt <= expiresBeforeUtc
+                        && record.StatusCode != IdempotencyRecord.ResponseUnavailableStatusCode)
+                    .OrderBy(record => record.ExpiresAt)
+                    .Take(batchSize)
+                    .Count());
             }
-
-            _records.Remove(pair.Key);
-            return Task.FromResult(true);
         }
 
-        public Task<int> CountExpiredAsync(DateTime expiresBeforeUtc, int batchSize, CancellationToken cancellationToken = default) =>
-            Task.FromResult(0);
+        public Task<int> ScrubExpiredAsync(DateTime expiresBeforeUtc, int batchSize, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_sync)
+            {
+                var expired = _receipts.Values
+                    .Select(receipt => receipt.Record)
+                    .Where(record => record.ExpiresAt <= expiresBeforeUtc
+                        && record.StatusCode != IdempotencyRecord.ResponseUnavailableStatusCode)
+                    .OrderBy(record => record.ExpiresAt)
+                    .Take(batchSize)
+                    .ToArray();
+                foreach (var record in expired)
+                {
+                    record.StatusCode = IdempotencyRecord.ResponseUnavailableStatusCode;
+                    record.ResponseBody = null;
+                    record.ContentType = null;
+                }
+                return Task.FromResult(expired.Length);
+            }
+        }
 
-        public Task<int> DeleteExpiredAsync(DateTime expiresBeforeUtc, int batchSize, CancellationToken cancellationToken = default) =>
-            Task.FromResult(0);
+        private IdempotencyLookup Lookup(IdempotencyRequestDescriptor request, DateTime utcNow)
+        {
+            if (!_receipts.TryGetValue((request.TenantId, request.Key), out var receipt))
+            {
+                return new IdempotencyLookup(IdempotencyLookupOutcome.Absent, null);
+            }
+
+            ScrubExpiredReceipt(receipt.Record, utcNow);
+            return receipt.Descriptor == request
+                ? new IdempotencyLookup(IdempotencyLookupOutcome.Existing, receipt.Record)
+                : new IdempotencyLookup(IdempotencyLookupOutcome.RequestMismatch, null);
+        }
+
+        private static void ScrubExpiredReceipt(IdempotencyRecord record, DateTime utcNow)
+        {
+            if (record.ExpiresAt <= utcNow
+                && record.StatusCode != IdempotencyRecord.ResponseUnavailableStatusCode)
+            {
+                record.StatusCode = IdempotencyRecord.ResponseUnavailableStatusCode;
+                record.ResponseBody = null;
+                record.ContentType = null;
+            }
+        }
+
+        private sealed class Receipt(
+            IdempotencyRecord record,
+            IdempotencyRequestDescriptor descriptor)
+        {
+            public IdempotencyRecord Record { get; } = record;
+
+            public IdempotencyRequestDescriptor Descriptor { get; } = descriptor;
+
+            public ReceiptOwner? Owner { get; set; }
+        }
+
+        private sealed class ReceiptOwner(
+            InMemoryIdempotencyRepository issuer,
+            IdempotencyRequestDescriptor descriptor,
+            Guid receiptId) : IIdempotencyClaimOwner
+        {
+            private readonly InMemoryIdempotencyRepository _issuer = issuer;
+            private readonly Guid _receiptId = receiptId;
+            private bool _disposed;
+            private bool _spent;
+
+            public IdempotencyRequestDescriptor Descriptor { get; } = descriptor;
+
+            public bool CanComplete(
+                InMemoryIdempotencyRepository issuer,
+                IdempotencyRequestDescriptor descriptor,
+                Guid receiptId) =>
+                ReferenceEquals(_issuer, issuer)
+                && Descriptor == descriptor
+                && _receiptId == receiptId
+                && !_disposed
+                && !_spent;
+
+            public void Spend() => _spent = true;
+
+            public void Dispose() => _disposed = true;
+        }
     }
 
     private sealed class FailingIdempotencyRepository : IIdempotencyRepository
     {
-        public Task<IdempotencyRecord?> FindAsync(
-            string key,
-            Guid tenantId,
+        public Task<IdempotencyLookup> LookupAsync(
+            IdempotencyRequestDescriptor request,
+            DateTime utcNow,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IdempotencyRecord?>(null);
-
-        public Task SaveAsync(IdempotencyRecord record, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Idempotency storage is unavailable.");
 
         public Task<IdempotencyClaim> TryClaimAsync(
@@ -393,27 +529,24 @@ public class IdempotencyMiddlewareTests
             throw new InvalidOperationException("Idempotency storage is unavailable.");
 
         public Task<bool> CompleteAsync(
-            Guid recordId,
+            IIdempotencyClaimOwner owner,
             int statusCode,
             string? responseBody,
             string? contentType,
             CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException("Idempotency storage is unavailable.");
-
-        public Task<bool> ReleaseAsync(Guid recordId, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Idempotency storage is unavailable.");
 
         public Task<int> CountExpiredAsync(
             DateTime expiresBeforeUtc,
             int batchSize,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(0);
+            throw new InvalidOperationException("Idempotency storage is unavailable.");
 
-        public Task<int> DeleteExpiredAsync(
+        public Task<int> ScrubExpiredAsync(
             DateTime expiresBeforeUtc,
             int batchSize,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(0);
+            throw new InvalidOperationException("Idempotency storage is unavailable.");
     }
 
 }

@@ -339,7 +339,7 @@ public static class GovernanceSettingKeys
         public const string Enabled = "ai_assistant.enabled";
         public const string Provider = "ai_assistant.provider";
         public const string EndpointUrl = "ai_assistant.endpoint_url";
-        public const string ApiKey = "ai_assistant.api_key";
+        public const string CredentialScope = "ai_assistant.credential_scope";
         public const string ModelId = "ai_assistant.model_id";
         public const string AllowedModelIds = "ai_assistant.allowed_model_ids";
         public const string MaxInputTokens = "ai_assistant.max_input_tokens";

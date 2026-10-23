@@ -9,11 +9,12 @@ namespace Explore.Application.DTOs.ExternalApiKey.Validators;
 
 internal class UpdateExternalApiKeyPolicyDtoValidator : AbstractValidator<UpdateExternalApiKeyPolicyDto>
 {
-    private readonly IExternalApiKeyRepository _externalApiKeyRepository;
+    private readonly Func<string, CancellationToken, Task<bool>> _nameExists;
 
-    public UpdateExternalApiKeyPolicyDtoValidator(IExternalApiKeyRepository externalApiKeyRepository, Explore.Domain.ExternalApiKey existingApiKey)
+    public UpdateExternalApiKeyPolicyDtoValidator(
+        Func<string, CancellationToken, Task<bool>> nameExists, Explore.Domain.ExternalApiKey existingApiKey)
     {
-        _externalApiKeyRepository = externalApiKeyRepository;
+        _nameExists = nameExists;
 
         RuleFor(x => x)
             .Must(x => x.Metadata is not null || x.AccessPolicy is not null)
@@ -49,19 +50,6 @@ internal class UpdateExternalApiKeyPolicyDtoValidator : AbstractValidator<Update
             return true;
         }
 
-        if (existingApiKey.OwnerType == ExternalApiKeyOwnerType.InstanceAdmin)
-        {
-            return !await _externalApiKeyRepository.ExistsByOwnerAndNameIgnoringTenantFilter(
-                existingApiKey.OwnerType,
-                existingApiKey.OwnerId,
-                name,
-                cancellationToken);
-        }
-
-        return !await _externalApiKeyRepository.ExistsByOwnerAndName(
-            existingApiKey.OwnerType,
-            existingApiKey.OwnerId,
-            name,
-            cancellationToken);
+        return !await _nameExists(name, cancellationToken);
     }
 }

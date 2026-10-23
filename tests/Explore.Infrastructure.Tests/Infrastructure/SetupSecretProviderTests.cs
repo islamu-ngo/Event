@@ -349,11 +349,11 @@ public class SetupSecretProviderTests
     [Test]
     public async Task InitializeAsync_WhenBootstrapStateCannotBeRead_FailsClosed()
     {
-        var repository = Substitute.For<IInstanceBootstrapStateRepository>();
+        var repository = Substitute.For<IInstanceBootstrapStateReader>();
         repository.GetCurrent(Arg.Any<CancellationToken>())
             .Returns<Task<InstanceBootstrapState?>>(_ => throw new InvalidOperationException("database unavailable"));
         var scope = Substitute.For<IServiceScope>();
-        scope.ServiceProvider.GetService(typeof(IInstanceBootstrapStateRepository)).Returns(repository);
+        scope.ServiceProvider.GetService(typeof(IInstanceBootstrapStateReader)).Returns(repository);
         var scopeFactory = Substitute.For<IServiceScopeFactory>();
         scopeFactory.CreateScope().Returns(scope);
         var provider = new SetupSecretProvider(new ConfigurationBuilder().Build(), scopeFactory);
@@ -392,11 +392,11 @@ public class SetupSecretProviderTests
 
     private static IServiceScopeFactory CreateScopeFactory(InstanceBootstrapState? bootstrapState)
     {
-        var repository = Substitute.For<IInstanceBootstrapStateRepository>();
+        var repository = Substitute.For<IInstanceBootstrapStateReader>();
         repository.GetCurrent().Returns(Task.FromResult(bootstrapState));
 
         var scope = Substitute.For<IServiceScope>();
-        scope.ServiceProvider.GetService(typeof(IInstanceBootstrapStateRepository)).Returns(repository);
+        scope.ServiceProvider.GetService(typeof(IInstanceBootstrapStateReader)).Returns(repository);
 
         var scopeFactory = Substitute.For<IServiceScopeFactory>();
         scopeFactory.CreateScope().Returns(scope);

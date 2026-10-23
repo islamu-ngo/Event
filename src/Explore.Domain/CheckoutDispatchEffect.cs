@@ -32,12 +32,17 @@ public sealed class CheckoutDispatchEffect : ITenantEntity, IAuditableEntity
     public Guid? UpdatedBy { get; set; }
 
     public static CheckoutDispatchEffect Create(PaymentAttempt attempt, DateTime createdAt)
+        => Create(Guid.CreateVersion7(), attempt, createdAt);
+
+    public static CheckoutDispatchEffect Create(Guid id, PaymentAttempt attempt, DateTime createdAt)
     {
         ArgumentNullException.ThrowIfNull(attempt);
+        if (id == Guid.Empty)
+            throw new ArgumentException("A dispatch effect identity is required.", nameof(id));
         EnsureUtc(createdAt, nameof(createdAt));
         return new()
         {
-            Id = Guid.CreateVersion7(),
+            Id = id,
             TenantId = attempt.TenantId,
             RegistrationOrderId = attempt.RegistrationOrderId,
             PaymentAttemptId = attempt.Id,

@@ -298,10 +298,16 @@
                                                   Label="Google Client ID (Required)"
                                                   @bind-Value="_model.GoogleClientId"
                                                   Placeholder="123456789.apps.googleusercontent.com" />
-                                    <MudTextField Variant="Variant.Outlined" T="string"
-                                                  Label="Google Client Secret (Required)"
-                                                  InputType="InputType.Password"
-                                                  @bind-Value="_model.GoogleClientSecret" />
+                                    <MudAlert Severity="@(_model.GoogleClientSecretOwnership?.Configured == true ? Severity.Info : Severity.Warning)" Dense="true">
+                                        <MudText Typo="Typo.body2">
+                                            @(_model.GoogleClientSecretOwnership?.Configured == true
+                                                ? T("ui.onboarding.authentication.google_secret.configured", "The Google client secret is configured by deployment.")
+                                                : T("ui.onboarding.authentication.google_secret.not_configured", "The Google client secret is not confirmed configured by deployment."))
+                                        </MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @T("ui.onboarding.authentication.google_secret.remedy", "Configure or rotate it in Google and the selected secret authority, restart affected replicas, then reload this page and verify sign-in. This page cannot edit the client secret.")
+                                        </MudText>
+                                    </MudAlert>
                                 }
 
                                 <section class="auth-provider-configuration__visitor-onboarding"
@@ -420,7 +426,6 @@
     private bool _showDiscardConfirmation;
     private bool _focusDiscardConfirmation;
     private bool _skipAuthorizationProviderStep;
-    private bool _googleSecretAlreadyConfigured;
     private int CurrentPrimaryProviderId =>
         _model.PrimaryProviderId is KeycloakProviderId
             or AtprotoProviderId
@@ -443,7 +448,7 @@
 
     private bool HasGoogleCredentials =>
         !string.IsNullOrWhiteSpace(_model.GoogleClientId) &&
-        (_googleSecretAlreadyConfigured || !string.IsNullOrWhiteSpace(_model.GoogleClientSecret));
+        _model.GoogleClientSecretOwnership?.Configured == true;
 
     private bool CanSave =>
         !_submitState.IsSubmitting &&
@@ -532,9 +537,6 @@
             SetPrimaryProvider(LocalIdentityProviderId);
         }
         _skipAuthorizationProviderStep = await InstanceOnboardingService.ShouldSkipAuthorizationProviderStepAsync();
-        _googleSecretAlreadyConfigured = _model.GoogleSsoEnabled == true;
-        _model.KeycloakClientSecret = string.Empty;
-        _model.GoogleClientSecret = string.Empty;
 
         // Pre-fill the ATProto public URL from the current browser request if not already set
         if (string.IsNullOrWhiteSpace(_model.AtprotoPublicUrl))
@@ -675,7 +677,6 @@
         {
             _model.AtprotoLoginEnabled = true;
             _model.GoogleSsoEnabled = false;
-            _model.GoogleClientSecret = string.Empty;
         }
     }
 
@@ -711,8 +712,6 @@
 
     private void DiscardAndExit()
     {
-        _model.KeycloakClientSecret = string.Empty;
-        _model.GoogleClientSecret = string.Empty;
         Navigation.NavigateTo("/setup", forceLoad: true);
     }
 
@@ -720,10 +719,7 @@
     {
         AuthProviderConfigurationDto authoritativeConfiguration =
             await InstanceOnboardingService.GetAuthProviderConfigurationAsync();
-        authoritativeConfiguration.KeycloakClientSecret = string.Empty;
-        authoritativeConfiguration.GoogleClientSecret = string.Empty;
         _model = authoritativeConfiguration;
-        _googleSecretAlreadyConfigured = authoritativeConfiguration.GoogleSsoEnabled == true;
     }
 
     private static bool IsVisitorPolicyConflict(string? failureCode) => failureCode is

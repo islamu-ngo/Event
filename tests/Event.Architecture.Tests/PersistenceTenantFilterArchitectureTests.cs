@@ -165,10 +165,14 @@ public class PersistenceTenantFilterArchitectureTests
             }
             else
             {
-                await Assert.That(table.ParentJoin.ParentTableName).IsNotNull();
-                await Assert.That(table.ParentJoin.ForeignKeyColumn).IsNotNull();
-                await Assert.That(table.ParentJoin.ParentKeyColumn).IsNotNull();
-                await Assert.That(table.ParentJoin.ParentTenantIdColumn).IsNotNull();
+                for (var join = table.ParentJoin; join is not null; join = join.ParentJoin)
+                {
+                    await Assert.That(join.ParentTableName).IsNotNull();
+                    await Assert.That(join.ForeignKeyColumn).IsNotNull();
+                    await Assert.That(join.ParentKeyColumn).IsNotNull();
+                    await Assert.That((join.ParentTenantIdColumn is not null) != (join.ParentJoin is not null))
+                        .IsTrue();
+                }
             }
 
             var sql = PostgresTenantRowLevelSecurityModel.BuildEnableRlsSql(table, "islamu_event");

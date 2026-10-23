@@ -39,6 +39,21 @@ explicit remediation and restart states.
 
 ## 1. Architecture & Service Topology
 
+With Infisical selected, inject distinct API, BFF and migration machine pairs.
+The common environment anchor shares only source selection, URL, project and
+environment; it no longer forwards a common machine credential. BFF confidential
+Keycloak/Google/ATProto values are UI-only. Keycloak bootstrap/database inputs and
+Cerbos verifier/database inputs stay in their provider resources. Do not replace
+these explicit projections with `env_file: .env`.
+
+Set `KEYCLOAK__AUDIENCE` to the API resource identifier. Optional
+`KEYCLOAK__PERMITTEDCLIENTS__0` is passed through only when supplied; omit it
+instead of assigning an empty string when no client restriction is needed.
+Additional indices need explicit API service entries. Neither this list nor the
+BFF client identifier is an additional audience. Complete the
+[consumer isolation cutover](../configuration-and-operations/infisical.md#consumer-isolation-cutover)
+and external Cerbos publication before activating the runtime.
+
 The repository `docker-compose.yml` declares these base services. Host ports below
 are defaults; use the service names and container ports for container-network
 connections.
@@ -349,19 +364,21 @@ Preserve the actual named volumes and selected secret authority:
 
 | Volume | Contents |
 |---|---|
-| `postgres_data` | Primary database, colocated Local Identity and API Data Protection keys |
+| `postgres_data` | Primary database and colocated Local Identity; preserve historical key tables offline, not as runtime authority |
 | `keycloak_data` | Keycloak database |
-| `redis_data` | Redis persistence, including the separate UI's Data Protection keys |
+| `redis_data` | Redis persistence; preserve any historical UI key state, but it is no longer runtime ring authority |
 | `local_storage_data` | Local uploads |
 | `privacy_erasure_authority_data` | Default independent SQLite erasure authority |
 | `setup_data` | Generated setup secret while interactive setup is active |
 | `mailpit_data` | Optional captured mail; private and capped at 500 messages |
 
-There is no `data_protection_keys` filesystem volume in this Compose file. The
-API uses database-backed keys; the separate UI uses Redis key
-`islamu-event:data-protection-keys`. Keep signing keys in their selected secret
-authority too. External Identity or erasure topologies introduce their own backup
-units.
+Data Protection uses selected external authority, not a database, Redis or
+filesystem keyring volume. Compose projects only `EVENT_DP_API_*` to API and
+`EVENT_DP_BFF_*` to UI. Provision each ring and its complete admission record,
+then inject the admission hash/minimum generation from an independently protected
+operator deployment control. Do not restore these expectations with candidate
+backups. See [external Data Protection rings](../configuration-and-operations/secrets.md#external-data-protection-rings).
+Signing keys and external Identity/erasure topologies remain separate backup units.
 
 Use coordinated, consistent database/Redis/media backups, not a copy of live
 database files with unknown WAL state. Keep erasure evidence independently of

@@ -298,11 +298,14 @@ public sealed class TicketTransferApiTests(
     }
 
     [Test]
-    public async Task InvalidCapabilityIsGenericPrivateProblemDetails()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task InvalidCapabilityIsGenericPrivateProblemDetails(bool issuedCapability)
     {
         HttpClient client = fixture.Client;
-        string sentinel =
-            "SENTINEL_TRANSFER_CAPABILITY_DO_NOT_ECHO";
+        string sentinel = issuedCapability
+            ? new Explore.Infrastructure.Services.GuestCapabilityTokenService().Issue().RawToken
+            : "SENTINEL_TRANSFER_CAPABILITY_DO_NOT_ECHO";
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"/api/events/{Guid.CreateVersion7()}/admission-tickets/{Guid.CreateVersion7()}/transfers/{Guid.CreateVersion7()}");

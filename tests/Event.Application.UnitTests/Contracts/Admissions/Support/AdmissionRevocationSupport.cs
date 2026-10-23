@@ -81,6 +81,14 @@ internal static class AdmissionRevocationPorts
 
 internal sealed class RevocationRepositoryFake(AdmissionTestScenario scenario) : IAdmissionRevocationRepository
 {
+    public void RequireCommittedCancellationScope(Guid tenantId) =>
+        throw new NotSupportedException("Committed cancellation is covered by the native persistence fixture.");
+
+    public Task<AdmissionRevocationContext?> LoadCommittedCancellationAsync(
+        AdmissionCommittedCancellationRequest request,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Committed cancellation is covered by the native persistence fixture.");
+
     public Task<AdmissionRevocationContext?> LoadAsync(
         AdmissionRevocationRequest request,
         CancellationToken cancellationToken) => Task.FromResult<AdmissionRevocationContext?>(new(

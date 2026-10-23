@@ -135,7 +135,7 @@ public sealed class CompleteParticipantAdmissionCommandHandler(
 
 public sealed class ApproveParticipantAdmissionCommandHandler(
     IParticipantAdmissionEligibilityRepository repository,
-    IActorRepository actors,
+    IActorOwnershipReader actors,
     ICurrentUserService currentUser,
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
@@ -161,7 +161,7 @@ public sealed class ApproveParticipantAdmissionCommandHandler(
 
 public sealed class RevokeParticipantAdmissionCommandHandler(
     IParticipantAdmissionEligibilityRepository repository,
-    IActorRepository actors,
+    IActorOwnershipReader actors,
     ICurrentUserService currentUser,
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
@@ -192,7 +192,7 @@ file static class ParticipantAdmissionDecisionHandler
             TCommand request,
             bool approve,
             IParticipantAdmissionEligibilityRepository repository,
-            IActorRepository actors,
+            IActorOwnershipReader actors,
             ICurrentUserService currentUser,
             ITenantContext tenant,
             IUnitOfWork unitOfWork,
@@ -218,8 +218,8 @@ file static class ParticipantAdmissionDecisionHandler
                     .ApprovalUnavailable,
                 request.RegistrationTicketAssignmentId);
         }
-        Actor? actor =
-            await actors.GetActorByUserIdAndTenantId(
+        ActorOwnershipFacts? actor =
+            await actors.ReadForUserAsync(
                 userId,
                 tenant.TenantId,
                 cancellationToken);

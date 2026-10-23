@@ -21,6 +21,7 @@ public sealed class SupportAccessSessionService(
     ITenantContextAccessor tenantContextAccessor,
     IHierarchicalSettingsResolver settingsResolver,
     ISupportAccessSessionRepository sessionRepository,
+    TimeProvider clock,
     BusinessMetrics? metrics = null,
     ILogger<SupportAccessSessionService>? logger = null)
     : ISupportAccessSessionService
@@ -93,7 +94,7 @@ public sealed class SupportAccessSessionService(
             return SupportAccessContext.InactiveForwarded;
         }
 
-        var nowUtc = DateTimeOffset.UtcNow;
+        var nowUtc = clock.GetUtcNow();
         var session = await sessionRepository.GetActiveOwnedSessionAsync(
             sessionId,
             actorUserId,

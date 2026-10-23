@@ -17,14 +17,18 @@ public sealed class StripeCheckoutAdapter(
     IPaymentProviderDescriptor
 {
     public const string HttpClientName = "Payments.StripeCheckout";
-    private const int MaxNetworkRetries = 2;
+    // Mutation retry authority belongs to the durable business operation, not SDK transport.
+    private const int MaxNetworkRetries = 0;
 
     public PaymentProviderDescriptor Describe() => new(
         "stripe",
         "OrganizerDirect",
         global::Stripe.StripeConfiguration.ApiVersion,
         options.Value.ExpectsLiveMode ? "live" : "test",
-        "instance-operator");
+        "instance-operator")
+    {
+        CheckoutMutationIdempotencyRetentionFloor = TimeSpan.FromHours(24)
+    };
 
     public async Task<PaymentCancellationProviderResult> CancelAsync(
         PaymentCancellationRequest request,

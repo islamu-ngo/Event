@@ -14,6 +14,7 @@ using Explore.Infrastructure.Registration;
 using Explore.Infrastructure.Storage;
 using Explore.Infrastructure.Services.Registration.Providers.SubmissionSinks;
 using Explore.Persistence.Repositories;
+using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -23,6 +24,215 @@ namespace Event.Persistence.IntegrationTests;
 public sealed class AnonymousRetentionProviderDrainTests
 {
     private static readonly DateTime Now = new(2027, 1, 8, 14, 0, 0, DateTimeKind.Utc);
+
+    [Test]
+    [Arguments("expired")]
+    [Arguments("reclaimed")]
+    [Arguments("completed")]
+    [Arguments("parked")]
+    [Arguments("retry")]
+    [Arguments("dead-lettered")]
+    public async Task LostOriginalClaimCannotAcquireSensitiveDeliveryOrInvokeSink(string loss)
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now.AddHours(1));
+        harness.Context.ChangeTracker.Clear();
+        var repository = harness.CreateRepository();
+        var claim = (await repository.ClaimDueAsync("original", 1, Now,
+            TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+        await harness.LoseClaimAsync(claim, loss);
+
+        await Assert.That(await repository.GetDeliveryAsync(claim, CancellationToken.None)).IsNull();
+        await Assert.That(await harness.DrainClaimAsync(claim)).IsFalse();
+        await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(0);
+        await Assert.That(harness.StorageCalls).IsEqualTo(0);
+        await Assert.That(await harness.Context.RegistrationSensitiveAnswerValues.CountAsync()).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task GenuineClaimCannotSubstituteAnotherInternallyConsistentDeliveryGraph()
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var first = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        var second = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(first, "name", Now.AddHours(1));
+        await harness.AddAnswerAsync(second, "included", Now.AddHours(1));
+        harness.Context.ChangeTracker.Clear();
+        var repository = harness.CreateRepository();
+        var claims = await repository.ClaimDueAsync("original", 10, Now,
+            TimeSpan.FromMinutes(1), CancellationToken.None);
+        var claim = claims.Single(value => value.RegistrationSubmissionId == first.Submission.Id);
+        var substituted = claim with
+        {
+            RegistrationSubmissionId = second.Submission.Id,
+            RegistrationAttemptId = second.Submission.RegistrationAttemptId,
+            RegistrationProviderBindingId = second.Binding.Id
+        };
+
+        await Assert.That(await repository.GetDeliveryAsync(substituted, CancellationToken.None)).IsNull();
+        await Assert.That(await harness.DrainClaimAsync(substituted)).IsFalse();
+        await Assert.That(await repository.GetDeliveryAsync(claim, CancellationToken.None)).IsNotNull();
+        await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(0);
+        await Assert.That(harness.StorageCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments("token")]
+    [Arguments("fence")]
+    [Arguments("expiry")]
+    public async Task AlteredClaimIdentityCannotAcquireDelivery(string changed)
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now.AddHours(1));
+        harness.Context.ChangeTracker.Clear();
+        var repository = harness.CreateRepository();
+        var claim = (await repository.ClaimDueAsync("original", 1, Now,
+            TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+        var altered = changed switch
+        {
+            "token" => claim with { LeaseToken = Guid.CreateVersion7() },
+            "fence" => claim with { ProcessingFence = claim.ProcessingFence + 1 },
+            _ => claim with { LeaseExpiresAt = claim.LeaseExpiresAt.AddSeconds(1) }
+        };
+
+        await Assert.That(await repository.GetDeliveryAsync(altered, CancellationToken.None)).IsNull();
+        await Assert.That(await harness.DrainClaimAsync(altered)).IsFalse();
+        await Assert.That(harness.StorageCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments("expired")]
+    [Arguments("reclaimed")]
+    [Arguments("completed")]
+    [Arguments("source-deleted")]
+    [Arguments("binding-changed")]
+    [Timeout(120_000)]
+    public async Task CustodyLostDuringPreparationCannotCrossProviderBoundary(string loss)
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now.AddHours(1));
+        harness.Context.ChangeTracker.Clear();
+        var claim = (await harness.CreateRepository().ClaimDueAsync("original", 1, Now,
+            TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+        var preparing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Protector.BeforeUnprotect = () =>
+        {
+            preparing.TrySetResult();
+            resume.Task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+        };
+        // Subscribe before triggering a separate worker; no shared DbContext runs concurrently.
+        Task<bool> draining = Task.Run(() => harness.DrainClaimAsync(claim));
+        await RunDuringProviderHandoffAsync(preparing.Task, resume, draining, async () =>
+        {
+            if (loss == "source-deleted")
+            {
+                await harness.Context.RegistrationSubmissions.Where(value => value.Id == graph.Submission.Id)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.IsDeleted, true));
+            }
+            else if (loss == "binding-changed")
+            {
+                await harness.Context.RegistrationProviderBindings.Where(value => value.Id == graph.Binding.Id)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.ConcurrencyStamp, Guid.CreateVersion7()));
+            }
+            else
+            {
+                await harness.LoseClaimAsync(claim, loss);
+            }
+        });
+
+        await Assert.That(await draining).IsFalse();
+        await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(1);
+        await Assert.That(harness.StorageCalls).IsEqualTo(0);
+        await Assert.That(await harness.Context.StorageObjects.CountAsync()).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task PersistedEffectLineageMustMatchBeforeSensitiveAcquisition()
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var first = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        var second = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(first, "name", Now.AddHours(1));
+        harness.Context.ChangeTracker.Clear();
+        var repository = harness.CreateRepository();
+        var claims = await repository.ClaimDueAsync("original", 10, Now,
+            TimeSpan.FromMinutes(1), CancellationToken.None);
+        var claim = claims.Single(value => value.RegistrationSubmissionId == first.Submission.Id);
+        // Preserve the effect's composite order/Event foreign key while breaking
+        // its native submission lineage, rather than testing a rejected FK write.
+        await harness.Context.RegistrationProviderSubmissionWriteEffects.Where(value => value.Id == claim.EffectId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(value => value.RegistrationOrderId, second.Order.Id)
+                .SetProperty(value => value.EventId, second.Order.EventId));
+
+        await Assert.That(await repository.GetDeliveryAsync(claim, CancellationToken.None)).IsNull();
+        await Assert.That(await harness.DrainClaimAsync(claim)).IsFalse();
+        await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(0);
+        await Assert.That(harness.StorageCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task DeliveryAcquisitionCannotBorrowAnExistingTransactionForProviderWork()
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now.AddHours(1));
+        harness.Context.ChangeTracker.Clear();
+        var repository = harness.CreateRepository();
+        var claim = (await repository.ClaimDueAsync("original", 1, Now,
+            TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+        await using var transaction = await harness.Context.Database.BeginTransactionAsync();
+
+        await Assert.That(await repository.GetDeliveryAsync(claim, CancellationToken.None)).IsNull();
+        await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(0);
+        await Assert.That(harness.StorageCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task NativeDrainClaimsGloballyThenConstructsIndependentTenantDelivery()
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now.AddHours(1));
+        harness.Context.ChangeTracker.Clear();
+
+        await Assert.That(await harness.DrainAsync()).IsEqualTo(1);
+        await Assert.That(harness.DependencyTenant).IsEqualTo(graph.Submission.TenantId);
+        await Assert.That(harness.DependencyContextTenant).IsEqualTo(graph.Submission.TenantId);
+        await Assert.That(harness.DependencyContextWasIndependent).IsTrue();
+        await Assert.That(harness.ProviderHadTransaction).IsFalse();
+        await Assert.That(harness.StorageCalls).IsEqualTo(1);
+        await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(1);
+        await Assert.That(await harness.DrainAsync()).IsEqualTo(0);
+        await Assert.That(harness.StorageCalls).IsEqualTo(1);
+        await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task SelectedTenantIsBoundBeforeSinkConstructionAndCompletedReplayDoesNotDiscloseAgain()
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now.AddHours(1));
+        harness.Context.ChangeTracker.Clear();
+        var claim = (await harness.CreateRepository().ClaimDueAsync("original", 1, Now,
+            TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+
+        await Assert.That(await harness.DrainClaimAsync(claim)).IsTrue();
+        await Assert.That(harness.DependencyTenant).IsEqualTo(claim.TenantId);
+        await Assert.That(harness.DependencyContextTenant).IsEqualTo(claim.TenantId);
+        await Assert.That(harness.DependencyContextWasIndependent).IsTrue();
+        await Assert.That(harness.ProviderHadTransaction).IsFalse();
+        await Assert.That(await harness.DrainClaimAsync(claim)).IsFalse();
+        await Assert.That(await harness.DrainAsync()).IsEqualTo(0);
+        await Assert.That(harness.StorageCalls).IsEqualTo(1);
+        await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(1);
+        await Assert.That(harness.Csv).Contains("private-name");
+    }
 
     [Test]
     [Arguments(false)]
@@ -173,7 +383,7 @@ public sealed class AnonymousRetentionProviderDrainTests
         var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
         await harness.AddAnswerAsync(graph, "name", Now);
         harness.Context.ChangeTracker.Clear();
-        var repository = new RegistrationProviderSubmissionWriteEffectRepository(harness.Context);
+        var repository = harness.CreateRepository();
         DateTime claimedAt = Now.AddMinutes(-2);
         var claim = (await repository.ClaimDueAsync("in-flight", 1, claimedAt,
             TimeSpan.FromMinutes(state == "expired-claim" ? 1 : 3), CancellationToken.None)).Single();
@@ -362,7 +572,7 @@ public sealed class AnonymousRetentionProviderDrainTests
         var first = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
         var second = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
         harness.Context.ChangeTracker.Clear();
-        var repository = new RegistrationProviderSubmissionWriteEffectRepository(harness.Context);
+        var repository = harness.CreateRepository();
         var claims = await repository.ClaimDueAsync("lineage", 10, Now, TimeSpan.FromMinutes(1), CancellationToken.None);
         var claim = claims.Single(value => value.RegistrationSubmissionId == first.Submission.Id);
 
@@ -385,7 +595,7 @@ public sealed class AnonymousRetentionProviderDrainTests
         var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
         await harness.AddAnswerAsync(graph, "name", Now.AddHours(1));
         var storage = await harness.SeedArtifactAsync(graph);
-        var repository = new RegistrationProviderSubmissionWriteEffectRepository(harness.Context);
+        var repository = harness.CreateRepository();
         var claim = (await repository.ClaimDueAsync("settlement", 1, Now,
             TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
         Guid before = await harness.Context.StorageObjects.AsNoTracking()
@@ -416,11 +626,68 @@ public sealed class AnonymousRetentionProviderDrainTests
         public CountingProtector Protector { get; } = new(fixture.Services.GetRequiredService<IRegistrationSensitiveValueProtector>());
         public int StorageCalls { get; private set; }
         public string Csv { get; private set; } = string.Empty;
+        public Guid? DependencyTenant { get; private set; }
+        public Guid? DependencyContextTenant { get; private set; }
+        public bool DependencyContextWasIndependent { get; private set; }
+        public bool ProviderHadTransaction { get; private set; }
+        private Func<Task>? _afterHandoff;
 
         public static async Task<Harness> CreateAsync(DateTime now)
         {
             var clock = new Clock(now);
-            return new(await EventVisitorCapabilitySqliteFixture.CreateAsync(services => services.AddSingleton<TimeProvider>(clock)), clock);
+            Harness? harness = null;
+            var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(services =>
+            {
+                services.AddSingleton<TimeProvider>(clock);
+                services.AddScoped<IRegistrationProviderRegistry>(provider => harness!.CreateProviderRegistry(provider));
+                services.AddScoped(provider => new RegistrationProviderSubmissionWriteEffectDeliveryService(
+                    provider.GetRequiredService<IRegistrationProviderSubmissionWriteEffectRepository>(),
+                    provider.GetRequiredService<IRegistrationProviderRegistry>(), harness!.Protector, clock));
+            });
+            harness = new Harness(fixture, clock);
+            return harness;
+        }
+
+        public RegistrationProviderSubmissionWriteEffectRepository CreateRepository() => new(Context, clock);
+
+        public async Task<bool> DrainClaimAsync(RegistrationProviderSubmissionWriteClaim claim)
+        {
+            await using var scope = await fixture.Services
+                .GetRequiredService<IRegistrationProviderSubmissionWriteExecutionScopeFactory>()
+                .CreateAsync(claim.TenantId, CancellationToken.None);
+            return await scope.DrainAsync(claim, CancellationToken.None);
+        }
+
+        public async Task LoseClaimAsync(RegistrationProviderSubmissionWriteClaim claim, string loss)
+        {
+            var repository = CreateRepository();
+            switch (loss)
+            {
+                case "expired":
+                    SetUtcNow(claim.LeaseExpiresAt);
+                    break;
+                case "reclaimed":
+                    SetUtcNow(claim.LeaseExpiresAt);
+                    Context.ChangeTracker.Clear();
+                    var replacement = (await repository.ClaimDueAsync("replacement", 1, claim.LeaseExpiresAt,
+                        TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+                    await Assert.That(replacement.ProcessingFence).IsGreaterThan(claim.ProcessingFence);
+                    break;
+                case "completed":
+                    await Assert.That(await repository.CompleteAsync(claim, Now, CancellationToken.None)).IsTrue();
+                    break;
+                case "parked":
+                    await Assert.That(await repository.ParkAmbiguousAsync(claim, "uncertain", Now, CancellationToken.None)).IsTrue();
+                    break;
+                case "retry":
+                    await Assert.That(await repository.RetryAsync(claim, "unavailable", Now.AddMinutes(1), Now, CancellationToken.None)).IsTrue();
+                    break;
+                case "dead-lettered":
+                    await Assert.That(await repository.DeadLetterAsync(claim, "rejected", Now, CancellationToken.None)).IsTrue();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(loss));
+            }
         }
 
         public async Task<Graph> SeedAsync(DateTime? deadline, bool anonymous)
@@ -476,6 +743,12 @@ public sealed class AnonymousRetentionProviderDrainTests
                 binding.Id, revision, createdAt, Now.AddDays(3));
             var submission = attempt.SubmitHeadlessProvider(revision, createdAt.AddMinutes(1), null);
             Context.AddRange(attempt, submission, RegistrationProviderSubmissionWriteEffect.Create(attempt, submission, createdAt.AddMinutes(1)));
+            // Validate against the persisted owners before INSERT generates these FK components.
+            // Both properties remain store-generated; these values do not override the database.
+            Context.Entry(attempt).Property<Guid>("RegistrationProviderBindingKey").CurrentValue =
+                Context.Entry(channel).Property<Guid>("RegistrationProviderBindingKey").CurrentValue;
+            Context.Entry(attempt).Property<string>("ProviderMappingRevisionHashKey").CurrentValue =
+                binding.PublishedMappingRevisionHashKey;
             await Context.SaveChangesAsync();
             return new(order, requirement, version, section, binding, submission);
         }
@@ -490,6 +763,9 @@ public sealed class AnonymousRetentionProviderDrainTests
                 "registration", key, key, RegistrationFieldTypeEnum.ShortText, retentionPolicyId,
                 RegistrationOrganizerVisibilityEnum.AuthorizedOrganizers, false, transferable, createdAt);
             graph.Version.AddField(graph.Section, field);
+            // Seeding another event can detach this version. Enroll the new field
+            // explicitly so answer lineage never depends on tracked navigation fixup.
+            Context.RegistrationFormFields.Add(field);
             var protectedValue = Protector.Protect("private-" + key);
             var sensitive = RegistrationSensitiveAnswerValue.Create(fixture.TenantId, protectedValue.Ciphertext, protectedValue.KeyVersion,
                 retentionPolicyId, createdAt, sensitiveDeadline ?? retentionUntil);
@@ -542,8 +818,20 @@ public sealed class AnonymousRetentionProviderDrainTests
             return storage;
         }
 
-        public async Task<int> DrainAsync(Func<Task>? afterHandoff = null)
+        public Task<int> DrainAsync(Func<Task>? afterHandoff = null)
         {
+            _afterHandoff = afterHandoff;
+            return fixture.Services.GetRequiredService<
+                Explore.Application.Contracts.Operations.ICommandHandler<DrainRegistrationProviderSubmissionWriteEffectsCommand, int>>()
+                .ExecuteAsync(new("retention-provider", 10), CancellationToken.None);
+        }
+
+        private IRegistrationProviderRegistry CreateProviderRegistry(IServiceProvider services)
+        {
+            var context = services.GetRequiredService<ExploreDbContext>();
+            DependencyTenant = services.GetRequiredService<ITenantContextAccessor>().TenantId;
+            DependencyContextTenant = context.TenantFilterTenantId;
+            DependencyContextWasIndependent = !ReferenceEquals(context, Context);
             var storage = Substitute.For<IFileStorageProvider>();
             storage.Provider.Returns(StorageProviders.Local);
             storage.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
@@ -552,14 +840,15 @@ public sealed class AnonymousRetentionProviderDrainTests
                 using var reader = new StreamReader(input.Content, Encoding.UTF8, leaveOpen: true);
                 Csv = await reader.ReadToEndAsync();
                 StorageCalls++;
-                if (afterHandoff is not null)
+                ProviderHadTransaction = context.Database.CurrentTransaction is not null;
+                if (_afterHandoff is not null)
                 {
-                    await afterHandoff();
+                    await _afterHandoff();
                 }
                 return new FileStorageWriteResult(StorageProviders.Local, input.ObjectKey!, input.ExpectedSizeBytes!.Value,
                     input.ContentType, new string('a', 64));
             });
-            var actualBindings = fixture.Services.GetRequiredService<IStorageProviderBindingService>();
+            var actualBindings = services.GetRequiredService<IStorageProviderBindingService>();
             var bindings = Substitute.For<IStorageProviderBindingService>();
             bindings.CaptureAsync(StorageProviders.Local, fixture.TenantId, Arg.Any<CancellationToken>())
                 .Returns(call => actualBindings.CaptureAsync(StorageProviders.Local, fixture.TenantId,
@@ -569,14 +858,11 @@ public sealed class AnonymousRetentionProviderDrainTests
                 await actualBindings.ResolveAsync(call.ArgAt<Guid>(0), call.ArgAt<CancellationToken>(1));
                 return storage;
             });
-            var producers = fixture.Services.GetRequiredService<IStorageProducerOperationRepository>();
-            var unitOfWork = fixture.Services.GetRequiredService<IUnitOfWork>();
+            var producers = services.GetRequiredService<IStorageProducerOperationRepository>();
+            var unitOfWork = services.GetRequiredService<IUnitOfWork>();
             var sink = new CsvRegistrationProviderSubmissionSink(
                 new ManagedStorageProducer(bindings, producers, unitOfWork), producers, unitOfWork, clock);
-            var handler = new DrainRegistrationProviderSubmissionWriteEffectsCommandHandler(
-                new RegistrationProviderSubmissionWriteEffectRepository(Context), new RegistrationProviderRegistry([sink]),
-                fixture.Services.GetRequiredService<ITenantContextAccessor>(), Protector, clock);
-            return await handler.ExecuteAsync(new("retention-provider", 10), CancellationToken.None);
+            return new RegistrationProviderRegistry([sink]);
         }
 
         public ValueTask DisposeAsync() => fixture.DisposeAsync();
@@ -591,10 +877,12 @@ public sealed class AnonymousRetentionProviderDrainTests
     private sealed class CountingProtector(IRegistrationSensitiveValueProtector inner) : IRegistrationSensitiveValueProtector
     {
         public int UnprotectCalls { get; private set; }
+        public Action? BeforeUnprotect { get; set; }
         public RegistrationProtectedValue Protect(string plaintext) => inner.Protect(plaintext);
         public string Unprotect(string ciphertext, int keyVersion)
         {
             UnprotectCalls++;
+            BeforeUnprotect?.Invoke();
             return inner.Unprotect(ciphertext, keyVersion);
         }
     }

@@ -32,9 +32,16 @@ public static class StorageContentSignaturePolicy
         string contentType,
         string? extension,
         long expectedSizeBytes,
+        long maximumBytes,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(content);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (expectedSizeBytes <= 0 || maximumBytes <= 0 || expectedSizeBytes > maximumBytes)
+        {
+            return StorageContentInspectionResult.Failed(content,
+                ["Reserved upload length exceeds the permitted bounds."]);
+        }
 
         if (contentType.TrimStart().StartsWith("image", StringComparison.OrdinalIgnoreCase))
         {

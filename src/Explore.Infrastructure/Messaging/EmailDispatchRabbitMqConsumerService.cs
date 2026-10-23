@@ -35,9 +35,7 @@ public sealed class EmailDispatchRabbitMqConsumerService(
         try
         {
             logger.LogInformation(
-                "Starting RabbitMQ EmailDispatch consumer {ConsumerId} on queue {DispatchQueueName} with prefetch {PrefetchCount}",
-                options.ConsumerId,
-                options.DispatchQueueName,
+                "Starting RabbitMQ EmailDispatch consumer with prefetch {PrefetchCount}",
                 options.PrefetchCount);
 
             await transport.DeclareTopologyAsync(stoppingToken);
@@ -68,9 +66,7 @@ public sealed class EmailDispatchRabbitMqConsumerService(
                 cancellationToken: stoppingToken);
 
             logger.LogInformation(
-                "RabbitMQ EmailDispatch consumer {ConsumerId} is consuming with tag {ConsumerTag}",
-                options.ConsumerId,
-                consumerTag);
+                "RabbitMQ EmailDispatch consumer is consuming");
 
             await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
         }
@@ -78,9 +74,9 @@ public sealed class EmailDispatchRabbitMqConsumerService(
         {
             logger.LogInformation("RabbitMQ EmailDispatch consumer stopping");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogError(ex, "RabbitMQ EmailDispatch consumer stopped unexpectedly");
+            logger.LogError("RabbitMQ EmailDispatch consumer stopped unexpectedly");
             throw;
         }
         finally
@@ -135,9 +131,7 @@ public sealed class EmailDispatchRabbitMqConsumerService(
             EmailDispatchRabbitMqSettlement settlement = EmailDispatchRabbitMqConsumerDecision.DecideForDrainResult(result);
             await ApplySettlementAsync(channel, args.DeliveryTag, settlement, stoppingToken);
             logger.LogDebug(
-                "Settled RabbitMQ EmailDispatch pointer {PublishEventId} for tenant {TenantId} with broker action {BrokerAction} after drain outcome {DrainOutcome}",
-                pointer.PublishEventId,
-                pointer.TenantId,
+                "Settled RabbitMQ EmailDispatch pointer with broker action {BrokerAction} after drain outcome {DrainOutcome}",
                 settlement.Action,
                 result.Outcome);
         }
@@ -147,14 +141,11 @@ public sealed class EmailDispatchRabbitMqConsumerService(
                 "RabbitMQ EmailDispatch delivery {DeliveryTag} stopped during shutdown before settlement",
                 args.DeliveryTag);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Nacked, "consumer_exception");
             logger.LogWarning(
-                ex,
-                "Nacking RabbitMQ EmailDispatch pointer {PublishEventId} for tenant {TenantId} after consumer exception",
-                pointer.PublishEventId,
-                pointer.TenantId);
+                "Nacking RabbitMQ EmailDispatch pointer after consumer exception");
             await ApplySettlementAsync(
                 channel,
                 args.DeliveryTag,

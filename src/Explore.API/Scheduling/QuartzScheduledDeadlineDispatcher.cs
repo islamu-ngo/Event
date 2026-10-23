@@ -25,8 +25,8 @@ public sealed class QuartzScheduledDeadlineDispatcher(
             // A trigger for a job the scheduler does not store would be accepted and then never run, which
             // is worse than refusing: the caller would believe the deadline is live.
             logger.LogError(
-                "Deadline registration refused for unknown scheduled job {JobName}.",
-                deadline.JobName);
+                "Deadline registration refused. FailureCategory={FailureCategory}",
+                "unknown_scheduled_job");
             return ScheduledDeadlineResult.NotScheduled(ScheduledDeadlineResult.SchedulerUnavailable);
         }
 
@@ -52,12 +52,10 @@ public sealed class QuartzScheduledDeadlineDispatcher(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            // Only the exception type is logged: provider errors carry connection detail that the platform
-            // keeps out of logs by convention.
+            // Native scheduler failures retain no private key or runtime subtype.
             logger.LogWarning(
-                "Deadline registration failed for job {JobName}. FailureType={FailureType}",
-                deadline.JobName,
-                exception.GetType().Name);
+                "Deadline registration failed. FailureCategory={FailureCategory}",
+                "scheduler_unavailable");
             return ScheduledDeadlineResult.NotScheduled(ScheduledDeadlineResult.SchedulerUnavailable);
         }
     }
@@ -79,9 +77,8 @@ public sealed class QuartzScheduledDeadlineDispatcher(
             // A deadline that outlives its work fires once and finds nothing to do, so a failed cancel is
             // wasted wake-up rather than incorrect behaviour, and must not fail the caller's transition.
             logger.LogWarning(
-                "Deadline cancellation failed for job {JobName}. FailureType={FailureType}",
-                jobName,
-                exception.GetType().Name);
+                "Deadline cancellation failed. FailureCategory={FailureCategory}",
+                "scheduler_unavailable");
             return false;
         }
     }

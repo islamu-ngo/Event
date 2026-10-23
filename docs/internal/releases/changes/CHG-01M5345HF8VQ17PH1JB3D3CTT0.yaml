@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5345HF8VQ17PH1JB3D3CTT0
+Title: "Project persisted human sources into isolated policy snapshots"
+Type: feat
+Scope: access
+Summary: "Project immutable human source facts into existing Cerbos attributes and retain independent protobuf snapshots."
+Group: human-principal-source-projection
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Captured policy evidence is independent of later SDK object mutation; projection itself grants no authority.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Existing policy attribute names are preserved; production native-source reader integration remains separate.

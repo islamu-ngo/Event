@@ -15,27 +15,44 @@ internal static class IdentityDatabaseProviderComposition
     internal static void Configure(
         DbContextOptionsBuilder optionsBuilder,
         IConfiguration configuration,
-        PrimaryDatabaseRole role)
+        PrimaryDatabaseRole role) =>
+        Configure(optionsBuilder, IdentityDatabaseConfiguration.BindExternal(configuration, role));
+
+    internal static void Configure(
+        DbContextOptionsBuilder optionsBuilder,
+        ExternalIdentityDatabaseDescriptor database)
     {
-        ExternalIdentityDatabaseDescriptor database =
-            IdentityDatabaseConfiguration.BindExternal(configuration, role);
+        ArgumentNullException.ThrowIfNull(database);
+        ConfigureProvider(optionsBuilder, database.Provider, database.Schema, database.ServerVersion,
+            database.ConnectionString);
+    }
+
+    /// <summary>Builds the same provider model without granting connection authority.</summary>
+    internal static void ConfigureModel(DbContextOptionsBuilder optionsBuilder,
+        PrimaryDatabaseProvider provider, string schema, Version? serverVersion) =>
+        ConfigureProvider(optionsBuilder, provider, schema, serverVersion, connectionString: null);
+
+    private static void ConfigureProvider(DbContextOptionsBuilder optionsBuilder,
+        PrimaryDatabaseProvider databaseProvider, string databaseSchema, Version? serverVersion,
+        string? connectionString)
+    {
         string migrationsAssembly = PrimaryDatabaseProviderComposition.GetMigrationsAssemblyName(
-            database.Provider,
+            databaseProvider,
             PrimaryDatabaseMigrationTarget.Application);
-        string? schema = database.Provider
+        string? schema = databaseProvider
             is PrimaryDatabaseProvider.PostgreSql or PrimaryDatabaseProvider.SqlServer
-            ? database.Schema
+            ? databaseSchema
             : null;
 
         ((IDbContextOptionsBuilderInfrastructure)optionsBuilder)
             .AddOrUpdateExtension(new RelationalNamespaceOptionsExtension(
-                database.Schema,
-                database.Schema));
+                databaseSchema,
+                databaseSchema));
 
-        switch (database.Provider)
+        switch (databaseProvider)
         {
             case PrimaryDatabaseProvider.PostgreSql:
-                optionsBuilder.UseNpgsql(database.ConnectionString, provider =>
+                optionsBuilder.UseNpgsql(connectionString, provider =>
                 {
                     provider.MigrationsAssembly(migrationsAssembly);
                     provider.MigrationsHistoryTable(MigrationsHistoryTable, schema);
@@ -46,7 +63,7 @@ internal static class IdentityDatabaseProviderComposition
                 break;
 
             case PrimaryDatabaseProvider.Sqlite:
-                optionsBuilder.UseSqlite(database.ConnectionString, provider =>
+                optionsBuilder.UseSqlite(connectionString, provider =>
                 {
                     provider.MigrationsAssembly(migrationsAssembly);
                     provider.MigrationsHistoryTable(
@@ -56,7 +73,7 @@ internal static class IdentityDatabaseProviderComposition
                 break;
 
             case PrimaryDatabaseProvider.SqlServer:
-                optionsBuilder.UseSqlServer(database.ConnectionString, provider =>
+                optionsBuilder.UseSqlServer(connectionString, provider =>
                 {
                     provider.MigrationsAssembly(migrationsAssembly);
                     provider.MigrationsHistoryTable(MigrationsHistoryTable, schema);
@@ -66,8 +83,8 @@ internal static class IdentityDatabaseProviderComposition
 
             case PrimaryDatabaseProvider.MariaDb:
                 optionsBuilder.UseMySql(
-                    database.ConnectionString,
-                    new MariaDbServerVersion(database.ServerVersion!),
+                    connectionString,
+                    new MariaDbServerVersion(serverVersion!),
                     provider =>
                     {
                         provider.MigrationsAssembly(migrationsAssembly);
@@ -79,8 +96,8 @@ internal static class IdentityDatabaseProviderComposition
 
             case PrimaryDatabaseProvider.MySql:
                 optionsBuilder.UseMySql(
-                    database.ConnectionString,
-                    new MySqlServerVersion(database.ServerVersion!),
+                    connectionString,
+                    new MySqlServerVersion(serverVersion!),
                     provider =>
                     {
                         provider.MigrationsAssembly(migrationsAssembly);
@@ -92,7 +109,7 @@ internal static class IdentityDatabaseProviderComposition
 
             default:
                 throw new InvalidOperationException(
-                    $"Unsupported external Identity database provider '{database.Provider}'.");
+                    $"Unsupported external Identity database provider '{databaseProvider}'.");
         }
 
         optionsBuilder.UseSnakeCaseNamingConvention();

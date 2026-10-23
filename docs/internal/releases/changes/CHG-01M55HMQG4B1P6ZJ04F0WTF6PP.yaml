@@ -1,0 +1,30 @@
+Change-Id: CHG-01M55HMQG4B1P6ZJ04F0WTF6PP
+Title: "Fence account and administrative mutations by original authority"
+Type: fix
+Scope: access
+Summary: "Bind account, membership, machine credentials, support and managed-provider administration to original authenticated principal and tenant custody."
+Group: staged-programme-access
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Deploy matching native owners and original-source operation scopes together. Prior reconstructed privileged execution and older runtime composition are no longer accepted.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Bind account, membership, machine credentials, support and managed-provider administration to original authenticated principal and tenant custody.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Review the paired public operator guidance and complete final composed assurance before release. Packaging does not establish deployment readiness.

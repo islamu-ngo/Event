@@ -7,7 +7,7 @@ using Explore.Domain.Enums;
 namespace Explore.Application.Features.Geocoding;
 
 public sealed class AddressGovernancePolicyResolver(
-    IHierarchicalSettingsResolver settingsResolver,
+    IHierarchicalSettingsReader settingsResolver,
     IAuthorizationProvider authorizationProvider)
     : IAddressGovernancePolicyResolver
 {

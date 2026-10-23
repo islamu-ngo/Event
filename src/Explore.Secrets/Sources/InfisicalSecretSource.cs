@@ -1,7 +1,9 @@
 using Explore.Application.Contracts.Secrets;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
+using Explore.Secrets.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Explore.Secrets.Sources;
 
@@ -14,13 +16,16 @@ public sealed class InfisicalSecretSource : ISecretSource
 {
     private readonly IInfisicalClientFactory _clientFactory;
     private readonly ILogger<InfisicalSecretSource> _logger;
+    private readonly SecretProviderOptions _options;
 
-    public InfisicalSecretSource(IInfisicalClientFactory clientFactory, ILogger<InfisicalSecretSource> logger)
+    public InfisicalSecretSource(IInfisicalClientFactory clientFactory, ILogger<InfisicalSecretSource> logger,
+        IOptions<SecretProviderOptions> options)
     {
         ArgumentNullException.ThrowIfNull(clientFactory);
         ArgumentNullException.ThrowIfNull(logger);
         _clientFactory = clientFactory;
         _logger = logger;
+        _options = options.Value;
     }
 
     /// <inheritdoc />
@@ -33,7 +38,8 @@ public sealed class InfisicalSecretSource : ISecretSource
     {
         ArgumentNullException.ThrowIfNull(binding);
 
-        if (string.IsNullOrWhiteSpace(binding.InfisicalEnvironment)
+        if (!SecretAcquisitionPolicy.AllowsBinding(_options.Consumer, binding, _options.Infisical.Environment)
+            || string.IsNullOrWhiteSpace(binding.InfisicalEnvironment)
             || string.IsNullOrWhiteSpace(binding.InfisicalPath)
             || string.IsNullOrWhiteSpace(binding.InfisicalKey))
         {

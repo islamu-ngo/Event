@@ -1,0 +1,29 @@
+Change-Id: CHG-01M57RC3KGG5A9M2A09VF3F07X
+Title: "Preserve deployment login literals in native preference and navigation contracts"
+Type: fix
+Scope: self-hosting
+Summary: "Escape dollar delimiters, apostrophes and backslashes in deployment login literals without weakening native enrollment or installed-body attestation."
+Group: deployment-login-literals
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Accepted deployment login text cannot terminate an enclosing dollar-quoted SQL body. Changed enrollment identities remain subject to exact installed-body checks.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Re-enroll affected development native contracts through controlled deployment tooling. Existing routine-body drift remains a startup failure rather than an automatic repair.

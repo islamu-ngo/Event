@@ -1,6 +1,5 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
-using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -20,8 +19,10 @@ public class EventModerationRecordRepository : GenericRepository<EventModeration
         Guid id,
         CancellationToken cancellationToken)
     {
+        if (tenantId == Guid.Empty || _dbContext.IsTenantFilterBypassed
+            || _dbContext.TenantFilterTenantId != tenantId)
+            return null;
         return await _dbContext.EventModerationRecords
-            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .AsNoTracking()
             .Where(record => record.TenantId == tenantId && record.Id == id)
             .FirstOrDefaultAsync(cancellationToken);

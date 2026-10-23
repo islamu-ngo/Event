@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-using TUnit.Core;
 
 namespace Explore.Infrastructure.Tests.Infrastructure.Webhooks;
 
@@ -25,8 +24,8 @@ public sealed class IncomingWebhookDrainServiceTests
                 1,
                 1))
             .ToArray();
-        var repository = Substitute.For<IIncomingWebhookMessageRepository>();
-        repository.ClaimDueAsync(
+        var repository = Substitute.For<IIncomingWebhookQueueRepository>();
+        repository.ClaimMessagesAsync(
                 Arg.Any<IncomingWebhookClaimRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<IncomingWebhookClaim>>(claims));
@@ -69,8 +68,8 @@ public sealed class IncomingWebhookDrainServiceTests
                 1,
                 1))
             .ToArray();
-        var repository = Substitute.For<IIncomingWebhookEffectOutboxRepository>();
-        repository.ClaimDueAsync(
+        var repository = Substitute.For<IIncomingWebhookQueueRepository>();
+        repository.ClaimEffectsAsync(
                 Arg.Any<IncomingWebhookEffectClaimRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<IncomingWebhookEffectClaim>>(claims));
@@ -102,6 +101,136 @@ public sealed class IncomingWebhookDrainServiceTests
         await Assert.That(executor.MaximumConcurrency).IsEqualTo(2);
     }
 
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task RenewalLossCancelsInFlightExecutionWithTheExactPersistedClaim(bool effects, bool renewalThrows)
+    {
+        var claim = new IncomingWebhookClaim(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), 7, 3);
+        var effect = new IncomingWebhookEffectClaim(
+            claim.IncomingWebhookMessageId, claim.TenantId, claim.LeaseToken, claim.ProcessingFence, claim.ProcessingGeneration);
+        var renewed = new TaskCompletionSource<IncomingWebhookClaim>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var repository = Substitute.For<IIncomingWebhookQueueRepository>();
+        repository.ClaimMessagesAsync(Arg.Any<IncomingWebhookClaimRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<IncomingWebhookClaim>>([claim]));
+        repository.ClaimEffectsAsync(Arg.Any<IncomingWebhookEffectClaimRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<IncomingWebhookEffectClaim>>([effect]));
+        repository.TryRenewMessageAsync(Arg.Any<IncomingWebhookClaim>(), Arg.Any<DateTime>(),
+                Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                renewed.TrySetResult(call.Arg<IncomingWebhookClaim>()
+                    ?? throw new InvalidOperationException("Renewal requires an incoming claim."));
+                return renewalThrows
+                    ? Task.FromException<bool>(new InvalidOperationException("Renewal unavailable."))
+                    : Task.FromResult(false);
+            });
+        repository.TryRenewEffectAsync(Arg.Any<IncomingWebhookEffectClaim>(), Arg.Any<DateTime>(),
+                Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var observed = call.Arg<IncomingWebhookEffectClaim>()
+                    ?? throw new InvalidOperationException("Renewal requires an incoming effect claim.");
+                renewed.TrySetResult(new IncomingWebhookClaim(observed.EffectOutboxId, observed.TenantId,
+                    observed.LeaseToken, observed.ProcessingFence, observed.ProcessingGeneration));
+                return renewalThrows
+                    ? Task.FromException<bool>(new InvalidOperationException("Renewal unavailable."))
+                    : Task.FromResult(false);
+            });
+        var services = new ServiceCollection();
+        services.AddSingleton(repository);
+        await using var provider = services.BuildServiceProvider();
+        var executor = new CancellationObservingExecutor();
+        using var clock = new RenewalClock();
+        var settings = Options.Create(new IncomingWebhookProcessingSettings
+        {
+            BatchSize = 1,
+            LeaseSeconds = 30,
+            MaxConcurrentItems = 1
+        });
+        using var metrics = CreateMetrics();
+        Task<IncomingWebhookDrainResult> batch = effects
+            ? new IncomingWebhookEffectDrainService(
+                provider.GetRequiredService<IServiceScopeFactory>(), executor, settings, clock, metrics,
+                NullLogger<IncomingWebhookEffectDrainService>.Instance).ProcessBatchAsync(CancellationToken.None)
+            : new IncomingWebhookDrainService(
+                provider.GetRequiredService<IServiceScopeFactory>(), executor, settings, clock,
+                NullLogger<IncomingWebhookDrainService>.Instance).ProcessBatchAsync(CancellationToken.None);
+        await executor.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        clock.Tick();
+        await Assert.That(await renewed.Task.WaitAsync(TimeSpan.FromSeconds(5))).IsEqualTo(claim);
+        await executor.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await batch.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(result.ClaimedCount).IsEqualTo(1);
+        await Assert.That(result.LeaseLostCount).IsEqualTo(1);
+        await Assert.That(result.CompletedCount).IsEqualTo(0);
+        await Assert.That(result.FailedCount).IsEqualTo(0);
+    }
+
+    private sealed class CancellationObservingExecutor : IIncomingWebhookClaimExecutor, IIncomingWebhookEffectClaimExecutor
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<IncomingWebhookClaimExecutionResult> ExecuteAsync(IncomingWebhookClaim claim, CancellationToken token) =>
+            ExecuteAsync(token);
+
+        public Task<IncomingWebhookClaimExecutionResult> ExecuteAsync(IncomingWebhookEffectClaim claim, CancellationToken token) =>
+            ExecuteAsync(token);
+
+        private async Task<IncomingWebhookClaimExecutionResult> ExecuteAsync(CancellationToken token)
+        {
+            Started.TrySetResult();
+            try
+            {
+                await _completion.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+                return IncomingWebhookClaimExecutionResult.Completed();
+            }
+            catch (OperationCanceledException)
+            {
+                Cancelled.TrySetResult();
+                throw;
+            }
+        }
+    }
+
+    private sealed class RenewalClock : TimeProvider, IDisposable
+    {
+        private DateTimeOffset _now = new(2026, 10, 8, 10, 0, 0, TimeSpan.Zero);
+        private RenewalTimer? _timer;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) =>
+            _timer = new RenewalTimer(callback, state);
+
+        public void Tick()
+        {
+            _now = _now.AddSeconds(10);
+            (_timer ?? throw new InvalidOperationException("Renewal timer was not registered.")).Tick();
+        }
+
+        public void Dispose() => _timer?.Dispose();
+
+        private sealed class RenewalTimer(TimerCallback callback, object? state) : ITimer
+        {
+            private bool _disposed;
+            public bool Change(TimeSpan dueTime, TimeSpan period) => !_disposed;
+            public void Tick()
+            {
+                if (!_disposed)
+                    callback(state);
+            }
+            public void Dispose() => _disposed = true;
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+                return ValueTask.CompletedTask;
+            }
+        }
+    }
+
     private sealed class ConcurrencyTrackingExecutor(int expectedConcurrency) : IIncomingWebhookClaimExecutor
     {
         private readonly TaskCompletionSource _expectedConcurrencyReached =
@@ -125,7 +254,6 @@ public sealed class IncomingWebhookDrainServiceTests
             try
             {
                 await _expectedConcurrencyReached.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
-                await Task.Delay(10, cancellationToken);
                 return IncomingWebhookClaimExecutionResult.Completed();
             }
             finally
@@ -174,7 +302,6 @@ public sealed class IncomingWebhookDrainServiceTests
             try
             {
                 await _expectedConcurrencyReached.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
-                await Task.Delay(10, cancellationToken);
                 return IncomingWebhookClaimExecutionResult.Completed();
             }
             finally

@@ -1,6 +1,7 @@
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
@@ -21,16 +22,12 @@ public enum ConfigurationManifestEffectDeliveryMode
 public static class ConfigurationManifestApplicationServicesRegistration
 {
     public static IServiceCollection AddConfigurationManifestApplication(
-        this IServiceCollection services,
-        ConfigurationManifestEffectDeliveryMode effectDeliveryMode =
-            ConfigurationManifestEffectDeliveryMode.Immediate)
+        this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        if (!Enum.IsDefined(effectDeliveryMode))
-        {
-            throw new ArgumentOutOfRangeException(nameof(effectDeliveryMode));
-        }
 
+        services.TryAddScoped<IConfigurationManifestApplier, ConfigurationManifestApplier>();
+        services.TryAddSingleton<LegalDocumentRenderingService>();
         services.TryAddScoped<IPublicationPolicyMutationBoundary, PublicationPolicyMutationBoundary>();
         services.TryAddScoped<SettingUpsertService>();
         services.TryAddScoped<
@@ -49,38 +46,28 @@ public static class ConfigurationManifestApplicationServicesRegistration
         services.TryAddScoped<
             IConfigurationManifestPreflight,
             ConfigurationManifestPreflight>();
-        services.TryAddScoped<IConfigurationManifestApplier, ConfigurationManifestApplier>();
-        services.TryAddSingleton<LegalDocumentRenderingService>();
-
-        if (effectDeliveryMode == ConfigurationManifestEffectDeliveryMode.DeferredToRuntime)
-        {
-            services.TryAddScoped<
-                IConfigurationManifestEffectDeliveryStrategy,
-                DeferredConfigurationManifestEffectDelivery>();
-        }
-        else
-        {
-            services.TryAddScoped<ConfigurationManifestCurrentStateReader>();
-            services.TryAddSingleton<ConfigurationImportArtifactParser>();
-            services.TryAddSingleton<ConfigurationImportPreviewComposer>();
-            services.TryAddScoped<ConfigurationImportSessionManager>();
-            services.TryAddScoped<ConfigurationImportSessionApplicationService>();
-            services.TryAddScoped<IConfigurationImportTenantIdentityMutationBoundary,
-                ConfigurationImportTenantIdentityMutationBoundary>();
-            services.TryAddScoped<ConfigurationImportSectionApplier>();
-            services.TryAddScoped<ConfigurationImportApplyService>();
-            services.TryAddScoped<ConfigurationManagedApplyScheduleService>();
-            services.TryAddScoped<ConfigurationDirectTransferService>();
-            services.TryAddScoped<IConfigurationImportEffectDelivery,
-                ConfigurationImportEffectDelivery>();
-            services.TryAddScoped<
-                IConfigurationManifestEffectDispatcher,
-                ConfigurationManifestEffectDispatcher>();
-            services.TryAddScoped<
-                IConfigurationManifestEffectDeliveryStrategy,
-                ConfigurationManifestEffectDelivery>();
-        }
-
+        services.TryAddScoped<ConfigurationManifestCurrentStateReader>();
+        services.TryAddSingleton<ConfigurationImportArtifactParser>();
+        services.TryAddSingleton<ConfigurationImportPreviewComposer>();
+        services.TryAddScoped<ConfigurationImportSessionManager>();
+        services.TryAddScoped<ConfigurationImportSessionApplicationService>();
+        services.TryAddScoped<IConfigurationImportTenantIdentityMutationBoundary,
+            ConfigurationImportTenantIdentityMutationBoundary>();
+        services.TryAddScoped<ConfigurationImportSectionApplier>();
+        services.TryAddScoped<ConfigurationImportApplyService>();
+        services.TryAddScoped<Func<IInstanceAdministratorCommitAuthority>>(provider =>
+            () => provider.GetRequiredService<IInstanceAdministratorCommitAuthority>());
+        services.TryAddScoped<Func<ITenantAdministratorCommitAuthority>>(provider =>
+            () => provider.GetRequiredService<ITenantAdministratorCommitAuthority>());
+        services.TryAddScoped<Func<IHumanActionCommitFinalizer>>(provider =>
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>());
+        services.TryAddScoped<ConfigurationManagedApplyScheduleService>();
+        services.TryAddScoped<ConfigurationDirectTransferService>();
+        services.TryAddScoped<IConfigurationImportEffectDelivery,
+            ConfigurationImportEffectDelivery>();
+        services.TryAddScoped<
+            IConfigurationManifestEffectDispatcher,
+            ConfigurationManifestEffectDispatcher>();
         return services;
     }
 }

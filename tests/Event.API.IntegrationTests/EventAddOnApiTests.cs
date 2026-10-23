@@ -329,17 +329,20 @@ public sealed class EventAddOnApiTests(ContractApiFixture fixture)
     }
 
     [Test]
-    public async Task UnknownOrderAndCapabilityReturnGenericNoStoreWithoutSentinelLeakage()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task UnknownOrderAndCapabilityReturnGenericNoStoreWithoutSentinelLeakage(bool issuedCapability)
     {
-        string sentinel = "ADDON-SENTINEL-CAPABILITY";
+        string sentinel = issuedCapability
+            ? new Explore.Infrastructure.Services.GuestCapabilityTokenService().Issue().RawToken
+            : "ADDON-SENTINEL-CAPABILITY";
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"/api/events/{Guid.CreateVersion7()}/registration-orders/" +
             $"{Guid.CreateVersion7()}/add-ons");
         request.Headers.Add(CapabilityHeader, sentinel);
 
-        using HttpResponseMessage response = await fixture.Client.SendAsync(request);
-
+        using var response = await fixture.Client.SendAsync(request);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
         await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
         string body = await response.Content.ReadAsStringAsync();

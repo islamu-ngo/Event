@@ -1,0 +1,29 @@
+Change-Id: CHG-01M55HMPBF66BTVRRVG7CBQSM7
+Title: "Retain idempotency operation custody across retries"
+Type: fix
+Scope: access
+Summary: "Use persisted operation identity and native transaction fences rather than reconstructed request authority when recovering a commit."
+Group: staged-programme-recovery
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Use persisted operation identity and native transaction fences rather than reconstructed request authority when recovering a commit.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Review the paired public operator guidance and complete final composed assurance before release. Packaging does not establish deployment readiness.

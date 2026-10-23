@@ -13,15 +13,7 @@ using Explore.Domain.Enums;
 namespace Explore.Application.Features.Admissions.Handlers.Queries;
 
 public sealed class GetParticipantReadinessQueryHandler(
-    IRegistrationInventoryRepository inventory,
-    IRegistrationParticipantRepository participants,
-    IParticipantAdmissionEligibilityRepository readiness,
-    IGuestCapabilityTokenService capabilities,
-    IEventRepository events,
-    IAuthorizationProvider authorization,
-    ICurrentUserService currentUser,
-    ITenantContext tenant,
-    TimeProvider timeProvider) :
+    IRegistrationPrivateReader reader) :
     IQueryHandler<
         GetParticipantReadinessQuery,
         ParticipantReadinessDto?>
@@ -39,27 +31,17 @@ public sealed class GetParticipantReadinessQueryHandler(
             return null;
         }
 
-        RegistrationOrder? order =
-            await inventory.GetOrderWithLinesAsync(
-                query.RegistrationOrderId,
-                tenant.TenantId,
-                cancellationToken);
-        if (order is null || order.EventId != query.EventId)
+        var graph = await reader.ReadAsync(new(RegistrationPrivateReadKind.Readiness,
+            query.EventId, query.RegistrationOrderId, ParticipantId: query.ParticipantId,
+            AssignmentId: query.RegistrationTicketAssignmentId), query.CapabilityToken, cancellationToken);
+        if (graph is null)
         {
             return null;
         }
 
-        ParticipantAdmissionEligibility? eligibility =
-            await readiness.GetAsync(
-                tenant.TenantId,
-                query.RegistrationTicketAssignmentId,
-                cancellationToken);
-        RegistrationParticipant? participant =
-            await participants.GetParticipantAsync(
-                query.ParticipantId,
-                query.RegistrationOrderId,
-                tenant.TenantId,
-                cancellationToken);
+        RegistrationOrder order = graph.Order;
+        ParticipantAdmissionEligibility? eligibility = graph.Eligibility;
+        RegistrationParticipant? participant = graph.Participant;
         if (eligibility is null
             || participant is null
             || eligibility.EventId != query.EventId
@@ -71,35 +53,14 @@ public sealed class GetParticipantReadinessQueryHandler(
             return null;
         }
 
-        Guid? userId = currentUser.IsAuthenticated
-            ? currentUser.UserId
-            : null;
+        Guid? userId = graph.PrincipalId;
         bool isSubject =
             userId.HasValue
             && (order.AccountUserId == userId
                 || participant.LinkedUserId == userId
                 || eligibility.SubjectUserId == userId);
-        bool hasGuestCapability =
-            RegistrationOrderAccessGuard.HasGuestAccess(
-                order,
-                query.EventId,
-                query.CapabilityToken,
-                capabilities,
-                timeProvider);
-        bool isOrganizer =
-            userId.HasValue
-            && await OrganizerMayManageAsync(
-                order,
-                cancellationToken);
-        if (!isSubject && !hasGuestCapability && !isOrganizer)
-        {
-            return null;
-        }
-
-        Event? admissionEvent =
-            await events.GetAuthorizationTargetByIdAsync(
-                order.EventId,
-                cancellationToken);
+        bool isOrganizer = graph.CanManageAttendees;
+        Event? admissionEvent = graph.Event;
         bool orderConfirmed =
             order.RegistrationOrderStatusId ==
             (int)RegistrationOrderStatusEnum.Confirmed
@@ -112,11 +73,7 @@ public sealed class GetParticipantReadinessQueryHandler(
                 orderConfirmed,
                 order.TotalDueMinorSnapshot == 0
                 || orderConfirmed);
-        AdmissionTicket? ticket =
-            await readiness.GetIssuedTicketAsync(
-                tenant.TenantId,
-                query.RegistrationTicketAssignmentId,
-                cancellationToken);
+        AdmissionTicket? ticket = graph.Ticket;
         bool activeAdmission =
             ticket?.AdmissionTicketStatusId ==
             (int)AdmissionTicketStatusEnum.Active;
@@ -151,37 +108,6 @@ public sealed class GetParticipantReadinessQueryHandler(
                 eligibility.RegistrationOrderId,
             ParticipantId = eligibility.ParticipantId,
         };
-    }
-
-    private async Task<bool> OrganizerMayManageAsync(
-        RegistrationOrder order,
-        CancellationToken cancellationToken)
-    {
-        Event? eventEntity =
-            await events.GetAuthorizationTargetByIdAsync(
-                order.EventId,
-                cancellationToken);
-        if (eventEntity?.TenantId != order.TenantId)
-        {
-            return false;
-        }
-
-        AuthorizationDecision decision =
-            await authorization.AuthorizeAsync(
-                new AuthorizationRequest(
-                    AuthorizationCapabilityCatalog.Require(
-                        ResourceKinds.Event,
-                        AuthorizationActions.Events
-                            .ManageAttendees),
-                    eventEntity.Id.ToString("D"),
-                    Scope: ResourceDescriptors
-                        .EventAuthorizationTarget
-                        .GetScope(eventEntity),
-                    Facts: ResourceDescriptors
-                        .EventAuthorizationTarget
-                        .GetFacts(eventEntity)),
-                cancellationToken);
-        return decision.IsAllowed;
     }
 
     private static string StatusCode(

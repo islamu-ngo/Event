@@ -14,20 +14,38 @@ public class UpdateOrganizationMemberRoleCommandHandler : ICommandHandler<Update
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
     private readonly IOrganizationRepository _organizationRepository;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
+    private readonly ISerializableAttemptOwner _owner;
 
     public UpdateOrganizationMemberRoleCommandHandler(
         IOrganizationMemberRepository organizationMemberRepository,
-        IOrganizationRepository organizationRepository)
+        IOrganizationRepository organizationRepository,
+        IHumanAccountAdministrativeActionPreparation preparation,
+        ISerializableAttemptOwner owner)
     {
         _organizationMemberRepository = organizationMemberRepository;
         _organizationRepository = organizationRepository;
+        _preparation = preparation;
+        _owner = owner;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateOrganizationMemberRoleCommand request, CancellationToken cancellationToken)
     {
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        return await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, token);
+            var result = await ExecuteBodyAsync(request, token);
+            if (result.IsSuccess) prepared.Complete(result.Id);
+            return result;
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(UpdateOrganizationMemberRoleCommand request, CancellationToken cancellationToken)
+    {
         var dto = request.UpdateOrganizationMemberRoleDto;
 
-        var memberToUpdate = await _organizationMemberRepository.GetOrganizationMemberWithDetails(dto.Id);
+        var memberToUpdate = await _organizationMemberRepository.GetOrganizationMemberWithDetails(dto.Id, cancellationToken);
         if (memberToUpdate == null)
         {
             return BaseCommandResponse.Validation<Guid>(["Member not found"], "Member not found");

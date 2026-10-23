@@ -2,6 +2,7 @@ using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Notifications;
+using Explore.Domain;
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Services;
@@ -31,7 +32,19 @@ public sealed class DefaultAccountAuthorityLifecycleEmailService(
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var login = await externalLogins.GetById(request.ExternalLoginId);
+        UserExternalLogin? login;
+        try
+        {
+            login = await externalLogins.GetById(request.ExternalLoginId);
+        }
+        catch (Exception exception) when (action == AccountAuthorityLifecycleEmailAction.PasswordReset
+            && LocalIdentityIntakeFailureClassifier.IsTransientStoreFailure(exception))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(AccountAuthorityLifecycleEmailStatus.ProviderRequestFailed, action, AccountAuthorityKind.None,
+                ReasonCode: "account_authority_intake_store_unavailable");
+        }
+        cancellationToken.ThrowIfCancellationRequested();
         if (login is null || login.UserId != request.UserId)
         {
             return new(AccountAuthorityLifecycleEmailStatus.AccountNotLinked, action, AccountAuthorityKind.None,

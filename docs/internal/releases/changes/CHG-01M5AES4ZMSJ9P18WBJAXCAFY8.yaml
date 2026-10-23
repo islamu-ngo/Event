@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5AES4ZMSJ9P18WBJAXCAFY8
+Title: "Coordinate bootstrap writes through API-owned locks"
+Type: fix
+Scope: self-hosting
+Summary: "Retain ordered C# coordination before the bootstrap transaction, remove privileged source table/row fences, and align native-owner reads with the existing fixed-column authority contract."
+Group: configuration-bootstrap-api-coordination
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Detail: Direct database edits no longer participate in bootstrap's removed source table and row fences. Only API writers following the ordered C# protocol are coordinated; out-of-protocol edits, including absent-setting inserts, can race and are not guaranteed to be detected by Serializable isolation or exact-effect checks.
+  Security:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Replace native-owner table SELECT with its existing fixed mapped-column SELECT inventory. Do not widen Global permissions or owner membership. Preserve original transactions, immutable native body attestation, scope, exact effects and fail-closed readiness; no new privileged locking routine is introduced. Direct credential use can bypass cooperative API coordination.
+  Migration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: No new environment variable or credential is added. Use the API as the configuration authority; direct SQL edits are not an equivalent administration protocol.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: Keep matching application and native definitions; readiness drift is not permission for automatic role or grant repair. Retain a coherent backup checkpoint for rollback and do not depend on the removed native source fences to protect direct database writes.

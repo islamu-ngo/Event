@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Infrastructure;
 using Microsoft.Extensions.Options;
@@ -44,9 +45,11 @@ public sealed class OutboxProcessor(
             {
                 break;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                logger.LogError(ex, "Error in outbox processor loop");
+                logger.LogError(
+                    "Error in outbox processor loop. FailureCategory={FailureCategory}",
+                    "batch_failed");
             }
 
             try
@@ -65,114 +68,151 @@ public sealed class OutboxProcessor(
     internal async Task ProcessOutboxBatchAsync(CancellationToken stoppingToken)
     {
         using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(stoppingToken);
-        await using var scope = serviceProvider.CreateAsyncScope();
-
-        var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
-        var dispatcher = scope.ServiceProvider.GetRequiredService<IOutboxMessageDispatcher>();
-
-        var pendingMessages = await outboxRepository.GetPendingBatch(_settings.BatchSize, stoppingToken);
-
-        if (pendingMessages.Count == 0)
+        IReadOnlyList<GenericOutboxClaim> genericClaims;
+        await using (var admissionScope = serviceProvider.CreateAsyncScope())
         {
-            if (_settings.VerboseLogging)
+            genericClaims = await admissionScope.ServiceProvider.GetRequiredService<IGenericOutboxAdmission>()
+                .ClaimDueAsync(_settings.BatchSize, DateTime.UtcNow, stoppingToken);
+        }
+        foreach (var claim in genericClaims)
+        {
+            stoppingToken.ThrowIfCancellationRequested();
+            try
             {
-                logger.LogDebug("No pending outbox messages");
+                await ProcessGenericClaimAsync(claim, stoppingToken);
             }
-            return;
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                logger.LogWarning("Generic outbox claim unavailable. FailureCategory={FailureCategory}",
+                    "generic_claim_unavailable");
+            }
         }
 
-        logger.LogInformation("Processing {Count} outbox messages", pendingMessages.Count);
-
-        foreach (var message in pendingMessages)
+        IReadOnlyList<NotificationOutboxClaim> notificationClaims;
+        await using (var admissionScope = serviceProvider.CreateAsyncScope())
         {
-            if (stoppingToken.IsCancellationRequested)
-                break;
-
-            await ProcessSingleMessageAsync(message, outboxRepository, dispatcher, stoppingToken);
+            notificationClaims = await admissionScope.ServiceProvider
+                .GetRequiredService<INotificationOutboxAdmission>()
+                .ClaimDueAsync(_settings.BatchSize, DateTime.UtcNow, stoppingToken);
+        }
+        foreach (var claim in notificationClaims)
+        {
+            stoppingToken.ThrowIfCancellationRequested();
+            try
+            {
+                await ProcessNotificationClaimAsync(claim, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // No settlement through unproven custody. The original lease expires for recovery.
+                logger.LogWarning("Notification outbox claim unavailable. FailureCategory={FailureCategory}",
+                    "notification_claim_unavailable");
+            }
         }
     }
 
-    internal async Task ProcessSingleMessageAsync(
+    internal async Task ProcessNotificationClaimAsync(
+        NotificationOutboxClaim claim, CancellationToken stoppingToken)
+    {
+        await using var scope = serviceProvider.CreateAsyncScope();
+        // Select the persisted source owner before resolving any Runtime repository or dispatcher.
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().BindExecutionTenant(claim.TenantId);
+        var repository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
+        var authority = scope.ServiceProvider.GetRequiredService<INotificationOutboxExecutionAuthority>();
+        await authority.BindAsync(claim, stoppingToken);
+        var message = await repository.GetClaimedNotificationAsync(
+            claim.MessageId, claim.ProcessingLeaseExpiresAt, stoppingToken);
+        if (message is null)
+            return;
+        await authority.RequireAsync(message, stoppingToken);
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IOutboxMessageDispatcher>();
+        await DispatchClaimedMessageAsync(message, claim.ProcessingLeaseExpiresAt,
+            repository, dispatcher, stoppingToken);
+    }
+
+    internal async Task ProcessGenericClaimAsync(GenericOutboxClaim claim, CancellationToken stoppingToken)
+    {
+        if (!GenericOutboxRoutes.Contains(claim.EventType))
+            throw new InvalidOperationException("generic_outbox_requires_admission");
+        await using var preparation = serviceProvider.CreateAsyncScope();
+        await using var execution = await preparation.ServiceProvider
+            .GetRequiredService<IGenericOutboxExecutionScopeFactory>().CreateAsync(claim, stoppingToken);
+        var repository = execution.Services.GetRequiredService<IOutboxRepository>();
+        var authority = execution.Services.GetRequiredService<IGenericOutboxExecutionAuthority>();
+        var message = await repository.GetClaimedGenericAsync(
+            claim.MessageId, claim.LeaseExpiresAt, claim.Status,
+            execution.Services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime, stoppingToken);
+        if (message is null)
+            return;
+        if (claim.Status == OutboxMessageStatus.DeadLettered)
+        {
+            await authority.RequireDeadLetterAsync(message, stoppingToken);
+            await ReconcileDeadLetterAsync(message, claim.LeaseExpiresAt, repository,
+                execution.Services.GetRequiredService<IOutboxMessageDispatcher>(), authority, stoppingToken);
+            return;
+        }
+        await authority.RequireAsync(message, stoppingToken);
+        await DispatchClaimedMessageAsync(message, claim.LeaseExpiresAt, repository,
+            execution.Services.GetRequiredService<IOutboxMessageDispatcher>(), stoppingToken, authority);
+    }
+
+    private async Task DispatchClaimedMessageAsync(
         OutboxMessage message,
+        DateTime processingLeaseExpiresAt,
         IOutboxRepository outboxRepository,
         IOutboxMessageDispatcher dispatcher,
-        CancellationToken stoppingToken)
+        CancellationToken stoppingToken,
+        IGenericOutboxExecutionAuthority? genericAuthority = null)
     {
-        if (message.Status == OutboxMessageStatus.DeadLettered)
-        {
-            var reconciliationLeaseExpiresAt = await outboxRepository.TryClaimDeadLetterReconciliation(
-                message.Id,
-                DateTime.UtcNow,
-                stoppingToken);
-            if (reconciliationLeaseExpiresAt is not null)
-            {
-                await ReconcileDeadLetterAsync(
-                    message,
-                    reconciliationLeaseExpiresAt.Value,
-                    outboxRepository,
-                    dispatcher,
-                    stoppingToken);
-            }
-            return;
-        }
-
-        var processingLeaseExpiresAt = await outboxRepository.TryClaimForProcessing(
-            message.Id,
-            DateTime.UtcNow,
-            stoppingToken);
-        if (processingLeaseExpiresAt is null)
-        {
-            if (_settings.VerboseLogging)
-            {
-                logger.LogDebug("Message {Id} already being processed by another worker", message.Id);
-            }
-            return;
-        }
-
         try
         {
             if (_settings.VerboseLogging)
             {
-                logger.LogDebug(
-                    "Dispatching message {Id}: {EventType} for {AggregateType}/{AggregateId}",
-                    message.Id, message.EventType, message.AggregateType, message.AggregateId);
+                logger.LogDebug("Dispatching outbox message");
             }
 
             // Dispatch to consumer — idempotent consumers required (at-least-once delivery)
+            message.Status = OutboxMessageStatus.Processing;
+            message.NextRetryAt = processingLeaseExpiresAt;
             await dispatcher.DispatchAsync(message, stoppingToken);
+            if (genericAuthority is not null)
+                await genericAuthority.RequireAsync(message, stoppingToken);
 
             var completed = await outboxRepository.MarkAsCompleted(
                 message.Id,
-                processingLeaseExpiresAt.Value,
+                processingLeaseExpiresAt,
                 stoppingToken);
 
             if (!completed)
             {
-                logger.LogWarning(
-                    "Message {Id} was dispatched after its processing claim was replaced; completion was ignored",
-                    message.Id);
+                logger.LogWarning("Outbox message was dispatched after its processing claim was replaced; completion was ignored");
                 return;
             }
 
-            logger.LogInformation(
-                "Successfully dispatched message {Id}: {EventType} for {AggregateType}/{AggregateId}",
-                message.Id, message.EventType, message.AggregateType, message.AggregateId);
+            logger.LogInformation("Successfully dispatched outbox message");
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             logger.LogError(
-                "Exception dispatching message {Id}: {ExceptionType}",
-                message.Id,
-                ex.GetType().Name);
+                "Exception dispatching outbox message. FailureCategory={FailureCategory}",
+                "dispatch_failed");
 
             var retryDelay = _settings.CalculateRetryDelay(message.RetryCount);
             var transition = await outboxRepository.MarkAsFailed(
                 message.Id,
-                processingLeaseExpiresAt.Value,
+                processingLeaseExpiresAt,
                 "dispatch_failed",
                 isRetryable: true,
                 retryDelay,
@@ -181,27 +221,30 @@ public sealed class OutboxProcessor(
 
             if (transition == OutboxFailureTransition.DeadLettered)
             {
-                await ReconcileDeadLetterAsync(
-                    message,
-                    processingLeaseExpiresAt.Value,
-                    outboxRepository,
-                    dispatcher,
-                    stoppingToken);
+                // Notification fanout has no dead-letter reconciliation route.
+                // Retain its terminal row for operator investigation, never re-dispatch it.
+                if (genericAuthority is not null && GenericOutboxRoutes.SupportsDeadLetter(message.EventType))
+                {
+                    var terminal = await outboxRepository.GetClaimedGenericAsync(
+                        message.Id, processingLeaseExpiresAt, OutboxMessageStatus.DeadLettered,
+                        serviceProvider.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime, stoppingToken);
+                    if (terminal is not null)
+                        await ReconcileDeadLetterAsync(terminal, processingLeaseExpiresAt,
+                            outboxRepository, dispatcher, genericAuthority, stoppingToken);
+                }
                 logger.LogError(
-                    "Message {Id} dead-lettered after {Retries} attempts",
-                    message.Id, message.RetryCount + 1);
+                    "Outbox message dead-lettered after {Retries} attempts",
+                    message.RetryCount + 1);
             }
             else if (transition == OutboxFailureTransition.RetryScheduled)
             {
                 logger.LogWarning(
-                    "Message {Id} failed (retry {Retry}/{Max}). Next retry in {Delay}s",
-                    message.Id, message.RetryCount + 1, message.MaxRetries, retryDelay);
+                    "Outbox message failed (retry {Retry}/{Max}). Next retry in {Delay}s",
+                    message.RetryCount + 1, message.MaxRetries, retryDelay);
             }
             else if (transition == OutboxFailureTransition.NotOwned)
             {
-                logger.LogWarning(
-                    "Message {Id} failed after its processing claim was replaced; failure was ignored",
-                    message.Id);
+                logger.LogWarning("Outbox message failed after its processing claim was replaced; failure was ignored");
             }
         }
     }
@@ -211,32 +254,32 @@ public sealed class OutboxProcessor(
         DateTime processingLeaseExpiresAt,
         IOutboxRepository outboxRepository,
         IOutboxMessageDispatcher dispatcher,
+        IGenericOutboxExecutionAuthority authority,
         CancellationToken stoppingToken)
     {
         try
         {
+            await authority.RequireDeadLetterAsync(message, stoppingToken);
             await dispatcher.ReconcileDeadLetterAsync(message, stoppingToken);
+            await authority.RequireDeadLetterAsync(message, stoppingToken);
             var reconciled = await outboxRepository.MarkDeadLetterReconciled(
                 message.Id,
                 processingLeaseExpiresAt,
                 stoppingToken);
             if (!reconciled)
             {
-                logger.LogWarning(
-                    "Dead-letter reconciliation for message {Id} completed after its claim was replaced; acknowledgement was ignored",
-                    message.Id);
+                logger.LogWarning("Outbox dead-letter reconciliation completed after its claim was replaced; acknowledgement was ignored");
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             logger.LogError(
-                "Dead-letter reconciliation failed for message {Id}: {ExceptionType}",
-                message.Id,
-                ex.GetType().Name);
+                "Outbox dead-letter reconciliation failed. FailureCategory={FailureCategory}",
+                "reconciliation_failed");
         }
     }
 }

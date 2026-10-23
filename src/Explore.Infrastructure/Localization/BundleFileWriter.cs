@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Domain.Common.Localization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -41,9 +42,15 @@ public sealed class BundleFileWriter : IBundleFileWriter
         var directory = BundleDirectory;
         var finalPath = Path.Combine(directory, $"{normalised}.json");
         var tempPath = finalPath + ".tmp";
+        bool tempOpened = false;
 
         try
         {
+            var sortedTranslations = BundleSchema.ValidateAndSort(translations);
+            byte[] output = JsonSerializer.SerializeToUtf8Bytes(sortedTranslations, SerializerOptions);
+            if (output.Length > LocalizationBundlePolicy.MaximumBytes)
+                throw new JsonException("Localization bundle output limit exceeded.");
+            ct.ThrowIfCancellationRequested();
             Directory.CreateDirectory(directory);
 
             await using (var stream = new FileStream(
@@ -54,26 +61,25 @@ public sealed class BundleFileWriter : IBundleFileWriter
                 bufferSize: 4096,
                 useAsync: true))
             {
-                var sortedTranslations = BundleSchema.ValidateAndSort(translations);
-                await JsonSerializer.SerializeAsync(stream, sortedTranslations, SerializerOptions, ct);
+                tempOpened = true;
+                await stream.WriteAsync(output, ct);
                 await stream.FlushAsync(ct);
             }
 
             File.Move(tempPath, finalPath, overwrite: true);
 
             _logger.LogInformation(
-                "[LOCALIZATION] Persisted bundle for {Language}: {Count} keys → {Path}",
-                normalised, translations.Count, finalPath);
+                "localization_bundle_persisted key_count={KeyCount}",
+                translations.Count);
 
             return finalPath;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            TryDeleteTemp(tempPath);
-            _logger.LogError(ex, "[LOCALIZATION] Failed to write bundle for {Language} at {Path}", normalised, finalPath);
-            throw new BundleWriteException(
-                $"Failed to write bundle for language '{normalised}' at '{finalPath}': {ex.Message}",
-                ex);
+            if (tempOpened)
+                TryDeleteTemp(tempPath);
+            _logger.LogError("localization_bundle_write_failed");
+            throw new BundleWriteException("localization_bundle_write_failed");
         }
     }
 
@@ -100,13 +106,13 @@ public sealed class BundleFileWriter : IBundleFileWriter
                 Reason: null,
                 TargetPath: directory);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "[LOCALIZATION] Bundle directory health probe failed at {Path}", directory);
+            _logger.LogWarning("localization_bundle_health_probe_failed");
             return new WritablePathHealth(
                 Exists: Directory.Exists(directory),
                 Writable: false,
-                Reason: ex.Message,
+                Reason: "localization_bundle_health_probe_failed",
                 TargetPath: directory);
         }
     }
@@ -120,9 +126,9 @@ public sealed class BundleFileWriter : IBundleFileWriter
                 File.Delete(path);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogDebug(ex, "[LOCALIZATION] Could not delete stale temp file {Path}", path);
+            _logger.LogDebug("localization_bundle_temporary_cleanup_failed");
         }
     }
 }

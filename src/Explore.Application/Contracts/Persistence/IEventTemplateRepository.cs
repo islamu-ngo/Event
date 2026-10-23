@@ -4,7 +4,8 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IEventTemplateRepository : IGenericRepository<EventTemplate, Guid>
 {
-    Task<EventTemplate?> GetTemplateWithDetails(Guid id);
+    Task<EventTemplate?> GetTemplateWithDetails(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Fences and validates the tracked target in the caller-owned exact-tenant Serializable transaction.</summary>
     Task<EventTemplate?> GetTrackedTemplateWithDefinitions(Guid id, CancellationToken cancellationToken);
 
     Task<(List<EventTemplate> Items, int TotalCount)> GetTemplatesPaged(

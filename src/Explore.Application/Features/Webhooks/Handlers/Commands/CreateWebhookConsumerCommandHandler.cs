@@ -1,10 +1,13 @@
 using System.Text.Json;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Contracts.Operations;
 using Explore.Domain;
+using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 
@@ -13,7 +16,14 @@ public sealed class CreateWebhookConsumerCommandHandler(
     IWebhookOwnershipScopeResolver ownershipScopeResolver,
     IWebhookProviderCapabilityResolver capabilityResolver,
     IWebhookAuditEventWriter auditWriter,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IMachinePrincipalAccessor machinePrincipalAccessor,
+    IHumanCommitScopePreparation humanScope,
+    IHumanWebhookMutationPreparation preparation,
+    ITenantContext tenantContext,
+    ITenantUserRepository tenantUserRepository,
+    TimeProvider timeProvider,
+    IHumanActionCommitFinalizer finalizer)
     : ICommandHandler<CreateWebhookConsumerCommand, BaseCommandResponse<Guid>>
 {
     private const int MaxNameLength = 200;
@@ -40,41 +50,81 @@ public sealed class CreateWebhookConsumerCommandHandler(
                 [capabilityResolution.UnavailableReasonCode ?? "Webhook provider capability authority is unavailable."]);
         }
 
-        var ownershipResolution = await ownershipScopeResolver.ResolveAsync(
-            request.ConsumerKindId,
-            request.OwnerId,
-            cancellationToken);
-        if (ownershipResolution.Scope is not { } ownership)
+        var machine = machinePrincipalAccessor.Current;
+        HumanCommitSubject? subject = null;
+        if (machine is null)
         {
-            return Failure(
-                "Webhook owner resolution failed.",
-                ownershipResolution.FailureCode ?? "webhook_owner_resolution_failed",
-                [ownershipResolution.Error ?? "Webhook owner could not be resolved."]);
+            await humanScope.PrepareAsync(cancellationToken);
+            subject = humanScope.Subject
+                ?? throw new UnauthorizedAccessException("An original authenticated human is required.");
         }
 
+        var consumerId = Guid.CreateVersion7();
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var name = request.Name.Trim();
-        var existing = await consumerRepository.GetByOwnerAndNameAsync(
-            ownership,
-            name,
-            cancellationToken);
+        WebhookOwnershipScope? originalOwnership = null;
 
-        if (existing is not null)
+        async Task<BaseCommandResponse<Guid>> MutateAsync(CancellationToken token)
         {
-            return Failure(
-                "Webhook consumer name is already in use.",
-                "webhook_consumer_name_conflict",
-                ["A webhook consumer with this name already exists for the selected owner."]);
-        }
+            WebhookOwnershipScope ownership;
+            if (subject is not null && request.ConsumerKindId == (int)WebhookConsumerKind.User)
+            {
+                // The ordinary resolver reads claim attribution. Human creation instead
+                // retains the canonical account resolved before this acquired owner.
+                if (request.OwnerId.HasValue && request.OwnerId != subject.PrincipalId)
+                    return Failure("Webhook owner resolution failed.", "webhook_owner_mismatch",
+                        ["Users can select only their own webhook ownership scope."]);
+                var member = await tenantUserRepository.GetByTenantAndUserAsync(
+                    tenantContext.TenantId, subject.PrincipalId, token);
+                if (member is null || member.IsDeleted || member.StatusId != (int)TenantUserStatusEnum.Active)
+                    return Failure("Webhook owner resolution failed.", "webhook_owner_not_found",
+                        ["An active user membership is required in the current tenant."]);
+                if (member.TenantId != tenantContext.TenantId || member.UserId != subject.PrincipalId)
+                    throw new UnauthorizedAccessException("Webhook membership must retain the original human and tenant.");
+                ownership = WebhookOwnershipScope.Create(WebhookConsumerKind.User,
+                    member.TenantId, null, null, null, subject.PrincipalId);
+            }
+            else
+            {
+                var resolution = await ownershipScopeResolver.ResolveAsync(
+                    request.ConsumerKindId, request.OwnerId, token);
+                if (resolution.Scope is not { } resolved)
+                    return Failure("Webhook owner resolution failed.",
+                        resolution.FailureCode ?? "webhook_owner_resolution_failed",
+                        [resolution.Error ?? "Webhook owner could not be resolved."]);
+                ownership = resolved;
+            }
 
-        var consumer = WebhookConsumer.Create(
-            ownership,
-            name,
-            (WebhookProviderMode)request.ProviderModeId,
-            DateTime.UtcNow);
+            originalOwnership ??= ownership;
+            if (ownership != originalOwnership)
+                throw new UnauthorizedAccessException("A retried consumer must retain its original ownership.");
 
-        return await unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
+            var existing = await consumerRepository.GetByOwnerAndNameAsync(ownership, name, token);
+            if (existing is not null)
+                return Failure("Webhook consumer name is already in use.", "webhook_consumer_name_conflict",
+                    ["A webhook consumer with this name already exists for the selected owner."]);
+
+            // Reconstruct after whole-owner rollback; never reuse a tracked product.
+            var consumer = WebhookConsumer.Create(ownership, name, (WebhookProviderMode)request.ProviderModeId, now);
+            consumer.Id = consumerId;
+            consumer.CreatedBy = subject?.PrincipalId;
             var created = await consumerRepository.CreateAsync(consumer, token);
+            // CreateConsumer's W selects owner contributors, not the new consumer.
+            void RequireCreated(WebhookConsumer? current)
+            {
+                if (current is null || current.Id != consumerId || current.Ownership != ownership
+                    || current.ConfigurationScopeId != (ownership.TenantId ?? ownership.InstanceId)
+                    || current.CreatedAt != now || current.Name != name
+                    || current.Status != WebhookConsumerStatus.Active
+                    || current.ProviderModeId != request.ProviderModeId || current.ConfigurationVersion != 1
+                    || subject is not null && current.CreatedBy != subject.PrincipalId)
+                    throw new UnauthorizedAccessException("The created consumer must retain its original typed ownership.");
+            }
+            RequireCreated(created);
+            if (subject is not null)
+                finalizer.Register(async finalToken =>
+                    RequireCreated(await consumerRepository.GetByIdForOwnerOperationAsync(
+                        consumerId, forUpdate: false, finalToken)), _ => { });
             await auditWriter.AppendAsync(
                 new WebhookAuditWriteRequest(
                     created.TenantId,
@@ -94,11 +144,18 @@ public sealed class CreateWebhookConsumerCommandHandler(
                     }),
                     ConfigurationVersion: $"consumer-v{created.ConfigurationVersion}",
                     EffectiveScopeKind: ownership.AuditScopeKind,
-                    EffectiveScopeId: ownership.OwnerId),
+                    EffectiveScopeId: ownership.OwnerId,
+                    PrincipalKind: subject is not null ? WebhookAuditPrincipalKind.User : WebhookAuditPrincipalKind.Machine,
+                    PrincipalReference: subject is not null ? $"user:{subject.PrincipalId:D}"
+                        : $"machine:{machine!.OwnerType}:{machine.OwnerId:D}"),
                 token);
 
             return BaseCommandResponse.Success(created.Id, "Webhook consumer created.");
-        }, cancellationToken);
+        }
+
+        return machine is null
+            ? await preparation.ExecuteAsync(request, MutateAsync, cancellationToken)
+            : await unitOfWork.ExecuteInTransactionAsync(MutateAsync, cancellationToken);
     }
 
     private static List<string> Validate(CreateWebhookConsumerCommand request)

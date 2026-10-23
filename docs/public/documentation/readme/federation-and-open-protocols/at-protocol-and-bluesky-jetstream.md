@@ -59,6 +59,39 @@ External community events are ingested via the Bluesky Jetstream firehose:
 
 ## 3. Multi-Tenant Governance
 
+When a newer publication or compensating deletion replaces queued work, it
+replaces only work for the same tenant, source event, linked user, DID,
+collection and remote record key. Other owners' queued work and processing
+leases remain unchanged. The replacement and predecessor state changes commit
+together; a failed transaction leaves the original work and its remote-write
+evidence available for recovery.
+
+Recovery also rejects payload and CID evidence belonging to another source
+event, even if it references the same remote record and replacement message.
+Conditional remote writes therefore use only evidence from the message's
+complete source and ownership lineage.
+
+Switching the linked AT Protocol account does not transfer a previously
+published record to the new DID. Planning refuses to reuse the old account's
+record, and queued mutations recheck that ownership before delivery.
+
+Actor and exact-DID moderation keep suspension, audit and compensating deletes
+in one transaction. Repeating an existing suspension still reconciles queued
+work. Compensation requires current federation capability, publication consent
+and one linked session; ambiguous or changed bindings do not create a delete.
+In-flight writes retain their lease/retry safety delay before compensation.
+The `DomainAssignedModerationAuditKeys` migration aligns moderation audit
+metadata on every supported database provider. It does not alter database
+columns or existing audit records.
+Run the migration service before starting updated API/workers so
+`PdsExactLineageActiveUniqueness` and the PostgreSQL compensation capability
+are current. The queue now distinguishes every exact remote record for a
+source version, including its owner, DID, collection and record key. A replacement
+Delete becomes claimable only after its predecessors are superseded in the
+same transaction; an activation failure rolls back the replacement.
+Do not downgrade while active rows differ only in those additional lineage
+fields: the previous unique key cannot represent that queue state.
+
 Ingested external events are subject to tenant federation policies (see [Multi-Tenancy](../security-and-identity/multi-tenancy.md)):
 * Tenant administrators control whether external federated events appear in local community search listings.
 * Federated records display clear attribution links back to their origin Bluesky post.

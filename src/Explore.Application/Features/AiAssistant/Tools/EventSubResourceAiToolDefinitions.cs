@@ -370,7 +370,7 @@ public static class EventSubResourceAiToolDefinitions
             fields.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase),
             ForbiddenPayloadFields,
             typeof(EventSubResourceAiActionMapper),
-            new AiToolAuthorizationRequirement(resourceKind, authorizationAction),
+            AuthorizationFor(kind, resourceKind, authorizationAction),
             ExposeToProvider: false,
             ExposeToMcp: true,
             AgentMetadata: Metadata(
@@ -407,7 +407,7 @@ public static class EventSubResourceAiToolDefinitions
             fields.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase),
             ForbiddenPayloadFields,
             typeof(EventSubResourceAiActionMapper),
-            new AiToolAuthorizationRequirement(resourceKind, authorizationAction),
+            AuthorizationFor(kind, resourceKind, authorizationAction),
             ExposeToProvider: false,
             ExposeToMcp: true,
             AgentMetadata: Metadata(
@@ -418,6 +418,26 @@ public static class EventSubResourceAiToolDefinitions
                 contextScope,
                 destructive: true));
     }
+
+    private static AiToolAuthorizationRequirement AuthorizationFor(
+        AiProposedActionKind kind, string resourceKind, string authorizationAction) =>
+        kind switch
+        {
+            AiProposedActionKind.CreateEventCustomPropertyDefinition
+                or AiProposedActionKind.UpdateEventCustomPropertyDefinition
+                or AiProposedActionKind.DeleteEventCustomPropertyDefinition
+                or AiProposedActionKind.PurgeEventCustomPropertyDefinition
+                or AiProposedActionKind.SetEventCustomPropertyValue
+                or AiProposedActionKind.SetEventCustomPropertyMultiValues
+                or AiProposedActionKind.CreateEventTemplate
+                or AiProposedActionKind.UpdateEventTemplate
+                or AiProposedActionKind.DeleteEventTemplate
+                or AiProposedActionKind.CreateEventSessionTemplate
+                or AiProposedActionKind.UpdateEventSessionTemplate
+                or AiProposedActionKind.DeleteEventSessionTemplate =>
+                new(ResourceKinds.Tenant, AuthorizationActions.Update),
+            _ => new(resourceKind, authorizationAction)
+        };
 
     private static AiToolAgentMetadata Metadata(
         string displayName,

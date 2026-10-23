@@ -1,0 +1,28 @@
+Change-Id: CHG-01M527FG8ZNV1Q3E81ATJE12AM
+Title: "Resolve patched browser hosting and dashboard dependencies"
+Type: fix
+Scope: dependencies
+Summary: "Select patched Microsoft WebAssembly hosting packages and the standalone dashboard SignalR client graph without suppressing vulnerability auditing."
+Group: browser-runtime-package-baseline
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/legal/dependencies/dotnet-browser-runtime.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Replace vulnerable WebAssembly server and transitive SignalR dependencies with patched versions.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

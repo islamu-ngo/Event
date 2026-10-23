@@ -19,6 +19,9 @@ related_intents: [update-repository-query, add-ef-migration, add-cqrs-handler]
 - `src/Explore.Persistence/**/*.cs` (excluding Migrations)
 
 ## Path-Specific Constraints
+- **Application Authority**: C# Domain/Application own business rules, authorization, workflows, concurrency coordination and completion. The database supplies storage transactions, constraints and tenant isolation, not a competing business application. Follow [the accepted decision](../../docs/internal/adr/ADR-application-owned-persistence.md).
+- **EF-First Storage**: Use EF Core/LINQ, then supported provider APIs. Keep only small documented SQL storage primitives for demonstrated capability gaps; do not move use cases into stored procedures, privileged business routines or business triggers. Existing native contracts are transitional, not a requirement to preserve SQL-owned authority.
+- **Necessary Permissions**: Fixed rights for an approved application purpose are normal implementation. Keep useful least privilege and RLS, but do not repeatedly seek approval for an already accepted credential-compromise trade-off. Escalate genuinely new trust boundaries, secret exposure or destructive actions; do not silently bypass existing controls before a verified C# replacement.
 - **Context Pooling**: Use property injection for scoped context data; do not add scoped dependencies to `ExploreDbContext` constructor.
 - **Mapping Logic**: Favor `IEntityTypeConfiguration<T>` classes over smearing mapping rules across the `DbContext` or repositories.
 - **Explicit Tracking**: Use `AsNoTracking()` for all read-only query flows.

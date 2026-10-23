@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5J522GFGQVESAZ8NMMTV8FR
+Title: "Preserve configuration import coordination and commit outcomes"
+Type: fix
+Scope: onboarding
+Summary: "Keep configuration import coordination on its original application owner through settlement, and report uncertain Setup commits without replay or contradictory failed history."
+Group: configuration-import-settlement
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Human and Discovery coordination precede the original transaction and Setup enrollment-generation lock. Original authorization and credential custody remain required; cooperative coordination does not constrain direct database writers.
+  Migration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: A lost commit acknowledgement is not proof of rollback. Inspect the original session and operation receipt before retrying; recover a committed pending effect through the outbox worker instead of reapplying configuration.

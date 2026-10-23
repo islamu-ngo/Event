@@ -25,9 +25,11 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
         await Assert.That(result.AccountAuthorityKind).IsEqualTo(AccountAuthorityKind.Keycloak);
         await Assert.That(fixture.Http.Requests.Count).IsEqualTo(2);
         var token = fixture.Http.Requests[0];
-        await Assert.That(token.Body).Contains("grant_type=password");
-        await Assert.That(token.Body).Contains("client_id=admin-cli");
-        await Assert.That(token.Body).Contains($"password={fixture.Http.AdminPassword}");
+        await Assert.That(token.Body).Contains("grant_type=client_credentials");
+        await Assert.That(token.Body).Contains("client_id=event-lifecycle");
+        await Assert.That(token.Body).Contains($"client_secret={fixture.Http.ClientSecret}");
+        await Assert.That(token.Body).DoesNotContain("username=");
+        await Assert.That(token.Body).DoesNotContain("password=");
         var email = fixture.Http.Requests[1];
         await Assert.That(email.Uri.AbsolutePath).IsEqualTo("/auth/admin/realms/ISLAMU/users/keycloak-user-123/execute-actions-email");
         await Assert.That(email.Authorization!.Scheme).IsEqualTo("Bearer");
@@ -47,6 +49,27 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
         await Assert.That(result.Status).IsEqualTo(AccountAuthorityLifecycleEmailStatus.ProviderNotConfigured);
         await Assert.That(result.ReasonCode).IsEqualTo("keycloak_lifecycle_unsafe_host");
         await AssertNoDeliveryAsync(fixture);
+    }
+
+    [Test]
+    [Arguments("foreign_realm")]
+    [Arguments("missing_role")]
+    [Arguments("excess_role")]
+    public async Task RequestWithUnacceptableServiceGrantCannotHandOffLifecycleAction(string mutation)
+    {
+        await using var fixture = await AccountAuthorityLifecycleEmailFixture.CreateAsync();
+        if (mutation == "foreign_realm")
+            fixture.Http.TokenIssuer = "https://keycloak.example.test/auth/realms/foreign";
+        if (mutation == "missing_role")
+            fixture.Http.HasLifecycleRole = false;
+        if (mutation == "excess_role")
+            fixture.Http.ExcessRole = true;
+        var result = await fixture.Service.RequestPasswordResetAsync(fixture.Request());
+        await Assert.That(result.Status).IsEqualTo(AccountAuthorityLifecycleEmailStatus.ProviderRequestFailed);
+        await Assert.That(fixture.Http.Requests.Count).IsEqualTo(1);
+        await Assert.That(fixture.Http.Requests.Single().Uri.AbsolutePath)
+            .IsEqualTo("/auth/realms/ISLAMU/protocol/openid-connect/token");
+        await AssertPersistedSafeOutcomeAsync(fixture, result);
     }
 
     [Test]
@@ -121,7 +144,7 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
         await Assert.That(delegation.TenantId).IsEqualTo(fixture.TenantId);
         await Assert.That(delegation.AccountAuthorityKindId).IsEqualTo((int?)Explore.Domain.Enums.AccountAuthorityKindEnum.Keycloak);
         var safeData = JsonSerializer.Serialize(new { result, intent.SafePayloadReference, delegation.SafePayloadHash });
-        await Assert.That(safeData).DoesNotContain(fixture.Http.AdminPassword);
+        await Assert.That(safeData).DoesNotContain(fixture.Http.ClientSecret);
         await Assert.That(safeData).DoesNotContain(fixture.Http.AdminToken);
         await Assert.That(await fixture.Context.EmailDispatchOutbox.CountAsync()).IsEqualTo(0);
     }

@@ -24,6 +24,8 @@ public sealed class S3PreflightVerifier(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (request.TestWritePermissions)
+            throw new UnauthorizedAccessException("Write probes require original storage action custody.");
 
         var config = request.Configuration ?? await configResolver.ResolveAsync(cancellationToken);
         if (config is null)
@@ -63,15 +65,10 @@ public sealed class S3PreflightVerifier(
                 return result;
             }
 
-            var writeSucceeded = !request.TestWritePermissions
-                || await VerifyWriteAndDeleteAsync(client, config, result, cancellationToken);
-            if (!request.TestWritePermissions)
-            {
-                result.Steps.Add(Skipped(WriteStep, "Write and delete permissions were not requested."));
-            }
+            result.Steps.Add(Skipped(WriteStep, "Write and delete permissions were not requested."));
 
             result.Steps.Add(Skipped(IdentityStep, "Provider-specific identity checks are not required for S3 compatibility."));
-            result.IsSuccess = result.CanRead && writeSucceeded;
+            result.IsSuccess = result.CanRead;
             return result;
         }
     }
@@ -113,60 +110,6 @@ public sealed class S3PreflightVerifier(
         result.Steps.Add(Skipped(WriteStep, "Write and delete permissions were not checked because bucket access failed."));
         result.Steps.Add(Skipped(IdentityStep, "Account identity was not checked."));
         return false;
-    }
-
-    private async Task<bool> VerifyWriteAndDeleteAsync(
-        IAmazonS3 client,
-        S3Configuration config,
-        S3PreflightResult result,
-        CancellationToken cancellationToken)
-    {
-        var objectKey = $".system/preflight-probe-{Guid.CreateVersion7():N}";
-        var putRequest = new PutObjectRequest
-        {
-            BucketName = config.BucketName,
-            Key = objectKey,
-            InputStream = Stream.Null,
-            AutoCloseStream = false,
-            ContentType = "application/octet-stream"
-        };
-        putRequest.Headers.ContentLength = 0;
-
-        try
-        {
-            await client.PutObjectAsync(putRequest, cancellationToken);
-            result.CanWrite = true;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception) when (IsExpectedProviderFailure(exception))
-        {
-            LogFailure("put_object", exception);
-            result.Steps.Add(MapObjectFailure(exception, "put"));
-            return false;
-        }
-
-        using var cleanupTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        try
-        {
-            await client.DeleteObjectAsync(
-                new DeleteObjectRequest
-                {
-                    BucketName = config.BucketName,
-                    Key = objectKey
-                },
-                cleanupTimeout.Token);
-            result.Steps.Add(Passed(WriteStep, "A zero-byte probe object was written and deleted successfully."));
-            return true;
-        }
-        catch (Exception exception) when (IsExpectedProviderFailure(exception))
-        {
-            LogFailure("delete_probe_object", exception);
-            result.Steps.Add(MapObjectFailure(exception, "delete"));
-            return false;
-        }
     }
 
     private async Task VerifyIdentityWithoutBucketAsync(
@@ -220,28 +163,6 @@ public sealed class S3PreflightVerifier(
             _ =>
                 Failed(BucketStep, "s3_bucket_unavailable", "The target bucket could not be verified.", "Verify the bucket policy and provider configuration.")
         };
-
-    private static S3PreflightStepResult MapObjectFailure(Exception exception, string operation)
-    {
-        var forbidden = exception is AmazonS3Exception s3Exception
-            && s3Exception.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized;
-        var deleting = operation == "delete";
-
-        return new S3PreflightStepResult
-        {
-            StepName = WriteStep,
-            Status = deleting ? S3PreflightStepStatus.Warning : S3PreflightStepStatus.Failed,
-            ErrorCode = forbidden
-                ? deleting ? "s3_delete_forbidden" : "s3_put_forbidden"
-                : deleting ? "s3_delete_failed" : "s3_put_failed",
-            Message = deleting
-                ? "The zero-byte probe was written, but its cleanup delete failed."
-                : "The zero-byte write probe failed.",
-            Detail = deleting
-                ? "Remove the probe object manually if present and grant DeleteObject permission."
-                : "Grant PutObject permission for the target bucket and retry."
-        };
-    }
 
     private static S3PreflightResult MissingConfigurationResult() => new()
     {

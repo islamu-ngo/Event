@@ -1,16 +1,66 @@
 namespace Explore.Persistence.Repositories;
 
+using System.Data;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 public class FooterLinkGroupRepository : GenericRepository<TenantFooterLinkGroup, Guid>, IFooterLinkGroupRepository
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly IFooterOperationExecution? _execution;
 
-    public FooterLinkGroupRepository(ExploreDbContext dbContext) : base(dbContext)
+    public FooterLinkGroupRepository(ExploreDbContext dbContext, IFooterOperationExecution? execution = null) : base(dbContext)
     {
         _dbContext = dbContext;
+        _execution = execution;
+    }
+
+    public override async Task<TenantFooterLinkGroup> Create(TenantFooterLinkGroup entity)
+    {
+        await RequireWriteAsync(entity, FooterWriteKind.Create);
+        return await base.Create(entity);
+    }
+
+    public override async Task Update(TenantFooterLinkGroup entity)
+    {
+        await RequireWriteAsync(entity, FooterWriteKind.Update);
+        await base.Update(entity);
+    }
+
+    public override async Task Delete(TenantFooterLinkGroup entity)
+    {
+        await RequireWriteAsync(entity, FooterWriteKind.Delete);
+        await base.Delete(entity);
+    }
+
+    private Task RequireWriteAsync(TenantFooterLinkGroup entity, FooterWriteKind kind) =>
+        (_execution ?? throw new UnauthorizedAccessException("Footer writes require their actual operation producer."))
+        .RequireWriteAsync(entity, kind);
+
+    public async Task<TenantFooterLinkGroup?> GetForMutationAsync(Guid id, CancellationToken ct = default)
+    {
+        if (_dbContext.TenantFilterTenantId is not { } tenantId || tenantId == Guid.Empty
+            || _dbContext.IsTenantFilterBypassed
+            || _dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Footer mutation requires the exact tenant Serializable transaction.");
+        var candidate = await _dbContext.TenantFooterLinkGroups.AsNoTracking()
+            .SingleOrDefaultAsync(group => group.Id == id && group.TenantId == tenantId, ct);
+        if (candidate is null)
+            return null;
+        await RelationalEntityRowFence.AcquireGlobalAsync<TenantFooterLinkGroup>(_dbContext, id, ct);
+        var current = await _dbContext.TenantFooterLinkGroups.AsNoTracking()
+            .SingleOrDefaultAsync(group => group.Id == id && group.TenantId == tenantId, ct);
+        var tracked = _dbContext.ChangeTracker.Entries<TenantFooterLinkGroup>()
+            .SingleOrDefault(entry => entry.Entity.Id == id);
+        if (tracked is not null && current is not null && tracked.Entity.TenantId != current.TenantId)
+            throw new InvalidOperationException("Tracked footer ownership must match the persisted group.");
+        if (tracked is not null)
+            tracked.State = EntityState.Detached;
+        return current;
     }
 
     public async Task<List<TenantFooterLinkGroup>> GetResolvedGroupsForTenantAsync(

@@ -13,6 +13,47 @@ successful file copy alone is not evidence of crash safety or recovery.
 
 ---
 
+## PostgreSQL login identities during upgrade
+
+Preserve the exact declared Migrator, Global and Runtime login names when
+restoring or installing native database contracts. Supported punctuation in a
+login name remains identity data. Do not strip punctuation or rename these
+logins to accommodate SQL generation. This includes bootstrap installation as
+well as navigation and tenant-preference contracts; dollar tags, apostrophes and
+backslashes must preserve the original login identity.
+
+Deploy matching native definitions with the application through the controlled
+migrator before reopening traffic. Runtime rejects stale or changed definitions
+rather than repairing them or selecting another database authority.
+
+## Repeating PostgreSQL PDS permission installation
+
+Use the migration tooling matching the application version before reopening
+traffic. PDS permission installation uses EF Core's mapped column names so a
+repeat run can recognize its existing valid grants, including names the provider
+does not quote. This correction adds no database permissions or settings.
+
+If installation still reports `unsafe PDS admission column grants`, investigate
+the actual installed privileges. Unexpected column access and grant options
+remain errors; do not widen permissions, remove the check or reorder installers
+to force startup through.
+
+## Interrupted PostgreSQL lock reacquisition
+
+If logs report `named_lock_acquisition_cleanup_unconfirmed`, the API could not
+confirm a repeated lock acquisition on an already-held key. It deliberately keeps
+the original session and earlier locks intact so another writer cannot enter
+while the original operation is still settling. That acquisition failed; no new
+lock lease or successful configuration change is implied.
+
+A possibly retained extra lock count can block later work. Let the owning
+operation unwind and release its earlier leases, then recycle that database
+session through normal application lifecycle handling. Do not repeatedly retry
+on the same session or forcibly close a connection while its earlier operation is
+still running. A pooled connection being logically closed does not itself prove
+that the backend ended or its lock state was already reset. No new database
+permissions or deployment settings are required.
+
 ## 1. What Must Be Backed Up
 
 Inventory the stores your selected topology actually uses:
@@ -33,21 +74,26 @@ cleanup complete. See [storage target recovery](../integrations-and-ai/storage.m
 
 | Asset | Storage Location | Why It Matters |
 |---|---|---|
-| Primary database | Split `postgres_data`; Standalone `/app/data/islamu_event.db` | Application state, persisted email settings, outbox, colocated Local Identity and API/Standalone Data Protection keys; include migration histories and operational schemas |
+| Primary database | Split `postgres_data`; Standalone `/app/data/islamu_event.db` | Application state, persisted email settings, outbox and colocated Local Identity; include migration histories and operational schemas. Historical DP tables are not runtime key authority. |
 | External Local Identity, if selected | Configured independent Identity database | Credentials and credential-operation state, coordinated with application identity mappings |
 | Privacy-erasure authority | Default `/app/data/privacy_erasure_authority.db`; Split volume `privacy_erasure_authority_data` | Retained erasure facts and replay bounds, preserved independently of primary rollback |
 | Keycloak, when used | `keycloak-db`, volume `keycloak_data` | Accounts, realms, clients and credentials; use the configured database name, not an assumed one |
-| Split UI Data Protection keys | Redis key `islamu-event:data-protection-keys`, persisted in `redis_data` | The separate UI's protected-cookie key store; it is not the API's database key store |
+| External Data Protection ring and admission | Selected authority's exact partition folders/variables | Every retained key and revocation required by protected values and restorable backups |
+| Independent DP admission pin/floor | Separately protected operator deployment control | Preserve the latest hash/generation independently of application and candidate-authority rollback |
 | Media | Split `local_storage_data`; Standalone configured path, `/app/data/storage` in the Standalone runbook; or selected S3 bucket | Uploads and attachments consistent with database metadata |
 | Secret/configuration authority | Private `.env` or selected Infisical authority, configuration manifests and bindings | Local signing keys, external credentials, deployment configuration and key versions required by protected data |
 | Release inventory | Source revision, image digests, migration state and enabled profiles | Identifies the software and schema compatible with the recovery point |
 
-There is no `data_protection_keys` filesystem volume in shipped Compose and no
-Standalone `/app/data/dataprotection-keys/` directory. Default Standalone keys are
-in its primary database. Split uses database keys for the API and Redis keys for
-the separate UI. Preserve the selected secret authority too; Data Protection
-keys do not replace Local JWT signing keys. Key preservation alone does not
-guarantee that every session remains valid after recovery.
+No database, Redis snapshot or filesystem key directory supplies runtime Data
+Protection authority. Provision the selected external ring and separate complete
+admission record. Keep the current independently protected admission hash and
+minimum generation when restoring older data; restoring them with the candidate
+would defeat rollback rejection. Expired retained keys still decrypt, revoked
+keys stay revoked, and missing keys cannot be reconstructed. Durable destinations,
+registration answers and report evidence can require keys indefinitely.
+Preserve old database/Redis ring state and backups offline; cutover never deletes
+them. Data Protection does not replace Local JWT signing keys. See the
+[external ring runbook](secrets.md#external-data-protection-rings).
 
 If setup is incomplete, protect its generated secret in Split `setup_data` or
 Standalone `/app/data/setup-secret` as confidential bootstrap state. Optional
@@ -173,11 +219,13 @@ a main file with unrelated WAL/SHM files from another recovery point.
 
 ### Step 3: Restore Keys, Media And Secret Authority
 
-Database restoration includes API/Standalone Data Protection keys. For shipped
-Split, restore the complete captured Redis persistence unit into clean
-`redis_data` while Redis and the UI are stopped. Restore local media or S3 state
-consistent with the application snapshot. Use your volume/storage restore tool,
-not an invented filesystem keyring path. Preserve the deployment's non-root
+Database and Redis restoration do not provision current Data Protection authority.
+Restore the external partition's retained material and admission record without
+lowering the independently protected current hash/generation floor. Recover forward
+if a candidate is older; keep newer revocations. Restore any needed Redis persistence
+into clean `redis_data` with Redis/UI stopped, and media or S3 state consistent with
+the application snapshot. Use your volume/storage restore tool, not an invented
+filesystem keyring path. Preserve the deployment's non-root
 ownership and access permissions, including authority directories `0700` and
 files `0600`.
 
@@ -241,8 +289,10 @@ checkpoints or deleting facts. Keep traffic closed if these checks fail.
 
 Then start the UI, verify selected-provider sign-in, tenant routing, public event
 reads and media access, and review ambiguous outbox/provider outcomes before any
-replay. Inspect `data-protection-keys` on the UI: Redis reachability alone does not
-prove that its former keyring was restored. Check email intent separately:
+replay. Inspect `external-data-protection` on every API/BFF/Combined replica:
+require the intended generation and admission hash, then test real retained
+payloads. One healthy replica does not prove inventory completeness or cluster
+convergence. Check email intent separately:
 persisted disabled email is intentional, while SMTP-only degradation can return
 HTTP 200 with otherwise healthy core checks. Neither restoring configuration nor
 starting Mailpit should silently enable delivery. Required authority, database
@@ -251,6 +301,23 @@ and security failures still fail closed.
 ---
 
 ## 4. Upgrade Runbook (Pre-1.0 Releases)
+
+### Application-owned storage development migrations
+
+The current development migration set uses `ApplicationOwnedProgrammeModel`
+for the application database and `ApplicationOwnedLocalIdentityEligibility`
+for the separate local-identity database. These generated migrations replace
+unapplied development drafts on a confirmed clean development target. Apply the
+matching release and provider artifacts through the migration service, including
+the application changes that route federation settings to their dedicated tables.
+They do not copy old generic federation settings or rewrite migration history.
+
+Do not use their Down migrations as a data-preserving rollback: they remove new
+federation, policy and eligibility storage and typed evidence classification.
+For a deployment containing data you intend to retain, use the verified backup
+and recovery procedure above rather than relabeling history or resetting shared
+volumes. Application C# workflows remain responsible for authorization, canonical
+row creation and completion; schema creation alone does not execute those workflows.
 
 Because the project is pre-1.0 and in active development, breaking schema changes may occur between minor versions. Follow this strict procedure when updating your instance:
 
@@ -281,6 +348,154 @@ reopening traffic. Do not treat an older image as a schema rollback. If an
 upgrade is not explicitly image-only reversible, use a tested recovery plan that
 retains newer erasure facts. Keep the prior software and verified artifacts until
 acceptance completes; a successful startup is not itself a restore rehearsal.
+
+### Dedicated federation settings development transition
+
+The dedicated federation settings migration separates event federation enablement,
+backfill enablement, and backfill mode from private generic settings. Validation
+profiles and each user's publication consent remain in their existing stores.
+The API owns setting interpretation; the database retains value, uniqueness,
+tenant-boundary, and referential-integrity checks.
+
+The related API-owned discovery-revision design gives Runtime and Global narrowly
+bounded access to revision identifiers and two revision counters. Creation may
+insert those four fields; subsequent updates may change only the counters, not
+the keys. C# creates the canonical row in the tenant's original transaction.
+Global can also read tenant identifiers, including inactive
+tenants, so an instance-wide setting change cannot omit them. This revision capability does not grant
+access to private tenant settings or descriptive tenant fields. Tenant-selected
+sessions retain tenant isolation; cross-tenant revision access requires the
+original Global identity without a selected tenant, except for an INSERT-only
+permission for tenantless Runtime creation. That exception gives tenantless
+Runtime no revision read or update visibility. Revision deletion is not granted.
+
+Ordinary administrator tenant creation uses a separate, narrowly listed Global
+permission set. The API checks the authenticated administrator, creates the new
+tenant, its required settings documents and canonical revision atomically, and
+may create that same person's administrator membership in the new tenant. Global
+therefore has fixed column-level INSERT permissions for membership and role-grant
+rows, with only the necessary tenant, role and capacity metadata reads. Runtime
+receives no new rights, and this does not grant private account or credential reads.
+
+Creation readiness also rejects unexpected database columns, executable defaults
+and altered or non-enforced CHECK constraints on its write tables. If schema drift
+blocks startup or creation, investigate it against the generated migrations and
+documented installation rather than disabling checks or broadening permissions.
+These database checks protect the expected storage structure; the API still owns
+the administrator's authorization, capacity decisions and atomic creation workflow.
+
+There is an important accepted trade-off: **a stolen Global database credential
+could insert administrator access into an existing tenant**, even though normal
+API calls are restricted to their newly created tenant. INSERT-only permissions
+and database constraints limit the available operations but do not enforce the
+API's human authorization or new-tenant-only workflow. Protect Global as sensitive
+application authority, keep its secret separate from Runtime and rotate or revoke
+it if compromise is suspected. Do not treat RLS or a successful installation as
+protection against this direct-credential attack.
+
+The separately approved mandatory-document permission is limited to creating
+Branding and DirectoryOperatorIdentity documents. A restrictive database policy
+limits Global to those two keys and an unselected tenant session; the ordinary
+tenant policy cannot bypass that restriction. Existing documents cannot be replaced
+with this INSERT permission. However, a stolen Global credential could create
+either missing document in an existing tenant. The API normally permits these
+effects only as part of its own newly created tenant graph.
+
+The managed provisioning worker has its own approved creation boundary, separate
+from a signed-in administrator. It must retain the original admitted queue delivery
+and request, then atomically create the exact application graph and complete its
+operation. Its narrowly declared permissions may create accounts, identity links,
+profiles and provisioning records and change email-verification state, but do not
+read passwords, password hashes, security stamps or token values. A stolen Global
+credential could misuse those writes to forge accounts or links, alter verification
+state or fabricate provisioning records. This is an accepted additional risk,
+not a guarantee that database credentials enforce API authorization.
+
+The worker's Local-account eligibility must track the current credential lifecycle
+without exposing credentials. When Identity and application data use separate
+databases, the API coordinates participating lifecycle changes through settlement;
+there is no distributed atomic transaction and direct database edits can bypass
+that coordination. After an uncertain commit, the worker must reconcile the original
+operation before retrying creation. These are required implementation and deployment
+checks, not a claim that the current worker tests have already passed.
+
+Runtime and Global are separate database logins used by the API, not human
+administrator roles. Runtime normally handles one selected tenant; Global is
+reserved for admitted instance-wide operations. PostgreSQL row-level security (RLS) is a
+database filter/check that uses the API's selected tenant to restrict which rows
+an operation can see or change. Global does not mean a superuser or unrestricted
+access to all tables. RLS is a second boundary alongside API
+authorization, not a replacement for it. Someone who steals a database login
+can supply their own tenant session within that login's fixed permissions;
+RLS does not authenticate the human or make that credential harmless.
+
+Protect those database credentials as application authority. Unlike the former
+routine-only boundary, a stolen credential can directly alter revision metadata
+or fabricate a missing revision row within its permissions, including the
+tenantless Runtime insertion exception, even though the API normally validates authorization and
+updates settings and revision counters atomically. Installation rejects changed
+permissions or policies; do not broaden grants or disable RLS to repair startup.
+Deployment readiness still requires the native permission, rollback and concurrent
+workflow checks, not merely a successful migration build.
+
+The API coordinates parent and tenant setting changes using shared ordered
+setting-key leases, acquired before the transaction and retained until it settles.
+It also coordinates tenant creation/deletion with instance-wide audience changes.
+There is no new privileged parent-locking routine and Runtime cannot update an
+instance parent merely to lock it. This prevents races between participating API
+operations, but a direct parent-setting edit made with stolen Global credentials
+can bypass that coordination. Protect the database credentials accordingly; this
+design does not promise parent stability against direct credential misuse.
+
+If tenant creation rolls back to a savepoint, the API rejects completion of that
+whole attempt, even if earlier saves succeeded. Retry the complete operation
+with fresh state; do not manually roll back part of a creation transaction and
+then commit what remains. The creation protocol requires EF-managed transaction
+and savepoint APIs, not direct rollback SQL or provider-level rollback calls.
+
+Use an explicitly disposable development application database for this transition.
+For PostgreSQL, the retired `event_atproto_governance_owner`,
+`event_atproto_governance_migrator` and `event_atproto_governance_runtime` roles
+must also be absent from the cluster. The former governance routine and its
+`atproto_governance_overrides` policy must be absent from the mapped tenant-setting
+table. A new database alone does not remove cluster-wide roles. Installation and
+reads reject these leftovers without automatically dropping or changing them;
+do not remove shared roles or retained objects without a reviewed operator plan.
+Existing generic rows for these three settings are rejected, not automatically
+copied, deleted, or overwritten. If settings or other application data must survive,
+stop and arrange a reviewed transition before applying the migration. Do not edit
+migration history or delete independent Identity, encryption-key, or privacy-erasure
+stores to get startup to succeed.
+
+Reversing this migration deletes the dedicated settings. The custom-property
+provider reconciliation below is a separate migration, not part of federation
+storage.
+
+### Custom-property limits and maintenance downgrades
+
+Separate SQL Server and MySQL migrations align five custom-property pattern
+columns with the API's existing 2048-character limit. PostgreSQL already has that
+alignment. SQLite's separate provider-model metadata migration changes no stored
+data: it aligns length annotations and existing webhook UTC-converter metadata.
+
+Reversing the SQL Server/MySQL alignment restores the 1000-character limit.
+MySQL/MariaDB first validate all affected columns and reject oversized values,
+including trailing spaces and multibyte text, before running the original
+migration operations. They do not silently shorten patterns or change SQL mode.
+MariaDB enables constraint checking for the maintenance session and leaves it on;
+no server-wide setting changes.
+
+Stop the API and all workers before running the downgrade, whether through EF or
+an exported script. Keep them stopped until migration and verification finish.
+Temporary validation checks must be removed before the columns can change, so
+direct database writes during maintenance can bypass this protection. The schema
+changes are not an all-or-nothing rollback: a later error may leave earlier
+changes applied, or a failed cleanup may leave a temporary validation constraint.
+On failure, keep traffic stopped, inspect actual schema and migration history,
+and resolve the reported problem before retrying. Do not disable checks, shorten
+patterns, alter history, or delete a validation constraint just to force success.
+If a lossless downgrade is unavailable, use a forward correction or restore a
+verified application backup with its matching software.
 
 ### Email-optional development migration consolidation
 
@@ -339,3 +554,45 @@ Rollback needs matching binaries and a matching backup, not only a code revert.
 * **[Docker Compose Runbook](../self-hosting/docker-compose.md)** — Production deployment and container lifecycle commands.
 * **[Docker Standalone Runbook](../self-hosting/docker-standalone.md)** — Single-container storage and stopped-writer SQLite capture.
 * **[Troubleshooting & Operational Health](troubleshooting-and-health.md)** — Diagnose migration lock timeouts and database connection errors.
+
+## Public Event Response Freshness After Restore
+
+Run the matching release's migration authority before enabling PostgreSQL public
+event traffic. Public detail reads also need the timestamp-only response clock
+installed by that migration. It keeps responses bounded by upcoming session
+changes, enabled federation sources and location disclosure transitions, including
+sources omitted from a filtered result.
+
+The ordinary Runtime login receives execution permission, not raw event, session,
+federation or private-address table access. A missing or altered clock contract
+fails closed; do not grant source-table access, elevate Runtime, or disable
+freshness checks to restore service. Reinstallation rejects altered routine bodies,
+permissions and row-security policies rather than silently repairing them. Use the
+reviewed deployment recovery procedure with matching binaries and database authority.
+
+## Ticketing Recovery Readiness After Restore
+
+For releases integrating the recovery fleet observer, enabled `ticketing-recovery`
+readiness must observe recovery state across every tenant through the separately
+configured Global database authority. A successful ordinary Runtime database
+connection is not sufficient evidence: its tenant restrictions can hide unresolved
+recovery work.
+
+Run the matching release's migration authority before enabling traffic. On
+PostgreSQL, it enrolls Global for an aggregate-only observation capability;
+Global receives no direct recovery-table read or mutation permission. Do not
+grant broad table access or elevated database roles to make readiness pass.
+Repair missing or drifted authority through the reviewed deployment procedure.
+Portable deployments also require the separately configured Global scope.
+
+Missing observation authority reports Unhealthy rather than an empty healthy
+fleet. A Failed recovery checkpoint or sufficiently old due work is Unhealthy;
+unresolved recovery, ambiguous, poison, dead-letter, or threshold backlog work
+can be Degraded. Only fixed counts and an age are published, never ticket,
+tenant, operation, manifest, or private failure details. Disabled controls report
+an explicit disabled Healthy result and do not certify restore readiness.
+
+Release assurance must demonstrate foreign-tenant Failed checkpoints and Unknown
+effects through the registered health check. A schema that cannot persist Unknown
+effects has an unresolved recovery compatibility problem; do not weaken its
+constraints or treat a substitute status as a successful restore proof.

@@ -10,10 +10,10 @@ namespace Explore.Application.Features.Users.Handlers.Queries;
 public class ResolveCurrentUserIdByIdentityRequestHandler
     : IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>
 {
-    private readonly IUserExternalLoginRepository _userExternalLoginRepository;
+    private readonly IExternalLoginAuthenticationRepository _userExternalLoginRepository;
 
     public ResolveCurrentUserIdByIdentityRequestHandler(
-        IUserExternalLoginRepository userExternalLoginRepository)
+        IExternalLoginAuthenticationRepository userExternalLoginRepository)
     {
         _userExternalLoginRepository = userExternalLoginRepository;
     }
@@ -24,7 +24,7 @@ public class ResolveCurrentUserIdByIdentityRequestHandler
             request.Provider.ParseAuthenticationProviderKind();
         var accountKey = new ProviderAccountKey(providerKind, request.ProviderId.Trim());
 
-        var externalLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
+        var externalLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey, cancellationToken);
         return externalLogin?.UserId;
     }
 }

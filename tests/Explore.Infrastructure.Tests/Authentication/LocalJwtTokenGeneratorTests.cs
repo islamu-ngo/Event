@@ -2,13 +2,10 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
 using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Infrastructure.Authentication;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using NSubstitute;
 using System.IdentityModel.Tokens.Jwt;
 
 namespace Explore.Infrastructure.Tests.Authentication;
@@ -26,11 +23,10 @@ public sealed class LocalJwtTokenGeneratorTests
     public async Task GeneratedTokenIsSignedAndCarriesBoundedLocalIdentityClaims(bool emailVerified, string? email)
     {
         byte[] key = RandomNumberGenerator.GetBytes(64);
-        var resolver = CreateResolver(Convert.ToBase64String(key));
         var generator = new LocalJwtTokenGenerator(
-            resolver,
             Options.Create(new LocalIdentityOptions
             {
+                JwtKey = Convert.ToBase64String(key),
                 AccessTokenLifetimeMinutes = 30
             }),
             new FixedTimeProvider(Now));
@@ -90,14 +86,7 @@ public sealed class LocalJwtTokenGeneratorTests
     [Test]
     public async Task MissingSigningSecretFailsClosedWithoutProducingToken()
     {
-        var resolver = Substitute.For<ISecretResolver>();
-        resolver.ResolveAsync(
-                SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                null,
-                Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Unavailable);
         var generator = new LocalJwtTokenGenerator(
-            resolver,
             Options.Create(new LocalIdentityOptions()),
             new FixedTimeProvider(Now));
 
@@ -113,23 +102,6 @@ public sealed class LocalJwtTokenGeneratorTests
                     lastName: "Administrator",
                     roles: []),
                 CancellationToken.None));
-    }
-
-    private static ISecretResolver CreateResolver(string value)
-    {
-        var resolver = Substitute.For<ISecretResolver>();
-        resolver.ResolveAsync(
-                SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                null,
-                Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
-                SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                value,
-                SecretSourceType.EnvironmentVariable,
-                SecretScope.Instance,
-                null,
-                Now)));
-        return resolver;
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

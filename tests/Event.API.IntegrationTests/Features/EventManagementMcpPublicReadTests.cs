@@ -29,10 +29,10 @@ public sealed class EventManagementMcpPublicReadTests
         using var resourceTemplates = await mcp.InvokeAsync("resources/templates/list");
 
         await Assert.That(new[] { "list_ai_tool_contracts",
-        "search_public_events",
-        "get_public_event",
-        "get_public_event_program_summary",
-        "list_public_event_sessions" }.All(GetNames(GetResult(tools), "tools").Contains)).IsTrue();
+            "search_public_events",
+            "get_public_event",
+            "get_public_event_program_summary",
+            "list_public_event_sessions" }.All(GetNames(GetResult(tools), "tools").Contains)).IsTrue();
         await Assert.That(GetNames(GetResult(tools), "tools")).DoesNotContain("list_my_events");
         await Assert.That(GetNames(GetResult(tools), "tools")).DoesNotContain("get_event_creation_context");
         await Assert.That(GetNames(GetResult(tools), "tools")).DoesNotContain("get_event_publish_readiness");
@@ -60,7 +60,7 @@ public sealed class EventManagementMcpPublicReadTests
             seed.AddEvent(privateTitle, EventStatusEnum.Published, VisibilityTypeEnum.Private, addPublishedSession: true);
         });
 
-        using var restResponse = await client.GetAsync($"/api/event?searchTerm={marker}&pageNumber=1&pageSize=50");
+        using var restResponse = await client.GetAsync($"/api/event?searchTerm={marker}&pageSize=50");
         var restText = await restResponse.Content.ReadAsStringAsync();
         var mcp = McpProtocolClient.Anonymous(client);
 
@@ -258,8 +258,7 @@ public sealed class EventManagementMcpPublicReadTests
         AuthenticatedWebApplicationFactory factory,
         Action<EventSeedBuilder> configure)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var context = factory.CreateMigratorContext();
         var seed = await EventSeedBuilder.CreateAsync(context);
         configure(seed);
         await context.SaveChangesAsync();
@@ -457,7 +456,8 @@ public sealed class EventManagementMcpPublicReadTests
             }
 
             using var response = await SendRawAsync(requestBody.ToJsonString());
-            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+                .Because(response.StatusCode == HttpStatusCode.OK ? string.Empty : await response.Content.ReadAsStringAsync());
             var document = await ReadJsonRpcDocumentAsync(response);
             await Assert.That(document.RootElement.TryGetProperty("error", out _)).IsFalse().Because(document.RootElement.GetRawText());
             await Assert.That(document.RootElement.TryGetProperty("result", out _)).IsTrue().Because(document.RootElement.GetRawText());

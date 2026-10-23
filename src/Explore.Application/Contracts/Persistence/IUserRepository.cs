@@ -7,6 +7,12 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IUserRepository : IGenericRepository<User, Guid>
 {
+    /// <summary>Reads the filtered User and personal Actor binding without profile or storage navigation data.</summary>
+    Task<User?> GetLocalIdentityBindingAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Saves the existing tracked user's email mirror within its original account transaction.</summary>
+    Task SaveIdentityProfileAsync(User user, CancellationToken cancellationToken);
+
     Task<User?> GetUserWithDetails(Guid id);
     Task<User?> GetUserWithDetails(Guid id, CancellationToken cancellationToken);
     Task<User?> GetUserByEmail(string email);

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models.Storage;
 using Explore.Domain;
 using Microsoft.Extensions.Logging;
@@ -64,7 +65,8 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
         var directory = Path.GetDirectoryName(finalPath)
             ?? throw new InvalidOperationException("Unable to resolve storage object directory.");
 
-        Directory.CreateDirectory(directory);
+        CreatePrivateDirectory(directory);
+        EnsurePathCustody(finalPath);
         var tempPath = $"{finalPath}.tmp-{Guid.CreateVersion7():N}";
 
         long bytesWritten = 0;
@@ -72,13 +74,17 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
 
         try
         {
-            await using var target = new FileStream(
-                tempPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                BufferSize,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            var options = new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                BufferSize = BufferSize,
+                Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+            };
+            if (!OperatingSystem.IsWindows())
+                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            await using var target = new FileStream(tempPath, options);
 
             using var sha256 = SHA256.Create();
 
@@ -188,38 +194,37 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
         return Task.FromResult(new FileStorageDeleteResult(Provider, input.ObjectKey, deleted));
     }
 
-    public async Task<FileStorageProviderStatus> TestAsync(
+    public Task<FileStorageProviderStatus> TestAsync(
         CancellationToken cancellationToken,
         bool testWritePermissions = false)
     {
+        if (testWritePermissions)
+            throw new UnauthorizedAccessException("Write probes require original storage action custody.");
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var root = ResolveRootPath();
-            Directory.CreateDirectory(root);
-
-            var probePath = Path.Combine(root, $".health-{Guid.CreateVersion7():N}");
-            await File.WriteAllTextAsync(probePath, "ok", cancellationToken);
-            File.Delete(probePath);
-
-            return new FileStorageProviderStatus(
+            EnsurePathCustody(root);
+            EnsureRootAccessible();
+            return Task.FromResult(new FileStorageProviderStatus(
                 Provider,
                 IsAvailable: true,
                 SupportsServerSideStreaming: true,
                 SupportsBrowserDirectUpload: false,
-                Message: "Local storage root is writable.");
+                Message: "Local storage root is readable; write permissions were not probed."));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SystemException)
         {
             _logger.LogWarning(
                 "Local storage health check failed. FailureType={FailureType}",
                 CategorizeHealthFailure(ex));
-            return new FileStorageProviderStatus(
+            return Task.FromResult(new FileStorageProviderStatus(
                 Provider,
                 IsAvailable: false,
                 SupportsServerSideStreaming: true,
                 SupportsBrowserDirectUpload: false,
                 FailureCode: "local_storage_unavailable",
-                Message: "Local storage root is not writable.");
+                Message: "Local storage root is unavailable."));
         }
     }
 
@@ -239,7 +244,13 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
         }
 
         var yielded = 0;
-        foreach (var path in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        var enumeration = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            AttributesToSkip = FileAttributes.ReparsePoint,
+            IgnoreInaccessible = false
+        };
+        foreach (var path in Directory.EnumerateFiles(root, "*", enumeration))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -247,6 +258,7 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
             {
                 continue;
             }
+            EnsurePathCustody(path);
 
             var fileInfo = new FileInfo(path);
             if (!fileInfo.Exists)
@@ -274,37 +286,80 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
         }
     }
 
-    public Task<FileStorageQuarantineResult> QuarantineAsync(
+    public async Task<FileStorageQuarantineResult> QuarantineAsync(
         FileStorageQuarantineInput input,
+        ILocalStorageQuarantineOwner custody,
+        TimeProvider clock,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(custody);
+        ArgumentNullException.ThrowIfNull(clock);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(input.Reason))
+        if (input.QuarantineId == Guid.Empty || input.ExpectedSize < 0
+            || input.ExpectedLastModifiedUtc.Kind != DateTimeKind.Utc
+            || input.ProviderBindingId == Guid.Empty || input.ClaimStamp == Guid.Empty
+            || input.LeaseExpiresAtUtc == default || input.LeaseExpiresAtUtc.Kind != DateTimeKind.Utc)
         {
-            throw new ArgumentException("A quarantine reason is required.", nameof(input));
+            throw new ArgumentException("An original quarantine claim, expiry and UTC file snapshot are required.", nameof(input));
         }
 
         var sourcePath = ResolveObjectPath(input.ObjectKey);
-        if (!File.Exists(sourcePath))
-        {
-            return Task.FromResult(new FileStorageQuarantineResult(Provider, input.ObjectKey, Quarantined: false));
-        }
-
+        var canonicalPath = LocalStorageQuarantine.CanonicalizePhysicalPath(sourcePath);
+        if (!string.Equals(canonicalPath, input.CanonicalPhysicalPath, StringComparison.Ordinal)
+            || !string.Equals(LocalStorageQuarantine.HashPhysicalPath(canonicalPath), input.PhysicalPathHash, StringComparison.Ordinal)
+            || input.LeaseExpiresAtUtc <= clock.GetUtcNow().UtcDateTime)
+            return new(Provider, input.ObjectKey, FileStorageQuarantineOutcome.Blocked);
         var root = ResolveRootPath();
         var quarantinePath = Path.Combine(
             root,
             QuarantineDirectoryName,
-            input.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture),
-            $"{HashObjectKey(input.ObjectKey)}-{Path.GetFileName(sourcePath)}");
+            "reconciliation",
+            input.QuarantineId.ToString("N"));
 
-        Directory.CreateDirectory(Path.GetDirectoryName(quarantinePath)
-            ?? throw new InvalidOperationException("Unable to resolve quarantine directory."));
+        EnsurePathCustody(quarantinePath);
+        var source = new FileInfo(sourcePath);
+        var destination = new FileInfo(quarantinePath);
+        if (!await custody.IsLocalQuarantineClaimCurrentAsync(input, cancellationToken))
+            return new(Provider, input.ObjectKey, FileStorageQuarantineOutcome.Blocked);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (input.LeaseExpiresAtUtc <= clock.GetUtcNow().UtcDateTime)
+            return new(Provider, input.ObjectKey, FileStorageQuarantineOutcome.Blocked);
+        // Refresh the original observation after the awaited inventory/custody read.
+        EnsurePathCustody(sourcePath);
+        EnsurePathCustody(quarantinePath);
+        source.Refresh();
+        destination.Refresh();
+        bool Matches(FileInfo file) => file.Length == input.ExpectedSize
+            && file.LastWriteTimeUtc == input.ExpectedLastModifiedUtc;
+        FileStorageQuarantineOutcome outcome;
+        if (destination.Exists)
+            outcome = !source.Exists && Matches(destination)
+                ? FileStorageQuarantineOutcome.AlreadyQuarantined
+                : FileStorageQuarantineOutcome.Blocked;
+        else if (!source.Exists)
+            outcome = FileStorageQuarantineOutcome.AlreadyAbsent;
+        else if (!Matches(source))
+            outcome = FileStorageQuarantineOutcome.Blocked;
+        else
+        {
+            CreatePrivateDirectory(Path.GetDirectoryName(quarantinePath)
+                ?? throw new InvalidOperationException("Unable to resolve quarantine directory."));
+            EnsurePathCustody(sourcePath);
+            EnsurePathCustody(quarantinePath);
+            source.Refresh();
+            destination.Refresh();
+            if (!source.Exists || destination.Exists || !Matches(source))
+                return new(Provider, input.ObjectKey, FileStorageQuarantineOutcome.Blocked);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (input.LeaseExpiresAtUtc <= clock.GetUtcNow().UtcDateTime)
+                return new(Provider, input.ObjectKey, FileStorageQuarantineOutcome.Blocked);
+            File.Move(sourcePath, quarantinePath, overwrite: false);
+            outcome = FileStorageQuarantineOutcome.Moved;
+        }
 
-        File.Move(sourcePath, quarantinePath, overwrite: false);
-
-        return Task.FromResult(new FileStorageQuarantineResult(Provider, input.ObjectKey, Quarantined: true));
+        return new(Provider, input.ObjectKey, outcome);
     }
 
     internal string ResolveObjectPath(string objectKey)
@@ -343,6 +398,7 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
             throw new ArgumentException("Storage object key escapes the configured storage root.", nameof(objectKey));
         }
 
+        EnsurePathCustody(fullPath);
         return fullPath;
     }
 
@@ -363,7 +419,40 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
                fileName.Contains(".tmp-", StringComparison.Ordinal);
     }
 
-    private string ResolveRootPath() => Path.GetFullPath(_options.RootPath);
+    private string ResolveRootPath()
+    {
+        var root = Path.GetFullPath(_options.RootPath);
+        EnsurePathCustody(root);
+        return root;
+    }
+
+    /// <summary>
+    /// Rejects existing linked roots, ancestors and targets. The deployment must keep
+    /// these paths under service custody; concurrent hostile filesystem mutation is
+    /// unsupported, since checking a path and opening it are not an atomic operation.
+    /// </summary>
+    private static void EnsurePathCustody(string path)
+    {
+        for (string? current = path; current is not null; current = Path.GetDirectoryName(current))
+        {
+            try
+            {
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidOperationException("Local storage requires unlinked service-owned paths.");
+            }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+        }
+    }
+
+    private static void CreatePrivateDirectory(string path)
+    {
+        EnsurePathCustody(path);
+        if (OperatingSystem.IsWindows())
+            Directory.CreateDirectory(path);
+        else
+            Directory.CreateDirectory(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+    }
 
     private void EnsureRootAccessible()
     {
@@ -436,13 +525,6 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
         }
 
         return trimmed.ToLowerInvariant();
-    }
-
-    private static string HashObjectKey(string objectKey)
-    {
-        var bytes = System.Text.Encoding.UTF8.GetBytes(objectKey);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash.AsSpan(0, 8)).ToLowerInvariant();
     }
 
     private static string CategorizeHealthFailure(Exception exception) =>

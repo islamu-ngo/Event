@@ -25,6 +25,7 @@ public sealed class EventLocationDisclosureAudit : ITenantEntity
     }
 
     public Guid EventLocationId { get; private set; }
+    public Guid? CorrectionMessageId { get; private set; }
     public Guid? ActorUserId { get; private set; }
     public EventLocationDisclosureFields PreviousFields { get; private set; }
     public EventLocationDisclosureFields NewFields { get; private set; }
@@ -36,6 +37,17 @@ public sealed class EventLocationDisclosureAudit : ITenantEntity
     public int NewPolicyVersion { get; private set; }
     public EventLocationDisclosureAuditReasonEnum Reason { get; private set; }
     public DateTime OccurredAtUtc { get; private set; }
+
+    /// <summary>Binds the original correction before this append-only audit is first persisted.</summary>
+    public void BindCorrection(Guid messageId)
+    {
+        if (messageId == Guid.Empty || messageId.Version != 7 || messageId.Variant is < 8 or > 11
+            || Reason is not EventLocationDisclosureAuditReasonEnum.GovernanceTightening
+                and not EventLocationDisclosureAuditReasonEnum.PrivacyErasureRemediation
+            || CorrectionMessageId is { } original && original != messageId)
+            throw new InvalidOperationException("A disclosure transition retains one original correction identity.");
+        CorrectionMessageId = messageId;
+    }
 
     public static EventLocationDisclosureAudit Create(
         Guid tenantId,

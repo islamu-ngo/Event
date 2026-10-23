@@ -3,12 +3,14 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Webhooks;
+using Explore.Persistence.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,6 +21,89 @@ namespace Explore.Infrastructure.Tests.Infrastructure.Webhooks;
 
 public sealed class WebhookDeliveryDrainServiceTests
 {
+    [Test]
+    public async Task ProcessBatchAsync_WhenConnectionPolicyRejects_DoesNotScheduleRetry()
+    {
+        var handler = new RecordingMessageHandler(_ =>
+            throw new HttpRequestException("Connection rejected.",
+                new Explore.Infrastructure.Http.OutboundEndpointDeniedException("private_network_blocked")));
+        var fixture = new Fixture(handler);
+        fixture.ConfigureTargetClaim(CreateTargetClaim());
+
+        var result = await fixture.Service.ProcessBatchAsync(CancellationToken.None);
+
+        await Assert.That(result.SucceededCount).IsEqualTo(0);
+        await Assert.That(fixture.LastTargetClaim!.Target.DeliveryStatus)
+            .IsEqualTo(WebhookLocalDeliveryStatus.Abandoned);
+    }
+
+    [Test]
+    [Arguments("paused")]
+    [Arguments("archived")]
+    [Arguments("expired")]
+    [Arguments("replaced")]
+    [Arguments("suppressed")]
+    [Arguments("retention")]
+    [Arguments("cleared")]
+    public async Task ProcessBatchAsync_WhenNativeCustodyChangesDuringPreflight_DoesNotSendOrOverwrite(string invalidation)
+    {
+        await using var fixture = await WebhookPostAwaitCustodyFixture.CreateAsync();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var processing = fixture.Service.ProcessBatchAsync(cancellation.Token);
+        await fixture.AwaitPreflightAsync(processing);
+        var invalidated = await fixture.InvalidateAsync(invalidation);
+        fixture.ResumePreflight();
+
+        var result = await processing;
+
+        await Assert.That(result.AlreadyClaimedCount).IsEqualTo(1);
+        await Assert.That(result.ProcessedCount).IsEqualTo(0);
+        await Assert.That(fixture.TransportCalls).IsEqualTo(0);
+        await Assert.That(fixture.SecretReads).IsEqualTo(0);
+        await Assert.That(invalidated.Attempts).IsEqualTo(0);
+        await Assert.That(invalidated.Audits).IsEqualTo(0);
+        await Assert.That(await fixture.ReadStateAsync()).IsEqualTo(invalidated);
+    }
+
+    [Test]
+    public async Task ProcessBatchAsync_WhenNativeCustodySurvivesPreflight_SendsAndSettlesOriginalClaim()
+    {
+        await using var fixture = await WebhookPostAwaitCustodyFixture.CreateAsync();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var processing = fixture.Service.ProcessBatchAsync(cancellation.Token);
+        await fixture.AwaitPreflightAsync(processing);
+        var original = await fixture.ReadStateAsync();
+        fixture.ResumePreflight();
+
+        var result = await processing;
+        var settled = await fixture.ReadStateAsync();
+
+        await Assert.That(result.SucceededCount).IsEqualTo(1);
+        await Assert.That(fixture.TransportCalls).IsEqualTo(1);
+        await Assert.That(fixture.Payload).IsEquivalentTo("{\"type\":\"event.published\"}"u8.ToArray());
+        await Assert.That(fixture.SignatureValid).IsTrue();
+        await Assert.That(settled.Status).IsEqualTo(WebhookLocalDeliveryStatus.Succeeded);
+        await Assert.That(settled.Fence).IsEqualTo(original.Fence);
+        await Assert.That(settled.LeaseToken).IsNull();
+        await Assert.That(settled.Attempts).IsEqualTo(1);
+        await Assert.That(settled.LastSuccessAt).IsNotNull();
+    }
+
+    [Test]
+    public async Task NativeClaimReadRejectsUnselectedOrForeignTenantAuthority()
+    {
+        await using var fixture = await WebhookPostAwaitCustodyFixture.CreateAsync();
+        await using var selected = await fixture.Runtime.CreateDbContextAsync(fixture.TenantId);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new WebhookLocalTargetRepository(selected).GetActiveClaimAsync(
+                Guid.CreateVersion7(), fixture.TargetId, Guid.CreateVersion7(), 1,
+                DateTimeOffset.UtcNow, CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new WebhookLocalTargetRepository(selected).GetActiveClaimAsync(
+                Guid.Empty, fixture.TargetId, Guid.CreateVersion7(), 1,
+                DateTimeOffset.UtcNow, CancellationToken.None));
+    }
+
     [Test]
     public async Task ProcessBatchAsync_WhenPrimaryTargetIsPending_DrainsImmutableTarget()
     {
@@ -95,6 +180,9 @@ public sealed class WebhookDeliveryDrainServiceTests
         await fixture.EndpointRepository.Received(1).MarkSuccessAsync(
             attempt.TenantId,
             attempt.EndpointId,
+            fixture.LastTargetClaim!.Target.Id,
+            fixture.LastTargetClaim.LeaseToken,
+            fixture.LastTargetClaim.DeliveryFence,
             Arg.Any<DateTime>(),
             Arg.Any<CancellationToken>());
     }
@@ -699,6 +787,15 @@ public sealed class WebhookDeliveryDrainServiceTests
                     Arg.Any<int>(),
                     Arg.Any<CancellationToken>())
                 .Returns(new WebhookEndpointFailureState(1, false));
+            EndpointRepository.MarkSuccessAsync(
+                    Arg.Any<Guid>(),
+                    Arg.Any<Guid>(),
+                    Arg.Any<Guid>(),
+                    Arg.Any<Guid>(),
+                    Arg.Any<long>(),
+                    Arg.Any<DateTime>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(true);
 
             var configuration = secretConfiguration ?? new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
@@ -712,6 +809,8 @@ public sealed class WebhookDeliveryDrainServiceTests
 
             Service = new WebhookDeliveryDrainService(
                 ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+                new TestAdmission(TargetRepository),
+                new TestExecutionFactory(ServiceProvider),
                 new StaticHttpClientFactory(new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan }),
                 new WebhookSignatureService(),
                 new WebhookEndpointSafetyPolicy(new StaticOptionsMonitor<WebhookOptions>(options)),
@@ -817,6 +916,41 @@ public sealed class WebhookDeliveryDrainServiceTests
                     Arg.Any<CancellationToken>())
                 .Returns(callInfo => callInfo.Arg<WebhookDeliveryAttempt>());
         }
+    }
+
+    private sealed class TestAdmission(IWebhookLocalTargetRepository targets) : IWebhookLocalDeliveryAdmission
+    {
+        public Task<IReadOnlyList<Guid>> GetDueTenantIdsAsync(int limit, DateTimeOffset now, CancellationToken token) =>
+            targets.GetDueTenantIdsAsync(limit, now, token);
+        public Task<int> CountDueAsync(DateTimeOffset now, CancellationToken token) => targets.CountDueAsync(now, token);
+        public Task<int> CountStaleDeliveringAsync(DateTimeOffset now, CancellationToken token) =>
+            targets.CountStaleDeliveringAsync(now, token);
+        public Task<int> RecoverExpiredClaimsAsync(DateTimeOffset now, string category, int batch, CancellationToken token) =>
+            targets.RecoverExpiredClaimsAsync(now, category, batch, token);
+        public async Task<IReadOnlyList<WebhookLocalDeliveryClaim>> ClaimDueAsync(
+            WebhookLocalTargetClaimRequest request, IReadOnlyDictionary<Guid, WebhookDeliveryClaimLimits> limits,
+            CancellationToken token) =>
+            (await targets.ClaimDueAsync(request, limits, token)).Select(claim =>
+                new WebhookLocalDeliveryClaim(claim.Target.TenantId, claim.Target.Id, claim.LeaseToken,
+                    claim.DeliveryFence, claim.ClaimedAtUtc, claim.LeaseExpiresAtUtc, claim.Target.NextActionAtUtc)).ToArray();
+        public Task<Explore.Application.Settings.Groups.WebhookDeliverySettingGroup> GetGovernanceSettingsAsync(
+            Guid? tenantId, CancellationToken token) => throw new NotSupportedException();
+    }
+
+    private sealed class TestExecutionFactory(IServiceProvider services) : IWebhookLocalDeliveryExecutionScopeFactory
+    {
+        public Task<IWebhookLocalDeliveryExecutionScope> CreateAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult<IWebhookLocalDeliveryExecutionScope>(new TestExecutionScope(services));
+    }
+
+    private sealed class TestExecutionScope(IServiceProvider services) : IWebhookLocalDeliveryExecutionScope
+    {
+        public IWebhookLocalTargetRepository Targets => services.GetRequiredService<IWebhookLocalTargetRepository>();
+        public IWebhookDeliveryAttemptRepository Attempts => services.GetRequiredService<IWebhookDeliveryAttemptRepository>();
+        public IWebhookEndpointRepository Endpoints => services.GetRequiredService<IWebhookEndpointRepository>();
+        public IWebhookAuditEventWriter Audit => services.GetRequiredService<IWebhookAuditEventWriter>();
+        public IUnitOfWork UnitOfWork => services.GetRequiredService<IUnitOfWork>();
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class InlineUnitOfWork : IUnitOfWork

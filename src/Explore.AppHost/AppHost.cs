@@ -21,10 +21,6 @@ var dotenvPath = Path.Combine(repositoryRoot, ".env");
 if (File.Exists(dotenvPath))
     Env.NoClobber().Load(dotenvPath);
 var builder = DistributedApplication.CreateBuilder(args);
-if (SecretAuthorityConfiguration.IsDevelopmentOrTesting(builder.Environment.EnvironmentName))
-{
-    builder.Configuration.AddUserSecrets(typeof(SecretAuthorityConfiguration).Assembly, optional: true, reloadOnChange: false);
-}
 var runMode = AspireRunModeExtensions.Parse(builder.Configuration["ISLAMU_ASPIRE_MODE"]);
 var agentBrowserProfile = runMode == AspireRunMode.AgentBrowser
     ? AgentBrowserProfileSettings.Create()
@@ -64,23 +60,22 @@ if (agentBrowserProfile is not null || agentBrowserSeedEnabled)
 }
 SecretProviderType configuredSecretProvider =
     SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration, builder.Environment.EnvironmentName);
-IConfiguration authorityBootstrap = runMode == AspireRunMode.FullLocal
-    && configuredSecretProvider == SecretProviderType.Infisical
-    ? new ConfigurationBuilder()
-        .AddConfiguration(builder.Configuration)
-        .AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["SecretProvider:Provider"] = nameof(SecretProviderType.Environment),
-        })
-        .Build()
-    : builder.Configuration;
-IConfiguration secretAuthority = SecretAuthorityConfiguration.Build(
-    authorityBootstrap,
-    builder.Environment.EnvironmentName,
-    "/keycloak", "/database", "/database/erasure", "/api", "/blazor",
-    "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/stripe", "/postgresql",
-    "/integrations/listmonk");
-builder.Configuration.AddConfiguration(secretAuthority);
+// AppHost never authenticates to a runtime vault. Operators provision provider
+// infrastructure outside the application identity, then inject resource inputs.
+var operatorInputBuilder = new ConfigurationBuilder().AddEnvironmentVariables();
+if (configuredSecretProvider == SecretProviderType.UserSecrets)
+{
+    if (!SecretAuthorityConfiguration.IsDevelopmentOrTesting(builder.Environment.EnvironmentName))
+        throw new InvalidOperationException("secret_authority_user_secrets_environment_invalid");
+    operatorInputBuilder.Sources.Clear();
+    operatorInputBuilder.AddUserSecrets(typeof(SecretAuthorityConfiguration).Assembly, optional: true, reloadOnChange: false);
+}
+IConfiguration operatorInputs = operatorInputBuilder.Build();
+builder.Configuration.AddConfiguration(operatorInputs);
+builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+{
+    ["SecretProvider:Provider"] = configuredSecretProvider.ToString()
+});
 IResourceBuilder<ParameterResource>? agentPostgresUsername = null;
 IResourceBuilder<ParameterResource>? agentPostgresPassword = null;
 IResourceBuilder<ParameterResource>? agentRedisPassword = null;
@@ -197,15 +192,30 @@ var mailpit = AddMailpit(builder, agentBrowserProfile);
 
 if (runMode.UsesLocalData())
 {
+    var localPostgresUser = agentPostgresUsername ?? builder.AddParameter(
+        "postgres-bootstrap-username",
+        () => RequiredConfiguredValue(operatorInputs, "DATABASE_MIGRATOR_USERNAME"),
+        publishValueAsDefault: false, secret: true);
+    var localPostgresPassword = agentPostgresPassword ?? builder.AddParameter(
+        "postgres-bootstrap-password",
+        () => RequiredConfiguredValue(operatorInputs, "DATABASE_MIGRATOR_PASSWORD"),
+        publishValueAsDefault: false, secret: true);
+    int? localPostgresPort = null;
+    if (agentBrowserProfile is null && configuredSecretProvider == SecretProviderType.Infisical)
+        localPostgresPort = operatorInputs.GetValue<int?>("DATABASE_PORT")
+            ?? throw new InvalidOperationException("secret_local_database_port_required");
     database = (agentBrowserProfile is null
-            ? builder.AddPostgres("postgres").WithImageTag("18-alpine")
+            ? builder.AddPostgres("postgres", localPostgresUser, localPostgresPassword,
+                    port: localPostgresPort)
+                .WithImageTag("18-alpine")
             : builder.AddPostgres("postgres", agentPostgresUsername!, agentPostgresPassword!)
                 .WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit)
                 .WithImage("postgis/postgis")
                 .WithImageTag("18-3.6-alpine@sha256:"
                     + "ffcf0c4b904e41b9779f8098007fb5a9484025319c18c70cf8e1bcebb742b9b7"))
         .WithDataVolume(agentBrowserProfile?.PostgresVolumeName ?? "islamu-event-postgres-data")
-        .AddDatabase("islamu-event-db", agentBrowserProfile?.DatabaseName ?? "islamu_event_db");
+        .AddDatabase("islamu-event-db", agentBrowserProfile?.DatabaseName
+            ?? operatorInputs["DATABASE_NAME"] ?? "islamu_event_db");
 
     if (agentResetPipeName is not null)
     {
@@ -241,10 +251,21 @@ if (runMode.UsesLocalData())
 
     if (usesExternalPrivacyErasureAuthority)
     {
-        privacyErasureDatabase = builder.AddPostgres("privacy-erasure-postgres")
+        var erasureUsername = builder.AddParameter("erasure-bootstrap-username",
+            () => RequiredConfiguredValue(operatorInputs, "ERASURE_DATABASE_MIGRATOR_USERNAME"),
+            publishValueAsDefault: false, secret: true);
+        var erasurePassword = builder.AddParameter("erasure-bootstrap-password",
+            () => RequiredConfiguredValue(operatorInputs, "ERASURE_DATABASE_MIGRATOR_PASSWORD"),
+            publishValueAsDefault: false, secret: true);
+        privacyErasureDatabase = builder.AddPostgres("privacy-erasure-postgres", erasureUsername, erasurePassword,
+                port: configuredSecretProvider == SecretProviderType.Infisical
+                    ? operatorInputs.GetValue<int?>("ERASURE_DATABASE_PORT")
+                        ?? throw new InvalidOperationException("secret_local_database_port_required")
+                    : null)
             .WithImageTag("18-alpine")
             .WithDataVolume("islamu-event-privacy-erasure-postgres-data")
-            .AddDatabase("privacy-erasure-authority", "islamu_event_privacy_erasure");
+            .AddDatabase("privacy-erasure-authority",
+                operatorInputs["ERASURE_DATABASE_NAME"] ?? "islamu_event_privacy_erasure");
     }
 
     cache = (agentBrowserProfile is null
@@ -262,6 +283,7 @@ if (runMode is AspireRunMode.FullLocal or AspireRunMode.DefaultLocal)
 
     localPlatformResources = AddLocalPlatform(
         builder,
+        operatorInputs,
         includeHeavyExtras: runMode == AspireRunMode.FullLocal,
         includeSvix,
         cerbosConfigPath,
@@ -290,12 +312,6 @@ var migrations = WithProfileSecretMode(
         builder.Configuration,
         allowAgentRuntimeSecrets: false)
     .WithEnvironment("PrivacyErasure__Authority__Topology", privacyErasureTopology.ToString());
-migrations = ConfigureConfigurationManifestOwner(
-    migrations,
-    ownsConfigurationManifest: hostingTopology == HostingTopology.Split,
-    configurationManifestMode,
-    configurationManifestHostPath);
-
 if (usesEmbeddedPrivacyErasureAuthority)
 {
     migrations = WithEmbeddedPrivacyErasureAuthority(
@@ -312,7 +328,7 @@ if (!string.IsNullOrWhiteSpace(eventLocationPrivacyMigrationStage))
 
 if (database is not null)
 {
-    migrations = WithLocalPrimaryDatabase(migrations, database, PrimaryDatabaseRole.Migrator)
+    migrations = WithLocalPrimaryDatabase(builder, migrations, database, PrimaryDatabaseRole.Migrator)
         .WaitFor(database);
 }
 else
@@ -374,6 +390,12 @@ if (hostingTopology == HostingTopology.Split)
         .WithEnvironment("ForwardedHeadersTrust__KnownNetworks__0", ConfiguredValue(builder.Configuration, "API_FORWARDED_HEADERS_KNOWN_NETWORK", "::1/128"))
         .WaitFor(mailpit);
 
+    exploreAPI = ConfigureConfigurationManifestOwner(
+        exploreAPI,
+        ownsConfigurationManifest: true,
+        configurationManifestMode,
+        configurationManifestHostPath);
+
     if (usesEmbeddedPrivacyErasureAuthority)
     {
         exploreAPI = WithEmbeddedPrivacyErasureAuthority(
@@ -412,13 +434,16 @@ if (hostingTopology == HostingTopology.Split)
 
     if (database is not null)
     {
-        exploreAPI = WithLocalPrimaryDatabase(exploreAPI, database, PrimaryDatabaseRole.Runtime)
+        exploreAPI = WithLocalPrimaryDatabase(builder, exploreAPI, database, PrimaryDatabaseRole.Runtime)
             .WaitFor(database);
+        exploreAPI = WithExternalPrimaryDatabase(builder, exploreAPI, PrimaryDatabaseRole.Global);
     }
     else
     {
         exploreAPI = WithExternalPrimaryDatabase(builder, exploreAPI, PrimaryDatabaseRole.Runtime);
+        exploreAPI = WithExternalPrimaryDatabase(builder, exploreAPI, PrimaryDatabaseRole.Global);
     }
+    exploreAPI = WithInstanceApiKeyCapabilities(builder, exploreAPI);
 
     if (privacyErasureDatabase is not null)
     {
@@ -612,15 +637,19 @@ else
     if (database is not null)
     {
         eventStandalone = WithLocalPrimaryDatabase(
+                builder,
                 eventStandalone,
                 database,
                 PrimaryDatabaseRole.Runtime)
             .WaitFor(database);
+        eventStandalone = WithExternalPrimaryDatabase(builder, eventStandalone, PrimaryDatabaseRole.Global);
     }
     else
     {
         eventStandalone = WithExternalPrimaryDatabase(builder, eventStandalone, PrimaryDatabaseRole.Runtime);
+        eventStandalone = WithExternalPrimaryDatabase(builder, eventStandalone, PrimaryDatabaseRole.Global);
     }
+    eventStandalone = WithInstanceApiKeyCapabilities(builder, eventStandalone);
 
     if (privacyErasureDatabase is not null)
     {
@@ -675,10 +704,166 @@ else
     }
 }
 
+// Register last, after every explicit resource projection. Parent-process .env
+// inheritance must not reintroduce sibling or infrastructure authority.
+foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>())
+{
+    SecretConsumer consumer = resource.Name switch
+    {
+        "explore-api" => SecretConsumer.Api,
+        "explore-blazor" => SecretConsumer.Bff,
+        "event-standalone" => SecretConsumer.Combined,
+        "event-migrationservice" => SecretConsumer.Migration,
+        _ => throw new InvalidOperationException("secret_consumer_invalid")
+    };
+    builder.CreateResourceBuilder(resource).WithEnvironment(context =>
+    {
+        if (consumer is SecretConsumer.Api or SecretConsumer.Combined)
+        {
+            // Event owns its runtime input projection. The external Configurator
+            // prepares artifacts; no offline engine or definition is loaded here.
+            // RuntimeSecretEnvironment applies the final consumer-specific exclusions.
+            foreach (string key in new[]
+            {
+                "PUBLIC_BASE_URL", "EFFECTIVEHOSTAUTHORITY__INSTANCEHOSTS__0",
+                "EFFECTIVEHOSTAUTHORITY__SUBDOMAINBASEDOMAINS__0", "FORWARDEDHEADERSTRUST__FORWARDLIMIT",
+                "FORWARDEDHEADERSTRUST__TRUSTLOOPBACKPROXY", "FORWARDEDHEADERSTRUST__KNOWNPROXIES__0",
+                "FORWARDEDHEADERSTRUST__KNOWNNETWORKS__0", "OPERATIONALENDPOINTS__ADDRESS",
+                "OPERATIONALENDPOINTS__PORT", "API_HTTP_PORT", "UI_HTTP_PORT", "KEYCLOAK_HTTP_PORT",
+                "DEPLOYMENT_MODE", "KEYCLOAK__AUDIENCE", "KEYCLOAK__PERMITTEDCLIENTS__0",
+                "EVENT_DP_API_MINIMUM_GENERATION", "EVENT_DP_BFF_MINIMUM_GENERATION",
+                "EVENT_DP_COMBINED_MINIMUM_GENERATION", "DATABASE_PROVIDER", "DATABASE_HOST",
+                "DATABASE_PORT", "DATABASE_NAME", "DATABASE_SCHEMA", "DATABASE_RUNTIME_USERNAME",
+                "DATABASE_GLOBAL_USERNAME", "DATABASE_LOCAL_IDENTITY_WRITER_USERNAME", "DATABASE_INSTANCE_KEY_READ_USERNAME",
+                "DATABASE_INSTANCE_KEY_WRITE_USERNAME", "DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME",
+                "DATABASE_PLATFORM_KEY_REPORT_USERNAME", "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME",
+                "DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME", "DATABASE_MIGRATOR_USERNAME", "DATABASE_TLS_MODE",
+                "AUTHENTICATION_PROVIDER", "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION", "GOOGLE_CLIENT_ID",
+                "IDENTITYCORRELATION__TRUSTEDISSUERS__0", "ATPROTO_LOGIN_ENABLED",
+                "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER", "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
+                "AGENT_BROWSER_SEED_ENABLED", "AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD",
+                "AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES", "AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH",
+                "AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256", "AUTHENTICATION_LOCAL_PASSWORD_HASH_ITERATIONS",
+                "IDENTITY_DATABASE_TOPOLOGY", "KEYCLOAK_BLAZOR_CLIENT_ID",
+                "KEYCLOAKLIFECYCLEEMAIL__ENABLED", "KEYCLOAKLIFECYCLEEMAIL__BASEURL",
+                "KEYCLOAKLIFECYCLEEMAIL__REALM", "KEYCLOAKLIFECYCLEEMAIL__CLIENTID",
+                "KEYCLOAKLIFECYCLEEMAIL__DEFAULTCLIENTID", "KEYCLOAKLIFECYCLEEMAIL__PROVIDERVERSION",
+                "KEYCLOAKLIFECYCLEEMAIL__ALLOWLOCALURLS", "LOCAL_STORAGE_ROOT_PATH",
+                "EMAIL_DISPATCH_RABBITMQ_ENABLED", "ERASURE_DATABASE_TOPOLOGY", "ERASURE_EMBEDDED_PATH",
+                "INSTANCE_BOOTSTRAP_MODE", "INSTANCE__OPERATORIDENTITY__OPERATORID",
+                "INSTANCE__OPERATORIDENTITY__PUBLICNAME", "INSTANCE__OPERATORIDENTITY__LEGALNAME",
+                "INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE", "INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN",
+                "INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE", "INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE",
+                "INSTANCE__OPERATORIDENTITY__WEBSITEURL", "INSTANCE__OPERATORIDENTITY__LEGALNOTICEURL",
+                "INSTANCE__OPERATORIDENTITY__TERMSURL", "INSTANCE__OPERATORIDENTITY__PRIVACYURL",
+                "CONFIGURATION_MANIFEST_MODE", "CONFIGURATION_MANIFEST_PATH", "CONFIGURATION_MANIFEST_HOST_DIRECTORY",
+                "ASPNETCORE_ENVIRONMENT", "DOTNET_ENVIRONMENT", "MAIL_SMTP_ENCRYPTION",
+                "CERBOS_HTTP_PORT", "CERBOS_GRPC_PORT", "INFISICAL_URL", "INFISICAL_PROJECT_ID",
+                "INFISICAL_CLIENT_ID", "INFISICAL_ENV", "DATABASE_TRUST_SERVER_CERTIFICATE",
+                "KEYCLOAK_REQUIRE_HTTPS_METADATA", "IDENTITY_DATABASE_PROVIDER", "IDENTITY_DATABASE_HOST",
+                "IDENTITY_DATABASE_PORT", "IDENTITY_DATABASE_NAME", "IDENTITY_DATABASE_SCHEMA",
+                "IDENTITY_DATABASE_TLS_MODE", "IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE",
+                "IDENTITY_DATABASE_SERVER_VERSION",
+                "IDENTITY_DATABASE_RUNTIME_USERNAME", "IDENTITY_DATABASE_MIGRATOR_USERNAME",
+                "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME",
+                "HOSTING_REPLICA_COUNT", "PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION",
+                "CONTROL_PLANE_MANAGED_MODE", "CONTROL_PLANE_URL", "CONTROL_PLANE_INSTANCE_ID",
+                "CONTROL_PLANE_MAXIMUM_TENANT_COUNT", "CONTROL_PLANE_TENANT_ADMINISTRATOR_SIGN_IN_URL",
+                "GEOCODING_PROVIDER", "GEOCODING_ENDPOINT", "GEOCODING_LANGUAGE", "GEOCODING_COUNTRY_CODES",
+                "GEOCODING_MAXIMUM_RESULTS", "GEOCODING_MAXIMUM_RESPONSE_BYTES", "GEOCODING_DATASET_VERSION",
+                "GEOCODING_TOTAL_TIMEOUT_MILLISECONDS", "GEOCODING_MAXIMUM_RETRY_COUNT",
+                "GEOCODING_RETRY_DELAYS_MILLISECONDS", "GEOCODING_READINESS_TIMEOUT_MILLISECONDS",
+                "GEOCODING_SELECTION_LIFETIME_SECONDS", "PROVISIONING_TRUSTED", "PROVISIONING_MODE",
+                "MANAGED_CLIENT_EXTERNAL_PROVIDER", "PHYSICAL_TENANCY_MODE", "API_ENDPOINT",
+                "INSTANCE_ADMIN_PUBLIC_ORIGIN", "INSTANCE__OPERATORIDENTITY__REGISTRATIONIDENTIFIER",
+                "PAYMENTS_STRIPE_MODE", "PAYMENTS_ORGANIZER_DIRECT_PROVIDER_CODE",
+                "PAYMENTS_ORGANIZER_DIRECT_CONNECT_PLATFORM_ID", "PAYMENTS__CHECKOUTGOVERNANCE__COMPLAINTOWNER",
+                "PAYMENTS__CHECKOUTGOVERNANCE__REFUNDOWNER", "PAYMENTS__CHECKOUTGOVERNANCE__DISPUTEOWNER",
+                "PAYMENTS__CHECKOUTGOVERNANCE__RECONCILIATIONOWNER", "PAYMENTS__CHECKOUTGOVERNANCE__ACTIVATIONSTATUS",
+                "PAYMENTS__CHECKOUTGOVERNANCE__REFUNDPOLICYLANGUAGETAG", "PAYMENTS__CHECKOUTGOVERNANCE__STATEMENTDESCRIPTOR",
+                "PAYMENTS__CHECKOUTGOVERNANCE__CHARGETYPE", "ADMISSIONS__CREDENTIALLOOKUP__ACTIVEKEYVERSION",
+                "ADMISSIONS__RECOVERY__ACTIVEKEYVERSION", "ADMISSIONS__RECOVERY__CAPABILITYLIFETIMEMINUTES",
+                "ADMISSIONS__RECOVERY__RATELIMITBUCKETCOUNT", "ADMISSIONS__RECOVERY__RATELIMITPERMITCOUNT",
+                "ADMISSIONS__RECOVERY__RATELIMITWINDOWSECONDS", "RATELIMITING__ANONYMOUSREGISTRATION__IPPERMITLIMIT",
+                "RATELIMITING__ANONYMOUSREGISTRATION__SUBNETPERMITLIMIT", "RATELIMITING__ANONYMOUSREGISTRATION__WINDOWSECONDS",
+                "RATELIMITING__ANONYMOUSREGISTRATION__CONCURRENCYLIMIT", "RATELIMITING__ANONYMOUSREGISTRATION__QUEUELIMIT",
+                "TICKETING__RECOVERY__ENABLED", "TICKETING__RECOVERY__EXPECTEDRELEASEREVISION",
+                "TICKETING__RECOVERY__EXPECTEDSCHEMAREVISION", "TICKETING__RECOVERY__MINIMUMRETAINEDKEYVERSION",
+                "TICKETING__RECOVERY__MINIMUMAUTHORITYFLOOR", "TICKETING__RECOVERY__MINIMUMPROVIDERCURSOR",
+                "TICKETING__RECOVERY__MINIMUMIDEMPOTENCYFLOOR", "TICKETING__RECOVERY__MINIMUMWORKERFENCE",
+                "TICKETING__RECOVERY__WARNINGOLDESTDUESECONDS", "TICKETING__RECOVERY__UNHEALTHYOLDESTDUESECONDS",
+                "TICKETING__RECOVERY__BACKLOGTHRESHOLD", "TICKETING__RECOVERY__DECLAREDRPOMINUTES",
+                "TICKETING__RECOVERY__DECLAREDRTOMINUTES", "TICKETING__RECOVERY__MANIFESTSIGNINGKEYREFERENCE",
+                "TICKETING__RECOVERY__RETAINEDKEYVERSIONS__0", "AUTHORIZATION_PROVIDER",
+                "CERBOS_HTTP_ENDPOINT", "CERBOS_USE_TLS", "CERBOS_PLAINTEXT_MODE",
+                "CERBOS_PUBLICATION_RECEIPT_BASE64", "CERBOS_PUBLICATION_SIGNATURE_BASE64",
+                "CERBOS_PUBLICATION_PUBLIC_KEY_PEM", "CERBOS_PUBLICATION_REVISION", "CERBOS_PUBLICATION_ENVIRONMENT",
+                "CERBOS_PG_URL", "LOCAL_STORAGE_CREATE_ROOT_IF_MISSING", "STORAGE_RECONCILIATION_ENABLED",
+                "STORAGE_RECONCILIATION_DRY_RUN", "STORAGE_RECONCILIATION_QUARANTINE_MISSING_OBJECTS",
+                "STORAGE_RECONCILIATION_QUARANTINE_ORPHAN_LOCAL_FILES", "STORAGE_RECONCILIATION_DELETE_QUARANTINED_OBJECTS",
+                "AI_PROVIDER", "AI_ENDPOINT", "AI_MODEL_ID", "AI_CREDENTIAL_SCOPE", "AI_TOOL_PROPOSALS_ENABLED",
+                "MCP_ENABLED", "MCP_ENDPOINT_PATH", "MCP_STATELESS", "MCP_ENABLE_LEGACY_SSE",
+                "WEB_PUSH_ENABLED", "VAPID_SUBJECT", "VAPID_PUBLIC_KEY", "MESSAGING_URI",
+                "EMAIL_DISPATCH_RABBITMQ_EXCHANGE_NAME", "EMAIL_DISPATCH_RABBITMQ_DISPATCH_QUEUE_NAME",
+                "EMAIL_DISPATCH_RABBITMQ_DISPATCH_ROUTING_KEY", "EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_EXCHANGE_NAME",
+                "EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_QUEUE_NAME", "EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_ROUTING_KEY",
+                "EMAIL_DISPATCH_RABBITMQ_PARKING_QUEUE_NAME", "EMAIL_DISPATCH_RABBITMQ_PARKING_ROUTING_KEY",
+                "EMAIL_DISPATCH_RABBITMQ_CLIENT_PROVIDED_NAME", "EMAIL_DISPATCH_RABBITMQ_CONSUMER_ID",
+                "EMAIL_DISPATCH_RABBITMQ_PREFETCH_COUNT", "EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_REPLAY_ENABLED",
+                "EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_REPLAY_CONSUMER_ID", "EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_REPLAY_PREFETCH_COUNT",
+                "EMAIL_DISPATCH_RABBITMQ_PUBLISH_TIMEOUT_SECONDS", "EMAIL_DISPATCH_RABBITMQ_PUBLISHER_POLLING_INTERVAL_SECONDS",
+                "EMAIL_DISPATCH_RABBITMQ_PUBLISHER_BATCH_SIZE", "EMAIL_DISPATCH_RABBITMQ_PUBLISHER_RETRY_DELAY_SECONDS",
+                "WEBHOOKS_ENABLED", "WEBHOOKS_PROVIDER", "WEBHOOKS_SVIX_BASE_URL", "WEBHOOKS_SVIX_ENVIRONMENT",
+                "WEBHOOKS_SVIX_PROVIDER_VERSION", "WEBHOOKS_SVIX_CAPABILITY_POLICY_VERSION",
+                "REPORTING_ENABLED", "REPORTING_MODE", "REPORTING_SYNC_REPORTS", "REPORTING_EVALUATE_SIGNALS",
+                "REPORTING_MIRROR_REVIEW_QUEUE", "REPORTING_EXECUTE_DECISIONS",
+                "REPORTING_HEALTH_STUCK_PROVIDER_SYNC_MINUTES", "REPORTING_HEALTH_FAILED_PROVIDER_SYNC_WARNING_THRESHOLD",
+                "REPORTING_OSPREY_ENABLED", "REPORTING_OSPREY_ENDPOINT_URL", "REPORTING_OSPREY_ALLOW_LOCAL_PROVIDER_ENDPOINTS",
+                "REPORTING_COOP_ENABLED", "REPORTING_COOP_ENDPOINT_URL", "REPORTING_COOP_ALLOW_LOCAL_PROVIDER_ENDPOINTS",
+                "LISTMONK_ENABLED", "LISTMONK_INSTANCE_URL", "LISTMONK_DEFAULT_LIST_ID",
+                "LISTMONK_PRECONFIRM_SUBSCRIPTIONS", "LISTMONK_SYNC_ON_REGISTRATION",
+                "ERASURE_WRITER_REPLICA_COUNT", "ERASURE_BUSY_TIMEOUT_SECONDS", "ERASURE_DATABASE_HOST",
+                "ERASURE_DATABASE_PORT", "ERASURE_DATABASE_NAME", "ERASURE_DATABASE_RUNTIME_USERNAME",
+                "ERASURE_DATABASE_MIGRATOR_USERNAME", "ERASURE_DATABASE_TLS_MODE", "ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE"
+            })
+            {
+                string? value = builder.Configuration[key.Replace("__", ":", StringComparison.Ordinal)];
+                if (value is not null && !context.EnvironmentVariables.ContainsKey(key))
+                    context.EnvironmentVariables[key] = value;
+            }
+            foreach (var client in builder.Configuration.GetSection("Keycloak:PermittedClients").GetChildren())
+                context.EnvironmentVariables[$"KEYCLOAK__PERMITTEDCLIENTS__{client.Key}"] = client.Value
+                    ?? throw new InvalidOperationException("keycloak_permitted_client_invalid");
+        }
+        if (consumer == SecretConsumer.Migration)
+        {
+            foreach (string key in new[]
+            {
+                "IDENTITY_DATABASE_TOPOLOGY", "IDENTITY_DATABASE_PROVIDER", "IDENTITY_DATABASE_HOST",
+                "IDENTITY_DATABASE_PORT", "IDENTITY_DATABASE_NAME", "IDENTITY_DATABASE_SCHEMA",
+                "IDENTITY_DATABASE_TLS_MODE", "IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE",
+                "IDENTITY_DATABASE_SERVER_VERSION"
+            })
+                if (builder.Configuration[key] is { } value && !context.EnvironmentVariables.ContainsKey(key))
+                    context.EnvironmentVariables[key] = value;
+        }
+        if (consumer == SecretConsumer.Bff)
+        {
+            foreach (string key in new[] { "AUTHENTICATION_PROVIDER", "ATPROTO_LOGIN_ENABLED",
+                "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION", "API_ENDPOINT" })
+                if (builder.Configuration[key] is { } value && !context.EnvironmentVariables.ContainsKey(key))
+                    context.EnvironmentVariables[key] = value;
+        }
+        RuntimeSecretEnvironment.Apply(context.EnvironmentVariables, operatorInputs,
+            Environment.GetEnvironmentVariables().Keys.Cast<string>(), consumer, configuredSecretProvider);
+    });
+}
+
 await builder.Build().RunAsync();
 
 static LocalPlatformResources AddLocalPlatform(
     IDistributedApplicationBuilder builder,
+    IConfiguration resourceInputs,
     bool includeHeavyExtras,
     bool includeSvix,
     string cerbosConfigPath,
@@ -694,19 +879,14 @@ static LocalPlatformResources AddLocalPlatform(
     IResourceBuilder<RedisResource>? cache)
 {
     var configuration = builder.Configuration;
-    var keycloakBlazorClientSecret = builder.AddParameter(
-        "keycloak-blazor-client-secret",
-        () => configuration["KEYCLOAK_BLAZOR_CLIENT_SECRET"] ?? string.Empty,
-        publishValueAsDefault: false,
-        secret: true);
-    var cerbosAdminUsername = ConfiguredValue(configuration, "CERBOS_ADMIN_USERNAME", string.Empty);
+    var cerbosAdminUsername = ConfiguredValue(resourceInputs, "CERBOS_ADMIN_USERNAME", string.Empty);
     var cerbosAdminCredentialHash = ConfiguredValue(
-        configuration,
+        resourceInputs,
         "CERBOS_ADMIN_PASSWORD_HASH",
         string.Empty);
-    var cerbosPostgresUser = configuration["CERBOS_POSTGRES_USER"] ?? "cerbos_user";
-    var cerbosPostgresPassword = configuration["CERBOS_POSTGRES_PASSWORD"] ?? string.Empty;
-    var cerbosPostgresDatabase = configuration["CERBOS_POSTGRES_DB"] ?? "cerbos";
+    var cerbosPostgresUser = resourceInputs["CERBOS_POSTGRES_USER"] ?? "cerbos_user";
+    var cerbosPostgresPassword = RequiredConfiguredValue(resourceInputs, "CERBOS_POSTGRES_PASSWORD");
+    var cerbosPostgresDatabase = resourceInputs["CERBOS_POSTGRES_DB"] ?? "cerbos";
     var crdb = builder.AddContainer("crdb", "cockroachdb/cockroach", "v24.1.1")
         .WithArgs("start-single-node", "--insecure")
         .WithVolume("islamu-event-crdb-data", "/cockroach/cockroach-data")
@@ -724,8 +904,8 @@ static LocalPlatformResources AddLocalPlatform(
             "--spi-email-template-provider=freemarker-plus-mustache",
             "--spi-email-template-freemarker-plus-mustache-enabled=true",
             "--spi-theme-cache-themes=false")
-        .WithEnvironment("KC_BOOTSTRAP_ADMIN_USERNAME", configuration["KEYCLOAK_ADMIN"] ?? string.Empty)
-        .WithEnvironment("KC_BOOTSTRAP_ADMIN_PASSWORD", configuration["KEYCLOAK_ADMIN_PASSWORD"] ?? string.Empty)
+        .WithEnvironment("KC_BOOTSTRAP_ADMIN_USERNAME", resourceInputs["KEYCLOAK_ADMIN"] ?? string.Empty)
+        .WithEnvironment("KC_BOOTSTRAP_ADMIN_PASSWORD", resourceInputs["KEYCLOAK_ADMIN_PASSWORD"] ?? string.Empty)
         .WithEnvironment("KC_DB", "cockroach")
         .WithEnvironment("KC_DB_URL_HOST", "crdb")
         .WithEnvironment("KC_DB_URL_PORT", "26257")
@@ -1037,7 +1217,6 @@ static LocalPlatformResources AddLocalPlatform(
 
     return new LocalPlatformResources(
         Keycloak: keycloak,
-        KeycloakBlazorClientSecret: keycloakBlazorClientSecret,
         Cerbos: cerbos,
         Minio: minio,
         MinioBootstrap: minioBootstrap,
@@ -1293,15 +1472,8 @@ static IResourceBuilder<ProjectResource> ConfigureLocalPlatformApi(
     IConfiguration configuration)
 {
     var keycloakRealm = configuration["KEYCLOAK_REALM"] ?? "ISLAMU";
-    var keycloakApiClientId = configuration["KEYCLOAK_API_CLIENT_ID"] ?? "islamu-event-api";
     var keycloakBlazorClientId = configuration["KEYCLOAK_BLAZOR_CLIENT_ID"] ?? "islamu-event-blazor";
     var authorizationProvider = configuration["AUTHORIZATION_PROVIDER"] ?? "cerbos";
-    var cerbosAdminUsername = ConfiguredValue(configuration, "CERBOS_ADMIN_USERNAME", string.Empty);
-    var cerbosAdminPassword = ConfiguredValue(configuration, "CERBOS_ADMIN_PASSWORD", string.Empty);
-    var cerbosAdminCredentialHash = ConfiguredValue(
-        configuration,
-        "CERBOS_ADMIN_PASSWORD_HASH",
-        string.Empty);
     var keycloakBaseUrl = EndpointUrl(resources.Keycloak, "http", "/auth");
     var keycloakAuthority = EndpointUrl(resources.Keycloak, "http", $"/auth/realms/{keycloakRealm}");
     var keycloakMetadataAddress = EndpointUrl(
@@ -1319,7 +1491,6 @@ static IResourceBuilder<ProjectResource> ConfigureLocalPlatformApi(
         .WithEnvironment("KEYCLOAK_REALM", keycloakRealm)
         .WithEnvironment("KEYCLOAK_ENDPOINT", keycloakBaseUrl)
         .WithEnvironment("KEYCLOAK_BLAZOR_CLIENT_ID", keycloakBlazorClientId)
-        .WithEnvironment("KEYCLOAK_BLAZOR_CLIENT_SECRET", resources.KeycloakBlazorClientSecret)
         .WithEnvironment("Keycloak__Realm", keycloakRealm)
         .WithEnvironment("Keycloak__Authority", keycloakAuthority)
         .WithEnvironment("Keycloak__MetadataAddress", keycloakMetadataAddress)
@@ -1328,9 +1499,6 @@ static IResourceBuilder<ProjectResource> ConfigureLocalPlatformApi(
         .WithEnvironment(
             "Keycloak__ManagedLocalHttpOrigin",
             keycloakBaseUrl)
-        .WithEnvironment("Keycloak__Audience", keycloakApiClientId)
-        .WithEnvironment("Keycloak__ValidAudiences__0", keycloakApiClientId)
-        .WithEnvironment("Keycloak__ValidAudiences__1", keycloakBlazorClientId)
         .WithEnvironment("AUTHORIZATION_PROVIDER", authorizationProvider)
         .WithEnvironment("Cerbos__GrpcEndpoint", cerbosGrpcEndpoint)
         .WithEnvironment("CERBOS_GRPC_ENDPOINT", cerbosGrpcEndpoint)
@@ -1338,9 +1506,11 @@ static IResourceBuilder<ProjectResource> ConfigureLocalPlatformApi(
         .WithEnvironment("Cerbos__UseTls", "false")
         .WithEnvironment("Cerbos__PlaintextMode", "true")
         .WithEnvironment("Cerbos__AdminApi__Endpoints__0", cerbosHttpEndpoint)
-        .WithEnvironment("Cerbos__AdminPasswordHash", cerbosAdminCredentialHash)
-        .WithEnvironment("CERBOS_ADMIN_USERNAME", cerbosAdminUsername)
-        .WithEnvironment("CERBOS_ADMIN_PASSWORD", cerbosAdminPassword)
+        .WithEnvironment("Cerbos__PolicyPackage__Publication__ReceiptBase64", configuration["CERBOS_PUBLICATION_RECEIPT_BASE64"])
+        .WithEnvironment("Cerbos__PolicyPackage__Publication__SignatureBase64", configuration["CERBOS_PUBLICATION_SIGNATURE_BASE64"])
+        .WithEnvironment("Cerbos__PolicyPackage__Publication__PublicKeyPem", configuration["CERBOS_PUBLICATION_PUBLIC_KEY_PEM"])
+        .WithEnvironment("Cerbos__PolicyPackage__Publication__Revision", configuration["CERBOS_PUBLICATION_REVISION"])
+        .WithEnvironment("Cerbos__PolicyPackage__Publication__Environment", configuration["CERBOS_PUBLICATION_ENVIRONMENT"])
         .WithEnvironment("STORAGE_S3_ACCESS_KEY_ID", configuration["STORAGE_S3_ACCESS_KEY_ID"] ?? string.Empty)
         .WithEnvironment("STORAGE_S3_SECRET_ACCESS_KEY", configuration["STORAGE_S3_SECRET_ACCESS_KEY"] ?? string.Empty)
         .WithEnvironment("Reporting__Enabled", configuration["REPORTING_ENABLED"] ?? "true")
@@ -1424,12 +1594,10 @@ static IResourceBuilder<ProjectResource> ConfigureLocalPlatformBlazor(
         .WithEnvironment("KEYCLOAK_REALM", keycloakRealm)
         .WithEnvironment("KEYCLOAK_ENDPOINT", keycloakBaseUrl)
         .WithEnvironment("KEYCLOAK_CLIENT_ID", keycloakClientId)
-        .WithEnvironment("KEYCLOAK_BLAZOR_CLIENT_SECRET", resources.KeycloakBlazorClientSecret)
         .WithEnvironment("Keycloak__Realm", keycloakRealm)
         .WithEnvironment("Keycloak__Authority", keycloakAuthority)
         .WithEnvironment("Keycloak__MetadataAddress", keycloakMetadataAddress)
         .WithEnvironment("Keycloak__ClientId", keycloakClientId)
-        .WithEnvironment("Keycloak__ClientSecret", resources.KeycloakBlazorClientSecret)
         .WithEnvironment("Keycloak__RequireHttpsMetadata", "false")
         .WaitFor(resources.Keycloak);
 }
@@ -1492,23 +1660,31 @@ static string BuildPostgresUrl(string username, string password, string host, in
 }
 
 static IResourceBuilder<ProjectResource> WithLocalPrimaryDatabase(
+    IDistributedApplicationBuilder builder,
     IResourceBuilder<ProjectResource> project,
     IResourceBuilder<PostgresDatabaseResource> database,
     PrimaryDatabaseRole role)
 {
+    if (SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration) == SecretProviderType.Infisical)
+        return project;
     var credentialPrefix = $"Database__{role}__";
     var postgres = database.Resource.Parent;
+    var selected = PrimaryDatabaseConfiguration.Bind(builder.Configuration, role);
+    if (selected.Provider != PrimaryDatabaseProvider.PostgreSql)
+        throw new InvalidOperationException("Local primary database resources require PostgreSql configuration.");
 
-    return project
+    project = project
         .WithEnvironment("Database__Provider", PrimaryDatabaseProvider.PostgreSql.ToString())
         .WithEnvironment("Database__Host", postgres.PrimaryEndpoint.Property(EndpointProperty.Host))
         .WithEnvironment("Database__Port", postgres.PrimaryEndpoint.Property(EndpointProperty.Port))
         .WithEnvironment("Database__Database", database.Resource.DatabaseName)
-        .WithEnvironment("Database__Schema", PrimaryDatabaseConnectionOptions.DefaultSchema)
+        .WithEnvironment("Database__Schema", selected.Schema)
         .WithEnvironment("Database__TlsMode", PrimaryDatabaseTlsMode.Prefer.ToString())
-        .WithEnvironment("Database__TrustServerCertificate", "false")
-        .WithEnvironment($"{credentialPrefix}Username", postgres.UserNameReference)
-        .WithEnvironment($"{credentialPrefix}Password", postgres.PasswordParameter);
+        .WithEnvironment("Database__TrustServerCertificate", "false");
+    return role == PrimaryDatabaseRole.Migrator
+        ? project.WithEnvironment($"{credentialPrefix}Username", postgres.UserNameReference)
+            .WithEnvironment($"{credentialPrefix}Password", postgres.PasswordParameter)
+        : WithSelectedPrimaryDatabaseCredentials(builder, project, selected);
 }
 
 static IResourceBuilder<ProjectResource> WithExternalPrimaryDatabase(
@@ -1516,8 +1692,11 @@ static IResourceBuilder<ProjectResource> WithExternalPrimaryDatabase(
     IResourceBuilder<ProjectResource> project,
     PrimaryDatabaseRole role)
 {
+    if (SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration) == SecretProviderType.Infisical)
+        return project;
     var database = PrimaryDatabaseConfiguration.Bind(builder.Configuration, role);
-    var credentialPrefix = $"Database__{role}__";
+    if (role == PrimaryDatabaseRole.Global)
+        return WithSelectedPrimaryDatabaseCredentials(builder, project, database);
 
     project = project
         .WithEnvironment("Database__Provider", database.Provider.ToString())
@@ -1530,23 +1709,52 @@ static IResourceBuilder<ProjectResource> WithExternalPrimaryDatabase(
         project = project.WithEnvironment("Database__Host", database.Host);
     if (database.Port is not null)
         project = project.WithEnvironment("Database__Port", database.Port.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
-    if (database.Username is not null)
-        project = project.WithEnvironment($"{credentialPrefix}Username", database.Username);
-    if (database.Password is not null)
-    {
-        var password = builder.AddParameter(
-            $"database-{role.ToString().ToLowerInvariant()}-{project.Resource.Name}-password",
-            () => database.Password,
-            publishValueAsDefault: false,
-            secret: true);
-        project = project.WithEnvironment($"{credentialPrefix}Password", password);
-    }
     if (database.ServerFlavor is not null)
         project = project.WithEnvironment("Database__ServerFlavor", database.ServerFlavor.Value.ToString());
     if (database.ServerVersion is not null)
         project = project.WithEnvironment("Database__ServerVersion", database.ServerVersion.ToString());
 
+    return WithSelectedPrimaryDatabaseCredentials(builder, project, database);
+}
+
+static IResourceBuilder<ProjectResource> WithInstanceApiKeyCapabilities(
+    IDistributedApplicationBuilder builder,
+    IResourceBuilder<ProjectResource> project)
+{
+    if (SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration) == SecretProviderType.Infisical)
+        return project;
+    PrimaryDatabaseRole[] roles =
+    [
+        PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
+        PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport
+    ];
+    foreach (var role in roles)
+        project = WithSelectedPrimaryDatabaseCredentials(
+            builder, project, PrimaryDatabaseConfiguration.Bind(builder.Configuration, role));
     return project;
+}
+
+static IResourceBuilder<ProjectResource> WithSelectedPrimaryDatabaseCredentials(
+    IDistributedApplicationBuilder builder,
+    IResourceBuilder<ProjectResource> project,
+    PrimaryDatabaseConnectionOptions database)
+{
+    if (database.Provider == PrimaryDatabaseProvider.Sqlite)
+        return project;
+    string username = database.Username
+        ?? throw new InvalidOperationException("Primary database credentials must come from the selected authority.");
+    string secret = database.Password
+        ?? throw new InvalidOperationException("Primary database credentials must come from the selected authority.");
+    if (string.IsNullOrWhiteSpace(username) || secret.Length == 0)
+        throw new InvalidOperationException("Primary database credentials must come from the selected authority.");
+    var password = builder.AddParameter(
+        $"database-{database.Role.ToString().ToLowerInvariant()}-{project.Resource.Name}-password",
+        () => secret,
+        publishValueAsDefault: false,
+        secret: true);
+    var prefix = $"Database__{database.Role}__";
+    return project.WithEnvironment($"{prefix}Username", username)
+        .WithEnvironment($"{prefix}Password", password);
 }
 
 static IResourceBuilder<ProjectResource> WithLocalPrivacyErasureAuthorityDatabase(
@@ -1582,6 +1790,8 @@ static IResourceBuilder<ProjectResource> WithExternalPrivacyErasureAuthorityData
     IResourceBuilder<ProjectResource> project,
     PrimaryDatabaseRole role)
 {
+    if (SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration) == SecretProviderType.Infisical)
+        return project;
     var database = PrivacyErasureAuthorityDatabaseConfiguration.Bind(builder.Configuration, role);
     var credentialPrefix = $"PrivacyErasureAuthorityDatabase__{role}__";
     var erasureCredentialPrefix = $"Database__Erasure__{role}__";
@@ -1709,16 +1919,8 @@ static IResourceBuilder<ProjectResource> WithProfileSecretMode(
         }
     }
 
-    SecretProviderType provider = SecretAuthorityConfiguration.GetRequiredProvider(configuration);
-    return runMode == AspireRunMode.FullLocal && provider == SecretProviderType.Infisical
-        ? project
-            .WithEnvironment("SecretProvider__Provider", nameof(SecretProviderType.Environment))
-            .WithEnvironment("SecretProvider__Infisical__Url", "")
-            .WithEnvironment("SecretProvider__Infisical__ProjectId", "")
-            .WithEnvironment("SecretProvider__Infisical__ClientId", "")
-            .WithEnvironment("SecretProvider__Infisical__ClientSecret", "")
-            .WithEnvironment("SecretProvider__Infisical__Environment", "")
-        : WithSelectedSecretAuthority(project, configuration);
+    return project.WithEnvironment("SecretProvider__Provider",
+        SecretAuthorityConfiguration.GetRequiredProvider(configuration).ToString());
 }
 
 static IResourceBuilder<ProjectResource> WithAgentBrowserEnvironment(
@@ -1767,63 +1969,6 @@ static IResourceBuilder<ParameterResource> AddSelectedAuthorityParameter(
         () => RequiredConfiguredValue(builder.Configuration, configurationKey),
         publishValueAsDefault: false,
         secret: secret);
-
-static IResourceBuilder<ProjectResource> WithSelectedSecretAuthority(
-    IResourceBuilder<ProjectResource> project,
-    IConfiguration configuration)
-{
-    SecretProviderType provider = SecretAuthorityConfiguration.GetRequiredProvider(configuration);
-    if (provider is SecretProviderType.Environment or SecretProviderType.UserSecrets)
-    {
-        return project
-            .WithEnvironment("SecretProvider__Provider", provider.ToString())
-            .WithEnvironment("SecretProvider__Infisical__Url", "")
-            .WithEnvironment("SecretProvider__Infisical__ProjectId", "")
-            .WithEnvironment("SecretProvider__Infisical__ClientId", "")
-            .WithEnvironment("SecretProvider__Infisical__ClientSecret", "")
-            .WithEnvironment("SecretProvider__Infisical__Environment", "");
-    }
-
-    var infisical = ReadInfisicalBootstrap(configuration);
-
-    return project
-        .WithEnvironment("SecretProvider__Provider", provider.ToString())
-        .WithEnvironment("SecretProvider__Infisical__Url", infisical.Url)
-        .WithEnvironment("SecretProvider__Infisical__ProjectId", infisical.ProjectId)
-        .WithEnvironment("SecretProvider__Infisical__ClientId", infisical.ClientId)
-        .WithEnvironment("SecretProvider__Infisical__ClientSecret", infisical.ClientSecret)
-        .WithEnvironment("SecretProvider__Infisical__Environment", infisical.Environment);
-}
-
-static InfisicalBootstrapSettings ReadInfisicalBootstrap(IConfiguration configuration)
-{
-    static string Read(
-        IConfiguration configuration,
-        string key,
-        string? fallback = null)
-    {
-        string environmentKey = key switch
-        {
-            "ProjectId" => "INFISICAL_PROJECT_ID",
-            "ClientId" => "INFISICAL_CLIENT_ID",
-            "ClientSecret" => "INFISICAL_CLIENT_SECRET",
-            "Environment" => "INFISICAL_ENV",
-            _ => $"INFISICAL_{key.ToUpperInvariant()}",
-        };
-        return configuration[$"SecretProvider:Infisical:{key}"]
-            ?? configuration[$"Infisical:{key}"]
-            ?? configuration[environmentKey]
-            ?? fallback
-            ?? string.Empty;
-    }
-
-    return new InfisicalBootstrapSettings(
-        Url: Read(configuration, "Url"),
-        ProjectId: Read(configuration, "ProjectId"),
-        ClientId: Read(configuration, "ClientId"),
-        ClientSecret: Read(configuration, "ClientSecret"),
-        Environment: Read(configuration, "Environment"));
-}
 
 static string FindRepositoryRoot(string startDirectory)
 {
@@ -1965,7 +2110,6 @@ internal static class AspireRunModeExtensions
 
 internal sealed record LocalPlatformResources(
     IResourceBuilder<ContainerResource> Keycloak,
-    IResourceBuilder<ParameterResource> KeycloakBlazorClientSecret,
     IResourceBuilder<ContainerResource> Cerbos,
     IResourceBuilder<ContainerResource> Minio,
     IResourceBuilder<ContainerResource> MinioBootstrap,
@@ -1979,10 +2123,3 @@ internal sealed record LocalPlatformResources(
     IResourceBuilder<ContainerResource>? Osprey,
     IResourceBuilder<ContainerResource>? Prometheus,
     IResourceBuilder<ContainerResource>? Grafana);
-
-internal sealed record InfisicalBootstrapSettings(
-    string Url,
-    string ProjectId,
-    string ClientId,
-    string ClientSecret,
-    string Environment);

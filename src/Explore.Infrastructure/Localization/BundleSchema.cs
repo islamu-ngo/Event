@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Explore.Domain.Common.Localization;
 
 namespace Explore.Infrastructure.Localization;
 
@@ -6,7 +7,18 @@ internal static class BundleSchema
 {
     public static SortedDictionary<string, string> Read(Stream stream)
     {
-        using var document = JsonDocument.Parse(stream);
+        using var bounded = new MemoryStream();
+        byte[] buffer = new byte[8192];
+        int count;
+        while ((count = stream.Read(buffer, 0,
+            Math.Min(buffer.Length, LocalizationBundlePolicy.MaximumBytes - (int)bounded.Length + 1))) > 0)
+        {
+            if (bounded.Length + count > LocalizationBundlePolicy.MaximumBytes)
+                throw new JsonException("Localization bundle input limit exceeded.");
+            bounded.Write(buffer, 0, count);
+        }
+        bounded.Position = 0;
+        using var document = JsonDocument.Parse(bounded, new JsonDocumentOptions { MaxDepth = 2 });
         if (document.RootElement.ValueKind != JsonValueKind.Object)
         {
             throw new JsonException("Localization bundle root must be a JSON object.");
@@ -15,40 +27,33 @@ internal static class BundleSchema
         var translations = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var property in document.RootElement.EnumerateObject())
         {
-            ValidateKey(property.Name);
-            if (property.Value.ValueKind != JsonValueKind.String)
+            if (translations.Count >= LocalizationBundlePolicy.MaximumEntries
+                || property.Value.ValueKind != JsonValueKind.String)
             {
-                throw new JsonException($"Localization bundle value for '{property.Name}' must be a string.");
+                throw new JsonException("Localization bundle entry limit or shape is invalid.");
             }
 
-            translations[property.Name] = property.Value.GetString() ?? string.Empty;
+            if (!translations.TryAdd(property.Name, property.Value.GetString()!))
+                throw new JsonException("Localization bundle has duplicate translation keys.");
         }
 
-        return translations;
+        return ValidateAndSort(translations);
     }
 
     public static SortedDictionary<string, string> ValidateAndSort(IReadOnlyDictionary<string, string> translations)
     {
-        var sorted = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (key, value) in translations)
+        try
         {
-            ValidateKey(key);
-            sorted[key] = value ?? string.Empty;
+            LocalizationBundlePolicy.Validate(translations);
+        }
+        catch (ArgumentException)
+        {
+            throw new JsonException("Localization bundle must contain bounded flat translation text.");
         }
 
+        var sorted = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach ((string key, string value) in translations)
+            sorted.Add(key, value);
         return sorted;
     }
-
-    private static void ValidateKey(string key)
-    {
-        if (string.IsNullOrWhiteSpace(key) || key != key.Trim() || key.Any(char.IsWhiteSpace) || !HasAllowedPrefix(key) || key.Split('.').Any(segment => segment.Length == 0))
-        {
-            throw new JsonException($"Localization bundle key '{key}' must start with 'ui.', 'lookup.', or 'payment.' and use non-empty dot-separated segments without whitespace.");
-        }
-    }
-
-    private static bool HasAllowedPrefix(string key) =>
-        key.StartsWith("ui.", StringComparison.Ordinal) ||
-        key.StartsWith("lookup.", StringComparison.Ordinal) ||
-        key.StartsWith("payment.", StringComparison.Ordinal);
 }

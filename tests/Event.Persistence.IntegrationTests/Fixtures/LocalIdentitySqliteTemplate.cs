@@ -1,7 +1,9 @@
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -69,8 +71,14 @@ internal static class LocalIdentitySqliteTemplate
             byte[] emptyApplication = await File.ReadAllBytesAsync(applicationPath, token);
             await using (var application = new ExploreDbContext(applicationOptions.Options))
             {
+                if (application.BindTenantLease() is not null)
+                    throw new InvalidOperationException("The fresh Identity template requires an instance-scoped owner.");
                 // Lookup setup is immutable, not an operation under test. One commit avoids
                 // hundreds of per-table durable commits while retaining every production seed row.
+                // Governance defaults share the same enrollment boundary as runtime settings writes.
+                await using var human = new HumanSecuritySourceGate(application);
+                await using var humanLease = await human.AcquireAsync(token);
+                await using var enrollment = await new EventDiscoveryEnrollmentGate(application).AcquireAsync(token);
                 await using var transaction = await application.Database.BeginTransactionAsync(token);
                 await LookupTableSeeder.SeedAsync(application, token);
                 await transaction.CommitAsync(token);

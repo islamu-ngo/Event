@@ -3,6 +3,7 @@ using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -39,6 +40,7 @@ public sealed class AdmissionCheckInRepository(
         ArgumentNullException.ThrowIfNull(request);
         RequireTransaction();
         ValidateCandidates(request.CredentialDigestCandidates);
+        AdmissionTargetTransaction.RequireCurrent(dbContext, request.TenantId, request.TargetId);
         if (request.StaffActorId.HasValue == request.ScannerCapabilityId.HasValue)
         {
             return null;
@@ -86,10 +88,9 @@ public sealed class AdmissionCheckInRepository(
             return null;
         }
 
-        await RelationalEntityRowFence.AcquireAsync<AdmissionTarget>(
+        await AdmissionTargetTransaction.RequireCurrentAsync(
             dbContext,
             request.TenantId,
-            target => target.Id,
             request.TargetId,
             cancellationToken);
         AdmissionTarget? target = await dbContext.AdmissionTargets

@@ -94,7 +94,7 @@ public sealed class StorageReadinessHealthCheckTests
         await Assert.That(result.Status).IsEqualTo(HealthStatus.Unhealthy);
         await Assert.That(result.Description).Contains("could not be resolved");
         await Assert.That(result.Data["failureCode"]).IsEqualTo("storage_provider_resolution_failed");
-        await Assert.That(result.Data["reason"]).IsEqualTo(nameof(InvalidOperationException));
+        await Assert.That(result.Data["reason"]).IsEqualTo("provider_unavailable");
     }
 
     private static StorageReadinessHealthCheck CreateHealthCheck(

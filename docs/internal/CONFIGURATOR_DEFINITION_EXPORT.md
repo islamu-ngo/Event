@@ -7,10 +7,10 @@ There is no Event-specific definition exporter in the supported workflow.
 
 ## Install the native maintainer workflow
 
-Install the standalone [Configurator CLI package](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/packaging.md).
+Install the standalone [Configurator CLI package](https://github.com/islamu-ngo/Configurator/blob/HEAD/docs/public/packaging.md).
 Copy its complete `skills/configurator-integrate/` directory, including routed
 resources, into the maintainer's Agent Skills-aware tool's supported skill location.
-The same [portable skill](https://github.com/ISLAMU/Configurator/blob/HEAD/skills/configurator-integrate/SKILL.md)
+The same [portable skill](https://github.com/islamu-ngo/Configurator/blob/HEAD/skills/configurator-integrate/SKILL.md)
 is available in Configurator's repository. No Event-local skill, generator,
 compiler wrapper, target runtime dependency or running Event instance is required.
 
@@ -45,7 +45,8 @@ islamu-configurator definition --help
 islamu-configurator definition check --source configurator/definitions/islamu-event/configurator.yaml --machine
 ```
 
-Confirm command and authoring contracts are v1. Missing commands are prerequisite
+Confirm the command result contract is v2; authoring and runtime definition
+schemas remain v1. Missing commands are prerequisite
 failures, not grounds for an Event-specific replacement. For a new integration,
 use `definition init --project-id ID --name NAME --application-version VERSION`
 with `--output PATH` for its new source. Supply reviewed exact target facts.
@@ -97,8 +98,8 @@ islamu-configurator artifact create --definition configurator/definitions/islamu
 
 Use the newly selected canonical definition, declared artifact ID and matching
 answer workspace. All answer-derived bytes are restricted; native output is
-protected and create-only on supported hosts. Machine success remains
-`host-validation-required`. Event's existing parsers and authorized backend
+protected and create-only on supported hosts. Machine preparation success does
+not establish target acceptance. Event's existing parsers and authorized backend
 workflows own semantic acceptance, issuer normalization, identity integrity,
 secret binding, tenant scope, optimistic concurrency and apply. Configurator
 does not create Event identity hashes or confer administrator authority.
@@ -120,4 +121,4 @@ The [source cutover inventory](configurator-source-cutover-inventory.md) retains
 historical extraction dispositions. It does not define an active exporter path.
 See [the architecture boundary](SETUP_ASSISTANT_ARCHITECTURE.md),
 [operator guidance](../public/self-hosting/setup-assistant.md) and
-the [native CLI contract](https://github.com/ISLAMU/Configurator/blob/HEAD/docs/public/cli.md).
+the [native CLI contract](https://github.com/islamu-ngo/Configurator/blob/HEAD/docs/public/cli.md).

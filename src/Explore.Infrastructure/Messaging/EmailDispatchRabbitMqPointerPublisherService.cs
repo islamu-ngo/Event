@@ -54,9 +54,9 @@ public sealed class EmailDispatchRabbitMqPointerPublisherService(
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogError(ex, "RabbitMQ EmailDispatch pointer publisher pass failed");
+            logger.LogError("RabbitMQ EmailDispatch pointer publisher pass failed");
         }
     }
 

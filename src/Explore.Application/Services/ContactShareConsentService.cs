@@ -53,20 +53,20 @@ public class ContactShareConsentService : IContactShareConsentService
         var @event = await _eventRepository.GetById(eventId);
         if (@event == null || @event.TenantId != tenantId)
         {
-            _logger.LogWarning("Cannot process consent: event {EventId} not found", eventId);
+            _logger.LogWarning("Cannot process consent because the event was not found");
             return null;
         }
 
         if (@event.OrganizerActorId is null)
         {
-            _logger.LogWarning("Cannot process consent: event {EventId} has no organizer actor", eventId);
+            _logger.LogWarning("Cannot process consent because the event has no organizer actor");
             return null;
         }
 
         var actor = await _actorRepository.GetById(@event.OrganizerActorId.Value);
         if (actor?.OrganizationId == null)
         {
-            _logger.LogWarning("Cannot process consent: event {EventId} actor {ActorId} has no organisation", eventId, @event.ActorId);
+            _logger.LogWarning("Cannot process consent because the organizer has no organization");
             return null;
         }
 
@@ -75,7 +75,7 @@ public class ContactShareConsentService : IContactShareConsentService
                 participation => participation.TenantId == tenantId &&
                     participation.ApprovalStatusId == (int)ApprovalStatusEnum.Approved))
         {
-            _logger.LogWarning("Cannot process consent: organisation {OrgId} is not approved", actor.OrganizationId);
+            _logger.LogWarning("Cannot process consent because the organization is not approved");
             return null;
         }
 
@@ -104,8 +104,7 @@ public class ContactShareConsentService : IContactShareConsentService
             await _consentRepository.UpdateWithHistory(existing, history);
 
             _logger.LogInformation(
-                "Reactivated contact share consent {ConsentId} for user {UserId} → actor {ActorId}",
-                existing.Id, userId, @event.OrganizerActorId.Value);
+                "Reactivated contact share consent");
 
             return existing.Id;
         }
@@ -119,8 +118,7 @@ public class ContactShareConsentService : IContactShareConsentService
         consent = await _consentRepository.CreateWithHistory(consent, grantHistory);
 
         _logger.LogInformation(
-            "Created contact share consent {ConsentId} for user {UserId} → actor {ActorId}",
-            consent.Id, userId, @event.OrganizerActorId.Value);
+            "Created contact share consent");
 
         return consent.Id;
     }
@@ -154,7 +152,7 @@ public class ContactShareConsentService : IContactShareConsentService
         await _consentRepository.UpdateWithHistory(consent, history);
 
         _logger.LogInformation(
-            "Withdrawn contact share consent {ConsentId} for user {UserId}", consentId, userId);
+            "Contact share consent withdrawn");
     }
 
     public async Task<List<UserContactShareConsentDto>> GetUserConsents(Guid tenantId, Guid userId)

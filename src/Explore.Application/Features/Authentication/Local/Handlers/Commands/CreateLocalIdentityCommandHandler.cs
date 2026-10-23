@@ -1,8 +1,6 @@
 
-using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
@@ -12,18 +10,17 @@ namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
 public sealed class CreateLocalIdentityCommandHandler(
     IAdminContext adminContext,
-    IPlatformUserRoleRepository platformUserRoles,
-    ILocalCredentialAdministration credentialAdministration,
-    ICommandHandler<ReconcileLocalCredentialOperationCommand, BaseCommandResponse<Guid>> reconcileHandler)
+    ILocalHumanCredentialAdministration credentialAdministration,
+    ILocalAdministrationPreparation preparation)
     : ICommandHandler<CreateLocalIdentityCommand, LocalCredentialIssueCommandResponse>
 {
     public async Task<LocalCredentialIssueCommandResponse> ExecuteAsync(
         CreateLocalIdentityCommand request, CancellationToken cancellationToken = default)
     {
-        Guid? actor = await LocalCredentialAdministrator.ResolveAsync(
-            adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
+        var original = await LocalCredentialAdministrator.ResolveAsync(
+            adminContext, preparation, request, cancellationToken)
             .ConfigureAwait(false);
-        if (actor is null)
+        if (original is null)
         {
             return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Authorization<Guid>());
         }
@@ -40,16 +37,7 @@ public sealed class CreateLocalIdentityCommandHandler(
             return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Validation<Guid>(
                 errors: validation.Errors.Select(error => error.ErrorMessage)));
         }
-        var intent = new LocalCredentialCreateRequest(
-            operationId: request.OperationId, initiatingApplicationUserId: actor.Value,
-            email: request.Email, firstName: request.FirstName, lastName: request.LastName);
-        if (await LocalCredentialAdministrator.ResolveAsync(
-                adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
-                .ConfigureAwait(false) != actor)
-        {
-            return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Authorization<Guid>());
-        }
-        LocalCredentialCreateResult creation = await credentialAdministration.CreatePendingAsync(intent, cancellationToken)
+        LocalCredentialCreateResult creation = await credentialAdministration.CreatePendingAsync(original, request, cancellationToken)
             .ConfigureAwait(false);
         switch (creation.Outcome)
         {
@@ -59,15 +47,9 @@ public sealed class CreateLocalIdentityCommandHandler(
             case LocalCredentialCreateOutcome.Conflict:
                 return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Conflict(id: request.OperationId));
             case LocalCredentialCreateOutcome.Created:
-                if (await LocalCredentialAdministrator.ResolveAsync(
-                        adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
-                        .ConfigureAwait(false) != actor)
-                {
-                    return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Authorization<Guid>());
-                }
-                BaseCommandResponse<Guid> reconciliation = await reconcileHandler.ExecuteAsync(
-                    new ReconcileLocalCredentialOperationCommand(operationId: request.OperationId), cancellationToken)
-                    .ConfigureAwait(false);
+                BaseCommandResponse<Guid> reconciliation = await LocalCredentialAdministrator.ReconcileAsync(
+                    credentialAdministration, original, request, request.OperationId,
+                    cancellationToken);
                 if (!reconciliation.IsSuccess)
                 {
                     return LocalCredentialIssueCommandResponse.Failure(reconciliation);
@@ -79,13 +61,7 @@ public sealed class CreateLocalIdentityCommandHandler(
                 throw new InvalidOperationException("Unknown Local creation outcome.");
         }
         LocalCredentialOperationStatus? status = await credentialAdministration.ReadOperationAsync(
-            operationId: request.OperationId, cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (await LocalCredentialAdministrator.ResolveAsync(
-                adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
-                .ConfigureAwait(false) != actor)
-        {
-            return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Authorization<Guid>());
-        }
+            original, request, cancellationToken).ConfigureAwait(false);
         if (status is null)
         {
             return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Conflict(id: request.OperationId));

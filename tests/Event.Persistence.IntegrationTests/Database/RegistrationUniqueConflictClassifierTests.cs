@@ -12,6 +12,33 @@ namespace Event.Persistence.IntegrationTests.Database;
 public sealed class RegistrationUniqueConflictClassifierTests
 {
     [Test]
+    public async Task PaymentClaimRecoveryRecognizesOnlyItsExactUniqueConstraints()
+    {
+        await using ExploreDbContext context = CreateContext("PostgreSql");
+        RelationalConstraintDescriptor[] constraints =
+        [
+            RelationalConstraintDescriptorResolver.UniqueIndex<PaymentAttempt>(
+                context, nameof(PaymentAttempt.ActiveScopeKey), nameof(PaymentAttempt.ActiveUniquenessSlot)),
+            RelationalConstraintDescriptorResolver.UniqueIndex<PaymentAttempt>(
+                context, nameof(PaymentAttempt.ProviderIdempotencyKey))
+        ];
+        foreach (RelationalConstraintDescriptor constraint in constraints)
+        {
+            await Assert.That(RegistrationUniqueConflictClassifier.IsPaymentClaimIdentityConflict(
+                context, new DbUpdateException("Identity contention.", CreatePostgresUniqueViolation(constraint.Name)))).IsTrue();
+            await Assert.That(RegistrationUniqueConflictClassifier.IsPaymentClaimIdentityConflict(
+                context, new DbUpdateException("Nonunique failure.", new PostgresException(
+                    "check failed", "ERROR", "ERROR", PostgresErrorCodes.CheckViolation,
+                    constraintName: constraint.Name)))).IsFalse();
+        }
+        await Assert.That(RegistrationUniqueConflictClassifier.IsPaymentClaimIdentityConflict(
+            context, new DbUpdateException("Unrelated identity.", CreatePostgresUniqueViolation(
+                SubmissionConstraints(context)[0].Name)))).IsFalse();
+        await Assert.That(RegistrationUniqueConflictClassifier.IsPaymentClaimIdentityConflict(
+            context, new DbUpdateException("Transport failure.", new IOException("lost acknowledgement")))).IsFalse();
+    }
+
+    [Test]
     public async Task PostgresExpectedSubmissionConstraints_AreClassifiedFromMetadata()
     {
         await using ExploreDbContext context = CreateContext("PostgreSql");

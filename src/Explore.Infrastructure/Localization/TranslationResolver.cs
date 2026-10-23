@@ -110,8 +110,8 @@ public class TranslationResolver : ITranslationResolver
         }
 
         _logger.LogInformation(
-            "[LOCALIZATION] Invalidated {Count} cache entries for tenant={TenantId} lang={Language} (both modes)",
-            cleared, tenantId, normalizedLang);
+            "localization_cache_invalidated count={Count}",
+            cleared);
 
         return Task.CompletedTask;
     }
@@ -139,13 +139,12 @@ public class TranslationResolver : ITranslationResolver
 
             _preloadedKeys.TryAdd(preloadKey, insertedKeys);
             _logger.LogInformation(
-                "Preloaded {Count} translations for tenant={TenantId} lang={Language} mode={Mode} (TTL: {TTL})",
-                exportList.Count, tenantId, languageCode, mode, cacheDuration);
+                "localization_cache_preloaded count={Count} mode={Mode} ttl={TTL}",
+                exportList.Count, mode, cacheDuration);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Failed to preload translations for tenant={TenantId} lang={Language} mode={Mode}",
-                tenantId, languageCode, mode);
+            _logger.LogWarning("localization_cache_preload_failed mode={Mode}", mode);
             _preloadedKeys.TryAdd(preloadKey, new List<string>()); // prevent retry storms
         }
     }

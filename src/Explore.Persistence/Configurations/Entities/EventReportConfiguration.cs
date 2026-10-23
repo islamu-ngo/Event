@@ -1,6 +1,7 @@
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Explore.Persistence.Configurations.Entities;
@@ -28,6 +29,19 @@ public sealed class EventReportConfiguration : IEntityTypeConfiguration<EventRep
         builder.Property(e => e.ReporterUserAgentHash).HasMaxLength(64);
         builder.Property(e => e.IsDeleted).HasDefaultValue(false);
         builder.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
+        builder.Property(e => e.ProviderSyncOutboxId)
+            .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
+        builder.Property(e => e.ProviderSyncCaseId)
+            .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
+        builder.Property(e => e.ProviderSyncCaseConcurrencyStamp)
+            .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
+        builder.Property(e => e.ProviderSyncSubmittedAtUtc)
+            .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
+        builder.Property(e => e.ProviderSyncPayloadDigest).HasMaxLength(64)
+            .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
+        builder.HasIndex(e => e.ProviderSyncOutboxId).IsUnique()
+            .HasFilter("provider_sync_outbox_id IS NOT NULL")
+            .HasDatabaseName("ix_event_reports_provider_sync_outbox");
 
         builder.HasOne(e => e.Tenant)
             .WithMany()

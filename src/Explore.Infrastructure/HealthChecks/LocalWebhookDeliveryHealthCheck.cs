@@ -59,9 +59,10 @@ public sealed class LocalWebhookDeliveryHealthCheck(
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();
-            var targetRepository = scope.ServiceProvider.GetRequiredService<IWebhookLocalTargetRepository>();
-            dueLocalTargets = await targetRepository.CountDueAsync(now, cancellationToken);
-            staleDeliveringTargets = await targetRepository.CountStaleDeliveringAsync(now, cancellationToken);
+            var observer = scope.ServiceProvider.GetRequiredService<IWebhookLocalDeliveryHealthObserver>();
+            var health = await observer.ObserveAsync(now, cancellationToken);
+            dueLocalTargets = health.DueLocalTargets;
+            staleDeliveringTargets = health.StaleDeliveringTargets;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

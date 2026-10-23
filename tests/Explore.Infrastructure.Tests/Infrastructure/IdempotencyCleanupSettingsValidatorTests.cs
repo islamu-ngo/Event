@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Persistence;
 using Explore.Infrastructure;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
@@ -12,6 +13,28 @@ public sealed class IdempotencyCleanupSettingsValidatorTests
         var result = _validator.Validate(null, new IdempotencyCleanupSettings());
 
         await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(new IdempotencyCleanupSettings().BatchSize).IsEqualTo(500);
+    }
+
+    [Test]
+    [Arguments(1)]
+    [Arguments(IdempotencyCleanupLimits.MaximumRows)]
+    public async Task ValidateSupportedBatchBoundaryReturnsSuccess(int batchSize)
+    {
+        var result = _validator.Validate(null, new IdempotencyCleanupSettings { BatchSize = batchSize });
+
+        await Assert.That(result.Succeeded).IsTrue();
+    }
+
+    [Test]
+    [Arguments(-1)]
+    [Arguments(IdempotencyCleanupLimits.MaximumRows + 1)]
+    public async Task ValidateOutOfRangeBatchReturnsFailure(int batchSize)
+    {
+        var result = _validator.Validate(null, new IdempotencyCleanupSettings { BatchSize = batchSize });
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.FailureMessage).Contains(nameof(IdempotencyCleanupSettings.BatchSize));
     }
 
     [Test]

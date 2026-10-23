@@ -302,9 +302,6 @@ public sealed class EventLocationAttachmentServiceTests
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<int> CountNeedingPrivacyReviewAsync(CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
         public Task SaveGovernanceChangesAsync(
             IReadOnlyCollection<EventLocationDisclosureAudit> audits,
             IReadOnlyCollection<OutboxMessage> outboxMessages,

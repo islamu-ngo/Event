@@ -1,6 +1,7 @@
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Notifications;
 using Explore.Application.Settings;
+using Explore.Application.Features.Settings;
 
 namespace Explore.Application.Contracts.Services;
 
@@ -33,9 +34,8 @@ public interface IInstanceGovernanceSettingService
         Guid? actorUserId,
         CancellationToken cancellationToken = default);
     Task<PublicationPolicyMutationResult> ApplyEventPolicyPatchAsync(
-        PatchEventPolicyDto patch,
-        EventPolicyDto eventPolicy,
-        Guid? actorUserId,
+        TypedSettingsOriginal original,
+        ITypedSettingsOriginalStore store,
         CancellationToken cancellationToken = default);
 
     Task ApplyOrganizationPolicyAsync(OrganizationPolicyDto orgPolicy, Guid? actorUserId);

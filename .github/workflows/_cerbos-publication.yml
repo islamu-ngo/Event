@@ -1,0 +1,58 @@
+name: Cerbos Publication Prerequisite
+
+on:
+  workflow_call:
+    inputs:
+      receipt:
+        required: true
+        type: string
+      signature:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publication:
+    name: Publish Cerbos Policy Store
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - uses: cerbos/cerbos-setup-action@d1418d9ea5db17f419a48e992edff39b01bd0756 # v1
+        with:
+          version: "v0.53.0"
+      - name: Validate the exact publication package
+        run: cerbos compile --tests=cerbos/tests cerbos/policies
+      - name: Verify operator publication statement
+        shell: bash
+        env:
+          RECEIPT: ${{ inputs.receipt }}
+          SIGNATURE: ${{ inputs.signature }}
+          PUBLIC_KEY: ${{ vars.CERBOS_PUBLICATION_PUBLIC_KEY_PEM }}
+          PDP_ENDPOINT: ${{ vars.CERBOS_PUBLICATION_PDP_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          test -n "$RECEIPT" && test -n "$SIGNATURE" && test -n "$PUBLIC_KEY" && test -n "$PDP_ENDPOINT"
+          mkdir -p artifacts/cerbos-publication
+          printf '%s' "$RECEIPT" > artifacts/cerbos-publication/receipt.json
+          printf '%s' "$SIGNATURE" | base64 --decode > artifacts/cerbos-publication/receipt.sig
+          printf '%s' "$PUBLIC_KEY" > "$RUNNER_TEMP/cerbos-publication-public.pem"
+          dotnet run .ci/scripts/verify-cerbos-publication.cs -- \
+            artifacts/cerbos-publication/receipt.json artifacts/cerbos-publication/receipt.sig \
+            "$RUNNER_TEMP/cerbos-publication-public.pem" "$GITHUB_SHA" production \
+            "$PDP_ENDPOINT" cerbos/policies
+      - name: Retain authenticated publication receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cerbos-publication-receipt
+          path: artifacts/cerbos-publication/*
+          if-no-files-found: error
+          retention-days: 90

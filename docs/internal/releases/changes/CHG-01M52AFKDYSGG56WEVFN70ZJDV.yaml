@@ -1,0 +1,31 @@
+Change-Id: CHG-01M52AFKDYSGG56WEVFN70ZJDV
+Title: "Separate email retention discovery from tenant redaction authority"
+Type: fix
+Scope: access
+Summary: "Discover bounded tenant identities through independent Global authority and redact each tenant's email graph through a fresh Runtime lease and one transaction."
+Group: email-retention-tenant-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Install the PostgreSQL email-retention discovery capability before enabling cleanup.
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Deny Global private email content and require original tenant selection plus transactional redaction of all four relations.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Install bounded tenant-identity discovery after forced RLS with the declared native queue enrollment.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/communications-and-notifications/email-smtp.md
+    Disposition: documented
+    Detail: Cleanup failures retain aggregate counts and a fixed failure category, never exception type, recipient details or provider text.

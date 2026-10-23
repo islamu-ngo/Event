@@ -64,22 +64,18 @@ public sealed class EmailDispatchHealthCheck(
         var now = DateTime.UtcNow;
         var processingStartedBefore = now.AddSeconds(-settings.ProcessingLeaseTimeoutSeconds);
         await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IEmailDispatchOutboxRepository>();
-        var dueDispatchCount = await repository.CountDueDispatchAsync(now, cancellationToken);
-        var retryScheduledCount = await repository.CountRetryScheduledAsync(cancellationToken);
-        var staleProcessingCount = await repository.CountStaleProcessingAsync(
-            processingStartedBefore,
-            cancellationToken);
-        var deadLetteredCount = await repository.CountDeadLetteredAsync(cancellationToken);
-        var unknownCount = await repository.CountUnknownAsync(cancellationToken);
-        var parkedCount = await repository.CountParkedAsync(cancellationToken);
-        var optionalReminderDeferralActive = await repository.IsOptionalReminderDeferralActiveAsync(cancellationToken);
-        var processorState = await repository.GetProcessorState(cancellationToken);
-        var oldestDueCreatedAt = await repository.GetOldestDueCreatedAtAsync(now, cancellationToken);
-        var tenantBacklog = await repository.CountDueDispatchByTenantAsync(
-            now,
-            settings.HealthTenantSampleLimit,
-            cancellationToken);
+        var reader = scope.ServiceProvider.GetRequiredService<IEmailDispatchHealthSnapshotReader>();
+        var snapshot = await reader.ReadAsync(
+            now, processingStartedBefore, settings.HealthTenantSampleLimit, cancellationToken);
+        var dueDispatchCount = snapshot.DueDispatchCount;
+        var retryScheduledCount = snapshot.RetryScheduledCount;
+        var staleProcessingCount = snapshot.StaleProcessingCount;
+        var deadLetteredCount = snapshot.DeadLetteredCount;
+        var unknownCount = snapshot.UnknownCount;
+        var parkedCount = snapshot.ParkedCount;
+        var optionalReminderDeferralActive = snapshot.OptionalReminderDeferralActive;
+        var oldestDueCreatedAt = snapshot.OldestDueCreatedAt;
+        var tenantBacklog = snapshot.TenantBacklogSample;
         var oldestPendingAgeSeconds = oldestDueCreatedAt is null
             ? 0d
             : Math.Max(0d, (now - oldestDueCreatedAt.Value).TotalSeconds);
@@ -91,8 +87,8 @@ public sealed class EmailDispatchHealthCheck(
         data["unknownCount"] = unknownCount;
         data["parkedCount"] = parkedCount;
         data["optionalReminderDeferralActive"] = optionalReminderDeferralActive;
-        data["globalPaused"] = processorState?.IsPaused == true;
-        data["globalSmtpRateLimitOverrideActive"] = processorState?.GlobalSmtpRateLimitPerMinuteOverride.HasValue == true;
+        data["globalPaused"] = snapshot.GlobalPaused;
+        data["globalSmtpRateLimitOverrideActive"] = snapshot.GlobalSmtpRateLimitOverrideActive;
         data["processingStartedBefore"] = processingStartedBefore;
         data["oldestActivePendingAgeSeconds"] = oldestPendingAgeSeconds;
         data["tenantBacklogSample"] = tenantBacklog;
@@ -107,7 +103,7 @@ public sealed class EmailDispatchHealthCheck(
             metrics.RecordEmailDispatchTenantBacklog(++sampleRank, count);
         }
 
-        if (processorState?.IsPaused == true)
+        if (snapshot.GlobalPaused)
         {
             return HealthCheckResult.Degraded(
                 "Basic email dispatch is paused by an instance operator.",

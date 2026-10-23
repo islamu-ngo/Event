@@ -16,7 +16,8 @@ public sealed class RevokeEventRoleAssignmentCommandHandler
 {
     private readonly IEventRoleAssignmentRepository _assignmentRepository;
     private readonly IEventRepository _eventRepository;
-    private readonly IEventRoleAuthorityCeilingService _authorityCeilingService;
+    private readonly IHumanEventTeamActionPreparation _preparation;
+    private readonly ISerializableAttemptOwner _owner;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly BusinessMetrics _metrics;
     private readonly ILogger<RevokeEventRoleAssignmentCommandHandler> _logger;
@@ -24,20 +25,33 @@ public sealed class RevokeEventRoleAssignmentCommandHandler
     public RevokeEventRoleAssignmentCommandHandler(
         IEventRoleAssignmentRepository assignmentRepository,
         IEventRepository eventRepository,
-        IEventRoleAuthorityCeilingService authorityCeilingService,
+        IHumanEventTeamActionPreparation preparation,
+        ISerializableAttemptOwner owner,
         IAuditLogRepository auditLogRepository,
         BusinessMetrics metrics,
         ILogger<RevokeEventRoleAssignmentCommandHandler> logger)
     {
         _assignmentRepository = assignmentRepository;
         _eventRepository = eventRepository;
-        _authorityCeilingService = authorityCeilingService;
+        _preparation = preparation;
+        _owner = owner;
         _auditLogRepository = auditLogRepository;
         _metrics = metrics;
         _logger = logger;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RevokeEventRoleAssignmentCommand request, CancellationToken cancellationToken = default)
+    {
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        return await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, token);
+            return await ExecuteBodyAsync(request, prepared);
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(RevokeEventRoleAssignmentCommand request,
+        IPreparedHumanEventTeamAction prepared)
     {
         var assignment = await _assignmentRepository.GetById(request.AssignmentId);
         if (assignment is null || assignment.TenantId != request.TenantId || assignment.EventId != request.EventId)
@@ -55,13 +69,7 @@ public sealed class RevokeEventRoleAssignmentCommandHandler
         {
             _metrics.RecordEventRoleAssignmentChanged("revoke", "denied", RoleCodeFor(assignment.RoleId));
             _logger.LogWarning(
-                "Event role assignment revoke denied TenantId={TenantId} EventId={EventId} AssignmentId={AssignmentId} TargetUserId={TargetUserId} RoleId={RoleId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
-                request.TenantId,
-                request.EventId,
-                assignment.Id,
-                assignment.UserId,
-                assignment.RoleId,
-                request.ActorUserId,
+                "Event role assignment revoke denied: {DenyReason}",
                 "event_owner_transfer_required");
             await WriteAuditAsync(
                 _auditLogRepository,
@@ -91,20 +99,13 @@ public sealed class RevokeEventRoleAssignmentCommandHandler
                 assignment.Id);
         }
 
-        var authority = await _authorityCeilingService.CanAssignRoleAsync(
-            request.TenantId, request.EventId, request.ActorUserId, assignment.RoleId, cancellationToken);
+        var authority = prepared.CanAssignRole(assignment.RoleId);
 
         if (!authority.IsAllowed)
         {
             _metrics.RecordEventRoleAssignmentChanged("revoke", "denied", RoleCodeFor(assignment.RoleId));
             _logger.LogWarning(
-                "Event role assignment revoke denied TenantId={TenantId} EventId={EventId} AssignmentId={AssignmentId} TargetUserId={TargetUserId} RoleId={RoleId} ActorUserId={ActorUserId} DenyReason={DenyReason}",
-                request.TenantId,
-                request.EventId,
-                assignment.Id,
-                assignment.UserId,
-                assignment.RoleId,
-                request.ActorUserId,
+                "Event role assignment revoke denied DenyReason={DenyReason}",
                 authority.FailureCode ?? EventRoleAuthorityFailureCodes.AuthorityMissing);
             await WriteAuditAsync(
                 _auditLogRepository,
@@ -133,17 +134,11 @@ public sealed class RevokeEventRoleAssignmentCommandHandler
 
         var previousStatus = assignment.Status;
         var previousVersion = assignment.Version;
-        assignment.Revoke(request.ActorUserId, DateTime.UtcNow);
+        assignment.Revoke(request.ActorUserId, prepared.ChangedAt);
         await _assignmentRepository.Update(assignment);
         _metrics.RecordEventRoleAssignmentChanged("revoke", "allowed", RoleCodeFor(assignment.RoleId));
         _logger.LogInformation(
-            "Event role assignment revoked TenantId={TenantId} EventId={EventId} AssignmentId={AssignmentId} TargetUserId={TargetUserId} RoleId={RoleId} ActorUserId={ActorUserId} PreviousStatus={PreviousStatus} NewStatus={NewStatus}",
-            assignment.TenantId,
-            assignment.EventId,
-            assignment.Id,
-            assignment.UserId,
-            assignment.RoleId,
-            request.ActorUserId,
+            "Event role assignment revoked PreviousStatus={PreviousStatus} NewStatus={NewStatus}",
             previousStatus,
             assignment.Status);
         await WriteAuditAsync(
@@ -173,6 +168,7 @@ public sealed class RevokeEventRoleAssignmentCommandHandler
             },
             affectedColumns: new[] { nameof(EventRoleAssignment.Status), nameof(EventRoleAssignment.RevokedAtUtc), nameof(EventRoleAssignment.RevokedByUserId) });
 
+        prepared.Complete(assignment.Id);
         return Success(assignment.Id, "Event role assignment revoked successfully.");
     }
 }

@@ -8,5 +8,7 @@ public sealed record SecretOwnershipDto
     public string Description { get; init; } = "Stored securely by the platform and editable from Admin UI.";
     public bool Editable { get; init; } = true;
     public bool Configured { get; init; }
+    /// <summary>Bounded selected-authority outcome when the owning capability reports one.</summary>
+    public string? ResolutionStatus { get; init; }
     public bool BootstrapAvailable { get; init; }
 }

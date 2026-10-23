@@ -1,9 +1,8 @@
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
-using Explore.Application.Settings;
-using Explore.Application.Settings.Groups;
 using Explore.Application.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -46,10 +45,10 @@ public sealed class AiRetentionCleanupService(
                 {
                     throw;
                 }
-                catch (Exception exception)
+                catch (Exception)
                 {
                     aggregate.AddFailure();
-                    logger.LogWarning(exception, "AI retention cleanup failed for one tenant during aggregate pass.");
+                    logger.LogWarning("AI retention cleanup failed for one tenant during aggregate pass.");
                 }
             }
 
@@ -83,20 +82,9 @@ public sealed class AiRetentionCleanupService(
 
         try
         {
-            var settingsResolver = tenantScope.ServiceProvider.GetRequiredService<IHierarchicalSettingsResolver>();
-            var conversationRepository = tenantScope.ServiceProvider.GetRequiredService<IAiConversationRepository>();
-            var aiSettings = await settingsResolver.ResolveGroupAsync<AiAssistantSettingGroup>(
-                new SettingContext(TenantId: tenantId),
-                cancellationToken);
-            var retentionDays = Math.Max(1, aiSettings.RetentionDays);
-            var cutoffUtc = utcNow.AddDays(-retentionDays);
-
-            return await conversationRepository.RedactExpiredConversationsAsync(
-                cutoffUtc,
-                retentionDays,
-                utcNow,
-                _settings.DryRun,
-                cancellationToken);
+            return await tenantScope.ServiceProvider
+                .GetRequiredService<ICommandHandler<RunAiRetentionCleanupCommand, AiRetentionCleanupResult>>()
+                .ExecuteAsync(new() { UtcNow = utcNow, DryRun = _settings.DryRun }, cancellationToken);
         }
         finally
         {

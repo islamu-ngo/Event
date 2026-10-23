@@ -1,12 +1,13 @@
 using Explore.API.BackgroundServices;
 using Explore.API.Extensions;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Operations;
 using Explore.Persistence;
 using Explore.Persistence.Schema;
-using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
-using Explore.Infrastructure.ConfigurationManifest;
+using Explore.Secrets.Database;
+using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Infrastructure.Services;
 using Explore.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
@@ -72,37 +73,26 @@ public static class ApiHostStartupExtensions
                 if (app.Environment.IsDevelopment() && state.OwnsDevelopmentMigrations)
                 {
                     var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-                    var startupSequence = scope.ServiceProvider
-                        .GetRequiredService<IConfigurationManifestPostMigrationSequence>();
-                    await startupSequence.RunAsync(
-                        async cancellationToken =>
+                    async Task MigrateAndSeedAsync(CancellationToken cancellationToken)
+                    {
+                        var seedDevelopmentData =
+                            !app.Configuration.GetValue<bool>(
+                                "Testing:DisableDevelopmentDataSeed");
+                        if (db.Database.IsRelational())
                         {
-                            if (db.Database.IsRelational())
-                            {
-                                logger.LogInformation("Applying database migrations...");
-                                await ExploreDatabaseMigrator.MigrateAsync(
-                                    db,
-                                    app.Configuration,
-                                    cancellationToken);
-                                await PostgresModelConstraintApplier.ApplyAsync(
-                                    db,
-                                    cancellationToken);
-                                await PostgresTenantRowLevelSecurityModel.ApplyAsync(
-                                    db,
-                                    cancellationToken);
-                                logger.LogInformation(
-                                    "Database migrations completed successfully.");
-                            }
-                            else
-                            {
-                                logger.LogInformation(
-                                    "Skipping database migrations because provider {ProviderName} is non-relational.",
-                                    db.Database.ProviderName ?? "(unknown)");
-                            }
-
-                            var seedDevelopmentData =
-                                !app.Configuration.GetValue<bool>(
-                                    "Testing:DisableDevelopmentDataSeed");
+                            await ExploreDatabaseMigrator.MigrateAndSeedAsync(
+                                app.Environment,
+                                app.Configuration,
+                                PrimaryDatabaseConfiguration.BindMigrator(app.Configuration),
+                                logger,
+                                seedDevelopmentData,
+                                cancellationToken);
+                        }
+                        else
+                        {
+                            logger.LogInformation(
+                                "Skipping database migrations because provider {ProviderName} is non-relational.",
+                                db.Database.ProviderName ?? "(unknown)");
                             if (agentBrowser)
                                 await LookupTableSeeder.SeedAsync(db, cancellationToken);
                             else
@@ -112,9 +102,21 @@ public static class ApiHostStartupExtensions
                                     seedDevelopmentData,
                                     app.Configuration,
                                     cancellationToken);
-                            logger.LogInformation("Database seeding completed.");
-                        },
-                        shutdownCts.Token);
+                        }
+                        logger.LogInformation("Database seeding completed.");
+                    }
+                    if (state.OwnsConfigurationManifestStartup)
+                        await scope.ServiceProvider.GetRequiredService<IConfigurationManifestPostMigrationSequence>()
+                            .RunAsync(MigrateAndSeedAsync, shutdownCts.Token);
+                    else
+                        await MigrateAndSeedAsync(shutdownCts.Token);
+                }
+                else if (state.OwnsConfigurationManifestStartup)
+                {
+                    // Split orchestration has completed migration before starting this host.
+                    // Bootstrap selects this host's Global owner, never MigrationService's connector.
+                    await scope.ServiceProvider.GetRequiredService<IConfigurationManifestStartupRunner>()
+                        .RunAsync(shutdownCts.Token);
                 }
                 else
                 {
@@ -129,9 +131,9 @@ public static class ApiHostStartupExtensions
                     logger.LogInformation("Quartz scheduler schema applied successfully.");
                 }
             }
-            catch (Exception exception)
+            catch (Exception)
             {
-                logger.LogCritical(exception, "Database migration failed. Application cannot start.");
+                logger.LogCritical("Database initialization failed. Application cannot start.");
                 throw;
             }
         }
@@ -141,7 +143,7 @@ public static class ApiHostStartupExtensions
 
         if (!agentBrowser && !app.Environment.IsEnvironment("Testing") &&
             !state.IsOpenApiGeneration &&
-            state.OwnsDevelopmentMigrations)
+            state.OwnsConfigurationManifestStartup)
         {
             await app.PrepareConfiguredAdministratorBootstrapAsync(shutdownCts.Token);
         }
@@ -173,9 +175,7 @@ public static class ApiHostStartupExtensions
                     if (setupSecretProvider.GeneratedSecretFilePath is not null)
                     {
                         app.Logger.LogWarning(
-                            "[SetupMode] Instance is unclaimed. Retrieve the generated setup secret from the Docker host with: " +
-                            "docker cp <container-name>:{SetupSecretFilePath} ./setup-secret",
-                            setupSecretProvider.GeneratedSecretFilePath);
+                            "[SetupMode] Instance is unclaimed. Retrieve the generated setup secret through the documented host-file procedure.");
                     }
                     else
                     {
@@ -200,13 +200,16 @@ public static class ApiHostStartupExtensions
         ArgumentNullException.ThrowIfNull(app);
 
         await using var scope = app.Services.CreateAsyncScope();
+        await using var selected = await scope.ServiceProvider
+            .GetRequiredService<IPolicyMutationExecutionScopeFactory>()
+            .CreateAsync(PolicyMutationScope.Instance, cancellationToken);
         var provider = ActivatorUtilities.CreateInstance<
-            ConfiguredAdministratorBootstrapProvider>(scope.ServiceProvider);
+            ConfiguredAdministratorBootstrapProvider>(selected.Services);
         var runner = ActivatorUtilities.CreateInstance<
             ConfiguredAdministratorBootstrapStartupRunner>(
-                scope.ServiceProvider,
+                selected.Services,
                 provider);
         await runner.PrepareAsync(cancellationToken);
-        await scope.ServiceProvider.GetRequiredService<LocalAdministratorBootstrapRunner>().RunAsync(cancellationToken);
+        await selected.Services.GetRequiredService<LocalAdministratorBootstrapRunner>().RunAsync(cancellationToken);
     }
 }

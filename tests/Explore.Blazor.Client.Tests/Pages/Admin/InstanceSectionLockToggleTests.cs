@@ -18,7 +18,6 @@ public class InstanceSectionLockToggleTests : IDisposable
             .Returns(new HalResourceOfInstanceSmtpSettingsDto { DeliveryEnabled = false });
         _ctx.AddMockService<IInstanceOnboardingService>();
         _tenantOnboardingService = _ctx.AddMockService<ITenantOnboardingService>();
-        _ctx.AddMockService<ITenantOnboardingService>();
     }
 
     public void Dispose() => _ctx.Dispose();
@@ -223,6 +222,36 @@ public class InstanceSectionLockToggleTests : IDisposable
     }
 
     [Test]
+    public async Task AiSection_DisabledOfficialProviderCanBeConfiguredOnlyWithInstanceReference()
+    {
+        AiAssistantProviderConfigurationWriteDto? captured = null;
+        var model = new AiAssistantGovernanceSettingsDto
+        {
+            Enabled = false,
+            Provider = "anthropic",
+            CredentialScope = "none",
+            ModelId = "model-a"
+        };
+        var cut = _ctx.RenderMudComponent<InstanceAiSection>(parameters => parameters
+            .Add(component => component.AiAssistant, model)
+            .Add(component => component.SaveAiProviderConfigurationAsync, patch =>
+            {
+                captured = patch;
+                return Task.FromResult(new BaseCommandResponseOfGuid { Success = true });
+            }));
+        await Assert.That(cut.FindAll("button").Single(button =>
+            button.TextContent.Contains("Save provider configuration", StringComparison.Ordinal)).HasAttribute("disabled")).IsTrue();
+        var scope = cut.FindComponents<MudSelect<string>>().Single(field => field.Instance.Label == "Credential scope");
+        await cut.InvokeAsync(() => scope.Instance.ValueChanged.InvokeAsync("instance"));
+        await cut.FindAll("button").Single(button =>
+            button.TextContent.Contains("Save provider configuration", StringComparison.Ordinal)).ClickAsync(new());
+        await Assert.That(captured).IsNotNull();
+        await Assert.That(captured!.CredentialScope).IsEqualTo("instance");
+        await Assert.That(model.Enabled).IsFalse();
+        await Assert.That(cut.FindAll("input[type='password']")).IsEmpty();
+    }
+
+    [Test]
     public async Task AiSection_ProviderFieldsRemainExplicitAndSaveAsOneCoupledPatch()
     {
         AiAssistantProviderConfigurationWriteDto? captured = null;
@@ -231,6 +260,7 @@ public class InstanceSectionLockToggleTests : IDisposable
             Enabled = true,
             Provider = "openai-compatible",
             EndpointUrl = "https://ai.example.test/v1",
+            CredentialScope = "none",
             ModelId = "model-a",
             AllowedModelIds = ["model-a", "model-b"]
         };
@@ -245,16 +275,17 @@ public class InstanceSectionLockToggleTests : IDisposable
             }));
 
         await Assert.That(captured).IsNull();
-        var apiKeyField = cut.FindComponents<MudTextField<string>>().Single(field =>
-            field.Instance.Label?.Contains("API key", StringComparison.Ordinal) == true);
-        await cut.InvokeAsync(() => apiKeyField.Instance.ValueChanged.InvokeAsync("replacement-key"));
-        cut.FindAll("button").Single(button =>
-            button.TextContent.Contains("Save provider configuration", StringComparison.Ordinal)).Click();
+        await Assert.That(cut.FindAll("input[type='password']")).IsEmpty();
+        var credentialField = cut.FindComponents<MudSelect<string>>().Single(field =>
+            field.Instance.Label == "Credential scope");
+        await cut.InvokeAsync(() => credentialField.Instance.ValueChanged.InvokeAsync("instance"));
+        await cut.FindAll("button").Single(button =>
+            button.TextContent.Contains("Save provider configuration", StringComparison.Ordinal)).ClickAsync(new());
 
         await Assert.That(captured).IsNotNull();
         await Assert.That(captured!.Provider).IsEqualTo("openai-compatible");
         await Assert.That(captured.EndpointUrl).IsEqualTo("https://ai.example.test/v1");
-        await Assert.That(captured.ApiKey).IsEqualTo("replacement-key");
+        await Assert.That(captured.CredentialScope).IsEqualTo("instance");
         await Assert.That(captured.ModelId).IsEqualTo("model-a");
         await Assert.That(captured.AllowedModelIds).IsEquivalentTo(["model-a", "model-b"]);
         await Assert.That(cut.Find("[role='status']").TextContent).Contains("AI provider configuration saved.", StringComparison.Ordinal);
@@ -306,39 +337,44 @@ public class InstanceSectionLockToggleTests : IDisposable
     }
 
     [Test]
-    public async Task AiSection_EndpointChangeIgnoresStaleModelDiscoveryResponse()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AiSection_ConfigurationChangeIgnoresStaleModelDiscoveryResponse(bool changeCredentialScope)
     {
         var response = new TaskCompletionSource<IReadOnlyList<AiAssistantModelDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _tenantOnboardingService.GetAiModelsAsync("https://first.example.test/v1", string.Empty)
+        _tenantOnboardingService.GetAiModelsAsync("https://first.example.test/v1", "none", AiModelDiscoveryScope.Instance)
             .Returns(response.Task);
         var model = new AiAssistantGovernanceSettingsDto
         {
             Enabled = true,
+            Provider = "openai-compatible",
+            CredentialScope = "none",
             EndpointUrl = "https://first.example.test/v1"
         };
         var cut = _ctx.RenderMudComponent<InstanceAiSection>(parameters => parameters
             .Add(component => component.AiAssistant, model)
             .Add(component => component.SaveAiAssistantAsync, _ =>
                 Task.FromResult(new BaseCommandResponseOfGuid { Success = true })));
-        cut.FindAll("button").Single(button =>
-            button.TextContent.Contains("Load models", StringComparison.Ordinal)).Click();
-        var endpointField = cut.FindComponents<MudTextField<string>>()
-            .Single(field => field.Instance.Label == "Endpoint URL");
-
-        await cut.InvokeAsync(() => endpointField.Instance.ValueChanged.InvokeAsync("https://second.example.test/v1"));
-        response.SetResult([new AiAssistantModelDto { Id = "stale-model" }]);
-        cut.WaitForAssertion(() =>
+        Task discovery = cut.FindAll("button").Single(button =>
+            button.TextContent.Contains("Load models", StringComparison.Ordinal)).ClickAsync(new());
+        if (changeCredentialScope)
         {
-            var loadButton = cut.FindAll("button").Single(button =>
-                button.TextContent.Contains("Load models", StringComparison.Ordinal));
-            if (loadButton.HasAttribute("disabled")
-                || cut.Markup.Contains("stale-model", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException("The stale model-discovery request has not settled safely.");
-            }
-        });
+            var scopeField = cut.FindComponents<MudSelect<string>>()
+                .Single(field => field.Instance.Label == "Credential scope");
+            await cut.InvokeAsync(() => scopeField.Instance.ValueChanged.InvokeAsync("instance"));
+        }
+        else
+        {
+            var endpointField = cut.FindComponents<MudTextField<string>>()
+                .Single(field => field.Instance.Label == "Endpoint URL");
+            await cut.InvokeAsync(() => endpointField.Instance.ValueChanged.InvokeAsync("https://second.example.test/v1"));
+        }
+        response.SetResult([new AiAssistantModelDto { Id = "stale-model" }]);
+        await discovery.WaitAsync(TimeSpan.FromSeconds(10));
 
-        await Assert.That(model.EndpointUrl).IsEqualTo("https://second.example.test/v1");
+        await Assert.That(model.EndpointUrl).IsEqualTo(
+            changeCredentialScope ? "https://first.example.test/v1" : "https://second.example.test/v1");
+        await Assert.That(model.CredentialScope).IsEqualTo(changeCredentialScope ? "instance" : "none");
         await Assert.That(string.IsNullOrEmpty(model.ModelId)).IsTrue();
         await Assert.That(cut.Markup).DoesNotContain("stale-model", StringComparison.Ordinal);
         await Assert.That(cut.FindAll("button").Single(button =>

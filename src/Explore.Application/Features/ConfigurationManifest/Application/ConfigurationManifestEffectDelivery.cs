@@ -5,11 +5,6 @@ using Explore.Domain;
 
 public interface IConfigurationManifestEffectDeliveryStrategy
 {
-    Task CreatePendingAsync(
-        Guid messageId,
-        Guid operationId,
-        DateTime occurredAtUtc);
-
     Task DrainPendingAsync(CancellationToken cancellationToken);
 
     Task DeliverAsync(
@@ -23,15 +18,6 @@ public sealed class ConfigurationManifestEffectDelivery(
     : IConfigurationManifestEffectDeliveryStrategy
 {
     private const int StartupDrainBatchSize = 1_000;
-
-    public async Task CreatePendingAsync(
-        Guid messageId,
-        Guid operationId,
-        DateTime occurredAtUtc) =>
-        await outboxRepository.Create(ConfigurationManifestEffectOutbox.Create(
-            messageId,
-            operationId,
-            occurredAtUtc));
 
     public async Task DrainPendingAsync(CancellationToken cancellationToken)
     {
@@ -84,7 +70,11 @@ public sealed class ConfigurationManifestEffectDelivery(
 
         try
         {
-            await dispatcher.DispatchAsync(message.AggregateId, cancellationToken);
+            OutboxMessage claimed = await outboxRepository.GetByIdAsync(message.Id, cancellationToken)
+                ?? throw new InvalidOperationException("Manifest effect claim was not found.");
+            if (claimed.Status != OutboxMessageStatus.Processing || claimed.NextRetryAt != leaseExpiresAt.Value)
+                throw new InvalidOperationException("Manifest effect claim was replaced.");
+            await dispatcher.DispatchAsync(claimed, cancellationToken);
             bool completed = await outboxRepository.MarkAsCompleted(
                 message.Id,
                 leaseExpiresAt.Value,
@@ -112,19 +102,9 @@ public sealed class ConfigurationManifestEffectDelivery(
     }
 }
 
-public sealed class DeferredConfigurationManifestEffectDelivery(
-    IConfigurationManifestEffectOutboxRepository outboxRepository)
+public sealed class DeferredConfigurationManifestEffectDelivery
     : IConfigurationManifestEffectDeliveryStrategy
 {
-    public async Task CreatePendingAsync(
-        Guid messageId,
-        Guid operationId,
-        DateTime occurredAtUtc) =>
-        await outboxRepository.Create(ConfigurationManifestEffectOutbox.Create(
-            messageId,
-            operationId,
-            occurredAtUtc));
-
     public Task DrainPendingAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M535PTQQCK6B60Q53VSNH9N3
+Title: "Define Unicode scalar boundaries for local credentials"
+Type: feat
+Scope: access
+Summary: "Normalize valid local credentials to NFC with bounded scalar counts while preserving whitespace and case."
+Group: local-password-domain-policy
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Malformed UTF-16 is rejected and credential normalization is bounded before expensive hashing.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: New credential minimum and existing-credential verification semantics require production request and hashing integration.

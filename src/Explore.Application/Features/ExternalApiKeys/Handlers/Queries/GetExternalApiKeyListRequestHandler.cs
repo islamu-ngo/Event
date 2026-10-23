@@ -16,19 +16,22 @@ public class GetExternalApiKeyListRequestHandler : IQueryHandler<GetExternalApiK
     private readonly IGroupMemberRepository _groupMemberRepository;
     private readonly IAdminContext _adminContext;
     private readonly IUserContext _userContext;
+    private readonly InstanceApiKeyOperations _instanceOperations;
 
     public GetExternalApiKeyListRequestHandler(
         IExternalApiKeyRepository externalApiKeyRepository,
         IOrganizationMemberRepository organizationMemberRepository,
         IGroupMemberRepository groupMemberRepository,
         IAdminContext adminContext,
-        IUserContext userContext)
+        IUserContext userContext,
+        InstanceApiKeyOperations instanceOperations)
     {
         _externalApiKeyRepository = externalApiKeyRepository;
         _organizationMemberRepository = organizationMemberRepository;
         _groupMemberRepository = groupMemberRepository;
         _adminContext = adminContext;
         _userContext = userContext;
+        _instanceOperations = instanceOperations;
     }
 
     /// <summary>
@@ -68,8 +71,7 @@ public class GetExternalApiKeyListRequestHandler : IQueryHandler<GetExternalApiK
 
         if (await _adminContext.IsInstanceAdminAsync(cancellationToken))
         {
-            visibleKeys.AddRange(await _externalApiKeyRepository.GetByOwnerIgnoringTenantFilter(
-                ExternalApiKeyOwnerType.InstanceAdmin, currentUserId, cancellationToken));
+            visibleKeys.AddRange(await _instanceOperations.ReadAsync(currentUserId, null, cancellationToken));
         }
 
         return visibleKeys

@@ -24,14 +24,36 @@ public sealed class ConfigurationImportSessionManager(
     IConfigurationImportSessionRepository repository,
     IConfigurationImportArtifactStore artifactStore,
     IUnitOfWork unitOfWork,
-    ConfigurationImportPreviewComposer previewComposer)
+    ConfigurationImportPreviewComposer previewComposer,
+    IHumanConfigurationImportAdmission admission)
 {
-    public async Task<ConfigurationImportSessionCreated> CreateAsync(
+    public Task<ConfigurationImportSessionCreated> CreateAsync(
+        IPreparedHumanConfigurationImport preparedOwner,
+        ConfigurationImportTarget target,
+        ReadOnlyMemory<byte> artifact,
+        DateTime occurredAt,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken) =>
+        admission.ExecuteSessionAsync(preparedOwner,
+            CreateOperation(target, artifact, occurredAt, lifetime), cancellationToken);
+
+    internal Task<ConfigurationImportSessionCreated> CreateSetupLiveAsync(
         ConfigurationImportTarget target,
         ReadOnlyMemory<byte> artifact,
         DateTime occurredAt,
         TimeSpan lifetime,
         CancellationToken cancellationToken)
+    {
+        RequireSetupLiveTarget(target);
+        return unitOfWork.ExecuteInTransactionAsync(
+            CreateOperation(target, artifact, occurredAt, lifetime).Execute, cancellationToken);
+    }
+
+    private HumanConfigurationImportSessionOperation<ConfigurationImportSessionCreated> CreateOperation(
+        ConfigurationImportTarget target,
+        ReadOnlyMemory<byte> artifact,
+        DateTime occurredAt,
+        TimeSpan lifetime)
     {
         ArgumentNullException.ThrowIfNull(target);
         ConfigurationImportContractGuard.RequireUtc(occurredAt, nameof(occurredAt));
@@ -46,8 +68,9 @@ public sealed class ConfigurationImportSessionManager(
         string accessToken = IssueAccessToken();
         string accessTokenDigest = DigestToken(accessToken);
         DateTime expiresAt = occurredAt.Add(lifetime);
+        ReadOnlyMemory<byte> capturedArtifact = artifact.ToArray();
 
-        return await unitOfWork.ExecuteInTransactionAsync(
+        return new(target, HumanConfigurationImportSessionOperationKind.Create,
             async token =>
             {
                 ConfigurationImportSession? existing =
@@ -65,7 +88,7 @@ public sealed class ConfigurationImportSessionManager(
                 ConfigurationImportArtifactReference stored =
                     await artifactStore.StoreAsync(
                         handle,
-                        artifact,
+                        capturedArtifact,
                         occurredAt,
                         expiresAt,
                         token);
@@ -81,11 +104,21 @@ public sealed class ConfigurationImportSessionManager(
                 return new ConfigurationImportSessionCreated(
                     session,
                     accessToken);
-            },
-            cancellationToken);
+            });
     }
 
-    public async Task<ConfigurationImportPreview> PreparePreviewAsync(
+    public Task<ConfigurationImportPreview> PreparePreviewAsync(
+        IPreparedHumanConfigurationImport preparedOwner,
+        Guid sessionId,
+        ConfigurationImportTarget target,
+        string accessToken,
+        ConfigurationImportPreviewInput input,
+        DateTime occurredAt,
+        CancellationToken cancellationToken) =>
+        admission.ExecuteSessionAsync(preparedOwner,
+            PreviewOperation(sessionId, target, accessToken, input, occurredAt), cancellationToken);
+
+    internal Task<ConfigurationImportPreview> PrepareSetupLivePreviewAsync(
         Guid sessionId,
         ConfigurationImportTarget target,
         string accessToken,
@@ -93,10 +126,22 @@ public sealed class ConfigurationImportSessionManager(
         DateTime occurredAt,
         CancellationToken cancellationToken)
     {
+        RequireSetupLiveTarget(target);
+        return unitOfWork.ExecuteInTransactionAsync(
+            PreviewOperation(sessionId, target, accessToken, input, occurredAt).Execute, cancellationToken);
+    }
+
+    private HumanConfigurationImportSessionOperation<ConfigurationImportPreview> PreviewOperation(
+        Guid sessionId,
+        ConfigurationImportTarget target,
+        string accessToken,
+        ConfigurationImportPreviewInput input,
+        DateTime occurredAt)
+    {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(input);
         string tokenDigest = DigestToken(accessToken);
-        return await unitOfWork.ExecuteInTransactionAsync(
+        return new(target, HumanConfigurationImportSessionOperationKind.PreparePreview,
             async token =>
             {
                 ConfigurationImportSession session =
@@ -135,21 +180,41 @@ public sealed class ConfigurationImportSessionManager(
                 session.MarkPreviewReady(preview.Binding, occurredAt);
                 await repository.UpdateAsync(session, token);
                 return preview;
-            },
-            cancellationToken);
+            });
     }
 
-    public async Task<ConfigurationImportAuthorizedArtifact>
+    public Task<ConfigurationImportAuthorizedArtifact>
         ReadArtifactForPreviewAsync(
+        IPreparedHumanConfigurationImport preparedOwner,
+        Guid sessionId,
+        ConfigurationImportTarget target,
+        string accessToken,
+        DateTime occurredAt,
+        CancellationToken cancellationToken) =>
+        admission.ExecuteSessionAsync(preparedOwner,
+            ReadArtifactOperation(sessionId, target, accessToken, occurredAt), cancellationToken);
+
+    internal Task<ConfigurationImportAuthorizedArtifact> ReadSetupLiveArtifactAsync(
         Guid sessionId,
         ConfigurationImportTarget target,
         string accessToken,
         DateTime occurredAt,
         CancellationToken cancellationToken)
     {
+        RequireSetupLiveTarget(target);
+        return unitOfWork.ExecuteInTransactionAsync(
+            ReadArtifactOperation(sessionId, target, accessToken, occurredAt).Execute, cancellationToken);
+    }
+
+    private HumanConfigurationImportSessionOperation<ConfigurationImportAuthorizedArtifact> ReadArtifactOperation(
+        Guid sessionId,
+        ConfigurationImportTarget target,
+        string accessToken,
+        DateTime occurredAt)
+    {
         ArgumentNullException.ThrowIfNull(target);
         string tokenDigest = DigestToken(accessToken);
-        return await unitOfWork.ExecuteInTransactionAsync(
+        return new(target, HumanConfigurationImportSessionOperationKind.ReadArtifact,
             async token =>
             {
                 ConfigurationImportSession session =
@@ -176,11 +241,11 @@ public sealed class ConfigurationImportSessionManager(
                     artifact,
                     session.ArtifactDigest,
                     session.ExpiresAt);
-            },
-            cancellationToken);
+            });
     }
 
-    public async Task CancelAsync(
+    public Task CancelAsync(
+        IPreparedHumanConfigurationImport preparedOwner,
         Guid sessionId,
         ConfigurationImportTarget target,
         string accessToken,
@@ -188,7 +253,8 @@ public sealed class ConfigurationImportSessionManager(
         CancellationToken cancellationToken)
     {
         string tokenDigest = DigestToken(accessToken);
-        await unitOfWork.ExecuteInTransactionAsync(
+        return admission.ExecuteSessionAsync(preparedOwner,
+            new HumanConfigurationImportSessionOperation<bool>(target, HumanConfigurationImportSessionOperationKind.Cancel,
             async token =>
             {
                 ConfigurationImportSession session =
@@ -205,15 +271,23 @@ public sealed class ConfigurationImportSessionManager(
                         throw new ConfigurationImportSessionException(
                             ConfigurationImportFailureCodes.TokenInvalid);
                     }
-                    return;
+                    return true;
                 }
 
                 session.AuthorizePreview(target, tokenDigest, occurredAt);
                 session.Cancel(occurredAt);
-                await artifactStore.DeleteAsync(session.Artifact.Handle, token);
                 await repository.UpdateAsync(session, token);
-            },
+                await artifactStore.DeleteAsync(session.Artifact.Handle, token);
+                return true;
+            }),
             cancellationToken);
+    }
+
+    private static void RequireSetupLiveTarget(ConfigurationImportTarget target)
+    {
+        if (target.Scope != ConfigurationImportScope.Tenant
+            || target.GetSessionStorageKey() == target.AuthorityKey)
+            throw new InvalidOperationException("Setup import requires its enrollment-bound target.");
     }
 
     public Task<int> ExpireAsync(
@@ -231,10 +305,10 @@ public sealed class ConfigurationImportSessionManager(
                 foreach (ConfigurationImportSession session in sessions)
                 {
                     session.Expire(occurredAt);
+                    await repository.UpdateAsync(session, token);
                     await artifactStore.DeleteAsync(
                         session.Artifact.Handle,
                         token);
-                    await repository.UpdateAsync(session, token);
                 }
 
                 return sessions.Count;

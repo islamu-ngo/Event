@@ -18,12 +18,6 @@ public class CerbosConfiguration
     /// <summary>Optional Admin API endpoint for policy management (BYO tenants).</summary>
     public string? AdminEndpoint { get; set; }
 
-    /// <summary>Admin API username for basic auth (BYO tenants).</summary>
-    public string? AdminUsername { get; set; }
-
-    /// <summary>Admin API password for basic auth (BYO tenants).</summary>
-    public string? AdminPassword { get; set; }
-
     /// <summary>Whether this config points to the instance's default PDP (not a BYO override).</summary>
     public bool IsInstanceDefault { get; set; }
 }

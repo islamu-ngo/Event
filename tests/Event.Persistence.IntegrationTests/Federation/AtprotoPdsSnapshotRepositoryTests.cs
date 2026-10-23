@@ -23,7 +23,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
     {
         await fixture.ResetAsync();
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime now = DateTime.UtcNow;
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",
@@ -93,7 +93,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
     {
         await fixture.ResetAsync();
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime now = DateTime.UtcNow;
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",
@@ -145,7 +145,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
     {
         await fixture.ResetAsync();
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime now = DateTime.UtcNow;
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",
@@ -203,7 +203,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
     {
         await fixture.ResetAsync();
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime now = DateTime.UtcNow;
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",
@@ -306,7 +306,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         {
             retryContext.EnableTenantFilterBypass("PostgreSQL ATProto snapshot retry test.");
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            bool applied = await new AtprotoJetstreamRepository(retryContext)
+            bool applied = await new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(retryContext))
                 .TryReconcileAsync(request, timeout.Token);
             await Assert.That(applied).IsTrue();
         }
@@ -341,7 +341,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         await using (var cancelledContext = fixture.CreateDbContext(cancelAfterSave))
         {
             cancelledContext.EnableTenantFilterBypass("PostgreSQL ATProto cancelled claim test.");
-            var repository = new AtprotoJetstreamRepository(cancelledContext);
+            var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(cancelledContext));
             bool cancelled = false;
             try
             {
@@ -360,7 +360,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         await using (var freshContext = fixture.CreateDbContext())
         {
             freshContext.EnableTenantFilterBypass("PostgreSQL ATProto fresh claim verification.");
-            var repository = new AtprotoJetstreamRepository(freshContext);
+            var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(freshContext));
             AtprotoJetstreamClaim? freshClaim = await repository.TryClaimAsync(
                 service, "worker-b", now.AddSeconds(1), TimeSpan.FromMinutes(5));
             await Assert.That(freshClaim).IsNotNull();
@@ -427,7 +427,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
             bool cancelled = false;
             try
             {
-                await new AtprotoJetstreamRepository(cancelledContext)
+                await new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(cancelledContext))
                     .TryReconcileAsync(request, cancellation.Token);
             }
             catch (OperationCanceledException)
@@ -450,7 +450,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
             await Assert.That(rolledBack.SourceCursor).IsEqualTo(100);
             await Assert.That(rolledBack.Cid).IsEqualTo(storedRecord.Cid);
             await Assert.That(rolledBackState.Cursor).IsEqualTo(0);
-            bool applied = await new AtprotoJetstreamRepository(freshContext)
+            bool applied = await new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(freshContext))
                 .TryReconcileAsync(request, recovery.Token);
             freshContext.ChangeTracker.Clear();
             AtprotoRecord persisted = await freshContext.AtprotoRecords.AsNoTracking().SingleAsync();
@@ -468,7 +468,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
     {
         await fixture.ResetAsync();
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new AtprotoJetstreamRepository(context);
+        var repository = new AtprotoJetstreamRepository(new AtprotoMaterializationTestFactory(context));
         DateTime now = DateTime.UtcNow;
         AtprotoJetstreamClaim claim = await repository.TryClaimAsync(
             "https://jetstream.example",

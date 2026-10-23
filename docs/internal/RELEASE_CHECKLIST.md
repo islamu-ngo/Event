@@ -11,6 +11,15 @@ ABOUTME: Provides the release documentation contract for self-hostable operators
 
 Use this checklist before tagging or publishing a release. A release is not ready until operators can understand what changed, how to upgrade, how to verify, and how to roll back.
 
+## Complete release-impact metadata
+
+Review complete changed-file metadata, including previous names for renames.
+A large PR must not bypass impact classification or lower its declared file count.
+See [the trusted metadata contract](CI_CD_GOVERNANCE.md#complete-pr-file-metadata).
+A workflow correction on a PR branch does not replace the trusted-base version
+used by `pull_request_target`; arrange an independently reviewed base update
+before relying on its rerun.
+
 ## Release Model
 
 The current release model is manual semantic-version tags plus manually authored GitHub Releases. Version scope and release history are tracked in [semantic_versioning/CHANGELOG.md](semantic_versioning/CHANGELOG.md); release readiness evidence is assembled from this checklist and the retained CI/CD artifacts referenced below.
@@ -80,6 +89,17 @@ success do not establish activation. Use the
 - [ ] Review [adopter help](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md) separately from the entries-only changelog. Keep publication prospective/unverified until these activation gates are evidenced.
 
 ## Release Evidence Bundle
+
+Before candidate verification, retain the selected security workflow's
+`security-execution.v1.json` and every referenced report/log under
+`docs/internal/releases/<version>/`, preserving relative paths. The packet must
+name exact candidate B and both nonzero completed lanes; a no-op or another
+revision's passing run cannot satisfy this gate. Do not commit a sidecar that
+contains its own candidate identity. Archive it with replay evidence.
+The generated candidate manifest binds its exact validated packet digest.
+This first execution gate does not replace supported-provider, non-Testing,
+operator/browser or authenticated-provenance assurance. See
+[Security Verification](SECURITY_VERIFICATION.md).
 
 Before publishing a GitHub Release, download the retained CI/CD artifacts listed in this checklist into a local evidence directory. For governed release-mode bundles, the artifact tree must contain exactly one final authoritative manifest from `verify-tag`:
 

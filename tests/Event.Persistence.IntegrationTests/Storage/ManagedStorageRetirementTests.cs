@@ -1,17 +1,14 @@
 using System.Data.Common;
-using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
-using Explore.Application.Services;
-using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Storage;
 
@@ -280,17 +277,45 @@ public sealed class ManagedStorageRetirementTests(EventResourceFileUploadTests.D
         await Assert.That(await verify.StorageObjects.AnyAsync(row => row.Id == survivingId
             && row.LifecycleState == StorageObjectLifecycleStates.Active)).IsTrue();
         await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(row => row.Id == scope.StorageAId)).IsTrue();
-        using var meter = new Meter(BusinessMetrics.MeterName);
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(meter);
-        var administration = new InstanceStorageSettingService(Substitute.For<ISystemSettingRepository>(),
-            Substitute.For<IStoragePolicyResolver>(), new StorageUsageCounterRepository(verify),
-            new StorageObjectRepository(verify), new EfCoreUnitOfWork(verify), new BusinessMetrics(meterFactory));
-        await administration.RecalculateUsageAsync();
+        // Exercise the existing exact-tenant physical projection, not an invented
+        // human/setup request. Original accounting custody is tested through real tickets.
+        var contexts = new StorageAccountingContexts(database);
+        await using (var accounting = await contexts.CreateDbContextAsync(scope.TenantAId))
+        {
+            await ((ISerializableAttemptOwner)new EfCoreUnitOfWork(accounting)).ExecuteAsync(async token =>
+            {
+                await new StorageUsageCounterRepository(accounting).RecalculateForInstanceStorageAdministrationAsync(
+                    scope.TenantAId, counter.Provider, DateTime.UtcNow, token);
+                return true;
+            });
+        }
         await verify.Entry(counter).ReloadAsync();
         await Assert.That(counter.UsedBytes).IsEqualTo(500L);
         await Assert.That(counter.ObjectCount).IsEqualTo(1L);
     }
+
+    private sealed class StorageAccountingContexts(EventResourceFileUploadTests.Database database)
+        : IGlobalExploreDbContextFactory, ITenantExploreDbContextFactory
+    {
+        public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var context = database.CreateContext();
+            context.ClearTenantFilterBypass();
+            return Task.FromResult(context);
+        }
+
+        public Task<ExploreDbContext> CreateDbContextAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var context = database.CreateContext();
+            context.ClearTenantFilterBypass();
+            context.TenantContext = new StorageTenant(tenantId);
+            return Task.FromResult(context);
+        }
+    }
+
+    private sealed record StorageTenant(Guid TenantId) : ITenantContext;
 
     [Test]
     [Arguments(true)]

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.PrivacyErasure;
@@ -18,7 +19,8 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
     IUnitOfWork unitOfWork,
     PrivacyErasureApplier applier,
     IOptions<PrivacyErasureOptions> options,
-    TimeProvider timeProvider) : IPrivacyErasureService
+    TimeProvider timeProvider,
+    ILocalIdentityEligibilityRevocation localEligibility) : IPrivacyErasureService
 {
     private const int ReplayBatchSize = 100;
     private const int ReceiptByteCount = 32;
@@ -182,12 +184,13 @@ public sealed class RetainedAuthorityPrivacyErasureWorkflow(
                     cancellationToken);
                 if (latest?.AuthoritySequence < intent.AuthoritySequence || latest is null || !covered)
                 {
+                    await using var eligibilityRevocation = await localEligibility.AcquireAsync(intent, cancellationToken);
                     await EnsureFenceForReplayAsync(intent, cancellationToken);
                     PrivacyErasureApplier.PreparedErasure prepared = await applier.PrepareAsync(
                         intent,
                         cancellationToken);
                     PrivacyErasureApplier.AppliedErasure applied = await unitOfWork.ExecuteSerializableAsync(
-                        ct => applier.ApplyInCurrentTransactionAsync(intent, prepared, ct),
+                        ct => applier.ApplyInCurrentTransactionAsync(intent, prepared, authority, ct),
                         cancellationToken);
                     await applier.InvalidateAfterCommitAsync(applied);
                     latest = await checkpointRepository.GetLatestAsync(cancellationToken);

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M549666T8ECKR658S1PZQ5T3
+Title: "Reserve operational and dotted tenant roots"
+Type: fix
+Scope: access
+Summary: "Reject tenant slugs that collide with operational endpoints or dotted asset and metadata filenames."
+Group: reserved-tenant-roots
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Keep tenant roots distinct from operational endpoints and generated asset filenames.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Choose distinct hyphen-separated tenant slugs; existing tenants are not automatically renamed.

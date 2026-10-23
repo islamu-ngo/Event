@@ -1,10 +1,8 @@
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;
 using Explore.Application.Settings;
 using Explore.Application.Utilities;
 using Explore.Domain.Constants;
-using Explore.Domain.Secrets;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -29,7 +27,6 @@ public class CerbosConfigResolver : ICerbosConfigResolver
     private readonly ICerbosClientFactory _clientFactory;
     private readonly CerbosSettings _instanceSettings;
     private readonly ILogger<CerbosConfigResolver> _logger;
-    private readonly ISecretResolver _secretResolver;
 
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(5);
     private const string CacheKeyPrefix = "CerbosConfig:";
@@ -41,7 +38,6 @@ public class CerbosConfigResolver : ICerbosConfigResolver
         CerbosConfigCacheRegistry cacheRegistry,
         ICerbosClientFactory clientFactory,
         IOptions<CerbosSettings> instanceSettings,
-        ISecretResolver secretResolver,
         ILogger<CerbosConfigResolver> logger)
     {
         _resolver = resolver;
@@ -50,7 +46,6 @@ public class CerbosConfigResolver : ICerbosConfigResolver
         _cacheRegistry = cacheRegistry;
         _clientFactory = clientFactory;
         _instanceSettings = instanceSettings.Value;
-        _secretResolver = secretResolver;
         _logger = logger;
     }
 
@@ -84,7 +79,7 @@ public class CerbosConfigResolver : ICerbosConfigResolver
             if (_cacheRegistry.Untrack(tenantId.Value, out var endpoint))
                 _clientFactory.Evict(endpoint);
 
-            _logger.LogInformation("Cerbos config cache invalidated for tenant {TenantId}", tenantId.Value);
+            _logger.LogInformation("Current tenant Cerbos config cache invalidated");
         }
         else
         {
@@ -129,20 +124,11 @@ public class CerbosConfigResolver : ICerbosConfigResolver
         // an explicitly configured Admin API target while runtime authorization still fails closed.
         var adminEndpoint = await _resolver.ResolveAsync<string>(
             GovernanceSettingKeys.Cerbos.CustomAdminEndpoint, ctx, cancellationToken);
-        var adminUsername = await ResolveOptionalSecretAsync(
-            SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername,
-            tenantId,
-            cancellationToken);
-        var adminPassword = await ResolveOptionalSecretAsync(
-            SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword,
-            tenantId,
-            cancellationToken);
 
         if (string.IsNullOrWhiteSpace(customEndpoint))
         {
             _logger.LogWarning(
-                "Tenant {TenantId} has cerbos.mode=custom_endpoint but no custom endpoint configured. Runtime authorization fails closed for this tenant",
-                tenantId);
+                "Custom Cerbos mode has no configured endpoint; runtime authorization fails closed");
 
             return new CerbosConfiguration
             {
@@ -151,13 +137,11 @@ public class CerbosConfigResolver : ICerbosConfigResolver
                 AdminEndpoint = string.IsNullOrWhiteSpace(adminEndpoint)
                     ? null
                     : GrpcEndpointNormalizer.Normalize(adminEndpoint),
-                AdminUsername = string.IsNullOrWhiteSpace(adminUsername) ? null : adminUsername,
-                AdminPassword = string.IsNullOrWhiteSpace(adminPassword) ? null : adminPassword,
                 IsInstanceDefault = false
             };
         }
 
-        _logger.LogDebug("Resolved BYO Cerbos for tenant {TenantId}", tenantId);
+        _logger.LogDebug("Resolved BYO Cerbos for current tenant");
 
         return new CerbosConfiguration
         {
@@ -166,8 +150,6 @@ public class CerbosConfigResolver : ICerbosConfigResolver
             AdminEndpoint = string.IsNullOrWhiteSpace(adminEndpoint)
                 ? null
                 : GrpcEndpointNormalizer.Normalize(adminEndpoint),
-            AdminUsername = string.IsNullOrWhiteSpace(adminUsername) ? null : adminUsername,
-            AdminPassword = string.IsNullOrWhiteSpace(adminPassword) ? null : adminPassword,
             IsInstanceDefault = false
         };
     }
@@ -179,23 +161,6 @@ public class CerbosConfigResolver : ICerbosConfigResolver
             Endpoint = GrpcEndpointNormalizer.Normalize(_instanceSettings.GrpcEndpoint),
             Mode = CerbosMode.Instance,
             IsInstanceDefault = true
-        };
-    }
-
-    private async Task<string?> ResolveOptionalSecretAsync(
-        string settingKey,
-        Guid tenantId,
-        CancellationToken cancellationToken)
-    {
-        SecretResolutionResult result = await _secretResolver.ResolveAsync(
-            settingKey,
-            tenantId,
-            cancellationToken);
-        return result.Status switch
-        {
-            SecretResolutionStatus.Resolved => result.Value,
-            SecretResolutionStatus.Unconfigured => null,
-            _ => throw new InvalidOperationException("cerbos_admin_secret_unavailable")
         };
     }
 

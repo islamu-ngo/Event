@@ -28,6 +28,10 @@ public sealed record PaidCheckoutActivationResult(
 public interface IPaidCheckoutActivationService
 {
     Task<PaidCheckoutActivationResult> EvaluateSaleControlAsync(
+        Guid tenantId, Guid eventId, PaidCheckoutSaleControl? tenantControl,
+        PaidCheckoutSaleControl? eventControl, CancellationToken cancellationToken);
+
+    Task<PaidCheckoutActivationResult> EvaluateSaleControlAsync(
         Guid tenantId,
         Guid eventId,
         CancellationToken cancellationToken);
@@ -48,9 +52,31 @@ public sealed class PaidCheckoutActivationService(
     private readonly ITenantDirectoryOperatorReadinessEvaluator _directoryOperatorReadiness =
         directoryOperatorReadiness;
 
-    public async Task<PaidCheckoutActivationResult> EvaluateSaleControlAsync(
+    public Task<PaidCheckoutActivationResult> EvaluateSaleControlAsync(
         Guid tenantId,
         Guid eventId,
+        CancellationToken cancellationToken) =>
+        EvaluateSaleControlCoreAsync(tenantId, async token =>
+        {
+            var global = await repository.GetSaleControlAsync(tenantId, null, false, token);
+            var local = global is null ? null : await repository.GetSaleControlAsync(tenantId, eventId, false, token);
+            return (global, local);
+        }, cancellationToken);
+
+    public Task<PaidCheckoutActivationResult> EvaluateSaleControlAsync(
+        Guid tenantId, Guid eventId, PaidCheckoutSaleControl? tenantControl,
+        PaidCheckoutSaleControl? eventControl, CancellationToken cancellationToken)
+    {
+        if (tenantControl is not null && (tenantControl.TenantId != tenantId || tenantControl.EventId is not null)
+            || eventControl is not null && (eventControl.TenantId != tenantId || eventControl.EventId != eventId))
+            throw new UnauthorizedAccessException("Sale controls must belong to the exact admitted registration read.");
+        return EvaluateSaleControlCoreAsync(tenantId,
+            _ => Task.FromResult((tenantControl, eventControl)), cancellationToken);
+    }
+
+    private async Task<PaidCheckoutActivationResult> EvaluateSaleControlCoreAsync(
+        Guid tenantId,
+        Func<CancellationToken, Task<(PaidCheckoutSaleControl? Tenant, PaidCheckoutSaleControl? Event)>> readControls,
         CancellationToken cancellationToken)
     {
         InstanceOperatorIdentityReadinessAssessment instanceIdentity =
@@ -78,13 +104,12 @@ public sealed class PaidCheckoutActivationService(
         {
             return PaidCheckoutActivationResult.Failure("payment_operator_inactive", "The instance operator has not activated new paid sales.");
         }
-        PaidCheckoutSaleControl? global = await repository.GetSaleControlAsync(tenantId, null, false, cancellationToken);
+        var (global, eventControl) = await readControls(cancellationToken);
         if (global is null)
         {
             return PaidCheckoutActivationResult.Failure(
                 "paid_sale_control_uninitialized", "The tenant-wide paid-sale control has not been activated.");
         }
-        PaidCheckoutSaleControl? eventControl = await repository.GetSaleControlAsync(tenantId, eventId, false, cancellationToken);
         return global.IsStopped || eventControl?.IsStopped == true
             ? PaidCheckoutActivationResult.Failure("paid_sale_stopped", "New paid sales are temporarily stopped.")
             : new PaidCheckoutActivationResult(true, null, "Paid sales are active from durable sale controls.");

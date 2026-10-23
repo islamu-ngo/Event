@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,9 +49,9 @@ public sealed class NotificationFanoutProcessor(
             {
                 break;
             }
-            catch (Exception exception)
+            catch (Exception)
             {
-                logger.LogError(exception, "Notification fanout processor round failed");
+                logger.LogError("Notification fanout processor round failed");
             }
 
             await Task.Delay(
@@ -68,7 +69,7 @@ public sealed class NotificationFanoutProcessor(
         NotificationFanoutClaimRoundResult claimRound;
         await using (AsyncServiceScope claimScope = scopeFactory.CreateAsyncScope())
         {
-            var repository = claimScope.ServiceProvider.GetRequiredService<INotificationFanoutRunRepository>();
+            var repository = claimScope.ServiceProvider.GetRequiredService<INotificationFanoutAdmission>();
             claimRound = await repository.ClaimDueRoundAsync(
                 new NotificationFanoutClaimRoundRequest(
                     _settings.ConsumerId,
@@ -127,6 +128,7 @@ public sealed class NotificationFanoutProcessor(
         try
         {
             await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(claim.TenantId);
             var pageProcessor = scope.ServiceProvider.GetRequiredService<NotificationFanoutPageProcessor>();
             NotificationFanoutPageProcessingResult result = await pageProcessor.ProcessAsync(
                 claim,
@@ -143,9 +145,9 @@ public sealed class NotificationFanoutProcessor(
         {
             throw;
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            logger.LogError(exception, "Notification fanout claim processing failed");
+            logger.LogError("Notification fanout claim processing failed");
             return ClaimExecutionResult.Failure;
         }
     }
@@ -154,7 +156,7 @@ public sealed class NotificationFanoutProcessor(
     {
         DateTime observedAt = UtcNow();
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<INotificationFanoutRunRepository>();
+        var repository = scope.ServiceProvider.GetRequiredService<INotificationFanoutAdmission>();
         NotificationFanoutProcessorSnapshot snapshot = await repository.GetProcessorSnapshotAsync(
             observedAt,
             cancellationToken);

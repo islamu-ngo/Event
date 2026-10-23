@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52WMCPXAS9ZVR83ZV6MC5NE
+Title: "Compose original-owner authorization route and source-set leases"
+Type: feat
+Scope: access
+Summary: "Bind route observation and revalidation to one selected owner and original Serializable source-set transaction."
+Group: managed-route-source-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Source-set-first acquisition preserves context lease, connection, transaction and tenant-purpose custody through route revalidation.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Managed composition preserves allowed-value metadata but still requires production registration and verified mutation consumers.

@@ -11,6 +11,7 @@ using Explore.Domain.Services;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence.Services;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.QueryFilters;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -30,7 +31,7 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         await using var seed = EventResourcePersistenceTests.TestDatabase.CreateProvider(() => database.CreateContext());
         var scope = await seed.SeedScopeAsync();
         Guid fileId = Guid.CreateVersion7(), linkId = Guid.CreateVersion7(), objectId = Guid.CreateVersion7();
-        await using var context = database.CreateContext();
+        await using var context = seed.CreateSelectedContext(scope.TenantAId);
         Guid managerId = (await context.Actors.Where(actor => actor.Id == scope.ActorId)
             .Select(actor => actor.UserId).SingleAsync())!.Value;
         var parent = await context.Events.SingleAsync(row => row.Id == scope.EventAId);
@@ -74,19 +75,25 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         await context.SaveChangesAsync();
         var repository = new EventHeavyRedactionRepository(context);
         var graph = await repository.GetForUpdateAsync(scope.EventAId, default);
-        await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async ct =>
+        await using (var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(context))
         {
-            await new StorageObjectReferenceRepository(context).FenceAsync([objectId], ct);
-            EventHeavyRedactionApplicator.Apply(graph!, managerId, new DateTimeOffset(Now));
-            await repository.SaveChangesAsync(ct);
-            var lifecycle = new EventResourceStorageLifecycleRepository(context);
-            await lifecycle.RetireAsync(scope.TenantAId, [fileId, linkId], [], Now, ct);
-            await lifecycle.RemoveTransferredSourcesAsync(scope.TenantAId, [fileId, linkId], [], ct);
-            return true;
-        }, default);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(context);
+            await using var discovery = await discoveryGate.AcquireAsync();
+            await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async ct =>
+            {
+                await new StorageObjectReferenceRepository(context).FenceAsync([objectId], ct);
+                EventHeavyRedactionApplicator.Apply(graph!, managerId, new DateTimeOffset(Now));
+                await repository.SaveChangesAsync(ct);
+                var lifecycle = new EventResourceStorageLifecycleRepository(context);
+                await lifecycle.RetireAsync(scope.TenantAId, [fileId, linkId], [], Now, ct);
+                await lifecycle.RemoveTransferredSourcesAsync(scope.TenantAId, [fileId, linkId], [], ct);
+                return true;
+            }, default);
+        }
 
-        await using var verify = database.CreateContext();
-        var saved = await verify.EventResources.IgnoreQueryFilters()
+        await using var verify = seed.CreateSelectedContext(scope.TenantAId);
+        var saved = await verify.EventResources.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
             .Where(row => row.TenantId == scope.TenantAId && (row.Id == fileId || row.Id == linkId))
             .ToArrayAsync();
         await Assert.That(saved.Length).IsEqualTo(2);
@@ -122,7 +129,7 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         Guid objectId = Guid.CreateVersion7();
         string key = $"objects/{objectId:N}";
         var clock = new CleanupClock(new DateTimeOffset(Now));
-        await using var context = database.CreateContext();
+        await using var context = seeds.CreateSelectedContext(scope.TenantAId);
         Guid managerId = (await context.Actors.Where(actor => actor.Id == scope.ActorId)
             .Select(actor => actor.UserId).SingleAsync())!.Value;
         var parent = await context.Events.SingleAsync(row => row.Id == scope.EventAId);
@@ -139,11 +146,19 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
             StatusId = (int)TenantUserStatusEnum.Active
         });
         string checksum = Convert.ToHexString(SHA256.HashData("%PDF-1.7\ncleanup\n%%EOF"u8));
-        var settings = new EventResourceSettingsWriter(context,
-            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)), new EfCoreUnitOfWork(context));
-        var setting = await settings.ApplyAsync([new(null, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
-            EventResourceSettingMutationKind.SetValue, "true")], null);
-        await Assert.That(setting.Success).IsTrue();
+        await using (var settingsContext = seeds.CreateSelectedContext(null))
+        {
+            await using var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(settingsContext);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(settingsContext);
+            await using var discovery = await discoveryGate.AcquireAsync();
+            var settings = new EventResourceSettingsWriter(settingsContext,
+                new RelationalSettingMutationLock(settingsContext, new EfCoreUnitOfWork(settingsContext)),
+                new EfCoreUnitOfWork(settingsContext));
+            var setting = await settings.ApplyInternalAsync([new(null, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
+                EventResourceSettingMutationKind.SetValue, "true")], null);
+            await Assert.That(setting.Success).IsTrue();
+        }
         context.AddRange(resource, binding, new StorageObject
         {
             Id = objectId,
@@ -219,24 +234,31 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         await worker.ProcessDueAsync(100, false, default);
         await Assert.That(exists).IsTrue();
         await Assert.That(await tombstones.GetByIdAsync(objectId, default)).IsNotNull();
-        await Assert.That(await context.StorageObjects.IgnoreQueryFilters().AnyAsync(item => item.Id == objectId)).IsFalse();
+        await Assert.That(await context.StorageObjects.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+            .AnyAsync(item => item.Id == objectId)).IsFalse();
         await Assert.That(await DeliveryAsync()).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
 
-        var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
-        governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(EventResourceGovernancePolicy.Default(long.MaxValue));
-        var retention = new EventResourceAuditRetentionService(new EventResourceAuditRetentionRepository(context),
-            governance, unit, clock);
+        var retentionFactory = new EventResourceAuditRetentionManualContextFactory(seeds.CreateSelectedContext);
+        var retention = new EventResourceAuditRetentionService(
+            new EventResourceAuditOwnerDiscoveryRepository(retentionFactory, null),
+            new EventResourceAuditRetentionExecutionScopeFactory(retentionFactory), clock);
         await retention.CleanupAsync(default);
         var auditAfterExpiry = await context.EventResourceAuditEntries.AsNoTracking()
             .SingleAsync(item => item.EventResourceId == resource.Id);
         await Assert.That(auditAfterExpiry.Id).IsEqualTo(retainedAudit.Id);
         await Assert.That(auditAfterExpiry.ResponsibleManagerUserId).IsEqualTo(managerId);
-        await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async ct =>
+        await using (var erasureContext = seeds.CreateSelectedContext(null))
         {
-            await new UserLocationPrivacyErasureRepository(context).AnonymizeRetainedAuditEvidenceAsync(managerId, ct);
-            return true;
-        });
+            await using var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(erasureContext);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(erasureContext);
+            await using var discovery = await discoveryGate.AcquireAsync();
+            await new EfCoreUnitOfWork(erasureContext).ExecuteSerializableAsync(async ct =>
+            {
+                await new UserLocationPrivacyErasureRepository(erasureContext).AnonymizeRetainedAuditEvidenceAsync(managerId, ct);
+                return true;
+            });
+        }
         await Assert.That((await context.EventResourceAuditEntries.AsNoTracking()
             .SingleAsync(item => item.Id == retainedAudit.Id)).ResponsibleManagerUserId).IsNull();
         await Assert.That(await DeliveryAsync()).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
@@ -244,7 +266,8 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         clock.UtcNow = new DateTimeOffset(Now.AddDays(31));
         await retention.CleanupAsync(default);
         await Assert.That(await context.EventResourceAuditEntries.AnyAsync(item => item.EventResourceId == resource.Id)).IsFalse();
-        await context.EventResources.IgnoreQueryFilters().Where(item => item.Id == resource.Id).ExecuteDeleteAsync();
+        await context.EventResources.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+            .Where(item => item.Id == resource.Id).ExecuteDeleteAsync();
         await Assert.That(await DeliveryAsync()).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
         var retained = await tombstones.GetByIdAsync(objectId, default);
         await Assert.That(retained).IsNotNull();
@@ -258,11 +281,11 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
 
         async Task<EventResourceAuthorityOutcome> DeliveryAsync()
         {
-            await using var read = database.CreateContext();
+            await using var read = seeds.CreateSelectedContext(scope.TenantAId);
             var readUnit = new EfCoreUnitOfWork(read);
             var mutationLock = new RelationalSettingMutationLock(read, readUnit);
             var policy = new EventResourceGovernancePolicyReader(
-                new SystemSettingRepository(read, mutationLock), new TenantSettingRepository(read, mutationLock));
+                SystemSettingRepository.CreateReadOnly(read, mutationLock), TenantSettingRepository.CreateReadOnly(read, mutationLock));
             var repository = new EventResourceRepository(read);
             var authority = new EventResourceAuthorityOrchestrator(readUnit,
                 new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(read), policy),

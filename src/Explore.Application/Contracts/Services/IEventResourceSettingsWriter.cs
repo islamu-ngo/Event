@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
@@ -10,6 +11,16 @@ using Explore.Domain.Settings.Definitions;
 namespace Explore.Application.Contracts.Services;
 
 public enum EventResourceSettingMutationKind { SetValue, SetLock, Remove }
+
+/// <summary>The source-owned action, not a policy flag supplied by a settings request.</summary>
+public enum SettingsMutationOperation
+{
+    InstanceSettings,
+    TenantSettings,
+    InstanceTenantSettings,
+    ConfigurationInstanceImport,
+    ConfigurationTenantImport
+}
 
 public sealed record EventResourceSettingMutation(
     Guid? TenantId,
@@ -62,10 +73,31 @@ public static class EventResourceSettingMutationGuard
 public interface IEventResourceSettingsWriter
 {
     /// <summary>
+    /// Direct human service entry. Selects the exact owner before constructing the concrete
+    /// writer, then uses that owner's immutable authenticated subject.
+    /// </summary>
+    Task<EventResourceSettingsWriteResult> ApplyCurrentHumanAsync(
+        ImmutableArray<EventResourceSettingMutation> mutations,
+        SettingsMutationOperation operation,
+        Guid? actorUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Validates the complete proposed state and writes atomically. Joins a caller-owned transaction
     /// when present; the caller must dispatch returned notifications only after its commit.
     /// </summary>
     Task<EventResourceSettingsWriteResult> ApplyAsync(
+        ImmutableArray<EventResourceSettingMutation> mutations,
+        HumanCommitSubject subject,
+        SettingsMutationOperation operation,
+        Guid? actorUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Explicit trusted bootstrap/internal entry. Human settings and instance import must use
+    /// ApplyAsync; a null audit actor never selects this entry.
+    /// </summary>
+    Task<EventResourceSettingsWriteResult> ApplyInternalAsync(
         ImmutableArray<EventResourceSettingMutation> mutations,
         Guid? actorUserId,
         CancellationToken cancellationToken = default);

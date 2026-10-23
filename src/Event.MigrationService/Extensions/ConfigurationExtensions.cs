@@ -20,6 +20,7 @@ public static class ConfigurationExtensions
         IConfiguration authority = SecretAuthorityConfiguration.Build(
             bootstrapConfiguration,
             environmentName,
+            SecretConsumer.Migration,
             "/database",
             "/database/erasure",
             "/database/identity");

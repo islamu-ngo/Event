@@ -23,11 +23,6 @@ internal static class LocalAuthenticationResultMapper
                 Title: "Authentication failed",
                 Type: ApiProblemTypes.Unauthorized,
                 Detail: "The submitted credentials are invalid."),
-            [LocalAuthFailure.AccountLocked] = new(
-                StatusCode: StatusCodes.Status401Unauthorized,
-                Title: "Authentication failed",
-                Type: ApiProblemTypes.Unauthorized,
-                Detail: "The local account is temporarily unavailable."),
             [LocalAuthFailure.ProviderInactive] = new(
                 StatusCode: StatusCodes.Status409Conflict,
                 Title: "Authentication provider inactive",
@@ -65,8 +60,11 @@ internal static class LocalAuthenticationResultMapper
         ControllerBase controller,
         LocalAuthResponseDto response)
     {
+        LocalAuthFailure failure = response.Failure == LocalAuthFailure.AccountLocked
+            ? LocalAuthFailure.InvalidCredentials
+            : response.Failure!.Value;
         FailureDescriptor descriptor = Failures.GetValueOrDefault(
-            response.Failure!.Value,
+            failure,
             UnexpectedFailure);
         ProblemDetails problem = ApiProblemFactory.CreateProblem(
             controller.HttpContext,
@@ -74,7 +72,7 @@ internal static class LocalAuthenticationResultMapper
             descriptor.Title,
             descriptor.Type,
             descriptor.Detail,
-            response.FailureCode);
+            failure == LocalAuthFailure.InvalidCredentials ? "invalid_credentials" : response.FailureCode);
         return ApiProblemFactory.ToProblemResult(problem);
     }
 

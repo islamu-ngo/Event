@@ -1,7 +1,9 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -157,26 +159,70 @@ public sealed class WebhookLocalTargetRepository(ExploreDbContext dbContext)
         });
     }
 
-    public Task<WebhookLocalTargetSnapshot?> GetActiveClaimAsync(
+    public async Task<WebhookLocalTargetSnapshot?> GetActiveClaimAsync(
         Guid tenantId,
         Guid targetId,
         Guid leaseToken,
         long deliveryFence,
         DateTimeOffset observedAtUtc,
-        CancellationToken cancellationToken) =>
-        dbContext.WebhookLocalTargetSnapshots
+        CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty || dbContext.IsTenantFilterBypassed
+            || dbContext.BindTenantLease() != tenantId)
+            throw new InvalidOperationException("Local webhook claim reads require selected-tenant Runtime authority.");
+        if (WebhookClaimEndpointNativeOperations.For(dbContext) is { } native)
+        {
+            var authority = dbContext.CaptureNativeWebhookClaimReadOwner(tenantId);
+            var state = await native.ReadAsync(
+                tenantId, targetId, leaseToken, deliveryFence, observedAtUtc, cancellationToken);
+            if (state is null) return null;
+            // Only the tenant-owned frozen transport snapshot and message cross this boundary.
+            // The definer checked retained endpoint identity/status without granting config reads.
+            var admitted = await dbContext.WebhookLocalTargetSnapshots
+                .Include(target => target.WebhookMessage)
+                .Where(target =>
+                    target.TenantId == tenantId &&
+                    target.WebhookMessage.TenantId == tenantId &&
+                    target.DeliveryPlanSnapshot.TenantId == tenantId &&
+                    target.DeliveryPlanSnapshot.WebhookMessageId == target.WebhookMessageId &&
+                    target.Id == targetId &&
+                    target.DeliveryStatusId == (int)WebhookLocalDeliveryStatus.Delivering &&
+                    target.ProcessingLeaseToken == leaseToken &&
+                    target.DeliveryFence == deliveryFence &&
+                    target.ProcessingLeaseExpiresAtUtc > observedAtUtc)
+                .Select(target => new
+                {
+                    Target = target,
+                    Snapshot = new ExploreDbContext.NativeWebhookClaimSnapshot(
+                        target.Id, target.TenantId, target.WebhookMessageId, target.DeliveryPlanSnapshotId,
+                        target.WebhookEndpointId, target.DeliveryStatusId, target.ProcessingLeaseOwner,
+                        target.ProcessingLeaseToken, target.DeliveryFence, target.ProcessingLeaseExpiresAtUtc,
+                        target.ConcurrencyVersion, target.NextActionAtUtc)
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+            if (admitted is null) return null;
+            dbContext.RetainNativeWebhookClaim(authority, admitted.Target, admitted.Snapshot);
+            return admitted.Target;
+        }
+        return await dbContext.WebhookLocalTargetSnapshots
             .IgnoreTenantFilter(TenantFilterBypassReasons.WebhookTenantOperation)
             .Include(target => target.WebhookMessage)
-            .Include(target => target.WebhookEndpoint)
             .FirstOrDefaultAsync(target =>
                 target.TenantId == tenantId &&
+                target.WebhookMessage.TenantId == tenantId &&
+                target.DeliveryPlanSnapshot.TenantId == tenantId &&
+                target.DeliveryPlanSnapshot.WebhookMessageId == target.WebhookMessageId &&
                 target.Id == targetId &&
                 target.DeliveryStatusId == (int)WebhookLocalDeliveryStatus.Delivering &&
                 target.ProcessingLeaseToken == leaseToken &&
                 target.DeliveryFence == deliveryFence &&
+                (target.WebhookEndpoint.TenantId == tenantId
+                    || target.WebhookEndpoint.TenantId == null && target.WebhookEndpoint.InstanceId != null) &&
+                target.WebhookEndpoint.ConsumerId == target.DeliveryPlanSnapshot.WebhookConsumerId &&
                 target.WebhookEndpoint.StatusId == (int)WebhookEndpointStatus.Active &&
                 target.ProcessingLeaseExpiresAtUtc > observedAtUtc,
                 cancellationToken);
+    }
 
     public Task<WebhookLocalTargetSnapshot?> GetByMessageAndEndpointForUpdateAsync(
         Guid tenantId,

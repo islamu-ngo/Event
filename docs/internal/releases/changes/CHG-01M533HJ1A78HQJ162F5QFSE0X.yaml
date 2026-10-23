@@ -1,0 +1,29 @@
+Change-Id: CHG-01M533HJ1A78HQJ162F5QFSE0X
+Title: "Revalidate managed webhook resources on original owners"
+Type: feat
+Scope: access
+Summary: "Compose original-owner webhook leases and pure persisted ownership projection without tracker or audit-identity shortcuts."
+Group: managed-human-webhook-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Webhook ownership and lineage remain bound to original actor, tenant, command selector and Serializable source-set owner.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Resource custody does not enable provider access; production registration, provider release checks and final parent admission remain required.

@@ -419,11 +419,21 @@ public sealed class IncomingWebhookEffectProcessingService(
                     bindingId,
                     provider,
                     message.PayloadBytes,
-                    ReadSafeHeaders(message.HeadersJson)),
+                    ReadSafeHeaders(message.HeadersJson),
+                    new RegistrationProviderSubmissionEffectCustody(
+                        claim,
+                        pointer.ProcessingLeaseExpiresAt!.Value,
+                        pointer.IncomingWebhookMessageId,
+                        pointer.Provider,
+                        pointer.ProviderDecisionId,
+                        pointer.EffectKind,
+                        message.EventType!,
+                        pointer.PayloadSha256)),
                 cancellationToken);
             return result.Outcome switch
             {
                 ProviderSubmissionEffectOutcome.Completed => await CompleteAsync(claim, cancellationToken),
+                ProviderSubmissionEffectOutcome.LeaseLost => IncomingWebhookClaimExecutionResult.LeaseLost(),
                 ProviderSubmissionEffectOutcome.Retryable => await TransitionAsync(
                     claim,
                     result.Code.ToLowerInvariant(),

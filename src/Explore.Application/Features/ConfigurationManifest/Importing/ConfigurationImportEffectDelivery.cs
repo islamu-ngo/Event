@@ -54,15 +54,52 @@ public sealed class ConfigurationImportEffectDelivery(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (message.Id == Guid.Empty
+            || message.AggregateId == Guid.Empty
+            || message.Status is not OutboxMessageStatus.Processing and not OutboxMessageStatus.DeadLettered
+            || message.NextRetryAt is null
+            || !string.Equals(message.AggregateType, ConfigurationImportEffectOutbox.AggregateType, StringComparison.Ordinal)
+            || !string.Equals(message.EventType, ConfigurationImportEffectOutbox.EventType, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Configuration import effect envelope is invalid.");
+        }
+        OutboxMessage persisted = await outbox.GetByIdAsync(message.Id, cancellationToken)
+            ?? throw new InvalidOperationException("Configuration import effect message was not found.");
+        if (persisted.AggregateId != message.AggregateId
+            || persisted.AggregateType != message.AggregateType || persisted.EventType != message.EventType
+            || persisted.Payload != message.Payload || persisted.CreatedAt != message.CreatedAt
+            || persisted.Status != message.Status || persisted.NextRetryAt != message.NextRetryAt)
+            throw new InvalidOperationException("Configuration import effect custody was lost.");
         ConfigurationImportOperation operation =
             await operations.GetByIdForEffectAsync(
                 message.AggregateId,
                 cancellationToken)
             ?? throw new InvalidOperationException(
                 "Configuration import operation was not found.");
+        if (operation.Id != message.AggregateId
+            || operation.EffectOutboxId != message.Id
+            || operation.CompletedAt != message.CreatedAt
+            || operation.EffectPayloadDigest != Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(message.Payload ?? string.Empty)))
+            || operation.Status is not ConfigurationImportOperationStatus.Applied
+                and not ConfigurationImportOperationStatus.RolledBack)
+        {
+            throw new InvalidOperationException("Configuration import effects require their bound committed operation.");
+        }
+        var notifications = ConfigurationImportEffectOutbox.ReadNotifications(persisted.Payload);
+        foreach (SettingChangedNotification notification in notifications)
+        {
+            if (notification.TenantId == Guid.Empty
+                || notification.TenantId is not null && operation.TargetTenantId is { } tenantId
+                    && notification.TenantId != tenantId
+                || !operation.SelectedSectionKeys.Contains(
+                    notification.TenantId is null ? "instance.settings" : "tenant.settings",
+                    StringComparer.Ordinal))
+                throw new InvalidOperationException("Configuration import notification scope is invalid.");
+        }
         await InvalidateAsync(operation, cancellationToken);
-        foreach (SettingChangedNotification notification in
-                 ConfigurationImportEffectOutbox.ReadNotifications(message.Payload))
+        foreach (SettingChangedNotification notification in notifications)
         {
             await notificationHandlers.HandleAsync(
                 notification,
@@ -84,7 +121,11 @@ public sealed class ConfigurationImportEffectDelivery(
             return;
         try
         {
-            await DispatchClaimedAsync(message, cancellationToken);
+            OutboxMessage claimed = await outbox.GetByIdAsync(message.Id, cancellationToken)
+                ?? throw new InvalidOperationException("Configuration import effect claim was not found.");
+            if (claimed.Status != OutboxMessageStatus.Processing || claimed.NextRetryAt != lease.Value)
+                throw new InvalidOperationException("Configuration import effect claim was replaced.");
+            await DispatchClaimedAsync(claimed, cancellationToken);
             if (!await outbox.MarkAsCompleted(
                     message.Id,
                     lease.Value,

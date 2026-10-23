@@ -474,6 +474,8 @@ public sealed class ExternalApiPhase0IntegrationTests
         using var request = new HttpRequestMessage(HttpMethod.Get, ProbeUrl);
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", factory.CreateJwt(userId));
         request.Headers.Add("X-Forwarded-Host", "tenant.example.test");
+        request.Headers.Add("X-Forwarded-For", "203.0.113.7");
+        request.Headers.Add("X-Forwarded-Proto", "https");
 
         var response = await client.SendAsync(request);
         var body = await response.Content.ReadFromJsonAsync<AuthProbeResult>();

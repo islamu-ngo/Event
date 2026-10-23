@@ -1,0 +1,29 @@
+Change-Id: CHG-01M54RQAQ3EXWSZ4EZFXP7EETR
+Title: "Keep Cerbos publication diagnostics free of private transport detail"
+Type: fix
+Scope: privacy
+Summary: "Retain typed operation outcomes while exporting fixed failure categories instead of provider exception types, endpoints or package identity."
+Group: cerbos-publication-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Prevent provider exception details, endpoints and package identity from entering publication or status diagnostic exports.
+  Migration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/coolify-cerbos-traefik.md
+    Disposition: documented
+    Detail: Use typed issue codes and bounded categories; inspect external state before retrying an uncertain publication.

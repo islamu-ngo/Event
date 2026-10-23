@@ -2,12 +2,12 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Notifications;
 using Explore.Domain.Enums;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Infrastructure.Authentication;
 
 public sealed class LocalIdentityLifecycleEmailService(
-    ILocalIdentityLifecycleStore lifecycle,
-    ILocalIdentityLifecycleDeliveryStore deliveries) : IAccountAuthorityLifecycleEmailProvider
+    ILocalIdentityExecutionScopeFactory scopes) : IAccountAuthorityLifecycleEmailProvider
 {
     public AccountAuthorityKind Kind => AccountAuthorityKind.LocalIdentity;
 
@@ -25,9 +25,34 @@ public sealed class LocalIdentityLifecycleEmailService(
             AccountAuthorityLifecycleEmailAction.PasswordReset => LocalIdentityLifecyclePurpose.PasswordRecovery,
             _ => throw new ArgumentOutOfRangeException(nameof(action))
         };
-        var nativeRequest = await deliveries.ReadRequestAsync(request.UserId, request.ExternalLoginId, purpose,
-            request.ProposedEmail, request.ExpectedSecurityStamp, cancellationToken);
-        var operation = nativeRequest is null ? null : await lifecycle.BeginAsync(nativeRequest, cancellationToken);
+        await using var identity = await scopes.CreateAsync(cancellationToken);
+        var lifecycle = identity.Services.GetRequiredService<ILocalIdentityLifecycleStore>();
+        var deliveries = identity.Services.GetRequiredService<ILocalIdentityLifecycleDeliveryStore>();
+        LocalIdentityLifecycleRequest? nativeRequest;
+        try
+        {
+            nativeRequest = await deliveries.ReadRequestAsync(request.UserId, request.ExternalLoginId, purpose,
+                request.ProposedEmail, request.ExpectedSecurityStamp, cancellationToken);
+        }
+        catch (Exception exception) when (purpose == LocalIdentityLifecyclePurpose.PasswordRecovery
+            && LocalIdentityIntakeFailureClassifier.IsTransientStoreFailure(exception))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(AccountAuthorityLifecycleEmailStatus.ProviderRequestFailed, action, Kind,
+                ReasonCode: "local_intake_store_unavailable");
+        }
+        LocalIdentityLifecyclePointer? operation;
+        try
+        {
+            operation = nativeRequest is null ? null : await lifecycle.BeginAsync(nativeRequest, cancellationToken);
+        }
+        catch (LocalIdentityIntakeException exception) when (purpose == LocalIdentityLifecyclePurpose.PasswordRecovery)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(AccountAuthorityLifecycleEmailStatus.ProviderRequestFailed, action, Kind,
+                ReasonCode: exception.Failure == LocalIdentityIntakeFailure.Conflict
+                    ? "local_intake_conflict" : "local_intake_store_unavailable");
+        }
         // Public intake maps target-specific statuses uniformly; no recipient, pointer, or rate key is exposed here.
         // Local audit is the native ledger, NOT an external provider delegation in a fabricated tenant.
         return operation is null

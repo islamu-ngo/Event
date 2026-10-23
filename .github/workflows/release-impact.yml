@@ -23,6 +23,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Setup .NET
@@ -30,8 +31,42 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Collect Complete Changed File Metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          # Fetch objects only: never check out or execute PR-head code.
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            fetch --no-tags --filter=blob:none origin "$HEAD_SHA"
+          git diff --no-ext-diff --no-textconv --find-renames --name-status -z \
+            "$BASE_SHA...$HEAD_SHA" -- > "$RUNNER_TEMP/release-impact-diff"
+          jq -Rs '
+            split("\u0000") | .[:-1] |
+            reduce .[] as $value ({files: [], change: null, previous: null};
+              if .change == null then .change = $value
+              elif (.change | startswith("R")) and .previous == null then .previous = $value
+              else
+                .files += [{
+                  filename: $value,
+                  status: (if (.change | startswith("R")) then "renamed"
+                    elif .change == "A" then "added"
+                    elif .change == "D" then "removed"
+                    elif .change == "M" or .change == "T" then "modified"
+                    else error("unsupported_git_change_status") end),
+                  previous_filename: .previous
+                }] | .change = null | .previous = null
+              end) |
+            if .change != null then error("incomplete_git_change_record") else .files end
+          ' < "$RUNNER_TEMP/release-impact-diff" > "$RUNNER_TEMP/release-impact-files.json"
+
       - name: Validate Release Impact Metadata
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RestorePackagesWithLockFile: "false"
+          RELEASE_IMPACT_FILE_METADATA_PATH: ${{ runner.temp }}/release-impact-files.json
         run: dotnet run .ci/scripts/validate-release-impact-pr.cs -- "$GITHUB_EVENT_PATH"

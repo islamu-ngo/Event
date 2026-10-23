@@ -1,0 +1,29 @@
+Change-Id: CHG-01M4CBGF7K3QJSR9ZNZKCJ8K8H
+Title: "sanitize secret provider failures at the HTTP boundary"
+Type: fix
+Scope: onboarding
+Summary: "Authentication, reads and updates retain only value-free failure categories and observed rejection; remote diagnostics never enter application exceptions."
+Group: security-phase-02
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Provider error payloads and inner diagnostics are excluded from application failures; only a failure category and observed-rejection flag cross the boundary.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: Authentication renews at provider expiry; cancellation and malformed or disconnected responses do not certify a completed remote update.

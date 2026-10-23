@@ -15,6 +15,11 @@ public sealed class RefundAttemptConfiguration : IEntityTypeConfiguration<Refund
                 "ck_refund_attempts_allocation",
                 "allocation_organizer_amount_minor >= 0 AND allocation_platform_fee_minor >= 0 AND allocation_platform_contribution_minor >= 0 AND allocation_total_minor > 0 AND allocation_platform_fee_minor <= allocation_organizer_amount_minor AND allocation_total_minor = allocation_organizer_amount_minor + allocation_platform_contribution_minor");
             table.HasCheckConstraint("ck_refund_attempts_policy_version", "refund_policy_version > 0");
+            table.HasCheckConstraint("ck_refund_attempts_dispatch_phase", "dispatch_phase BETWEEN 0 AND 4");
+            table.HasCheckConstraint("ck_refund_attempts_requested_amount",
+                "requested_amount_minor IS NULL OR requested_amount_minor > 0");
+            table.HasCheckConstraint("ck_refund_attempts_dispatch_fence",
+                "dispatch_phase NOT IN (1, 3) OR (dispatch_token IS NOT NULL AND dispatch_committed_at IS NOT NULL AND provider_mutation_expires_at IS NOT NULL)");
             table.HasCheckConstraint(
                 "ck_refund_attempts_fee_refund",
                 "application_fee_refunded_amount_minor >= 0");
@@ -28,6 +33,14 @@ public sealed class RefundAttemptConfiguration : IEntityTypeConfiguration<Refund
         builder.Property(value => value.CurrencyCode).IsRequired().HasMaxLength(3);
         builder.Property(value => value.ProviderPaymentId).IsRequired().HasMaxLength(200);
         builder.Property(value => value.ProviderIdempotencyKey).IsRequired().HasMaxLength(160);
+        builder.Property(value => value.NativeOperationKey).IsRequired().HasMaxLength(160);
+        builder.Property(value => value.NativeInputDigest).IsRequired().HasMaxLength(64);
+        builder.Property(value => value.DispatchPhase).HasConversion<int>();
+        builder.Property(value => value.ProviderMutationExpiresAt).HasConversion(
+            value => value,
+            value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : (DateTime?)null);
+        builder.Ignore(value => value.CanDispatchBuyer);
+        builder.Ignore(value => value.CanDispatchApplicationFee);
         builder.Property(value => value.ReservationSourceKey).IsRequired().HasMaxLength(48);
         builder.Property(value => value.AuthorityCode).IsRequired().HasMaxLength(40);
         builder.Property(value => value.ReasonCode).IsRequired().HasMaxLength(80);
@@ -38,7 +51,9 @@ public sealed class RefundAttemptConfiguration : IEntityTypeConfiguration<Refund
         builder.Property(value => value.FailureCode).HasMaxLength(80);
         builder.Property(value => value.Status).HasConversion<int>();
         builder.Property(value => value.CreatedAt).IsRequired();
-        builder.Property(value => value.LastObservedAt).IsRequired();
+        builder.Property(value => value.LastObservedAt).IsRequired().HasConversion(
+            value => value,
+            value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
         builder.Property(value => value.ConcurrencyStamp).IsConcurrencyToken();
         builder.OwnsOne(value => value.Allocation, owned =>
         {
@@ -71,6 +86,7 @@ public sealed class RefundAttemptConfiguration : IEntityTypeConfiguration<Refund
             .HasPrincipalKey(value => new { value.TenantId, value.Id })
             .OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(value => new { value.TenantId, value.ProviderIdempotencyKey }).IsUnique();
+        builder.HasIndex(value => new { value.TenantId, value.NativeOperationKey }).IsUnique();
         builder.HasIndex(value => new
         {
             value.TenantId,

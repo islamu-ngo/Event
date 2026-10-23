@@ -5,6 +5,8 @@ using Explore.Application.Responses;
 
 public interface IConfigurationManifestApplier
 {
+    Task<BaseCommandResponse<Guid>?> ApplyOriginalStartupAsync(CancellationToken cancellationToken);
+
     Task<BaseCommandResponse<Guid>> ApplyAsync(
         ConfigurationManifestReadResult source,
         CancellationToken cancellationToken);

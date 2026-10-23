@@ -6,7 +6,8 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
 using Explore.Secrets.Database;
-using Explore.Infrastructure.ConfigurationManifest;
+using Explore.Secrets.Configuration;
+using Explore.Application.Features.ConfigurationManifest.Application;
 using Event.Standalone.Hosting;
 using Event.Standalone.Middleware;
 using System.Runtime.Loader;
@@ -28,7 +29,9 @@ if (!builder.Environment.IsEnvironment("Testing"))
 
 var apiHost = builder.AddApiHostServices(
     () => shutdownState.IsShuttingDown,
-    ownsDevelopmentMigrations: false);
+    ownsDevelopmentMigrations: false,
+    secretConsumer: SecretConsumer.Combined,
+    ownsConfigurationManifestStartup: false);
 builder.AddBlazorHostServices(hostProfile, shutdownState);
 builder.Services.AddCombinedApiDataProtection();
 builder.Services.AddCombinedApiBridge();
@@ -54,7 +57,6 @@ await ExternalIdentityDatabaseMigrator.MigrateIfExternalAsync(
 
 await using (var scope = app.Services.CreateAsyncScope())
 {
-    var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
     var startupSequence = scope.ServiceProvider
         .GetRequiredService<IConfigurationManifestPostMigrationSequence>();
     await startupSequence.RunAsync(
@@ -62,17 +64,17 @@ await using (var scope = app.Services.CreateAsyncScope())
         {
             if (app.Environment.IsEnvironment("Testing"))
             {
+                var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
                 await SqliteDatabaseInitializer.InitializeAsync(database, cancellationToken);
                 return;
             }
 
             await ExploreDatabaseMigrator.MigrateAndSeedAsync(
-                database,
                 app.Environment,
                 app.Configuration,
                 PrimaryDatabaseConfiguration.BindMigrator(app.Configuration),
                 app.Logger,
-                cancellationToken);
+                cancellationToken: cancellationToken);
         },
         shutdownCts.Token);
 }

@@ -58,6 +58,20 @@ public sealed class RegistrationProviderRepository(ExploreDbContext dbContext) :
             .AnyAsync(version => version.TenantId == tenantId && version.EventId == eventId &&
                 version.RegistrationFormId == formId && version.Id == formVersionId, cancellationToken);
 
+    public Task<RegistrationProviderBinding?> GetBindingObservationAsync(Guid tenantId, Guid bindingId, CancellationToken cancellationToken) =>
+        dbContext.RegistrationProviderBindings.AsNoTracking()
+            .Include(binding => binding.Connection!)
+                .ThenInclude(connection => connection.ApprovedOrigins)
+            .Include(binding => binding.FieldMappings)
+            .Include(binding => binding.OptionMappings)
+            .Include(binding => binding.Capabilities)
+            .FirstOrDefaultAsync(binding => binding.TenantId == tenantId && binding.Id == bindingId, cancellationToken);
+
+    public Task<RegistrationProviderConnection?> GetConnectionObservationAsync(Guid tenantId, Guid connectionId, CancellationToken cancellationToken) =>
+        dbContext.RegistrationProviderConnections.AsNoTracking()
+            .Include(connection => connection.ApprovedOrigins)
+            .FirstOrDefaultAsync(connection => connection.TenantId == tenantId && connection.Id == connectionId, cancellationToken);
+
     public async Task<IReadOnlyList<RegistrationProviderBinding>> GetBindingsAsync(Guid tenantId, CancellationToken cancellationToken) =>
         await dbContext.RegistrationProviderBindings
             .AsNoTracking()

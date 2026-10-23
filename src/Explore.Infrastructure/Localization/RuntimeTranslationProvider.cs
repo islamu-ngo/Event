@@ -52,7 +52,8 @@ public sealed class RuntimeTranslationProvider : ITranslationManagementProvider
         {
             _metrics.RecordConnectionTest(providerName, "error");
             _metrics.RecordFallbackActivated(providerName, ClassifyException(ex));
-            _logger.LogError(ex, "[LOCALIZATION] TMS TestConnection failed on {Provider}; falling back to OfflineProvider", providerName);
+            _logger.LogError("localization_connection_test_failed provider={Provider} category={FailureCategory} fallback=offline",
+                providerName, ClassifyException(ex));
             return await _offlineProvider.TestConnectionAsync(ct);
         }
     }
@@ -67,7 +68,8 @@ public sealed class RuntimeTranslationProvider : ITranslationManagementProvider
         catch (Exception ex)
         {
             _metrics.RecordFallbackActivated(provider.GetType().Name, ClassifyException(ex));
-            _logger.LogWarning(ex, "TMS ImportKeys failed on {Provider}", provider.GetType().Name);
+            _logger.LogWarning("localization_key_import_failed provider={Provider} category={FailureCategory}",
+                provider.GetType().Name, ClassifyException(ex));
         }
     }
 
@@ -101,8 +103,8 @@ public sealed class RuntimeTranslationProvider : ITranslationManagementProvider
             _metrics.RecordFetch(providerName, languageCode, "error");
             _metrics.RecordFetchDuration(providerName, languageCode, stopwatch.Elapsed.TotalSeconds);
             _metrics.RecordFallbackActivated(providerName, ClassifyException(ex));
-            _logger.LogError(ex, "[LOCALIZATION] TMS ExportTranslations failed on {Provider} for {Language}; falling back to OfflineProvider",
-                providerName, languageCode);
+            _logger.LogError("localization_export_failed provider={Provider} category={FailureCategory} fallback=offline",
+                providerName, ClassifyException(ex));
 
             var fallbackStopwatch = Stopwatch.StartNew();
             var fallbackResults = await _offlineProvider.ExportTranslationsAsync(languageCode, ct);
@@ -124,7 +126,8 @@ public sealed class RuntimeTranslationProvider : ITranslationManagementProvider
         catch (Exception ex)
         {
             _metrics.RecordFallbackActivated(provider.GetType().Name, ClassifyException(ex));
-            _logger.LogError(ex, "[LOCALIZATION] TMS GetAvailableLanguages failed on {Provider}; falling back to OfflineProvider", provider.GetType().Name);
+            _logger.LogError("localization_language_list_failed provider={Provider} category={FailureCategory} fallback=offline",
+                provider.GetType().Name, ClassifyException(ex));
             return await _offlineProvider.GetAvailableLanguagesAsync(ct);
         }
     }
@@ -151,9 +154,9 @@ public sealed class RuntimeTranslationProvider : ITranslationManagementProvider
                 _ => _offlineProvider
             };
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Failed to resolve TMS provider; defaulting to OfflineProvider");
+            _logger.LogWarning("localization_provider_resolution_failed fallback=offline");
             return _offlineProvider;
         }
     }

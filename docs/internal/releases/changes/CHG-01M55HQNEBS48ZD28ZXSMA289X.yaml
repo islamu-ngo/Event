@@ -1,0 +1,31 @@
+Change-Id: CHG-01M55HQNEBS48ZD28ZXSMA289X
+Title: "Reconcile native recovery schema and migration scaffolding"
+Type: fix
+Scope: access
+Summary: "Record the approved recovery model using provider-generated migration and model artifacts and retire superseded unapplied development scaffolding."
+Group: staged-programme-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Deploy the provider-generated recovery model and native schema together. Superseded development migration scaffolding is removed; verify the target migration lineage before deployment.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Record the approved recovery model using provider-generated migration and model artifacts and retire superseded unapplied development scaffolding.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: Provider-generated recovery migrations and model snapshots replace superseded unapplied development scaffolding. Final migration matrix verification remains outstanding.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Review the paired public operator guidance and complete final composed assurance before release. Packaging does not establish deployment readiness.

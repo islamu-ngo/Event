@@ -1,14 +1,16 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Storage;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Models.Storage;
+using Explore.Application.Features.TenantStorageSettings.Requests.Commands;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using Explore.Domain.Settings;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Application.Services;
 
@@ -26,20 +28,23 @@ public sealed class TenantStorageSettingService : ITenantStorageSettingService
     ];
 
     private readonly IHierarchicalSettingsResolver _settingsResolver;
-    private readonly ITenantSettingRepository _tenantSettingRepository;
     private readonly IStoragePolicyResolver _storagePolicyResolver;
     private readonly IStorageUsageCounterRepository _usageCounterRepository;
+    private readonly ITenantContext _tenantContext;
+    private readonly IPolicyMutationExecutionScopeFactory _scopeFactory;
 
     public TenantStorageSettingService(
         IHierarchicalSettingsResolver settingsResolver,
-        ITenantSettingRepository tenantSettingRepository,
         IStoragePolicyResolver storagePolicyResolver,
-        IStorageUsageCounterRepository usageCounterRepository)
+        IStorageUsageCounterRepository usageCounterRepository,
+        ITenantContext tenantContext,
+        IPolicyMutationExecutionScopeFactory scopeFactory)
     {
         _settingsResolver = settingsResolver;
-        _tenantSettingRepository = tenantSettingRepository;
         _storagePolicyResolver = storagePolicyResolver;
         _usageCounterRepository = usageCounterRepository;
+        _tenantContext = tenantContext;
+        _scopeFactory = scopeFactory;
     }
 
     public async Task<TenantStorageSettingsDto> ReadSettingsAsync(
@@ -79,130 +84,29 @@ public sealed class TenantStorageSettingService : ITenantStorageSettingService
         };
     }
 
-    public async Task ApplyPatchAsync(
-        Guid tenantId,
-        Guid actorUserId,
-        PatchTenantStorageSettingsDto settings,
+    public Task<StorageSettingsMutation> ObserveConfigurationAsync(
+        PatchTenantStorageSettingsCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (settings.Policy?.Provider is { HasValue: true } provider)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.Provider,
-                NormalizeProvider(provider.Value),
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
+        Guid tenantId = _tenantContext.TenantId;
+        if (tenantId == Guid.Empty)
+            throw new UnauthorizedAccessException("Storage configuration requires the original current tenant.");
+        return StorageSettingsMutation.ObserveAsync(command, this, tenantId, _scopeFactory, cancellationToken);
+    }
 
-        if (settings.Policy?.MaxUploadBytes is { HasValue: true } maxUploadBytes)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.DefaultMaxUploadBytes,
-                maxUploadBytes.Value,
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
-
-        if (settings.Policy?.TenantQuotaBytes is { HasValue: true } tenantQuotaBytes)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes,
-                tenantQuotaBytes.Value,
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
-
-        if (settings.Policy?.Routes is { HasValue: true } routes)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.RouteMatrix,
-                ToRouteMatrix(routes.Value ?? []),
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
-
-        if (settings.S3?.Endpoint is { HasValue: true } endpoint)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.Endpoint,
-                TrimOrEmpty(endpoint.Value),
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
-
-        if (settings.S3?.PublicEndpoint is { HasValue: true } publicEndpoint)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.PublicEndpoint,
-                TrimOrEmpty(publicEndpoint.Value),
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
-
-        if (settings.S3?.BucketName is { HasValue: true } bucketName)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.BucketName,
-                TrimOrEmpty(bucketName.Value),
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
-
-        if (settings.S3?.Region is { HasValue: true } region)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.Region,
-                TrimOrEmpty(region.Value),
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
-
-        if (settings.S3?.ForcePathStyle is { HasValue: true } forcePathStyle)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.ForcePathStyle,
-                forcePathStyle.Value,
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
-
-        if (settings.S3?.UploadUrlExpirationMinutes is { HasValue: true } expirationMinutes)
-        {
-            await SetTenantValueAsync(
-                GovernanceSettingKeys.Storage.UploadUrlExpirationMinutes,
-                expirationMinutes.Value,
-                tenantId,
-                actorUserId,
-                cancellationToken);
-        }
+    public Task ApplyPatchAsync(StorageSettingsMutation observation, CancellationToken cancellationToken = default)
+    {
+        if (observation.TenantId != _tenantContext.TenantId)
+            throw new UnauthorizedAccessException("Tenant configuration requires its original current-tenant observation.");
+        return observation.ExecuteAsync(this, cancellationToken);
     }
 
     public async Task<InstanceStorageProviderStatusDto> TestProviderAsync(
-        Guid tenantId,
+        TestTenantStorageProviderCommand command,
         CancellationToken cancellationToken = default)
     {
-        var provider = await _storagePolicyResolver.ResolveProviderAsync(tenantId, cancellationToken);
-        var status = await provider.TestAsync(cancellationToken, testWritePermissions: true);
-
-        return new InstanceStorageProviderStatusDto
-        {
-            Provider = status.Provider,
-            IsAvailable = status.IsAvailable,
-            SupportsServerSideStreaming = status.SupportsServerSideStreaming,
-            SupportsBrowserDirectUpload = status.SupportsBrowserDirectUpload,
-            FailureCode = status.FailureCode,
-            Message = status.Message,
-            Preflight = status.Preflight
-        };
+        await using var scope = await _scopeFactory.CreateAsync(new(_tenantContext.TenantId), cancellationToken);
+        return await scope.Services.GetRequiredService<IStorageProbeOriginalAction>().ExecuteAsync(command, cancellationToken);
     }
 
     private async Task<Dictionary<string, ResolvedSetting>> ResolveSettingsAsync(
@@ -211,21 +115,6 @@ public sealed class TenantStorageSettingService : ITenantStorageSettingService
     {
         var resolved = await _settingsResolver.ResolveBatchAsync(StorageSettingKeys, context, cancellationToken);
         return resolved.ToDictionary(setting => setting.Key, setting => setting);
-    }
-
-    private async Task SetTenantValueAsync<T>(
-        string key,
-        T value,
-        Guid tenantId,
-        Guid actorUserId,
-        CancellationToken cancellationToken)
-    {
-        await _tenantSettingRepository.SetValueAsync(
-            tenantId,
-            key,
-            SettingValueSerializer.Serialize(value),
-            cancellationToken,
-            actorUserId);
     }
 
     private static TenantStorageEffectivePolicyDto MapPolicy(ResolvedStoragePolicy policy)

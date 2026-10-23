@@ -5,12 +5,9 @@ using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Infrastructure.Mail;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Services;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using static Event.Persistence.IntegrationTests.Fixtures.EmailDispatchSqliteFixture;
@@ -39,7 +36,8 @@ public sealed class EmailDeliveryGenericSettingGuardTests
         {
             await CreateDatabaseAsync(path);
             await using var context = CreateContext(path);
-            Guid actorId = await InstanceSettingsCommandFixture.SeedAdministratorAsync(context);
+            await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => CreateContext(path));
+            Guid actorId = authenticated.ActorId;
             Guid tenantId = Guid.CreateVersion7();
             context.Tenants.Add(new Tenant
             {
@@ -53,9 +51,8 @@ public sealed class EmailDeliveryGenericSettingGuardTests
             await context.SaveChangesAsync();
             var unitOfWork = new EfCoreUnitOfWork(context);
             var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
-            var writer = new EmailDeliverySettingsWriter(context, mutationLock, unitOfWork,
-                new EmailDeliveryDisableImpactReader(context), new EmailDeliveryDisableTokenService(new EphemeralDataProtectionProvider()));
-            var seeded = await writer.ApplyAsync(
+            var writer = CreateInternalEmailSettingsWriter(context, mutationLock);
+            var seeded = await writer.ApplyInternalAsync(
                 [new(TenantId: null, Key: GovernanceSettingKeys.TenantDelegation.LockSmtp,
                     Kind: EmailDeliverySettingMutationKind.SetValue, Value: "false"),
                     new(TenantId: tenantId, Key: GovernanceSettingKeys.Email.DeliveryEnabled,
@@ -64,11 +61,16 @@ public sealed class EmailDeliveryGenericSettingGuardTests
             await Assert.That(seeded.Status).IsEqualTo(EmailDeliverySettingsWriteStatus.Applied);
             var processorBefore = await context.EmailDispatchProcessorStates.AsNoTracking()
                 .Select(row => new { row.DeliveryPolicyRevision, row.OptionalSuppressedThroughRevision, row.OptionalSuppressedThroughUtc }).SingleAsync();
-            var systemRepository = new SystemSettingRepository(context, mutationLock);
-            var tenantRepository = new TenantSettingRepository(context, mutationLock);
             bool rejected = false;
-            await mutationLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All],
-                token => unitOfWork.ExecuteSerializableAsync(async transactionToken =>
+            bool instance = operation is GenericWrite.SystemValue or GenericWrite.SystemTransaction or GenericWrite.SystemLock;
+            string admittedKey = operation == GenericWrite.TenantCreateBulk
+                ? GovernanceSettingKeys.Email.FromName : GovernanceSettingKeys.Email.DeliveryEnabled;
+            string admittedValue = operation == GenericWrite.TenantCreateBulk ? "\"blocked\"" : "false";
+            await authenticated.RunAsync(instance ? null : tenantId, async session =>
+            {
+                var systemRepository = new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary);
+                var tenantRepository = new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary);
+                async Task<bool> Attempt(CancellationToken transactionToken)
                 {
                     var system = new SystemSetting
                     {
@@ -79,6 +81,19 @@ public sealed class EmailDeliveryGenericSettingGuardTests
                         IsLocked = true,
                         CreatedAt = DateTime.UtcNow
                     };
+                    if (operation is GenericWrite.TenantBulk or GenericWrite.TenantCreateBulk)
+                    {
+                        // The genuine scalar producer admits this protected value but cannot
+                        // grant the paired lock effect required by a replacement batch.
+                        // Check the email-specific guard separately inside that same owner,
+                        // so an unauthenticated or wrong-target denial cannot satisfy the case.
+                        await session.Boundary.RequireAsync(session.Context, Explore.Domain.Settings.SettingScope.Tenant,
+                            tenantId, null, admittedKey, HumanSettingsMutationKind.SetValue, admittedValue,
+                            auditActorId: actorId, cancellationToken: transactionToken);
+                        var guarded = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                            tenantRepository.SetValueAsync(tenantId, admittedKey, admittedValue, transactionToken, actorId));
+                        await Assert.That(guarded!.Message).Contains("dedicated email");
+                    }
                     try
                     {
                         switch (operation)
@@ -92,21 +107,39 @@ public sealed class EmailDeliveryGenericSettingGuardTests
                             case GenericWrite.TenantUnlock: await tenantRepository.UnlockAsync(tenantId, system.SettingKey, actorId, transactionToken); break;
                             case GenericWrite.TenantBulk:
                                 await tenantRepository.UpsertManyForTenantAsync(tenantId,
-                                    [new(SettingKey: "branding.site_name", Value: "\"must-not-commit\"", IsLocked: false),
-                                        new(SettingKey: system.SettingKey, Value: "false", IsLocked: false)], actorId, transactionToken);
+                                    [new(SettingKey: admittedKey, Value: admittedValue, IsLocked: false),
+                                        new(SettingKey: "branding.site_name", Value: "\"must-not-commit\"", IsLocked: false)],
+                                    actorId, transactionToken);
                                 break;
                             case GenericWrite.TenantCreateBulk:
                                 await tenantRepository.CreateManyForTenantAsync(tenantId,
-                                    [new(SettingKey: "branding.site_name", Value: "\"must-not-commit\"", IsLocked: false),
-                                        new(SettingKey: GovernanceSettingKeys.Email.FromName, Value: "\"blocked\"", IsLocked: false)],
+                                    [new(SettingKey: admittedKey, Value: admittedValue, IsLocked: false),
+                                        new(SettingKey: "branding.site_name", Value: "\"must-not-commit\"", IsLocked: false)],
                                     actorId, DateTime.UtcNow, transactionToken);
                                 break;
                         }
                     }
-                    catch (InvalidOperationException) { rejected = true; }
-                    await context.SaveChangesAsync(transactionToken);
+                    catch (InvalidOperationException error) when (operation is not (GenericWrite.TenantBulk or GenericWrite.TenantCreateBulk))
+                    {
+                        await Assert.That(error.Message).Contains("dedicated email");
+                        rejected = true;
+                    }
+                    catch (UnauthorizedAccessException) when (operation is GenericWrite.TenantBulk or GenericWrite.TenantCreateBulk)
+                    {
+                        rejected = true;
+                    }
+                    await session.Context.SaveChangesAsync(transactionToken);
                     return true;
-                }, token));
+                }
+                return operation switch
+                {
+                    GenericWrite.SystemLock or GenericWrite.TenantLock => await session.LockAsync(admittedKey, true, Attempt),
+                    GenericWrite.TenantUnlock => await session.LockAsync(admittedKey, false, Attempt),
+                    GenericWrite.TenantRemove => await session.RemoveAsync(admittedKey, Attempt),
+                    _ => await session.ValueAsync(admittedKey,
+                        operation == GenericWrite.TenantCreateBulk ? "blocked" : "false", admittedValue, Attempt)
+                };
+            });
             await Assert.That(rejected).IsTrue();
             await using var observer = CreateContext(path);
             var instanceSetting = await observer.SystemSettings.AsNoTracking().SingleAsync(
@@ -137,20 +170,31 @@ public sealed class EmailDeliveryGenericSettingGuardTests
         {
             await CreateDatabaseAsync(path);
             await using var context = CreateContext(path);
+            await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => CreateContext(path));
             bool rejected = false;
-            try
-            {
-                await new SystemSettingRepository(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)))
-                    .UpsertAsync(new SystemSetting
+            await authenticated.RunAsync(null, session => session.ValueAsync(
+                    GovernanceSettingKeys.Email.DeliveryEnabled, "false", "false", async token =>
                     {
-                        Id = Guid.CreateVersion7(),
-                        SettingKey = key,
-                        Value = "false",
-                        ValueType = SettingValueType.Boolean,
-                        CreatedAt = DateTime.UtcNow
-                    });
-            }
-            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { rejected = true; }
+                        var repository = new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary);
+                        var canonical = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.UpsertAsync(new SystemSetting
+                        {
+                            SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+                            Value = "false"
+                        }, token));
+                        await Assert.That(canonical!.Message).Contains("dedicated email");
+                        // Alias text is not the original key. Reject at exact-effect custody,
+                        // before provider collation or the generic writer can resolve it.
+                        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => repository.UpsertAsync(new SystemSetting
+                        {
+                            Id = Guid.CreateVersion7(),
+                            SettingKey = key,
+                            Value = "false",
+                            ValueType = SettingValueType.Boolean,
+                            CreatedAt = DateTime.UtcNow
+                        }, token));
+                        rejected = true;
+                        return true;
+                    }));
             await Assert.That(rejected).IsTrue();
             await Assert.That((await context.SystemSettings.AsNoTracking().SingleAsync(
                 row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled)).Value).IsEqualTo("true");

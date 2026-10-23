@@ -25,8 +25,6 @@ using Explore.Application.Features.EventSessionSpeakers.Handlers.Commands;
 using Explore.Application.Features.EventSessionSpeakers.Handlers.Queries;
 using Explore.Application.Features.EventSessionSpeakers.Requests.Commands;
 using Explore.Application.Features.EventSessionSpeakers.Requests.Queries;
-using Explore.Application.Features.EventSessions.Handlers.Commands;
-using Explore.Application.Features.EventSessions.Requests.Commands;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -51,6 +49,10 @@ public sealed class EventSessionMappingHandlerTests
         var repository = Substitute.For<IEventSessionLanguageRepository>();
         var sessions = Substitute.For<IEventSessionRepository>();
         var languages = Substitute.For<ILanguageRepository>();
+        var session = Session();
+        sessions.GetSessionWithDetails(SessionId, Arg.Any<CancellationToken>()).Returns(session);
+        var events = Substitute.For<IEventRepository>();
+        events.GetEventWithDetails(EventId, Arg.Any<CancellationToken>()).Returns(session.Event);
         sessions.Exists(SessionId).Returns(true);
         languages.Exists(7).Returns(true);
         EventSessionLanguage? stored = null;
@@ -62,9 +64,12 @@ public sealed class EventSessionMappingHandlerTests
         });
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton(Substitute.For<IMachinePrincipalAccessor>());
         services.AddSingleton(repository);
         services.AddSingleton(sessions);
         services.AddSingleton(languages);
+        services.AddSingleton(events);
+        services.AddScoped<AuthorizationResourceContextResolver>();
         services.AddSingleton(Tenant());
         services.AddSingleton<IAuthorizationProvider>(new OperationAuthorizationTests.Policy(
             AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)));
@@ -125,67 +130,6 @@ public sealed class EventSessionMappingHandlerTests
         await Assert.That(stored.ActorId).IsEqualTo(CreatedId);
         await Assert.That(stored.ConcurrencyStamp).IsEqualTo(Guid.Empty);
         await Assert.That(stored.Actor).IsNull();
-    }
-
-    [Test]
-    [Arguments(SessionEndTimeType.Fixed)]
-    [Arguments(SessionEndTimeType.OpenEnded)]
-    [Arguments(SessionEndTimeType.RelativeToPrayer)]
-    public async Task CreateSession_PreservesDraftAuthorityAndDomainSchedule(SessionEndTimeType kind)
-    {
-        var repository = Substitute.For<IEventSessionRepository>();
-        var events = Substitute.For<IEventRepository>();
-        var parent = Session().Event;
-        parent.EventTimeZoneId = "UTC";
-        events.Exists(EventId).Returns(true);
-        events.GetById(EventId).Returns(parent);
-        EventSession? stored = null;
-        repository.CreateWithRoomOverlapGuardAsync(Arg.Any<EventSession>(), Arg.Any<CancellationToken>()).Returns(call =>
-        {
-            stored = call.Arg<EventSession>() ?? throw new InvalidOperationException("Expected session at persistence boundary.");
-            stored.Id = CreatedId;
-            return stored;
-        });
-        var handler = new CreateEventSessionCommandHandler(
-            repository, events, Substitute.For<ILocationRepository>(), Substitute.For<IRegistrationModeRepository>(),
-            Substitute.For<IEventSessionKindRepository>(), Substitute.For<IEventSessionIslamicAspectRepository>(),
-            Substitute.For<IEventSessionTemplateRepository>(), Substitute.For<IEventSessionCustomPropertyRepository>(),
-            Substitute.For<IEventSessionCustomPropertyProjectionUpdater>(), Substitute.For<IEventSessionTemplateInstantiationService>(),
-            new EventScheduleProjectionCalculator(), Substitute.For<IEventDayRepository>(), Substitute.For<IStorageObjectRepository>(),
-            new InlineUnitOfWork(), Attachment());
-        var result = await handler.ExecuteAsync(new CreateEventSessionCommand
-        {
-            EventSessionDto = new CreateEventSessionDto
-            {
-                EventId = EventId,
-                StartTime = Start,
-                EndTime = kind == SessionEndTimeType.Fixed ? Start.AddHours(1) : null,
-                EndTimeType = kind,
-                Title = "New session",
-                Description = "Description",
-                Slug = "new-session",
-                SortOrder = 5,
-                MaxAudienceAttendees = 40
-            }
-        }, CancellationToken.None);
-        await Assert.That(result.IsSuccess).IsTrue();
-        await Assert.That(stored!.TenantId).IsEqualTo(TenantId);
-        await Assert.That(stored.EventId).IsEqualTo(EventId);
-        await Assert.That(stored.EventSessionStatusId).IsEqualTo((int)EventSessionStatusEnum.Draft);
-        await Assert.That(stored.EndTimeType).IsEqualTo(kind);
-        await Assert.That(stored.StartTime).IsEqualTo(Start);
-        await Assert.That(stored.EndTime).IsEqualTo(kind == SessionEndTimeType.Fixed ? Start.AddHours(1) : (DateTimeOffset?)null);
-        await Assert.That(stored.LocalStartDate).IsEqualTo(new DateOnly(2026, 6, 15));
-        await Assert.That(stored.LocalStartTime).IsEqualTo(new TimeOnly(10, 0));
-        await Assert.That(stored.CurrentAudienceAttendees).IsEqualTo(0);
-        await Assert.That(stored.MaxAudienceAttendees).IsEqualTo(40);
-        await Assert.That(stored.SortOrder).IsEqualTo(5);
-        await Assert.That(stored.Description).IsEqualTo("Description");
-        await Assert.That(stored.Slug).IsEqualTo("new-session");
-        await Assert.That(stored.SourceTemplateId).IsNull();
-        await Assert.That(stored.CreatedBy).IsNull();
-        await Assert.That(stored.ConcurrencyStamp).IsEqualTo(Guid.Empty);
-        await Assert.That(stored.EventLocation!.IsToBeAnnounced).IsTrue();
     }
 
     [Test]
@@ -291,6 +235,7 @@ public sealed class EventSessionMappingHandlerTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(languages);
+        services.AddSingleton(Substitute.For<IMachinePrincipalAccessor>());
         services.AddSingleton(sessions);
         services.AddSingleton(Substitute.For<IAuthorizationProvider>());
         services.AddNativeOperations([typeof(GetEventSessionLanguageDetailsQuery), typeof(GetEventSessionLanguageDetailsQueryHandler)]);

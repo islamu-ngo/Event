@@ -3,14 +3,30 @@ using Explore.API.Hosting;
 using Explore.Application;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Operations;
+using Explore.Infrastructure;
+using Explore.Infrastructure.Authentication;
+using Explore.Infrastructure.WebPush;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Event.Api.IntegrationTests.Hosting;
 
 public sealed class NativeOperationHostCompositionTests
 {
+    [Test]
+    public async Task MetadataInfrastructureDoesNotConstructCredentialBoundHostedWorkers()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder().Build();
+        services.ConfigureInfrastructureServices(configuration, registerBackgroundWorkers: false);
+        await using var provider = services.BuildServiceProvider();
+        await Assert.That(provider.GetServices<IHostedService>().Any(worker =>
+            worker is WebPushDispatchProcessor or LocalIdentityLifecycleDeliveryWorker)).IsFalse();
+    }
+
     [Test]
     public async Task ActualApiProviderDeeplyResolvesEveryNativeHandlerInADisposableScope()
     {

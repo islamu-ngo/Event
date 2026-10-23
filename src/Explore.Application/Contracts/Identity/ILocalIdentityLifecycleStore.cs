@@ -42,7 +42,7 @@ public sealed record LocalIdentityPasswordChangeRequest
     {
         ArgumentNullException.ThrowIfNull(authority);
         if (personalActorId == Guid.Empty || externalLoginId == Guid.Empty) throw new ArgumentException("An exact Local binding is required.");
-        ArgumentException.ThrowIfNullOrWhiteSpace(currentPassword); ArgumentException.ThrowIfNullOrWhiteSpace(newPassword);
+        ArgumentException.ThrowIfNullOrEmpty(currentPassword); ArgumentException.ThrowIfNullOrEmpty(newPassword);
         Authority = authority; PersonalActorId = personalActorId; ExternalLoginId = externalLoginId;
         CurrentPassword = currentPassword; NewPassword = newPassword;
     }

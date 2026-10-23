@@ -3,6 +3,7 @@ namespace Explore.Application.Features.ConfigurationManifest.Managed;
 using System.Net;
 using System.Security.Cryptography;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Domain;
@@ -95,6 +96,7 @@ public sealed class ConfigurationDirectTransferService(
     IConfigurationDirectTransferChunkStore chunks,
     IConfigurationTransferDestinationResolver destinations,
     ConfigurationImportSessionApplicationService imports,
+    IConfigurationInstanceImportExecutor instanceImports,
     ConfigurationImportArtifactParser parser,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUser,
@@ -318,7 +320,7 @@ public sealed class ConfigurationDirectTransferService(
                 cancellationToken);
             created =
                 target.Scope == ConfigurationImportScope.Instance
-                    ? await imports.CreateInstanceAsync(
+                    ? await instanceImports.CreateAsync(
                         artifact,
                         cancellationToken)
                     : await imports.CreateTenantAsync(

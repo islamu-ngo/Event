@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
@@ -17,12 +18,16 @@ internal sealed class PrimaryDatabaseProviderBehaviorFixture
 {
     private readonly PrimaryDatabaseConnectionOptions _databaseOptions;
 
-    private PrimaryDatabaseProviderBehaviorFixture(PrimaryDatabaseConnectionOptions databaseOptions)
+    private PrimaryDatabaseProviderBehaviorFixture(
+        PrimaryDatabaseConnectionOptions databaseOptions, IConfiguration? configuration = null)
     {
         _databaseOptions = databaseOptions;
+        ReceiptEnrollment = databaseOptions.Provider == PrimaryDatabaseProvider.PostgreSql && configuration is not null
+            ? PostgresNativeQueueEnrollment.Bind(configuration) : null;
     }
 
     public PrimaryDatabaseProvider Provider => _databaseOptions.Provider;
+    public PostgresNativeQueueEnrollment? ReceiptEnrollment { get; }
 
     public static PrimaryDatabaseProviderBehaviorFixture Create()
     {
@@ -31,7 +36,7 @@ internal sealed class PrimaryDatabaseProviderBehaviorFixture
             .Build();
 
         return new PrimaryDatabaseProviderBehaviorFixture(
-            PrimaryDatabaseConfiguration.BindRuntime(configuration));
+            PrimaryDatabaseConfiguration.BindRuntime(configuration), configuration);
     }
 
     public static PrimaryDatabaseProviderBehaviorFixture Create(
@@ -52,6 +57,17 @@ internal sealed class PrimaryDatabaseProviderBehaviorFixture
     {
         var context = CreateContext(interceptors);
         context.TenantContext = tenantId.HasValue ? new TestTenantContext(tenantId.Value) : null;
+        return context;
+    }
+
+    public ExploreDbContext CreateReceiptContext(Guid tenantId)
+    {
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder, _databaseOptions);
+        if (Provider == PrimaryDatabaseProvider.PostgreSql)
+            builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
+        var context = new ExploreDbContext(builder.Options) { TenantContext = new TestTenantContext(tenantId) };
+        context.BindTenantLease();
         return context;
     }
 

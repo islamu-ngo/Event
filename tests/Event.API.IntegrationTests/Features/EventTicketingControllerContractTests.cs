@@ -1,6 +1,7 @@
 using System.Reflection;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
+using Explore.API.Configuration;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Operations;
@@ -16,6 +17,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using NSubstitute;
+using Microsoft.Extensions.Options;
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -173,10 +175,41 @@ public sealed class EventTicketingControllerContractTests
         await Assert.That(((ObjectResult)result.Result!).StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
     }
 
+    [Test]
+    public async Task PaymentOnboardingUsesConfiguredCanonicalAuthorityInsteadOfRequestAuthority()
+    {
+        CreateOrganizerPaymentOnboardingLinkCommand? captured = null;
+        var handler = Substitute.For<ICommandHandler<CreateOrganizerPaymentOnboardingLinkCommand, BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>>>();
+        handler.ExecuteAsync(Arg.Any<CreateOrganizerPaymentOnboardingLinkCommand>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                captured = call.Arg<CreateOrganizerPaymentOnboardingLinkCommand>();
+                return BaseCommandResponse.Failure<OrganizerPaymentOnboardingLinkResult>(
+                    "Provider not called by this contract test.", "organizer_payment_event_not_found");
+            });
+        var controller = CreateController(handler);
+        controller.Request.Scheme = "http";
+        controller.Request.Host = new HostString("tenant.example.test", 8443);
+        var url = Substitute.For<IUrlHelper>();
+        url.RouteUrl(Arg.Any<UrlRouteContext>()).Returns(call =>
+        {
+            var route = call.Arg<UrlRouteContext>();
+            return $"{route.Protocol}://{route.Host}/api/onboarding/{route.RouteName}";
+        });
+        controller.Url = url;
+        await controller.StartPaymentOnboarding(Guid.CreateVersion7(), CancellationToken.None);
+        await Assert.That(captured).IsNotNull();
+        await Assert.That(captured!.ReturnUrl.GetLeftPart(UriPartial.Authority)).IsEqualTo("https://canonical.example.test");
+        await Assert.That(captured.RefreshUrl.GetLeftPart(UriPartial.Authority)).IsEqualTo("https://canonical.example.test");
+    }
+
     private static EventTicketingController CreateController(
         ICommandHandler<CreateOrganizerPaymentOnboardingLinkCommand, BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>>? onboardingHandler = null)
     {
+        var authority = Substitute.For<IOptionsMonitor<EffectiveHostAuthorityOptions>>();
+        authority.CurrentValue.Returns(new EffectiveHostAuthorityOptions { CanonicalOrigin = "https://canonical.example.test" });
         var controller = new EventTicketingController(
+            authority,
             Substitute.For<IResourceAssembler<EventTicketCatalogManagementDto, EventTicketCatalogManagementDto>>(),
             Substitute.For<IResourceAssembler<PaidEventPublicationPreflightDto, PaidEventPublicationPreflightDto>>(),
             Substitute.For<IResourceAssembler<EventOrganizerPaymentConnectionManagementDto, EventOrganizerPaymentConnectionManagementDto>>(),

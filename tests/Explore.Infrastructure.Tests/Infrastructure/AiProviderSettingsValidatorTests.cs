@@ -1,10 +1,11 @@
+using Explore.Domain.Ai;
 using Explore.Infrastructure.Ai;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
-public sealed class AiProviderSettingsValidatorTests
+public sealed class AiProviderSettingsValidatorTests : AiProviderTestBase
 {
     private readonly AiProviderSettingsValidator _validator = CreateValidator();
 
@@ -60,7 +61,7 @@ public sealed class AiProviderSettingsValidatorTests
     }
 
     [Test]
-    public async Task Validate_OpenAiRequiresModelAndKeyButNotEndpoint()
+    public async Task Validate_OpenAiRequiresModelAndCredentialReferenceButNotEndpoint()
     {
         var missing = _validator.Validate(null, new AiProviderSettings
         {
@@ -70,21 +71,29 @@ public sealed class AiProviderSettingsValidatorTests
 
         await Assert.That(missing.Succeeded).IsFalse();
         await Assert.That(missing.FailureMessage).Contains("ModelId");
-        await Assert.That(missing.FailureMessage).Contains("ApiKey");
+        var settings = new AiProviderSettings
+        {
+            Enabled = true,
+            Provider = AiProviderSettings.ProviderOpenAi,
+            ModelId = "gpt-test",
+            CredentialScope = AiCredentialScope.None
+        };
+        var absentReference = await Fixture.Configuration(settings).ResolveInstanceAsync(settings, CancellationToken.None);
+        await Assert.That(absentReference.FailureCode).IsEqualTo("credential_scope_invalid");
 
         var configured = _validator.Validate(null, new AiProviderSettings
         {
             Enabled = true,
             Provider = AiProviderSettings.ProviderOpenAi,
             ModelId = "gpt-test",
-            ApiKey = "test-key"
+            CredentialScope = AiCredentialScope.Instance
         });
 
         await Assert.That(configured.Succeeded).IsTrue();
     }
 
     [Test]
-    public async Task Validate_AnthropicRequiresModelAndKeyButNotEndpoint()
+    public async Task Validate_AnthropicRequiresModelAndCredentialReferenceButNotEndpoint()
     {
         var missing = _validator.Validate(null, new AiProviderSettings
         {
@@ -94,14 +103,22 @@ public sealed class AiProviderSettingsValidatorTests
 
         await Assert.That(missing.Succeeded).IsFalse();
         await Assert.That(missing.FailureMessage).Contains("ModelId");
-        await Assert.That(missing.FailureMessage).Contains("ApiKey");
+        var settings = new AiProviderSettings
+        {
+            Enabled = true,
+            Provider = AiProviderSettings.ProviderAnthropic,
+            ModelId = "claude-test",
+            CredentialScope = AiCredentialScope.None
+        };
+        var absentReference = await Fixture.Configuration(settings).ResolveInstanceAsync(settings, CancellationToken.None);
+        await Assert.That(absentReference.FailureCode).IsEqualTo("credential_scope_invalid");
 
         var configured = _validator.Validate(null, new AiProviderSettings
         {
             Enabled = true,
             Provider = AiProviderSettings.ProviderAnthropic,
             ModelId = "claude-test",
-            ApiKey = "test-key"
+            CredentialScope = AiCredentialScope.Instance
         });
 
         await Assert.That(configured.Succeeded).IsTrue();
@@ -116,6 +133,7 @@ public sealed class AiProviderSettingsValidatorTests
             Provider = AiProviderSettings.ProviderAzureOpenAi,
             EndpointUrl = "https://ai.example.openai.azure.com/",
             ModelId = "deployment-test",
+            CredentialScope = AiCredentialScope.None,
             AzureCredentialMode = AiProviderSettings.AzureCredentialModeDefaultAzureCredential
         });
 
@@ -123,19 +141,21 @@ public sealed class AiProviderSettingsValidatorTests
     }
 
     [Test]
-    public async Task Validate_AzureOpenAiApiKeyModeRequiresApiKey()
+    public async Task Validate_AzureOpenAiApiKeyModeRequiresInstanceReference()
     {
-        var result = _validator.Validate(null, new AiProviderSettings
+        var settings = new AiProviderSettings
         {
             Enabled = true,
             Provider = AiProviderSettings.ProviderAzureOpenAi,
             EndpointUrl = "https://ai.example.openai.azure.com/",
             ModelId = "deployment-test",
+            CredentialScope = AiCredentialScope.None,
             AzureCredentialMode = AiProviderSettings.AzureCredentialModeApiKey
-        });
+        };
+        var result = await Fixture.Configuration(settings).ResolveInstanceAsync(settings, CancellationToken.None);
 
-        await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.FailureMessage).Contains("ApiKey");
+        await Assert.That(result.Configuration).IsNull();
+        await Assert.That(result.FailureCode).IsEqualTo("credential_scope_invalid");
     }
 
     [Test]
@@ -147,7 +167,7 @@ public sealed class AiProviderSettingsValidatorTests
             Provider = AiProviderSettings.ProviderAzureOpenAi,
             EndpointUrl = "http://ai.example.openai.azure.com/",
             ModelId = "deployment-test",
-            ApiKey = "test-key"
+            CredentialScope = AiCredentialScope.Instance
         });
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -163,7 +183,7 @@ public sealed class AiProviderSettingsValidatorTests
             Provider = AiProviderSettings.ProviderOpenAiCompatible,
             EndpointUrl = "https://ai.example.test/v1",
             ModelId = "gpt-test",
-            ApiKey = "test-key"
+            CredentialScope = AiCredentialScope.Instance
         });
 
         await Assert.That(result.Succeeded).IsTrue();
@@ -176,9 +196,9 @@ public sealed class AiProviderSettingsValidatorTests
         {
             Enabled = true,
             Provider = AiProviderSettings.ProviderOpenAiCompatible,
-            EndpointUrl = "https://user:password@ai.example.test/v1",
+            EndpointUrl = $"https://user:{Guid.CreateVersion7():N}@ai.example.test/v1",
             ModelId = "gpt-test",
-            ApiKey = "test-key"
+            CredentialScope = AiCredentialScope.Instance
         });
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -206,7 +226,7 @@ public sealed class AiProviderSettingsValidatorTests
             Provider = AiProviderSettings.ProviderOpenAiCompatible,
             EndpointUrl = "http://localhost:11434/v1",
             ModelId = "local-model",
-            ApiKey = "test-key"
+            CredentialScope = AiCredentialScope.Instance
         });
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -222,7 +242,7 @@ public sealed class AiProviderSettingsValidatorTests
             Provider = AiProviderSettings.ProviderOpenAiCompatible,
             EndpointUrl = "http://localhost:11434/v1",
             ModelId = "local-model",
-            ApiKey = "test-key",
+            CredentialScope = AiCredentialScope.Instance,
             AllowLocalProviderEndpoints = true
         });
 
@@ -238,7 +258,7 @@ public sealed class AiProviderSettingsValidatorTests
             Provider = AiProviderSettings.ProviderOpenAiCompatible,
             EndpointUrl = "https://ai.example.test/v1?tenant=browser-controlled",
             ModelId = "gpt-test",
-            ApiKey = "test-key"
+            CredentialScope = AiCredentialScope.Instance
         });
 
         await Assert.That(result.Succeeded).IsFalse();

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;
@@ -12,7 +13,8 @@ namespace Explore.Infrastructure.Messaging;
 public sealed class LocationPrivacyCorrectionDispatcher(
     HybridCache cache,
     IAtprotoLocationPrivacyCorrectionPlanner correctionPlanner,
-    EventLocationPrivacyMetrics metrics)
+    EventLocationPrivacyMetrics metrics,
+    ILocationPrivacyCorrectionReceiptRepository receipts)
 {
     public const string GovernanceCorrectionEventType = LocationPrivacyOutboxMessageFactory.ProjectionCorrectionEventType;
 
@@ -59,7 +61,7 @@ public sealed class LocationPrivacyCorrectionDispatcher(
 
         try
         {
-            await ApplyCorrectionAsync(message, cancellationToken);
+            await ApplyCorrectionAsync(message, isDeadLetterReconciliation, cancellationToken);
         }
         catch (Exception) when (!isDeadLetterReconciliation)
         {
@@ -73,7 +75,8 @@ public sealed class LocationPrivacyCorrectionDispatcher(
         }
     }
 
-    private async Task ApplyCorrectionAsync(OutboxMessage message, CancellationToken cancellationToken)
+    private async Task ApplyCorrectionAsync(
+        OutboxMessage message, bool deadLetterReconciliation, CancellationToken cancellationToken)
     {
         CorrectionDispatchPlan plan = message.EventType switch
         {
@@ -86,6 +89,13 @@ public sealed class LocationPrivacyCorrectionDispatcher(
             _ => throw Invalid(message, "event type is not a supported location-privacy correction")
         };
 
+        if (plan.ExternalCorrection is not null)
+        {
+            LocationPrivacyCorrectionReceipt receipt =
+                await RequireSourceAsync(message, deadLetterReconciliation, cancellationToken);
+            plan = ProjectionPlan(receipt);
+        }
+
         foreach (string tag in plan.Tags)
         {
             await cache.RemoveByTagAsync(tag, cancellationToken);
@@ -93,6 +103,9 @@ public sealed class LocationPrivacyCorrectionDispatcher(
 
         if (plan.ExternalCorrection is not null)
         {
+            // Cache invalidation can take time or fail part way through. Recheck custody
+            // at the external planning boundary, retaining the original lease identity.
+            await RequireSourceAsync(message, deadLetterReconciliation, cancellationToken);
             AtprotoPublicationPlanningResult result = await correctionPlanner.PlanLocationPrivacyCorrectionAsync(
                 plan.ExternalCorrection,
                 cancellationToken);
@@ -105,6 +118,35 @@ public sealed class LocationPrivacyCorrectionDispatcher(
                     $"PDS correction was not planned ({result.ReasonCode ?? "unknown"})");
             }
         }
+    }
+
+    private async Task<LocationPrivacyCorrectionReceipt> RequireSourceAsync(
+        OutboxMessage message, bool deadLetterReconciliation, CancellationToken cancellationToken)
+    {
+        LocationPrivacyCorrectionReceipt receipt =
+            await receipts.GetClaimedAsync(message, deadLetterReconciliation, cancellationToken)
+            ?? throw Invalid(message, "has no retained source under its exact live claim");
+        bool matches = receipt.Id == message.Id && receipt.EventType == message.EventType
+            && receipt.EventLocationId == message.AggregateId && receipt.CreatedAtUtc == message.CreatedAt;
+        if (message.EventType == GovernanceCorrectionEventType)
+        {
+            var payload = Deserialize<LocationPrivacyGovernanceCorrectionPayload>(message);
+            matches &= receipt.DisclosureAuditId is not null && receipt.ErasureIntentId is null
+                && receipt.AuthoritySequence is null && receipt.LocationId is null
+                && payload.TenantId == receipt.TenantId && payload.EventId == receipt.EventId
+                && payload.EventLocationId == receipt.EventLocationId && payload.PolicyVersion == receipt.PolicyVersion;
+        }
+        else
+        {
+            var payload = Deserialize<LocationPrivacyCorrectionRequestedPayload>(message);
+            matches &= receipt.DisclosureAuditId is null && receipt.ErasureIntentId == payload.IntentId
+                && receipt.AuthoritySequence == payload.AuthoritySequence && receipt.LocationId == payload.LocationId
+                && payload.TenantId == receipt.TenantId && payload.EventId == receipt.EventId
+                && payload.EventLocationId == receipt.EventLocationId && payload.PolicyVersion == receipt.PolicyVersion;
+        }
+        if (!matches)
+            throw Invalid(message, "does not match its retained correction source");
+        return receipt;
     }
 
     private static bool IsSupportedEventType(string eventType) => eventType is
@@ -138,6 +180,7 @@ public sealed class LocationPrivacyCorrectionDispatcher(
             || payload.TenantId == Guid.Empty
             || payload.EventId == Guid.Empty
             || payload.EventLocationId == Guid.Empty
+            || payload.LocationId is null
             || payload.LocationId == Guid.Empty
             || !MatchesEnvelope(message, nameof(EventLocation), payload.EventLocationId)
             || payload.PolicyVersion <= 0
@@ -178,6 +221,11 @@ public sealed class LocationPrivacyCorrectionDispatcher(
                 eventId,
                 message.Id,
                 message.CreatedAt));
+
+    private static CorrectionDispatchPlan ProjectionPlan(LocationPrivacyCorrectionReceipt receipt) => new(
+        ProjectionTags(receipt.TenantId, receipt.EventId, receipt.EventLocationId),
+        new AtprotoLocationPrivacyCorrectionInput(
+            receipt.TenantId, receipt.EventId, receipt.Id, receipt.CreatedAtUtc));
 
     private static IReadOnlyList<string> ProjectionTags(
         Guid tenantId,

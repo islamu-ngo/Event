@@ -1,0 +1,30 @@
+Change-Id: CHG-01M54N2D2QP535HN99AE6PSY8B
+Title: "Remove raw Svix configuration from readiness health data"
+Type: fix
+Scope: privacy
+Summary: "Replace provider environment and version text with presence booleans and normalize provider selection without changing conformance admission."
+Group: svix-health-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/integrations-and-ai/webhooks.md
+    Disposition: documented
+    Detail: Health consumers must replace raw environment and version fields with their Configured boolean counterparts.
+  Security:
+    Reference: docs/internal/WEBHOOKS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Prevent unregistered provider configuration text from entering readiness diagnostic exports.
+  Migration:
+    Reference: docs/internal/WEBHOOKS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/WEBHOOKS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/webhooks.md
+    Disposition: documented
+    Detail: Readiness validates exact conformance coordinates but exports only presence flags and normalized provider names.

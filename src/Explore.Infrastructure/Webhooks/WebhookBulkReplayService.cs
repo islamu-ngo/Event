@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,8 @@ public sealed class WebhookBulkReplayService(
     TimeProvider timeProvider,
     ILogger<WebhookBulkReplayService> logger) : IWebhookBulkReplayService
 {
+    private Guid? _lastScannedTenantId;
+
     public async Task<WebhookBulkReplayProcessResult> ProcessQueuedAsync(
         CancellationToken cancellationToken = default)
     {
@@ -20,17 +23,29 @@ public sealed class WebhookBulkReplayService(
         var scheduledTargets = 0;
         var failedOperations = 0;
         var operationsPerPass = policyResolver.Resolve().OperationsPerPass;
-
-        for (var index = 0; index < operationsPerPass; index++)
+        Guid[] tenantIds;
+        await using (var discovery = scopeFactory.CreateAsyncScope())
         {
+            var directory = await discovery.ServiceProvider.GetRequiredService<ITenantLookupSource>()
+                .GetTenantLookupsAsync(cancellationToken);
+            tenantIds = directory.Select(tenant => tenant.TenantId).Distinct().Order()
+                .Where(id => !_lastScannedTenantId.HasValue || id.CompareTo(_lastScannedTenantId.Value) > 0)
+                .Take(operationsPerPass).ToArray();
+        }
+
+        // The existing nonconcurrent Quartz job owns this cursor. The directory
+        // selects owners only; the native reader rechecks current tenant and queue state.
+        foreach (Guid tenantId in tenantIds)
+        {
+            _lastScannedTenantId = tenantId;
             cancellationToken.ThrowIfCancellationRequested();
             BulkReplayExecution? execution = null;
             try
             {
-                execution = await ProcessNextAsync(cancellationToken);
+                execution = await ProcessNextAsync(tenantId, cancellationToken);
                 if (execution is null)
                 {
-                    break;
+                    continue;
                 }
 
                 completedOperations++;
@@ -44,8 +59,8 @@ public sealed class WebhookBulkReplayService(
             {
                 failedOperations++;
                 logger.LogError(
-                    "Webhook bulk replay execution failed. FailureType={FailureType}",
-                    (exception.InnerException ?? exception).GetType().Name);
+                    "Webhook bulk replay execution failed. FailureCategory={FailureCategory}",
+                    "bulk_replay_execution_failed");
                 await MarkFailedAsync(
                     exception.TenantId,
                     exception.OperationId,
@@ -53,6 +68,8 @@ public sealed class WebhookBulkReplayService(
                 break;
             }
         }
+        if (tenantIds.Length < operationsPerPass)
+            _lastScannedTenantId = null;
 
         return new WebhookBulkReplayProcessResult(
             completedOperations,
@@ -60,9 +77,10 @@ public sealed class WebhookBulkReplayService(
             failedOperations);
     }
 
-    private async Task<BulkReplayExecution?> ProcessNextAsync(CancellationToken cancellationToken)
+    private async Task<BulkReplayExecution?> ProcessNextAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().BindExecutionTenant(tenantId);
         var repository = scope.ServiceProvider.GetRequiredService<IWebhookBulkReplayRepository>();
         var auditWriter = scope.ServiceProvider.GetRequiredService<IWebhookAuditEventWriter>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
@@ -129,6 +147,7 @@ public sealed class WebhookBulkReplayService(
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().BindExecutionTenant(tenantId);
             var repository = scope.ServiceProvider.GetRequiredService<IWebhookBulkReplayRepository>();
             var auditWriter = scope.ServiceProvider.GetRequiredService<IWebhookAuditEventWriter>();
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
@@ -168,11 +187,11 @@ public sealed class WebhookBulkReplayService(
         {
             throw;
         }
-        catch (Exception exception)
+        catch (Exception)
         {
             logger.LogError(
-                "Webhook bulk replay failure settlement failed. FailureType={FailureType}",
-                exception.GetType().Name);
+                "Webhook bulk replay failure settlement failed. FailureCategory={FailureCategory}",
+                "bulk_replay_failure_settlement_failed");
         }
     }
 

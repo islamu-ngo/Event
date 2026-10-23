@@ -23,7 +23,7 @@ public sealed class EventDiscoveryTraversal(
     IEventDiscoveryDisclosureRepository disclosure,
     EventDiscoveryCandidateReader candidates,
     IEventDiscoveryCursorProtector protector,
-    IHierarchicalSettingsResolver settings,
+    IHierarchicalSettingsReader settings,
     ITenantContext tenant,
     TimeProvider clock) : IQueryHandler<GetEventDiscoveryTraversalQuery, EventDiscoveryTraversalDto>
 {

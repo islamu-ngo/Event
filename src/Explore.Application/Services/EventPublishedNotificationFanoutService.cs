@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models.InternalEvents;
 using Explore.Application.Telemetry;
@@ -38,6 +39,8 @@ public sealed class EventPublishedNotificationFanoutService : IEventPublishedNot
     private readonly IWebPushDispatchOutboxRepository webPushDispatchOutboxRepository;
     private readonly BusinessMetrics metrics;
     private readonly ILogger<EventPublishedNotificationFanoutService> logger;
+    private readonly IEventRepository eventRepository;
+    private readonly ITenantContext tenantContext;
 
     public EventPublishedNotificationFanoutService(
         IActorSubscriptionRepository actorSubscriptionRepository,
@@ -49,7 +52,9 @@ public sealed class EventPublishedNotificationFanoutService : IEventPublishedNot
         IWebPushSubscriptionRepository webPushSubscriptionRepository,
         IWebPushDispatchOutboxRepository webPushDispatchOutboxRepository,
         BusinessMetrics metrics,
-        ILogger<EventPublishedNotificationFanoutService> logger)
+        ILogger<EventPublishedNotificationFanoutService> logger,
+        IEventRepository eventRepository,
+        ITenantContext tenantContext)
     {
         this.actorSubscriptionRepository = actorSubscriptionRepository;
         this.notificationRepository = notificationRepository;
@@ -61,18 +66,29 @@ public sealed class EventPublishedNotificationFanoutService : IEventPublishedNot
         this.webPushDispatchOutboxRepository = webPushDispatchOutboxRepository;
         this.metrics = metrics;
         this.logger = logger;
+        this.eventRepository = eventRepository;
+        this.tenantContext = tenantContext;
     }
 
     public async Task FanoutAsync(EventPublishedNotificationFanoutRequested request, CancellationToken cancellationToken = default)
     {
+        if (request.TenantId == Guid.Empty || request.TenantId != tenantContext.TenantId)
+            throw new InvalidOperationException("The publication fanout tenant is not selected.");
+        var source = await eventRepository.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        if (source is null || source.TenantId != request.TenantId || source.ActorId != request.SourceActorId
+            || source.EventStatusId != (int)EventStatusEnum.Published)
+            throw new InvalidOperationException("The publication fanout source is unavailable.");
+        request = request with
+        {
+            EventTitle = source.Title,
+            StartDate = source.FirstSessionStartUtc ?? request.PublishedAt,
+            EndDate = source.LastSessionStartUtc
+        };
         var run = await GetOrCreateRunAsync(request, cancellationToken);
         if (string.Equals(run.Status, StatusCompleted, StringComparison.Ordinal))
         {
             metrics.RecordNotificationFanoutRun(FanoutKind, OutcomeSkippedCompleted);
-            logger.LogInformation(
-                "Skipping completed notification fanout run {RunId} for event {EventId}",
-                run.Id,
-                request.EventId);
+            logger.LogInformation("Skipping completed notification fanout run.");
             return;
         }
 
@@ -82,11 +98,7 @@ public sealed class EventPublishedNotificationFanoutService : IEventPublishedNot
         run.LastError = null;
         await fanoutRunRepository.Update(run);
         metrics.RecordNotificationFanoutRun(FanoutKind, OutcomeProcessing);
-        logger.LogInformation(
-            "Started notification fanout run {RunId} for event {EventId} and tenant {TenantId}",
-            run.Id,
-            request.EventId,
-            request.TenantId);
+        logger.LogInformation("Started notification fanout run.");
 
         var processedThisAttempt = 0;
         var createdThisAttempt = 0;
@@ -153,9 +165,7 @@ public sealed class EventPublishedNotificationFanoutService : IEventPublishedNot
             metrics.RecordNotificationFanoutSubscribers(createdThisAttempt, FanoutKind, OutcomeNotificationCreated);
             metrics.RecordNotificationFanoutSubscribers(duplicateSkippedThisAttempt, FanoutKind, OutcomeDuplicateSkipped);
             logger.LogInformation(
-                "Completed notification fanout run {RunId} for event {EventId}: processed {ProcessedCount}, created {CreatedCount}, duplicate skipped {DuplicateSkippedCount}",
-                run.Id,
-                request.EventId,
+                "Completed notification fanout run: processed {ProcessedCount}, created {CreatedCount}, duplicate skipped {DuplicateSkippedCount}",
                 processedThisAttempt,
                 createdThisAttempt,
                 duplicateSkippedThisAttempt);
@@ -164,17 +174,14 @@ public sealed class EventPublishedNotificationFanoutService : IEventPublishedNot
         {
             run.Status = StatusFailed;
             run.FailedAt = DateTime.UtcNow;
-            run.LastError = ex.Message;
+            run.LastError = "event_publication_fanout_failed";
             await fanoutRunRepository.Update(run);
             metrics.RecordNotificationFanoutRun(FanoutKind, OutcomeFailed);
             metrics.RecordNotificationFanoutSubscribers(processedThisAttempt, FanoutKind, OutcomeProcessed);
             metrics.RecordNotificationFanoutSubscribers(createdThisAttempt, FanoutKind, OutcomeNotificationCreated);
             metrics.RecordNotificationFanoutSubscribers(duplicateSkippedThisAttempt, FanoutKind, OutcomeDuplicateSkipped);
             logger.LogError(
-                ex,
-                "Failed notification fanout run {RunId} for event {EventId}: processed {ProcessedCount}, created {CreatedCount}, duplicate skipped {DuplicateSkippedCount}",
-                run.Id,
-                request.EventId,
+                "Failed notification fanout run: processed {ProcessedCount}, created {CreatedCount}, duplicate skipped {DuplicateSkippedCount}",
                 processedThisAttempt,
                 createdThisAttempt,
                 duplicateSkippedThisAttempt);
@@ -257,6 +264,17 @@ public sealed class EventPublishedNotificationFanoutService : IEventPublishedNot
         string deduplicationKey,
         CancellationToken cancellationToken)
     {
+        var source = await eventRepository.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        if (request.TenantId != tenantContext.TenantId || source is null
+            || source.TenantId != request.TenantId || source.ActorId != request.SourceActorId
+            || source.EventStatusId != (int)EventStatusEnum.Published)
+            return RecipientOutcomeFenced;
+        request = request with
+        {
+            EventTitle = source.Title,
+            StartDate = source.FirstSessionStartUtc ?? request.PublishedAt,
+            EndDate = source.LastSessionStartUtc
+        };
         if (await IsFencedAsync(subscription.SubscriberUserId, cancellationToken))
         {
             return RecipientOutcomeFenced;

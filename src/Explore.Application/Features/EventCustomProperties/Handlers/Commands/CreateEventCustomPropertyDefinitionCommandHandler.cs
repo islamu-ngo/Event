@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Exceptions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -11,6 +12,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
 using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Commands;
 
@@ -22,8 +24,13 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly HybridCache _cache;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IEventRepository _eventRepository;
+    private readonly ISerializableAttemptOwner _owner;
+    private readonly IHumanAdministrativeActionPreparation _preparation;
+    private readonly IAdminContext _adminContext;
+    private readonly ITenantAdministratorCommitAuthority _tenantAuthority;
+    private readonly IInstanceAdministratorCommitAuthority _instanceAuthority;
+    private readonly RequestAuthorization<CreateEventCustomPropertyDefinitionCommand> _authorization;
+    private readonly ILogger<CreateEventCustomPropertyDefinitionCommandHandler> _logger;
 
     public CreateEventCustomPropertyDefinitionCommandHandler(
         IEventCustomPropertyRepository eventCustomPropertyRepository,
@@ -32,8 +39,13 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         HybridCache cache,
-        IUnitOfWork unitOfWork,
-        IEventRepository eventRepository)
+        ISerializableAttemptOwner owner,
+        IAdminContext adminContext,
+        ITenantAdministratorCommitAuthority tenantAuthority,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        RequestAuthorization<CreateEventCustomPropertyDefinitionCommand> authorization,
+        ILogger<CreateEventCustomPropertyDefinitionCommandHandler> logger,
+        IHumanAdministrativeActionPreparation preparation)
     {
         _eventCustomPropertyRepository = eventCustomPropertyRepository;
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
@@ -41,12 +53,23 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
         _cache = cache;
-        _unitOfWork = unitOfWork;
-        _eventRepository = eventRepository;
+        _owner = owner;
+        _preparation = preparation;
+        _adminContext = adminContext;
+        _tenantAuthority = tenantAuthority;
+        _instanceAuthority = instanceAuthority;
+        _authorization = authorization;
+        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
+        Guid tenantId = _tenantContext.TenantId;
+        if (!_currentUserService.IsAuthenticated || tenantId == Guid.Empty
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) is not { } userId)
+            return BaseCommandResponse.Authentication<Guid>();
+        request = request with { DefinitionDto = request.DefinitionDto with { } };
+        await _authorization.AuthorizeAsync(request, _logger, cancellationToken);
         var validator = new CreateEventCustomPropertyDefinitionDtoValidator();
         var validationResult = await validator.ValidateAsync(request.DefinitionDto, cancellationToken);
         if (!validationResult.IsValid)
@@ -56,8 +79,32 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
                 "Event custom property definition creation failed.");
         }
 
-        var parent = await _eventRepository.GetById(request.DefinitionDto.EventId);
-        if (parent is null || parent.TenantId != _tenantContext.TenantId)
+        Guid definitionId = Guid.CreateVersion7();
+        Guid[] optionIds = request.DefinitionDto.Options.Select(_ => Guid.CreateVersion7()).ToArray();
+        DateTimeOffset createdAt = DateTimeOffset.UtcNow;
+        var prepared = await _preparation.PrepareAsync(request, userId, cancellationToken);
+        var response = await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, userId, token);
+            if (!await _instanceAuthority.IsInstanceAdministratorForCommitAsync(userId, token)
+                && !await _tenantAuthority.IsTenantAdministratorForCommitAsync(userId, tenantId, token))
+                return BaseCommandResponse.Authorization<Guid>();
+            return await CreateAuthorizedAsync(request, tenantId, definitionId, optionIds, createdAt, token);
+        }, cancellationToken);
+        if (response.IsSuccess)
+            await _cache.RemoveByTagAsync(
+                EventCustomPropertyCache.ListsByEvent(tenantId, request.DefinitionDto.EventId),
+                CancellationToken.None);
+        return response;
+    }
+
+    private async Task<BaseCommandResponse<Guid>> CreateAuthorizedAsync(
+        CreateEventCustomPropertyDefinitionCommand request, Guid tenantId, Guid definitionId,
+        Guid[] optionIds, DateTimeOffset createdAt, CancellationToken cancellationToken)
+    {
+        var parent = await _eventCustomPropertyRepository.GetParentForMutationAsync(
+            request.DefinitionDto.EventId, cancellationToken);
+        if (parent is null || parent.TenantId != tenantId)
         {
             throw new AuthorizationException(ResourceKinds.Tenant, AuthorizationActions.Update);
         }
@@ -82,7 +129,7 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
 
         var maxDefinitions = await _quotaResolver.GetIntAsync(
             CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerEvent.Key,
-            _tenantContext.TenantId,
+            tenantId,
             cancellationToken);
         var currentDefinitionCount = await _eventCustomPropertyRepository.CountDefinitionsForEvent(
             request.DefinitionDto.EventId,
@@ -97,12 +144,12 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
                     currentDefinitionCount,
                     currentDefinitionCount + 1,
                     "event_custom_property_definitions",
-                    _tenantContext.TenantId));
+                    tenantId));
         }
 
         var maxOptions = await _quotaResolver.GetIntAsync(
             CustomPropertyQuotaSettingDefinitions.MaxOptionsPerDefinition.Key,
-            _tenantContext.TenantId,
+            tenantId,
             cancellationToken);
         if (request.DefinitionDto.Options.Count > maxOptions)
         {
@@ -114,13 +161,14 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
                     null,
                     request.DefinitionDto.Options.Count,
                     "event_custom_property_options",
-                    _tenantContext.TenantId));
+                    tenantId));
         }
 
         var dto = request.DefinitionDto;
         var definition = new EventCustomPropertyDefinition
         {
-            Id = Guid.CreateVersion7(),
+            Id = definitionId,
+            CreatedAt = createdAt.UtcDateTime,
             EventId = dto.EventId,
             Namespace = governance.NormalizedNamespace,
             Key = governance.NormalizedKey,
@@ -150,34 +198,31 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : ICommandHandler
             MinDateTime = dto.MinDateTime,
             MaxDateTime = dto.MaxDateTime,
             AllowedUrlSchemes = dto.AllowedUrlSchemes,
-            TenantId = _tenantContext.TenantId,
-            InstantiatedAt = DateTimeOffset.UtcNow,
+            TenantId = tenantId,
+            InstantiatedAt = createdAt,
             CreatedBy = _currentUserService.UserId,
             UpdatedBy = _currentUserService.UserId
         };
 
-        var options = CreateOptionEntities(request.DefinitionDto.Options, definition.Id);
+        var options = CreateOptionEntities(request.DefinitionDto.Options, definition.Id, optionIds, createdAt.UtcDateTime);
         var defaultOption = options.SingleOrDefault(x => x.IsDefault);
 
-        definition = await _unitOfWork.ExecuteInTransactionAsync(
-            ct => _eventCustomPropertyRepository.CreateWithOptions(definition, options, defaultOption?.Id, ct),
-            cancellationToken);
-
-        await _cache.RemoveByTagAsync(
-            EventCustomPropertyCache.ListsByEvent(definition.TenantId, definition.EventId),
-            CancellationToken.None);
+        definition = await _eventCustomPropertyRepository.CreateWithOptions(
+            definition, options, defaultOption?.Id, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         return BaseCommandResponse.Success(definition.Id, "Event custom property definition created successfully.");
     }
 
     private List<EventCustomPropertyOption> CreateOptionEntities(
         IReadOnlyCollection<DTOs.EventCustomProperty.CreateEventCustomPropertyOptionDto> optionDtos,
-        Guid definitionId)
+        Guid definitionId, Guid[] optionIds, DateTime createdAt)
     {
         return optionDtos
-            .Select(optionDto => new EventCustomPropertyOption
+            .Select((optionDto, index) => new EventCustomPropertyOption
             {
-                Id = Guid.CreateVersion7(),
+                Id = optionIds[index],
+                CreatedAt = createdAt,
                 EventCustomPropertyDefinitionId = definitionId,
                 Namespace = CustomPropertyIdentity.NormalizeNamespace(optionDto.Namespace),
                 Key = CustomPropertyIdentity.NormalizeKey(optionDto.Key),

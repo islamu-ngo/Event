@@ -29,8 +29,8 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
     private readonly Guid _eventId = Guid.CreateVersion7();
     private readonly Guid _orderId = Guid.CreateVersion7();
     private readonly Guid _accountId = Guid.CreateVersion7();
-    private readonly IRegistrationInventoryRepository _inventory =
-        Substitute.For<IRegistrationInventoryRepository>();
+    private readonly IRegistrationPrivateReader _reader =
+        Substitute.For<IRegistrationPrivateReader>();
     private readonly ITicketPurchaseGovernanceRepository _governance =
         Substitute.For<ITicketPurchaseGovernanceRepository>();
     private readonly ICurrentUserService _currentUser =
@@ -57,11 +57,11 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
         TicketPurchasePolicyVersion currentPolicy =
             CreatePolicy();
         ReserveTicketPurchaseCommand? forwarded = null;
-        _inventory.GetOrderWithLinesAsync(
-                _orderId,
-                _tenantId,
+        _reader.ReadAsync(
+                Arg.Any<RegistrationPrivateRead>(),
+                null,
                 Arg.Any<CancellationToken>())
-            .Returns(order);
+            .Returns(new RegistrationPrivateGraph { Order = order, PrincipalId = _accountId });
         _governance.GetCurrentPolicyVersionAsync(
                 _tenantId,
                 _eventId,
@@ -80,9 +80,8 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
             });
         var handler =
             new ReserveAuthenticatedTicketPurchaseCommandHandler(
-                _inventory,
+                _reader,
                 _governance,
-                _currentUser,
                 _tenant,
                 _reserveHandler);
 
@@ -106,19 +105,19 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
     [Test]
     public async Task AccountOwnershipFailurePrecedesCurrentPolicyLookup()
     {
-        _inventory.GetOrderWithLinesAsync(
-                _orderId,
-                _tenantId,
+        _reader.ReadAsync(
+                Arg.Any<RegistrationPrivateRead>(),
+                null,
                 Arg.Any<CancellationToken>())
-            .Returns(
-                CreateOrder(
-                    Guid.CreateVersion7(),
-                    guestHash: null));
+            .Returns(new RegistrationPrivateGraph
+            {
+                Order = CreateOrder(Guid.CreateVersion7(), guestHash: null),
+                PrincipalId = _accountId
+            });
         var handler =
             new ReserveAuthenticatedTicketPurchaseCommandHandler(
-                _inventory,
+                _reader,
                 _governance,
-                _currentUser,
                 _tenant,
                 _reserveHandler);
 
@@ -146,18 +145,18 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
         CapabilityTokenHash guestHash =
             CapabilityTokenHash.Create(
                 Convert.ToBase64String(new byte[32]));
-        _inventory.GetOrderWithLinesAsync(
-                _orderId,
-                _tenantId,
+        _reader.ReadAsync(
+                Arg.Any<RegistrationPrivateRead>(),
+                Arg.Any<string?>(),
                 Arg.Any<CancellationToken>())
-            .Returns(CreateOrder(null, guestHash));
+            .Returns(new RegistrationPrivateGraph { Order = CreateOrder(null, guestHash) });
         _capabilities.Matches(
                 Arg.Any<string?>(),
                 guestHash)
             .Returns(false);
         var handler =
             new ReserveGuestTicketPurchaseCommandHandler(
-                _inventory,
+                _reader,
                 _governance,
                 _capabilities,
                 _tenant,

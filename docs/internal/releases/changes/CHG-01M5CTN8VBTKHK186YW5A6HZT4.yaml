@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5CTN8VBTKHK186YW5A6HZT4
+Title: "Recognize valid PDS permissions during repeated migration"
+Type: fix
+Scope: self-hosting
+Summary: "Compare PDS catalog privileges with raw EF-mapped column names instead of stripping presumed identifier quotes, preserving the existing fixed permissions and drift refusal."
+Group: pds-permission-reapplication
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Queue SELECT11/UPDATE5 and record SELECT4 inventories remain unchanged. Unexpected column access and grant options still fail; installation does not repair them or add application privileges.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Deploy matching migration tooling before reopening traffic. A remaining unsafe PDS admission column grants error requires privilege investigation, not broader permissions, reordered installers or a disabled guard.

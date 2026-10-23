@@ -1,18 +1,20 @@
-using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
+using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Persistence.Caching;
 
-public class LookupDataCache : ILookupDataCache
+public class LookupDataCache : ILookupDataCache, IDisposable
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<LookupDataCache> _logger;
-    private readonly ConcurrentDictionary<Type, object> _cache = new();
+    private readonly SemaphoreSlim _loadGate = new(1, 1);
+    private FrozenDictionary<Type, object> _cache = FrozenDictionary<Type, object>.Empty;
 
     public LookupDataCache(IServiceScopeFactory scopeFactory, ILogger<LookupDataCache> logger)
     {
@@ -22,7 +24,7 @@ public class LookupDataCache : ILookupDataCache
 
     public FrozenDictionary<int, T> Get<T>() where T : class
     {
-        if (_cache.TryGetValue(typeof(T), out var cached))
+        if (Volatile.Read(ref _cache).TryGetValue(typeof(T), out var cached))
         {
             return (FrozenDictionary<int, T>)cached;
         }
@@ -44,59 +46,70 @@ public class LookupDataCache : ILookupDataCache
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Initializing lookup data cache...");
-
-        using var scope = _scopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-
-        await LoadLookupAsync<EventType>(dbContext, cancellationToken);
-        await LoadLookupAsync<EventFormat>(dbContext, cancellationToken);
-        await LoadLookupAsync<EventStatus>(dbContext, cancellationToken);
-        await LoadLookupAsync<AudienceAge>(dbContext, cancellationToken);
-        await LoadLookupAsync<AudienceGender>(dbContext, cancellationToken);
-        await LoadLookupAsync<Madhab>(dbContext, cancellationToken);
-        await LoadLookupAsync<Language>(dbContext, cancellationToken);
-        await LoadLookupAsync<VisibilityType>(dbContext, cancellationToken);
-        await LoadLookupAsync<ApprovalStatus>(dbContext, cancellationToken);
-        await LoadLookupAsync<RegistrationMode>(dbContext, cancellationToken);
-        await LoadLookupAsync<Role>(dbContext, cancellationToken);
-        await LoadLookupAsync<OrganizationPosition>(dbContext, cancellationToken);
-        await LoadLookupAsync<ActorType>(dbContext, cancellationToken);
-        await LoadLookupAsync<DidCustodyType>(dbContext, cancellationToken);
-        await LoadLookupAsync<FileType>(dbContext, cancellationToken);
-        await LoadLookupAsync<TagType>(dbContext, cancellationToken);
-        await LoadLookupAsync<OwnerType>(dbContext, cancellationToken);
-
-        _logger.LogInformation("Lookup data cache initialized with {Count} types", _cache.Count);
-    }
-
-    public async Task RefreshAsync(CancellationToken cancellationToken = default)
-    {
-        _cache.Clear();
-        await InitializeAsync(cancellationToken);
-    }
-
-    private async Task LoadLookupAsync<T>(ExploreDbContext dbContext, CancellationToken cancellationToken) where T : class
-    {
+        await _loadGate.WaitAsync(cancellationToken);
         try
         {
-            var items = await dbContext.Set<T>().AsNoTracking().ToListAsync(cancellationToken);
-
-            var idProperty = typeof(T).GetProperty("Id");
-            if (idProperty is null || idProperty.PropertyType != typeof(int))
-            {
-                _logger.LogWarning("Lookup type {Type} does not have an int Id property, skipping", typeof(T).Name);
-                return;
-            }
-
-            var dict = items.ToFrozenDictionary(item => (int)idProperty.GetValue(item)!);
-            _cache[typeof(T)] = dict;
-
-            _logger.LogDebug("Cached {Count} {Type} items", items.Count, typeof(T).Name);
+            _logger.LogInformation("Initializing lookup data cache...");
+            var snapshot = await LoadSnapshotAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            Volatile.Write(ref _cache, snapshot);
+            _logger.LogInformation("Lookup data cache initialized with {Count} types", snapshot.Count);
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogError(ex, "Failed to load lookup data for {Type}", typeof(T).Name);
+            _loadGate.Release();
         }
+    }
+
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => InitializeAsync(cancellationToken);
+
+    private async Task<FrozenDictionary<Type, object>> LoadSnapshotAsync(CancellationToken cancellationToken)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        await using var dbContext = await scope.ServiceProvider
+            .GetRequiredService<IDbContextFactory<ExploreDbContext>>()
+            .CreateDbContextAsync(cancellationToken);
+        var enrollment = dbContext.Database.IsNpgsql()
+            ? scope.ServiceProvider.GetRequiredService<PostgresNativeQueueEnrollment>() : null;
+        var snapshot = new Dictionary<Type, object>(17);
+
+        await LoadLookupAsync<EventType>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<EventFormat>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<EventStatus>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<AudienceAge>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<AudienceGender>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<Madhab>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<Language>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<VisibilityType>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<ApprovalStatus>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<RegistrationMode>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<Role>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<OrganizationPosition>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<ActorType>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<DidCustodyType>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<FileType>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<TagType>(snapshot, dbContext, enrollment, cancellationToken);
+        await LoadLookupAsync<OwnerType>(snapshot, dbContext, enrollment, cancellationToken);
+
+        return snapshot.ToFrozenDictionary();
+    }
+
+    private async Task LoadLookupAsync<T>(Dictionary<Type, object> snapshot, ExploreDbContext dbContext,
+        PostgresNativeQueueEnrollment? enrollment, CancellationToken cancellationToken) where T : class
+    {
+        var items = await GlobalLookupCatalogueProviderOperations.ReadAsync<T>(dbContext, enrollment, cancellationToken);
+
+        var idProperty = typeof(T).GetProperty("Id");
+        if (idProperty is null || idProperty.PropertyType != typeof(int))
+            throw new InvalidOperationException("global_lookup_model_shape_drift");
+
+        snapshot.Add(typeof(T), items.ToFrozenDictionary(item => (int)idProperty.GetValue(item)!));
+        _logger.LogDebug("Loaded {Count} {Type} items", items.Count, typeof(T).Name);
+    }
+
+    public void Dispose()
+    {
+        _loadGate.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

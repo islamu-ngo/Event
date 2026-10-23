@@ -22,7 +22,15 @@ public sealed class TenantPlanStorageQuotaCeilingPolicy(ISystemSettingRepository
         SystemSetting? ceilingSetting = await systemSettingRepository.GetByKey(
             GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes,
             cancellationToken);
-        if (ceilingSetting is null || !TryParseLong(ceilingSetting.Value, out long ceiling))
+        return Validate([storageQuota], ceilingSetting?.Value);
+    }
+
+    /// <summary>Applies the same ceiling rule to an already retained nonsecret source value.</summary>
+    public static string? Validate(IEnumerable<TenantPlanVersionQuota> quotas, string? ceilingValue)
+    {
+        TenantPlanVersionQuota? storageQuota = quotas
+            .FirstOrDefault(quota => quota.QuotaKey == TenantPlanQuotaKeys.StorageBytes);
+        if (storageQuota is null || ceilingValue is null || !TryParseLong(ceilingValue, out long ceiling))
         {
             return null;
         }

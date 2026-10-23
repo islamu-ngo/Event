@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
@@ -18,9 +17,10 @@ public sealed class UpdateWebhookConsumerProviderModeCommandHandler(
     IWebhookProviderCapabilityResolver capabilityResolver,
     IWebhookAuditEventWriter auditWriter,
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUserService,
     IMachinePrincipalAccessor machinePrincipalAccessor,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IHumanCommitScopePreparation humanScope,
+    IHumanWebhookMutationPreparation preparation)
     : ICommandHandler<UpdateWebhookConsumerProviderModeCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -33,11 +33,15 @@ public sealed class UpdateWebhookConsumerProviderModeCommandHandler(
             return Failure("webhook_consumer_provider_mode_validation_failed", validationErrors);
         }
 
-        if (!TryResolveActor(out _, out var actorUserId))
+        var machine = machinePrincipalAccessor.Current;
+        HumanCommitSubject? subject = null;
+        if (machine is null)
         {
-            return Failure(
-                "webhook_consumer_provider_mode_actor_required",
-                ["An authenticated operator identity is required."]);
+            await humanScope.PrepareAsync(cancellationToken);
+            subject = humanScope.Subject;
+            if (subject is null)
+                return Failure("webhook_consumer_provider_mode_actor_required",
+                    ["An authenticated operator identity is required."]);
         }
 
         var targetMode = (WebhookProviderMode)request.ProviderModeId;
@@ -49,7 +53,8 @@ public sealed class UpdateWebhookConsumerProviderModeCommandHandler(
                 ["Provider-mode changes cannot migrate existing work between Local targets and provider publications. Preserve existing work and let new work use the new mode."]);
         }
 
-        return await unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        async Task<BaseCommandResponse<Guid>> MutateAsync(CancellationToken transactionCancellationToken)
         {
             var consumer = await consumerRepository.GetByIdForOwnerOperationAsync(
                 request.ConsumerId,
@@ -105,11 +110,12 @@ public sealed class UpdateWebhookConsumerProviderModeCommandHandler(
 
             var previousMode = consumer.ProviderMode;
             var previousVersion = consumer.ConfigurationVersion;
-            var now = timeProvider.GetUtcNow().UtcDateTime;
             consumer.ChangeProviderMode(targetMode, now);
-            consumer.UpdatedBy = actorUserId;
+            consumer.UpdatedBy = subject?.PrincipalId;
 
             var persisted = await consumerRepository.UpdateAsync(consumer, transactionCancellationToken);
+            if (subject is not null && (persisted.UpdatedBy != subject.PrincipalId || persisted.UpdatedAt != now))
+                throw new UnauthorizedAccessException("The consumer update must retain its original human and time.");
             await auditWriter.AppendAsync(
                 new WebhookAuditWriteRequest(
                     consumer.TenantId,
@@ -136,14 +142,21 @@ public sealed class UpdateWebhookConsumerProviderModeCommandHandler(
                     }),
                     ConfigurationVersion: $"consumer-v{consumer.ConfigurationVersion}",
                     EffectiveScopeKind: consumer.Ownership.AuditScopeKind,
-                    EffectiveScopeId: consumer.OwnerId),
+                    EffectiveScopeId: consumer.OwnerId,
+                    PrincipalKind: subject is not null ? WebhookAuditPrincipalKind.User : WebhookAuditPrincipalKind.Machine,
+                    PrincipalReference: subject is not null ? $"user:{subject.PrincipalId:D}"
+                        : $"machine:{machine!.OwnerType}:{machine.OwnerId:D}"),
                 transactionCancellationToken);
 
             var warning = uncertainPublicationCount > 0
                 ? $" {uncertainPublicationCount} uncertain provider publication(s) remain on their original snapshots."
                 : string.Empty;
             return BaseCommandResponse.Success(persisted.Id, $"Webhook consumer provider mode changed; existing pending work preserved.{warning}");
-        }, cancellationToken);
+        }
+
+        return machine is null
+            ? await preparation.ExecuteAsync(request, MutateAsync, cancellationToken)
+            : await unitOfWork.ExecuteInTransactionAsync(MutateAsync, cancellationToken);
     }
 
     private async Task<(string Code, string Message)?> ValidateTargetConfigurationAsync(
@@ -211,27 +224,6 @@ public sealed class UpdateWebhookConsumerProviderModeCommandHandler(
         }
 
         return errors;
-    }
-
-    private bool TryResolveActor(out string actorReference, out Guid? actorUserId)
-    {
-        if (currentUserService.UserId is { } userId)
-        {
-            actorReference = $"user:{userId:D}";
-            actorUserId = userId;
-            return true;
-        }
-
-        if (machinePrincipalAccessor.Current is { } machine)
-        {
-            actorReference = $"machine:{machine.OwnerType}:{machine.OwnerId:D}";
-            actorUserId = null;
-            return true;
-        }
-
-        actorReference = string.Empty;
-        actorUserId = null;
-        return false;
     }
 
     private static BaseCommandResponse<Guid> Failure(string code, IReadOnlyList<string> errors) =>

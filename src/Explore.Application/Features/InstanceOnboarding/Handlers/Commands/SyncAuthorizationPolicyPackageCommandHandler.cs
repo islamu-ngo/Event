@@ -6,13 +6,15 @@ using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
 public sealed class SyncAuthorizationPolicyPackageCommandHandler(
     IPolicyPackageService policyPackageService,
     IAuthorizationProviderConfigurationService configurationService,
-    ILogger<SyncAuthorizationPolicyPackageCommandHandler> logger)
+    ILogger<SyncAuthorizationPolicyPackageCommandHandler> logger,
+    IPolicyMutationExecutionScopeFactory scopes)
     : ICommandHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -32,29 +34,27 @@ public sealed class SyncAuthorizationPolicyPackageCommandHandler(
             string.IsNullOrWhiteSpace(request.Request.AdminUsername)
                 ? null
                 : new(
-                    request.Request.AdminUsername.Trim(),
+                    request.Request.AdminUsername,
                     request.Request.AdminPassword!);
 
         try
         {
-            var configuration = await configurationService.ReadConfigurationAsync();
-            if (configuration.AuthorizationProviderManagedByDeployment)
+            if (request.Request.InspectOnly)
             {
-                var reconciliation = await configurationService
-                    .ReconcileDeploymentProviderAsync(cancellationToken, oneTimeCredentials);
-                return reconciliation.Succeeded
-                    ? BaseCommandResponse.Success(Guid.Empty, reconciliation.Message)
-                    : BaseCommandResponse.Validation<Guid>([reconciliation.Message], reconciliation.Message);
+                var configuration = await configurationService.ReadConfigurationAsync();
+                var status = await policyPackageService.GetStatusAsync(cancellationToken, oneTimeCredentials,
+                    configuration.AuthorizationProviderManagedByDeployment);
+                return status.IsHealthy
+                    ? BaseCommandResponse.Success(Guid.Empty, status.Message)
+                    : BaseCommandResponse.Failure<Guid>(status.IssueCode.ToString(), status.Message);
             }
 
-            var result = await policyPackageService.PublishAsync(cancellationToken, oneTimeCredentials);
+            await using var selected = await scopes.CreateAsync(PolicyMutationScope.Instance, cancellationToken);
+            var result = await selected.Services.GetRequiredService<IPolicyPackageService>().PublishAsync(request, cancellationToken);
 
             if (result.Succeeded)
             {
-                logger.LogInformation(
-                    "Authorization policy package synced. PackageId={PackageId} ContentHash={ContentHash}",
-                    result.PackageId,
-                    result.ContentHash);
+                logger.LogInformation("Authorization policy package synced.");
 
                 return BaseCommandResponse.Success(
                     Guid.Empty,
@@ -64,10 +64,8 @@ public sealed class SyncAuthorizationPolicyPackageCommandHandler(
             }
 
             logger.LogWarning(
-                "Authorization policy package sync failed. PackageId={PackageId} IssueCode={IssueCode} Message={Message}",
-                result.PackageId,
-                result.IssueCode,
-                result.Message);
+                "Authorization policy package sync failed. IssueCode={IssueCode}",
+                result.IssueCode);
 
             string message = string.IsNullOrWhiteSpace(result.Message)
                 ? "Authorization policy package sync failed."
@@ -87,9 +85,9 @@ public sealed class SyncAuthorizationPolicyPackageCommandHandler(
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogError(ex, "Authorization policy package sync failed unexpectedly.");
+            logger.LogError("Authorization policy package sync failed.");
             return BaseCommandResponse.Validation(
                 ["Review server logs for the safe failure details and retry."],
                 "Authorization policy package sync failed.",

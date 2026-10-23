@@ -64,7 +64,7 @@ public sealed class NativeLocalizationHttpTests
             var foreignTenantId = Guid.CreateVersion7();
             using (var scope = factory.Services.CreateScope())
             {
-                var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+                using var db = baseFactory.CreateMigratorContext();
                 var admin = NewUser(adminId, "localization-admin");
                 db.Users.AddRange(admin, NewUser(memberId, "localization-member"));
                 var role = await db.Set<Role>().SingleAsync(item => item.MasterCode == "platform.admin");
@@ -120,6 +120,28 @@ public sealed class NativeLocalizationHttpTests
                 await Assert.That((await JsonAsync(probe)).GetProperty("id").GetGuid()).IsEqualTo(Guid.Empty);
             }
             await Assert.That((await File.ReadAllBytesAsync(bundlePath)).SequenceEqual(importedBytes)).IsTrue();
+            foreach (var json in new[]
+            {
+                """{"languageCode":"fr","translations":{"ui.test":"first","ui.test":"second"}}""",
+                """{"languageCode":"fr","translations":{"ui.test":{"text":"nested"}}}""",
+                """{"languageCode":"fr","translations":{"ui.test":"text"},"unknown":true}""",
+                """{"languageCode":"fr","translations":{"unsupported.test":"text"}}""",
+                JsonSerializer.Serialize(new
+                {
+                    languageCode = "fr",
+                    translations = new Dictionary<string, string>
+                    {
+                        ["ui.test"] = new string('x',
+                            Explore.Domain.Common.Localization.LocalizationBundlePolicy.MaximumValueCharacters + 1)
+                    }
+                })
+            })
+            {
+                using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                using var invalid = await adminClient.PostAsync("/api/admin/localization/bundle", content);
+                await ProblemAsync(invalid);
+                await Assert.That((await File.ReadAllBytesAsync(bundlePath)).SequenceEqual(importedBytes)).IsTrue();
+            }
             using (var invalid = await adminClient.PostAsJsonAsync("/api/admin/localization/bundle", Bundle("invalid") with { LanguageCode = "zz" }))
                 await ProblemAsync(invalid);
             await Assert.That((await File.ReadAllBytesAsync(bundlePath)).SequenceEqual(importedBytes)).IsTrue();
@@ -184,7 +206,7 @@ public sealed class NativeLocalizationHttpTests
                 await Assert.That(await status.QueryAsync(new(), default)).IsTrue();
                 tenant.SetTenant(PlatformDefaults.DefaultTenantId);
                 await Assert.That(await status.QueryAsync(new(), default)).IsFalse();
-                var db = services.GetRequiredService<ExploreDbContext>();
+                using var db = baseFactory.CreateMigratorContext();
                 db.SecretBindings.Add(Binding(SecretScope.Instance, null));
                 await db.SaveChangesAsync();
                 await Assert.That(await status.QueryAsync(new(), default)).IsTrue();

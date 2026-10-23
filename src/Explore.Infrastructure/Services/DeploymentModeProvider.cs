@@ -44,10 +44,10 @@ public sealed class DeploymentModeProvider : IDeploymentModeProvider
                 return cached.Value;
         }
 
-        // Layer 2: database (scoped repo accessed via factory)
+        // Layer 2: committed bootstrap evidence through the admitted Global reader.
         using var scope = _scopeFactory.CreateScope();
         var repo = scope.ServiceProvider
-            .GetRequiredService<IInstanceBootstrapStateRepository>();
+            .GetRequiredService<IInstanceBootstrapStateReader>();
         var bootstrap = await repo.GetCurrent(ct);
 
         // Pre-onboarding (fresh install): InstanceBootstrapState is null or incomplete.
@@ -101,9 +101,9 @@ public sealed class DeploymentModeProvider : IDeploymentModeProvider
                 ? cachedMode
                 : null;
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
-            _logger.LogWarning(ex, "Distributed cache unavailable while resolving deployment mode. Falling back to database.");
+            _logger.LogWarning("Distributed cache unavailable while resolving deployment mode. Falling back to database.");
             return null;
         }
     }
@@ -121,9 +121,9 @@ public sealed class DeploymentModeProvider : IDeploymentModeProvider
                 },
                 ct);
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
-            _logger.LogWarning(ex, "Distributed cache unavailable while storing deployment mode. Continuing without cache.");
+            _logger.LogWarning("Distributed cache unavailable while storing deployment mode. Continuing without cache.");
         }
     }
 
@@ -133,9 +133,9 @@ public sealed class DeploymentModeProvider : IDeploymentModeProvider
         {
             await _cache.RemoveAsync(CacheKey);
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
-            _logger.LogWarning(ex, "Distributed cache unavailable while invalidating deployment mode cache.");
+            _logger.LogWarning("Distributed cache unavailable while invalidating deployment mode cache.");
         }
     }
 

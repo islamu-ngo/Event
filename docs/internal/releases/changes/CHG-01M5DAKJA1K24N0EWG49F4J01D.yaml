@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5DAKJA1K24N0EWG49F4J01D
+Title: "Isolate Local Identity credential delivery"
+Type: fix
+Scope: self-hosting
+Summary: "Deliver dedicated Local Identity writer configuration through the selected secret authority without borrowing another database purpose's credentials or lower-priority aliases."
+Group: local-identity-credential-delivery
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: External Identity no longer accepts a shared IDENTITY_DATABASE_CONNECTION_STRING. Configure discrete endpoint fields and credentials for each selected purpose; empty canonical credentials cannot fall back to aliases.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Application and external Identity writer credentials remain distinct from Runtime, Global and Migrator. Selected-authority omission cannot acquire credentials or server-version metadata from lower-priority aliases. This configuration delivery does not install writer grants or activate the privileged workflow.
+  Migration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Environment, Infisical, API and combined-host projection carry the dedicated writer purpose and optional external MySQL or MariaDB server version. Event's data-only Configurator definition selects revision 8 and removes the retired shared connection-string input.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: Supply writer credentials from the selected approved secret authority and provision its fixed permissions separately. Use the separately installed Configurator with Event's definition; no Configurator runtime or offline engine is restored to Event.

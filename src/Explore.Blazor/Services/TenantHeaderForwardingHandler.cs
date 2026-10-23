@@ -33,9 +33,14 @@ public class TenantHeaderForwardingHandler : DelegatingHandler
         var httpContext = _httpContextAccessor.HttpContext;
         var forwardedHost = httpContext?.Request.Host.Value;
 
-        if (!request.Headers.Contains("X-Forwarded-Host") && !string.IsNullOrWhiteSpace(forwardedHost))
+        if (!request.Headers.Contains("X-Forwarded-Host") && !string.IsNullOrWhiteSpace(forwardedHost)
+            && httpContext?.Connection.RemoteIpAddress is { } peer)
         {
             request.Headers.Add("X-Forwarded-Host", forwardedHost);
+            request.Headers.Remove("X-Forwarded-Proto");
+            request.Headers.Remove("X-Forwarded-For");
+            request.Headers.Add("X-Forwarded-Proto", httpContext.Request.Scheme);
+            request.Headers.Add("X-Forwarded-For", peer.ToString());
         }
 
         return base.SendAsync(request, cancellationToken);

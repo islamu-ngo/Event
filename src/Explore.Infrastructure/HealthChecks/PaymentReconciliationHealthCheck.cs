@@ -15,7 +15,7 @@ public sealed class PaymentReconciliationHealthCheck(
         try
         {
             await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-            IRegistrationPaymentAttemptRepository repository = scope.ServiceProvider.GetRequiredService<IRegistrationPaymentAttemptRepository>();
+            IPaymentReconciliationAdmission repository = scope.ServiceProvider.GetRequiredService<IPaymentReconciliationAdmission>();
             PaymentReconciliationHealth health = await repository.GetReconciliationHealthAsync(
                 timeProvider.GetUtcNow().UtcDateTime,
                 cancellationToken);

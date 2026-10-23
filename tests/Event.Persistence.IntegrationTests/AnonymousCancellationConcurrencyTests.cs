@@ -197,11 +197,11 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         await IssueAsync(fixture, command);
         var order = await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync();
         var hold = await fixture.Context.RegistrationInventoryHolds.AsNoTracking().SingleAsync();
-        await using var scope = fixture.CreateScope();
-        var services = scope.ServiceProvider;
         var foreignTenant = Substitute.For<ITenantContext>();
-        foreignTenant.TenantId.Returns(Guid.CreateVersion7());
-        services.GetRequiredService<ExploreDbContext>().TenantContext = missing ? null : foreignTenant;
+        foreignTenant.TenantId.Returns(missing ? Guid.Empty : Guid.CreateVersion7());
+        await using var replica = fixture.CreateReplica(foreignTenant);
+        await using var scope = replica.CreateAsyncScope();
+        var services = scope.ServiceProvider;
 
         // Even a valid proof and exact explicit tenant predicate cannot replace ambient isolation.
         await Assert.That(await services.GetRequiredService<IQueryHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()

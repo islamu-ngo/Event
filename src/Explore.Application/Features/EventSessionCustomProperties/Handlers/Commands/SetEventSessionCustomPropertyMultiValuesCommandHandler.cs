@@ -1,3 +1,5 @@
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -8,6 +10,7 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
 using Explore.Application.Contracts.Operations;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
@@ -18,7 +21,13 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : ICommandHa
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISerializableAttemptOwner _owner;
+    private readonly IHumanAdministrativeActionPreparation _preparation;
+    private readonly IAdminContext _adminContext;
+    private readonly ITenantAdministratorCommitAuthority _tenantAuthority;
+    private readonly IInstanceAdministratorCommitAuthority _instanceAuthority;
+    private readonly RequestAuthorization<SetEventSessionCustomPropertyMultiValuesCommand> _authorization;
+    private readonly ILogger<SetEventSessionCustomPropertyMultiValuesCommandHandler> _logger;
 
     public SetEventSessionCustomPropertyMultiValuesCommandHandler(
         IEventSessionCustomPropertyRepository sessionCustomPropertyRepository,
@@ -26,18 +35,35 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : ICommandHa
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IUnitOfWork unitOfWork)
+        ISerializableAttemptOwner owner,
+        IAdminContext adminContext,
+        ITenantAdministratorCommitAuthority tenantAuthority,
+        IInstanceAdministratorCommitAuthority instanceAuthority,
+        RequestAuthorization<SetEventSessionCustomPropertyMultiValuesCommand> authorization,
+        ILogger<SetEventSessionCustomPropertyMultiValuesCommandHandler> logger,
+        IHumanAdministrativeActionPreparation preparation)
     {
         _sessionCustomPropertyRepository = sessionCustomPropertyRepository;
         _projectionUpdater = projectionUpdater;
         _quotaResolver = quotaResolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _unitOfWork = unitOfWork;
+        _owner = owner;
+        _preparation = preparation;
+        _adminContext = adminContext;
+        _tenantAuthority = tenantAuthority;
+        _instanceAuthority = instanceAuthority;
+        _authorization = authorization;
+        _logger = logger;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SetEventSessionCustomPropertyMultiValuesCommand request, CancellationToken cancellationToken)
     {
+        Guid tenantId = _tenantContext.TenantId;
+        if (!_currentUserService.IsAuthenticated || tenantId == Guid.Empty
+            || await _adminContext.ResolveUserIdAsync(cancellationToken) is not { } userId)
+            return BaseCommandResponse.Authentication<Guid>();
+        await _authorization.AuthorizeAsync(request, _logger, cancellationToken);
         var validator = new SetEventSessionCustomPropertyValueDtoValidator();
         var errors = new List<string>();
         for (var i = 0; i < request.Values.Count; i++)
@@ -56,13 +82,33 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : ICommandHa
                 "Event session custom property multi-value set failed.");
         }
 
-        var definition = await _sessionCustomPropertyRepository.GetDefinitionWithDetails(request.DefinitionId);
-        if (definition is null || definition.EventSessionId != request.EventSessionId)
+        Guid[] valueIds = request.Values.Select(_ => Guid.CreateVersion7()).ToArray();
+        DateTime createdAt = DateTime.UtcNow;
+        var prepared = await _preparation.PrepareAsync(request, userId, cancellationToken);
+        return await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, userId, token);
+            if (!await _instanceAuthority.IsInstanceAdministratorForCommitAsync(userId, token)
+                && !await _tenantAuthority.IsTenantAdministratorForCommitAsync(userId, tenantId, token))
+                return BaseCommandResponse.Authorization<Guid>();
+            return await SetAuthorizedAsync(request, tenantId, valueIds, createdAt, token);
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> SetAuthorizedAsync(
+        SetEventSessionCustomPropertyMultiValuesCommand request, Guid tenantId, Guid[] valueIds, DateTime createdAt,
+        CancellationToken cancellationToken)
+    {
+        var held = await _sessionCustomPropertyRepository.GetTrackedDefinitionWithOptions(
+            request.DefinitionId, cancellationToken);
+        if (held is null || held.TenantId != tenantId || held.EventSessionId != request.EventSessionId)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["Event session custom property definition was not found for the requested session."],
                 "Event session custom property multi-value set failed.");
         }
+        var definition = await _sessionCustomPropertyRepository.GetDefinitionWithDetails(held.Id, cancellationToken)
+            ?? throw new InvalidOperationException("The fenced definition is unavailable.");
 
         var maxRows = await _quotaResolver.GetIntAsync(
             CustomPropertyQuotaSettingDefinitions.MaxMultiValueRowsPerValue.Key,
@@ -93,6 +139,8 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : ICommandHa
         var values = request.Values
             .Select((dto, index) => new EventSessionCustomPropertyValue
             {
+                Id = valueIds[index],
+                CreatedAt = createdAt,
                 EventSessionCustomPropertyDefinitionId = request.DefinitionId,
                 EventSessionId = request.EventSessionId,
                 Ordinal = index,
@@ -101,20 +149,17 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : ICommandHa
                 BooleanValue = dto.BooleanValue,
                 DateTimeValue = dto.DateTimeValue,
                 OptionId = dto.OptionId,
-                TenantId = _tenantContext.TenantId,
+                TenantId = tenantId,
                 CreatedBy = _currentUserService.UserId,
                 UpdatedBy = _currentUserService.UserId
             })
             .ToList();
 
-        await _unitOfWork.ExecuteInTransactionAsync(
-            async ct =>
-            {
-                await _projectionUpdater.RemoveForDefinitionAsync(request.DefinitionId, ct);
-                await _sessionCustomPropertyRepository.SetMultiValues(request.DefinitionId, request.EventSessionId, values, ct);
-                await _projectionUpdater.UpdateForDefinitionAsync(request.DefinitionId, ct);
-            },
-            cancellationToken);
+        await _projectionUpdater.RemoveForDefinitionAsync(request.DefinitionId, cancellationToken);
+        await _sessionCustomPropertyRepository.SetMultiValues(
+            request.DefinitionId, request.EventSessionId, values, cancellationToken);
+        await _projectionUpdater.UpdateForDefinitionAsync(request.DefinitionId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         return BaseCommandResponse.Success(request.DefinitionId, "Event session custom property values set successfully.");
     }

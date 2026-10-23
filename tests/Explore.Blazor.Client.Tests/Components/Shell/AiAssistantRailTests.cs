@@ -294,6 +294,7 @@ public sealed class AiAssistantRailTests : IDisposable
         var conversationId = Guid.CreateVersion7();
         var linkedActionId = Guid.CreateVersion7();
         var staleActionId = Guid.CreateVersion7();
+        string displayedVersion = new string('a', 64);
         _conversationState.SelectConversation(new HalResourceOfAiConversationDto
         {
             Id = conversationId,
@@ -303,6 +304,7 @@ public sealed class AiAssistantRailTests : IDisposable
                 new ProposedActions2
                 {
                     Id = linkedActionId,
+                    Version = displayedVersion,
                     Kind = "CreateEventDraft",
                     Status = "Proposed"
                 },
@@ -322,7 +324,8 @@ public sealed class AiAssistantRailTests : IDisposable
             ("reject-action", "/reject", "POST"));
         _clientService.GetConversationCollectionAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<HalCollectionResourceOfAiConversationSummaryDto?>(CreateConversationCollection([])));
-        _clientService.ConfirmProposedActionAsync(conversationId, linkedActionId, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _clientService.ConfirmProposedActionAsync(conversationId, linkedActionId, displayedVersion,
+                Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new AiAssistantCommandResult(true, Guid.CreateVersion7(), "Confirmed", null, [])));
         _clientService.GetConversationAsync(conversationId, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<HalResourceOfAiConversationDto?>(_conversationState.SelectedConversation));
@@ -345,8 +348,87 @@ public sealed class AiAssistantRailTests : IDisposable
         await _clientService.Received(1).ConfirmProposedActionAsync(
             conversationId,
             linkedActionId,
+            displayedVersion,
             Arg.Is<string?>(value => value != null && value.StartsWith("blazor-ai-confirm-", StringComparison.Ordinal)),
             Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("   ")]
+    public async Task Confirm_WhenDisplayedVersionIsMissing_DoesNotSendEvenWithHalLink(string? version)
+    {
+        var conversationId = Guid.CreateVersion7();
+        var actionId = Guid.CreateVersion7();
+        var action = new ProposedActions2
+        {
+            Id = actionId,
+            Kind = "CreateEventDraft",
+            Status = "Proposed",
+            Version = version
+        };
+        GeneratedHalLinkTestHelper.SetLinks(action, ("confirm-action", "/confirm", "POST"));
+        _conversationState.SelectConversation(new HalResourceOfAiConversationDto
+        {
+            Id = conversationId,
+            ProposedActions = [action]
+        });
+        _clientService.GetConversationCollectionAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<HalCollectionResourceOfAiConversationSummaryDto?>(CreateConversationCollection([])));
+        _shellState.SetPolicy(tenantEnabled: true, tenantAvailable: true, allowAnonymousAccess: false, isAuthenticated: true);
+        _shellState.Open();
+        var cut = _ctx.RenderMudComponent<AiAssistantRail>();
+
+        await cut.Find("[data-testid='ai-rail-confirm-action']").ClickAsync(new MouseEventArgs());
+
+        await Assert.That(_conversationState.ErrorMessage).IsNotNull();
+        await _clientService.DidNotReceive().ConfirmProposedActionAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task Confirm_WhenPreviewIsStale_PreservesDisplayedVersionAndRequiresReview()
+    {
+        var conversationId = Guid.CreateVersion7();
+        var actionId = Guid.CreateVersion7();
+        string displayedVersion = new string('b', 64);
+        var action = new ProposedActions2
+        {
+            Id = actionId,
+            Kind = "CreateEventDraft",
+            Status = "Proposed",
+            Version = displayedVersion
+        };
+        GeneratedHalLinkTestHelper.SetLinks(action, ("confirm-action", "/confirm", "POST"));
+        _conversationState.SelectConversation(new HalResourceOfAiConversationDto
+        {
+            Id = conversationId,
+            ProposedActions = [action]
+        });
+        _clientService.GetConversationCollectionAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<HalCollectionResourceOfAiConversationSummaryDto?>(CreateConversationCollection([])));
+        var submittedVersions = new List<string>();
+        _clientService.ConfirmProposedActionAsync(conversationId, actionId,
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                submittedVersions.Add(call.ArgAt<string>(2));
+                return Task.FromResult(AiAssistantCommandResult.Failure(
+                    "proposed_action_version_changed", "Review the changed action."));
+            });
+        _shellState.SetPolicy(tenantEnabled: true, tenantAvailable: true, allowAnonymousAccess: false, isAuthenticated: true);
+        _shellState.Open();
+        var cut = _ctx.RenderMudComponent<AiAssistantRail>();
+
+        await cut.Find("[data-testid='ai-rail-confirm-action']").ClickAsync(new MouseEventArgs());
+
+        await Assert.That(submittedVersions.Count).IsEqualTo(1);
+        await Assert.That(submittedVersions[0]).IsEqualTo(displayedVersion);
+        await Assert.That(_conversationState.SelectedConversation!.ProposedActions!.Single().Version)
+            .IsEqualTo(displayedVersion);
+        await Assert.That(_conversationState.ErrorMessage).IsNotNull();
+        await _clientService.DidNotReceive().GetConversationAsync(conversationId, Arg.Any<CancellationToken>());
     }
 
     [Test]

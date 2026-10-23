@@ -202,13 +202,14 @@ public sealed class InstanceOnboardingOpenApiContractTests
         string smtpJson = JsonSerializer.Serialize(new InstanceSmtpSettingsDto(), JsonSerializerOptions.Web);
         string aiJson = JsonSerializer.Serialize(new AiAssistantGovernanceSettingsDto
         {
-            ApiKey = "secret-api-key",
-            ApiKeyConfigured = true
+            CredentialScope = "instance"
         }, JsonSerializerOptions.Web);
 
         await Assert.That(smtpJson).DoesNotContain("username", StringComparison.OrdinalIgnoreCase);
         await Assert.That(smtpJson).DoesNotContain("password", StringComparison.OrdinalIgnoreCase);
-        await Assert.That(aiJson).DoesNotContain("secret-api-key", StringComparison.Ordinal);
+        using var aiRead = JsonDocument.Parse(aiJson);
+        await Assert.That(aiRead.RootElement.GetProperty("credentialScope").GetString()).IsEqualTo("instance");
+        await Assert.That(aiRead.RootElement.TryGetProperty("apiKey", out _)).IsFalse();
 
         await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var schemaDocument = await JsonDocument.ParseAsync(schemaStream);
@@ -222,8 +223,10 @@ public sealed class InstanceOnboardingOpenApiContractTests
         await Assert.That(smtpProperties.TryGetProperty("usernameConfigured", out _)).IsFalse();
         await Assert.That(smtpProperties.TryGetProperty("passwordConfigured", out _)).IsFalse();
         await Assert.That(aiProperties.TryGetProperty("apiKey", out _)).IsFalse();
-        await Assert.That(aiProperties.TryGetProperty("apiKeyConfigured", out _)).IsTrue();
-        await Assert.That(aiProviderWriteProperties.TryGetProperty("apiKey", out _)).IsTrue();
+        await Assert.That(aiProperties.TryGetProperty("apiKeyConfigured", out _)).IsFalse();
+        await Assert.That(aiProperties.TryGetProperty("credentialScope", out _)).IsTrue();
+        await Assert.That(aiProviderWriteProperties.TryGetProperty("apiKey", out _)).IsFalse();
+        await Assert.That(aiProviderWriteProperties.TryGetProperty("credentialScope", out _)).IsTrue();
     }
 
 }

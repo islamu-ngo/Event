@@ -1,15 +1,17 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
-using Explore.Domain.Enums;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreDbContext dbContext)
+public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null)
     : IRegistrationProviderSubmissionWriteEffectRepository
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     public async Task<IReadOnlyList<RegistrationProviderSubmissionWriteClaim>> ClaimDueAsync(
         string leaseOwner,
         int batchSize,
@@ -22,6 +24,9 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
         {
             return [];
         }
+        var native = await RegistrationProviderSubmissionNativeClaim.TryClaimAsync(
+            dbContext, leaseOwner, batchSize, claimedAt, leaseDuration, cancellationToken);
+        if (native is not null) return native;
 
         var strategy = dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -56,7 +61,8 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
                 Guid leaseToken = Guid.CreateVersion7();
                 row.Claim(leaseOwner, leaseToken, claimedAt.Add(leaseDuration), claimedAt);
                 claims.Add(new(row.Id, row.TenantId, row.RegistrationSubmissionId, row.RegistrationAttemptId,
-                    row.RegistrationProviderBindingId, leaseToken, row.ProcessingFence, row.AttemptCount));
+                    row.RegistrationProviderBindingId, leaseToken, row.ProcessingFence, row.AttemptCount,
+                    row.ProcessingLeaseExpiresAt!.Value));
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -69,28 +75,71 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
         RegistrationProviderSubmissionWriteClaim claim,
         CancellationToken cancellationToken)
     {
+        var source = await GetDeliverySourceAsync(claim, cancellationToken);
+        if (source is null)
+            return null;
+
+        DateTime observedAt = _timeProvider.GetUtcNow().UtcDateTime;
+        var activeClaim = ActiveClaim(claim, observedAt);
+        // The sensitive query itself requires live custody, not just an earlier graph lookup.
+        IReadOnlyList<RegistrationAnswer> answers = await dbContext.RegistrationAnswers
+            .AsNoTracking()
+            .Include(value => value.SensitiveAnswerValue)
+            .Where(value => value.TenantId == source.Submission.TenantId &&
+                value.RegistrationSubmissionId == source.Submission.Id &&
+                value.RegistrationOrderId == source.Order.Id && value.RegistrationAttemptId == source.Attempt.Id &&
+                value.EventId == source.Submission.EventId &&
+                value.RegistrationFormVersionId == source.Submission.RegistrationFormVersionId &&
+                activeClaim.Any())
+            .OrderBy(value => value.RegistrationFormFieldId)
+            .ThenBy(value => value.Ordinal)
+            .ToListAsync(cancellationToken);
+        IReadOnlyList<RegistrationFormField> fields = await dbContext.RegistrationFormFields
+            .AsNoTracking()
+            .Include(value => value.Options)
+            .Where(value => value.TenantId == source.Submission.TenantId &&
+                value.RegistrationFormVersionId == source.Submission.RegistrationFormVersionId)
+            .ToListAsync(cancellationToken);
+        var delivery = source with { Answers = answers, Fields = fields };
+        return await IsDeliveryCurrentAsync(claim, delivery, cancellationToken) ? delivery : null;
+    }
+
+    private async Task<RegistrationProviderSubmissionWriteDelivery?> GetDeliverySourceAsync(
+        RegistrationProviderSubmissionWriteClaim claim,
+        CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.CurrentTransaction is not null || System.Transactions.Transaction.Current is not null)
+            return null;
+
+        RegistrationProviderSubmissionWriteEffect? effect = await ActiveClaim(claim, _timeProvider.GetUtcNow().UtcDateTime)
+            .AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+        if (effect is null)
+            return null;
+
         RegistrationAttempt? attempt = await dbContext.RegistrationAttempts
             .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
-            .SingleOrDefaultAsync(value => value.TenantId == claim.TenantId && value.Id == claim.RegistrationAttemptId, cancellationToken);
+            .SingleOrDefaultAsync(value => value.TenantId == effect.TenantId && value.Id == effect.RegistrationAttemptId, cancellationToken);
         RegistrationSubmission? submission = await dbContext.RegistrationSubmissions
             .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
-            .SingleOrDefaultAsync(value => value.TenantId == claim.TenantId && value.Id == claim.RegistrationSubmissionId, cancellationToken);
+            .SingleOrDefaultAsync(value => value.TenantId == effect.TenantId && value.Id == effect.RegistrationSubmissionId, cancellationToken);
         RegistrationProviderBinding? binding = await dbContext.RegistrationProviderBindings
             .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
             .Include(value => value.Connection)
             .Include(value => value.FieldMappings)
             .Include(value => value.OptionMappings)
             .Include(value => value.Capabilities)
-            .SingleOrDefaultAsync(value => value.TenantId == claim.TenantId && value.Id == claim.RegistrationProviderBindingId, cancellationToken);
+            .SingleOrDefaultAsync(value => value.TenantId == effect.TenantId && value.Id == effect.RegistrationProviderBindingId, cancellationToken);
         if (attempt is null || submission is null || binding?.Connection is null ||
+            binding.Connection.TenantId != effect.TenantId ||
+            submission.RegistrationOrderId != effect.RegistrationOrderId ||
+            submission.EventId != effect.EventId ||
             submission.RegistrationAttemptId != attempt.Id ||
             submission.RegistrationOrderId != attempt.RegistrationOrderId ||
             submission.EventId != attempt.EventId ||
             attempt.RegistrationProviderBindingId != binding.Id ||
             submission.RegistrationProviderBindingId != binding.Id ||
+            attempt.RegistrationFormId != binding.RegistrationFormId ||
+            submission.RegistrationFormId != binding.RegistrationFormId ||
             attempt.RegistrationFormVersionId != binding.RegistrationFormVersionId ||
             submission.RegistrationFormVersionId != binding.RegistrationFormVersionId ||
             attempt.ProviderMappingRevisionHash?.Value != binding.PublishedMappingRevisionHash?.Value ||
@@ -101,30 +150,59 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
 
         RegistrationOrder? order = await dbContext.RegistrationOrders
             .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
-            .SingleOrDefaultAsync(value => value.TenantId == claim.TenantId &&
-                value.Id == submission.RegistrationOrderId && value.EventId == submission.EventId, cancellationToken);
+            .SingleOrDefaultAsync(value => value.TenantId == effect.TenantId &&
+                value.Id == effect.RegistrationOrderId && value.EventId == effect.EventId, cancellationToken);
         if (order is null)
         {
             return null;
         }
 
-        IReadOnlyList<RegistrationAnswer> answers = await dbContext.RegistrationAnswers
-            .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
-            .Include(value => value.SensitiveAnswerValue)
-            .Where(value => value.TenantId == claim.TenantId && value.RegistrationSubmissionId == submission.Id &&
-                value.RegistrationOrderId == order.Id && value.RegistrationAttemptId == attempt.Id)
-            .OrderBy(value => value.RegistrationFormFieldId)
-            .ThenBy(value => value.Ordinal)
-            .ToListAsync(cancellationToken);
-        IReadOnlyList<RegistrationFormField> fields = await dbContext.RegistrationFormFields
-            .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
-            .Include(value => value.Options)
-            .Where(value => value.TenantId == claim.TenantId && value.RegistrationFormVersionId == submission.RegistrationFormVersionId)
-            .ToListAsync(cancellationToken);
-        return new(order, attempt, submission, binding, answers, fields);
+        return new(order, attempt, submission, binding, [], []);
+    }
+
+    public async Task<bool> IsDeliveryCurrentAsync(
+        RegistrationProviderSubmissionWriteClaim claim,
+        RegistrationProviderSubmissionWriteDelivery delivery,
+        CancellationToken cancellationToken)
+    {
+        var source = await GetDeliverySourceAsync(claim, cancellationToken);
+        if (source is null ||
+            source.Order.Id != delivery.Order.Id || source.Order.EventId != delivery.Order.EventId ||
+            source.Order.AnonymousPiiRetentionUntilUtc != delivery.Order.AnonymousPiiRetentionUntilUtc ||
+            source.Attempt.Id != delivery.Attempt.Id || source.Submission.Id != delivery.Submission.Id ||
+            source.Submission.RegistrationFormId != delivery.Submission.RegistrationFormId ||
+            source.Submission.RegistrationFormVersionId != delivery.Submission.RegistrationFormVersionId ||
+            source.Binding.Id != delivery.Binding.Id || source.Binding.Connection!.Id != delivery.Binding.Connection?.Id ||
+            source.Binding.ConcurrencyStamp != delivery.Binding.ConcurrencyStamp ||
+            source.Binding.Connection.ConcurrencyStamp != delivery.Binding.Connection.ConcurrencyStamp ||
+            source.Binding.PublishedMappingRevisionHash?.Value != delivery.Binding.PublishedMappingRevisionHash?.Value)
+            return false;
+
+        // Cleanup or a source replacement during preparation must not disclose the retained copy.
+        Guid[] answerIds = delivery.Answers.Select(answer => answer.Id).ToArray();
+        var presentAnswers = await dbContext.RegistrationAnswers.AsNoTracking()
+            .Where(value => value.TenantId == claim.TenantId && answerIds.Contains(value.Id) &&
+                value.RegistrationSubmissionId == source.Submission.Id &&
+                value.RegistrationOrderId == source.Order.Id && value.RegistrationAttemptId == source.Attempt.Id &&
+                value.EventId == source.Submission.EventId &&
+                value.RegistrationFormVersionId == source.Submission.RegistrationFormVersionId)
+            .Select(value => new
+            {
+                value.Id,
+                value.RegistrationFormFieldId,
+                value.SensitiveAnswerValueId,
+                value.RetentionUntil,
+                LiveSensitiveId = value.SensitiveAnswerValue == null ? (Guid?)null : value.SensitiveAnswerValue.Id,
+                SensitiveRetentionUntil = value.SensitiveAnswerValue == null ? (DateTime?)null : value.SensitiveAnswerValue.RetentionUntil
+            }).ToListAsync(cancellationToken);
+        return presentAnswers.Count == answerIds.Length &&
+            delivery.Answers.All(answer => presentAnswers.Any(current => current.Id == answer.Id &&
+                current.RegistrationFormFieldId == answer.RegistrationFormFieldId &&
+                current.SensitiveAnswerValueId == answer.SensitiveAnswerValueId &&
+                current.LiveSensitiveId == answer.SensitiveAnswerValue?.Id &&
+                current.RetentionUntil == answer.RetentionUntil &&
+                current.SensitiveRetentionUntil == answer.SensitiveAnswerValue?.RetentionUntil)) &&
+            await ActiveClaim(claim, _timeProvider.GetUtcNow().UtcDateTime).AnyAsync(cancellationToken);
     }
 
     public async Task<bool> CompleteAsync(RegistrationProviderSubmissionWriteClaim claim, DateTime completedAt, CancellationToken cancellationToken) =>
@@ -212,12 +290,22 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
 
     private IQueryable<RegistrationProviderSubmissionWriteEffect> ActiveClaim(
         RegistrationProviderSubmissionWriteClaim claim,
-        DateTime observedAt) => dbContext.RegistrationProviderSubmissionWriteEffects
-        .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
-        .Where(value => value.Id == claim.EffectId &&
+        DateTime observedAt)
+    {
+        bool selectedTenant = claim.TenantId != Guid.Empty && claim.LeaseToken != Guid.Empty &&
+            claim.ProcessingFence > 0 && claim.LeaseExpiresAt.Kind == DateTimeKind.Utc &&
+            !dbContext.IsTenantFilterBypassed && dbContext.BindTenantLease() == claim.TenantId;
+        return dbContext.RegistrationProviderSubmissionWriteEffects
+        .Where(value => selectedTenant && value.Id == claim.EffectId &&
             value.TenantId == claim.TenantId &&
+            value.RegistrationSubmissionId == claim.RegistrationSubmissionId &&
+            value.RegistrationAttemptId == claim.RegistrationAttemptId &&
+            value.RegistrationProviderBindingId == claim.RegistrationProviderBindingId &&
             value.Status == OutboxMessageStatus.Processing &&
             value.ProcessingLeaseToken == claim.LeaseToken &&
             value.ProcessingFence == claim.ProcessingFence &&
+            value.AttemptCount == claim.AttemptCount &&
+            value.ProcessingLeaseExpiresAt == claim.LeaseExpiresAt &&
             value.ProcessingLeaseExpiresAt > observedAt);
+    }
 }

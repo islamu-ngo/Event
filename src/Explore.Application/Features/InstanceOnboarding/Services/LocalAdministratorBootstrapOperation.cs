@@ -13,22 +13,25 @@ using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Models;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Domain.Authentication;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Application.Features.InstanceOnboarding.Services;
 
 public sealed class LocalAdministratorBootstrapOperation(
     IInstanceBootstrapStateRepository bootstrapRepository,
     IConfiguredAdministratorBootstrapProvider configuredProvider,
-    ILocalCredentialAdministration credentials,
+    ILocalIdentityExecutionScopeFactory identityScopes,
     ISecretResolver secretResolver,
     InstanceOnboardingCompletionOperation completion,
     ISetupSecretProvider setupSecretProvider,
     IDeploymentModeProvider deploymentModeProvider,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
-    IAuthenticationProviderDispatcher providerDispatcher)
+    IAuthenticationProviderDispatcher providerDispatcher,
+    IEventDiscoveryEnrollmentGate enrollmentGate)
 {
     public async Task<BaseCommandResponse<Guid>> CompleteInteractiveAsync(
         Guid operationId, string username, string temporaryPassword, string? email, string? firstName, string? lastName,
@@ -44,8 +47,7 @@ public sealed class LocalAdministratorBootstrapOperation(
             return Failure("local_bootstrap_provider_inactive");
         if (operationId.Version != 7 || operationId.Variant is < 8 or > 11)
             return Failure("local_bootstrap_operation_invalid");
-        if (string.IsNullOrWhiteSpace(temporaryPassword)
-            || temporaryPassword.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength)
+        if (!LocalPasswordPolicy.TryNormalizeNewCredential(temporaryPassword, out _))
             return Failure("local_bootstrap_credential_invalid");
 
         settings.DeploymentMode = await deploymentModeProvider.GetConfiguredOnboardingModeAsync(cancellationToken);
@@ -59,27 +61,41 @@ public sealed class LocalAdministratorBootstrapOperation(
                 firstName ?? "Administrator", lastName ?? string.Empty, username);
         }
         catch (ArgumentException) { return Failure("local_bootstrap_profile_invalid"); }
-        if (!await credentials.ValidateBootstrapCreationAsync(intent, temporaryPassword, cancellationToken))
-            return Failure("local_bootstrap_credential_invalid");
-
-        bool admitted = await unitOfWork.ExecuteBootstrapConvergenceAsync(async token =>
+        await using (var validationScope = await identityScopes.CreateAsync(cancellationToken))
         {
-            InstanceBootstrapState? current = await completion.AdmitInteractiveGenerationAsync(settings, token);
-            if (current is null)
+            if (!await validationScope.Services.GetRequiredService<ILocalCredentialAdministration>()
+                    .ValidateBootstrapCreationAsync(intent, temporaryPassword, cancellationToken))
+                return Failure("local_bootstrap_credential_invalid");
+        }
+
+        bool admitted;
+        await using (var enrollment = await enrollmentGate.AcquireAsync(cancellationToken))
+        {
+            admitted = await unitOfWork.ExecuteBootstrapConvergenceAsync(async token =>
             {
-                await bootstrapRepository.Create(InstanceBootstrapState.CreateInteractivePending(
-                    operationId, settings.DeploymentMode, timeProvider.GetUtcNow().UtcDateTime));
-                return true;
-            }
-            return current.Id == operationId && current.Mode == InstanceBootstrapMode.Interactive
-                && current.Status == InstanceBootstrapStatus.Pending && current.DeploymentMode == settings.DeploymentMode;
-        }, cancellationToken);
+                InstanceBootstrapState? current = await completion.AdmitInteractiveGenerationAsync(settings, token);
+                if (current is null)
+                {
+                    await bootstrapRepository.Create(InstanceBootstrapState.CreateInteractivePending(
+                        operationId, settings.DeploymentMode, timeProvider.GetUtcNow().UtcDateTime));
+                    return true;
+                }
+                return current.Id == operationId && current.Mode == InstanceBootstrapMode.Interactive
+                    && current.Status == InstanceBootstrapStatus.Pending && current.DeploymentMode == settings.DeploymentMode;
+            }, cancellationToken);
+            enrollmentGate.RequireCurrent();
+        }
         if (!admitted) return Failure("local_bootstrap_authority_invalid");
-        LocalCredentialCreateResult created = await credentials.CreateBootstrapPendingAsync(
-            intent, localSubjectId: null, temporaryPassword, cancellationToken);
-        if (created.Outcome is not (LocalCredentialCreateOutcome.Created or LocalCredentialCreateOutcome.Replayed))
-            return Failure("local_bootstrap_credential_conflict");
-        LocalCredentialProvisioningSnapshot? snapshot = await credentials.ReadProvisioningAsync(operationId, cancellationToken);
+        LocalCredentialProvisioningSnapshot? snapshot;
+        await using (var creation = await identityScopes.CreateAsync(cancellationToken))
+        {
+            var credentials = creation.Services.GetRequiredService<ILocalCredentialAdministration>();
+            LocalCredentialCreateResult created = await credentials.CreateBootstrapPendingAsync(
+                intent, localSubjectId: null, temporaryPassword, cancellationToken);
+            if (created.Outcome is not (LocalCredentialCreateOutcome.Created or LocalCredentialCreateOutcome.Replayed))
+                return Failure("local_bootstrap_credential_conflict");
+            snapshot = await credentials.ReadProvisioningAsync(operationId, cancellationToken);
+        }
         if (snapshot is null || !Matches(snapshot, intent)) return Failure("local_bootstrap_credential_conflict");
         return await CompleteAndActivateAsync(null, settings, snapshot, cancellationToken);
     }
@@ -107,19 +123,24 @@ public sealed class LocalAdministratorBootstrapOperation(
         var intent = new LocalCredentialCreateRequest(current.Id, subject, binding.AdministratorProfile.Email,
             binding.AdministratorProfile.FirstName ?? "Administrator", binding.AdministratorProfile.LastName ?? string.Empty,
             username: accountKey.Value);
-        LocalCredentialProvisioningSnapshot? snapshot = await credentials.ReadProvisioningAsync(current.Id, cancellationToken);
-        if (snapshot is null)
+        LocalCredentialProvisioningSnapshot? snapshot;
+        await using (var creation = await identityScopes.CreateAsync(cancellationToken))
         {
-            SecretResolutionResult secret = await secretResolver.ResolveAsync(
-                SecretDefinitionRegistry.Keys.Authentication.LocalBootstrapPassword, tenantId: null, cancellationToken);
-            if (!secret.IsResolved || string.IsNullOrWhiteSpace(secret.Value)) return Failure("local_bootstrap_secret_unavailable");
-            LocalCredentialCreateResult created = await credentials.CreateBootstrapPendingAsync(intent, subject, secret.Value, cancellationToken);
-            if (created.Outcome is not (LocalCredentialCreateOutcome.Created or LocalCredentialCreateOutcome.Replayed))
-                return Failure("local_bootstrap_credential_conflict");
+            var credentials = creation.Services.GetRequiredService<ILocalCredentialAdministration>();
             snapshot = await credentials.ReadProvisioningAsync(current.Id, cancellationToken);
+            if (snapshot is null)
+            {
+                SecretResolutionResult secret = await secretResolver.ResolveAsync(
+                    SecretDefinitionRegistry.Keys.Authentication.LocalBootstrapPassword, tenantId: null, cancellationToken);
+                if (!secret.IsResolved || string.IsNullOrWhiteSpace(secret.Value)) return Failure("local_bootstrap_secret_unavailable");
+                LocalCredentialCreateResult created = await credentials.CreateBootstrapPendingAsync(intent, subject, secret.Value, cancellationToken);
+                if (created.Outcome is not (LocalCredentialCreateOutcome.Created or LocalCredentialCreateOutcome.Replayed))
+                    return Failure("local_bootstrap_credential_conflict");
+                snapshot = await credentials.ReadProvisioningAsync(current.Id, cancellationToken);
+            }
+            if (snapshot is null || snapshot.Receipt.LocalSubjectId != subject || !Matches(snapshot, intent))
+                return Failure("local_bootstrap_credential_conflict");
         }
-        if (snapshot is null || snapshot.Receipt.LocalSubjectId != subject || !Matches(snapshot, intent))
-            return Failure("local_bootstrap_credential_conflict");
         return await CompleteAndActivateAsync(binding, binding.Settings, snapshot, cancellationToken);
     }
 
@@ -140,6 +161,8 @@ public sealed class LocalAdministratorBootstrapOperation(
         InstanceBootstrapState? current = await bootstrapRepository.GetCurrent(cancellationToken);
         if (current?.Status != InstanceBootstrapStatus.Completed
             || current.ProviderKind is not (null or AuthenticationProviderKind.Local)) return;
+        await using var activationScope = await identityScopes.CreateAsync(cancellationToken);
+        var credentials = activationScope.Services.GetRequiredService<ILocalCredentialAdministration>();
         LocalCredentialProvisioningSnapshot? snapshot = await credentials.ReadProvisioningAsync(current.Id, cancellationToken);
         if (snapshot is null && current.Mode == InstanceBootstrapMode.Interactive) return;
         Guid? initiator = current.Mode == InstanceBootstrapMode.Interactive ? current.Id : current.CompletedByUserId;

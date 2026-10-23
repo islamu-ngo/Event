@@ -51,6 +51,7 @@ ABOUTME: Focuses on non-inferable constraints and project-specific behavior.
 35. **No Warning Suppressions to Force Build/Tests**: Never suppress compiler warnings or analyzer diagnostics via `#pragma warning disable` or `[SuppressMessage]` to force a build through. Fix the underlying root cause. If an intentional compiler ratchet is needed, obtain maintainer approval for `Directory.Build.props`.
 36. **Execution Continuity Directive for Approved Tasks**: For tasks within an approved plan, continue implementation and proportional verification end-to-end without routine stage pauses. Pause only at material boundaries: requirement ambiguity, unexpected scope creep, irreversible actions, or explicit user direction.
 37. **Targeted Verification Default & Verification Evidence**: Always target verification against the specific affected project(s) by default using [`PROJECTS.md`](../../PROJECTS.md). Every task completion report must record exact commands executed and their outcomes, plus checks omitted with reasons. Never state or imply a build or test suite passed when it was not physically executed.
+38. **C# application authority; database storage**: Domain/Application own authorization, business rules, workflows, concurrency coordination and completion. EF Core/LINQ and supported provider APIs are the default; transactions, foreign keys, uniqueness, constraints and tenant RLS support that authority. Do not move business authority into stored procedures or privileged routines to deny legitimate application operations. Fixed permissions for an approved workflow are normal implementation; record credential-only compromise risk once rather than repeatedly reopening accepted decisions. See [the accepted decision and transition rules](adr/ADR-application-owned-persistence.md).
 
 ## Multi-Tenancy Reminder
 Browser tenant routing defaults to `/{slug}`. The BFF extracts the first path
@@ -81,6 +82,14 @@ Database defense-in-depth (PostgreSQL):
 - `PostgresTenantSessionInterceptor` sets the connection session variable `app.current_tenant_id` on every connection open.
 - Model-derived policies fail closed (`0` rows visible, cross-tenant inserts rejected with 42501) when `app.current_tenant_id` is missing or empty, protecting against raw SQL queries or inadvertent `IgnoreQueryFilters()` calls.
 - Runtime database roles must have `NOBYPASSRLS` and must not have `SUPERUSER`.
+- PostgreSQL runtime registration always binds an immutable tenant lease and
+  performs read-only role/policy admission before application SQL. Migration
+  authority installs policies; Runtime never repairs them.
+- Explicit Global credentials own a separate pool. EF tenant-filter bypass is
+  not database permission or application authorization: select the approved
+  purpose-bound C# workflow and its fixed storage rights, never session switching
+  or Runtime role promotion. Existing execute-only functions are transitional
+  mechanisms, not a requirement to keep business logic in SQL.
 
 ## Auditing And Soft Delete
 1. Auditable entities use `CreatedAt/By` and `UpdatedAt/By`.

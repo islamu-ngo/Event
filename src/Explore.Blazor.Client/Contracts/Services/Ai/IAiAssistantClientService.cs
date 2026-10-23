@@ -52,6 +52,7 @@ public interface IAiAssistantClientService
     Task<AiAssistantCommandResult> ConfirmProposedActionAsync(
         Guid conversationId,
         Guid proposedActionId,
+        string expectedVersion,
         string? idempotencyKey = null,
         CancellationToken cancellationToken = default);
 

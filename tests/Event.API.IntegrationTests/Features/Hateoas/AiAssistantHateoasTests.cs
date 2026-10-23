@@ -7,12 +7,14 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Hateoas;
+using Explore.Domain.Ai;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 public sealed class AiAssistantHateoasTests
 {
+    private static readonly DateTime Now = new(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
     [Test]
     public async Task DetailPolicy_WhenConversationActive_EmitsAuthenticatedSendLink()
     {
@@ -57,7 +59,7 @@ public sealed class AiAssistantHateoasTests
         var conversation = CreateDetail(conversationId, "Active");
         var action = CreateProposedAction(proposedActionId, "Proposed");
 
-        var links = AiProposedActionLinkPolicy.GetLinks(conversation, action).ToList();
+        var links = AiProposedActionLinkPolicy.GetLinks(conversation, action, Now).ToList();
 
         var confirm = links.Single(link => link.Rel == LinkRelations.ConfirmAction);
         var reject = links.Single(link => link.Rel == LinkRelations.RejectAction);
@@ -84,7 +86,7 @@ public sealed class AiAssistantHateoasTests
     {
         var links = AiProposedActionLinkPolicy.GetLinks(
                 CreateDetail(Guid.CreateVersion7(), "Active"),
-                CreateProposedAction(Guid.CreateVersion7(), actionStatus))
+                CreateProposedAction(Guid.CreateVersion7(), actionStatus), Now)
             .ToList();
 
         await Assert.That(links.Any(link => link.Rel == LinkRelations.ConfirmAction)).IsFalse();
@@ -96,11 +98,71 @@ public sealed class AiAssistantHateoasTests
     {
         var links = AiProposedActionLinkPolicy.GetLinks(
                 CreateDetail(Guid.CreateVersion7(), "Archived"),
-                CreateProposedAction(Guid.CreateVersion7(), "Proposed"))
+                CreateProposedAction(Guid.CreateVersion7(), "Proposed"), Now)
             .ToList();
 
         await Assert.That(links.Any(link => link.Rel == LinkRelations.ConfirmAction)).IsFalse();
         await Assert.That(links.Any(link => link.Rel == LinkRelations.RejectAction)).IsFalse();
+    }
+
+    [Test]
+    [Arguments("expired")]
+    [Arguments("future")]
+    [Arguments("unimplemented")]
+    public async Task ProposalWithoutLiveNativeExecutionOwnerDoesNotOfferConfirmation(string reason)
+    {
+        var action = CreateProposedAction(Guid.CreateVersion7(), "Proposed") with
+        {
+            CreatedAt = reason == "expired" ? Now.AddMinutes(-30).AddTicks(-1)
+                : reason == "future" ? Now.AddTicks(1) : Now,
+            Kind = reason == "unimplemented" ? "UpdateEventDraft" : "CreateEventDraft"
+        };
+        var links = AiProposedActionLinkPolicy.GetLinks(CreateDetail(Guid.CreateVersion7(), "Active"), action, Now).ToList();
+        await Assert.That(links.Any(link => link.Rel == LinkRelations.ConfirmAction)).IsFalse();
+        await Assert.That(links.Any(link => link.Rel == LinkRelations.RejectAction)).IsTrue();
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ConfirmedDraftRecoveryAffordanceRequiresExactPrincipalConfirmation(bool samePrincipal)
+    {
+        var conversation = CreateDetail(Guid.CreateVersion7(), "Active");
+        var action = CreateProposedAction(Guid.CreateVersion7(), "Confirmed") with
+        {
+            ConfirmedBy = samePrincipal ? conversation.UserId : Guid.CreateVersion7(),
+            ConfirmedAt = Now
+        };
+        var links = AiProposedActionLinkPolicy.GetLinks(conversation, action, Now).ToList();
+        await Assert.That(links.Any(link => link.Rel == LinkRelations.ConfirmAction)).IsEqualTo(samePrincipal);
+        await Assert.That(links.Any(link => link.Rel == LinkRelations.RejectAction)).IsFalse();
+    }
+
+    public static IEnumerable<(AiProposedActionKind Kind, string Status)> ProposalOnlyStates()
+    {
+        foreach (var kind in Enum.GetValues<AiProposedActionKind>().Where(kind => kind != AiProposedActionKind.CreateEventDraft))
+        {
+            yield return (kind, "Proposed");
+            yield return (kind, "Confirmed");
+        }
+    }
+
+    [Test]
+    [MethodDataSource(nameof(ProposalOnlyStates))]
+    public async Task ProposalOnlyFamiliesNeverAdvertiseConfirmation(
+        (AiProposedActionKind Kind, string Status) state)
+    {
+        var conversation = CreateDetail(Guid.CreateVersion7(), "Active");
+        var action = CreateProposedAction(Guid.CreateVersion7(), state.Status) with
+        {
+            Kind = state.Kind.ToString(),
+            ConfirmedBy = state.Status == "Confirmed" ? conversation.UserId : null,
+            ConfirmedAt = state.Status == "Confirmed" ? Now : null
+        };
+        var links = AiProposedActionLinkPolicy.GetLinks(conversation, action, Now).ToList();
+        await Assert.That(links.Any(link => link.Rel == LinkRelations.ConfirmAction)).IsFalse();
+        await Assert.That(links.Any(link => link.Rel == LinkRelations.RejectAction))
+            .IsEqualTo(state.Status == "Proposed");
     }
 
     [Test]
@@ -153,7 +215,7 @@ public sealed class AiAssistantHateoasTests
             TenantId = Guid.CreateVersion7(),
             UserId = Guid.CreateVersion7(),
             Status = status,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = Now
         };
 
     private static AiConversationSummaryDto CreateSummary(Guid id, string status) =>
@@ -163,7 +225,7 @@ public sealed class AiAssistantHateoasTests
             TenantId = Guid.CreateVersion7(),
             UserId = Guid.CreateVersion7(),
             Status = status,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = Now
         };
 
     private static AiProposedActionDto CreateProposedAction(Guid id, string status) =>
@@ -171,8 +233,9 @@ public sealed class AiAssistantHateoasTests
         {
             Id = id,
             Kind = "CreateEventDraft",
+            Version = new string('a', 64),
             Status = status,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = Now
         };
 
     private static ClaimsPrincipal AuthenticatedUser() =>

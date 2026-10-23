@@ -23,6 +23,69 @@ namespace Explore.Persistence.Identity.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Explore.Domain.LocalIdentityEligibility", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CurrentOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_operation_id");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<long>("Generation")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("generation");
+
+                    b.Property<Guid>("LocalSubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("local_subject_id");
+
+                    b.Property<DateTime?>("LockoutUntilUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lockout_until_utc");
+
+                    b.Property<Guid>("PersonalActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("personal_actor_id");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer")
+                        .HasColumnName("state");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_local_identity_eligibilities");
+
+                    b.HasIndex("CurrentOperationId")
+                        .HasDatabaseName("ix_local_identity_eligibilities_current_operation_id");
+
+                    b.HasIndex("LocalSubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_local_identity_eligibilities_local_subject_id");
+
+                    b.ToTable("local_identity_eligibilities", "islamu_identity", t =>
+                        {
+                            t.HasCheckConstraint("ck_local_identity_eligibility_audit", "updated_at IS NULL OR updated_at >= created_at");
+
+                            t.HasCheckConstraint("ck_local_identity_eligibility_generation", "generation > 0");
+
+                            t.HasCheckConstraint("ck_local_identity_eligibility_state", "state BETWEEN 1 AND 5");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -481,6 +544,23 @@ namespace Explore.Persistence.Identity.Migrations
                         .HasName("pk_identity_user_tokens");
 
                     b.ToTable("identity_user_tokens", "islamu_identity");
+                });
+
+            modelBuilder.Entity("Explore.Domain.LocalIdentityEligibility", b =>
+                {
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityCredentialOperation", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_identity_eligibilities_local_identity_cre_465291b56c19");
+
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("LocalSubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_identity_eligibilities_local_identity_use_d31d17a98ba6");
                 });
 
             modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>

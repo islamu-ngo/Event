@@ -14,18 +14,36 @@ public class DeleteOrganizationMemberCommandHandler : ICommandHandler<DeleteOrga
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
     private readonly IOrganizationRepository _organizationRepository;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
+    private readonly ISerializableAttemptOwner _owner;
 
     public DeleteOrganizationMemberCommandHandler(
         IOrganizationMemberRepository organizationMemberRepository,
-        IOrganizationRepository organizationRepository)
+        IOrganizationRepository organizationRepository,
+        IHumanAccountAdministrativeActionPreparation preparation,
+        ISerializableAttemptOwner owner)
     {
         _organizationMemberRepository = organizationMemberRepository;
         _organizationRepository = organizationRepository;
+        _preparation = preparation;
+        _owner = owner;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteOrganizationMemberCommand request, CancellationToken cancellationToken)
     {
-        var memberToDelete = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.MemberId);
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        return await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, token);
+            var result = await ExecuteBodyAsync(request, token);
+            if (result.IsSuccess) prepared.Complete(result.Id);
+            return result;
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(DeleteOrganizationMemberCommand request, CancellationToken cancellationToken)
+    {
+        var memberToDelete = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.MemberId, cancellationToken);
 
         if (memberToDelete == null)
         {

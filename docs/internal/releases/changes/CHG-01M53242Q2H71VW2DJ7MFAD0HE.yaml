@@ -1,0 +1,29 @@
+Change-Id: CHG-01M53242Q2H71VW2DJ7MFAD0HE
+Title: "Revalidate persisted support facts on original human owners"
+Type: feat
+Scope: access
+Summary: "Compose support source leases and denial-only boundary projection after original principal and policy-source-set revalidation."
+Group: managed-human-support-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Persisted support session and governance facts override cached positives without granting operations or replacing parent admission.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Native metadata is preserved; production factory registration and verified parent final admission remain required.

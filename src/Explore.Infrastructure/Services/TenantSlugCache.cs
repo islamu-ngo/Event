@@ -10,7 +10,6 @@ public class TenantSlugCache : ITenantSlugCache, IDisposable
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
     private ConcurrentDictionary<string, Guid> _slugToTenantId = new(StringComparer.OrdinalIgnoreCase);
-    private ConcurrentDictionary<string, Guid> _domainToTenantId = new(StringComparer.OrdinalIgnoreCase);
     private volatile bool _isWarm;
 
     public TenantSlugCache(IServiceScopeFactory serviceScopeFactory)
@@ -45,17 +44,12 @@ public class TenantSlugCache : ITenantSlugCache, IDisposable
 
     public async ValueTask<Guid?> GetTenantIdByDomainAsync(string domain, CancellationToken cancellationToken = default)
     {
-        await EnsureWarmAsync(cancellationToken);
-
-        var tenantId = TryGetValue(_domainToTenantId, domain);
-        if (tenantId.HasValue)
-        {
-            return tenantId;
-        }
-
-        await LoadAsync(forceRefresh: true, cancellationToken);
-
-        return TryGetValue(_domainToTenantId, domain);
+        var normalized = NormalizeKey(domain);
+        if (normalized is null) return null;
+        using var scope = _serviceScopeFactory.CreateScope();
+        var source = scope.ServiceProvider.GetRequiredService<ITenantLookupSource>();
+        return await source.GetCurrentDomainTenantAsync(normalized, customDomain: true, cancellationToken)
+            ?? await source.GetCurrentDomainTenantAsync(normalized, customDomain: false, cancellationToken);
     }
 
     private async Task EnsureWarmAsync(CancellationToken cancellationToken)
@@ -88,17 +82,13 @@ public class TenantSlugCache : ITenantSlugCache, IDisposable
             var tenantLookups = await tenantLookupSource.GetTenantLookupsAsync(cancellationToken);
 
             var slugMap = new ConcurrentDictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
-            var domainMap = new ConcurrentDictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var tenantLookup in tenantLookups)
             {
                 AddLookup(slugMap, tenantLookup.Slug, tenantLookup.TenantId);
-                AddLookup(domainMap, tenantLookup.Subdomain, tenantLookup.TenantId);
-                AddLookup(domainMap, tenantLookup.CustomDomain, tenantLookup.TenantId);
             }
 
             _slugToTenantId = slugMap;
-            _domainToTenantId = domainMap;
             _isWarm = true;
         }
         finally

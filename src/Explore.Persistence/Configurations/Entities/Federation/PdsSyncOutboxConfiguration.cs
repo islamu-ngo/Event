@@ -1,4 +1,5 @@
 using Explore.Domain.Federation;
+using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -32,9 +33,9 @@ public sealed class PdsSyncOutboxConfiguration : IEntityTypeConfiguration<PdsSyn
         });
 
         builder.Property(value => value.Id).HasDefaultValueSql("uuidv7()");
-        builder.Property(value => value.Did).HasMaxLength(255).IsRequired();
-        builder.Property(value => value.Collection).HasMaxLength(255).IsRequired();
-        builder.Property(value => value.RecordKey).HasMaxLength(255).IsRequired();
+        builder.Property(value => value.Did).HasMaxLength(255).IsUnicode(false).UsePortableOrdinalAscii().IsRequired();
+        builder.Property(value => value.Collection).HasMaxLength(255).IsUnicode(false).UsePortableOrdinalAscii().IsRequired();
+        builder.Property(value => value.RecordKey).HasMaxLength(255).IsUnicode(false).UsePortableOrdinalAscii().IsRequired();
         builder.Property(value => value.Payload).HasColumnType("jsonb");
         builder.Property(value => value.PayloadHash).HasMaxLength(64).IsRequired();
         builder.Property(value => value.IdempotencyKey).HasMaxLength(255).IsRequired();
@@ -82,6 +83,10 @@ public sealed class PdsSyncOutboxConfiguration : IEntityTypeConfiguration<PdsSyn
             value.TenantId,
             value.SourceEntityType,
             value.SourceEntityId,
+            value.UserId,
+            value.Did,
+            value.Collection,
+            value.RecordKey,
             value.SourceVersion,
             value.Operation,
             value.PayloadHash

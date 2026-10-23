@@ -1,0 +1,29 @@
+Change-Id: CHG-01M521SM015XS36YABZ96QJVAG
+Title: "freeze tenant identity for each database lease"
+Type: fix
+Scope: access
+Summary: "A database context lease captures tenant identity on connection use and rejects tenant changes before every command until disposal resets the lease."
+Group: database-tenant-lease-identity
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MULTI_TENANCY.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: A database context seals its tenant identity when its connection is used and rejects replacement or mutation before every command; disposal clears pooled lease state.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: A tenant_lease_identity_changed rejection requires a fresh context for the newly selected tenant, not rebinding an open context.

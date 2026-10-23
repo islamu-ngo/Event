@@ -1,11 +1,12 @@
-using Explore.Application.Contracts.Services;
+using Explore.Persistence.Services;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Services;
 using Explore.Domain;
-using Explore.Domain.ValueObjects;
+using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -24,29 +25,75 @@ public sealed class EventResourceAuditRetentionPersistenceTests(EventResourcePer
         var expired = Audit(first, Now.AddDays(-30));
         var retained = Audit(first, Now.AddDays(-30).AddMilliseconds(1));
         var disabled = Audit(second, Now.AddDays(1));
-        await using (var seed = database.CreateContext())
+        await using (var seed = database.CreateSelectedContext(null))
         {
+            await using var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(seed);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(seed);
+            await using var discovery = await discoveryGate.AcquireAsync();
             seed.AddRange(first, second, expired, retained, disabled);
+            seed.TenantSettingOverrides.Add(new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantBId,
+                Tenant = null!,
+                SettingKey = GovernanceSettingKeys.EventResources.AuditRetentionDays,
+                Value = "0"
+            });
             await seed.SaveChangesAsync();
         }
-        var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
-        governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(call =>
-        {
-            var policy = EventResourceGovernancePolicy.Default(long.MaxValue);
-            return EventResourceGovernancePolicy.Create(policy.EnabledDeliveryTypes, policy.EnabledAudiences,
-                policy.PermittedFileTypes, policy.MaxUploadBytes, false, [],
-                call.Arg<Guid>() == scope.TenantBId ? 0 : 30, policy.MaxActiveResources, long.MaxValue);
-        });
-        await using var context = database.CreateContext();
-        var repository = new EventResourceAuditRetentionRepository(context);
-        var service = new EventResourceAuditRetentionService(repository, governance, new EfCoreUnitOfWork(context), new Clock());
+        var factory = new EventResourceAuditRetentionManualContextFactory(database.CreateSelectedContext);
+        var service = new EventResourceAuditRetentionService(
+            new EventResourceAuditOwnerDiscoveryRepository(factory, null),
+            new EventResourceAuditRetentionExecutionScopeFactory(factory), new Clock());
         await Assert.That(await service.CleanupAsync(default)).IsEqualTo(2L);
-        await using var verification = database.CreateContext();
-        var remaining = await verification.Set<EventResourceAuditEntry>().AsNoTracking()
+        await using var tenantA = database.CreateSelectedContext(scope.TenantAId);
+        await using var tenantB = database.CreateSelectedContext(scope.TenantBId);
+        var remainingA = await tenantA.Set<EventResourceAuditEntry>().AsNoTracking()
             .Where(row => row.EventResourceId == first.Id || row.EventResourceId == second.Id).ToArrayAsync();
+        var remainingB = await tenantB.Set<EventResourceAuditEntry>().AsNoTracking()
+            .Where(row => row.EventResourceId == first.Id || row.EventResourceId == second.Id).ToArrayAsync();
+        var remaining = remainingA.Concat(remainingB).ToArray();
         await Assert.That(remaining.Select(row => row.Id)).IsEquivalentTo([retained.Id]);
         await Assert.That(remaining.Single().ResponsibleManagerUserId).IsEqualTo(retained.ResponsibleManagerUserId);
-        await Assert.That(await verification.EventResources.CountAsync(row => row.Id == first.Id || row.Id == second.Id)).IsEqualTo(2);
+        await Assert.That(await tenantA.EventResources.CountAsync(row => row.Id == first.Id || row.Id == second.Id)
+            + await tenantB.EventResources.CountAsync(row => row.Id == first.Id || row.Id == second.Id)).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task ZeroRetentionContinuesAcrossFreshTenantDeleteBatches()
+    {
+        var scope = await database.SeedScopeAsync();
+        var resource = EventResourcePersistenceTests.CreateDraft(scope.TenantBId, scope.EventBId);
+        var rows = Enumerable.Range(0, EventResourceAuditRetentionService.DeleteBatchSize + 1)
+            .Select(_ => Audit(resource, Now.AddDays(1))).ToArray();
+        await using (var seed = database.CreateSelectedContext(null))
+        {
+            await using var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(seed);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(seed);
+            await using var discovery = await discoveryGate.AcquireAsync();
+            seed.Add(resource);
+            seed.AddRange(rows);
+            seed.TenantSettingOverrides.Add(new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantBId,
+                Tenant = null!,
+                SettingKey = GovernanceSettingKeys.EventResources.AuditRetentionDays,
+                Value = "0"
+            });
+            await seed.SaveChangesAsync();
+        }
+        var factory = new EventResourceAuditRetentionManualContextFactory(database.CreateSelectedContext);
+        var service = new EventResourceAuditRetentionService(
+            new EventResourceAuditOwnerDiscoveryRepository(factory, null),
+            new EventResourceAuditRetentionExecutionScopeFactory(factory), new Clock());
+        await Assert.That(await service.CleanupAsync(default)).IsEqualTo(1001L);
+        await using var verification = database.CreateSelectedContext(scope.TenantBId);
+        await Assert.That(await verification.Set<EventResourceAuditEntry>()
+            .CountAsync(row => row.EventResourceId == resource.Id)).IsEqualTo(0);
+        await Assert.That(await verification.EventResources.CountAsync(row => row.Id == resource.Id)).IsEqualTo(1);
     }
 
     [Test]
@@ -68,13 +115,17 @@ public sealed class EventResourceAuditRetentionPersistenceTests(EventResourcePer
         var otherAudit = EventResourceAuditEntry.Create(shared.TenantId, shared.Id, other,
             EventResourceAuditAction.UpdateMetadata, EventResourceAuditOutcome.Succeeded,
             EventResourceAuditReason.OrganizerMutation, Now);
-        await using (var seed = database.CreateContext())
+        await using (var seed = database.CreateSelectedContext(null))
         {
             seed.AddRange(authored, shared, unrelated, subjectAudit, otherAudit);
             await seed.SaveChangesAsync();
         }
-        await using (var context = database.CreateContext())
+        await using (var context = database.CreateSelectedContext(null))
         {
+            await using var humanGate = new Explore.Persistence.Security.HumanSecuritySourceGate(context);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(context);
+            await using var discovery = await discoveryGate.AcquireAsync();
             var erasure = new UserLocationPrivacyErasureRepository(context);
             await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async token =>
             {
@@ -82,9 +133,10 @@ public sealed class EventResourceAuditRetentionPersistenceTests(EventResourcePer
                 return true;
             });
         }
-        await using var verification = database.CreateContext();
-        var first = await verification.EventResources.AsNoTracking().SingleAsync(row => row.Id == authored.Id);
-        var second = await verification.EventResources.AsNoTracking().SingleAsync(row => row.Id == shared.Id);
+        await using var tenantA = database.CreateSelectedContext(scope.TenantAId);
+        await using var tenantB = database.CreateSelectedContext(scope.TenantBId);
+        var first = await tenantA.EventResources.AsNoTracking().SingleAsync(row => row.Id == authored.Id);
+        var second = await tenantB.EventResources.AsNoTracking().SingleAsync(row => row.Id == shared.Id);
         await Assert.That(first.CreatedBy).IsNull();
         await Assert.That(first.UpdatedBy).IsEqualTo(other);
         await Assert.That(first.ConcurrencyStamp).IsNotEqualTo(authored.ConcurrencyStamp);
@@ -92,11 +144,11 @@ public sealed class EventResourceAuditRetentionPersistenceTests(EventResourcePer
         await Assert.That(second.UpdatedBy).IsEqualTo(other);
         await Assert.That(second.ConcurrencyStamp).IsNotEqualTo(shared.ConcurrencyStamp);
         await Assert.That(first.IsDeleted || second.IsDeleted).IsFalse();
-        await Assert.That((await verification.Set<EventResourceAuditEntry>().AsNoTracking()
+        await Assert.That((await tenantB.Set<EventResourceAuditEntry>().AsNoTracking()
             .SingleAsync(row => row.Id == subjectAudit.Id)).ResponsibleManagerUserId).IsNull();
-        await Assert.That((await verification.Set<EventResourceAuditEntry>().AsNoTracking()
+        await Assert.That((await tenantB.Set<EventResourceAuditEntry>().AsNoTracking()
             .SingleAsync(row => row.Id == otherAudit.Id)).ResponsibleManagerUserId).IsEqualTo(other);
-        await Assert.That((await verification.EventResources.AsNoTracking()
+        await Assert.That((await tenantA.EventResources.AsNoTracking()
             .SingleAsync(row => row.Id == unrelated.Id)).ConcurrencyStamp).IsEqualTo(unrelated.ConcurrencyStamp);
     }
 
@@ -108,5 +160,22 @@ public sealed class EventResourceAuditRetentionPersistenceTests(EventResourcePer
     private sealed class Clock : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(Now);
+    }
+}
+
+internal sealed class EventResourceAuditRetentionManualContextFactory(Func<Guid?, ExploreDbContext> createContext)
+    : IGlobalExploreDbContextFactory, ITenantExploreDbContextFactory
+{
+    public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(createContext(null));
+    }
+
+    public Task<ExploreDbContext> CreateDbContextAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(createContext(tenantId));
     }
 }

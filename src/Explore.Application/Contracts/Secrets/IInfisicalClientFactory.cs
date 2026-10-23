@@ -43,3 +43,34 @@ public interface IInfisicalClient
 public sealed record SecretProviderValue(
     string Value,
     string Revision);
+
+/// <summary>Value-free classification of an Infisical boundary failure.</summary>
+public enum InfisicalOperationFailureKind
+{
+    Missing,
+    Invalid,
+    Unauthorized,
+    Unavailable
+}
+
+/// <summary>
+/// Contains no provider diagnostics. Definite rejection describes an observed remote
+/// rejection, not whether a caller can safely retry a mutation.
+/// </summary>
+public sealed class InfisicalOperationException : Exception
+{
+    public InfisicalOperationException(
+        InfisicalOperationFailureKind failureKind,
+        bool definiteRejection = false)
+        : base("infisical_operation_failed")
+    {
+        FailureKind = failureKind;
+        DefiniteRejection = definiteRejection;
+    }
+
+    public InfisicalOperationFailureKind FailureKind { get; }
+    public bool DefiniteRejection { get; }
+
+    public override string ToString() =>
+        $"InfisicalOperationException: {FailureKind}; DefiniteRejection={DefiniteRejection}";
+}

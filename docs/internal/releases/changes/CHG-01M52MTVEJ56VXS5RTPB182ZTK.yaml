@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52MTVEJ56VXS5RTPB182ZTK
+Title: "Bind persisted API-key evidence to authenticated identity"
+Type: feat
+Scope: access
+Summary: "Retain immutable persisted-key authentication facts bound to the original server identity, excluding claims copies and internal execution."
+Group: persisted-api-key-proof
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Only the original authenticated persisted-key identity can expose matching server-owned key evidence.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Configured clients and internal execution do not supply persisted-key authentication proof.

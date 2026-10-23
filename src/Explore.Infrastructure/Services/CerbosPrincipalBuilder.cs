@@ -23,24 +23,24 @@ namespace Explore.Infrastructure.Services;
 /// </summary>
 public class CerbosPrincipalBuilder
 {
+    internal static Cerbos.Api.V1.Engine.Principal CapturePrincipal(Principal principal) =>
+        principal.ToPrincipal().Clone();
+
     private readonly IAdminContext _adminContext;
     private readonly IMachinePrincipalAccessor _machinePrincipalAccessor;
     private readonly IEventAuthoritySnapshotService _eventAuthoritySnapshotService;
-    private readonly IOrganizationMemberRepository _organizationMemberRepository;
-    private readonly IGroupMemberRepository _groupMemberRepository;
+    private readonly IHumanCerbosPrincipalReader _humanPrincipalReader;
 
     public CerbosPrincipalBuilder(
         IAdminContext adminContext,
         IMachinePrincipalAccessor machinePrincipalAccessor,
         IEventAuthoritySnapshotService eventAuthoritySnapshotService,
-        IOrganizationMemberRepository organizationMemberRepository,
-        IGroupMemberRepository groupMemberRepository)
+        IHumanCerbosPrincipalReader humanPrincipalReader)
     {
         _adminContext = adminContext;
         _machinePrincipalAccessor = machinePrincipalAccessor;
         _eventAuthoritySnapshotService = eventAuthoritySnapshotService;
-        _organizationMemberRepository = organizationMemberRepository;
-        _groupMemberRepository = groupMemberRepository;
+        _humanPrincipalReader = humanPrincipalReader;
     }
 
     /// <summary>
@@ -66,32 +66,41 @@ public class CerbosPrincipalBuilder
     }
 
     /// <summary>
-    /// Builds a Cerbos SDK <see cref="Principal"/> for the given user by querying their
-    /// administrative authority across instance, tenant, and organization scopes.
+    /// Builds the original human's Cerbos principal from current native source facts.
+    /// This idle observation is not authority to commit a later mutation.
     /// </summary>
     public async Task<Principal> BuildSdkPrincipalAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(userId, cancellationToken);
-        var adminTenantIds = await _adminContext.GetAdminTenantIdsAsync(userId, cancellationToken);
-        var adminOrgIds = await _adminContext.GetAdminOrganizationIdsAsync(userId, cancellationToken);
-        var adminGroupIds = await _adminContext.GetAdminGroupIdsAsync(userId, cancellationToken);
-        var eventCreateOrganizationIds = await _organizationMemberRepository.GetOrganizationIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventCreate,
-            cancellationToken) ?? [];
-        var eventCreateGroupIds = await _groupMemberRepository.GetGroupIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventCreate,
-            cancellationToken) ?? [];
-        var eventFinanceOrganizationIds = await _organizationMemberRepository.GetOrganizationIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventManageFinance,
-            cancellationToken) ?? [];
-        var eventFinanceGroupIds = await _groupMemberRepository.GetGroupIdsWhereUserHasPermission(
-            userId,
-            PermissionCodes.EventManageFinance,
-            cancellationToken) ?? [];
+        var facts = await _humanPrincipalReader.ReadAsync(userId, cancellationToken);
+        return BuildPrincipalFromSources(facts);
+    }
 
+    public static Principal BuildPrincipalFromSources(HumanPrincipalSourceFacts facts)
+    {
+        bool instanceAdmin = facts.PlatformGrants.Any(grant => facts.Roles.Any(role =>
+            role.Id == grant.RoleId && role.RoleScopeId == (int)RoleScopeEnum.Platform
+                && role.MatchesPlatformAdministratorCode));
+        var tenants = facts.TenantGrants.Where(grant => grant.RevokedAt is null
+                && grant.RoleId == (int)RoleEnum.TenantAdmin
+                && facts.TenantMemberships.Any(member => member.Id == grant.TenantUserId
+                    && member.StatusId == (int)TenantUserStatusEnum.Active && !member.IsDeleted))
+            .Select(grant => grant.TenantId).Distinct();
+        var organizations = facts.Organizations.Where(member => member.RoleId == (int)RoleEnum.OrgAdmin
+                && !member.IsDeleted && !member.PlacementIsDeleted && !member.OwnerIsDeleted)
+            .Select(member => member.OwnerId).Distinct();
+        var groups = facts.Groups.Where(member => member.RoleId == (int)RoleEnum.GroupAdmin
+                && !member.IsDeleted && !member.PlacementIsDeleted && !member.OwnerIsDeleted)
+            .Select(member => member.OwnerId).Distinct();
+        return BuildHumanPrincipal(facts.PrincipalId, instanceAdmin, tenants, organizations, groups,
+            facts.EventCreateOrganizations, facts.EventCreateGroups,
+            facts.EventFinanceOrganizations, facts.EventFinanceGroups);
+    }
+
+    private static Principal BuildHumanPrincipal(Guid userId, bool isInstanceAdmin,
+        IEnumerable<Guid> adminTenantIds, IEnumerable<Guid> adminOrgIds, IEnumerable<Guid> adminGroupIds,
+        IEnumerable<Guid> eventCreateOrganizationIds, IEnumerable<Guid> eventCreateGroupIds,
+        IEnumerable<Guid> eventFinanceOrganizationIds, IEnumerable<Guid> eventFinanceGroupIds)
+    {
         var tenantMemberships = adminTenantIds
             .ToDictionary(id => id.ToString(), _ => AttributeValue.StringValue("admin"));
         var orgMemberships = adminOrgIds

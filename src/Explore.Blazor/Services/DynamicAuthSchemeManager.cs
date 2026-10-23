@@ -2,6 +2,7 @@ using Event.Web.BffHosting.Authentication;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Constants;
+using Explore.Blazor.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
@@ -18,6 +19,7 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
     private readonly IDataProtectionProvider _dataProtection;
     private readonly IEventBffOidcOptionsFactory _oidcOptionsFactory;
     private readonly ILogger<DynamicAuthSchemeManager> _logger;
+    private readonly AuthenticationCredentialAcquisitionReceipts? _acquisitionReceipts;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly object _registeredSchemesSync = new();
 
@@ -26,9 +28,6 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
     /// </summary>
     private readonly HashSet<string> _registeredSchemes = [];
 
-    // Tracks the last-known Keycloak client secret so it can be preserved
-    // when ApplyConfiguration is called without secrets (includeSecrets: false).
-    private string? _currentKeycloakSecret;
     private readonly string? _deploymentPrimaryProvider;
     private string _activePrimaryProvider;
 
@@ -39,7 +38,8 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         IConfiguration configuration,
         IDataProtectionProvider dataProtection,
         IEventBffOidcOptionsFactory oidcOptionsFactory,
-        ILogger<DynamicAuthSchemeManager> logger)
+        ILogger<DynamicAuthSchemeManager> logger,
+        AuthenticationCredentialAcquisitionReceipts? acquisitionReceipts = null)
     {
         _schemeProvider = schemeProvider;
         _oidcOptionsCache = oidcOptionsCache;
@@ -48,6 +48,7 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         _dataProtection = dataProtection;
         _oidcOptionsFactory = oidcOptionsFactory;
         _logger = logger;
+        _acquisitionReceipts = acquisitionReceipts;
         _deploymentPrimaryProvider = ResolveDeploymentPrimaryProvider(
             configuration["Authentication:Provider"] ?? configuration["AUTHENTICATION_PROVIDER"]);
         _activePrimaryProvider = _deploymentPrimaryProvider ?? "local";
@@ -60,7 +61,7 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         {
             _logger.LogInformation("Initializing dynamic auth schemes...");
 
-            // 1. Check environment variables for Keycloak (legacy/Docker config)
+            // Confidential schemes require credentials acquired by this process.
             var envAuthority = _configuration["Keycloak:Authority"];
             var envClientId = _configuration["Keycloak:ClientId"];
             var envClientSecret = _configuration["Keycloak:ClientSecret"];
@@ -68,30 +69,27 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
             var envGoogleClientId = _configuration["Google:ClientId"];
             var envGoogleClientSecret = _configuration["Google:ClientSecret"];
 
-            if (!string.IsNullOrEmpty(envAuthority) && !string.IsNullOrEmpty(envClientId))
+            if (!string.IsNullOrEmpty(envAuthority)
+                && !string.IsNullOrEmpty(envClientId))
             {
                 if (_deploymentPrimaryProvider is null)
                 {
                     _activePrimaryProvider = "keycloak";
                 }
 
-                _logger.LogInformation(
-                    "Keycloak config detected in environment variables — registering Keycloak scheme from env " +
-                    "(authority={Authority}, clientId={ClientId}, hasSecret={HasSecret})",
-                    envAuthority, envClientId, !string.IsNullOrEmpty(envClientSecret));
-
-                if (string.IsNullOrEmpty(envClientSecret))
+                if (!string.IsNullOrWhiteSpace(envClientSecret))
                 {
-                    _logger.LogWarning(
-"⚠️ KEYCLOAK_BLAZOR_CLIENT_SECRET is NOT set — Keycloak confidential clients will fail " +
-                    "token exchange with 'unauthorized_client'. Ensure KEYCLOAK_BLAZOR_CLIENT_SECRET is set " +
-                    "in Infisical (path: /keycloak) or as an environment variable.");
-                }
+                    _logger.LogInformation(
+                        "Keycloak config detected in environment variables — registering Keycloak scheme from env " +
+                        "(hasSecret={HasSecret})",
+                        true);
 
-                RegisterKeycloakScheme(envAuthority, envClientId, envClientSecret, envMetadataAddress);
+                    RegisterKeycloakScheme(envAuthority, envClientId, envClientSecret, envMetadataAddress);
+                }
             }
 
             if (!string.IsNullOrEmpty(envGoogleClientId)
+                && !string.IsNullOrWhiteSpace(envGoogleClientSecret)
                 && !string.Equals(
                     _activePrimaryProvider,
                     "atproto",
@@ -113,20 +111,19 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
                     ?? string.Empty);
             }
 
-            // 2. Read DB configuration via API (may override or add providers).
-            //    At startup, the setup secret is not available, so we read without secrets.
-            //    Env-var Keycloak is the only scheme that works at cold start.
-            //    After setup flow, RefreshSchemesAsync is called with secrets from the cookie.
+            // API configuration carries provider metadata only. Credentials belong to this
+            // process's selected deployment authority at cold start and refresh.
             AuthProviderConfigurationDto? dbConfig = null;
             try
             {
-                dbConfig = await FetchConfigFromApiAsync(includeSecrets: false, setupSecret: null);
+                dbConfig = await FetchConfigFromApiAsync();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogWarning(ex,
+                _logger.LogWarning(
                     "Could not read auth provider configuration from API at startup — " +
-                    "this is expected on first run before setup is completed");
+                    "this is expected on first run before setup is completed. FailureCategory={FailureCategory}",
+                    "auth_configuration_unavailable");
             }
 
             if (dbConfig is not null)
@@ -144,16 +141,14 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         }
     }
 
-    public async Task RefreshSchemesAsync(string? setupSecret = null)
+    public async Task RefreshSchemesAsync()
     {
         await _lock.WaitAsync();
         try
         {
             _logger.LogInformation("Refreshing dynamic auth schemes from API...");
 
-            var config = await FetchConfigFromApiAsync(
-                includeSecrets: !string.IsNullOrEmpty(setupSecret),
-                setupSecret: setupSecret);
+            var config = await FetchConfigFromApiAsync();
 
             if (config is not null)
             {
@@ -186,17 +181,13 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         }
     }
 
-    private async Task<AuthProviderConfigurationDto?> FetchConfigFromApiAsync(
-        bool includeSecrets,
-        string? setupSecret)
+    private async Task<AuthProviderConfigurationDto?> FetchConfigFromApiAsync()
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var apiClient = scope.ServiceProvider.GetRequiredService<IInstanceOnboardingClient>();
         try
         {
-            return includeSecrets && !string.IsNullOrEmpty(setupSecret)
-                ? await apiClient.GetInstanceOnboardingAuthProviderConfigurationInternalAsync()
-                : (await apiClient.GetInstanceOnboardingAuthProviderConfigurationAsync()).ToDto();
+            return (await apiClient.GetInstanceOnboardingAuthProviderConfigurationAsync()).ToDto();
         }
         catch (ApiException ex)
         {
@@ -224,47 +215,48 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         // Keep configured Keycloak validation/refresh metadata registered even when Local
         // becomes the primary provider. Provider discovery gates new login challenges.
         if (!string.IsNullOrEmpty(config.KeycloakAuthority)
-            && !string.IsNullOrEmpty(config.KeycloakClientId))
+            && !string.IsNullOrEmpty(config.KeycloakClientId)
+            && !string.IsNullOrWhiteSpace(_configuration["Keycloak:ClientSecret"]))
         {
             if (!_registeredSchemes.Contains(AuthSchemeNames.Keycloak))
             {
                 RegisterKeycloakScheme(
                     config.KeycloakAuthority,
                     config.KeycloakClientId,
-                    config.KeycloakClientSecret,
+                    _configuration["Keycloak:ClientSecret"],
                     metadataAddress: null);
             }
             else
             {
-                // Preserve the existing secret from env vars when DB config has no secret
-                // (e.g., at startup when includeSecrets: false)
-                var effectiveSecret = !string.IsNullOrEmpty(config.KeycloakClientSecret)
-                    ? config.KeycloakClientSecret
-                    : GetCurrentKeycloakSecret();
-
                 UpdateKeycloakSchemeOptions(
                     config.KeycloakAuthority,
                     config.KeycloakClientId,
-                    effectiveSecret);
+                    _configuration["Keycloak:ClientSecret"]);
             }
         }
+        else if (_registeredSchemes.Contains(AuthSchemeNames.Keycloak))
+        {
+            RemoveScheme(AuthSchemeNames.Keycloak);
+        }
         // Google: register if enabled and has credentials
-        if (config.GoogleSsoEnabled == true && !string.IsNullOrEmpty(config.GoogleClientId))
+        if (config.GoogleSsoEnabled == true && !string.IsNullOrEmpty(config.GoogleClientId)
+            && !string.IsNullOrWhiteSpace(_configuration["Google:ClientSecret"]))
         {
             if (!_registeredSchemes.Contains(AuthSchemeNames.Google))
             {
-                RegisterGoogleScheme(config.GoogleClientId, config.GoogleClientSecret);
+                RegisterGoogleScheme(config.GoogleClientId, _configuration["Google:ClientSecret"]);
             }
             else
             {
-                UpdateGoogleSchemeOptions(config.GoogleClientId, config.GoogleClientSecret);
+                UpdateGoogleSchemeOptions(config.GoogleClientId, _configuration["Google:ClientSecret"]);
             }
         }
-        else if (config.GoogleSsoEnabled != true && _registeredSchemes.Contains(AuthSchemeNames.Google))
+        else if (_registeredSchemes.Contains(AuthSchemeNames.Google))
         {
             // Only remove if NOT configured via env vars (env vars take priority)
             var envGoogleClientId = _configuration["Google:ClientId"];
-            if (string.IsNullOrEmpty(envGoogleClientId))
+            if (string.IsNullOrEmpty(envGoogleClientId)
+                || string.IsNullOrWhiteSpace(_configuration["Google:ClientSecret"]))
             {
                 RemoveScheme(AuthSchemeNames.Google);
             }
@@ -314,26 +306,25 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         var options = CreateKeycloakOptions(authority, clientId, clientSecret, metadataAddress);
         new OpenIdConnectPostConfigureOptions(_dataProtection)
             .PostConfigure(AuthSchemeNames.Keycloak, options);
-        _oidcOptionsCache.TryAdd(AuthSchemeNames.Keycloak, options);
+        bool optionsAdded = _oidcOptionsCache.TryAdd(AuthSchemeNames.Keycloak, options);
 
         var scheme = new AuthenticationScheme(
             AuthSchemeNames.Keycloak,
             displayName: "Keycloak",
             typeof(OpenIdConnectHandler));
 
-        _schemeProvider.TryAddScheme(scheme);
+        bool schemeAdded = _schemeProvider.TryAddScheme(scheme);
+        _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc,
+            optionsAdded && schemeAdded);
         lock (_registeredSchemesSync)
         {
             _registeredSchemes.Add(AuthSchemeNames.Keycloak);
         }
 
-        if (!string.IsNullOrEmpty(clientSecret?.Trim()))
-            _currentKeycloakSecret = clientSecret;
-
         _logger.LogInformation(
-            "[OIDC-DIAG] Registered Keycloak OIDC scheme (authority={Authority}, clientId={ClientId}, " +
+            "[OIDC-DIAG] Registered Keycloak OIDC scheme (" +
             "hasClientSecret={HasClientSecret})",
-            authority, clientId, !string.IsNullOrWhiteSpace(clientSecret));
+            !string.IsNullOrWhiteSpace(clientSecret));
     }
 
     private void UpdateKeycloakSchemeOptions(string authority, string clientId, string? clientSecret)
@@ -342,19 +333,13 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         var options = CreateKeycloakOptions(authority, clientId, clientSecret, metadataAddress: null);
         new OpenIdConnectPostConfigureOptions(_dataProtection)
             .PostConfigure(AuthSchemeNames.Keycloak, options);
-        _oidcOptionsCache.TryAdd(AuthSchemeNames.Keycloak, options);
-
-        if (!string.IsNullOrEmpty(clientSecret?.Trim()))
-            _currentKeycloakSecret = clientSecret;
+        bool optionsAdded = _oidcOptionsCache.TryAdd(AuthSchemeNames.Keycloak, options);
+        _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc,
+            optionsAdded);
 
         _logger.LogInformation(
-            "Updated Keycloak OIDC scheme options (authority: {Authority}, hasClientSecret: {HasClientSecret})",
-            authority, !string.IsNullOrWhiteSpace(clientSecret));
-    }
-
-    private string? GetCurrentKeycloakSecret()
-    {
-        return _currentKeycloakSecret ?? _configuration["Keycloak:ClientSecret"];
+            "Updated Keycloak OIDC scheme options (hasClientSecret: {HasClientSecret})",
+            !string.IsNullOrWhiteSpace(clientSecret));
     }
 
     private OpenIdConnectOptions CreateKeycloakOptions(
@@ -376,14 +361,16 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         var options = CreateGoogleOptions(clientId, clientSecret);
         new OpenIdConnectPostConfigureOptions(_dataProtection)
             .PostConfigure(AuthSchemeNames.Google, options);
-        _oidcOptionsCache.TryAdd(AuthSchemeNames.Google, options);
+        bool optionsAdded = _oidcOptionsCache.TryAdd(AuthSchemeNames.Google, options);
 
         var scheme = new AuthenticationScheme(
             AuthSchemeNames.Google,
             displayName: "Google",
             typeof(OpenIdConnectHandler));
 
-        _schemeProvider.TryAddScheme(scheme);
+        bool schemeAdded = _schemeProvider.TryAddScheme(scheme);
+        _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc,
+            optionsAdded && schemeAdded);
         lock (_registeredSchemesSync)
         {
             _registeredSchemes.Add(AuthSchemeNames.Google);
@@ -398,7 +385,9 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         var options = CreateGoogleOptions(clientId, clientSecret);
         new OpenIdConnectPostConfigureOptions(_dataProtection)
             .PostConfigure(AuthSchemeNames.Google, options);
-        _oidcOptionsCache.TryAdd(AuthSchemeNames.Google, options);
+        bool optionsAdded = _oidcOptionsCache.TryAdd(AuthSchemeNames.Google, options);
+        _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc,
+            optionsAdded);
 
         _logger.LogInformation("Updated Google OIDC scheme options");
     }
@@ -429,6 +418,10 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
 
     private void RemoveScheme(string schemeName)
     {
+        if (schemeName == AuthSchemeNames.Keycloak)
+            _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, false);
+        if (schemeName == AuthSchemeNames.Google)
+            _acquisitionReceipts?.SetInstalled(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, false);
         _schemeProvider.RemoveScheme(schemeName);
 
         // Clean up cached options for OIDC-based schemes

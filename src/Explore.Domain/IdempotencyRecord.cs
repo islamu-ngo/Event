@@ -3,6 +3,11 @@ namespace Explore.Domain;
 public class IdempotencyRecord
 {
     public const int InProgressStatusCode = 0;
+    /// <summary>
+    /// Execution may have committed, but no response may be replayed. This is a
+    /// rejection fence, not an HTTP status or permission to execute again.
+    /// </summary>
+    public const int ResponseUnavailableStatusCode = -1;
 
     public Guid Id { get; set; }
     public string Key { get; set; } = string.Empty;

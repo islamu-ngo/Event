@@ -34,7 +34,7 @@ public sealed class InstanceOnboardingStatusLinkPolicy(
 
             yield return new LinkDefinition(
                 "manage-authentication",
-                RouteNames.GetInstanceOnboardingAuthProviderConfigurationInternal,
+                RouteNames.GetInstanceOnboardingAuthProviderConfiguration,
                 Method: HttpMethods.Get,
                 Title: "Manage authentication provider during setup");
 

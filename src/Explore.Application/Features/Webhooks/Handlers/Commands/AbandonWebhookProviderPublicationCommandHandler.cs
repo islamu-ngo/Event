@@ -13,7 +13,7 @@ namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 public sealed class AbandonWebhookProviderPublicationCommandHandler(
     IWebhookProviderPublicationRepository repository,
     IWebhookAuditEventWriter auditWriter,
-    IUnitOfWork unitOfWork,
+    IHumanWebhookMutationPreparation preparation,
     TimeProvider timeProvider)
     : ICommandHandler<AbandonWebhookProviderPublicationCommand, BaseCommandResponse<Guid>>
 {
@@ -34,7 +34,7 @@ public sealed class AbandonWebhookProviderPublicationCommandHandler(
 
         try
         {
-            return await unitOfWork.ExecuteInTransactionAsync(async token =>
+            return await preparation.ExecuteAsync(request, async token =>
             {
                 var publication = await repository.GetByTenantAndIdAsync(
                     request.TenantId,

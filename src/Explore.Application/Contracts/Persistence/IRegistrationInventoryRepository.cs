@@ -73,7 +73,7 @@ public interface IRegistrationInventoryRepository
         Guid tenantId,
         CancellationToken cancellationToken);
 
-    Task<int> GetAllocatedQuantityAsync(Guid capacityPoolId, Guid tenantId, CancellationToken cancellationToken);
+    Task<long> GetAllocatedQuantityAsync(Guid capacityPoolId, Guid tenantId, CancellationToken cancellationToken);
 
     Task<IReadOnlyDictionary<Guid, RegistrationTicketLimitUsage>> GetTicketLimitUsageAsync(
         Guid eventId,
@@ -145,9 +145,9 @@ public interface IRegistrationInventoryRepository
 
 public sealed record RegistrationTicketLimitUsage(
     Guid TicketTypeId,
-    int AccountQuantity,
-    int VerifiedContactQuantity,
-    int BookingPartyQuantity);
+    long AccountQuantity,
+    long VerifiedContactQuantity,
+    long BookingPartyQuantity);
 
 public sealed record RegistrationInventoryReservation(
     Guid HoldId,

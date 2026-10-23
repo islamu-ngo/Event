@@ -1,7 +1,10 @@
+using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Repositories;
 
@@ -14,7 +17,33 @@ public class EventSessionCustomPropertyRepository : GenericRepository<EventSessi
         _dbContext = dbContext;
     }
 
-    public async Task<EventSessionCustomPropertyDefinition?> GetDefinitionWithDetails(Guid id)
+    public async Task<EventSession?> GetParentForMutationAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        Guid tenantId = RequireMutationTenant();
+        var selected = await _dbContext.EventSessions.AsNoTracking().SingleOrDefaultAsync(
+            row => row.Id == sessionId && row.TenantId == tenantId, cancellationToken);
+        if (selected is null)
+            return null;
+        await RelationalEntityRowFence.AcquireAsync<Event>(
+            _dbContext, tenantId, row => row.Id, selected.EventId, cancellationToken);
+        await RelationalEntityRowFence.AcquireAsync<EventSession>(
+            _dbContext, tenantId, row => row.Id, sessionId, cancellationToken);
+        return await _dbContext.EventSessions.AsNoTracking().SingleOrDefaultAsync(
+            row => row.Id == sessionId && row.TenantId == tenantId
+                && row.EventId == selected.EventId && !row.Event.IsDeleted, cancellationToken);
+    }
+
+    private Guid RequireMutationTenant()
+    {
+        if (_dbContext.TenantFilterTenantId is not { } tenantId || tenantId == Guid.Empty
+            || _dbContext.IsTenantFilterBypassed
+            || _dbContext.Database.IsRelational()
+                && _dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Definition mutation requires an exact tenant and a Serializable transaction.");
+        return tenantId;
+    }
+
+    public async Task<EventSessionCustomPropertyDefinition?> GetDefinitionWithDetails(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.EventSessionCustomPropertyDefinitions
             .AsNoTrackingWithIdentityResolution()
@@ -22,14 +51,67 @@ public class EventSessionCustomPropertyRepository : GenericRepository<EventSessi
             .Include(x => x.DefaultOption)
             .Include(x => x.Options.OrderBy(o => o.SortOrder))
             .Include(x => x.Values.OrderBy(v => v.Ordinal))
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
     public async Task<EventSessionCustomPropertyDefinition?> GetTrackedDefinitionWithOptions(Guid id, CancellationToken cancellationToken)
     {
-        return await _dbContext.EventSessionCustomPropertyDefinitions
+        Guid tenantId = RequireMutationTenant();
+        var selected = await _dbContext.EventSessionCustomPropertyDefinitions.AsNoTracking()
+            .SingleOrDefaultAsync(row => row.Id == id && row.TenantId == tenantId, cancellationToken);
+        if (selected is null)
+            return null;
+        var session = await GetParentForMutationAsync(selected.EventSessionId, cancellationToken);
+        if (session is null)
+            return null;
+        await RelationalEntityRowFence.AcquireAsync<EventSessionCustomPropertyDefinition>(
+            _dbContext, tenantId, row => row.Id, id, cancellationToken);
+        var optionIds = await _dbContext.EventSessionCustomPropertyOptions
+            .IgnoreQueryFilters([QueryFilterNames.SoftDelete]).AsNoTracking()
+            .Where(row => row.EventSessionCustomPropertyDefinitionId == id)
+            .OrderBy(row => row.Id).Select(row => row.Id).ToListAsync(cancellationToken);
+        foreach (Guid optionId in optionIds)
+            await RelationalEntityRowFence.AcquireGlobalAsync<EventSessionCustomPropertyOption>(
+                _dbContext, optionId, cancellationToken);
+        var persisted = await _dbContext.EventSessionCustomPropertyDefinitions.AsNoTracking()
+            .Include(row => row.Options)
+            .SingleOrDefaultAsync(row => row.Id == id && row.TenantId == tenantId
+                && row.EventSessionId == session.Id, cancellationToken);
+        if (persisted is null)
+            return null;
+        var tracked = await _dbContext.EventSessionCustomPropertyDefinitions
             .Include(x => x.Options.OrderBy(o => o.SortOrder))
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (tracked is null)
+            return null;
+        RequireStoredScalars(tracked, persisted);
+        var persistedOptions = persisted.Options.ToDictionary(option => option.Id);
+        if (tracked.Options.Count != persistedOptions.Count)
+            throw new InvalidOperationException("Tracked options do not match the persisted definition.");
+        foreach (var option in tracked.Options)
+        {
+            if (!persistedOptions.TryGetValue(option.Id, out var storedOption))
+                throw new InvalidOperationException("Tracked options do not match the persisted definition.");
+            RequireStoredScalars(option, storedOption);
+        }
+        return tracked;
+    }
+
+    private void RequireStoredScalars<TEntity>(TEntity tracked, TEntity persisted) where TEntity : class
+    {
+        var persistedValues = _dbContext.Entry(persisted).CurrentValues;
+        foreach (var property in _dbContext.Entry(tracked).Properties)
+        {
+            if (property.Metadata.Name is nameof(EventSessionCustomPropertyDefinition.CreatedAt)
+                or nameof(EventSessionCustomPropertyDefinition.UpdatedAt) or nameof(EventSessionCustomPropertyDefinition.DeletedAt))
+            {
+                property.CurrentValue = persistedValues[property.Metadata.Name];
+                property.OriginalValue = property.CurrentValue;
+                property.IsModified = false;
+            }
+            else if (!Equals(property.CurrentValue, persistedValues[property.Metadata.Name]))
+                throw new InvalidOperationException("Tracked definition values do not match the persisted mutation target.");
+        }
     }
 
     public async Task<(List<EventSessionCustomPropertyDefinition> Items, int TotalCount)> GetDefinitionsForSessionPaged(
@@ -231,6 +313,15 @@ public class EventSessionCustomPropertyRepository : GenericRepository<EventSessi
         return true;
     }
 
+    public async Task<bool> FenceDefinitionForPurgeAsync(Guid id, CancellationToken cancellationToken)
+    {
+        Guid tenantId = RequireMutationTenant();
+        await RelationalEntityRowFence.AcquireAsync<EventSessionCustomPropertyDefinition>(
+            _dbContext, tenantId, row => row.Id, id, cancellationToken);
+        return await _dbContext.EventSessionCustomPropertyDefinitions.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+            .AsNoTracking().AnyAsync(row => row.Id == id && row.TenantId == tenantId, cancellationToken);
+    }
+
     public async Task<CustomPropertyPurgeDependencySummary?> GetPurgeDependencies(Guid id, CancellationToken cancellationToken)
     {
         var definition = await _dbContext.EventSessionCustomPropertyDefinitions
@@ -272,6 +363,8 @@ public class EventSessionCustomPropertyRepository : GenericRepository<EventSessi
 
     private async Task<bool> PurgeDefinitionCoreAsync(Guid id, CancellationToken cancellationToken)
     {
+        if (!await FenceDefinitionForPurgeAsync(id, cancellationToken))
+            return false;
         await _dbContext.DisclosureMutations.EnlistQueryAsync(
             _dbContext.EventSessionCustomPropertyDefinitions.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
                 .Where(value => value.Id == id).Select(value => value.TenantId), cancellationToken);
@@ -319,15 +412,28 @@ public class EventSessionCustomPropertyRepository : GenericRepository<EventSessi
 
     public async Task<EventSessionCustomPropertyValue> SetValue(EventSessionCustomPropertyValue value, CancellationToken cancellationToken)
     {
-        var existing = await _dbContext.EventSessionCustomPropertyValues
+        Guid tenantId = RequireMutationTenant();
+        if (value.TenantId != tenantId)
+            throw new InvalidOperationException("Value mutation requires the exact execution tenant.");
+        var selected = await _dbContext.EventSessionCustomPropertyValues.AsNoTracking()
             .FirstOrDefaultAsync(x =>
                 x.EventSessionCustomPropertyDefinitionId == value.EventSessionCustomPropertyDefinitionId
                 && x.EventSessionId == value.EventSessionId
                 && x.Ordinal == value.Ordinal,
                 cancellationToken);
 
-        if (existing != null)
+        if (selected != null)
         {
+            await RelationalEntityRowFence.AcquireAsync<EventSessionCustomPropertyValue>(
+                _dbContext, tenantId, row => row.Id, selected.Id, cancellationToken);
+            var persisted = await _dbContext.EventSessionCustomPropertyValues.AsNoTracking()
+                .SingleOrDefaultAsync(row => row.Id == selected.Id && row.TenantId == tenantId
+                    && row.EventSessionCustomPropertyDefinitionId == value.EventSessionCustomPropertyDefinitionId
+                    && row.EventSessionId == value.EventSessionId && row.Ordinal == value.Ordinal, cancellationToken)
+                ?? throw new InvalidOperationException("The selected value mutation target changed.");
+            var existing = await _dbContext.EventSessionCustomPropertyValues.SingleAsync(
+                row => row.Id == persisted.Id, cancellationToken);
+            RequireStoredScalars(existing, persisted);
             existing.TextValue = value.TextValue;
             existing.NumberValue = value.NumberValue;
             existing.BooleanValue = value.BooleanValue;
@@ -370,6 +476,10 @@ public class EventSessionCustomPropertyRepository : GenericRepository<EventSessi
         Guid definitionId, Guid eventSessionId, IReadOnlyCollection<EventSessionCustomPropertyValue> values,
         CancellationToken cancellationToken)
     {
+        Guid tenantId = RequireMutationTenant();
+        if (values.Any(value => value.TenantId != tenantId
+            || value.EventSessionCustomPropertyDefinitionId != definitionId || value.EventSessionId != eventSessionId))
+            throw new InvalidOperationException("Replacement values must retain the exact definition, parent and tenant.");
         await _dbContext.DisclosureMutations.EnlistQueryAsync(
             _dbContext.EventSessions.IgnoreQueryFilters([QueryFilterNames.SoftDelete])
                 .Where(value => value.Id == eventSessionId).Select(value => value.TenantId), cancellationToken);

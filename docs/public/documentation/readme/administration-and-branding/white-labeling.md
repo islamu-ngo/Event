@@ -21,6 +21,12 @@ Depending on delegated administrative scope (see [Admin Hierarchy](admin-hierarc
 > **Governance Locks Retain Legal Disclosures!**  
 > Instance administrators can enforce **Governance Locks** on footer components. This prevents individual tenants from hiding or deleting legally required terms of service, privacy notices, or operator identity disclosures.
 
+Footer administration rechecks the original account, credential and support
+session before releasing protected data or committing edits. A direct URL or
+actor ID does not bypass that authority. Setup credentials retain governance
+read access only and are checked again before the response; they do not grant
+Footer edits. These source changes still await final executable assurance.
+
 ---
 
 ## Visual Branding vs. Legal Accountability Identity

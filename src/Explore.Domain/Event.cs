@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using Explore.Domain.Enums;
@@ -273,6 +274,16 @@ public class Event : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurren
     [NotMapped]
     public int? DiscoveryAdditionalSessionCount { get; private set; }
 
+    [NotMapped]
+    public EventDiscoveryPresentation? DiscoveryPresentation { get; private set; }
+
+    /// <summary>Presence means native public outcomes are authoritative, including explicit nulls.</summary>
+    public void SetDiscoveryPresentation(EventDiscoveryPresentation presentation)
+    {
+        ArgumentNullException.ThrowIfNull(presentation);
+        DiscoveryPresentation = presentation;
+    }
+
     /// <summary>
     /// Retains only the selected occurrence in a read graph, with a count of other eligible matches.
     /// </summary>
@@ -362,3 +373,27 @@ public class Event : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurren
         return value;
     }
 }
+
+public sealed record EventDiscoveryPresentation(
+    string? FeaturedImageUri,
+    string? ActorDisplayName,
+    string? ActorProfilePictureUri,
+    int ActorTypeId,
+    string? ActorTypeFullName,
+    Guid? ActorUserId,
+    Guid? ActorOrganizationId,
+    Guid? ActorGroupId,
+    bool HasValidOptionalQuestionnaire,
+    EventDiscoveryTicketSummary? TicketSummary)
+{
+    public ImmutableArray<EventTagPresentation> Tags { get; init; } = [];
+    public ImmutableArray<EventCategoryPresentation> Categories { get; init; } = [];
+    public bool IsUnmoderationEligible { get; init; }
+}
+
+public sealed record EventTagPresentation(Guid Id, string MasterCode, string FullName);
+
+public sealed record EventCategoryPresentation(
+    Guid Id, Guid ConcurrencyStamp, string MasterCode, string FullName, Guid? ParentId);
+
+public sealed record EventDiscoveryTicketSummary(string SummaryCode, string CurrencyCode, long FromAmountMinor);

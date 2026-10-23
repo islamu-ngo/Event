@@ -76,7 +76,7 @@ public sealed class StorageObjectReferenceRepository(ExploreDbContext dbContext)
         return HasBlockingHoldsCoreAsync(storageObjectId, serverNowUtc, cancellationToken);
     }
 
-    private Task<bool> HasBlockingHoldsCoreAsync(
+    private async Task<bool> HasBlockingHoldsCoreAsync(
         Guid storageObjectId,
         DateTime serverNowUtc,
         CancellationToken cancellationToken)
@@ -84,54 +84,8 @@ public sealed class StorageObjectReferenceRepository(ExploreDbContext dbContext)
         if (serverNowUtc == default || serverNowUtc.Kind != DateTimeKind.Utc)
             throw new ArgumentException("Retention evaluation requires a non-default server UTC instant.", nameof(serverNowUtc));
 
-        // As in registration retention cleanup, the immutable published version
-        // remains authority after answers have been erased. Missing authority is
-        // not permission to delete. These are object-bounded system predicates.
-        var submissions = dbContext.RegistrationSubmissions.AsNoTracking()
-            .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete]);
-        var orders = dbContext.RegistrationOrders.AsNoTracking()
-            .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete]);
-        var versions = dbContext.RegistrationFormVersions.AsNoTracking()
-            .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete]);
-        var fields = dbContext.RegistrationFormFields.AsNoTracking()
-            .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete]);
-        var policies = dbContext.RegistrationRetentionPolicies.AsNoTracking();
-        var deliveries = dbContext.RegistrationProviderSubmissionWriteEffects.AsNoTracking()
-            .IgnoreQueryFilters([QueryFilterNames.Tenant]);
-
-        var releasableSubmissions =
-            from submission in submissions
-            join order in orders
-                on new { submission.TenantId, submission.EventId, Id = submission.RegistrationOrderId }
-                equals new { order.TenantId, order.EventId, order.Id }
-            join version in versions
-                on new { submission.TenantId, submission.EventId, submission.RegistrationFormId, Id = submission.RegistrationFormVersionId }
-                equals new { version.TenantId, version.EventId, version.RegistrationFormId, version.Id }
-            where order.AnonymousPiiRetentionUntilUtc != null
-                && version.PublishedAt != null && version.SchemaHash != null
-                && fields.Any(field => field.TenantId == submission.TenantId && field.RegistrationFormVersionId == version.Id)
-                && !fields.Any(field => field.TenantId == submission.TenantId && field.RegistrationFormVersionId == version.Id
-                    && !policies.Any(policy => policy.Id == field.RetentionPolicyId && !policy.IsLegalHold && policy.DurationDays != null))
-                && (submission.RegistrationProviderBindingId == null || deliveries.Any(effect =>
-                    effect.TenantId == submission.TenantId && effect.EventId == submission.EventId
-                    && effect.RegistrationOrderId == submission.RegistrationOrderId
-                    && effect.RegistrationAttemptId == submission.RegistrationAttemptId
-                    && effect.RegistrationSubmissionId == submission.Id
-                    && effect.RegistrationProviderBindingId == submission.RegistrationProviderBindingId
-                    && effect.ParkedAt == null
-                    && ((effect.Status == OutboxMessageStatus.Completed && effect.CompletedAt != null)
-                        || (effect.Status == OutboxMessageStatus.DeadLettered && effect.DeadLetteredAt != null))))
-            select submission;
-
-        return dbContext.StorageObjects.AsNoTracking()
-            .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
-            .AnyAsync(storage => storage.Id == storageObjectId
-                && storage.OwningResourceKind == "registration_submission_sink"
-                && (storage.RegistrationContentRetentionUntilUtc == null
-                    || storage.RegistrationContentRetentionUntilUtc > serverNowUtc
-                    || !releasableSubmissions.Any(submission =>
-                        submission.TenantId == storage.TenantId && submission.Id == storage.OwningResourceId)),
-                cancellationToken);
+        return await StorageObjectRetentionQuery.HasBlockingHoldsAsync(
+            dbContext, storageObjectId, serverNowUtc, cancellationToken);
     }
 
     private void RequireTransaction()

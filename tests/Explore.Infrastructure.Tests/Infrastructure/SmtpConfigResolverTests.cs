@@ -1,32 +1,12 @@
 using System.Text.Json;
 using SettingsDatabase = Explore.Tests.Shared.Settings.SmtpSettingsDatabase;
-using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
-using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Models;
-using Explore.Application.Services;
-using Explore.Application.Settings;
-using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
-using Explore.Domain.Settings;
-using Explore.Infrastructure.Mail;
-using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Tests.Fixtures;
-using Explore.Persistence;
-using Explore.Persistence.Database;
-using Explore.Persistence.Repositories;
-using Explore.Secrets.Database;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using NSubstitute.Extensions;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
@@ -226,26 +206,7 @@ public sealed class SmtpConfigResolverTests
         if (explicitLock)
             await fixture.SetInstanceAsync(GovernanceSettingKeys.TenantDelegation.LockSmtp, true);
         else
-            (await fixture.Writer.ApplyAsync([new(TenantId: null,
-                Key: GovernanceSettingKeys.TenantDelegation.LockSmtp,
-                Kind: EmailDeliverySettingMutationKind.Remove)], fixture.ActorId)).EnsureAccepted();
-
-        var capability = await fixture.Capabilities.ResolveAsync(fixture.TenantId);
-        var transport = await fixture.Smtp.ResolveAsync();
-
-        await Assert.That(capability.Scope).IsEqualTo(SecretScope.Instance);
-        await Assert.That(transport!.Host).IsEqualTo("smtp.instance.test");
-        await Assert.That(transport.FromAddress).IsEqualTo("events@instance.test");
-    }
-
-    [Test]
-    public async Task ResolveAsync_InstanceHostLock_OverridesTenantDelegation()
-    {
-        await using var fixture = await SettingsDatabase.CreateAsync();
-        await fixture.ConfigureInstanceAsync();
-        await fixture.ConfigureTenantAsync();
-        await fixture.Settings.LockAsync(GovernanceSettingKeys.Email.SmtpHost, SettingScope.Instance,
-            Guid.Empty, fixture.ActorId);
+            await fixture.RemoveEmailValueAsync(null, GovernanceSettingKeys.TenantDelegation.LockSmtp);
 
         var capability = await fixture.Capabilities.ResolveAsync(fixture.TenantId);
         var transport = await fixture.Smtp.ResolveAsync();
@@ -362,46 +323,6 @@ public sealed class SmtpConfigResolverTests
         await Assert.That((await fixture.Capabilities.ResolveAsync(fixture.TenantId)).State)
             .IsEqualTo(EmailDeliveryState.Misconfigured);
         await Assert.That(await fixture.Smtp.ResolveAsync()).IsNull();
-    }
-
-    [Test]
-    public async Task ApplySettingsAsync_LockedHost_PreservesLockAndInstanceOwnership()
-    {
-        await using var fixture = await SettingsDatabase.CreateAsync();
-        await fixture.ConfigureInstanceAsync();
-        await fixture.ConfigureTenantAsync();
-        await fixture.Settings.LockAsync(GovernanceSettingKeys.Email.SmtpHost, SettingScope.Instance,
-            Guid.Empty, fixture.ActorId);
-
-        await fixture.InstanceSmtp.ApplySettingsAsync(new InstanceSmtpSettingsDto
-        {
-            Host = "smtp.updated-instance.test",
-            FromAddress = "events@updated-instance.test"
-        });
-        fixture.Settings.InvalidateCache(SettingScope.Instance);
-
-        var setting = await fixture.Settings.ResolveWithMetadataAsync(GovernanceSettingKeys.Email.SmtpHost,
-            new SettingContext(fixture.TenantId));
-        var transport = await fixture.Smtp.ResolveAsync();
-        await Assert.That(setting!.Source).IsEqualTo(SettingSource.SystemLocked);
-        await Assert.That(transport!.Host).IsEqualTo("smtp.updated-instance.test");
-        await Assert.That(transport.FromAddress).IsEqualTo("events@updated-instance.test");
-    }
-
-    [Test]
-    public async Task ApplySettingsAsync_LaterWriteFails_RollsBackEarlierHostWrite()
-    {
-        await using var fixture = await SettingsDatabase.CreateAsync();
-        await fixture.ConfigureInstanceAsync();
-        await fixture.RejectPortUpdatesAsync();
-
-        await Assert.ThrowsAsync<DbUpdateException>(() => fixture.InstanceSmtp.ApplySettingsAsync(
-            new InstanceSmtpSettingsDto { Host = "smtp.rollback.test", Port = 2525, FromAddress = "events@rollback.test" }));
-
-        var settings = await fixture.InstanceSmtp.ReadSettingsAsync();
-        await Assert.That(settings.Host).IsEqualTo("smtp.instance.test");
-        await Assert.That(settings.Port).IsEqualTo(587);
-        await Assert.That(settings.FromAddress).IsEqualTo("events@instance.test");
     }
 
 }

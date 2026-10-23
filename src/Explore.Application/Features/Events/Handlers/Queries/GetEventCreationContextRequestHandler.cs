@@ -1,12 +1,12 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Application.Settings;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
@@ -18,32 +18,38 @@ public class GetEventCreationContextRequestHandler : IQueryHandler<GetEventCreat
 
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
-    private readonly ITenantPolicySettingService _tenantPolicySettingService;
-    private readonly IOrganizationMemberRepository _organizationMemberRepository;
-    private readonly IGroupMemberRepository _groupMemberRepository;
+    private readonly IHierarchicalSettingsReader _settings;
+    private readonly IHumanEventCreationPublisherReader _publishers;
 
     public GetEventCreationContextRequestHandler(
         IUserContext userContext,
         ITenantContext tenantContext,
-        ITenantPolicySettingService tenantPolicySettingService,
-        IOrganizationMemberRepository organizationMemberRepository,
-        IGroupMemberRepository groupMemberRepository)
+        IHierarchicalSettingsReader settings,
+        IHumanEventCreationPublisherReader publishers)
     {
         _userContext = userContext;
         _tenantContext = tenantContext;
-        _tenantPolicySettingService = tenantPolicySettingService;
-        _organizationMemberRepository = organizationMemberRepository;
-        _groupMemberRepository = groupMemberRepository;
+        _settings = settings;
+        _publishers = publishers;
     }
 
     public async Task<EventCreationContextDto> QueryAsync(GetEventCreationContextRequest request, CancellationToken cancellationToken)
     {
         var currentUserId = _userContext.GetRequiredUserId();
-        var tenantPolicy = await _tenantPolicySettingService.ReadEffectiveTenantSettingsAsync(_tenantContext.TenantId);
+        var tenantId = _tenantContext.TenantId;
+        var settingContext = new SettingContext(tenantId, RequireAuthoritativeReads: true);
+        var personalAllowed = await _settings.ResolveAsync<bool>(
+            GovernanceSettingKeys.Events.UserSubmissionEnabled, settingContext, cancellationToken);
+        var organizationAllowed = await _settings.ResolveAsync<bool>(
+            GovernanceSettingKeys.Events.OrganizationSubmissionEnabled, settingContext, cancellationToken);
+        var groupAllowed = await _settings.ResolveAsync<bool>(
+            GovernanceSettingKeys.Events.GroupSubmissionEnabled, settingContext, cancellationToken);
+        var requiresApproval = await _settings.ResolveAsync<bool>(
+            GovernanceSettingKeys.Events.RequireApproval, settingContext, cancellationToken);
 
         var publisherOptions = new List<EventCreationPublisherOptionDto>();
 
-        if (tenantPolicy.AllowUserSubmittedEvents)
+        if (personalAllowed)
         {
             publisherOptions.Add(new EventCreationPublisherOptionDto
             {
@@ -53,14 +59,23 @@ public class GetEventCreationContextRequestHandler : IQueryHandler<GetEventCreat
             });
         }
 
-        if (tenantPolicy.AllowOrganizationSubmittedEvents)
+        if (organizationAllowed || groupAllowed)
         {
-            publisherOptions.AddRange(await GetOrganizationPublisherOptionsAsync(currentUserId));
-        }
-
-        if (tenantPolicy.AllowGroupSubmittedEvents)
-        {
-            publisherOptions.AddRange(await GetGroupPublisherOptionsAsync(currentUserId));
+            var memberships = await _publishers.ReadAsync(tenantId, currentUserId, cancellationToken);
+            var allowedRoles = memberships.Permissions
+                .Where(mapping => mapping.Permission.IsActive && mapping.Permission.MasterCode == PermissionCodes.EventCreate)
+                .Select(mapping => mapping.RoleId)
+                .ToHashSet();
+            if (organizationAllowed)
+                publisherOptions.AddRange(memberships.Organizations
+                    .Select(membership => CreateOrganizationOption(membership, allowedRoles.Contains(membership.RoleId)))
+                    .OrderByDescending(option => option.CanPublish)
+                    .ThenBy(option => option.DisplayName, StringComparer.OrdinalIgnoreCase));
+            if (groupAllowed)
+                publisherOptions.AddRange(memberships.Groups
+                    .Select(membership => CreateGroupOption(membership, allowedRoles.Contains(membership.RoleId)))
+                    .OrderByDescending(option => option.CanPublish)
+                    .ThenBy(option => option.DisplayName, StringComparer.OrdinalIgnoreCase));
         }
 
         var defaultPublisherMode = publisherOptions.FirstOrDefault(option => option.CanPublish)?.PublisherMode;
@@ -68,52 +83,16 @@ public class GetEventCreationContextRequestHandler : IQueryHandler<GetEventCreat
         return new EventCreationContextDto
         {
             CanCreate = defaultPublisherMode is not null,
-            AllowPersonalPublishing = tenantPolicy.AllowUserSubmittedEvents,
-            AllowOrganizationPublishing = tenantPolicy.AllowOrganizationSubmittedEvents,
-            AllowGroupPublishing = tenantPolicy.AllowGroupSubmittedEvents,
-            RequiresApproval = tenantPolicy.RequireEventApproval,
+            AllowPersonalPublishing = personalAllowed,
+            AllowOrganizationPublishing = organizationAllowed,
+            AllowGroupPublishing = groupAllowed,
+            RequiresApproval = requiresApproval,
             DefaultPublisherMode = defaultPublisherMode,
             UnavailableReason = defaultPublisherMode is null
                 ? "No available publisher can create events for the current user."
                 : null,
             PublisherOptions = publisherOptions
         };
-    }
-
-    private async Task<List<EventCreationPublisherOptionDto>> GetOrganizationPublisherOptionsAsync(Guid currentUserId)
-    {
-        var memberships = await _organizationMemberRepository.GetMembershipsByUser(currentUserId);
-        if (memberships.Count == 0)
-            return [];
-
-        var allowedOrganizationIds = await _organizationMemberRepository.GetOrganizationIdsWhereUserHasPermission(
-            currentUserId,
-            PermissionCodes.EventCreate);
-        var allowedOrganizations = allowedOrganizationIds.ToHashSet();
-
-        return memberships
-            .Select(membership => CreateOrganizationOption(membership, allowedOrganizations.Contains(membership.OrganizationTenant.OrganizationId)))
-            .OrderByDescending(option => option.CanPublish)
-            .ThenBy(option => option.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    private async Task<List<EventCreationPublisherOptionDto>> GetGroupPublisherOptionsAsync(Guid currentUserId)
-    {
-        var memberships = await _groupMemberRepository.GetMembershipsByUser(currentUserId);
-        if (memberships.Count == 0)
-            return [];
-
-        var allowedGroupIds = await _groupMemberRepository.GetGroupIdsWhereUserHasPermission(
-            currentUserId,
-            PermissionCodes.EventCreate);
-        var allowedGroups = allowedGroupIds.ToHashSet();
-
-        return memberships
-            .Select(membership => CreateGroupOption(membership, allowedGroups.Contains(membership.GroupTenant.GroupId)))
-            .OrderByDescending(option => option.CanPublish)
-            .ThenBy(option => option.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
     }
 
     private static EventCreationPublisherOptionDto CreateOrganizationOption(

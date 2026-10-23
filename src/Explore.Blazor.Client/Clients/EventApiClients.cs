@@ -38,6 +38,32 @@ public partial interface IGuestRegistrationOrderClient
         CancellationToken cancellationToken = default);
 }
 
+public partial interface IAuthenticatedRegistrationOrderClient
+{
+    Task<BaseCommandResponseOfGuid> StartAuthenticatedRegistrationOrderWithOperationKeyAsync(
+        Guid eventId,
+        StartRegistrationOrderRequest body,
+        string operationKey,
+        CancellationToken cancellationToken = default);
+}
+
+public partial class AuthenticatedRegistrationOrderClient
+{
+    public async Task<BaseCommandResponseOfGuid> StartAuthenticatedRegistrationOrderWithOperationKeyAsync(
+        Guid eventId,
+        StartRegistrationOrderRequest body,
+        string operationKey,
+        CancellationToken cancellationToken = default)
+    {
+        using var operation = EventApiTransportBehavior.BeginAuthenticatedRegistrationOrder(operationKey);
+        return await StartAuthenticatedRegistrationOrderAsync(eventId, idempotency_Key: operationKey,
+            body: body, cancellationToken: cancellationToken);
+    }
+
+    partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url) =>
+        EventApiTransportBehavior.PrepareRequest(request, url);
+}
+
 public partial class EventLifecycleClient
 {
     public async Task<BaseCommandResponseOfGuid> CreateEventWithIdempotencyKeyAsync(
@@ -184,6 +210,9 @@ internal static class EventApiTransportBehavior
 
     internal static OperationScope BeginGuestRegistrationOrder(string idempotencyKey) =>
         Begin(new OperationContext(idempotencyKey, captureCapability: true));
+
+    internal static OperationScope BeginAuthenticatedRegistrationOrder(string operationKey) =>
+        Begin(new OperationContext(operationKey, captureCapability: false));
 
     internal static void PrepareRequest(HttpRequestMessage request, string? generatedUrl = null)
     {

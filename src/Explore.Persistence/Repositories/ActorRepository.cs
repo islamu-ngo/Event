@@ -15,6 +15,11 @@ public class ActorRepository : GenericRepository<Actor, Guid>, IActorRepository
         _dbContext = dbContext;
     }
 
+    public Task<Actor?> GetForModerationAsync(Guid id, CancellationToken cancellationToken = default) =>
+        _dbContext.Actors
+            .IgnoreAutoIncludes()
+            .FirstOrDefaultAsync(actor => actor.Id == id, cancellationToken);
+
     public new async Task<Actor?> GetById(Guid id)
     {
         return await _dbContext.Actors
@@ -169,20 +174,6 @@ public class ActorRepository : GenericRepository<Actor, Guid>, IActorRepository
             .Include(a => a.Pii)
             .Include(a => a.ActorType)
             .FirstOrDefaultAsync(a => a.UserId == userId, cancellationToken);
-    }
-
-    public async Task<Actor?> GetActorByUserIdAndTenantId(
-        Guid userId,
-        Guid tenantId,
-        CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.Actors
-            .AsNoTracking()
-            .Include(a => a.Pii)
-            .Include(a => a.ActorType)
-            .FirstOrDefaultAsync(a => a.UserId == userId
-                && _dbContext.TenantUsers.Any(participation =>
-                    participation.TenantId == tenantId && participation.ActorId == a.Id), cancellationToken);
     }
 
     public async Task<Actor?> GetActorByOrganizationId(Guid organizationId)

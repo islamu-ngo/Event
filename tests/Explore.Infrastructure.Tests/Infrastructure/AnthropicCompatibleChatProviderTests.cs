@@ -1,17 +1,13 @@
-using System.Diagnostics.Metrics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure.Ai;
-using Explore.Application.Telemetry;
 using Explore.Domain.Ai;
 using Explore.Infrastructure.Ai;
-using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
-public sealed class AnthropicCompatibleChatProviderTests
+public sealed class AnthropicCompatibleChatProviderTests : AiProviderTestBase
 {
     [Test]
     public async Task SendAsync_PostsMessagesRequestWithNativeToolsAndToolResults()
@@ -34,7 +30,7 @@ public sealed class AnthropicCompatibleChatProviderTests
               "usage": { "input_tokens": 12, "output_tokens": 4 }
             }
             """, response => response.Headers.Add("x-request-id", "req_test")));
-        var provider = CreateProvider(handler, CreateSettings(apiKey: "secret-key"));
+        var provider = CreateProvider(handler, CreateSettings());
 
         var result = await provider.SendAsync(CreateRequest(
             toolProposalsEnabled: true,
@@ -54,9 +50,9 @@ public sealed class AnthropicCompatibleChatProviderTests
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(handler.RequestUri).IsEqualTo(new Uri("https://ai.example.test/v1/messages"));
-        await Assert.That(handler.RequestHeaders!.GetValues("x-api-key").Single()).IsEqualTo("secret-key");
+        await Assert.That(handler.RequestHeaders!.GetValues("x-api-key").Single()).IsEqualTo(Fixture.Credential);
         await Assert.That(handler.RequestHeaders.GetValues("anthropic-version").Single()).IsEqualTo("2023-06-01");
-        await Assert.That(handler.RequestBody).DoesNotContain("secret-key");
+        await Assert.That(handler.RequestBody).DoesNotContain(Fixture.Credential);
         await Assert.That(result.Response!.ProviderRequestId).IsEqualTo("req_test");
         await Assert.That(result.Response.ProposedActions.Count).IsEqualTo(1);
         await Assert.That(result.Response.ProposedActions[0].PayloadJson).Contains("Community Dinner");
@@ -267,28 +263,26 @@ public sealed class AnthropicCompatibleChatProviderTests
         await Assert.That(document.RootElement.TryGetProperty("chat_template_kwargs", out _)).IsFalse();
     }
 
-    private static AnthropicCompatibleChatProvider CreateProvider(
+    private AnthropicCompatibleChatProvider CreateProvider(
         HttpMessageHandler handler,
         AiProviderSettings settings)
     {
-        var client = new HttpClient(handler);
+        var client = Fixture.CreateClient(handler);
         var factory = new StaticHttpClientFactory(client);
-        var meterFactory = Substitute.For<IMeterFactory>();
-        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
 
         return new AnthropicCompatibleChatProvider(
             factory,
-            Options.Create(settings),
-            new AiProviderSettingsValidator(),
-            new BusinessMetrics(meterFactory));
+            Fixture.Configuration(settings),
+            Fixture.Validator,
+            Fixture.Metrics);
     }
 
-    private static AiProviderSettings CreateSettings(string apiKey = "test-key") => new()
+    private static AiProviderSettings CreateSettings() => new()
     {
         Enabled = true,
         Provider = AiProviderSettings.ProviderAnthropicCompatible,
         EndpointUrl = "https://ai.example.test/v1/messages",
-        ApiKey = apiKey,
+        CredentialScope = AiCredentialScope.Instance,
         ModelId = "claude-test",
         MaxInputTokens = 8000,
         MaxOutputTokens = 1024,

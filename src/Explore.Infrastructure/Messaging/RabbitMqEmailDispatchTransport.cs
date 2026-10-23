@@ -157,11 +157,8 @@ public sealed class RabbitMqEmailDispatchTransport : IEmailDispatchTransport, IA
         {
             returned = args;
             _logger.LogWarning(
-                "RabbitMQ returned EmailDispatch pointer publish {PublishEventId} for tenant {TenantId} with reply code {ReplyCode} on routing key {RoutingKey}",
-                pointer.PublishEventId,
-                pointer.TenantId,
-                args.ReplyCode,
-                args.RoutingKey);
+                "RabbitMQ returned EmailDispatch pointer publish with reply code {ReplyCode}",
+                args.ReplyCode);
             return Task.CompletedTask;
         }
 
@@ -199,9 +196,7 @@ public sealed class RabbitMqEmailDispatchTransport : IEmailDispatchTransport, IA
 
             _metrics.RecordEmailDispatchRabbitMqPublish(EmailDispatchPublishOutcome.Confirmed);
             _logger.LogInformation(
-                "RabbitMQ confirmed EmailDispatch pointer publish {PublishEventId} for tenant {TenantId} with sequence {PublishSequenceNumber}",
-                pointer.PublishEventId,
-                pointer.TenantId,
+                "RabbitMQ confirmed EmailDispatch pointer publish with sequence {PublishSequenceNumber}",
                 sequenceNumber);
 
             return EmailDispatchPublishResult.Confirmed(sequenceNumber);
@@ -232,10 +227,7 @@ public sealed class RabbitMqEmailDispatchTransport : IEmailDispatchTransport, IA
         {
             _metrics.RecordEmailDispatchRabbitMqPublish(EmailDispatchPublishOutcome.Failed, EmailDispatchPublishFailure.BrokerPublishFailed.ToCode());
             _logger.LogWarning(
-                ex,
-                "RabbitMQ EmailDispatch pointer publish failed for {PublishEventId} and tenant {TenantId}",
-                pointer.PublishEventId,
-                pointer.TenantId);
+                "RabbitMQ EmailDispatch pointer publish failed");
             return new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Failed, FailureCategory: EmailDispatchPublishFailure.BrokerPublishFailed);
         }
         finally
@@ -244,10 +236,8 @@ public sealed class RabbitMqEmailDispatchTransport : IEmailDispatchTransport, IA
             if (returned is not null)
             {
                 _logger.LogDebug(
-                    "RabbitMQ return metadata captured for EmailDispatch pointer publish {PublishEventId}: {ReplyCode}/{ReplyText}",
-                    pointer.PublishEventId,
-                    returned.ReplyCode,
-                    returned.ReplyText);
+                    "RabbitMQ return metadata captured with reply code {ReplyCode}",
+                    returned.ReplyCode);
             }
 
             await CloseAndDisposeChannelAsync(channel, CancellationToken.None);
@@ -259,12 +249,7 @@ public sealed class RabbitMqEmailDispatchTransport : IEmailDispatchTransport, IA
         var options = _settings.CurrentValue;
         Dictionary<string, object> data = new(StringComparer.Ordinal)
         {
-            ["enabled"] = options.Enabled,
-            ["connectionStringName"] = options.ConnectionStringName,
-            ["exchange"] = options.ExchangeName,
-            ["dispatchQueue"] = options.DispatchQueueName,
-            ["deadLetterQueue"] = options.DeadLetterQueueName,
-            ["parkingQueue"] = options.ParkingQueueName
+            ["enabled"] = options.Enabled
         };
 
         if (!options.Enabled)
@@ -287,7 +272,7 @@ public sealed class RabbitMqEmailDispatchTransport : IEmailDispatchTransport, IA
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "RabbitMQ Dispatch Mode health check failed for exchange {ExchangeName}", options.ExchangeName);
+            _logger.LogWarning("RabbitMQ Dispatch Mode health check failed");
             return new EmailDispatchTransportHealth(
                 Enabled: true,
                 Healthy: false,

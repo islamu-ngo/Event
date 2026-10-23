@@ -96,7 +96,11 @@ public sealed class LocalIdentityPersistenceInvariantTests
             {
                 ["IdentityDatabase:Topology"] = "external",
                 ["IdentityDatabase:Provider"] = provider.ToString(),
-                ["IdentityDatabase:ConnectionString"] = ConnectionStringFor(provider),
+                ["IdentityDatabase:Host"] = provider == PrimaryDatabaseProvider.Sqlite ? null : "localhost",
+                ["IdentityDatabase:Name"] = provider == PrimaryDatabaseProvider.Sqlite ? "identity-model.db" : "identity_model",
+                ["IdentityDatabase:Migrator:Username"] = provider == PrimaryDatabaseProvider.Sqlite ? null : "identity_model_migrator",
+                ["IdentityDatabase:Migrator:Password"] = provider == PrimaryDatabaseProvider.Sqlite ? null : TestPassword(),
+                ["IdentityDatabase:TrustServerCertificate"] = provider == PrimaryDatabaseProvider.Sqlite ? null : "true",
                 ["IdentityDatabase:ServerVersion"] = provider == PrimaryDatabaseProvider.MySql
                     ? "8.4"
                     : null,
@@ -133,7 +137,7 @@ public sealed class LocalIdentityPersistenceInvariantTests
                 {
                     ["IdentityDatabase:Topology"] = "external",
                     ["IdentityDatabase:Provider"] = "Sqlite",
-                    ["IdentityDatabase:ConnectionString"] = $"Data Source={databasePath}",
+                    ["IdentityDatabase:Name"] = databasePath,
                 })
                 .Build();
             ILogger logger = Substitute.For<ILogger>();
@@ -205,25 +209,25 @@ public sealed class LocalIdentityPersistenceInvariantTests
     {
         var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseMySql(
-                "Server=localhost;Database=identity_model;User=test;Password=test",
+                PrimaryDatabaseConfiguration.BuildConnectionString(new PrimaryDatabaseConnectionOptions
+                {
+                    Role = PrimaryDatabaseRole.Runtime,
+                    Provider = PrimaryDatabaseProvider.MySql,
+                    Host = "localhost",
+                    Database = "identity_model",
+                    Username = "identity_model_runtime",
+                    Password = TestPassword(),
+                    ServerFlavor = PrimaryDatabaseServerFlavor.MySql,
+                    ServerVersion = new Version(8, 4),
+                }).ConnectionString,
                 new MySqlServerVersion(new Version(8, 4)))
             .UseSnakeCaseNamingConvention()
             .Options;
         return new ExploreDbContext(options);
     }
 
-    private static string ConnectionStringFor(PrimaryDatabaseProvider provider) =>
-        provider switch
-        {
-            PrimaryDatabaseProvider.PostgreSql =>
-                "Host=localhost;Database=identity_model;Username=test;Password=test",
-            PrimaryDatabaseProvider.Sqlite => "Data Source=identity-model.db",
-            PrimaryDatabaseProvider.SqlServer =>
-                "Server=localhost;Database=identity_model;User Id=test;Password=test;TrustServerCertificate=true",
-            PrimaryDatabaseProvider.MySql =>
-                "Server=localhost;Database=identity_model;User=test;Password=test",
-            _ => throw new ArgumentOutOfRangeException(nameof(provider)),
-        };
+    private static string TestPassword() => Convert.ToHexString(
+        System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
     private static async Task AssertNamesAsync(
         ExploreDbContext context,

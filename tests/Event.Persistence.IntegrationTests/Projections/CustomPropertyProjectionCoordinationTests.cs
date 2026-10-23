@@ -16,6 +16,7 @@ namespace Event.Persistence.IntegrationTests.Projections;
 [ClassDataSource<ProjectionTestContainerFixture>(Shared = SharedType.PerAssembly)]
 public class CustomPropertyProjectionCoordinationTests
 {
+    private sealed record ProjectionTenant(Guid TenantId) : Explore.Application.Contracts.Infrastructure.ITenantContext;
     private readonly ProjectionTestContainerFixture _fixture;
 
     public CustomPropertyProjectionCoordinationTests(ProjectionTestContainerFixture fixture)
@@ -106,7 +107,13 @@ public class CustomPropertyProjectionCoordinationTests
             CancellationToken.None);
         var drainRow = pending.Single(p => p.ScopeId == drainId);
 
-        await repo.MarkDrainedAsync(new[] { drainRow.Id }, DateTimeOffset.UtcNow, CancellationToken.None);
+        using var maintenance = _fixture.CreateDbContext(new ProjectionTenant(tenantId));
+        await new EfCoreUnitOfWork(maintenance).ExecuteSerializableAsync(async token =>
+        {
+            await new CustomPropertyProjectionDirtyScopeRepository(maintenance)
+                .MarkDrainedAsync([drainRow.Id], DateTimeOffset.UtcNow, token);
+            return true;
+        });
 
         using var verify = _fixture.CreateDbContext();
         var kept = await verify.CustomPropertyProjectionDirtyScopes
@@ -163,7 +170,13 @@ public class CustomPropertyProjectionCoordinationTests
             tenantId,
             batchSize: 100,
             CancellationToken.None);
-        await repo.MarkDrainedAsync(pending.Select(p => p.Id).ToList(), DateTimeOffset.UtcNow, CancellationToken.None);
+        using var maintenance = _fixture.CreateDbContext(new ProjectionTenant(tenantId));
+        await new EfCoreUnitOfWork(maintenance).ExecuteSerializableAsync(async token =>
+        {
+            await new CustomPropertyProjectionDirtyScopeRepository(maintenance)
+                .MarkDrainedAsync(pending.Select(p => p.Id).ToList(), DateTimeOffset.UtcNow, token);
+            return true;
+        });
 
         var pendingAfter = await repo.CountPendingAsync(
             IEventCustomPropertyProjectionUpdater.ProjectionName,
@@ -177,7 +190,6 @@ public class CustomPropertyProjectionCoordinationTests
     public async Task DrainDirtyScopesForTenantAsync_RefreshesAndMarksAllPending()
     {
         using var context = _fixture.CreateDbContext();
-        var updater = CreateEventUpdater(context);
 
         // Seed a full tenant/event/def/value graph so the drain has a real event to refresh.
         var scope = await SeedEventWithDefinitionAsync(context);
@@ -205,7 +217,9 @@ public class CustomPropertyProjectionCoordinationTests
             CancellationToken.None);
         await context.SaveChangesAsync();
 
-        var drained = await updater.DrainDirtyScopesForTenantAsync(scope.TenantId, CancellationToken.None);
+        using var maintenance = _fixture.CreateDbContext(new ProjectionTenant(scope.TenantId));
+        var drained = await new EfCoreUnitOfWork(maintenance)
+            .ExecuteSerializableAsync(token => CreateEventUpdater(maintenance).DrainDirtyScopesForTenantAsync(scope.TenantId, token));
         await Assert.That(drained).IsGreaterThanOrEqualTo(1);
 
         using var verify = _fixture.CreateDbContext();
@@ -266,8 +280,8 @@ public class CustomPropertyProjectionCoordinationTests
         var statusRepo = new CustomPropertyProjectionStatusRepository(context);
         var dirtyScopeRepo = new CustomPropertyProjectionDirtyScopeRepository(context);
         var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
-        var tenantSettingRepo = new TenantSettingRepository(context, mutationLock);
-        var systemSettingRepo = new SystemSettingRepository(context, mutationLock);
+        var tenantSettingRepo = TenantSettingRepository.CreateReadOnly(context, mutationLock);
+        var systemSettingRepo = SystemSettingRepository.CreateReadOnly(context, mutationLock);
         var quotaResolver = new CustomPropertyQuotaResolver(tenantSettingRepo, systemSettingRepo);
 
         return new EventCustomPropertyProjectionUpdater(

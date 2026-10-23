@@ -8,7 +8,7 @@ namespace Explore.API.Middleware;
 
 /// <summary>
 /// Logs structured metadata for every HTTP request.
-/// Records method, path, status code, duration, user ID, and tenant ID.
+/// Records bounded method, native route identity, status, duration and correlation.
 /// Sensitive data (authorization headers, request/response bodies) is never logged.
 /// </summary>
 public sealed class RequestLoggingMiddleware
@@ -35,23 +35,21 @@ public sealed class RequestLoggingMiddleware
             var elapsed = Stopwatch.GetElapsedTime(startTimestamp);
 
             var correlationId = context.Items["CorrelationId"] as string;
+            string safeRoute = SafeRouteMetadata.GetRouteIdentityOrClassification(context);
+            RedactSensitiveRouteActivity(Activity.Current, safeRoute, SafeRouteMetadata.GetMethod(context));
             if (SafeRouteMetadata.TryGetSensitiveRouteIdentity(context, out string routeIdentity))
             {
-                RedactSensitiveRouteActivity(Activity.Current, routeIdentity);
                 _logger.LogInformation(
-                    "HTTP {Method} {Route} responded {StatusCode} in {ElapsedMs:0.00}ms | CorrelationId={CorrelationId} RequestPath={RequestPath}",
-                    context.Request.Method,
+                    "HTTP {Method} {Route} responded {StatusCode} in {ElapsedMs:0.00}ms | CorrelationId={CorrelationId}",
+                    SafeRouteMetadata.GetMethod(context),
                     routeIdentity,
                     context.Response.StatusCode,
                     elapsed.TotalMilliseconds,
-                    correlationId ?? "-",
-                    routeIdentity);
+                    correlationId ?? "-");
             }
             else
             {
                 string safePath = SafeRouteMetadata.GetRouteIdentityOrClassification(context);
-                if (safePath == SafeRouteMetadata.UnresolvedRouteClassification)
-                    RedactSensitiveRouteActivity(Activity.Current, safePath);
                 var platformIdentityPresent = context.User.GetPlatformUserId().HasValue;
                 var tenantPresent = tenantContextAccessor.TenantId.HasValue;
                 var tenantSlugPresent = context.Request.Headers.ContainsKey(
@@ -60,8 +58,8 @@ public sealed class RequestLoggingMiddleware
                 var isAuthenticated = context.User?.Identity?.IsAuthenticated ?? false;
 
                 _logger.LogInformation(
-                    "HTTP {Method} {Path} responded {StatusCode} in {ElapsedMs:0.00}ms | PlatformIdentityPresent={PlatformIdentityPresent} Authenticated={IsAuthenticated} AuthHeaderPresent={AuthHeaderPresent} TenantPresent={TenantPresent} TenantSlugPresent={TenantSlugPresent} CorrelationId={CorrelationId}",
-                    context.Request.Method,
+                    "HTTP {Method} {Route} responded {StatusCode} in {ElapsedMs:0.00}ms | PlatformIdentityPresent={PlatformIdentityPresent} Authenticated={IsAuthenticated} AuthHeaderPresent={AuthHeaderPresent} TenantPresent={TenantPresent} TenantSlugPresent={TenantSlugPresent} CorrelationId={CorrelationId}",
+                    SafeRouteMetadata.GetMethod(context),
                     safePath,
                     context.Response.StatusCode,
                     elapsed.TotalMilliseconds,
@@ -78,10 +76,10 @@ public sealed class RequestLoggingMiddleware
     internal static bool TryGetAdmissionRouteIdentity(HttpContext context, out string routeIdentity) =>
         SafeRouteMetadata.TryGetSensitiveRouteIdentity(context, out routeIdentity);
 
-    private static void RedactSensitiveRouteActivity(Activity? activity, string routeIdentity)
+    private static void RedactSensitiveRouteActivity(Activity? activity, string routeIdentity, string method)
     {
         if (activity is null) return;
-        activity.DisplayName = $"{activity.GetTagItem("http.request.method") ?? activity.GetTagItem("http.method") ?? "HTTP"} {routeIdentity}";
+        activity.DisplayName = $"{method} {routeIdentity}";
         activity.SetTag("url.path", routeIdentity);
         activity.SetTag("url.query", null);
         activity.SetTag("url.full", null);
@@ -93,6 +91,13 @@ public sealed class RequestLoggingMiddleware
 internal static class SafeRouteMetadata
 {
     internal const string UnresolvedRouteClassification = "route-unresolved";
+
+    internal static string GetMethod(HttpContext context) => context.Request.Method switch
+    {
+        "GET" or "POST" or "PUT" or "PATCH" or "DELETE" or "HEAD" or "OPTIONS" or "TRACE" or "CONNECT"
+            => context.Request.Method,
+        _ => "OTHER"
+    };
 
     internal static string GetRouteIdentityOrClassification(HttpContext context)
     {

@@ -63,6 +63,24 @@ public sealed class StorageObjectDeletionTombstoneRepository(ExploreDbContext da
         return changed == 1 ? work : null;
     }
 
+    public Task<bool> HasLiveClaimAsync(
+        StorageObjectDeletionTombstone claim, DateTime utcNow, CancellationToken cancellationToken) =>
+        database.StorageObjectDeletionTombstones.AsNoTracking()
+            .AnyAsync(item => claim.State == StorageObjectDeletionState.Deleting
+                && item.Id == claim.Id && item.TenantId == claim.TenantId
+                && item.Provider == claim.Provider && item.ProviderBindingId == claim.ProviderBindingId
+                && item.ObjectKey == claim.ObjectKey && item.ProviderObjectVersion == claim.ProviderObjectVersion
+                && item.State == StorageObjectDeletionState.Deleting
+                && item.ConcurrencyStamp == claim.ConcurrencyStamp
+                && item.LeaseExpiresAtUtc == claim.LeaseExpiresAtUtc && item.LeaseExpiresAtUtc > utcNow
+                && !database.StorageObjects
+                    .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
+                    .Any(source => source.Id == item.Id)
+                && !database.StorageUploadSessions.IgnoreQueryFilters(new[] { QueryFilterNames.Tenant })
+                    .Any(session => session.StorageObjectId == item.Id || session.Id == item.Id)
+                && !database.Set<StorageProducerOperation>().Any(operation => operation.Id == item.Id),
+                cancellationToken);
+
     public async Task<bool> TrySettleProducerAsync(Guid objectId, Guid bindingId, string objectKey,
         string? providerVersion, DateTime utcNow, CancellationToken cancellationToken)
     {

@@ -84,7 +84,8 @@ public sealed class AiToolContractRegistry : IAiToolContractRegistry
 
     private static bool ShouldNormalizeCreateEventDraftProviderPayload(AiToolValidationResult validation)
         => !validation.Succeeded
-            && !string.Equals(validation.FailureCode, "forbidden_tool_argument", StringComparison.Ordinal);
+            && validation.FailureCode is not ("forbidden_tool_argument" or "tool_arguments_too_large"
+                or "ambiguous_tool_arguments" or "invalid_tool_arguments");
 
     private static AiToolValidationResult ValidateNormalizedPayload(
         string normalizedPayloadJson,

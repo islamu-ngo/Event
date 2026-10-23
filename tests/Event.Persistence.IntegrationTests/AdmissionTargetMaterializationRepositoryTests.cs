@@ -4,6 +4,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -17,6 +18,7 @@ public sealed class AdmissionTargetMaterializationRepositoryTests
     public async Task MaterializeAsync_WhenRepeated_PersistsOneReusableTargetAndPolicy()
     {
         Guid tenantId = Guid.CreateVersion7();
+        Guid foreignTenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseTestInMemoryDatabase($"admission-target-materialization-{Guid.NewGuid():N}")
@@ -24,8 +26,39 @@ public sealed class AdmissionTargetMaterializationRepositoryTests
         DomainEvent eventTarget = CreateEvent(tenantId, eventId);
         EventTicketCatalogVersion catalog = CreateCatalog(tenantId, eventId);
 
+        await using (var setup = new ExploreDbContext(options))
+        {
+            await LookupTableSeeder.SeedAsync(setup);
+            var user = new User
+            {
+                Id = Guid.CreateVersion7(),
+                Pii = new UserPii { Email = string.Empty, FirstName = "Materialization", LastName = "Owner" }
+            };
+            var actor = new Actor
+            {
+                Id = Guid.CreateVersion7(),
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = user.Id,
+                User = user,
+                Pii = new ActorPii { DisplayName = "Materialization owner" }
+            };
+            setup.Actors.Add(actor);
+            await setup.SaveChangesAsync();
+            eventTarget.ActorId = actor.Id;
+        }
+
         await using (ExploreDbContext seed = CreateContext(options, tenantId))
         {
+            seed.Tenants.Add(new Tenant
+            {
+                Id = tenantId,
+                FullName = "Materialization tenant",
+                Slug = $"materialization-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
+            });
+            seed.Events.Add(eventTarget);
             seed.EventSessions.Add(new EventSession(EventSessionStatusEnum.Draft)
             {
                 Id = Guid.CreateVersion7(),
@@ -36,17 +69,32 @@ public sealed class AdmissionTargetMaterializationRepositoryTests
                 StartTime = new DateTimeOffset(2026, 10, 1, 13, 0, 0, TimeSpan.Zero),
                 EndTime = new DateTimeOffset(2026, 10, 1, 16, 0, 0, TimeSpan.Zero)
             });
+            await seed.SaveChangesAsync();
+        }
+
+        await using (ExploreDbContext seed = CreateContext(options, foreignTenantId))
+        {
+            seed.Tenants.Add(new Tenant
+            {
+                Id = foreignTenantId,
+                FullName = "Foreign materialization tenant",
+                Slug = $"materialization-{foreignTenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
+            });
+            await seed.SaveChangesAsync();
             seed.EventSessions.Add(new EventSession(EventSessionStatusEnum.Draft)
             {
                 Id = Guid.CreateVersion7(),
-                TenantId = Guid.CreateVersion7(),
+                TenantId = foreignTenantId,
                 EventId = eventId,
                 Event = null!,
                 Tenant = null!,
                 StartTime = new DateTimeOffset(2026, 10, 1, 8, 0, 0, TimeSpan.Zero),
                 EndTime = new DateTimeOffset(2026, 10, 1, 20, 0, 0, TimeSpan.Zero)
             });
-            await seed.SaveChangesAsync();
+            var denied = await Assert.ThrowsAsync<InvalidOperationException>(() => seed.SaveChangesAsync());
+            await Assert.That(denied!.Message).IsEqualTo("tracked_tenant_authority_mismatch");
         }
 
         await using (ExploreDbContext first = CreateContext(options, tenantId))
@@ -90,7 +138,10 @@ public sealed class AdmissionTargetMaterializationRepositoryTests
         Tenant = null!,
         VisibilityType = null!,
         EventStatus = null!,
-        EventFormat = null!
+        EventFormat = null!,
+        VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+        EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+        EventFormatId = (int)EventFormatEnum.Local
     };
 
     private static EventTicketCatalogVersion CreateCatalog(Guid tenantId, Guid eventId)

@@ -22,7 +22,7 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
     {
         var data = await SeedAsync();
         var userId = Guid.CreateVersion7();
-        await using (var context = fixture.CreateDbContext())
+        await using (var context = fixture.CreateTenantFilteredDbContext(new ExecutionTenant(data.TenantId)))
         {
             context.CurrentUserService = new CurrentUser(userId);
             var repository = new LocationRoomRepository(context);
@@ -52,7 +52,7 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
     public async Task SaveFailure_RollsBackKeyNameAndRemainingFieldChanges()
     {
         var data = await SeedAsync();
-        await using (var context = fixture.CreateDbContext(new FailSave()))
+        await using (var context = fixture.CreateTenantFilteredDbContext(new ExecutionTenant(data.TenantId), new FailSave()))
         {
             var repository = new LocationRoomRepository(context);
             var room = await context.LocationRooms.SingleAsync(item => item.Id == data.RoomId);
@@ -76,7 +76,7 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
     public async Task ConcurrentEditAfterRead_PreventsRelocationFromOverwritingNewState()
     {
         var data = await SeedAsync();
-        await using var staleContext = fixture.CreateDbContext();
+        await using var staleContext = fixture.CreateTenantFilteredDbContext(new ExecutionTenant(data.TenantId));
         var staleRoom = await staleContext.LocationRooms.SingleAsync(item => item.Id == data.RoomId);
         var target = await staleContext.Locations.SingleAsync(item => item.Id == data.TargetId);
         Guid freshStamp;
@@ -174,7 +174,7 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
     public async Task DestinationNameCollision_ReturnsValidationWithoutPartiallyMovingRoom()
     {
         var data = await SeedAsync();
-        await using (var context = fixture.CreateDbContext())
+        await using (var context = fixture.CreateTenantFilteredDbContext(new ExecutionTenant(data.TenantId)))
         {
             var room = await context.LocationRooms.SingleAsync(item => item.Id == data.RoomId);
             var target = await context.Locations.SingleAsync(item => item.Id == data.TargetId);
@@ -193,7 +193,7 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
     public async Task SoftDeletedRoom_CannotBeRelocatedFromAnOlderSnapshot()
     {
         var data = await SeedAsync();
-        await using var moving = fixture.CreateDbContext();
+        await using var moving = fixture.CreateTenantFilteredDbContext(new ExecutionTenant(data.TenantId));
         var room = await moving.LocationRooms.SingleAsync(item => item.Id == data.RoomId);
         var target = await moving.Locations.SingleAsync(item => item.Id == data.TargetId);
         await using (var deleting = fixture.CreateDbContext())
@@ -245,7 +245,7 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
                 await setup.SaveChangesAsync();
             }
         }
-        await using (var moving = fixture.CreateDbContext())
+        await using (var moving = fixture.CreateTenantFilteredDbContext(new ExecutionTenant(data.TenantId)))
         {
             var room = await moving.LocationRooms.SingleAsync(item => item.Id == data.RoomId);
             await Assert.That(async () => await new EfCoreUnitOfWork(moving).ExecuteInTransactionAsync(
@@ -284,7 +284,7 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
             await attaching.SaveChangesAsync();
 
             var observer = new MoveCommandObserver();
-            await using var moving = fixture.CreateDbContext(observer);
+            await using var moving = fixture.CreateTenantFilteredDbContext(new ExecutionTenant(data.TenantId), observer);
             observer.TableName = moving.Model.FindEntityType(typeof(LocationRoom))?.GetTableName()
                 ?? throw new InvalidOperationException("Expected room table metadata.");
             var room = await moving.LocationRooms.SingleAsync(item => item.Id == data.RoomId);
@@ -352,6 +352,67 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
         return (tenant, program, placement);
     }
 
+    [Test]
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(2)]
+    public async Task MoveRejectsForgedStoredRoomOrDestinationBinding(int substitution)
+    {
+        var data = await SeedAsync();
+        await using var context = fixture.CreateTenantFilteredDbContext(new ExecutionTenant(data.TenantId));
+        var room = await context.LocationRooms.SingleAsync(candidate => candidate.Id == data.RoomId);
+        var target = await context.Locations.SingleAsync(candidate => candidate.Id == data.TargetId);
+        if (substitution == 0)
+            room.LocationId = data.TargetId;
+        else if (substitution == 1)
+            room.TenantId = Guid.CreateVersion7();
+        else
+            target.TenantId = Guid.CreateVersion7();
+        var repository = new LocationRoomRepository(context);
+
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
+            new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(token =>
+                repository.MoveToLocationAsync(room, target, "Must not move", data.Stamp, token)));
+
+        var stored = await context.LocationRooms.AsNoTracking().SingleAsync(candidate => candidate.Id == data.RoomId);
+        await Assert.That(stored.LocationId).IsEqualTo(data.SourceId);
+        await Assert.That(stored.TenantId).IsEqualTo(data.TenantId);
+        await Assert.That(stored.Name).IsEqualTo("Shared name");
+    }
+
+    [Test]
+    public async Task MoveRejectsAnErasedDestinationInsteadOfReattachingRoomMetadata()
+    {
+        var data = await SeedAsync();
+        await using (var setup = fixture.CreateDbContext())
+        {
+            var owner = new User
+            {
+                Id = Guid.CreateVersion7(),
+                Pii = new() { FirstName = "Room", LastName = "Owner", Email = $"room-{Guid.CreateVersion7():N}@test.example" }
+            };
+            setup.Users.Add(owner);
+            await setup.SaveChangesAsync();
+            var destination = await setup.Locations.Include(candidate => candidate.Rooms)
+                .SingleAsync(candidate => candidate.Id == data.TargetId);
+            destination.ClassifyAsPrivateHome(owner.Id);
+            destination.EraseOwnedPii(DateTime.UtcNow, LocationPrivacyErasureReasonEnum.OwnerErasureRequest);
+            await setup.SaveChangesAsync();
+        }
+        await using var context = fixture.CreateTenantFilteredDbContext(new ExecutionTenant(data.TenantId));
+        var room = await context.LocationRooms.SingleAsync(candidate => candidate.Id == data.RoomId);
+        var target = await context.Locations.SingleAsync(candidate => candidate.Id == data.TargetId);
+
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
+            new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(token =>
+                new LocationRoomRepository(context).MoveToLocationAsync(room, target, "Must not move", data.Stamp, token)));
+
+        await Assert.That((await context.LocationRooms.AsNoTracking().SingleAsync(candidate => candidate.Id == data.RoomId)).LocationId)
+            .IsEqualTo(data.SourceId);
+        await Assert.That((await context.Locations.AsNoTracking().SingleAsync(candidate => candidate.Id == data.TargetId)).LocationPrivacyStateId)
+            .IsEqualTo((int)LocationPrivacyStateEnum.Erased);
+    }
+
     private async Task<SeedData> SeedAsync()
     {
         await fixture.ResetAsync();
@@ -402,6 +463,7 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
     }
 
     private sealed record SeedData(Guid TenantId, Guid SourceId, Guid TargetId, Guid RoomId, Guid Stamp);
+    private sealed record ExecutionTenant(Guid TenantId) : ITenantContext;
 
     private sealed record CurrentUser(Guid? UserId) : ICurrentUserService
     {
@@ -419,7 +481,9 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
             DbCommand command, CommandEventData eventData, InterceptionResult<int> result,
             CancellationToken cancellationToken = default)
         {
-            if (command.CommandText.StartsWith("UPDATE ", StringComparison.OrdinalIgnoreCase)
+            bool nativeFence = command.CommandText.StartsWith("SELECT ", StringComparison.OrdinalIgnoreCase)
+                && command.CommandText.Contains(" FOR UPDATE", StringComparison.OrdinalIgnoreCase);
+            if ((nativeFence || command.CommandText.StartsWith("UPDATE ", StringComparison.OrdinalIgnoreCase))
                 && command.CommandText.Contains(TableName, StringComparison.Ordinal))
             {
                 Started.TrySetResult();

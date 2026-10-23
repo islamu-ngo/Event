@@ -5,6 +5,11 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IEventSessionRepository : IGenericRepository<EventSession, Guid>
 {
+    Task<Event?> GetAuthorizedParentForMutationAsync(
+        Guid tenantId, Guid userId, Guid eventId, string action, CancellationToken cancellationToken);
+
+    Task<EventSession?> GetForMutationAsync(Guid id, CancellationToken cancellationToken);
+
     Task<EventSession?> GetByIdForEventAsync(
         Guid eventSessionId,
         Guid eventId,
@@ -17,9 +22,10 @@ public interface IEventSessionRepository : IGenericRepository<EventSession, Guid
         Guid tenantId,
         CancellationToken cancellationToken);
 
-    Task<EventSession?> GetSessionWithDetails(Guid id);
+    Task<EventSession?> GetSessionWithDetails(Guid id, CancellationToken cancellationToken = default);
     Task<EventSession?> GetPublicSessionWithDetailsAsync(Guid id, CancellationToken cancellationToken);
-    Task<List<EventSession>> GetSessionsByEvent(Guid eventId);
+    /// <summary>Enumerates sessions through the current tenant filter and propagates caller cancellation.</summary>
+    Task<List<EventSession>> GetSessionsByEvent(Guid eventId, CancellationToken cancellationToken = default);
     Task<List<EventSession>> GetPublicSessionsByEventAsync(Guid eventId, CancellationToken cancellationToken);
     Task<List<EventSession>> GetSessionsByLocation(Guid locationId);
     Task<(List<EventSession> Items, int TotalCount)> GetSessionsWithDetailsPaged(int pageNumber, int pageSize);
@@ -53,19 +59,22 @@ public interface IEventSessionRepository : IGenericRepository<EventSession, Guid
     /// <see cref="Explore.Application.Exceptions.RoomScheduleConflictException"/> on conflict.
     /// If <see cref="EventSession.RoomId"/> is null, falls back to the base Create path.
     /// </summary>
-    Task<EventSession> CreateWithRoomOverlapGuardAsync(EventSession session, CancellationToken cancellationToken);
+    Task<EventSession> CreateWithRoomOverlapGuardAsync(EventSession session, CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeMutation = null);
 
     /// <summary>
     /// Layer B update path: opens a Serializable transaction, re-checks same-room overlap (excluding
     /// the session being updated) inside the transaction, and commits only if no overlap exists.
     /// Throws <see cref="Explore.Application.Exceptions.RoomScheduleConflictException"/> on conflict.
     /// </summary>
-    Task UpdateWithRoomOverlapGuardAsync(EventSession session, CancellationToken cancellationToken);
+    Task UpdateWithRoomOverlapGuardAsync(EventSession session, CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeMutation = null);
 
     Task MoveToEventAsync(
         EventSession session,
         Guid eventId,
         EventLocation eventLocation,
         Guid? roomId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeMutation = null);
 }

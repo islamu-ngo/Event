@@ -4,7 +4,7 @@ description: Create the Infisical project, folder tree, and machine identity tha
 
 # Infisical Setup
 
-This guide is the exact folder-and-key layout ISLAMU Event expects inside Infisical. Create the structure once, point the deployment at it with the five `INFISICAL_*` bootstrap inputs, and every service resolves its credentials from that single authority.
+This guide describes the folder-and-key layout ISLAMU Event expects inside Infisical. Each process uses its own machine identity and exact runtime folders. Sharing a project and environment does not mean sharing read permissions.
 
 Infisical is one of three approved authorities. See [Secrets Management](secrets.md) for how authority selection fails closed, and [Environment Variables](environment-variables.md) for the meaning and defaults of every key named below.
 
@@ -25,29 +25,81 @@ Infisical is one of three approved authorities. See [Secrets Management](secrets
 
 ISLAMU Event authenticates with **Universal Auth** only.
 
-1. Create a Machine Identity in the organization.
+1. Create independent Machine Identities for API, BFF and migration processes, or Combined and migration for Aspire Standalone.
 2. Attach a **Universal Auth** authentication method and generate a Client ID and Client Secret.
-3. Grant each service identity **read** access only to its required folders. The browser-facing BFF identity must be limited to `/keycloak`, `/blazor` and `/atproto` frontend values, not `/`, `/database` or `/api`. Use separate backend/provisioning identities for database and container credentials. Write access belongs only to the backend identity that performs an enabled Setup secret-write capability.
+3. Grant each service identity **read** access only to its required folders. The browser-facing BFF identity reads the exact `/runtime/bff/oidc/keycloak` and `/runtime/bff/oidc/google` roots, plus the separate `/runtime/bff/atproto/oauth` signing-key root. Do not grant it `/`, legacy `/keycloak`, `/blazor`, `/atproto`, `/database` or `/api` access. Use separate backend/provisioning identities for database and container credentials. Write access belongs only to the backend identity that performs an enabled Setup secret-write capability.
 4. Copy the project UUID from the project settings page.
 
-These four values plus the environment slug are *secret zero*: they live in the deployment environment, never inside Infisical itself.
+The bootstrap pairs are *secret zero*: inject each pair only into its consumer.
+The API identity may have narrowly scoped write-only permission for the two
+authentication credentials managed by setup, but must not have BFF read access.
+Runtime identities must be denied `/provisioning/*`, `/infrastructure/*`, broad
+`/keycloak` and `/cerbos`. Event checks requested roots locally; operators must
+configure and verify the provider ACLs independently.
 
 ---
 
 ## 3. Point the Deployment at Infisical
 
-Set these in `.env` (or your orchestrator's environment injection) and leave every other credential blank:
+For Compose or Aspire, set these through private operator injection:
 
 ```bash
 SECRET_PROVIDER=Infisical
 INFISICAL_URL=https://app.infisical.com   # or your self-hosted base URL
 INFISICAL_PROJECT_ID=<project UUID>
-INFISICAL_CLIENT_ID=<universal auth client id>
-INFISICAL_CLIENT_SECRET=<universal auth client secret>
+INFISICAL_API_CLIENT_ID=<API identity>
+INFISICAL_API_CLIENT_SECRET=<API credential>
+INFISICAL_BFF_CLIENT_ID=<BFF identity>
+INFISICAL_BFF_CLIENT_SECRET=<BFF credential>
+INFISICAL_MIGRATION_CLIENT_ID=<migration identity>
+INFISICAL_MIGRATION_CLIENT_SECRET=<migration credential>
 INFISICAL_ENV=prod
 ```
 
 When `SECRET_PROVIDER=Infisical`, only Infisical results are authoritative. The platform never silently falls back to environment variables or User Secrets for a value the authority failed to supply; startup fails closed instead.
+
+Aspire Standalone uses `INFISICAL_COMBINED_CLIENT_ID/CLIENT_SECRET` instead of
+the API and BFF pairs. A directly launched process receives only its own pair in
+`SecretProvider__Infisical__ClientId/ClientSecret` (or the documented direct-process
+`INFISICAL_CLIENT_ID/CLIENT_SECRET` fields). Those unqualified names are not a
+Compose/Aspire fallback. All local profiles preserve the selected source.
+Provider containers still need separately injected bootstrap, verifier and
+database inputs; they do not use a runtime vault identity.
+
+## Consumer isolation cutover
+
+1. Provision the exact roots below, including empty startup folders where a
+   capability is unused. Configure independent read ACLs and no imports or
+   reference expressions. Root strings are exact and case-sensitive.
+2. Copy provider metadata to the API runtime roots and confidential frontend
+   values to the BFF roots. Keep the dedicated lifecycle credential at
+   `/runtime/api/keycloak/lifecycle`. Provider database and verifier values
+   belong only to resource-specific operator injection, not Event runtime.
+3. Rebind stale database references to the registered runtime folder and selected
+   environment. A valid logical key does not legitimize an old admin coordinate.
+   The retired `keycloak.db_password` binding is not runtime authority.
+4. Prepare the independently signed Cerbos deployment receipt through the
+   operator-owned publication procedure. Do not restore a runtime publisher,
+   human-admin credential, or retired Keycloak initialization script.
+5. Drain old processes, start the new consumers, and test cold restart plus
+   denied access to sibling/provisioning/infrastructure roots using each actual
+   deployed identity. Revoke old grants and rotate old credentials only after
+   convergence. A successful login is not evidence that an identity lacks
+   broader permissions.
+
+AppHost is trusted to observe injected launch inputs and manage its children.
+Its projection does not protect against a compromised orchestrator or OS account.
+Development User Secrets shares an account-owned file and is not a production
+isolation mechanism. For Infisical-backed local databases, separately inject
+bootstrap role credentials and stable `DATABASE_PORT` / `ERASURE_DATABASE_PORT`
+values, then provision matching runtime and migrator coordinates in the vault.
+AppHost will not substitute generated local credentials for a failed vault read.
+This also applies to Global database credentials in both Split and Standalone
+local-data profiles: keep them in the selected consumer's vault authority, not
+in AppHost's `Database:Global` configuration. AppHost must not need those local
+values to construct its resource graph, and supplying them does not authorize
+forwarding them to an Infisical-backed child.
+Recovery is forward correction and restart; never restore broad folder fallback.
 
 > [!TIP]
 > Self-hosted Infisical behind an AAAA record that is not routable will stall .NET connection attempts. The platform forces IPv4 for Infisical calls, but the host must still resolve and answer on IPv4.
@@ -70,9 +122,12 @@ Before upgrading:
    Supply such values through the provisioning/container environment only to the
    backend service that owns them. BFF loading now rejects backend/root paths and
    database configuration placed inside frontend folders.
-3. Retain the actual `secretPath` in recursive Infisical responses. Custom proxies
-   must not strip it: missing or out-of-scope provenance fails startup. Child
-   folders keep their own namespace and cannot overwrite parent database values.
+3. Provision BFF values in the dedicated runtime roots below before replacing the
+   BFF processes. Reads are nonrecursive and do not expand secret references;
+   custom proxies must retain the exact `secretPath`. Missing or mismatched
+   provenance, unresolved references and unrelated keys fail startup. Child
+   folders are not accepted. Keep the prior deployment available until the
+   replacement is verified; changing these paths does not delete legacy values.
 4. Keep the same five bootstrap inputs and explicit provider selection. Startup
    and runtime provider binding now use the same validated authority and path set;
    there is no implicit runtime root-folder read.
@@ -185,16 +240,79 @@ Do not remove unrelated provider credentials or change the selected secret autho
 
 ### `/blazor`
 
-Read by the `Explore.Blazor` BFF.
+This legacy folder is not acquired by the BFF. Supply nonsecret `API_ENDPOINT`
+and `BFF_ADMIN_HOSTS` through deployment configuration. Provision Google
+credentials at `/runtime/bff/oidc/google` instead.
 
 | Key | Purpose |
 |---|---|
 | `API_ENDPOINT` | Absolute base URL the BFF uses to reach `Explore.API`. |
 | `BFF_ADMIN_HOSTS` | Optional comma-separated list of dedicated admin hostnames (e.g. `admin.example.org`). |
-| `GOOGLE_CLIENT_ID` | Optional Google SSO client identifier. |
-| `GOOGLE_CLIENT_SECRET` | Optional Google SSO client secret. |
 
-### `/keycloak`
+### BFF runtime roots
+
+| Exact root | Accepted keys |
+|---|---|
+| `/runtime/bff/oidc/keycloak` | `KEYCLOAK_ENDPOINT`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_BLAZOR_CLIENT_SECRET` |
+| `/runtime/bff/oidc/google` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| `/runtime/bff/atproto/oauth` | `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` only |
+
+The ATProto root is a separate signing-key consumer, not a third OIDC provider.
+Do not place session-encryption or session-JWT signing material in any BFF root.
+
+For Google/Keycloak credential replacement, use a coordinated maintenance
+restart. Provision the selected authority, start replacement BFF processes, and
+independently verify every expected replica before retiring any old reader.
+Set `AUTHENTICATION_CREDENTIAL_PROFILE_REVISION` to a new nonempty UUID identifying
+the approved provisioning profile, and inject it into every owning API/BFF process.
+Change it whenever that profile changes. It is public deployment metadata, not a
+credential and not a vault-returned key. Forward it explicitly through Compose
+service overrides. Missing or invalid metadata blocks credential maintenance.
+When Environment is selected instead of Infisical, inject the optional
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` inputs into the owning BFF process.
+Keep the credential out of application settings and provide explicit Compose
+service overrides rather than assuming `.env` entries are automatically forwarded.
+An authentication metadata refresh reuses the process's acquired credential;
+it does not refresh Infisical credential contents.
+
+Each process has a fresh boot identity and each acquired consumer has a random
+generation identity. These identify the process and acquisition, not the
+credential value. Freeze exact replacement membership only after the processes
+have started and been independently associated with the intended deployment.
+One healthy replica, successful provider discovery, or an opaque generation
+identity cannot prove fleet convergence.
+
+Before any separately authorized legacy cleanup or rotation, verify termination
+of every old process and fencing of its writers and sessions. Retain interrupted
+cutover history; restore approved external provisioning and restart replacements
+when recovery is needed, rather than returning credentials to application
+settings or deleting evidence.
+
+The administrator workflow uses
+`/api/admin/instance/authentication-credential-cutovers`. Read GET `current`
+before writing; an empty current operation returns 204. POST the collection to
+approve the exact replacement deployment/replica/boot/consumer/generation
+inventory, then POST `activations` for independently checked acquisitions and
+POST `fence` for the three verified old-process/writer/session fences. Keep the
+returned operation ID and current head/operation stamps. Preparation assigns
+the current instance, actor, selected profile and 15-minute deadline server-side;
+these are not caller-selected privileges.
+
+Inspect each replacement BFF directly through authenticated GET
+`/bff/auth/credential-acquisition-receipts`. Inspection checks fresh API-issued
+administrator capability and matching deployment profile. An installed flag
+means the process installed that acquisition into its named OIDC scheme, not
+that all replicas or provider credentials have been verified. Never treat an
+opaque generation as proof of credential contents.
+
+After a lost reply or conflict, reauthorize and read GET `current` or GET
+`{operationId}` to recover the retained receipt before deciding the next action.
+Do not blindly resubmit stale stamps. `ReadyForCleanup` is evidence readiness,
+not completed retirement: counts remain uncommitted until the separately
+authorized exact cleanup succeeds. Superseded and expired receipts remain
+history, not permission to mutate the replacement deployment.
+
+### `/runtime/api/authentication/keycloak`
 
 Required only when `AUTHENTICATION_PROVIDER=keycloak`.
 
@@ -203,10 +321,14 @@ Required only when `AUTHENTICATION_PROVIDER=keycloak`.
 | `KEYCLOAK_ENDPOINT` | Public base URL of Keycloak. |
 | `KEYCLOAK_INTERNAL_URL` | Optional internal base URL when Keycloak is reached across private container networks. |
 | `KEYCLOAK_REALM` | Realm name. |
-| `KEYCLOAK_CLIENT_ID` | Browser/BFF client metadata used for onboarding detection (alias: `KEYCLOAK_BLAZOR_CLIENT_ID`). |
-| `KEYCLOAK_BLAZOR_CLIENT_SECRET` | Confidential client secret for the Blazor BFF. |
+| `KEYCLOAK_CLIENT_ID` | Public client metadata used for onboarding detection; not the API resource audience. |
+| `KEYCLOAK__AUDIENCE` | Scalar API resource audience; defaults to `islamu-event-api`. |
+| `KEYCLOAK__PERMITTEDCLIENTS__0` | Optional independent permitted client; additional values use contiguous indices. Omit unused entries. |
 | `KEYCLOAK_REQUIRE_HTTPS_METADATA` | `true` (default) or `false`; enforce HTTPS metadata validation for OIDC endpoints. |
-`KEYCLOAK_DB_DATABASE`, `KEYCLOAK_DB_USERNAME`, and `KEYCLOAK_DB_PASSWORD` are backend provisioning inputs, not BFF-readable `/keycloak` entries. Inject them only into their owning container/provisioning environment; database keys in frontend folders fail closed.
+`KEYCLOAK_BLAZOR_CLIENT_SECRET` belongs only to `/runtime/bff/oidc/keycloak`.
+`KEYCLOAK_DB_DATABASE`, `KEYCLOAK_DB_USERNAME` and `KEYCLOAK_DB_PASSWORD` belong
+only to provider resources. The API never receives the BFF confidential secret
+through Compose's common Keycloak metadata anchor.
 
 ### `/database`
 
@@ -221,6 +343,14 @@ Primary application database. Every key maps into the structured `Database:*` co
 | `DATABASE_SCHEMA` | Schema namespace (`islamu_event` by default; PostgreSQL and SQL Server). |
 | `DATABASE_RUNTIME_USERNAME` | Least-privilege runtime login used by `Explore.API`. |
 | `DATABASE_RUNTIME_PASSWORD` | Runtime login password. |
+| `DATABASE_GLOBAL_USERNAME` | Independent Global login for API-owned bounded cross-tenant capabilities. |
+| `DATABASE_GLOBAL_PASSWORD` | Startup-owned Global login password. |
+| `DATABASE_LOCAL_IDENTITY_WRITER_USERNAME` | Dedicated application-side Local Identity workflow login; distinct from Runtime, Global and Migrator. |
+| `DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD` | Dedicated workflow password, delivered only to the owning API or combined host; role enrollment needs the username, not this password. |
+| `DATABASE_INSTANCE_KEY_READ_USERNAME`, `DATABASE_INSTANCE_KEY_READ_PASSWORD` | Dedicated instance-key metadata login/password. |
+| `DATABASE_INSTANCE_KEY_WRITE_USERNAME`, `DATABASE_INSTANCE_KEY_WRITE_PASSWORD` | Dedicated fixed policy/revocation login/password. |
+| `DATABASE_INSTANCE_KEY_ISSUANCE_USERNAME`, `DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD` | Dedicated issuance and metadata-only recovery login/password. |
+| `DATABASE_PLATFORM_KEY_REPORT_USERNAME`, `DATABASE_PLATFORM_KEY_REPORT_PASSWORD` | Dedicated historical aggregate-report login/password. |
 | `DATABASE_MIGRATOR_USERNAME` | DDL-capable login used only by `Event.MigrationService`. |
 | `DATABASE_MIGRATOR_PASSWORD` | Migrator login password. |
 | `DATABASE_TLS_MODE` | `Prefer`, `Required`, or `Disabled`. |
@@ -232,7 +362,39 @@ Primary application database. Every key maps into the structured `Database:*` co
 | `ERASURE_BUSY_TIMEOUT_SECONDS` | SQLite busy timeout seconds before retry (default: `30`). |
 | `IDENTITY_DATABASE_TOPOLOGY` | Identity database topology: `colocated` or `external`. |
 
-Runtime and migrator logins must be distinct. Never give runtime services the migrator role, and never expose either to the Blazor client.
+Runtime, Global, and Migrator use distinct logins and connection pools. Global
+requires its own username/password; missing values never inherit Runtime,
+Migrator, or root database credentials. These `/database` keys map to
+`Database:Global:Username` and `Database:Global:Password`; the username is public
+configuration and the password is secret. SQLite requires no login credentials.
+
+The four dedicated API-key pairs map to `Database:InstanceKeyRead`,
+`Database:InstanceKeyWrite`, `Database:InstanceKeyIssuance` and
+`Database:PlatformKeyReport` (`Username`/`Password` in each). They never inherit
+another role's credentials. Restrict them to the backend identity, keep the
+logins/passwords distinct, and provision only the matching execute-only roles
+described in [Environment variables](environment-variables.md#independent-database-credentials).
+Do not add them to the BFF's runtime credential roots. Missing native capability
+admission blocks the advertised profile; API startup does not install grants.
+
+Global is limited to explicitly granted cross-tenant capabilities, not universal
+`BYPASSRLS` access. On PostgreSQL it must remain `NOSUPERUSER NOBYPASSRLS`.
+Persisted machine footer link/group PATCH uses the already selected Runtime
+credentials and adds no Infisical key or credential pool. Provision only
+`event_machine_footer_runtime` to that Runtime login as described in
+[database provisioning](environment-variables.md#independent-database-credentials);
+do not add it to Global, authentication, scanner or key-management/report
+identities. It is a fixed target-fencing operation, not general key access or
+footer settings administration.
+Room updates similarly add only the distinct `event_machine_room_runtime`
+membership to the existing Runtime login when provisioned. They use a
+separate room-only function, not the footer executor or a new Infisical
+credential. Preserve the same frozen-role separation and never grant either
+executor the other purpose's function.
+DDL and capability installation belong only to the migration service. Never
+give API processes Migrator credentials or expose any database credential to
+the Blazor client. Restart consuming API processes after rotating startup-owned
+Global credentials so their independent pools use the new login.
 
 > [!WARNING]
 > **Do not blindly mirror `ERASURE_DATABASE_TOPOLOGY` and `IDENTITY_DATABASE_TOPOLOGY`.**
@@ -267,12 +429,11 @@ The two usernames must differ. Configuration binding and PostgreSQL provisioning
 External Local Identity credential store, used only when `IDENTITY_DATABASE_TOPOLOGY=external`.
 
 > [!CAUTION]
-> This folder uses the `IDENTITY_DATABASE_*` prefix, **not** the bare `DATABASE_*` names used by `/database`. The platform reads `IDENTITY_DATABASE_HOST`; a key named `DATABASE_HOST` placed here is not read as an identity setting, and because `/database` is fetched recursively it can collide with the primary database host. Name these keys exactly as listed. The same rule is why `/database/erasure` uses `ERASURE_DATABASE_*`.
+> This folder uses the `IDENTITY_DATABASE_*` prefix, **not** the bare `DATABASE_*` names used by `/database`. Each folder is fetched separately without recursion. Name keys exactly as listed so identity and erasure fields cannot become primary database aliases.
 
 | Key | Purpose |
 |---|---|
 | `IDENTITY_DATABASE_PROVIDER` | `PostgreSql`, `Sqlite`, `SqlServer`, `MariaDb`, or `MySql`. |
-| `IDENTITY_DATABASE_CONNECTION_STRING` | Optional complete operator-managed connection string. Prefer the discrete fields below. |
 | `IDENTITY_DATABASE_HOST` | Credential database host. |
 | `IDENTITY_DATABASE_PORT` | Credential database port. |
 | `IDENTITY_DATABASE_NAME` | Credential database name or persisted SQLite path. |
@@ -281,12 +442,15 @@ External Local Identity credential store, used only when `IDENTITY_DATABASE_TOPO
 | `IDENTITY_DATABASE_RUNTIME_PASSWORD` | Runtime credential password. |
 | `IDENTITY_DATABASE_MIGRATOR_USERNAME` | Schema-owner credential username. |
 | `IDENTITY_DATABASE_MIGRATOR_PASSWORD` | Schema-owner credential password. |
+| `IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME` | Dedicated C# lifecycle writer login; distinct from Runtime and Migrator. |
+| `IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD` | Dedicated lifecycle writer password. |
+| `IDENTITY_DATABASE_SERVER_VERSION` | Explicit MariaDB/MySQL server version when overriding provider defaults. |
 | `IDENTITY_DATABASE_TLS_MODE` | `Prefer`, `Required`, or `Disabled`. |
 | `IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE` | `false` for strict CA verification. |
 
 Local Identity tables share the primary application database when colocated (`IDENTITY_DATABASE_TOPOLOGY=colocated`, recommended for single-instance deployments), and connect to this external store when configured with external topology (e.g. when sharing a central identity database across multiple distinct applications or SaaS solutions like the ISLAMU suite).
 
-### `/cerbos`
+### `/runtime/api/authorization/cerbos`
 
 Required only when `AUTHORIZATION_PROVIDER=cerbos`.
 
@@ -297,15 +461,11 @@ Required only when `AUTHORIZATION_PROVIDER=cerbos`.
 | `CERBOS_USE_TLS` | `true` when the gRPC channel is TLS-protected. |
 | `CERBOS_PLAINTEXT_MODE` | `true` for internal container networks (`h2c`); `false` when TLS is active. |
 | `CERBOS_USE_POLICY_SCOPE` | `true` or `false`; enables scoped policy evaluation. |
-| `CERBOS_ADMIN_USERNAME` | Admin API username used by server-side policy package sync. |
-| `CERBOS_ADMIN_PASSWORD` | Admin API password used by server-side policy package sync. |
-| `CERBOS_ADMIN_PASSWORD_HASH` | The verifier the Cerbos server itself is configured with. |
-| `CERBOS_PG_URL` | PostgreSQL connection string for Cerbos storage backend. |
-| `CERBOS_POSTGRES_USER` | Database username for Cerbos PostgreSQL container. |
-| `CERBOS_POSTGRES_PASSWORD` | Database password for Cerbos PostgreSQL container. |
-| `CERBOS_POSTGRES_DB` | Database name for Cerbos PostgreSQL container. |
-
-The API resolves the Admin API credentials directly from the selected secret authority during policy sync; the browser receives only configured/ownership metadata. If the API restarts during unfinished onboarding, a protected onboarding page returns to `/setup` so the operator can re-enter the setup secret and resume the original page.
+Cerbos verifier and database inputs are injected only into Cerbos and its
+database. Runtime decisions have no Admin API credential. Foreground one-time
+administration requires fresh operator input; deployment publication uses the
+external signed-receipt procedure. Neither process restores unattended runtime
+publication or a broad `/cerbos` credential folder.
 
 ### `/mcp`
 
@@ -389,7 +549,7 @@ Required only when AT Protocol login is enabled.
 
 | Key | Purpose |
 |---|---|
-| `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` | OAuth client private key set used by the BFF. |
+| `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` | BFF value belongs at `/runtime/bff/atproto/oauth`, not this backend folder. |
 | `ATPROTO_SESSION_ENCRYPTION_KEYRING` | Session-envelope encryption keyring. |
 | `ATPROTO_SESSION_JWT_PRIVATE_JWKS` | First-party session JWT signing key set. |
 
@@ -402,12 +562,34 @@ Optional. Configures the assistant provider.
 | `AI_PROVIDER` | Provider selection: `NONE`, `FAKE`, `OPENAI_COMPATIBLE`, `ANTHROPIC_COMPATIBLE`, `OPENAI`, `AZURE_OPENAI`, or `ANTHROPIC`. |
 | `AI_ENDPOINT` | Base URL for compatible/self-hosted providers. |
 | `AI_MODEL_ID` | Model identifier passed to the provider. |
-| `AI_API_KEY` | Provider API credential. |
+| `AI_CREDENTIAL_SCOPE` | Deployment reference selection: `none` or `instance`; no credential value. |
 | `AI_TOOL_PROPOSALS_ENABLED` | `true` or `false`; enables assistant tool proposals. |
-| `AI_OPENAI_API_KEY` | Registry-bound OpenAI credential for tenant-scoped bindings. |
-| `AI_ANTHROPIC_API_KEY` | Registry-bound Anthropic credential for tenant-scoped bindings. |
+| `AI_OPENAI_API_KEY` | Registry-bound official OpenAI credential under `/ai`. |
+| `AI_ANTHROPIC_API_KEY` | Registry-bound official Anthropic credential under `/ai`. |
+| `AI_AZURE_API_KEY` | Separate instance Azure OpenAI API-key reference under `/ai`. |
+| `AI_OPENAI_COMPATIBLE_API_KEY` | Separate authenticated OpenAI-compatible provider reference under `/ai`. |
+| `AI_ANTHROPIC_COMPATIBLE_API_KEY` | Separate authenticated Anthropic-compatible provider reference under `/ai`. |
 
-`OPENAI` and `ANTHROPIC` need `AI_API_KEY` plus `AI_MODEL_ID`. Every other provider needs `AI_ENDPOINT` plus `AI_MODEL_ID`.
+`OPENAI` and `ANTHROPIC` need a model and a successfully resolved instance
+reference. When credential scope is omitted, official API-key providers select
+`instance`; compatible providers select `none`. Compatible endpoints need an
+endpoint and model. Authenticated compatible calls select their separate
+provider reference, never an official credential.
+Only explicit `none` permits unauthenticated compatible calls. Azure API-key
+mode uses its separate reference; managed identity uses `none` and the configured
+Azure identity.
+
+Admin and tenant policy contain reference selection, never credential values.
+Tenant credentials use exact tenant bindings and cannot inherit an instance
+credential. A tenant-selected endpoint cannot acquire an instance key. Setup
+Live handles admitted unqualified instance bindings, including the separate
+compatible-provider references. Tenant binding provisioning remains separate;
+do not submit a secret to ordinary settings PATCH.
+
+`AI_API_KEY` and `ai_assistant.api_key` are retired without copying their values
+to another authority. Coordinate old-writer retirement before exact live-row
+cleanup. Review historical audits, notifications and backups separately; source
+retirement does not prove that retained credential copies were removed.
 
 ---
 
@@ -465,22 +647,55 @@ Each host reads a bounded folder list at startup. A key placed outside the folde
 
 | Host | Folders read at startup |
 |---|---|
-| `Explore.API` | `/keycloak`, `/database`, `/database/erasure`, `/database/identity`, `/api` (including subfolders `/api/controlplane`, `/api/operator-identity`, `/api/bootstrap`, `/api/webpush`, `/api/ratelimiting`), `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/stripe`, `/integrations/listmonk` |
-| `Explore.Blazor` (BFF) | `/keycloak`, `/blazor`, `/atproto` |
-| `Explore.AppHost` (Aspire) | `/keycloak`, `/database`, `/database/erasure`, `/api`, `/blazor`, `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/stripe`, `/integrations/listmonk` |
+| `Explore.API` | `/runtime/api/authentication/keycloak`, `/runtime/api/keycloak/lifecycle`, `/runtime/api/authorization/cerbos`; explicit database/API/service roots described below |
+| `Explore.Blazor` (BFF) | Exact `/runtime/bff/oidc/keycloak`, `/runtime/bff/oidc/google`, `/runtime/bff/atproto/oauth`; no recursion or reference expansion |
+| `Event.Standalone` | Exact API+BFF union; no provisioning or infrastructure roots |
+| `Explore.AppHost` (Aspire) | None. It projects independently supplied launch identities and resource-specific operator inputs. |
 | Migration and design-time factories | `/database`, `/database/erasure`, `/database/identity` |
 
-Folder reads are recursive, so a request for `/database` also returns the secrets stored under `/database/erasure` and `/database/identity`, and a request for `/api` also returns its subfolders (`/api/controlplane`, `/api/operator-identity`, `/api/bootstrap`, `/api/webpush`, `/api/ratelimiting`). This is why subfolder key names must stay distinct from their parent's key names.
+All reads are exact, nonrecursive and reference-unexpanded. Imports are disabled.
+The API also admits `/database`, `/database/erasure`, `/database/identity`,
+`/postgresql`, `/api`, `/api/operator-identity`, `/api/operatoridentity`,
+`/api/bootstrap`, `/api/instance-bootstrap`, `/api/instancebootstrap`,
+`/api/controlplane`, `/api/control-plane`, `/api/webpush`, `/api/web-push`,
+`/api/ratelimiting`, `/api/rate-limiting`, `/mcp`, `/ai`, `/storage`, `/smtp`,
+`/stripe`, `/integrations/listmonk`, `/setup`, `/promotions`, `/admissions`,
+`/ticketing/recovery`, `/atproto`, `/webhook`, `/messaging`, `/reporting`,
+`/registration-providers`, `/analytics` and `/localization`. Existing alternate
+API subfolder spellings are independent exact roots, not recursive grants;
+do not put conflicting copies of a configuration key into them.
+Data Protection uses its separate partition loader and process pin/floor, not
+this bulk folder list.
 
 ---
 
 ## 6. Runtime Secret Bindings
 
-Beyond startup bootstrap, individual credentials are resolved on demand through `SecretBinding` records that name an Infisical path and key. The runtime resolver scans the project tree, so these folders do not need to appear in any startup list. Create a folder only when you enable the corresponding capability.
+Beyond startup bootstrap, individual credentials are resolved on demand through
+`SecretBinding` records. Their folder must equal the registered runtime folder
+and their environment must match the selected authority before any provider
+request or cache use. There is no project-tree scan, recursive discovery or
+old-folder fallback. Tenant-qualified keys remain supported inside their
+registered folder.
+
+For split deployments using Environment authority, supply the instance and
+tenant email-policy database credential pairs already listed in `.env.example`:
+`DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME` / `_PASSWORD` and
+`DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME` / `_PASSWORD`. Compose passes
+these pairs only to the API. Provision the corresponding limited database roles;
+ordinary Runtime or Migrator credentials are not substitutes for these profiles.
+
+The enrolled setup writer has two dedicated instance binding purposes:
+`setup.signing` and `setup.encryption`, with default names `SETUP_SIGNING` and
+`SETUP_ENCRYPTION` in `/setup`. These optional targets accept Infisical bindings
+only; Environment and Development User Secrets do not provide a write backend.
+Keep them separate from `SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY`, which protects
+write commitments and is never a setup write target. The BFF cannot acquire
+`/setup`; no additional consumer identity or folder grant is needed.
 
 | Folder | Keys |
 |---|---|
-| `/setup` | `SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY` |
+| `/setup` | `SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY`, `SETUP_SIGNING`, `SETUP_ENCRYPTION` |
 | `/webhook` | `WEBHOOKS_ENABLED`, `WEBHOOKS_PROVIDER`, `WEBHOOKS_SVIX_BASE_URL`, `WEBHOOKS_SVIX_AUTH_TOKEN`, `WEBHOOKS_SVIX_OPERATIONAL_WEBHOOK_SECRET`, `WEBHOOKS_SVIX_ENVIRONMENT`, `WEBHOOKS_SVIX_PROVIDER_VERSION`, `WEBHOOKS_SVIX_CAPABILITY_POLICY_VERSION`, `SVIX_SERVER_URL`, `SVIX_AUTH_TOKEN`, `SVIX_QUEUE_TYPE`, `SVIX_CACHE_TYPE`, `SVIX_REDIS_DSN`, `SVIX_JWT_SECRET` |
 | `/promotions` | `PROMOTIONS_CODE_LOOKUP_HMAC_KEY` (each binding uses a `v{version}` qualifier), `PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION` |
 | `/admissions` | `ADMISSIONS_CREDENTIAL_LOOKUP_HMAC_KEY`, `ADMISSIONS_SCANNER_CAPABILITY_HMAC_KEY`, `ADMISSIONS_RECOVERY_CAPABILITY_HMAC_KEY`, `ADMISSIONS__CREDENTIALLOOKUP__ACTIVEKEYVERSION`, `ADMISSIONS__RECOVERY__ACTIVEKEYVERSION`, `ADMISSIONS__RECOVERY__CAPABILITYLIFETIMEMINUTES`, `ADMISSIONS__RECOVERY__RATELIMITBUCKETCOUNT`, `ADMISSIONS__RECOVERY__RATELIMITPERMITCOUNT`, `ADMISSIONS__RECOVERY__RATELIMITWINDOWSECONDS` |

@@ -72,11 +72,8 @@ public sealed class AtprotoOperationalReadinessTests
                     options.Registrations.Remove(registration);
             }));
         });
-        using var client = host.CreateClient(new()
-        {
-            BaseAddress = new Uri(AtprotoRelationalLoginFixture.PublicOrigin),
-            AllowAutoRedirect = false
-        });
+        using var client = Event.Testing.Hosting.OperationalEndpointTestTransport.CreateClient(
+            host.Server, new Uri(AtprotoRelationalLoginFixture.PublicOrigin));
         using var healthy = await client.GetAsync("/health");
         await Assert.That(healthy.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(host.Services.GetRequiredService<bff::Explore.Blazor.Services.IDynamicAuthSchemeManager>()

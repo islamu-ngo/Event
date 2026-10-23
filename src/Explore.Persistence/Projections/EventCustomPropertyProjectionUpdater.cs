@@ -1,3 +1,4 @@
+using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
@@ -6,6 +7,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Projections;
 
@@ -157,97 +159,75 @@ public class EventCustomPropertyProjectionUpdater : IEventCustomPropertyProjecti
         int? batchSize,
         CancellationToken cancellationToken)
     {
-        // D1 baseline: single transaction with xact-scoped advisory lock. D2 may introduce
-        // session-scoped locks + per-batch commits + live "Rebuilding" status visibility.
+        RequireMaintenanceScope(tenantId);
         var effectiveBatchSize = batchSize ?? await _quotaResolver.GetIntAsync(
             CustomPropertyQuotaSettingDefinitions.ProjectionRebuildBatchSize.Key,
             tenantId,
             cancellationToken);
 
-        return await _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        var startedAt = DateTimeOffset.UtcNow;
+        long rowsProcessed = 0;
+        long rowsFailed = 0;
+        if (!await TryAcquireExclusiveLockAsync(tenantId, cancellationToken))
+            return new ProjectionRebuildResult(false, 0, 0, 0);
+        var eventIds = await _dbContext.Events
+            .Where(e => e.TenantId == tenantId)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
+        foreach (var chunk in ProjectionInfrastructure.Chunk(eventIds, effectiveBatchSize))
         {
-            var startedAt = DateTimeOffset.UtcNow;
-            long rowsProcessed = 0;
-            long rowsFailed = 0;
-
-            await using var transaction = await _dbContext.Database
-                .BeginTransactionAsync(cancellationToken);
-
-            if (!await TryAcquireExclusiveLockAsync(tenantId, cancellationToken))
+            foreach (var eventId in chunk)
             {
-                await transaction.RollbackAsync(cancellationToken);
-                return new ProjectionRebuildResult(false, 0, 0, 0);
-            }
-
-            var eventIds = await _dbContext.Events
-                .Where(e => e.TenantId == tenantId)
-                .Select(e => e.Id)
-                .ToListAsync(cancellationToken);
-
-            foreach (var chunk in ProjectionInfrastructure.Chunk(eventIds, effectiveBatchSize))
-            {
-                foreach (var eventId in chunk)
+                try
                 {
-                    try
-                    {
-                        await RefreshForEventAsync(eventId, cancellationToken);
-                        rowsProcessed++;
-                    }
-                    catch (DbUpdateException)
-                    {
-                        rowsFailed++;
-                    }
+                    await RefreshForEventAsync(eventId, cancellationToken);
+                    rowsProcessed++;
+                }
+                catch (DbUpdateException)
+                {
+                    rowsFailed++;
                 }
             }
+        }
 
-            var drained = await DrainPendingScopesAsync(tenantId, effectiveBatchSize, cancellationToken);
-
-            await _statusRepository.UpsertAsync(new CustomPropertyProjectionStatus
-            {
-                ProjectionName = ProjectionName,
-                ProjectionVersion = ProjectionVersion,
-                TenantId = tenantId,
-                State = rowsFailed == 0
-                    ? CustomPropertyProjectionState.Idle
-                    : CustomPropertyProjectionState.Failed,
-                LastRebuildStartedAt = startedAt,
-                LastRebuildCompletedAt = DateTimeOffset.UtcNow,
-                RowsProcessed = rowsProcessed,
-                RowsFailed = rowsFailed,
-                LastCheckpoint = null,
-                LastErrorMessage = null,
-            }, cancellationToken);
-
-            await _dbContext.FlushDisclosureAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return new ProjectionRebuildResult(true, rowsProcessed, rowsFailed, drained);
-        });
+        var drained = await DrainPendingScopesAsync(tenantId, effectiveBatchSize, cancellationToken);
+        await _statusRepository.UpsertAsync(new CustomPropertyProjectionStatus
+        {
+            ProjectionName = ProjectionName,
+            ProjectionVersion = ProjectionVersion,
+            TenantId = tenantId,
+            State = rowsFailed == 0 ? CustomPropertyProjectionState.Idle : CustomPropertyProjectionState.Failed,
+            LastRebuildStartedAt = startedAt,
+            LastRebuildCompletedAt = DateTimeOffset.UtcNow,
+            RowsProcessed = rowsProcessed,
+            RowsFailed = rowsFailed,
+            LastCheckpoint = null,
+            LastErrorMessage = null,
+        }, cancellationToken);
+        await _dbContext.FlushDisclosureAsync(cancellationToken);
+        return new ProjectionRebuildResult(true, rowsProcessed, rowsFailed, drained);
     }
 
     public async Task<int> DrainDirtyScopesForTenantAsync(Guid tenantId, CancellationToken cancellationToken)
     {
+        RequireMaintenanceScope(tenantId);
         var batchSize = await _quotaResolver.GetIntAsync(
             CustomPropertyQuotaSettingDefinitions.ProjectionRebuildBatchSize.Key,
             tenantId,
             cancellationToken);
 
-        return await _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
-        {
-            await using var transaction = await _dbContext.Database
-                .BeginTransactionAsync(cancellationToken);
+        if (!await TryAcquireExclusiveLockAsync(tenantId, cancellationToken))
+            return 0;
+        var drained = await DrainPendingScopesAsync(tenantId, batchSize, cancellationToken);
+        await _dbContext.FlushDisclosureAsync(cancellationToken);
+        return drained;
+    }
 
-            if (!await TryAcquireExclusiveLockAsync(tenantId, cancellationToken))
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return 0;
-            }
-
-            var drained = await DrainPendingScopesAsync(tenantId, batchSize, cancellationToken);
-            await _dbContext.FlushDisclosureAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return drained;
-        });
+    private void RequireMaintenanceScope(Guid tenantId)
+    {
+        if (tenantId == Guid.Empty || _dbContext.IsTenantFilterBypassed || _dbContext.TenantFilterTenantId != tenantId
+            || _dbContext.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("Projection maintenance requires the exact tenant Serializable transaction.");
     }
 
     private async Task<int> DrainPendingScopesAsync(Guid tenantId, int batchSize, CancellationToken cancellationToken)

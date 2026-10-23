@@ -54,7 +54,7 @@ public class ResolveSettingGroupQueryHandler
         var definitions = SettingRegistry.GetByCategory(request.Category);
         if (definitions is null || definitions.Count == 0)
         {
-            _logger.LogWarning("Setting category '{Category}' not found in registry", request.Category);
+            _logger.LogWarning("Setting category not found in registry.");
             return new SettingGroupResponseDto
             {
                 TenantId = request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null,

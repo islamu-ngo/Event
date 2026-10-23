@@ -115,10 +115,10 @@ public class SettingUpsertService
     {
         if (EventResourceSettingMutationGuard.Handles(settingKey))
         {
-            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
+            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyCurrentHumanAsync(
                 [new EventResourceSettingMutation(null, settingKey,
                     EventResourceSettingMutationKind.SetLock, IsLocked: isLocked)],
-                actorId, cancellationToken);
+                SettingsMutationOperation.InstanceSettings, actorId, cancellationToken);
             result.EnsureAccepted();
             return result.DeferredNotifications.FirstOrDefault() ?? new SettingChangedNotification(
                 settingKey, null, fallbackValue,
@@ -235,6 +235,7 @@ public class SettingUpsertService
 
     private static void EnsureUnguarded(string settingKey)
     {
+        Explore.Domain.Ai.AiCredentialReference.RejectRetiredSettingMutation(settingKey);
         EventResourceSettingMutationGuard.RejectGenericMutation(settingKey);
         EventResourceProviderBindingDocument.RejectGenericMutation(settingKey);
         if (PublicationPolicySettingKeys.All.Contains(settingKey, StringComparer.Ordinal))
@@ -296,10 +297,10 @@ public class SettingUpsertService
     {
         if (EventResourceSettingMutationGuard.Handles(setting.SettingKey))
         {
-            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
+            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyCurrentHumanAsync(
                 [new EventResourceSettingMutation(null, setting.SettingKey,
-                    EventResourceSettingMutationKind.SetValue, setting.Value, setting.IsLocked)],
-                actorId, cancellationToken);
+                    EventResourceSettingMutationKind.SetValue, setting.Value)],
+                SettingsMutationOperation.InstanceSettings, actorId, cancellationToken);
             result.EnsureAccepted();
             return new SettingPersistenceResult(
                 result.DeferredNotifications.IsEmpty

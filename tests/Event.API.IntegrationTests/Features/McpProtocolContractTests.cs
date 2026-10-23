@@ -5,34 +5,23 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Event.Api.IntegrationTests.Builders;
-using Event.Api.IntegrationTests.Fixtures;
+using Event.Api.IntegrationTests.Features;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.API.Mcp;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Infrastructure.Ai;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant.Tools;
-using Explore.Application.Models;
 using Explore.Application.Responses;
-using Explore.Application.Settings;
-using Explore.Application.Settings.Groups;
 using Explore.Domain;
-using Explore.Domain.Ai;
-using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Domain.Settings;
-using Explore.Persistence;
-using Explore.Persistence.Extensions;
-using IWebHostBuilder = Microsoft.AspNetCore.Hosting.IWebHostBuilder;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ApiIntegrationTests.Features;
 
-public sealed class McpProtocolContractTests
+[NotInParallel]
+[ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+public sealed class McpProtocolContractTests(PostgreSqlContainerFixture postgres)
 {
     private const string SensitiveMarker = "private-prompt-marker-7f29";
     private static readonly string[] ProjectedProposalToolNames = AiMcpProjectedToolFactory
@@ -43,9 +32,8 @@ public sealed class McpProtocolContractTests
     [Test]
     public async Task AuthenticatedClient_CanDiscoverExpectedMcpSurface()
     {
-        await using var factory = CreateMcpEnabledFactory();
-        using var httpClient = factory.CreateClient();
-        var mcp = McpProtocolTestClient.Authenticated(httpClient);
+        await using var factory = await McpProtocolNativeFixture.CreateAsync(postgres);
+        var mcp = new McpProtocolTestClient(factory);
 
         using var initialize = await mcp.InvokeAsync("initialize", new JsonObject
         {
@@ -94,10 +82,10 @@ public sealed class McpProtocolContractTests
     [Test]
     public async Task ToolsCall_ReturnsRedactedRegistryContractsAndProposalOnlyResults()
     {
-        await using var factory = CreateMcpEnabledFactory();
-        using var httpClient = factory.CreateClient();
-        var userId = Guid.CreateVersion7();
-        var conversationId = await CreateConversationAsync(httpClient, userId);
+        await using var factory = await McpProtocolNativeFixture.CreateAsync(postgres);
+        using var httpClient = factory.Client;
+        var userId = factory.UserId;
+        var conversationId = await CreateConversationAsync(factory);
         var existingEvent = await SeedOwnedDraftEventAsync(
             factory,
             userId,
@@ -105,7 +93,7 @@ public sealed class McpProtocolContractTests
         var eventCountBefore = await CountEventsAsync(factory);
         var aspectCountsBefore = await ReadAspectCountsAsync(factory);
         var existingEventBefore = await ReadEventStateAsync(factory, existingEvent.EventId);
-        var mcp = McpProtocolTestClient.Authenticated(httpClient, userId);
+        var mcp = new McpProtocolTestClient(factory);
 
         using var registryCall = await mcp.CallToolAsync("list_ai_tool_contracts", new JsonObject());
         var registryText = await GetFirstTextContent(GetResult(registryCall));
@@ -265,10 +253,9 @@ public sealed class McpProtocolContractTests
         var existingEventAfter = await ReadEventStateAsync(factory, existingEvent.EventId);
         await Assert.That(existingEventAfter).IsEqualTo(existingEventBefore);
 
-        using var detailRequest = CreateAuthenticatedRequest(
+        using var detailRequest = factory.CreateRequest(
             HttpMethod.Get,
-            $"/api/ai/assistant/conversations/{conversationId}",
-            userId);
+            $"/api/ai/assistant/conversations/{conversationId}");
         using var detailResponse = await httpClient.SendAsync(detailRequest);
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var detail = await JsonDocument.ParseAsync(await detailResponse.Content.ReadAsStreamAsync());
@@ -278,30 +265,15 @@ public sealed class McpProtocolContractTests
     [Test]
     public async Task ToolsCall_WhenModerationTargetAuthorizationDenied_ReturnsFailureWithoutPersistingProposal()
     {
-        var deniedChecks = new List<AuthorizationRequest>();
-        var authorizationProvider = new StubAuthorizationProvider
-        {
-            CheckPredicate = check =>
-            {
-                if (check.ResourceKind == ResourceKinds.Event &&
-                    check.Action == AuthorizationActions.Events.ModerateHeavy)
-                {
-                    deniedChecks.Add(check);
-                    return false;
-                }
-
-                return true;
-            }
-        };
-        await using var factory = CreateMcpEnabledFactory(authorizationProvider);
-        using var httpClient = factory.CreateClient();
-        var userId = Guid.CreateVersion7();
-        var conversationId = await CreateConversationAsync(httpClient, userId);
+        await using var factory = await McpProtocolNativeFixture.CreateAsync(postgres);
+        using var httpClient = factory.Client;
+        var userId = factory.UserId;
+        var conversationId = await CreateConversationAsync(factory);
         var existingEvent = await SeedOwnedDraftEventAsync(
             factory,
             userId,
             $"MCP Moderation Denied {Guid.NewGuid():N}");
-        var mcp = McpProtocolTestClient.Authenticated(httpClient, userId);
+        var mcp = new McpProtocolTestClient(factory);
 
         using var projectedModerationProposal = await mcp.CallToolAsync("propose_heavy_moderate_event", new JsonObject
         {
@@ -319,14 +291,13 @@ public sealed class McpProtocolContractTests
         using var descriptor = JsonDocument.Parse(await GetFirstTextContent(GetResult(projectedModerationProposal)));
         await Assert.That(descriptor.RootElement.GetProperty("Success").GetBoolean()).IsFalse();
         await Assert.That(descriptor.RootElement.GetProperty("FailureCode").GetString()).IsEqualTo("tool_authorization_denied");
-        await Assert.That(deniedChecks).HasSingleItem(check =>
+        await Assert.That(factory.ModerationChecks).HasSingleItem(check =>
             check.ResourceId == existingEvent.EventId.ToString() &&
-            HasEventScopedFacts(check, existingEvent.EventId, PlatformDefaults.DefaultTenantId));
+            HasEventScopedFacts(check, existingEvent.EventId, factory.TenantId));
 
-        using var detailRequest = CreateAuthenticatedRequest(
+        using var detailRequest = factory.CreateRequest(
             HttpMethod.Get,
-            $"/api/ai/assistant/conversations/{conversationId}",
-            userId);
+            $"/api/ai/assistant/conversations/{conversationId}");
         using var detailResponse = await httpClient.SendAsync(detailRequest);
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var detail = await JsonDocument.ParseAsync(await detailResponse.Content.ReadAsStreamAsync());
@@ -336,34 +307,18 @@ public sealed class McpProtocolContractTests
     [Test]
     public async Task ToolsCall_WhenInstanceAdminTargetsCrossTenantModeration_UsesTargetTenantAndPersistsProposal()
     {
-        var targetTenantId = Guid.CreateVersion7();
-        var moderationChecks = new List<AuthorizationRequest>();
-        var authorizationProvider = new StubAuthorizationProvider
-        {
-            CheckPredicate = check =>
-            {
-                if (check.ResourceKind == ResourceKinds.Event &&
-                    check.Action == AuthorizationActions.Events.ModerateHeavy)
-                {
-                    moderationChecks.Add(check);
-                    return check.Facts is EventScopedAuthorizationFacts facts && facts.TenantId == targetTenantId;
-                }
-
-                return true;
-            }
-        };
-        await using var factory = CreateMcpEnabledFactory(authorizationProvider);
-        using var httpClient = factory.CreateClient();
-        var userId = Guid.CreateVersion7();
-        var instanceAdminHeader = TestAuthHandler.CreateInstanceAdminHeaderValue(userId);
-        var conversationId = await CreateConversationAsync(httpClient, userId, instanceAdminHeader);
+        await using var factory = await McpProtocolNativeFixture.CreateAsync(postgres, instanceAdmin: true);
+        var targetTenantId = factory.OtherTenantId;
+        using var httpClient = factory.Client;
+        var userId = factory.UserId;
+        var conversationId = await CreateConversationAsync(factory);
         var existingEvent = await SeedOwnedDraftEventAsync(
             factory,
             userId,
             $"MCP Instance Admin Cross Tenant {Guid.NewGuid():N}",
             targetTenantId);
         var eventStateBefore = await ReadEventStateAsync(factory, existingEvent.EventId);
-        var mcp = McpProtocolTestClient.AuthenticatedWithHeader(httpClient, userId, instanceAdminHeader);
+        var mcp = new McpProtocolTestClient(factory);
 
         using var projectedModerationProposal = await mcp.CallToolAsync("propose_heavy_moderate_event", new JsonObject
         {
@@ -379,16 +334,14 @@ public sealed class McpProtocolContractTests
         });
 
         await AssertSuccessfulToolResult(projectedModerationProposal);
-        await Assert.That(moderationChecks).HasSingleItem(check =>
+        await Assert.That(factory.ModerationChecks).HasSingleItem(check =>
             check.ResourceId == existingEvent.EventId.ToString() &&
             HasEventScopedFacts(check, existingEvent.EventId, targetTenantId));
         await Assert.That((await ReadEventStateAsync(factory, existingEvent.EventId))).IsEqualTo(eventStateBefore);
 
-        using var detailRequest = CreateAuthenticatedRequest(
+        using var detailRequest = factory.CreateRequest(
             HttpMethod.Get,
-            $"/api/ai/assistant/conversations/{conversationId}",
-            userId,
-            instanceAdminHeader);
+            $"/api/ai/assistant/conversations/{conversationId}");
         using var detailResponse = await httpClient.SendAsync(detailRequest);
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var detail = await JsonDocument.ParseAsync(await detailResponse.Content.ReadAsStreamAsync());
@@ -399,11 +352,9 @@ public sealed class McpProtocolContractTests
     [Test]
     public async Task ProtocolErrors_DoNotEchoSensitivePayloadsOrSecrets()
     {
-        await using var factory = CreateMcpEnabledFactory();
-        using var httpClient = factory.CreateClient();
-        var userId = Guid.CreateVersion7();
-        var conversationId = await CreateConversationAsync(httpClient, userId);
-        var mcp = McpProtocolTestClient.Authenticated(httpClient, userId);
+        await using var factory = await McpProtocolNativeFixture.CreateAsync(postgres);
+        var conversationId = await CreateConversationAsync(factory);
+        var mcp = new McpProtocolTestClient(factory);
 
         using var malformed = await mcp.SendRawAsync(
             "{ \"jsonrpc\": \"2.0\", \"id\": 101, \"method\": \"tools/call\", " +
@@ -433,9 +384,8 @@ public sealed class McpProtocolContractTests
     [Test]
     public async Task McpEndpoint_WhenDisabled_ReturnsNotFound()
     {
-        await using var factory = CreateFactory(mcpEnabled: false);
-        using var httpClient = factory.CreateClient();
-        var mcp = McpProtocolTestClient.Authenticated(httpClient);
+        await using var factory = await McpProtocolNativeFixture.CreateAsync(postgres, mcpEnabled: false);
+        var mcp = new McpProtocolTestClient(factory);
 
         using var response = await mcp.SendRawAsync(
             "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}");
@@ -443,126 +393,41 @@ public sealed class McpProtocolContractTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
-    private static McpProtocolContractFactory CreateMcpEnabledFactory(
-        StubAuthorizationProvider? authorizationProvider = null)
-        => CreateFactory(mcpEnabled: true, authorizationProvider);
-
-    private static McpProtocolContractFactory CreateFactory(
-        bool mcpEnabled,
-        StubAuthorizationProvider? authorizationProvider = null)
-        => new(mcpEnabled, authorizationProvider)
-        {
-            SeedActiveDefaultTenant = true
-        };
-
-    private static async Task<Guid> CreateConversationAsync(
-        HttpClient client,
-        Guid userId,
-        string? authHeaderValue = null)
+    private static async Task<Guid> CreateConversationAsync(McpProtocolNativeFixture factory)
     {
-        using var request = CreateAuthenticatedRequest(
+        using var request = factory.CreateRequest(
             HttpMethod.Post,
-            "/api/ai/assistant/conversations",
-            userId,
-            authHeaderValue);
+            "/api/ai/assistant/conversations");
         request.Content = JsonContent.Create(new CreateAiConversationRequestDto
         {
             Title = "MCP protocol contract"
         });
 
-        using var response = await client.SendAsync(request);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Created);
+        using var response = await factory.Client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Created)
+            .Because(factory.RequestFailure?.GetType().Name ?? "The original signed caller must create the conversation.");
         var body = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
         await Assert.That(body).IsNotNull();
         await Assert.That(body!.IsSuccess).IsTrue();
         return body.Id;
     }
 
-    private static HttpRequestMessage CreateAuthenticatedRequest(
-        HttpMethod method,
-        string url,
-        Guid userId,
-        string? authHeaderValue = null)
+    private static async Task<int> CountEventsAsync(McpProtocolNativeFixture factory)
     {
-        var request = new HttpRequestMessage(method, url);
-        request.Headers.Add(TestAuthHandler.AuthHeaderName, authHeaderValue ?? TestAuthHandler.CreateAuthHeaderValue(userId));
-        return request;
-    }
-
-    private static async Task<int> CountEventsAsync(McpProtocolContractFactory factory)
-    {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var dbContext = factory.CreateSetupContext();
         return await dbContext.Events.CountAsync();
     }
 
     private static async Task<OwnedDraftEventSeed> SeedOwnedDraftEventAsync(
-        McpProtocolContractFactory factory,
+        McpProtocolNativeFixture factory,
         Guid userId,
         string title,
         Guid? tenantId = null)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var resolvedTenantId = tenantId ?? PlatformDefaults.DefaultTenantId;
-        var tenant = await context.Tenants.FindAsync(resolvedTenantId);
-        if (tenant is null)
-        {
-            tenant = new TenantBuilder()
-                .WithId(resolvedTenantId)
-                .WithFullName("Default MCP Protocol Event Tenant")
-                .WithSlug($"mcp-protocol-event-{resolvedTenantId:N}"[..48])
-                .Build();
-            context.Tenants.Add(tenant);
-            await context.SaveChangesAsync();
-        }
-
-        var owner = new UserBuilder()
-            .WithId(userId)
-            .Build();
-        var existingOwner = await context.Users.FindAsync(userId);
-        if (existingOwner is null)
-        {
-            context.Users.Add(owner);
-            await context.SaveChangesAsync();
-        }
-        else
-        {
-            owner = existingOwner;
-        }
-
-        var ownerActor = await context.Actors
-            .SingleOrDefaultAsync(actor => actor.UserId == owner.Id);
-        if (ownerActor is null)
-        {
-            ownerActor = new ActorBuilder()
-                .WithUserId(owner.Id)
-                .WithDisplayName("MCP Protocol Owner")
-                .Build();
-            context.Actors.Add(ownerActor);
-            await context.SaveChangesAsync();
-        }
-
-        if (!await context.TenantUsers.AnyAsync(candidate =>
-                candidate.TenantId == tenant.Id
-                && candidate.UserId == owner.Id
-                && candidate.ActorId == ownerActor.Id))
-        {
-            context.TenantUsers.Add(new TenantUser
-            {
-                Id = Guid.CreateVersion7(),
-                TenantId = tenant.Id,
-                Tenant = tenant,
-                UserId = owner.Id,
-                User = owner,
-                ActorId = ownerActor.Id,
-                Actor = ownerActor,
-                StatusId = (int)TenantUserStatusEnum.Active,
-                JoinedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
-            });
-            await context.SaveChangesAsync();
-        }
+        await using var context = factory.CreateSetupContext();
+        var resolvedTenantId = tenantId ?? factory.TenantId;
+        var tenant = await context.Tenants.SingleAsync(candidate => candidate.Id == resolvedTenantId);
+        var ownerActor = await context.Actors.SingleAsync(actor => actor.UserId == userId);
 
         var @event = new EventBuilder()
             .WithTitle(title)
@@ -576,6 +441,11 @@ public sealed class McpProtocolContractTests
                 DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7)))
             .Build();
         context.Events.Add(@event);
+        // Use the seeded EventOwner role and its real permission mappings. The
+        // same owner still has no platform/tenant moderation authority.
+        context.EventRoleAssignments.Add(EventRoleAssignment.Create(
+            tenant.Id, @event.Id, userId, (int)RoleEnum.EventOwner,
+            EventRoleAssignmentStatus.Active, DateTime.UtcNow, null, userId));
         await context.SaveChangesAsync();
 
         @event.CreatedBy = userId;
@@ -590,23 +460,19 @@ public sealed class McpProtocolContractTests
     }
 
     private static async Task<EventState> ReadEventStateAsync(
-        McpProtocolContractFactory factory,
+        McpProtocolNativeFixture factory,
         Guid eventId)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        return await Explore.Persistence.QueryFilters.QueryFilterExtensions.IgnoreTenantFilter(
-                dbContext.Events.AsNoTracking(),
-                Explore.Persistence.QueryFilters.TenantFilterBypassReasons.EventAuthorizationTargetResolution)
+        await using var dbContext = factory.CreateSetupContext();
+        return await dbContext.Events.AsNoTracking()
             .Where(@event => @event.Id == eventId)
             .Select(@event => new EventState(@event.Title, @event.ConcurrencyStamp, @event.EventStatusId))
             .SingleAsync();
     }
 
-    private static async Task<AspectCounts> ReadAspectCountsAsync(McpProtocolContractFactory factory)
+    private static async Task<AspectCounts> ReadAspectCountsAsync(McpProtocolNativeFixture factory)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var dbContext = factory.CreateSetupContext();
         return new AspectCounts(
             await dbContext.EventIslamicAspects.CountAsync(),
             await dbContext.EventTechAspects.CountAsync());
@@ -702,22 +568,9 @@ public sealed class McpProtocolContractTests
 
     private sealed record AspectCounts(int IslamicAspectCount, int TechAspectCount);
 
-    private sealed class McpProtocolTestClient(HttpClient client, Guid userId)
+    private sealed class McpProtocolTestClient(McpProtocolNativeFixture factory)
     {
         private int _nextId;
-        private string? _authHeaderValue;
-
-        public static McpProtocolTestClient Authenticated(HttpClient client, Guid? userId = null)
-            => new(client, userId ?? Guid.CreateVersion7());
-
-        public static McpProtocolTestClient AuthenticatedWithHeader(
-            HttpClient client,
-            Guid userId,
-            string authHeaderValue)
-            => new(client, userId)
-            {
-                _authHeaderValue = authHeaderValue
-            };
 
         public Task<JsonDocument> InvokeAsync(string method, JsonObject? parameters = null)
             => SendJsonRpcAsync(method, parameters, expectProtocolSuccess: true);
@@ -734,9 +587,9 @@ public sealed class McpProtocolContractTests
 
         public async Task<HttpResponseMessage> SendRawAsync(string json)
         {
-            var request = CreateBaseRequest();
+            using var request = CreateBaseRequest();
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            return await client.SendAsync(request);
+            return await factory.Client.SendAsync(request);
         }
 
         private async Task<JsonDocument> SendJsonRpcAsync(
@@ -771,8 +624,7 @@ public sealed class McpProtocolContractTests
 
         private HttpRequestMessage CreateBaseRequest()
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, "/mcp");
-            request.Headers.Add(TestAuthHandler.AuthHeaderName, _authHeaderValue ?? TestAuthHandler.CreateAuthHeaderValue(userId));
+            var request = factory.CreateRequest(HttpMethod.Post, "/mcp");
             request.Headers.Add("ProtocolVersion", "2025-06-18");
             request.Headers.Add("MCP-Protocol-Version", "2025-06-18");
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -807,360 +659,4 @@ public sealed class McpProtocolContractTests
         }
     }
 
-    private sealed class McpProtocolContractFactory(
-        bool mcpEnabled,
-        StubAuthorizationProvider? authorizationProvider) : AuthenticatedWebApplicationFactory
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            AuthorizationProviderOverride = authorizationProvider ?? new StubAuthorizationProvider();
-            AdditionalConfiguration["Mcp:Enabled"] = mcpEnabled ? "true" : "false";
-            AdditionalConfiguration["Mcp:EndpointPath"] = "/mcp";
-            AdditionalConfiguration["Mcp:Stateless"] = "true";
-            AdditionalConfiguration["Mcp:EnableLegacySse"] = "false";
-            base.ConfigureWebHost(builder);
-
-            builder.ConfigureTestServices(services =>
-            {
-                services.RemoveAll<IHierarchicalSettingsResolver>();
-                services.AddSingleton<IHierarchicalSettingsResolver>(new FixedAiSettingsResolver(CreateEnabledAiSettings()));
-
-                services.RemoveAll<IAiConversationRepository>();
-                services.AddSingleton<InMemoryAiConversationStore>();
-                services.AddScoped<IAiConversationRepository, InMemoryAiConversationRepository>();
-            });
-        }
-    }
-
-
-    private sealed class InMemoryAiConversationStore
-    {
-        public Dictionary<Guid, AiConversation> Conversations { get; } = [];
-        public List<AiToolExecution> ToolExecutions { get; } = [];
-    }
-
-    private sealed class InMemoryAiConversationRepository(
-        InMemoryAiConversationStore store,
-        ITenantContext tenantContext) : IAiConversationRepository
-    {
-        private IEnumerable<AiConversation> TenantConversations
-            => store.Conversations.Values.Where(conversation => conversation.TenantId == tenantContext.TenantId);
-
-        public Task<AiConversation?> GetById(Guid id)
-            => Task.FromResult(TenantConversations.FirstOrDefault(conversation => conversation.Id == id));
-
-        public Task<IReadOnlyList<AiConversation>> GetAll()
-            => Task.FromResult<IReadOnlyList<AiConversation>>(TenantConversations.ToArray());
-
-        public Task<(IReadOnlyList<AiConversation> Items, int TotalCount)> GetAllPaged(int pageNumber, int pageSize)
-        {
-            var conversations = TenantConversations.ToArray();
-            var items = conversations
-                .Skip(Math.Max(0, pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToArray();
-
-            return Task.FromResult<(
-                IReadOnlyList<AiConversation> Items,
-                int TotalCount)>((items, conversations.Length));
-        }
-
-        public Task<bool> Exists(Guid id)
-            => Task.FromResult(TenantConversations.Any(conversation => conversation.Id == id));
-
-        public Task<AiConversation> Create(AiConversation entity)
-        {
-            store.Conversations[entity.Id] = entity;
-            return Task.FromResult(entity);
-        }
-
-        public Task Update(AiConversation entity)
-        {
-            store.Conversations[entity.Id] = entity;
-            return Task.CompletedTask;
-        }
-
-        public Task Delete(AiConversation entity)
-        {
-            store.Conversations.Remove(entity.Id);
-            return Task.CompletedTask;
-        }
-
-        public Task<int> HardDeleteUserConversationGraphAsync(Guid subjectId, CancellationToken cancellationToken)
-        {
-            var deletedConversations = TenantConversations
-                .Where(conversation => conversation.UserId == subjectId)
-                .ToArray();
-            var deletedActionIds = deletedConversations
-                .SelectMany(conversation => conversation.ProposedActions)
-                .Select(action => action.Id)
-                .ToHashSet();
-
-            foreach (AiConversation conversation in deletedConversations)
-            {
-                store.Conversations.Remove(conversation.Id);
-            }
-
-            if (deletedActionIds.Count > 0)
-            {
-                store.ToolExecutions.RemoveAll(execution => deletedActionIds.Contains(execution.ProposedActionId));
-            }
-
-            return Task.FromResult(deletedConversations.Length);
-        }
-
-        public Task<AiConversation?> GetByIdWithDetailsAsync(Guid conversationId, CancellationToken cancellationToken)
-            => GetById(conversationId);
-
-        public Task<AiConversation?> GetByIdForUpdateAsync(Guid conversationId, CancellationToken cancellationToken)
-            => GetById(conversationId);
-
-        public Task<IReadOnlyList<AiConversation>> ListRecentForUserAsync(
-            Guid userId,
-            int limit,
-            CancellationToken cancellationToken)
-        {
-            var conversations = TenantConversations
-                .Where(conversation => conversation.UserId == userId)
-                .OrderByDescending(conversation => conversation.UpdatedAt ?? conversation.CreatedAt)
-                .ThenByDescending(conversation => conversation.Id)
-                .Take(Math.Max(0, limit))
-                .ToArray();
-
-            return Task.FromResult<IReadOnlyList<AiConversation>>(conversations);
-        }
-
-        public Task<int> CountUserMessagesSinceAsync(Guid userId, DateTime sinceUtc, CancellationToken cancellationToken)
-        {
-            var count = TenantConversations
-                .SelectMany(conversation => conversation.Messages)
-                .Count(message => message.Role == AiMessageRole.User &&
-                    message.CreatedBy == userId &&
-                    message.CreatedAt >= sinceUtc);
-
-            return Task.FromResult(count);
-        }
-
-        public Task<int> CountTenantMessagesSinceAsync(DateTime sinceUtc, CancellationToken cancellationToken)
-        {
-            var count = TenantConversations
-                .SelectMany(conversation => conversation.Messages)
-                .Count(message => message.Role == AiMessageRole.User && message.CreatedAt >= sinceUtc);
-
-            return Task.FromResult(count);
-        }
-
-        public Task<int> ReleaseStaleRunningConversationsForUserAsync(
-            Guid userId,
-            DateTime staleBeforeUtc,
-            string failureCode,
-            string failureMessage,
-            DateTime utcNow,
-            CancellationToken cancellationToken)
-        {
-            var staleConversations = TenantConversations
-                .Where(conversation => conversation.UserId == userId)
-                .Where(conversation => conversation.Status == AiConversationStatus.Running)
-                .Where(conversation => conversation.Runs.Any(run =>
-                    run.Status is AiRunStatus.Queued or AiRunStatus.InProgress
-                    && (run.StartedAt ?? run.QueuedAt) <= staleBeforeUtc))
-                .Where(conversation => !conversation.Runs.Any(run =>
-                    run.Status is AiRunStatus.Queued or AiRunStatus.InProgress
-                    && (run.StartedAt ?? run.QueuedAt) > staleBeforeUtc))
-                .ToList();
-
-            foreach (var conversation in staleConversations)
-            {
-                foreach (var run in conversation.Runs.Where(run =>
-                    run.Status is AiRunStatus.Queued or AiRunStatus.InProgress
-                    && (run.StartedAt ?? run.QueuedAt) <= staleBeforeUtc))
-                {
-                    run.Fail(failureCode, failureMessage, utcNow);
-                }
-
-                conversation.Activate(utcNow);
-            }
-
-            return Task.FromResult(staleConversations.Count);
-        }
-
-        public Task<int> CountRunningConversationsForUserAsync(Guid userId, CancellationToken cancellationToken)
-        {
-            var count = TenantConversations
-                .Count(conversation => conversation.UserId == userId && conversation.Status == AiConversationStatus.Running);
-
-            return Task.FromResult(count);
-        }
-
-
-        public Task<AiProposedAction?> GetProposedActionForUpdateAsync(Guid proposedActionId, CancellationToken cancellationToken)
-        {
-            var action = TenantConversations
-                .SelectMany(conversation => conversation.ProposedActions)
-                .FirstOrDefault(candidate => candidate.Id == proposedActionId);
-
-            return Task.FromResult(action);
-        }
-
-        public Task UpdateProposedActionAsync(AiProposedAction proposedAction, CancellationToken cancellationToken)
-        {
-            var existingAction = TenantConversations
-                .SelectMany(conversation => conversation.ProposedActions)
-                .FirstOrDefault(candidate => candidate.Id == proposedAction.Id);
-
-            if (existingAction is null)
-            {
-                return Task.CompletedTask;
-            }
-
-            existingAction.Status = proposedAction.Status;
-            existingAction.ConfirmedBy = proposedAction.ConfirmedBy;
-            existingAction.ConfirmedAt = proposedAction.ConfirmedAt;
-            existingAction.RejectedBy = proposedAction.RejectedBy;
-            existingAction.RejectedAt = proposedAction.RejectedAt;
-            existingAction.ResultResourceId = proposedAction.ResultResourceId;
-            existingAction.FailureCode = proposedAction.FailureCode;
-            existingAction.FailureMessage = proposedAction.FailureMessage;
-
-            return Task.CompletedTask;
-        }
-
-        public Task CreateToolExecutionAsync(AiToolExecution toolExecution, CancellationToken cancellationToken)
-        {
-            store.ToolExecutions.Add(toolExecution);
-            return Task.CompletedTask;
-        }
-
-        public Task<IReadOnlyList<AiToolExecution>> ListToolExecutionsForProposedActionAsync(
-            Guid proposedActionId,
-            CancellationToken cancellationToken)
-        {
-            var executions = store.ToolExecutions
-                .Where(execution => execution.TenantId == tenantContext.TenantId && execution.ProposedActionId == proposedActionId)
-                .OrderByDescending(execution => execution.StartedAt)
-                .ThenByDescending(execution => execution.Id)
-                .ToArray();
-
-            return Task.FromResult<IReadOnlyList<AiToolExecution>>(executions);
-        }
-
-        public Task<AiRetentionCleanupResult> RedactExpiredConversationsAsync(
-            DateTime cutoffUtc,
-            int retentionDays,
-            DateTime utcNow,
-            bool dryRun,
-            CancellationToken cancellationToken)
-        {
-            var eligibleConversations = TenantConversations
-                .Count(conversation => (conversation.UpdatedAt ?? conversation.CreatedAt) <= cutoffUtc);
-
-            return Task.FromResult(new AiRetentionCleanupResult(
-                cutoffUtc,
-                retentionDays,
-                eligibleConversations,
-                RedactedConversations: 0,
-                RedactedMessages: 0,
-                RedactedRuns: 0,
-                RedactedReferences: 0,
-                RedactedProposedActions: 0,
-                RedactedToolExecutions: 0,
-                DryRun: dryRun));
-        }
-    }
-
-    private sealed class FixedAiSettingsResolver(AiAssistantSettingGroup settings) : IHierarchicalSettingsResolver
-    {
-        public Task<T?> ResolveAsync<T>(string key, SettingContext context, CancellationToken ct = default)
-            => Task.FromResult(default(T));
-
-        public Task<ResolvedSetting?> ResolveWithMetadataAsync(string key, SettingContext context, CancellationToken ct = default)
-            => Task.FromResult<ResolvedSetting?>(null);
-
-        public Task<IReadOnlyList<ResolvedSetting>> ResolveBatchAsync(
-            IEnumerable<string> keys,
-            SettingContext context,
-            CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<ResolvedSetting>>([]);
-
-        public Task<TGroup> ResolveGroupAsync<TGroup>(SettingContext context, CancellationToken ct = default)
-            where TGroup : ISettingGroup, new()
-        {
-            if (typeof(TGroup) == typeof(AiAssistantSettingGroup))
-            {
-                return Task.FromResult((TGroup)(object)settings);
-            }
-
-            return Task.FromResult(new TGroup());
-        }
-
-        public Task SetValueAsync(
-            string key,
-            string value,
-            SettingScope scope,
-            Guid scopeId,
-            Guid actorId,
-            CancellationToken ct = default)
-            => Task.CompletedTask;
-
-        public Task RemoveOverrideAsync(
-            string key,
-            SettingScope scope,
-            Guid scopeId,
-            Guid actorId,
-            CancellationToken ct = default)
-            => Task.CompletedTask;
-
-        public Task LockAsync(
-            string key,
-            SettingScope scope,
-            Guid scopeId,
-            Guid actorId,
-            CancellationToken ct = default)
-            => Task.CompletedTask;
-
-        public Task UnlockAsync(
-            string key,
-            SettingScope scope,
-            Guid scopeId,
-            Guid actorId,
-            CancellationToken ct = default)
-            => Task.CompletedTask;
-
-        public void InvalidateCache(SettingScope? scope = null, Guid? scopeId = null)
-        {
-        }
-
-        public void InvalidateOrganizationCache(Guid tenantId, Guid organizationId)
-        {
-        }
-
-        public void InvalidateUserCache(Guid tenantId, Guid userId)
-        {
-        }
-    }
-
-    private static AiAssistantSettingGroup CreateEnabledAiSettings()
-    {
-        var values = new Dictionary<string, object?>
-        {
-            [GovernanceSettingKeys.AiAssistant.Enabled] = true,
-            [GovernanceSettingKeys.AiAssistant.Provider] = AiProviderDefaults.ProviderFake,
-            [GovernanceSettingKeys.AiAssistant.DailyMessageLimit] = 50,
-            [GovernanceSettingKeys.AiAssistant.ToolProposalsEnabled] = true
-        };
-
-        var resolved = values.ToDictionary(
-            pair => pair.Key,
-            pair => new ResolvedSetting
-            {
-                Key = pair.Key,
-                Value = JsonSerializer.Serialize(pair.Value),
-                Source = SettingSource.SystemDefault,
-                IsLocked = false
-            });
-
-        var group = new AiAssistantSettingGroup();
-        group.Populate(resolved);
-        return group;
-    }
 }

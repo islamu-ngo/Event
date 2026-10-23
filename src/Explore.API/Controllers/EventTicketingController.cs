@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Explore.API.Attributes;
+using Explore.API.Configuration;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
@@ -17,6 +18,7 @@ using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace Explore.API.Controllers;
 
@@ -26,6 +28,7 @@ namespace Explore.API.Controllers;
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
 public sealed class EventTicketingController(
+    IOptionsMonitor<EffectiveHostAuthorityOptions> hostAuthority,
     IResourceAssembler<EventTicketCatalogManagementDto, EventTicketCatalogManagementDto> assembler,
     IResourceAssembler<PaidEventPublicationPreflightDto, PaidEventPublicationPreflightDto> preflightAssembler,
     IResourceAssembler<EventOrganizerPaymentConnectionManagementDto, EventOrganizerPaymentConnectionManagementDto> paymentConnectionAssembler,
@@ -290,7 +293,8 @@ public sealed class EventTicketingController(
         [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Uri? uri)
     {
         uri = null;
-        string? value = Url.RouteUrl(routeName, new { eventId }, Request.Scheme);
+        var origin = hostAuthority.CurrentValue.GetCanonicalOrigin();
+        string? value = Url.RouteUrl(routeName, new { eventId }, origin.Scheme, origin.Authority);
         return Uri.TryCreate(value, UriKind.Absolute, out uri)
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }

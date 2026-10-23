@@ -1,0 +1,31 @@
+Change-Id: CHG-01M54J5DMJ5J68H12NT2DNK3KK
+Title: "Bind AI endpoint authority to the actual connection"
+Type: fix
+Scope: access
+Summary: "Keep tenant and instance origins separate and apply public-only policy to cloud credential traffic."
+Group: ai-connection-bound-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/ai-provider-response-limits.md
+    Disposition: documented
+    Detail: Metadata token acquisition is not admitted by local endpoint opt-in; Azure managed identity is excluded.
+  Security:
+    Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Bind endpoint decisions to validated DNS answers and socket connections while separating tenant, instance and cloud identity authority.
+  Migration:
+    Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/AI_PROVIDER_CONSUMPTION.md
+    Disposition: documented
+    Detail: Local-provider opt-in is restricted to the configured instance origin and never opens metadata traffic.
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/ai-provider-response-limits.md
+    Disposition: documented
+    Detail: Select an admitted instance credential mechanism and diagnose fixed endpoint-denial categories rather than enabling metadata access.

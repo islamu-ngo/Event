@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53BN5NDXGFVA5SB4ASZRJRZ
+Title: "Admit independent bootstrap configuration reads"
+Type: fix
+Scope: access
+Summary: "Read committed bootstrap evidence through an independent Global port backed by provider-native configuration custody."
+Group: admitted-bootstrap-configuration-reader
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Startup reads no longer borrow Runtime mutation repositories; native enrollment is not human or setup authority.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Native startup reads require the independent Global account and admitted provider configuration contract.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose native readiness without broadening Runtime privileges or repairing drift during admission.

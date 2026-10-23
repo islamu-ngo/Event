@@ -13,7 +13,9 @@ public sealed class RetryWebhookDeliveryAttemptCommandHandler(
     IWebhookDeliveryDrainService deliveryDrainService,
     IWebhookDeliveryAttemptRepository attemptRepository,
     ICurrentUserService currentUserService,
-    IMachinePrincipalAccessor machinePrincipalAccessor)
+    IMachinePrincipalAccessor machinePrincipalAccessor,
+    ISelectedWebhookManualRetryScheduler selectedRetryScheduler,
+    IHumanWebhookMutationPreparation preparation)
     : ICommandHandler<RetryWebhookDeliveryAttemptCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -36,23 +38,21 @@ public sealed class RetryWebhookDeliveryAttemptCommandHandler(
                 "An authenticated operator identity is required.");
         }
 
-        var attempt = await attemptRepository.GetByIdForOwnerOperationAsync(
-            request.AttemptId,
-            cancellationToken);
-        if (attempt is null)
+        WebhookDeliverySingleDrainResult result;
+        if (principalKind == WebhookAuditPrincipalKind.User)
         {
-            return Failure(
-                request.AttemptId,
-                "webhook_delivery_attempt_not_found",
-                "Webhook delivery attempt was not found.");
+            result = await preparation.ExecuteAsync(request, (prepared, token) =>
+                selectedRetryScheduler.ScheduleAsync(request, prepared, principalKind, principalReference, token),
+                cancellationToken);
         }
-
-        var result = await deliveryDrainService.ScheduleManualRetryAsync(
-            attempt.TenantId,
-            request.AttemptId,
-            principalKind,
-            principalReference,
-            cancellationToken);
+        else
+        {
+            var attempt = await attemptRepository.GetByIdForOwnerOperationAsync(request.AttemptId, cancellationToken);
+            if (attempt is null)
+                return Failure(request.AttemptId, "webhook_delivery_attempt_not_found", "Webhook delivery attempt was not found.");
+            result = await deliveryDrainService.ScheduleManualRetryAsync(
+                attempt.TenantId, request.AttemptId, principalKind, principalReference, cancellationToken);
+        }
 
         return result.Outcome switch
         {

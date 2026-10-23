@@ -2,12 +2,14 @@ using System.Text.Json;
 using Explore.Application.Mappings;
 using Explore.Application.Analytics;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Footer;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
+using Explore.Application.Features.AiAssistant;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Constants;
@@ -37,6 +39,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
     private readonly ITenantDirectoryOperatorReadinessEvaluator _directoryOperatorReadiness;
     private readonly IInstanceOperatorIdentityReadinessEvaluator _instanceOperatorReadiness;
     private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
+    private readonly IAiProviderCapabilityResolver _aiCapabilityResolver;
 
     public GetPublicExperienceSettingsQueryHandler(
         ITenantContext tenantContext,
@@ -54,7 +57,8 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
         ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
         IInstanceOperatorIdentityReadinessEvaluator instanceOperatorReadiness,
         IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
-        ITenantLifecycleAccessService lifecycle)
+        ITenantLifecycleAccessService lifecycle,
+        IAiProviderCapabilityResolver aiCapabilityResolver)
     {
         _lifecycle = lifecycle;
         _tenantContext = tenantContext;
@@ -72,6 +76,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
         _directoryOperatorReadiness = directoryOperatorReadiness;
         _instanceOperatorReadiness = instanceOperatorReadiness;
         _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
+        _aiCapabilityResolver = aiCapabilityResolver;
     }
 
     public async Task<PublicExperienceSettingsDto> QueryAsync(GetPublicExperienceSettingsQuery query, CancellationToken cancellationToken)
@@ -155,9 +160,10 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
             LinkGroups = footerLinkGroups.Select(FooterMapper.ToPublicGroup).ToList(),
         };
 
-        // Resolve AI assistant availability (enabled + configured API key)
         var aiSettingGroup = await _hierarchicalSettingsResolver.ResolveGroupAsync<AiAssistantSettingGroup>(
             new SettingContext(TenantId: tenantId), cancellationToken);
+        var aiDisabledReason = await AiAssistantAvailability.ResolveDisabledReasonAsync(
+            aiSettingGroup, _aiCapabilityResolver, cancellationToken);
 
         var appearanceSettingGroup = await _hierarchicalSettingsResolver.ResolveGroupAsync<AppearanceSettingGroup>(
             new SettingContext(TenantId: tenantId), cancellationToken);
@@ -223,7 +229,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
             OnboardingPrerenderEnabled = governanceSettings.RenderPolicy.OnboardingPrerenderEnabled,
             DisallowInteractiveServerOnOnboarding = governanceSettings.RenderPolicy.DisallowInteractiveServerOnOnboarding,
             IsAiAssistantEnabled = aiSettingGroup.Enabled,
-            IsAiAssistantAvailable = aiSettingGroup.IsAvailable,
+            IsAiAssistantAvailable = aiDisabledReason is null,
             AiAssistantAllowAnonymousAccess = aiSettingGroup.AllowAnonymousAccess,
             FooterConfig = footerConfig,
             DefaultThemeId = appearanceSettingGroup.ActiveProfileId,

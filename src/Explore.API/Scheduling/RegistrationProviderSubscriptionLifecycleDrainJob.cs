@@ -6,7 +6,7 @@ namespace Explore.API.Scheduling;
 
 [DisallowConcurrentExecution]
 public sealed class RegistrationProviderSubscriptionLifecycleDrainJob(
-    RegistrationProviderSubscriptionLifecycleService service,
+    RegistrationProviderSubscriptionDrainService service,
     ILogger<RegistrationProviderSubscriptionLifecycleDrainJob> logger) : IJob
 {
     public async Task Execute(IJobExecutionContext context)

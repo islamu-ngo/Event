@@ -218,7 +218,7 @@ or shared picture storage. No separate manual discovery-table cleanup is require
 
 For PostgreSQL, use the normal application migration bootstrap, not only
 `dotnet ef database update`: it also installs the bounded retention function.
-The runtime login needs `event_discovery_maintenance_runtime` membership with
+The Global login needs `event_discovery_maintenance_runtime` membership with
 effective inheritance. Keep its existing restricted role; never give it
 maintenance-owner/migrator membership or BYPASSRLS. The function can enumerate
 only bounded expired ownership keys, not foreign cards or membership.
@@ -226,7 +226,10 @@ Cleanup continues after physical directory deletion and does not recreate it.
 PostgreSQL cleanup never advances expiry beyond database time, even if the
 application clock is ahead; a future cutoff cannot remove live searches.
 Missing operational grants stop cleanup, so treat purge errors as capacity
-warnings rather than widening the runtime role.
+warnings rather than widening the Runtime role. Despite its historical name,
+the maintenance group belongs to Global owner discovery. Physical deletion
+continues through fresh tenant-bound Runtime connections; Global needs no direct
+snapshot deletion privileges.
 
 Public discovery accepts `areaId` alongside local `dateFrom` and `dateTo` filters. Its card payload includes `matchingSession` and a nullable `additionalSessionCount`. Regional matching-session fields contain only the currently permitted public city and country.
 

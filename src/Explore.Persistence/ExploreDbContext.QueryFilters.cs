@@ -28,6 +28,24 @@ public partial class ExploreDbContext
             .HasQueryFilter(QueryFilterNames.Tenant, value =>
                 IsTenantFilterBypassed || value.TenantId == TenantFilterTenantId);
 
+        modelBuilder.Entity<LegalDocument>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || value.TenantId == null || value.TenantId == TenantFilterTenantId);
+        modelBuilder.Entity<LegalDocumentVersion>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || (value.LegalDocument != null &&
+                    (value.LegalDocument.TenantId == null || value.LegalDocument.TenantId == TenantFilterTenantId)));
+        modelBuilder.Entity<LegalDocumentLocalizedSource>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || (value.LegalDocumentVersion != null &&
+                    value.LegalDocumentVersion.LegalDocument != null &&
+                    (value.LegalDocumentVersion.LegalDocument.TenantId == null ||
+                     value.LegalDocumentVersion.LegalDocument.TenantId == TenantFilterTenantId)));
+        modelBuilder.Entity<LegalDocumentPublication>()
+            .HasQueryFilter(QueryFilterNames.Tenant, value =>
+                IsTenantFilterBypassed || (value.LegalDocument != null &&
+                    (value.LegalDocument.TenantId == null || value.LegalDocument.TenantId == TenantFilterTenantId)));
+
         // ===== Event Entities =====
         // Entities with both Tenant and Soft Delete filters (separate named filters for selective disabling)
         modelBuilder.Entity<Event>()
@@ -770,6 +788,9 @@ public partial class ExploreDbContext
         modelBuilder.Entity<EventLocationDisclosureAudit>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
 
+        modelBuilder.Entity<LocationPrivacyCorrectionReceipt>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
+
         modelBuilder.Entity<EventLocationExactReadAudit>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
 
@@ -799,6 +820,8 @@ public partial class ExploreDbContext
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || (e.TenantId != null && e.TenantId == TenantFilterTenantId));
         modelBuilder.Entity<ExternalApiKeyIssuanceReceipt>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || (e.TenantId != null && e.TenantId == TenantFilterTenantId));
+        modelBuilder.Entity<RegistrationOrderCreationReceipt>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
         modelBuilder.Entity<ExternalApiKeyQuota>()
             .HasQueryFilter(QueryFilterNames.Tenant,
                 e => IsTenantFilterBypassed
@@ -813,6 +836,8 @@ public partial class ExploreDbContext
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
 
         // ===== Tenant Entities =====
+        modelBuilder.Entity<AtprotoFederationTenantSetting>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
         modelBuilder.Entity<TenantSetting>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
         modelBuilder.Entity<TenantSettingsDocument>()

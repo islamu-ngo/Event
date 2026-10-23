@@ -1,5 +1,7 @@
-using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
+using Explore.Application.Settings;
 
 namespace Explore.Application.Contracts.Services;
 
@@ -17,10 +19,19 @@ public interface IInstanceStorageSettingService
     /// <summary>
     /// Applies storage settings to SystemSetting records.
     /// </summary>
-    /// <param name="settings">The storage settings to apply.</param>
-    Task ApplySettingsAsync(InstanceStorageSettingsDto settings, PatchInstanceStorageSettingsDto patch);
+    Task<StorageSettingsMutation> ObserveConfigurationAsync(UpdateInstanceStorageSettingsCommand command,
+        CancellationToken cancellationToken = default);
+    Task ApplySettingsAsync(StorageSettingsMutation observation, CancellationToken cancellationToken = default);
 
-    Task<InstanceStorageProviderStatusDto> TestProviderAsync(CancellationToken cancellationToken = default);
+    Task<InstanceStorageProviderStatusDto> TestProviderAsync(
+        TestInstanceStorageProviderQuery query, CancellationToken cancellationToken = default);
 
-    Task<InstanceStorageUsageDto> RecalculateUsageAsync(CancellationToken cancellationToken = default);
+    Task<InstanceStorageProviderStatusDto> TestProviderAsync(
+        TestInstanceStorageProviderDuringSetupQuery query, CancellationToken cancellationToken = default);
+
+    Task<InstanceStorageUsageDto> RecalculateUsageAsync(
+        RecalculateInstanceStorageUsageCommand command, CancellationToken cancellationToken = default);
+
+    Task<InstanceStorageUsageDto> RecalculateUsageAsync(
+        RecalculateInstanceStorageUsageDuringSetupCommand command, CancellationToken cancellationToken = default);
 }

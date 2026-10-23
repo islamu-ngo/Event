@@ -89,10 +89,7 @@ public interface IPdsSyncOutboxRepository
         CancellationToken cancellationToken = default);
 
     Task<int> SupersedePriorAsync(
-        Guid tenantId,
-        string sourceEntityType,
-        Guid sourceEntityId,
-        Guid supersedingOutboxId,
+        PdsSyncOutbox successor,
         DateTime supersededAt,
         CancellationToken cancellationToken = default);
 

@@ -1,5 +1,5 @@
 
-using Explore.Application.Configuration;
+using Explore.Domain.Authentication;
 using Explore.Application.Features.Authentication.Local.Models;
 using FluentValidation;
 
@@ -9,8 +9,9 @@ public sealed class LocalPasswordChangeRequestDtoValidator : AbstractValidator<L
 {
     public LocalPasswordChangeRequestDtoValidator()
     {
-        RuleFor(request => request.CurrentPassword).NotEmpty().MaximumLength(LocalIdentityOptions.MaximumPasswordLength);
-        RuleFor(request => request.NewPassword).NotEmpty()
-            .MinimumLength(LocalIdentityOptions.MinimumPasswordLength).MaximumLength(LocalIdentityOptions.MaximumPasswordLength);
+        RuleFor(request => request.CurrentPassword)
+            .Must(password => LocalPasswordPolicy.TryNormalizeForVerification(password, out _));
+        RuleFor(request => request.NewPassword)
+            .Must(password => LocalPasswordPolicy.TryNormalizeNewCredential(password, out _));
     }
 }

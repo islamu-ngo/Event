@@ -47,7 +47,7 @@ public sealed class TenantPublicExperienceAdminService(
     private const string AiAssistantEnabledKey = "ai_assistant.enabled";
     private const string AiAssistantProviderKey = "ai_assistant.provider";
     private const string AiAssistantEndpointUrlKey = "ai_assistant.endpoint_url";
-    private const string AiAssistantApiKeyKey = "ai_assistant.api_key";
+    private const string AiAssistantCredentialScopeKey = "ai_assistant.credential_scope";
     private const string AiAssistantModelIdKey = "ai_assistant.model_id";
     private const string AiAssistantAllowAnonymousAccessKey = "ai_assistant.allow_anonymous_access";
     private const string AiProviderNone = "none";
@@ -142,10 +142,10 @@ public sealed class TenantPublicExperienceAdminService(
                 aiAssistantSettings,
                 AiAssistantEndpointUrlKey,
                 model.AiAssistantEndpointUrl ?? string.Empty);
-            model.AiAssistantApiKey = GetString(
+            model.AiAssistantCredentialScope = GetString(
                 aiAssistantSettings,
-                AiAssistantApiKeyKey,
-                model.AiAssistantApiKey ?? string.Empty);
+                AiAssistantCredentialScopeKey,
+                "none");
             model.AiAssistantModelId = GetString(
                 aiAssistantSettings,
                 AiAssistantModelIdKey,

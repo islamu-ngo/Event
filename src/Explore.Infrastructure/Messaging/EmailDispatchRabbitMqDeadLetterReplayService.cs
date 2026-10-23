@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using RabbitMQ.Client.Exceptions;
 
 namespace Explore.Infrastructure.Messaging;
 
@@ -39,9 +38,7 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
         try
         {
             logger.LogInformation(
-                "Starting RabbitMQ EmailDispatch dead-letter replay consumer {ConsumerId} on queue {DeadLetterQueueName} with prefetch {PrefetchCount}",
-                options.DeadLetterReplayConsumerId,
-                options.DeadLetterQueueName,
+                "Starting RabbitMQ EmailDispatch dead-letter replay consumer with prefetch {PrefetchCount}",
                 options.DeadLetterReplayPrefetchCount);
 
             await transport.DeclareTopologyAsync(stoppingToken);
@@ -78,9 +75,7 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
                 cancellationToken: stoppingToken);
 
             logger.LogInformation(
-                "RabbitMQ EmailDispatch dead-letter replay consumer {ConsumerId} is consuming with tag {ConsumerTag}",
-                options.DeadLetterReplayConsumerId,
-                consumerTag);
+                "RabbitMQ EmailDispatch dead-letter replay consumer is consuming");
 
             await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
         }
@@ -88,9 +83,9 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
         {
             logger.LogInformation("RabbitMQ EmailDispatch dead-letter replay consumer stopping");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogError(ex, "RabbitMQ EmailDispatch dead-letter replay consumer stopped unexpectedly");
+            logger.LogError("RabbitMQ EmailDispatch dead-letter replay consumer stopped unexpectedly");
             throw;
         }
         finally
@@ -152,9 +147,7 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
                         await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: true, stoppingToken);
                         metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Nacked, "replay_state_changed");
                         logger.LogWarning(
-                            "Nacked RabbitMQ EmailDispatch dead-letter pointer {PublishEventId} for tenant {TenantId} because durable replay state changed before reset",
-                            pointer.PublishEventId,
-                            pointer.TenantId);
+                            "Nacked RabbitMQ EmailDispatch dead-letter pointer because durable replay state changed before reset");
                         return;
                     }
                 }
@@ -163,9 +156,7 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
                 await channel.BasicAckAsync(args.DeliveryTag, multiple: false, stoppingToken);
                 metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Replayed, "none");
                 logger.LogInformation(
-                    "Replayed RabbitMQ EmailDispatch dead-letter pointer {PublishEventId} for tenant {TenantId}",
-                    pointer.PublishEventId,
-                    pointer.TenantId);
+                    "Replayed RabbitMQ EmailDispatch dead-letter pointer");
                 return;
             }
 
@@ -184,14 +175,11 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
                 "RabbitMQ EmailDispatch dead-letter delivery {DeliveryTag} stopped during shutdown before settlement",
                 args.DeliveryTag);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Nacked, "dlq_replay_exception");
             logger.LogWarning(
-                ex,
-                "Nacking RabbitMQ EmailDispatch dead-letter pointer {PublishEventId} for tenant {TenantId} after replay exception",
-                pointer.PublishEventId,
-                pointer.TenantId);
+                "Nacking RabbitMQ EmailDispatch dead-letter pointer after replay exception");
             await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: true, CancellationToken.None);
         }
     }

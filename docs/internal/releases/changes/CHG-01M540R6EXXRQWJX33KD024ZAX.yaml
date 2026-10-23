@@ -1,0 +1,30 @@
+Change-Id: CHG-01M540R6EXXRQWJX33KD024ZAX
+Title: "Read tenant navigation through exact-user native authority"
+Type: fix
+Scope: access
+Summary: "Resolve tenant navigation from a live server-resolved user and current memberships without loading personal profile data or granting Runtime user-table access."
+Group: tenant-navigation-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Require resolved-self identity before private navigation reads and attest exact native read privileges, enrollment and routine definition.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Database preparation installs the dedicated execute-only Global navigation reader.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Explain current-membership target selection and the separation between navigation, preference writes and tenant access.

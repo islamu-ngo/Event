@@ -197,8 +197,47 @@ loading embedded/writable bundles:
 - the root must be a JSON object;
 - every value must be a string;
 - keys must be nonblank, contain no whitespace, have no empty dot segments, and
-  start with `ui.` or `lookup.`;
+  start with `ui.`, `lookup.`, or `payment.`;
 - output is sorted deterministically before writing.
+
+`Explore.Domain.Common.Localization.LocalizationBundlePolicy` owns the shared
+text contract: at most 16,384 entries, 512 UTF-16 characters per key, 16,384 per
+value, and 524,288 aggregate key/value characters. Empty string values are valid;
+null, arrays and objects are not. These limits apply to native command imports
+and provider exports before file persistence, not only HTTP clients.
+
+The import DTO's dedicated STJ converter checks the raw JSON value's 4 MiB
+budget before allocating its document and rejects duplicate envelope members
+(including case aliases under the web decoder), unknown envelope fields and
+duplicate translation keys before creating the immutable dictionary. The bundle
+POST has a 4 MiB plus 1 KiB request limit; supported language selection and current
+instance-admin authority remain owned by the native handler. Other JSON
+serializers are unchanged.
+
+`LocalizationImportSchemaTransformer` explicitly publishes the converter-owned
+envelope in OpenAPI: required `languageCode` and `translations`, no additional
+envelope properties, and a bounded dictionary of string values. This restores
+the generated client's typed import fields without bypassing the strict decoder.
+Duplicate keys, aggregate text size and supported language validation still
+require the decoder and native handler; the schema is not their replacement.
+
+`BundleSchema.Read` consumes at most 4 MiB plus one overflow-detection byte from
+a stream, uses JSON depth 2 for the flat object, and validates the whole override
+before it becomes visible. It rejects duplicate keys rather than selecting the
+last value. A rejected writable bundle leaves embedded defaults active.
+`BundleFileWriter` validates and serializes the complete sorted output, checks
+the 4 MiB output limit, then creates the directory/temp file and performs the
+existing rename. Validation rejection cannot truncate a temp file, remove
+another pending temp file, replace the previous bundle or invalidate caches.
+Concurrent writers and shared-volume coordination retain their existing contract.
+
+Translations containing HTML, shell-like text or `{{placeholders}}` remain JSON
+strings; this codec does not render them, invoke a process or fetch a URL. Browser
+consumer sanitization is a separate boundary. The source-authored regression
+classes `LocalizationBundleInputBoundaryTests` and
+`LocalizationBundleBoundaryTests` cover decoder rejection, literal round trips,
+bounded streams/output and filesystem preservation. They are queued, not run,
+under the programme-wide no-execution override.
 
 ### Bundle Persistence & HA Constraint
 

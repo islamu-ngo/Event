@@ -17,9 +17,10 @@ namespace Explore.Domain.Secrets;
 /// <list type="bullet">
 ///   <item><c>/api</c> — SETUP_SECRET</item>
 ///   <item><c>/storage</c> — STORAGE_S3_*</item>
-///   <item><c>/keycloak</c> — KEYCLOAK_*</item>
+///   <item><c>/runtime/api/authentication/keycloak</c> — API Keycloak metadata</item>
+///   <item><c>/runtime/bff/oidc</c> — separately admitted Keycloak and Google folders</item>
 ///   <item><c>/atproto</c> — ATPROTO_*</item>
-///   <item><c>/cerbos</c> — CERBOS_GRPC_ENDPOINT</item>
+///   <item><c>/runtime/api/authorization/cerbos</c> — CERBOS_GRPC_ENDPOINT</item>
 ///   <item><c>/postgresql</c> — POSTGRESQL_*</item>
 ///   <item><c>/smtp</c> — MAIL_SMTP_*</item>
 ///   <item><c>/analytics</c> — ANALYTICS_POSTHOG_*</item>
@@ -49,6 +50,13 @@ public static class SecretDefinitionRegistry
     public static SecretRotationProfile GetRotationProfile(string settingKey)
     {
         _ = GetRequired(settingKey);
+        if (settingKey.StartsWith("data_protection.", StringComparison.Ordinal))
+            return new("data_protection", SecretRotationMode.CoordinatedRestart,
+                CandidateValidationRequired: true, EveryReplicaAcknowledgementRequired: true,
+                StaleReplicaAction: "drain-and-stop",
+                RollbackAction: "preserve-current-admission-pin-and-generation-floor",
+                RevocationGate: "operator-approved-invalidation-and-all-replica-drain",
+                BreakGlassAction: "forward-only-admission-and-coordinated-restart");
         var mode = settingKey switch
         {
             Keys.SetupSecret or Keys.Authentication.LocalBootstrapPassword
@@ -107,6 +115,8 @@ public static class SecretDefinitionRegistry
         public const string PrivacyIdentityFenceKey = "privacy.identity_fence_key";
         public const string SetupSecretBindingCommitmentHmacKey =
             "setup.secret_binding_commitment_hmac_key";
+        public const string SetupSigning = "setup.signing";
+        public const string SetupEncryption = "setup.encryption";
 
         public static class Storage
         {
@@ -123,12 +133,13 @@ public static class SecretDefinitionRegistry
             public const string Realm = "keycloak.realm";
             public const string ClientId = "keycloak.client_id";
             public const string BlazorClientSecret = "keycloak.blazor_client_secret";
+            public const string LifecycleClientSecret = "keycloak.lifecycle_client_secret";
             public const string Endpoint = "keycloak.endpoint";
-            public const string DbPassword = "keycloak.db_password";
         }
 
         public static class Authentication
         {
+            public const string GoogleClientSecret = InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret;
             public const string LocalJwtKey = "authentication.local.jwt_key";
             public const string LocalBootstrapPassword = "authentication.local.bootstrap_password";
             public const string AgentBrowserPersonaPassword = "authentication.local.agent_browser_persona_password";
@@ -139,11 +150,16 @@ public static class SecretDefinitionRegistry
             public const string AgentBrowserPassword = "redis.agent_browser_password";
         }
 
+        public static class Database
+        {
+            public const string LocalIdentityWriterPassword = "database.local_identity_writer.password";
+        }
+
         public static class IdentityDatabase
         {
-            public const string ConnectionString = "identity_database.connection_string";
             public const string RuntimePassword = "identity_database.runtime.password";
             public const string MigratorPassword = "identity_database.migrator.password";
+            public const string LocalIdentityWriterPassword = "identity_database.local_identity_writer.password";
         }
 
         public static class Stripe
@@ -237,6 +253,9 @@ public static class SecretDefinitionRegistry
         {
             public const string OpenAiApiKey = "ai.openai.api_key";
             public const string AnthropicApiKey = "ai.anthropic.api_key";
+            public const string AzureApiKey = "ai.azure.api_key";
+            public const string OpenAiCompatibleApiKey = "ai.openai_compatible.api_key";
+            public const string AnthropicCompatibleApiKey = "ai.anthropic_compatible.api_key";
         }
 
         public static class Integrations
@@ -291,6 +310,28 @@ public static class SecretDefinitionRegistry
                 DefaultEnvironmentVariableName = "SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY",
                 IsBootstrapSecret = false,
                 Description = "Server-only HMAC key for Setup secret-write commitments.",
+            },
+            new()
+            {
+                Key = Keys.SetupSigning,
+                AllowedScopes = instanceOnly,
+                AllowedSources = [SecretSourceType.Infisical],
+                DefaultInfisicalPath = "/setup",
+                DefaultInfisicalKey = "SETUP_SIGNING",
+                DefaultEnvironmentVariableName = "ISLAMU_SETUP_SIGNING",
+                IsBootstrapSecret = false,
+                Description = "Dedicated signing target for the enrolled setup secret-write protocol.",
+            },
+            new()
+            {
+                Key = Keys.SetupEncryption,
+                AllowedScopes = instanceOnly,
+                AllowedSources = [SecretSourceType.Infisical],
+                DefaultInfisicalPath = "/setup",
+                DefaultInfisicalKey = "SETUP_ENCRYPTION",
+                DefaultEnvironmentVariableName = "ISLAMU_SETUP_ENCRYPTION",
+                IsBootstrapSecret = false,
+                Description = "Dedicated encryption target for the enrolled setup secret-write protocol.",
             },
 
             new()
@@ -407,13 +448,13 @@ public static class SecretDefinitionRegistry
                 Description = "S3 region (e.g. us-east-1).",
             },
 
-            // --- keycloak/KEYCLOAK_* ---
+            // --- Consumer-owned Keycloak runtime configuration ---
             new()
             {
                 Key = Keys.Keycloak.Realm,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
+                DefaultInfisicalPath = "/runtime/api/authentication/keycloak",
                 DefaultInfisicalKey = "KEYCLOAK_REALM",
                 DefaultEnvironmentVariableName = "KEYCLOAK_REALM",
                 IsBootstrapSecret = false,
@@ -424,7 +465,7 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Keycloak.ClientId,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
+                DefaultInfisicalPath = "/runtime/api/authentication/keycloak",
                 DefaultInfisicalKey = "KEYCLOAK_CLIENT_ID",
                 DefaultEnvironmentVariableName = "KEYCLOAK_CLIENT_ID",
                 IsBootstrapSecret = false,
@@ -435,7 +476,7 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Keycloak.BlazorClientSecret,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
+                DefaultInfisicalPath = "/runtime/bff/oidc/keycloak",
                 DefaultInfisicalKey = "KEYCLOAK_BLAZOR_CLIENT_SECRET",
                 DefaultEnvironmentVariableName = "KEYCLOAK_BLAZOR_CLIENT_SECRET",
                 IsBootstrapSecret = false,
@@ -443,25 +484,36 @@ public static class SecretDefinitionRegistry
             },
             new()
             {
+                Key = Keys.Keycloak.LifecycleClientSecret,
+                AllowedScopes = instanceOnly,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/runtime/api/keycloak/lifecycle",
+                DefaultInfisicalKey = "KEYCLOAK_LIFECYCLE_CLIENT_SECRET",
+                DefaultEnvironmentVariableName = "KEYCLOAK_LIFECYCLE_CLIENT_SECRET",
+                IsBootstrapSecret = false,
+                Description = "Deployment-owned dedicated Keycloak lifecycle service client credential.",
+            },
+            new()
+            {
+                Key = Keys.Authentication.GoogleClientSecret,
+                AllowedScopes = instanceOnly,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/runtime/bff/oidc/google",
+                DefaultInfisicalKey = "GOOGLE_CLIENT_SECRET",
+                DefaultEnvironmentVariableName = "GOOGLE_CLIENT_SECRET",
+                IsBootstrapSecret = false,
+                Description = "Deployment-owned Google OAuth confidential-client credential for the Blazor BFF.",
+            },
+            new()
+            {
                 Key = Keys.Keycloak.Endpoint,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
+                DefaultInfisicalPath = "/runtime/api/authentication/keycloak",
                 DefaultInfisicalKey = "KEYCLOAK_ENDPOINT",
                 DefaultEnvironmentVariableName = "KEYCLOAK_ENDPOINT",
                 IsBootstrapSecret = false,
                 Description = "Keycloak base URL (e.g. https://auth.example.com).",
-            },
-            new()
-            {
-                Key = Keys.Keycloak.DbPassword,
-                AllowedScopes = instanceOnly,
-                AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
-                DefaultInfisicalKey = "KEYCLOAK_DB_PASSWORD",
-                DefaultEnvironmentVariableName = "KEYCLOAK_DB_PASSWORD",
-                IsBootstrapSecret = false,
-                Description = "Keycloak backing database password (read by Keycloak itself).",
             },
             new()
             {
@@ -476,14 +528,25 @@ public static class SecretDefinitionRegistry
             },
             new()
             {
-                Key = Keys.IdentityDatabase.ConnectionString,
+                Key = Keys.Database.LocalIdentityWriterPassword,
+                AllowedScopes = instanceOnly,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/database",
+                DefaultInfisicalKey = "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+                DefaultEnvironmentVariableName = "DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+                IsBootstrapSecret = false,
+                Description = "Dedicated application-side Local Identity workflow credential.",
+            },
+            new()
+            {
+                Key = Keys.IdentityDatabase.LocalIdentityWriterPassword,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
                 DefaultInfisicalPath = "/database/identity",
-                DefaultInfisicalKey = "IDENTITY_DATABASE_CONNECTION_STRING",
-                DefaultEnvironmentVariableName = "IDENTITY_DATABASE_CONNECTION_STRING",
+                DefaultInfisicalKey = "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
+                DefaultEnvironmentVariableName = "IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD",
                 IsBootstrapSecret = false,
-                Description = "Optional external Identity database connection string.",
+                Description = "Dedicated external Identity lifecycle writer credential.",
             },
             new()
             {
@@ -592,7 +655,7 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Atproto.OAuthClientPrivateJwks,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/atproto",
+                DefaultInfisicalPath = "/runtime/bff/atproto/oauth",
                 DefaultInfisicalKey = "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS",
                 DefaultEnvironmentVariableName = "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS",
                 IsBootstrapSecret = false,
@@ -627,35 +690,12 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Cerbos.GrpcEndpoint,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/cerbos",
+                DefaultInfisicalPath = "/runtime/api/authorization/cerbos",
                 DefaultInfisicalKey = "CERBOS_GRPC_ENDPOINT",
                 DefaultEnvironmentVariableName = "CERBOS_GRPC_ENDPOINT",
                 IsBootstrapSecret = false,
                 Description = "Cerbos PDP gRPC endpoint (e.g. cerbosgrpc.example.com:443).",
             },
-            new()
-            {
-                Key = Keys.Cerbos.CustomAdminUsername,
-                AllowedScopes = instanceOnly,
-                AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/cerbos",
-                DefaultInfisicalKey = "CERBOS_ADMIN_USERNAME",
-                DefaultEnvironmentVariableName = "CERBOS_ADMIN_USERNAME",
-                IsBootstrapSecret = false,
-                Description = "Cerbos Admin API username used by server-side policy package sync.",
-            },
-            new()
-            {
-                Key = Keys.Cerbos.CustomAdminPassword,
-                AllowedScopes = instanceOnly,
-                AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/cerbos",
-                DefaultInfisicalKey = "CERBOS_ADMIN_PASSWORD",
-                DefaultEnvironmentVariableName = "CERBOS_ADMIN_PASSWORD",
-                IsBootstrapSecret = false,
-                Description = "Cerbos Admin API password used by server-side policy package sync.",
-            },
-
             new()
             {
                 Key = Keys.Webhooks.SvixAuthToken,
@@ -913,6 +953,39 @@ public static class SecretDefinitionRegistry
             // --- ai/AI_* ---
             new()
             {
+                Key = Keys.Ai.OpenAiCompatibleApiKey,
+                AllowedScopes = instanceOrTenant,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/ai",
+                DefaultInfisicalKey = "AI_OPENAI_COMPATIBLE_API_KEY",
+                DefaultEnvironmentVariableName = "AI_OPENAI_COMPATIBLE_API_KEY",
+                IsBootstrapSecret = false,
+                Description = "OpenAI-compatible provider API key.",
+            },
+            new()
+            {
+                Key = Keys.Ai.AnthropicCompatibleApiKey,
+                AllowedScopes = instanceOrTenant,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/ai",
+                DefaultInfisicalKey = "AI_ANTHROPIC_COMPATIBLE_API_KEY",
+                DefaultEnvironmentVariableName = "AI_ANTHROPIC_COMPATIBLE_API_KEY",
+                IsBootstrapSecret = false,
+                Description = "Anthropic-compatible provider API key.",
+            },
+            new()
+            {
+                Key = Keys.Ai.AzureApiKey,
+                AllowedScopes = instanceOnly,
+                AllowedSources = nonBootstrapSources,
+                DefaultInfisicalPath = "/ai",
+                DefaultInfisicalKey = "AI_AZURE_API_KEY",
+                DefaultEnvironmentVariableName = "AI_AZURE_API_KEY",
+                IsBootstrapSecret = false,
+                Description = "Instance Azure OpenAI API key.",
+            },
+            new()
+            {
                 Key = Keys.Ai.OpenAiApiKey,
                 AllowedScopes = instanceOrTenant,
                 AllowedSources = nonBootstrapSources,
@@ -935,6 +1008,32 @@ public static class SecretDefinitionRegistry
             },
         };
 
+        foreach (string partition in new[] { "api", "bff", "combined" })
+        {
+            string prefix = $"EVENT_DP_{partition.ToUpperInvariant()}";
+            defs.Add(new SecretDefinition
+            {
+                Key = $"data_protection.{partition}.ring",
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = $"/runtime/{partition}/data-protection",
+                DefaultInfisicalKey = prefix + "_RING",
+                DefaultEnvironmentVariableName = prefix + "_RING",
+                IsBootstrapSecret = true,
+                Description = "Read-only external Data Protection ring; operator-only provisioning and restart.",
+            });
+            defs.Add(new SecretDefinition
+            {
+                Key = $"data_protection.{partition}.admission",
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = $"/admission/{partition}/data-protection",
+                DefaultInfisicalKey = prefix + "_ADMISSION",
+                DefaultEnvironmentVariableName = prefix + "_ADMISSION",
+                IsBootstrapSecret = true,
+                Description = "Independent complete retention/revocation admission; separately protected deployment pin required.",
+            });
+        }
         return defs.ToFrozenDictionary(d => d.Key, StringComparer.OrdinalIgnoreCase);
     }
 }

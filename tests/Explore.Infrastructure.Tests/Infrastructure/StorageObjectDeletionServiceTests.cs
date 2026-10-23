@@ -146,8 +146,7 @@ public sealed class StorageObjectDeletionServiceTests
             Directory.CreateDirectory(Path.GetDirectoryName(fixture.TargetPath)!);
             await File.WriteAllBytesAsync(fixture.TargetPath, [1]);
             await File.WriteAllBytesAsync(fixture.NeighborPath, [2]);
-            fixture.Database.Context.AddRange(fixture.Binding, fixture.Object,
-                new FileType { Id = (int)FileTypeEnum.Image, MasterCode = "Image", FullName = "Image" });
+            fixture.Database.Context.AddRange(fixture.Binding, fixture.Object);
             await fixture.Database.Context.SaveChangesAsync();
             fixture.Database.Context.ChangeTracker.Clear();
             return fixture;

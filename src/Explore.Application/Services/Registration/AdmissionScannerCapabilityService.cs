@@ -8,6 +8,8 @@ public sealed class AdmissionScannerCapabilityService(
     IAdmissionScannerCapabilityRepository repository,
     IAdmissionScannerCapabilityMaterialService materialService,
     IUnitOfWork unitOfWork,
+    IAdmissionTargetTransaction targetTransaction,
+    IActorOwnershipReader actorOwnership,
     TimeProvider timeProvider)
 {
     private const int MaximumDeviceLabelLength = 128;
@@ -45,8 +47,14 @@ public sealed class AdmissionScannerCapabilityService(
             cancellationToken);
         ValidateMaterial(material);
 
-        DateTime issuedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
-        AdmissionScannerCapability capability = AdmissionScannerCapability.Issue(
+        return await targetTransaction.ExecuteAsync(request.TenantId, request.TargetId, async token =>
+        {
+            Guid? actorId = await ResolvePersonalActorIdAsync(request.IssuedByUserId, request.TenantId, token);
+            if (actorId is null)
+                return new AdmissionScannerCapabilityIssuedResult(
+                    AdmissionScannerCapabilityIssueOutcome.Rejected, Guid.Empty, null, null);
+            DateTime issuedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
+            AdmissionScannerCapability capability = AdmissionScannerCapability.Issue(
             scannerCapabilityId,
             request.TenantId,
             request.IssueRequestId,
@@ -57,11 +65,9 @@ public sealed class AdmissionScannerCapabilityService(
             request.DeviceLabel,
             ToDomainActions(request.Actions),
             request.ExpiresAtUtc.UtcDateTime,
-            request.IssuedByActorId,
+            actorId.Value,
             issuedAtUtc);
-        AdmissionScannerCapabilityStoreResult persisted = await unitOfWork.ExecuteInTransactionAsync(
-            token => repository.StoreAsync(capability, token),
-            cancellationToken);
+        AdmissionScannerCapabilityStoreResult persisted = await repository.StoreAsync(capability, token);
         if (persisted.Rejected)
         {
             return new AdmissionScannerCapabilityIssuedResult(
@@ -79,7 +85,8 @@ public sealed class AdmissionScannerCapabilityService(
                 : AdmissionScannerCapabilityIssueOutcome.AlreadyIssued,
             persisted.Capability.Id,
             persisted.Created ? material.PlaintextCapability : null,
-            descriptor);
+                descriptor);
+        }, cancellationToken);
     }
 
     public async Task<AdmissionScannerCapabilityDescriptor> ReadAsync(
@@ -121,7 +128,7 @@ public sealed class AdmissionScannerCapabilityService(
     {
         if (request.TenantId == Guid.Empty || request.EventId == Guid.Empty ||
             request.ScannerCapabilityId == Guid.Empty ||
-            request.RevokedByActorId == Guid.Empty || string.IsNullOrWhiteSpace(request.Reason) ||
+            request.RevokedByUserId == Guid.Empty || string.IsNullOrWhiteSpace(request.Reason) ||
             request.Reason.Trim().Length > MaximumRevocationReasonLength)
         {
             throw new ArgumentException("A valid scanner capability revocation is required.", nameof(request));
@@ -140,8 +147,13 @@ public sealed class AdmissionScannerCapabilityService(
                     request.ScannerCapabilityId);
             }
 
+            Guid? actorId = await ResolvePersonalActorIdAsync(request.RevokedByUserId, request.TenantId, token);
+            if (actorId is null)
+                return new AdmissionScannerCapabilityRevocationResult(
+                    AdmissionScannerCapabilityRevocationOutcome.Rejected, request.ScannerCapabilityId);
+
             AdmissionScannerCapabilityRevocationTransition transition = capability.Revoke(
-                request.RevokedByActorId,
+                actorId.Value,
                 request.Reason,
                 timeProvider.GetUtcNow().UtcDateTime);
             if (transition == AdmissionScannerCapabilityRevocationTransition.Revoked)
@@ -159,7 +171,7 @@ public sealed class AdmissionScannerCapabilityService(
     {
         if (request is null || request.IssueRequestId == Guid.Empty || request.TenantId == Guid.Empty ||
             request.EventId == Guid.Empty || request.TargetId == Guid.Empty ||
-            request.IssuedByActorId == Guid.Empty || request.Actions is null or { Count: 0 } ||
+            request.IssuedByUserId == Guid.Empty || request.Actions is null or { Count: 0 } ||
             request.Actions.Any(action => !Enum.IsDefined(action)) ||
             request.Actions.Distinct().Count() != request.Actions.Count ||
             string.IsNullOrWhiteSpace(request.DeviceLabel) ||
@@ -168,6 +180,15 @@ public sealed class AdmissionScannerCapabilityService(
         {
             throw new ArgumentException("A valid bounded scanner capability issue request is required.", nameof(request));
         }
+    }
+
+    private async Task<Guid?> ResolvePersonalActorIdAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken)
+    {
+        var actor = await actorOwnership.ReadForUserAsync(userId, tenantId, cancellationToken);
+        if (actor is null || actor.Id == Guid.Empty || actor.UserId != userId
+            || actor.GroupId is not null || actor.OrganizationId is not null)
+            return null;
+        return actor.Id;
     }
 
     private static void ValidateMaterial(AdmissionScannerCapabilityMaterial material)

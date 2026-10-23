@@ -12,12 +12,14 @@ namespace Explore.Application.Services;
 
 public sealed class LocationPrivacyGovernanceMutationService(
     ISystemSettingRepository systemSettings,
-    ITenantSettingRepository tenantSettings,
-    IEventLocationRepository eventLocations,
+    ILocationPrivacyGovernanceStore governanceStore,
     ISettingMutationLock mutationLock,
     HybridCache cache,
-    TimeProvider timeProvider) : ILocationPrivacyGovernanceMutationService
+    TimeProvider timeProvider,
+    IHumanSettingsMutationPreparation preparation) : ILocationPrivacyGovernanceMutationService
 {
+    private static readonly AsyncLocal<StoreAdmission?> CurrentAdmission = new();
+
     public bool Handles(string key) => LocationPrivacyGovernancePolicy.Handles(key);
 
     public async Task<string?> ValidateTenantValueAsync(
@@ -56,14 +58,36 @@ public sealed class LocationPrivacyGovernanceMutationService(
             : null;
     }
 
-    public async Task<LocationPrivacyGovernanceMutationResult> ExecuteAsync(
+    public Task<LocationPrivacyGovernanceMutationResult> ExecuteAsync(
         string key,
         string proposedStoredValue,
         SettingScope scope,
         Guid? tenantId,
         Guid actorUserId,
         Func<CancellationToken, Task<string?>> persist,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        preparation.ExecuteLocationJoinedAsync(key, scope, tenantId, actorUserId,
+            async (proof, effect, derivedValue, token) =>
+            {
+                if (effect.Kind == HumanSettingsMutationKind.SetValue
+                    && !string.Equals(proposedStoredValue, derivedValue, StringComparison.Ordinal))
+                    throw new UnauthorizedAccessException("Location values must match the original prepared action.");
+                var previous = CurrentAdmission.Value;
+                CurrentAdmission.Value = new(preparation, proof, effect, actorUserId, [], null);
+                try
+                {
+                    var result = await ExecuteAdmittedAsync(key, derivedValue, scope, tenantId,
+                        actorUserId, persist, token);
+                    if (result.Accepted && governanceStore is IMixedLocationPrivacyGovernanceStore { MixedOccurredAt: not null } mixed)
+                        await mixed.CompleteMixedAsync(key, tenantId, actorUserId, token);
+                    return result;
+                }
+                finally { CurrentAdmission.Value = previous; }
+            }, cancellationToken);
+
+    private async Task<LocationPrivacyGovernanceMutationResult> ExecuteAdmittedAsync(
+        string key, string proposedStoredValue, SettingScope scope, Guid? tenantId, Guid actorUserId,
+        Func<CancellationToken, Task<string?>> persist, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(persist);
         if (!Handles(key))
@@ -90,6 +114,7 @@ public sealed class LocationPrivacyGovernanceMutationService(
         }
 
         LocationPrivacyGovernanceMutationResult result;
+        bool persistenceStarted = false;
         try
         {
             result = await mutationLock.ExecuteAsync(
@@ -100,7 +125,11 @@ public sealed class LocationPrivacyGovernanceMutationService(
                     scope,
                     tenantId,
                     actorUserId,
-                    persist,
+                    async innerToken =>
+                    {
+                        persistenceStarted = true;
+                        return await persist(innerToken);
+                    },
                     token),
                 cancellationToken);
         }
@@ -108,12 +137,14 @@ public sealed class LocationPrivacyGovernanceMutationService(
         {
             throw;
         }
-        catch
+        catch when (!persistenceStarted)
         {
             return LocationPrivacyGovernanceMutationResult.Rejected(
                 "Location-privacy governance storage is unavailable.");
         }
 
+        // Once persistence begins, failures must reach the transaction owner.
+        // Returning a rejection there could commit the setting without its projection corrections.
         return result;
     }
 
@@ -180,7 +211,7 @@ public sealed class LocationPrivacyGovernanceMutationService(
         var tenantValuesByTenant = new Dictionary<Guid, LocationPrivacyGovernanceSettingValue>();
         if (scope == SettingScope.Tenant)
         {
-            TenantSetting? previousTenantRow = await GetTenantRowAsync(
+            LocationPrivacyGovernanceOverride? previousTenantRow = await GetTenantRowAsync(
                 tenantId!.Value,
                 key,
                 cancellationToken);
@@ -188,7 +219,7 @@ public sealed class LocationPrivacyGovernanceMutationService(
             {
                 if (!LocationPrivacyGovernancePolicy.TryParse(
                         key,
-                        previousTenantRow.Value,
+                        previousTenantRow.StoredValue,
                         out LocationPrivacyGovernanceSettingValue previousTenantValue,
                         out _))
                 {
@@ -213,10 +244,10 @@ public sealed class LocationPrivacyGovernanceMutationService(
         }
         else
         {
-            List<TenantSetting> tenantRows = await tenantSettings.GetByKeyAcrossTenants(
-                key,
+            IReadOnlyList<LocationPrivacyGovernanceOverride> tenantRows = await governanceStore.ReadOverridesAsync(
+                key, null,
                 cancellationToken);
-            foreach (IGrouping<Guid, TenantSetting> tenantGroup in tenantRows.GroupBy(row => row.TenantId))
+            foreach (IGrouping<Guid, LocationPrivacyGovernanceOverride> tenantGroup in tenantRows.GroupBy(row => row.TenantId))
             {
                 if (tenantGroup.Count() != 1)
                 {
@@ -224,10 +255,10 @@ public sealed class LocationPrivacyGovernanceMutationService(
                         "Conflicting tenant location-privacy setting rows were found.");
                 }
 
-                TenantSetting tenantRow = tenantGroup.Single();
+                LocationPrivacyGovernanceOverride tenantRow = tenantGroup.Single();
                 if (!LocationPrivacyGovernancePolicy.TryParse(
                         key,
-                        tenantRow.Value,
+                        tenantRow.StoredValue,
                         out LocationPrivacyGovernanceSettingValue tenantValue,
                         out _))
                 {
@@ -243,20 +274,29 @@ public sealed class LocationPrivacyGovernanceMutationService(
         }
 
         string? previousStoredValue = await persist(cancellationToken);
+        var active = CurrentAdmission.Value
+            ?? throw new UnauthorizedAccessException("The original location mutation is required.");
+        await preparation.RequireOwnedAsync(active.Proof, active.Effect, cancellationToken);
+        string? persisted = scope == SettingScope.Instance
+            ? (await systemSettings.GetByKey(key, cancellationToken))?.Value
+            : (await GetTenantRowAsync(tenantId!.Value, key, cancellationToken))?.StoredValue;
+        if (active.Effect.Kind == HumanSettingsMutationKind.Remove ? persisted is not null
+            : !string.Equals(persisted, active.Effect.Value, StringComparison.Ordinal))
+            throw new InvalidOperationException("Location projection effects require the original setting mutation to be persisted.");
         if (!LocationPrivacyGovernancePolicy.IsTightening(previousEffective, currentEffective))
         {
             return new(true, null, previousStoredValue, []);
         }
 
-        IReadOnlyList<EventLocation> candidates = await eventLocations.GetActiveForGovernanceUpdateAsync(
+        IReadOnlyList<EventLocationGovernanceState> candidates = await governanceStore.ReadActiveProjectionsAsync(
             scope == SettingScope.Tenant ? tenantId : null,
             cancellationToken);
-        DateTime changedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
-        var audits = new List<EventLocationDisclosureAudit>();
-        var outboxMessages = new List<OutboxMessage>();
+        DateTime changedAtUtc = (governanceStore as IMixedLocationPrivacyGovernanceStore)?.MixedOccurredAt
+            ?? timeProvider.GetUtcNow().UtcDateTime;
+        var corrections = new List<LocationPrivacyGovernanceCorrection>();
         var corrected = new List<LocationPrivacyProjectionIdentity>();
 
-        foreach (EventLocation eventLocation in candidates)
+        foreach (EventLocationGovernanceState eventLocation in candidates)
         {
             LocationPrivacyGovernanceSettingValue projectionPrevious = previousEffective;
             LocationPrivacyGovernanceSettingValue projectionCurrent = currentEffective;
@@ -277,37 +317,66 @@ public sealed class LocationPrivacyGovernanceMutationService(
                 continue;
             }
 
-            EventLocationDisclosureAudit audit = eventLocation.ApplyGovernanceTightening(
-                requiresPrivacyReview: true,
-                actorUserId,
-                changedAtUtc);
-            audits.Add(audit);
-            outboxMessages.Add(LocationPrivacyOutboxMessageFactory.CreateProjectionCorrection(
-                Guid.CreateVersion7(),
-                eventLocation,
-                changedAtUtc));
+            EventLocationDisclosureAudit audit = eventLocation.CreateTighteningAudit(actorUserId, changedAtUtc);
+            corrections.Add(new(eventLocation, audit, LocationPrivacyOutboxMessageFactory.CreateProjectionCorrection(
+                Guid.CreateVersion7(), eventLocation.EventLocationId, eventLocation.TenantId,
+                eventLocation.EventId, audit.NewPolicyVersion, changedAtUtc)));
             corrected.Add(new(
                 eventLocation.TenantId,
                 eventLocation.EventId,
-                eventLocation.Id));
+                eventLocation.EventLocationId));
         }
 
-        if (audits.Count > 0)
+        if (corrections.Count > 0)
         {
-            await eventLocations.SaveGovernanceChangesAsync(audits, outboxMessages, cancellationToken);
+            var admission = CurrentAdmission.Value
+                ?? throw new UnauthorizedAccessException("The original location producer is required.");
+            var capturedCorrections = corrections.ToArray();
+            CurrentAdmission.Value = admission with { Corrections = capturedCorrections, ChangedAtUtc = changedAtUtc };
+            try
+            {
+                await governanceStore.ApplyCorrectionsAsync(key, scope == SettingScope.Tenant ? tenantId : null,
+                    capturedCorrections, actorUserId, changedAtUtc, cancellationToken);
+            }
+            finally { CurrentAdmission.Value = admission; }
         }
 
         return new(true, null, previousStoredValue, corrected);
     }
 
-    private async Task<TenantSetting?> GetTenantRowAsync(
+    public static async Task<HumanSettingsMutation> RequireStoreReadAsync(
+        string? key, Guid? tenantId, CancellationToken cancellationToken)
+    {
+        var admission = CurrentAdmission.Value;
+        if (admission is null || admission.Effect.TenantId != tenantId
+            || key is not null && admission.Effect.Key != key)
+            throw new UnauthorizedAccessException("Location storage requires its original coordinated source closure.");
+        await admission.Preparation.RequireOwnedAsync(admission.Proof, admission.Effect, cancellationToken);
+        return admission.Effect;
+    }
+
+    public static async Task RequireStoreCorrectionsAsync(string key, Guid? tenantId,
+        IReadOnlyList<LocationPrivacyGovernanceCorrection> corrections, Guid actor, DateTime changed,
+        CancellationToken cancellationToken)
+    {
+        await RequireStoreReadAsync(key, tenantId, cancellationToken);
+        var admission = CurrentAdmission.Value!;
+        if (admission.Actor != actor || admission.ChangedAtUtc != changed
+            || !ReferenceEquals(admission.Corrections, corrections))
+            throw new UnauthorizedAccessException("Only the original location producer can admit projection corrections.");
+    }
+
+    private sealed record StoreAdmission(IHumanSettingsMutationPreparation Preparation,
+        IPreparedHumanSettingsMutation Proof, HumanSettingsMutation Effect, Guid Actor,
+        IReadOnlyList<LocationPrivacyGovernanceCorrection> Corrections, DateTime? ChangedAtUtc);
+
+    private async Task<LocationPrivacyGovernanceOverride?> GetTenantRowAsync(
         Guid tenantId,
         string key,
         CancellationToken cancellationToken)
     {
-        List<TenantSetting> rows = await tenantSettings.GetByTenantAndKeys(
-            tenantId,
-            [key],
+        IReadOnlyList<LocationPrivacyGovernanceOverride> rows = await governanceStore.ReadOverridesAsync(
+            key, tenantId,
             cancellationToken);
         if (rows.Count > 1)
         {
@@ -319,17 +388,17 @@ public sealed class LocationPrivacyGovernanceMutationService(
     }
 
     private static bool IsProjectionAffected(
-        EventLocation eventLocation,
+        EventLocationGovernanceState eventLocation,
         string key,
         LocationPrivacyGovernanceSettingValue previous,
         LocationPrivacyGovernanceSettingValue current)
     {
-        if (eventLocation.IsToBeAnnounced || eventLocation.Location is null)
+        if (eventLocation.IsToBeAnnounced || eventLocation.LocationKindId is null)
         {
             return false;
         }
 
-        bool isPrivateHome = eventLocation.Location.LocationKindId == (int)LocationKindEnum.PrivateHome;
+        bool isPrivateHome = eventLocation.LocationKindId == (int)LocationKindEnum.PrivateHome;
         return key switch
         {
             GovernanceSettingKeys.LocationPrivacy.AllowHomeLocations =>
@@ -337,13 +406,13 @@ public sealed class LocationPrivacyGovernanceMutationService(
             GovernanceSettingKeys.LocationPrivacy.AllowPublicExactAddress =>
                 !isPrivateHome
                 && current.Boolean == false
-                && (eventLocation.ShowStreetAddress || eventLocation.ShowPostcode),
+                && (eventLocation.Fields & (EventLocationDisclosureFields.StreetAddress | EventLocationDisclosureFields.Postcode)) != 0,
             GovernanceSettingKeys.LocationPrivacy.AllowPublicCoordinates =>
-                !isPrivateHome && current.Boolean == false && eventLocation.ShowCoordinates,
+                !isPrivateHome && current.Boolean == false && eventLocation.Fields.HasFlag(EventLocationDisclosureFields.Coordinates),
             GovernanceSettingKeys.LocationPrivacy.MinimumHomeAudience =>
                 isPrivateHome
                 && current.Audience.HasValue
-                && AudienceRestrictionRank((LocationDisclosureAudienceEnum)eventLocation.FullDetailsAudienceId)
+                && AudienceRestrictionRank(eventLocation.Audience)
                     < AudienceRestrictionRank(current.Audience.Value),
             GovernanceSettingKeys.LocationPrivacy.DefaultRevealOffset =>
                 HasSelectedExactField(eventLocation)
@@ -353,12 +422,11 @@ public sealed class LocationPrivacyGovernanceMutationService(
         };
     }
 
-    private static bool HasSelectedExactField(EventLocation eventLocation) =>
-        eventLocation.ShowStreetAddress
-        || eventLocation.ShowPostcode
-        || eventLocation.ShowCoordinates;
+    private static bool HasSelectedExactField(EventLocationGovernanceState eventLocation) =>
+        (eventLocation.Fields & (EventLocationDisclosureFields.StreetAddress
+            | EventLocationDisclosureFields.Postcode | EventLocationDisclosureFields.Coordinates)) != 0;
 
-    private static DateTime EffectiveRevealFromUtc(EventLocation eventLocation, TimeSpan offset)
+    private static DateTime EffectiveRevealFromUtc(EventLocationGovernanceState eventLocation, TimeSpan offset)
     {
         if (eventLocation.CreatedAt == default || eventLocation.CreatedAt.Kind != DateTimeKind.Utc)
         {

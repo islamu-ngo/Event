@@ -1,9 +1,10 @@
-
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Event.Testing.DataProtection;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Models;
@@ -11,6 +12,9 @@ using Explore.Domain.Constants;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
+using Explore.ServiceDefaults.DataProtection;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +28,12 @@ namespace Event.Api.IntegrationTests.Fixtures;
 
 internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
 {
+    private readonly ExternalDataProtectionTestAuthority _dataProtectionAuthority;
+    private readonly RequestFailureMetadata _requestFailures = new();
+
+    private LocalIdentityLifecycleHttpFixture() =>
+        _dataProtectionAuthority = new("api", Clock);
+
     internal LocalAdmissionWebApplicationFactory Native { get; private set; } = null!;
     internal WebApplicationFactory<Program> Host { get; private set; } = null!;
     internal HttpClient Client { get; private set; } = null!;
@@ -36,15 +46,19 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
     internal static async Task<LocalIdentityLifecycleHttpFixture> CreateAsync(
         bool verified = true, bool emailEnabled = true,
         IdentityDatabaseTopology topology = IdentityDatabaseTopology.Colocated,
-        IInterceptor? interceptor = null, bool rateLimiting = false)
+        IInterceptor? interceptor = null, bool rateLimiting = false,
+        Action<IServiceCollection>? configureServices = null)
     {
         var fixture = new LocalIdentityLifecycleHttpFixture();
         try
         {
             fixture.Native = await LocalAdmissionWebApplicationFactory.CreateAsync(
-                identityTopology: topology, persistenceInterceptor: interceptor, enableRateLimiting: rateLimiting);
+                identityTopology: topology, persistenceInterceptor: interceptor, enableRateLimiting: rateLimiting,
+                timeProvider: fixture.Clock);
+            await Assert.That(ReferenceEquals(fixture.Native.Services.GetRequiredService<TimeProvider>(), fixture.Clock)).IsTrue();
             await using (ExploreDbContext seed = fixture.Native.CreateDatabase())
             {
+                seed.BindTenantLease();
                 var intent = await seed.SystemSettings.SingleAsync(row => row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled, CancellationToken);
                 intent.Value = emailEnabled ? "true" : "false";
                 var host = await seed.SystemSettings.SingleAsync(row => row.SettingKey == GovernanceSettingKeys.Email.SmtpHost, CancellationToken);
@@ -57,9 +71,14 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
             fixture.Host = fixture.Native.WithWebHostBuilder(builder =>
             {
                 builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
-                    new Dictionary<string, string?> { ["PublicBaseUrl"] = "https://lifecycle.test" }));
+                    new Dictionary<string, string?>
+                    {
+                        ["PublicBaseUrl"] = "https://lifecycle.test",
+                        ["EffectiveHostAuthority:CanonicalOrigin"] = "https://localhost"
+                    }));
                 builder.ConfigureTestServices(services =>
                 {
+                    services.Insert(0, ServiceDescriptor.Singleton<IExceptionHandler>(fixture._requestFailures));
                     // Disable timer scheduling, not the production processor. Tests explicitly drain admitted work
                     // and synchronously observe SMTP completion instead of waiting for a background polling interval.
                     ServiceDescriptor? worker = services.SingleOrDefault(descriptor => descriptor.ServiceType == typeof(IHostedService)
@@ -69,6 +88,9 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
                     services.AddSingleton<ILocalIdentityLifecycleSmtpTransport>(fixture.Smtp);
                     services.RemoveAll<TimeProvider>();
                     services.AddSingleton<TimeProvider>(fixture.Clock);
+                    services.RemoveAll<IExternalDataProtectionSource>();
+                    services.AddSingleton<IExternalDataProtectionSource>(fixture._dataProtectionAuthority);
+                    configureServices?.Invoke(services);
                 });
             });
             fixture.Client = fixture.Host.CreateClient(new WebApplicationFactoryClientOptions
@@ -76,6 +98,7 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
                 BaseAddress = new Uri("https://localhost"),
                 AllowAutoRedirect = false
             });
+            await Assert.That(ReferenceEquals(fixture.Host.Services.GetRequiredService<TimeProvider>(), fixture.Clock)).IsTrue();
             await using var scope = fixture.Host.Services.CreateAsyncScope();
             await using DbContext identity = fixture.Native.CreateIdentityDatabase();
             Guid subject = await identity.Set<LocalIdentityUser>().Where(user => user.Email == fixture.Login.Identifier)
@@ -94,10 +117,36 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
     internal async Task<string> SignInAsync(LocalAuthRequestDto? login = null)
     {
         using HttpResponseMessage response = await Client.PostAsJsonAsync("/api/auth/local/login", login ?? Login, CancellationToken);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(_requestFailures.Metadata);
         using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         await Assert.That(body.RootElement.GetProperty("success").GetBoolean()).IsTrue();
         return body.RootElement.GetProperty("token").GetString()!;
+    }
+
+    private sealed class RequestFailureMetadata : IExceptionHandler
+    {
+        private string metadata = "No request exception metadata was observed.";
+
+        internal string Metadata => Volatile.Read(ref metadata);
+
+        public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception,
+            CancellationToken cancellationToken)
+        {
+            Exception root = exception.GetBaseException();
+            string description = Describe(exception);
+            if (!ReferenceEquals(root, exception)) description += "; root=" + Describe(root);
+            Volatile.Write(ref metadata, description);
+            return ValueTask.FromResult(false);
+        }
+
+        private static string Describe(Exception exception)
+        {
+            var methods = new StackTrace(exception).GetFrames().Take(8)
+                .Select(frame => frame.GetMethod())
+                .Where(method => method is not null)
+                .Select(method => method!.DeclaringType?.FullName + "." + method.Name);
+            return exception.GetType().FullName + ": " + string.Join(" -> ", methods);
+        }
     }
 
     internal async Task<LocalIdentityLifecycleTransport> DrainOneAsync()

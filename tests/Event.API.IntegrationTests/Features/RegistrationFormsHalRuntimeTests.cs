@@ -12,12 +12,9 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
-using Explore.Persistence.Schema;
-using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -218,31 +215,17 @@ public sealed class RegistrationFormsHalRuntimeTests(RegistrationFormsRealRuntim
 
 public sealed class RegistrationFormsRealRuntimeFixture : IAsyncInitializer, IAsyncDisposable
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
-        .WithDatabase("registration_forms_http")
-        .WithUsername("postgres")
-        .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
-        .Build();
+    private readonly Event.Persistence.IntegrationTests.Fixtures.PostgreSqlContainerFixture _database = new();
 
     private PostgreSqlApiWebApplicationFactory _factory = null!;
     private HttpClient _client = null!;
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
-        await using (var context = new ExploreDbContext(
-            new DbContextOptionsBuilder<ExploreDbContext>()
-                .UseNpgsql(_container.GetConnectionString())
-                .UseSnakeCaseNamingConvention()
-                .Options))
-        {
-            await context.Database.EnsureCreatedAsync();
-            await PostgresModelConstraintApplier.ApplyAsync(context);
-            await LookupTableSeeder.SeedAsync(context);
-        }
+        await _database.InitializeAsync();
 
         _factory = new PostgreSqlApiWebApplicationFactory(
-            _container.GetConnectionString(),
+            _database,
             new Dictionary<string, string?>
             {
                 ["Testing:HostProfile"] = TestHostProfile.RealRuntime,
@@ -259,8 +242,7 @@ public sealed class RegistrationFormsRealRuntimeFixture : IAsyncInitializer, IAs
 
     public async Task<RegistrationFormsRuntimeScenario> SeedAsync()
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = _database.CreateDbContext();
         TenantScenarioSeed.TenantScenarioResult organizer =
             await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
         TenantScenarioSeed.TenantScenarioResult contributor =
@@ -360,8 +342,7 @@ public sealed class RegistrationFormsRealRuntimeFixture : IAsyncInitializer, IAs
 
     public async Task AssertPinnedArtifactsAsync(Guid versionId)
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = _database.CreateDbContext();
         RegistrationFormVersion version = await context.RegistrationFormVersions
             .AsNoTracking()
             .Include(value => value.Sections)
@@ -380,8 +361,7 @@ public sealed class RegistrationFormsRealRuntimeFixture : IAsyncInitializer, IAs
 
     public async Task<RegistrationFormPersistedOrderSnapshot> GetOrderSnapshotAsync(Guid versionId)
     {
-        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = _database.CreateDbContext();
         var version = await context.RegistrationFormVersions
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -426,7 +406,7 @@ public sealed class RegistrationFormsRealRuntimeFixture : IAsyncInitializer, IAs
         {
             await _factory.DisposeAsync();
         }
-        await _container.DisposeAsync();
+        await _database.DisposeAsync();
         GC.SuppressFinalize(this);
     }
 

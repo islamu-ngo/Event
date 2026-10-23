@@ -15,7 +15,7 @@ public sealed class LocalIdentityLifecycleDeliveryProcessor(
     ILocalIdentityLifecycleStore lifecycle,
     ILocalIdentityLifecycleDeliveryStore deliveries,
     ISettingMutationLock mutationLock,
-    IHierarchicalSettingsResolver settings,
+    IHierarchicalSettingsReader settings,
     EmailDeliveryCapabilityResolver capability,
     ILocalIdentityLifecycleSmtpTransport transport,
     IConfiguration configuration,

@@ -3,9 +3,9 @@ namespace Explore.Application.Contracts.Scheduling;
 /// <summary>
 /// Receives an audit record for every attempted scheduler control action.
 /// <para>
-/// This is a seam, not just a logger call. The default implementation writes structured records to the logging
-/// pipeline, which self-hosted operators already ship to their log store or SIEM. Should durable, queryable audit
-/// storage be required later, it is added by registering a different sink — no call site changes.
+/// The default implementation emits bounded action/outcome diagnostics, not the identity-bearing record,
+/// into the ordinary logging pipeline. An access-controlled audit destination can receive the full record
+/// by registering a different sink without changing scheduler call sites.
 /// </para>
 /// </summary>
 public interface ISchedulerAdminAuditSink

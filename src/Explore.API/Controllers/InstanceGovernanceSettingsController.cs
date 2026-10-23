@@ -292,7 +292,6 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<FooterGovernanceSettingsDto>> GetFooterGovernanceSettings(CancellationToken cancellationToken = default)
     {
-        if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
         var settings = await _footerGovernanceQuery.QueryAsync(new GetFooterGovernanceSettingsQuery(), cancellationToken);
         return Ok(settings);
     }
@@ -307,11 +306,7 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateFooterGovernanceSettings(
         [FromBody] PatchFooterGovernanceSettingsDto settings, CancellationToken cancellationToken = default)
     {
-        if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
-        if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
-
-        var response = await _updateFooterGovernance.ExecuteAsync(new UpdateFooterGovernanceSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
+        var response = await _updateFooterGovernance.ExecuteAsync(new UpdateFooterGovernanceSettingsCommand { Patch = settings }, cancellationToken);
         return HandleCommandResponse(response);
     }
 }

@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Application.Contracts.Payments;
 
 namespace Explore.Application.Contracts.Persistence;
 
@@ -11,26 +12,31 @@ public enum RefundReservationDisposition
     AuthorityMismatch,
     MaterialChangeChoiceConflict,
     OpenDispute,
-    CapacityExceeded
+    CapacityExceeded,
+    OperationConflict
 }
 
 public sealed record RefundReservationResult(
     RefundReservationDisposition Disposition,
     RefundAttempt? Attempt);
 
-public sealed record RefundReconciliationHealth(
-    int Pending,
-    int Unknown,
-    int RequiresAction,
-    int Failed,
-    int CampaignsRequiringOperator,
-    int DisputesDueSoon,
-    int DisputesDueWithin72Hours,
-    int DisputesOverdue,
-    DateTime? OldestNonTerminalAt);
-
 public interface IRefundAttemptRepository
 {
+    Task<RefundAttempt?> TryBeginDispatchAsync(
+        RefundAttempt expected, Guid dispatchToken, bool applicationFee, DateTime committedAt,
+        DateTime mutationExpiresAt, OutboxMessage recoveryTrigger, CancellationToken cancellationToken);
+
+    Task<RefundAttempt?> SettleAndScheduleAsync(
+        RefundAttempt expected, Guid? dispatchToken, RefundProviderResult result, DateTime observedAt,
+        OutboxMessage recoveryTrigger, CancellationToken cancellationToken);
+
+    Task<RefundReservationResult?> RecoverOperationAsync(
+        Guid tenantId,
+        Guid paymentAttemptId,
+        string nativeOperationKey,
+        string nativeInputDigest,
+        CancellationToken cancellationToken);
+
     Task<RefundReservationResult> ReserveAsync(
         RefundAttempt attempt,
         CancellationToken cancellationToken);
@@ -83,10 +89,6 @@ public interface IRefundAttemptRepository
     Task<PaidOrderAcceptanceSnapshot?> GetAcceptanceAsync(
         Guid tenantId,
         Guid paidOrderAcceptanceSnapshotId,
-        CancellationToken cancellationToken);
-
-    Task<RefundReconciliationHealth> GetReconciliationHealthAsync(
-        DateTime observedAt,
         CancellationToken cancellationToken);
 
     Task<PaymentDispute> ObserveDisputeAsync(

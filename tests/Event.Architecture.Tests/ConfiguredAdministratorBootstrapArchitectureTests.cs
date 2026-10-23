@@ -282,7 +282,8 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
             typeof(ConfiguredAdministratorBootstrapProvider),
             typeof(IInstanceBootstrapStateRepository),
             typeof(IUnitOfWork),
-            typeof(TimeProvider)
+            typeof(TimeProvider),
+            typeof(IEventDiscoveryEnrollmentGate)
         ]);
     }
 
@@ -544,7 +545,7 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
         return false;
     }
 
-    private static IEnumerable<MethodBase> ReadCalledMethods(MethodBase caller)
+    internal static IEnumerable<MethodBase> ReadCalledMethods(MethodBase caller)
     {
         MethodBody? body = caller.GetMethodBody();
         byte[] il = body?.GetILAsByteArray() ?? [];

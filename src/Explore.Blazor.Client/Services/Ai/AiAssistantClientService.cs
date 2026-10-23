@@ -8,7 +8,9 @@ public sealed class AiAssistantClientService(
     IAiAssistantClient apiClient,
     ILogger<AiAssistantClientService> logger) : IAiAssistantClientService
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private const int MaximumFallbackResponseCharacters = 64 * 1024;
+    private const int MaximumProblemCodeCharacters = 128;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { MaxDepth = 16 };
 
     public async Task<HalResourceOfAiAssistantBootstrapDto?> GetBootstrapAsync(CancellationToken cancellationToken = default)
     {
@@ -18,7 +20,8 @@ public sealed class AiAssistantClientService(
         }
         catch (ApiException ex)
         {
-            logger.LogWarning(ex, "Failed to load AI assistant bootstrap.");
+            logger.LogWarning("AI bootstrap failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "bootstrap_failed", ex.StatusCode);
             return null;
         }
     }
@@ -33,7 +36,8 @@ public sealed class AiAssistantClientService(
         }
         catch (ApiException ex)
         {
-            logger.LogWarning(ex, "Failed to load AI assistant conversations.");
+            logger.LogWarning("AI conversation list failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "conversation_list_failed", ex.StatusCode);
             return null;
         }
     }
@@ -56,7 +60,8 @@ public sealed class AiAssistantClientService(
         }
         catch (ApiException ex)
         {
-            logger.LogWarning(ex, "Failed to load AI assistant conversation {ConversationId}.", conversationId);
+            logger.LogWarning("AI conversation read failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "conversation_read_failed", ex.StatusCode);
             return null;
         }
     }
@@ -72,14 +77,16 @@ public sealed class AiAssistantClientService(
         }
         catch (ApiException<ProblemDetails> ex)
         {
-            logger.LogWarning(ex, "Failed to create AI assistant conversation.");
+            logger.LogWarning("AI conversation creation failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "conversation_create_failed", ex.StatusCode);
             return AiAssistantCommandResult.Failure(
                 FailureCodeFor(ex),
                 ex.Result?.Detail ?? ex.Result?.Title ?? "The AI assistant conversation could not be created.");
         }
         catch (ApiException ex)
         {
-            logger.LogWarning(ex, "Failed to create AI assistant conversation.");
+            logger.LogWarning("AI conversation creation failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "conversation_create_failed", ex.StatusCode);
             return AiAssistantCommandResult.Failure(
                 FailureCodeFor(ex),
                 "The AI assistant conversation could not be created.");
@@ -120,7 +127,8 @@ public sealed class AiAssistantClientService(
         }
         catch (ApiException<ProblemDetails> ex)
         {
-            logger.LogWarning(ex, "Failed to send AI assistant message for conversation {ConversationId}.", conversationId);
+            logger.LogWarning("AI message send failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "message_send_failed", ex.StatusCode);
             return FailureFromProblem(ex, "The AI assistant message could not be sent.");
         }
         catch (ApiException ex)
@@ -130,7 +138,8 @@ public sealed class AiAssistantClientService(
                 return legacyResult;
             }
 
-            logger.LogWarning(ex, "Failed to send AI assistant message for conversation {ConversationId}.", conversationId);
+            logger.LogWarning("AI message send failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "message_send_failed", ex.StatusCode);
             return AiAssistantCommandResult.Failure(FailureCodeFor(ex), "The AI assistant message could not be sent.");
         }
     }
@@ -147,12 +156,14 @@ public sealed class AiAssistantClientService(
         }
         catch (ApiException ex) when (ex.StatusCode == 401)
         {
-            logger.LogWarning(ex, "Unauthorized while loading AI run {RunId} for conversation {ConversationId}.", runId, conversationId);
+            logger.LogWarning("AI run read denied. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "run_read_denied", ex.StatusCode);
             return AiRunStatusResult.Unauthorized();
         }
         catch (ApiException ex)
         {
-            logger.LogWarning(ex, "Failed to load AI run {RunId} for conversation {ConversationId}.", runId, conversationId);
+            logger.LogWarning("AI run read failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "run_read_failed", ex.StatusCode);
             return AiRunStatusResult.NotFound();
         }
     }
@@ -173,12 +184,14 @@ public sealed class AiAssistantClientService(
         }
         catch (ApiException<ProblemDetails> ex)
         {
-            logger.LogWarning(ex, "Failed to cancel AI run {RunId} for conversation {ConversationId}.", runId, conversationId);
+            logger.LogWarning("AI run cancellation failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "run_cancel_failed", ex.StatusCode);
             return FailureFromProblem(ex, "The AI assistant run could not be cancelled.");
         }
         catch (ApiException ex)
         {
-            logger.LogWarning(ex, "Failed to cancel AI run {RunId} for conversation {ConversationId}.", runId, conversationId);
+            logger.LogWarning("AI run cancellation failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "run_cancel_failed", ex.StatusCode);
             return AiAssistantCommandResult.Failure("api_error", "The AI assistant run could not be cancelled.");
         }
     }
@@ -195,7 +208,8 @@ public sealed class AiAssistantClientService(
         }
         catch (ApiException ex)
         {
-            logger.LogWarning(ex, "Failed to search AI assistant references.");
+            logger.LogWarning("AI reference search failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "reference_search_failed", ex.StatusCode);
             return [];
         }
     }
@@ -203,6 +217,7 @@ public sealed class AiAssistantClientService(
     public async Task<AiAssistantCommandResult> ConfirmProposedActionAsync(
         Guid conversationId,
         Guid proposedActionId,
+        string expectedVersion,
         string? idempotencyKey = null,
         CancellationToken cancellationToken = default)
     {
@@ -211,6 +226,7 @@ public sealed class AiAssistantClientService(
             var response = await apiClient.ConfirmAiProposedActionAsync(
                 conversationId,
                 proposedActionId,
+                new ConfirmAiProposedActionRequestDto { ExpectedVersion = expectedVersion },
                 idempotencyKey,
                 cancellationToken: cancellationToken);
 
@@ -219,20 +235,16 @@ public sealed class AiAssistantClientService(
         catch (ApiException<ProblemDetails> ex)
         {
             logger.LogWarning(
-                ex,
-                "Failed to confirm AI proposed action {ProposedActionId} for conversation {ConversationId}.",
-                proposedActionId,
-                conversationId);
+                "AI confirmation failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "confirmation_failed", ex.StatusCode);
 
             return FailureFromProblem(ex, "The AI proposed action could not be confirmed.");
         }
         catch (ApiException ex)
         {
             logger.LogWarning(
-                ex,
-                "Failed to confirm AI proposed action {ProposedActionId} for conversation {ConversationId}.",
-                proposedActionId,
-                conversationId);
+                "AI confirmation failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "confirmation_failed", ex.StatusCode);
 
             return AiAssistantCommandResult.Failure("api_error", "The AI proposed action could not be confirmed.");
         }
@@ -255,10 +267,8 @@ public sealed class AiAssistantClientService(
         catch (ApiException ex)
         {
             logger.LogWarning(
-                ex,
-                "Failed to reject AI proposed action {ProposedActionId} for conversation {ConversationId}.",
-                proposedActionId,
-                conversationId);
+                "AI rejection failed. FailureCategory={FailureCategory} StatusCode={StatusCode}",
+                "rejection_failed", ex.StatusCode);
 
             return AiAssistantCommandResult.Failure("api_error", "The AI proposed action could not be rejected.");
         }
@@ -270,14 +280,28 @@ public sealed class AiAssistantClientService(
     {
         var message = FirstNonEmpty(ex.Result?.Detail, ex.Result?.Title, fallbackMessage);
         var failureCode = FirstNonEmpty(TryGetProblemCode(ex.Result), TryGetProblemCode(ex.Response), FailureCodeFor(ex));
-        return AiAssistantCommandResult.Failure(failureCode, message);
+        Guid? originalDraftId = null;
+        if (failureCode == "ai_draft_recovery_required"
+            && ex.Result?.AdditionalProperties.TryGetValue("id", out var retained) == true)
+        {
+            originalDraftId = retained switch
+            {
+                Guid id when id != Guid.Empty => id,
+                string value when Guid.TryParse(value, out var id) && id != Guid.Empty => id,
+                JsonElement { ValueKind: JsonValueKind.String } json
+                    when json.TryGetGuid(out var id) && id != Guid.Empty => id,
+                _ => null
+            };
+        }
+        return AiAssistantCommandResult.Failure(failureCode, message) with { Id = originalDraftId };
     }
 
     private static bool TryMapLegacySuccess(ApiException ex, out AiAssistantCommandResult result)
     {
         result = AiAssistantCommandResult.Failure("api_error", "The AI assistant message could not be sent.");
 
-        if (ex.StatusCode != 200 || string.IsNullOrWhiteSpace(ex.Response))
+        if (ex.StatusCode != 200 || string.IsNullOrWhiteSpace(ex.Response)
+            || ex.Response.Length > MaximumFallbackResponseCharacters)
         {
             return false;
         }
@@ -308,27 +332,38 @@ public sealed class AiAssistantClientService(
 
         return value switch
         {
-            string code when !string.IsNullOrWhiteSpace(code) => code.Trim(),
-            JsonElement { ValueKind: JsonValueKind.String } json => json.GetString()?.Trim(),
+            string code when !string.IsNullOrWhiteSpace(code)
+                && code.Length <= MaximumProblemCodeCharacters => code.Trim(),
+            JsonElement { ValueKind: JsonValueKind.String } json
+                when json.GetString() is { Length: <= MaximumProblemCodeCharacters } code => code.Trim(),
             _ => null
         };
     }
 
     private static string? TryGetProblemCode(string? response)
     {
-        if (string.IsNullOrWhiteSpace(response))
+        if (string.IsNullOrWhiteSpace(response) || response.Length > MaximumFallbackResponseCharacters)
         {
             return null;
         }
 
         try
         {
-            using var document = JsonDocument.Parse(response);
-            if (document.RootElement.TryGetProperty("code", out var code)
-                && code.ValueKind == JsonValueKind.String)
+            using var document = JsonDocument.Parse(response, new JsonDocumentOptions { MaxDepth = 16 });
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return null;
+            JsonElement? code = null;
+            foreach (var property in document.RootElement.EnumerateObject())
             {
-                return code.GetString()?.Trim();
+                if (property.Name != "code")
+                    continue;
+                if (code is not null)
+                    return null;
+                code = property.Value;
             }
+            if (code is { ValueKind: JsonValueKind.String } value
+                && value.GetString() is { Length: <= MaximumProblemCodeCharacters } text)
+                return text.Trim();
         }
         catch (JsonException)
         {

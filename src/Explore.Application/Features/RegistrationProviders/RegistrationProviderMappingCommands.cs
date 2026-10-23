@@ -1,4 +1,3 @@
-using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Responses;
@@ -11,60 +10,26 @@ using System.Text;
 
 namespace Explore.Application.Features.RegistrationProviders.Commands;
 
-public sealed record ImportRegistrationProviderSchemaRevisionCommand(
-    Guid TenantId,
-    Guid ConnectionId,
-    RegistrationProviderSchemaAuthorityEnum Authority,
-    RegistrationEvidenceHash RevisionHash,
-    DateTime ObservedAt) : ICommand<BaseCommandResponse<Guid>>;
-
-public sealed record ReplaceDraftRegistrationProviderMappingsCommand(
+// Database-only implementation inputs, not independently discoverable native operations.
+// Production invocation belongs exclusively to the acquired Event management parents.
+internal sealed record ReplaceDraftRegistrationProviderMappingsCommand(
     Guid TenantId,
     Guid BindingId,
     IReadOnlyList<RegistrationProviderFieldMappingInput> Fields,
-    IReadOnlyList<RegistrationProviderOptionMappingInput> Options) : ICommand<BaseCommandResponse<Guid>>;
+    IReadOnlyList<RegistrationProviderOptionMappingInput> Options);
 
-public sealed record PublishRegistrationProviderBindingCommand(
+internal sealed record PublishRegistrationProviderBindingCommand(
     Guid TenantId,
     Guid BindingId,
     RegistrationProviderSchemaDriftClass DriftClass,
-    DateTime PublishedAt) : ICommand<BaseCommandResponse<Guid>>;
+    DateTime PublishedAt);
 
 public sealed record RegistrationProviderFieldMappingInput(string PlatformFieldKey, string ProviderFieldKey, bool IsRequired);
 public sealed record RegistrationProviderOptionMappingInput(string PlatformFieldKey, string PlatformOptionKey, string ProviderOptionKey);
 
-public sealed class ImportRegistrationProviderSchemaRevisionCommandHandler(IRegistrationProviderRepository repository)
-    : ICommandHandler<ImportRegistrationProviderSchemaRevisionCommand, BaseCommandResponse<Guid>>
+internal sealed class ReplaceDraftRegistrationProviderMappingsCommandHandler(IRegistrationProviderRepository repository)
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ImportRegistrationProviderSchemaRevisionCommand request, CancellationToken cancellationToken = default)
-    {
-        await new ImportRegistrationProviderSchemaRevisionCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
-        if (await repository.GetConnectionAsync(request.TenantId, request.ConnectionId, cancellationToken) is null)
-        {
-            return RegistrationProviderCommandResponses.Failure(Guid.Empty, "registration_provider_connection_not_found");
-        }
-
-        RegistrationProviderSchemaRevision revision = RegistrationProviderSchemaRevision.Create(
-            request.TenantId,
-            request.ConnectionId,
-            request.Authority,
-            request.RevisionHash,
-            "legacy",
-            null,
-            "{\"schema\":\"legacy.registration-provider-schema-revision\",\"fields\":[]}",
-            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(request.RevisionHash.Value))),
-            RegistrationProviderDriftClassEnum.NoDrift,
-            request.ObservedAt);
-        await repository.AddSchemaRevisionAsync(revision, cancellationToken);
-        await repository.SaveChangesAsync(cancellationToken);
-        return RegistrationProviderCommandResponses.Success(revision.Id, "Registration provider schema revision imported.");
-    }
-}
-
-public sealed class ReplaceDraftRegistrationProviderMappingsCommandHandler(IRegistrationProviderRepository repository)
-    : ICommandHandler<ReplaceDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>>
-{
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReplaceDraftRegistrationProviderMappingsCommand request, CancellationToken cancellationToken = default)
+    internal async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReplaceDraftRegistrationProviderMappingsCommand request, CancellationToken cancellationToken = default)
     {
         await new ReplaceDraftRegistrationProviderMappingsCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
         RegistrationProviderBinding? binding = await repository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
@@ -116,10 +81,9 @@ public sealed class ReplaceDraftRegistrationProviderMappingsCommandHandler(IRegi
     private static string Normalize(string value) => value.Trim();
 }
 
-public sealed class PublishRegistrationProviderBindingCommandHandler(IRegistrationProviderRepository repository)
-    : ICommandHandler<PublishRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
+internal sealed class PublishRegistrationProviderBindingCommandHandler(IRegistrationProviderRepository repository)
 {
-    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
+    internal async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
     {
         await new PublishRegistrationProviderBindingCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
         RegistrationProviderBinding? binding = await repository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
@@ -181,18 +145,7 @@ public sealed class PublishRegistrationProviderBindingCommandHandler(IRegistrati
     };
 }
 
-public sealed class ImportRegistrationProviderSchemaRevisionCommandValidator : AbstractValidator<ImportRegistrationProviderSchemaRevisionCommand>
-{
-    public ImportRegistrationProviderSchemaRevisionCommandValidator()
-    {
-        RuleFor(command => command.TenantId).NotEmpty();
-        RuleFor(command => command.ConnectionId).NotEmpty();
-        RuleFor(command => command.RevisionHash).NotNull();
-        RuleFor(command => command.ObservedAt).Must(value => value.Kind == DateTimeKind.Utc && value != default);
-    }
-}
-
-public sealed class ReplaceDraftRegistrationProviderMappingsCommandValidator : AbstractValidator<ReplaceDraftRegistrationProviderMappingsCommand>
+internal sealed class ReplaceDraftRegistrationProviderMappingsCommandValidator : AbstractValidator<ReplaceDraftRegistrationProviderMappingsCommand>
 {
     public ReplaceDraftRegistrationProviderMappingsCommandValidator()
     {
@@ -213,7 +166,7 @@ public sealed class ReplaceDraftRegistrationProviderMappingsCommandValidator : A
     }
 }
 
-public sealed class PublishRegistrationProviderBindingCommandValidator : AbstractValidator<PublishRegistrationProviderBindingCommand>
+internal sealed class PublishRegistrationProviderBindingCommandValidator : AbstractValidator<PublishRegistrationProviderBindingCommand>
 {
     public PublishRegistrationProviderBindingCommandValidator()
     {

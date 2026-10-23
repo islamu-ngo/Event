@@ -1,14 +1,20 @@
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings;
+using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using ISLAMU.Wire.Contracts.ConfigurationPortability;
+using System.Text.Json;
 using Npgsql;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -20,16 +26,18 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFixture fixture)
 {
     private const string SettingKey = GovernanceSettingKeys.Branding.DisplayName;
-    private readonly Guid _actorId = Guid.NewGuid();
 
     [Test]
     public async Task SetValueAsync_WhenOverrideIsLocked_ChangesValueWithoutUnlocking()
     {
         Guid tenantId = await SeedAsync(tenantLocked: true);
-        await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new TenantSettingRepository(context, CreateMutationLock(context));
-
-        await repository.SetValueAsync(tenantId, SettingKey, "\"updated\"");
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
+        await authenticated.RunAsync(tenantId, session => session.ValueAsync(SettingKey, "updated", "\"updated\"", async token =>
+        {
+            var repository = new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary);
+            await repository.SetValueAsync(tenantId, SettingKey, "\"updated\"", token, session.ActorId);
+            return true;
+        }));
 
         TenantSetting saved = await ReadTenantSettingAsync(tenantId);
         await Assert.That(saved.Value).IsEqualTo("\"updated\"");
@@ -40,7 +48,6 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
     public async Task UpsertLockAsync_WhenSystemSettingExists_PreservesValueAndNonLockMetadata()
     {
         await fixture.ResetAsync();
-        var actorId = Guid.NewGuid();
         var originalCreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var originalUpdatedAt = new DateTime(2024, 2, 1, 0, 0, 0, DateTimeKind.Utc);
         Guid originalId;
@@ -64,9 +71,11 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
             originalId = existing.Id;
         }
 
-        await using (ExploreDbContext mutationContext = fixture.CreateDbContext())
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
+        Guid actorId = authenticated.ActorId;
+        await authenticated.RunAsync(null, session => session.LockAsync(SettingKey, true, async token =>
         {
-            var repository = new SystemSettingRepository(mutationContext, CreateMutationLock(mutationContext));
+            var repository = new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary);
 
             await repository.UpsertLockAsync(new SystemSetting
             {
@@ -82,8 +91,9 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
                 CreatedBy = Guid.NewGuid(),
                 UpdatedAt = DateTime.UtcNow,
                 UpdatedBy = actorId
-            }, CancellationToken.None);
-        }
+            }, token);
+            return true;
+        }));
 
         await using ExploreDbContext readContext = fixture.CreateDbContext();
         SystemSetting saved = await readContext.SystemSettings
@@ -106,35 +116,47 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
     }
 
     [Test]
-    public async Task UpsertLockAsync_WhenSystemSettingIsMissing_InsertsFallbackValueAndMetadata()
+    public async Task MissingSystemSetting_RequiresOriginalValueBeforeLockAndPreservesItsMetadata()
     {
         await fixture.ResetAsync();
-        const string key = "test.system-setting-lock-fallback";
-        const string fallbackValue = "\"fallback\"";
-        var actorId = Guid.NewGuid();
-        var createdAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var updatedAt = new DateTime(2024, 2, 1, 0, 0, 0, DateTimeKind.Utc);
-
-        await using (ExploreDbContext mutationContext = fixture.CreateDbContext())
+        const string key = GovernanceSettingKeys.Branding.LogoUrl;
+        const string fallbackValue = "\"https://fallback.example.test/logo.svg\"";
+        await using (var seed = fixture.CreateDbContext())
+            await seed.SystemSettings.Where(row => row.SettingKey == key).ExecuteDeleteAsync();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => authenticated.RunAsync(null,
+            session => session.LockAsync(key, true, token =>
+                new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary)
+                    .UpsertLockAsync(new SystemSetting { SettingKey = key, Value = fallbackValue, IsLocked = true }, token))));
+        await using (var absent = fixture.CreateDbContext())
+            await Assert.That(await absent.SystemSettings.AnyAsync(row => row.SettingKey == key)).IsFalse();
+        SystemSetting original = await authenticated.RunAsync(null, async session =>
         {
-            var repository = new SystemSettingRepository(mutationContext, CreateMutationLock(mutationContext));
-
-            await repository.UpsertLockAsync(new SystemSetting
+            var repository = new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary);
+            await session.ValueAsync(key, "https://fallback.example.test/logo.svg", fallbackValue, token =>
+                repository.UpsertAsync(new SystemSetting
+                {
+                    SettingKey = key,
+                    Value = fallbackValue,
+                    CreatedBy = session.ActorId
+                }, token));
+            var created = (await repository.GetByKey(key))!;
+            await session.LockAsync(key, true, token => repository.UpsertLockAsync(new SystemSetting
             {
                 SettingKey = key,
-                Value = fallbackValue,
-                ValueType = SettingValueType.String,
+                Value = "\"not-the-original-value\"",
+                ValueType = SettingValueType.Boolean,
                 IsLocked = true,
-                AllowedValues = "[\"fallback\"]",
-                Description = "Fallback description",
-                Category = "Fallback category",
-                DisplayOrder = 7,
-                CreatedAt = createdAt,
-                CreatedBy = actorId,
-                UpdatedAt = updatedAt,
-                UpdatedBy = actorId
-            }, CancellationToken.None);
-        }
+                AllowedValues = "[true,false]",
+                Description = "Replacement description",
+                Category = "Replacement category",
+                DisplayOrder = 99,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = session.ActorId,
+                UpdatedBy = session.ActorId
+            }, token));
+            return created;
+        });
 
         await using ExploreDbContext readContext = fixture.CreateDbContext();
         SystemSetting saved = await readContext.SystemSettings
@@ -144,35 +166,42 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         await Assert.That(saved.Value).IsEqualTo(fallbackValue);
         await Assert.That(saved.ValueType).IsEqualTo(SettingValueType.String);
         await Assert.That(saved.IsLocked).IsTrue();
-        await Assert.That(saved.AllowedValues).IsEqualTo("[\"fallback\"]");
-        await Assert.That(saved.Description).IsEqualTo("Fallback description");
-        await Assert.That(saved.Category).IsEqualTo("Fallback category");
-        await Assert.That(saved.DisplayOrder).IsEqualTo(7);
-        await Assert.That(saved.CreatedAt).IsEqualTo(createdAt);
-        await Assert.That(saved.CreatedBy).IsEqualTo(actorId);
-        await Assert.That(saved.UpdatedAt).IsEqualTo(updatedAt);
-        await Assert.That(saved.UpdatedBy).IsEqualTo(actorId);
+        await Assert.That(saved.Id).IsEqualTo(original.Id);
+        await Assert.That(saved.AllowedValues).IsEqualTo(original.AllowedValues);
+        await Assert.That(saved.Description).IsEqualTo(original.Description);
+        await Assert.That(saved.Category).IsEqualTo(original.Category);
+        await Assert.That(saved.DisplayOrder).IsEqualTo(original.DisplayOrder);
+        await Assert.That(saved.CreatedAt).IsEqualTo(original.CreatedAt);
+        await Assert.That(saved.CreatedBy).IsEqualTo(authenticated.ActorId);
+        await Assert.That(saved.UpdatedAt).IsNotNull();
+        await Assert.That(saved.UpdatedBy).IsEqualTo(authenticated.ActorId);
     }
 
     [Test]
     public async Task LockAndUnlockAsync_WhenExpectedStateDoesNotMatch_ReturnFalseWithoutMutation()
     {
         Guid tenantId = await SeedAsync(tenantLocked: true);
-        Guid deniedLockActor = Guid.NewGuid();
-        Guid unlockActor = Guid.NewGuid();
-        Guid deniedUnlockActor = Guid.NewGuid();
-        await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new TenantSettingRepository(context, CreateMutationLock(context));
-
-        bool lockApplied = await repository.LockAsync(tenantId, SettingKey, deniedLockActor);
-        bool unlockApplied = await repository.UnlockAsync(tenantId, SettingKey, unlockActor);
-        bool secondUnlockApplied = await repository.UnlockAsync(tenantId, SettingKey, deniedUnlockActor);
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
+        var outcome = await authenticated.RunAsync(tenantId, async session =>
+        {
+            var repository = new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary);
+            bool lockApplied = await session.LockAsync(SettingKey, true,
+                token => repository.LockAsync(tenantId, SettingKey, session.ActorId, token));
+            bool unlockApplied = await session.LockAsync(SettingKey, false,
+                token => repository.UnlockAsync(tenantId, SettingKey, session.ActorId, token));
+            TenantSetting afterUnlock = await ReadTenantSettingAsync(tenantId);
+            bool secondUnlockApplied = await session.LockAsync(SettingKey, false,
+                token => repository.UnlockAsync(tenantId, SettingKey, session.ActorId, token));
+            TenantSetting afterNoChange = await ReadTenantSettingAsync(tenantId);
+            await Assert.That(afterNoChange.UpdatedAt).IsEqualTo(afterUnlock.UpdatedAt);
+            return (lockApplied, unlockApplied, secondUnlockApplied);
+        });
         TenantSetting saved = await ReadTenantSettingAsync(tenantId);
 
-        await Assert.That(lockApplied).IsFalse();
-        await Assert.That(unlockApplied).IsTrue();
-        await Assert.That(secondUnlockApplied).IsFalse();
-        await Assert.That(saved.UpdatedBy).IsEqualTo(unlockActor);
+        await Assert.That(outcome.lockApplied).IsFalse();
+        await Assert.That(outcome.unlockApplied).IsTrue();
+        await Assert.That(outcome.secondUnlockApplied).IsFalse();
+        await Assert.That(saved.UpdatedBy).IsEqualTo(authenticated.ActorId);
         await Assert.That(saved.UpdatedAt).IsNotNull();
     }
 
@@ -180,25 +209,81 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
     public async Task UpsertManyForTenantAsync_StampsActorOnUpdatesAndInserts()
     {
         Guid tenantId = await SeedAsync(tenantLocked: false);
-        Guid actorId = Guid.NewGuid();
+        string updatedKey = AppearanceSettingDefinitions.DefaultThemeMode.Key;
+        string insertedKey = PublicExperienceSettingDefinitions.EventCatalogLabel.Key;
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.TenantSettingOverrides.Add(new TenantSetting
+            {
+                TenantId = tenantId,
+                Tenant = null!,
+                SettingKey = updatedKey,
+                Value = "\"light\"",
+                IsLocked = false
+            });
+            if (!await seed.PaidEventPolicyVersions.AnyAsync())
+                seed.PaidEventPolicyVersions.Add(PaidEventPolicyVersion.CreateDefaultInstance());
+            await seed.SaveChangesAsync();
+        }
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
+        Guid actorId = authenticated.ActorId;
+        await authenticated.RunAsync(tenantId, async session =>
+        {
+            // The production tenant import is the owner of paired value/unlocked effects.
+            // It invokes the real UpsertManyForTenantAsync, rather than lending a scalar
+            // proof to a test-authored replacement batch.
+            var package = new TenantConfigurationPackageV1Alpha2
+            {
+                Schema = TenantConfigurationPackageContractMetadata.SchemaId,
+                ApiVersion = TenantConfigurationPackageContractMetadata.ApiVersion,
+                Kind = TenantConfigurationPackageContractMetadata.Kind,
+                Metadata = new()
+                {
+                    Name = "settings-audit",
+                    Source = new() { TenantName = "settings-audit" }
+                },
+                Spec = new()
+                {
+                    DisplayName = "Setting Race Tenant",
+                    Settings = new Dictionary<string, JsonElement>
+                    {
+                        [updatedKey] = JsonSerializer.SerializeToElement("dark"),
+                        [insertedKey] = JsonSerializer.SerializeToElement("Updated catalog")
+                    },
+                    Documents = new Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(),
+                    LegalDocuments = new Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>()
+                }
+            };
+            var sessions = session.Services.GetRequiredService<ConfigurationImportSessionApplicationService>();
+            var created = await sessions.CreateTenantAsync(tenantId,
+                TenantConfigurationPackageSerializer.Serialize(package), CancellationToken.None);
+            var request = new ConfigurationImportPreviewRequest
+            {
+                SelectedSectionKeys = ["tenant.settings"],
+                Mappings = new Dictionary<string, string>(),
+                ApplyMode = ConfigurationImportApplyMode.ApplySelected,
+                GrantedApprovalCodes = []
+            };
+            var preview = await sessions.PreviewTenantAsync(tenantId, created.SessionId,
+                created.AccessToken, request, CancellationToken.None);
+            await Assert.That(preview.IsApplyReady).IsTrue();
+            var result = await session.Services.GetRequiredService<ConfigurationImportApplyService>()
+                .ApplyTenantAsync(tenantId, created.SessionId, created.AccessToken, request,
+                    session.Services.GetRequiredService<IHumanCommitScopePreparation>().Subject!,
+                    null, null, CancellationToken.None);
+            await Assert.That(result.Status).IsEqualTo(ConfigurationImportOperationStatus.Applied);
+            return true;
+        });
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new TenantSettingRepository(context, CreateMutationLock(context));
-
-        await repository.UpsertManyForTenantAsync(
-            tenantId,
-            [
-                new TenantSettingOverrideUpsert(SettingKey, "\"updated\"", true),
-                new TenantSettingOverrideUpsert(GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes, "2525", false)
-            ],
-            actorId);
-
         List<TenantSetting> saved = await context.TenantSettingOverrides
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(setting => setting.TenantId == tenantId)
             .ToListAsync();
-        TenantSetting updated = saved.Single(setting => setting.SettingKey == SettingKey);
-        TenantSetting inserted = saved.Single(setting => setting.SettingKey == GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes);
+        TenantSetting updated = saved.Single(setting => setting.SettingKey == updatedKey);
+        TenantSetting inserted = saved.Single(setting => setting.SettingKey == insertedKey);
+        await Assert.That(updated.Value).IsEqualTo("\"dark\"");
+        await Assert.That(inserted.Value).IsEqualTo("\"Updated catalog\"");
         await Assert.That(updated.UpdatedBy).IsEqualTo(actorId);
         await Assert.That(updated.UpdatedAt).IsNotNull();
         await Assert.That(inserted.CreatedBy).IsEqualTo(actorId);
@@ -209,20 +294,18 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
     public async Task SetThenLock_AreSerializedWithoutLosingValueOrLock()
     {
         Guid tenantId = await SeedAsync(tenantLocked: false);
-        await using ExploreDbContext firstContext = fixture.CreateDbContext();
-        await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        RelationalSettingMutationLock firstLock = CreateMutationLock(firstContext);
-        RelationalSettingMutationLock secondLock = CreateMutationLock(secondContext);
-        var firstRepository = new TenantSettingRepository(firstContext, firstLock);
-        var secondRepository = new TenantSettingRepository(secondContext, secondLock);
-
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
         bool lockApplied = await RunFirstThenSecondAsync(
-            firstLock,
-            secondContext,
-            token => firstRepository.SetValueAsync(tenantId, SettingKey, "\"raced\"", token),
-            () => secondLock.ExecuteAsync(
-                SettingKey,
-                token => secondRepository.LockAsync(tenantId, SettingKey, _actorId, token)));
+            authenticated, tenantId,
+            session => session.ValueAsync(SettingKey, "raced", "\"raced\"", async token =>
+            {
+                await new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary)
+                    .SetValueAsync(tenantId, SettingKey, "\"raced\"", token, session.ActorId);
+                return true;
+            }),
+            session => session.LockAsync(SettingKey, true, token =>
+                new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary)
+                    .LockAsync(tenantId, SettingKey, session.ActorId, token)));
 
         TenantSetting saved = await ReadTenantSettingAsync(tenantId);
         await Assert.That(lockApplied).IsTrue();
@@ -234,18 +317,12 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
     public async Task SystemValueThenLock_AreSerializedWithoutLosingTheCommittedValue()
     {
         await fixture.ResetAsync();
-        await using ExploreDbContext firstContext = fixture.CreateDbContext();
-        await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        RelationalSettingMutationLock firstLock = CreateMutationLock(firstContext);
-        RelationalSettingMutationLock secondLock = CreateMutationLock(secondContext);
-        var firstRepository = new SystemSettingRepository(firstContext, firstLock);
-        var secondRepository = new SystemSettingRepository(secondContext, secondLock);
-
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
         string? previousValue = await RunFirstThenSecondAsync(
-            firstLock,
-            secondContext,
-            async token =>
+            authenticated, null,
+            session => session.ValueAsync(SettingKey, "raced", "\"raced\"", async token =>
             {
+                var firstRepository = new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary);
                 await firstRepository.UpsertAsync(new SystemSetting
                 {
                     SettingKey = SettingKey,
@@ -258,15 +335,17 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 }, token);
-            },
-            () => secondRepository.UpsertLockAsync(new SystemSetting
-            {
-                SettingKey = SettingKey,
-                Value = "\"fallback\"",
-                ValueType = SettingValueType.String,
-                IsLocked = true,
-                UpdatedAt = DateTime.UtcNow
-            }));
+                return true;
+            }),
+            session => session.LockAsync(SettingKey, true, token =>
+                new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary).UpsertLockAsync(new SystemSetting
+                {
+                    SettingKey = SettingKey,
+                    Value = "\"fallback\"",
+                    ValueType = SettingValueType.String,
+                    IsLocked = true,
+                    UpdatedAt = DateTime.UtcNow
+                }, token)));
 
         await using ExploreDbContext readContext = fixture.CreateDbContext();
         SystemSetting saved = await readContext.SystemSettings
@@ -281,20 +360,18 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
     public async Task SetThenUnlock_AreSerializedWithoutRestoringStaleLockState()
     {
         Guid tenantId = await SeedAsync(tenantLocked: true);
-        await using ExploreDbContext firstContext = fixture.CreateDbContext();
-        await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        RelationalSettingMutationLock firstLock = CreateMutationLock(firstContext);
-        RelationalSettingMutationLock secondLock = CreateMutationLock(secondContext);
-        var firstRepository = new TenantSettingRepository(firstContext, firstLock);
-        var secondRepository = new TenantSettingRepository(secondContext, secondLock);
-
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
         bool unlockApplied = await RunFirstThenSecondAsync(
-            firstLock,
-            secondContext,
-            token => firstRepository.SetValueAsync(tenantId, SettingKey, "\"raced\"", token),
-            () => secondLock.ExecuteAsync(
-                SettingKey,
-                token => secondRepository.UnlockAsync(tenantId, SettingKey, _actorId, token)));
+            authenticated, tenantId,
+            session => session.ValueAsync(SettingKey, "raced", "\"raced\"", async token =>
+            {
+                await new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary)
+                    .SetValueAsync(tenantId, SettingKey, "\"raced\"", token, session.ActorId);
+                return true;
+            }),
+            session => session.LockAsync(SettingKey, false, token =>
+                new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary)
+                    .UnlockAsync(tenantId, SettingKey, session.ActorId, token)));
 
         TenantSetting saved = await ReadTenantSettingAsync(tenantId);
         await Assert.That(unlockApplied).IsTrue();
@@ -306,24 +383,19 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
     public async Task LockThenUnlock_AreSerializedByExpectedState()
     {
         Guid tenantId = await SeedAsync(tenantLocked: false);
-        await using ExploreDbContext firstContext = fixture.CreateDbContext();
-        await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        RelationalSettingMutationLock firstLock = CreateMutationLock(firstContext);
-        RelationalSettingMutationLock secondLock = CreateMutationLock(secondContext);
-        var firstRepository = new TenantSettingRepository(firstContext, firstLock);
-        var secondRepository = new TenantSettingRepository(secondContext, secondLock);
-
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
         bool unlockApplied = await RunFirstThenSecondAsync(
-            firstLock,
-            secondContext,
-            async token =>
+            authenticated, tenantId,
+            session => session.LockAsync(SettingKey, true, async token =>
             {
-                bool lockApplied = await firstRepository.LockAsync(tenantId, SettingKey, _actorId, token);
+                bool lockApplied = await new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary)
+                    .LockAsync(tenantId, SettingKey, session.ActorId, token);
                 await Assert.That(lockApplied).IsTrue();
-            },
-            () => secondLock.ExecuteAsync(
-                SettingKey,
-                token => secondRepository.UnlockAsync(tenantId, SettingKey, _actorId, token)));
+                return true;
+            }),
+            session => session.LockAsync(SettingKey, false, token =>
+                new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary)
+                    .UnlockAsync(tenantId, SettingKey, session.ActorId, token)));
 
         TenantSetting saved = await ReadTenantSettingAsync(tenantId);
         await Assert.That(unlockApplied).IsTrue();
@@ -389,24 +461,21 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         bool tenantInitiallyLocked)
     {
         Guid tenantId = await SeedAsync(tenantInitiallyLocked);
-        await using ExploreDbContext firstContext = fixture.CreateDbContext();
-        await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        RelationalSettingMutationLock firstLock = CreateMutationLock(firstContext);
-        RelationalSettingMutationLock secondLock = CreateMutationLock(secondContext);
-        var firstSystemRepository = new SystemSettingRepository(firstContext, firstLock);
-        var secondSystemRepository = new SystemSettingRepository(secondContext, secondLock);
-        var secondTenantRepository = new TenantSettingRepository(secondContext, secondLock);
-
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(() => fixture.CreateDbContext(), fixture);
         BaseCommandResponse<Guid> result = await RunFirstThenSecondAsync(
-            firstLock,
-            secondContext,
-            token => LockSystemSettingAsync(firstSystemRepository, token),
-            () => ExecuteTenantMutationAsync(
-                mutation,
-                tenantId,
-                secondTenantRepository,
-                secondSystemRepository,
-                secondLock));
+            authenticated, tenantId,
+            session => session.LockAsync(SettingKey, true, async token =>
+            {
+                await LockSystemSettingAsync(
+                    new SystemSettingRepository(session.Context, session.MutationLock, session.Boundary), token);
+                return true;
+            }),
+            session => ExecuteTenantMutationAsync(
+                mutation, tenantId,
+                new TenantSettingRepository(session.Context, session.MutationLock, session.Boundary),
+                SystemSettingRepository.CreateReadOnly(session.Context, session.MutationLock),
+                session.MutationLock, session.ActorId),
+            firstIsInstance: true);
 
         TenantSetting saved = await ReadTenantSettingAsync(tenantId);
         await Assert.That(result.FailureCode).IsEqualTo("setting_system_locked");
@@ -455,31 +524,52 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         new(context, new EfCoreUnitOfWork(context));
 
     private async Task<T> RunFirstThenSecondAsync<T>(
-        ISettingMutationLock firstLock,
-        ExploreDbContext secondContext,
-        Func<CancellationToken, Task> firstMutation,
-        Func<Task<T>> secondMutation)
+        AuthenticatedSettingsFixture authenticated,
+        Guid? tenantId,
+        Func<AuthenticatedSettingsFixture.Session, Task> firstMutation,
+        Func<AuthenticatedSettingsFixture.Session, Task<T>> secondMutation,
+        bool firstIsInstance = false)
     {
-        int secondBackendPid = await GetBackendPidAsync(secondContext);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var firstMutated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Task<bool> firstTask = firstLock.ExecuteAsync(
-            SettingKey,
-            async token =>
+        var secondBackend = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<bool> firstTask = authenticated.RunAsync(firstIsInstance ? null : tenantId, session =>
+            session.MutationLock.ExecuteOrderedGroupsAsync([[SettingKey]], async token =>
             {
-                await firstMutation(token);
+                // The outer native session lock precedes observation and BEGIN. The second
+                // command observes only after acquiring that same lock, never a stale proof.
+                await firstMutation(session);
                 firstMutated.SetResult();
                 await releaseFirst.Task.WaitAsync(token);
                 return true;
+            }, deadline.Token));
+        Task<T>? secondTask = null;
+        try
+        {
+            await Task.WhenAny(firstMutated.Task, firstTask).WaitAsync(deadline.Token);
+            if (!firstMutated.Task.IsCompleted)
+                await firstTask;
+            await firstMutated.Task.WaitAsync(deadline.Token);
+            secondTask = authenticated.RunAsync(tenantId, async session =>
+            {
+                secondBackend.SetResult(await GetBackendPidAsync(session.Context));
+                return await session.MutationLock.ExecuteOrderedGroupsAsync([[SettingKey]],
+                    _ => secondMutation(session), deadline.Token);
             });
-
-        await firstMutated.Task;
-        Task<T> secondTask = secondMutation();
-        await WaitUntilAdvisoryLockIsWaitingAsync(secondBackendPid, secondTask);
-        await Assert.That(secondTask.IsCompleted).IsFalse();
-        releaseFirst.SetResult();
-        await firstTask;
-        return await secondTask;
+            await Task.WhenAny(secondBackend.Task, secondTask).WaitAsync(deadline.Token);
+            if (!secondBackend.Task.IsCompleted)
+                await secondTask;
+            int secondBackendPid = await secondBackend.Task.WaitAsync(deadline.Token);
+            await WaitUntilAdvisoryLockIsWaitingAsync(secondBackendPid, secondTask);
+            await Assert.That(secondTask.IsCompleted).IsFalse();
+        }
+        finally
+        {
+            releaseFirst.TrySetResult();
+            await firstTask.WaitAsync(deadline.Token);
+        }
+        return await secondTask!.WaitAsync(deadline.Token);
     }
 
     private static async Task<int> GetBackendPidAsync(ExploreDbContext context)
@@ -501,6 +591,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         {
             if (secondTask.IsCompleted)
             {
+                await secondTask;
                 throw new InvalidOperationException(
                     "The competing setting mutation completed before waiting on the advisory lock.");
             }
@@ -520,7 +611,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
                 return;
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(20), timeout.Token);
+            await Task.Yield();
         }
 
         throw new TimeoutException(
@@ -531,7 +622,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         ISystemSettingRepository repository,
         CancellationToken cancellationToken)
     {
-        await repository.UpsertAsync(new SystemSetting
+        await repository.UpsertLockAsync(new SystemSetting
         {
             SettingKey = SettingKey,
             Value = "\"system\"",
@@ -550,7 +641,8 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         Guid tenantId,
         ITenantSettingRepository tenantRepository,
         ISystemSettingRepository systemRepository,
-        ISettingMutationLock mutationLock)
+        ISettingMutationLock mutationLock,
+        Guid actorId)
         => mutationLock.ExecuteAsync(
             SettingKey,
             async cancellationToken =>
@@ -569,10 +661,10 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
                             tenantId, SettingKey, "\"changed\"", cancellationToken);
                         break;
                     case TenantMutation.Lock:
-                        await tenantRepository.LockAsync(tenantId, SettingKey, _actorId, cancellationToken);
+                        await tenantRepository.LockAsync(tenantId, SettingKey, actorId, cancellationToken);
                         break;
                     case TenantMutation.Unlock:
-                        await tenantRepository.UnlockAsync(tenantId, SettingKey, _actorId, cancellationToken);
+                        await tenantRepository.UnlockAsync(tenantId, SettingKey, actorId, cancellationToken);
                         break;
                     default:
                         throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null);

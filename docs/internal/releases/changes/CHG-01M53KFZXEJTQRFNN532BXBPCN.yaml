@@ -1,0 +1,29 @@
+Change-Id: CHG-01M53KFZXEJTQRFNN532BXBPCN
+Title: "Keep catalogue initialization outside tenant leases"
+Type: fix
+Scope: access
+Summary: "Initialize reference caches through an independent identity-free Runtime factory lease."
+Group: catalogue-runtime-factory-lease
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Native catalogue guards retain tenant isolation and Runtime execute-only admission.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose empty caches through native readiness and Runtime factory registration.

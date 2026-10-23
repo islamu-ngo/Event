@@ -176,3 +176,49 @@ would obscure this mismatch rather than fix it.
 
 **Promotion Consideration**:
 - [x] Stays in domain journal as a verified admission debugging lesson.
+
+[2026-10-15 Europe/Brussels] — Original setup effects need a private Global executor
+
+**Context**: Final security-programme assurance moved successful onboarding cases
+from simulated Application owners to real Local identity, SQLite application
+storage and the production setup writer.
+
+**Symptom / Observation**: Completing single-tenant setup failed with
+`tracked_tenant_authority_mismatch` while creating mandatory tenant documents;
+with an existing default tenant it failed on membership creation instead.
+
+**Root Cause**: The admitted setup action owns an instance-global transaction,
+but ordinary tenant repositories correctly require a matching selected tenant.
+Calling those repositories from an authorized continuation does not transfer
+the continuation's provenance to arbitrary lower effects.
+
+**Resolution**: The original `TrustedSetupSettingsApply` capsule now binds
+immutable default-tenant seed data and receives a private executor from its
+original writer. The executor accepts no caller-selected tenant, subject,
+entity or callback, revalidates original source/owner before writes, enforces
+ordered one-shot steps and closes when the continuation exits. It persists
+the exact default documents and bound subject membership/admin grant directly;
+normal repository guards remain unchanged. Commit checks validate persisted
+membership and grant state independently of the disposed producer capsule.
+The writer also rejects unrelated pending tracked rows before settings writes.
+The complete native onboarding cohort passed 52/52, exit 0, without skips or
+timeouts. Executed verification:
+
+```bash
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build --verbosity quiet -- --maximum-parallel-tests 1 --treenode-filter "/*/*/LocalBootstrapConvergenceTests/*" --minimum-expected-tests 52 --no-progress --detailed-stacktrace --report-trx --report-trx-filename Repair-Complete-NativeOnboarding.trx
+```
+
+**Why This Matters for Future Work**: Do not repair a Global bootstrap failure
+by widening generic tenant guards or setting an ambient permission flag.
+Keep exceptional effects structurally inside their original typed action.
+Separate short-lived executor activity from terminal checks that run after
+the producer's `using` scope has ended.
+
+**References**:
+- `src/Explore.Application/Features/InstanceOnboarding/Services/ITrustedSetupSettingsWriter.cs`
+- `src/Explore.Persistence/Services/TrustedSetupSettingsWriter.TenantCompletion.cs`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalBootstrapConvergenceTests.SettingsCustody.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [x] Stays in domain journal; the technical authentication anchor records the implemented boundary.

@@ -3,12 +3,23 @@ namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Settings;
+using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
 using Explore.Domain.Settings.Documents;
 
 public sealed class ConfigurationManifestCatalogTests
 {
+    [Test]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsEnabled)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled)]
+    [Arguments(GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode)]
+    public async Task SettingCatalog_DedicatedFederationKeysRemainOutsideBothManifestScopes(string key)
+    {
+        await Assert.That(ConfigurationManifestCatalog.InstanceSettings.ContainsKey(key)).IsFalse();
+        await Assert.That(ConfigurationManifestCatalog.TenantSettings.ContainsKey(key)).IsFalse();
+    }
+
     private static readonly string[] ApprovedSettingKeys =
     [
         "appearance.default_theme_mode",

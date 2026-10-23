@@ -4,10 +4,13 @@ using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Notifications;
 using Explore.Application.Services;
 using Explore.Domain;
+using Explore.Domain.Keycloak;
+using Explore.Domain.Secrets;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services.Keycloak;
 using Microsoft.Extensions.Logging;
@@ -74,6 +77,12 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
                     NotificationOwnership.AccountAuthority, AccountAuthorityKind.Keycloak),
                 ExternalDelegation: delegation));
         var logger = new TestListLogger<KeycloakAccountAuthorityLifecycleEmailService>();
+        var secrets = Substitute.For<ISecretResolver>();
+        secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Keycloak.LifecycleClientSecret, null,
+                Arg.Any<CancellationToken>())
+            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
+                SecretDefinitionRegistry.Keys.Keycloak.LifecycleClientSecret, handler.ClientSecret,
+                SecretSourceType.EnvironmentVariable, SecretScope.Instance, null, DateTimeOffset.UtcNow)));
         var provider = new KeycloakAccountAuthorityLifecycleEmailService(clients, orchestrator, tenantUsers,
             Options.Create(new AccountAuthorityLifecycleEmailOptions { Enabled = true, ProviderConfigured = true }),
             Options.Create(new KeycloakLifecycleEmailOptions
@@ -81,9 +90,10 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
                 Enabled = true,
                 BaseUrl = "https://keycloak.example.test/auth",
                 Realm = "ISLAMU",
-                AdminUsername = handler.AdminUsername,
-                AdminPassword = handler.AdminPassword
-            }), logger);
+                ClientId = handler.ClientId,
+                ProviderVersion = KeycloakLifecycleGrantProfile.ProviderVersion,
+                DefaultClientId = "event-bff"
+            }), secrets, logger);
         IAccountAuthorityLifecycleEmailService service = new DefaultAccountAuthorityLifecycleEmailService(
             externalLogins, [provider]);
         var request = new AccountAuthorityLifecycleEmailRequest(userId, loginId, tenantId, proposedEmail);
@@ -120,7 +130,7 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
         }
         foreach (var canary in new[]
                  {
-                     subject, proposedEmail, handler.AdminUsername, handler.AdminPassword,
+                     subject, proposedEmail, handler.ClientId, handler.ClientSecret,
                      handler.AdminToken, handler.ResponseBodyCanary
                  })
         {
@@ -133,9 +143,9 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
     private sealed class FailingProviderHandler(string subject, string requiredAction, string proposedEmail)
         : HttpMessageHandler
     {
-        public string AdminUsername { get; } = Guid.NewGuid().ToString("N");
-        public string AdminPassword { get; } = Guid.NewGuid().ToString("N");
-        public string AdminToken { get; } = Guid.NewGuid().ToString("N");
+        public string ClientId { get; } = $"lifecycle-{Guid.NewGuid():N}";
+        public string ClientSecret { get; } = Guid.NewGuid().ToString("N");
+        public string AdminToken => Token();
         public string ResponseBodyCanary { get; } = Guid.NewGuid().ToString("N");
         public int RequestCount { get; private set; }
 
@@ -148,9 +158,12 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
             {
                 await Assert.That(request.Method).IsEqualTo(HttpMethod.Post);
                 await Assert.That(request.RequestUri!.AbsolutePath)
-                    .IsEqualTo("/auth/realms/master/protocol/openid-connect/token");
-                await Assert.That(body).Contains($"username={AdminUsername}");
-                await Assert.That(body).Contains($"password={AdminPassword}");
+                    .IsEqualTo("/auth/realms/ISLAMU/protocol/openid-connect/token");
+                await Assert.That(body).Contains("grant_type=client_credentials");
+                await Assert.That(body).Contains($"client_id={ClientId}");
+                await Assert.That(body).Contains($"client_secret={ClientSecret}");
+                await Assert.That(body).DoesNotContain("username=");
+                await Assert.That(body).DoesNotContain("password=");
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(JsonSerializer.Serialize(new { access_token = AdminToken }),
@@ -171,10 +184,32 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
                 {
                     error = ResponseBodyCanary,
                     email = proposedEmail,
-                    password = AdminPassword,
+                    password = ClientSecret,
                     access_token = AdminToken
                 }), Encoding.UTF8, "application/json")
             };
         }
+
+        private string? _token;
+
+        private string Token() => _token ??= string.Join(".", new[]
+        {
+            Segment(new { alg = "RS256" }),
+            Segment(new
+            {
+                iss = "https://keycloak.example.test/auth/realms/ISLAMU", azp = ClientId,
+                sub = Guid.CreateVersion7().ToString(), preferred_username = $"service-account-{ClientId}",
+                exp = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds(),
+                resource_access = new Dictionary<string, object>
+                {
+                    ["realm-management"] = new { roles = new[] { "manage-users" } }
+                }
+            }),
+            Segment(Guid.CreateVersion7().ToString())
+        });
+
+        private static string Segment<T>(T value) =>
+            Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)))
+                .TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 }

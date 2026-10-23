@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Event.Application.UnitTests.Operations;
 using Explore.Application;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -277,6 +278,7 @@ public sealed class ActorSubscriptionMapperTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton(NSubstitute.Substitute.For<IMachinePrincipalAccessor>());
         services.AddSingleton<IActorSubscriptionRepository>(subscriptions);
         services.AddSingleton<ITenantUserRepository>(memberships);
         services.AddSingleton<ITenantContext>(context);
@@ -316,7 +318,6 @@ public sealed class ActorSubscriptionMapperTests
             Task.FromResult(memberships.SingleOrDefault(member => member.TenantId == tenantId && member.UserId == userId));
         public Task<TenantUser?> GetByTenantAndActorAsync(Guid tenantId, Guid actorId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> IsActiveTenantUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<List<TenantUser>> GetActiveTenantsForUserAsync(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> TryRemoveMembershipAsync(Guid tenantId, Guid userId, Guid removedBy, DateTime removedAtUtc, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
@@ -331,7 +332,7 @@ public sealed class ActorSubscriptionMapperTests
             LastPage = visible.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
             return Task.FromResult((LastPage, visible.Count));
         }
-        public Task<ActorSubscription?> GetBySubscriberAndTargetAsync(Guid tenantId, Guid subscriberTenantUserId, Guid targetActorId, bool trackChanges = false, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ActorSubscription?> GetBySubscriberAndTargetAsync(Guid tenantId, Guid subscriberTenantUserId, Guid targetActorId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<ActorSubscription>> GetActiveFanoutBatchAsync(Guid tenantId, Guid targetActorId, Guid? afterSubscriberTenantUserId, int pageSize, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

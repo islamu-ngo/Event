@@ -17,6 +17,33 @@ Do not symlink `.github` to `.ci`. GitHub discovers workflows from `.github/work
 
 Workflow YAML defines what runs; repository settings define which checks are required, which environments require approval, and which organization security features are enabled.
 
+## Security integration fixture execution
+
+The security workflow runs the complete `Category=Security` selection with
+`--maximum-parallel-tests 1`. Each case may still exercise concurrent HTTP
+requests and independent database connections inside its own fixture; this
+setting serializes separate cases, not the business races they assert.
+Keep provider identities, external Data Protection authority, scoped database
+owners and host teardown real and bounded. A killed process or missing test
+summary is not a passing receipt. Diagnose partial-initialization leaks and
+provider lifecycle wiring rather than reducing coverage or extending a hang.
+
+## Complete PR file metadata
+
+The release-impact job checks out only its trusted base and fetches the immutable
+PR-head object without checking it out. Its NUL-delimited, rename-aware Git diff
+is serialized into a runner-local JSON file. This avoids both GitHub's
+3,000-file listing cap and process-environment payload limits while retaining
+previous filenames for impact classification. The validator accepts at most
+16 MiB of file metadata and still requires the exact event file count and unique
+paths; missing, truncated or invalid metadata fails closed.
+
+`RELEASE_IMPACT_FILE_METADATA_PATH` selects this runner-local metadata file.
+The former inline JSON environment payload is no longer used. No PR-head code,
+checkout, custom diff driver or text-conversion driver is executed. Because
+`pull_request_target` executes trusted-base code, this workflow repair must be
+reviewed and installed on the base before it can validate an affected large PR.
+
 ## Reproducible WebAssembly Restore
 
 `global.json` pins the SDK. `Directory.Build.props` additionally pins
@@ -511,6 +538,12 @@ ISLAMU Event is licensed under AGPL-3.0-or-later, and the ISLAMU CLA grants the 
 
 `Build & Test` runs `.ci/scripts/validate-dependency-license-policy.cs` after locked restore and the NuGet vulnerability audit. The validator scans product `packages.lock.json` files, reads restored NuGet package metadata from the local package cache, rejects denied or unknown license metadata unless a package-specific exception is encoded in the policy script, and guards future product npm or container OS package dependency surfaces until dedicated license scanning exists for those ecosystems.
 
+The Data Protection operator is outside the solution but retains its own
+dependency lockfile. The fast lane explicitly restores its project in locked
+mode before the license audit, so its exact package versions have local NuGet
+metadata even on a clean runner. This does not exempt operator dependencies
+from the audit or permit missing metadata.
+
 The retained exporter is part of `Explore.slnx`, so its lock and dependency
 closure participate in solution restore/audits. Missing metadata remains a
 blocking error. Removal of unused probes does not weaken package licensing
@@ -626,9 +659,20 @@ or empty changed-file evidence selects execution fail-safe; unrelated changes
 retain an explicitly reported no-op.
 
 The workflow sets up .NET and builds the classifier before making that decision.
+It also validates the complete source catalogue with the same native release
+engine. Catalogue or release-engine changes select execution rather than an
+unrelated-path no-op. Initial source dispositions remain separate from runtime
+assurance.
 Selected API security and Cerbos lanes retain their nonzero expected test count,
 TRX artifacts and separate outcomes. A classifier pass or unrelated no-op is not
 a passing security test run and does not establish candidate admission.
+
+After both selected lanes succeed, `produce-security-execution` validates their
+actual TRX, retains reports/logs and emits `security-execution.v1.json` for the
+exact tested GitHub SHA and invocation. No-op or failed execution emits no
+admissible packet. The upload retains diagnostic output on failure; human step
+summaries are not evidence receipts. See [Security Verification](SECURITY_VERIFICATION.md)
+for sidecar admission and the separate final provider/operational/provenance gate.
 
 The required `Build & Test` job has a bounded 45-minute budget. PR #71 run
 `37390746175` exhausted the former 30-minute job deadline during Standalone Host

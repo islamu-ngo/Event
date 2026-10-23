@@ -15,7 +15,7 @@ public sealed class UpdateEventSessionTemplateAuthorizationContextEnricher(
         UpdateEventSessionTemplateCommand request,
         CancellationToken cancellationToken)
     {
-        var template = await repository.GetSessionTemplateWithDetails(request.SessionTemplateId);
+        var template = await repository.GetSessionTemplateWithDetails(request.SessionTemplateId, cancellationToken);
         if (template is null || (tenantContext is not null && template.TenantId != tenantContext.TenantId))
         {
             throw new AuthorizationException(ResourceKinds.Tenant, AuthorizationActions.Update);

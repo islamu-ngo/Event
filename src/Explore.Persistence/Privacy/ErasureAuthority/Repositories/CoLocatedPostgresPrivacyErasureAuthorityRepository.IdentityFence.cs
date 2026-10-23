@@ -1,13 +1,22 @@
 using System.Data;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 
-public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository
+public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository : IOriginalPrivacyIdentityFenceAuthority
 {
     private readonly AsyncLocal<bool> _identityGate = new();
+
+    public Task<T> ExecuteOriginalEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    {
+        if (_identityGate.Value)
+            throw new InvalidOperationException("Original enrollment cannot borrow another identity gate.");
+        return ExecuteSerializedAsync(operation, cancellationToken);
+    }
 
     public async Task<T> ExecuteSerializedAsync<T>(
         Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)

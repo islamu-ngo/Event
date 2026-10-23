@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53J0ZMV8MABZ9YPNFBW9J3J
+Title: "Admit native administrative authority reads"
+Type: fix
+Scope: access
+Summary: "Read committed exact-user administrative authority through independent Global projections rather than Runtime membership tables."
+Group: native-administrative-authority-reader
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Administrative checks use committed membership and do not trust role claims or grant Runtime table access.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Requires the native administrative authority contract and independent Global execution membership.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose membership admission separately from role claims and transactional mutation authority.

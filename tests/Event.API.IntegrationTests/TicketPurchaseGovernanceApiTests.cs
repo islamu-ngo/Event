@@ -123,7 +123,9 @@ public sealed class TicketPurchaseGovernanceApiTests
     }
 
     [Test]
-    public async Task MissingGuestCapabilityFailsIndistinguishablyAndPrivate()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task MissingGuestCapabilityFailsIndistinguishablyAndPrivate(bool issuedCapability)
     {
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
@@ -133,7 +135,10 @@ public sealed class TicketPurchaseGovernanceApiTests
             guest: true);
         request.Headers.Add(
             "Idempotency-Key",
-            "missing-capability-test");
+            Guid.CreateVersion7().ToString("N"));
+        if (issuedCapability)
+            request.Headers.Add("X-Registration-Order-Capability",
+                new Explore.Infrastructure.Services.GuestCapabilityTokenService().Issue().RawToken);
 
         using HttpResponseMessage response =
             await _fixture.Client.SendAsync(request);

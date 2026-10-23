@@ -7,16 +7,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Services;
 
-public sealed class EmailDeliveryDisableImpactReader(ExploreDbContext context) : IEmailDeliveryDisableImpactReader
+public sealed class EmailDeliveryDisableImpactReader(
+    ExploreDbContext context, IServiceProvider selectedServices) : IEmailDeliveryDisableImpactReader
 {
     public async Task<EmailDeliveryDisableImpactSnapshot?> ReadAsync(
         Guid? tenantId, CancellationToken cancellationToken = default)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("An email delivery scope must identify a tenant or the instance.", nameof(tenantId));
+        var admission = HumanEmailDataOwner.Require(context, selectedServices);
         if (context.Database.CurrentTransaction is null)
             throw new InvalidOperationException("Email disable previews require an active transaction.");
 
+        await admission.RequireImpactAsync(tenantId, cancellationToken);
         var policies = await EmailDeliveryPolicyReader.ReadDisableAsync(context, tenantId, cancellationToken);
         if (policies is null)
             return null;

@@ -1,6 +1,8 @@
 using System.Net;
 using System.Security.Claims;
+using Event.Testing.DataProtection;
 using Explore.Blazor.Extensions;
+using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
@@ -8,7 +10,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.Redis;
 
 namespace Explore.Blazor.IntegrationTests.Endpoints;
 
@@ -17,33 +18,24 @@ public sealed class BffDataProtectionCookieRestartTests
     private const string CookieName = ".AspNetCore.RestartProof";
 
     [Test]
-    public async Task DataProtectionRoundTripWorksWhenRedisIsNotConfigured()
+    public async Task DataProtectionRejectsMissingAuthorityInsteadOfUsingLocalKeys()
     {
         var services = new ServiceCollection();
-        services.AddBffDataProtection(string.Empty);
+        services.AddBffDataProtection();
+        services.AddSingleton<IExternalDataProtectionSource>(new MissingAuthority());
         await using var provider = services.BuildServiceProvider();
-        var protector = provider
-            .GetRequiredService<IDataProtectionProvider>()
-            .CreateProtector(nameof(DataProtectionRoundTripWorksWhenRedisIsNotConfigured));
-
-        var protectedPayload = protector.Protect("local-lite");
-        var payload = protector.Unprotect(protectedPayload);
-
-        await Assert.That(payload).IsEqualTo("local-lite");
+        await Assert.That(() => provider.GetRequiredService<IDataProtectionProvider>())
+            .Throws<InvalidOperationException>();
     }
 
     [Test]
-    [Category(BffTestCategories.Runtime)]
-    [Explicit]
     public async Task CookieTicketSurvivesFreshBffHostWhenKeyRingPersists()
     {
-        await using var redis = new RedisBuilder("redis:7-alpine")
-            .Build();
-        await redis.StartAsync();
+        var authority = new ExternalDataProtectionTestAuthority("bff");
 
         string cookieHeader;
 
-        await using (var firstHost = await StartCookieHostAsync(redis.GetConnectionString()))
+        await using (var firstHost = await StartCookieHostAsync(authority))
         {
             using var firstClient = firstHost.GetTestClient();
             using var loginResponse = await firstClient.GetAsync("/login-test");
@@ -52,7 +44,7 @@ public sealed class BffDataProtectionCookieRestartTests
             cookieHeader = GetCookieHeader(loginResponse);
         }
 
-        await using (var secondHost = await StartCookieHostAsync(redis.GetConnectionString()))
+        await using (var secondHost = await StartCookieHostAsync(authority))
         {
             using var secondClient = secondHost.GetTestClient();
             secondClient.DefaultRequestHeaders.Add("Cookie", cookieHeader);
@@ -65,7 +57,7 @@ public sealed class BffDataProtectionCookieRestartTests
         }
     }
 
-    private static async Task<WebApplication> StartCookieHostAsync(string redisConnectionString)
+    private static async Task<WebApplication> StartCookieHostAsync(IExternalDataProtectionSource authority)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -73,7 +65,8 @@ public sealed class BffDataProtectionCookieRestartTests
         });
 
         builder.WebHost.UseTestServer();
-        builder.Services.AddBffDataProtection(redisConnectionString);
+        builder.Services.AddBffDataProtection();
+        builder.Services.AddSingleton(authority);
         builder.Services
             .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
@@ -125,5 +118,10 @@ public sealed class BffDataProtectionCookieRestartTests
         }
 
         return cookie.Split(';', 2)[0];
+    }
+
+    private sealed class MissingAuthority : IExternalDataProtectionSource
+    {
+        public ExternalDataProtectionInput Read() => throw new InvalidOperationException("authority_missing");
     }
 }

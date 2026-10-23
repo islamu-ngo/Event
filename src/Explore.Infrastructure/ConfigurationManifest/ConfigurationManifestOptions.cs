@@ -1,27 +1,21 @@
 namespace Explore.Infrastructure.ConfigurationManifest;
 
 using Explore.Application.Features.ConfigurationManifest.Ingestion;
+using Explore.Application.Features.ConfigurationManifest.Application;
 using Microsoft.Extensions.Options;
 
 public sealed class ConfigurationManifestOptions
 {
-    public const string ModeEnvironmentVariable = "CONFIGURATION_MANIFEST_MODE";
-    public const string PathEnvironmentVariable = "CONFIGURATION_MANIFEST_PATH";
+    public const string ModeEnvironmentVariable = ConfigurationManifestBootstrapDeployment.ModeVariable;
+    public const string PathEnvironmentVariable = ConfigurationManifestBootstrapDeployment.PathVariable;
     public const string ConventionPath =
-        "/etc/islamu-event/bootstrap/configuration-manifest.json";
+        ConfigurationManifestBootstrapDeployment.ConventionPath;
 
     public ConfigurationManifestMode Mode { get; set; } = ConfigurationManifestMode.Off;
 
     public string? Path { get; set; }
 
-    public static ConfigurationManifestMode ParseMode(string? value) =>
-        value switch
-        {
-            null or "" or "Off" => ConfigurationManifestMode.Off,
-            "ValidateOnly" => ConfigurationManifestMode.ValidateOnly,
-            "Bootstrap" => ConfigurationManifestMode.Bootstrap,
-            _ => (ConfigurationManifestMode)(-1)
-        };
+    public static ConfigurationManifestMode ParseMode(string? value) => ConfigurationManifestBootstrapDeployment.ParseMode(value);
 }
 
 public sealed class ConfigurationManifestOptionsValidator

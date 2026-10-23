@@ -1,4 +1,6 @@
 using System.Net;
+using Event.Testing.DataProtection;
+using Explore.ServiceDefaults.DataProtection;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.Hosting;
@@ -155,6 +157,7 @@ public sealed class BlazorHostCompositionTests
             ["Deployment:Mode"] = "SingleTenant",
             ["Deployment:DefaultTenantId"] = "018e4e5c-7f00-7000-8000-000000000001"
         });
+        builder.Services.AddSingleton<IExternalDataProtectionSource>(new ExternalDataProtectionTestAuthority("bff"));
         return builder;
     }
 }

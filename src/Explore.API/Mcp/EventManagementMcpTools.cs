@@ -61,21 +61,15 @@ public sealed class EventManagementMcpTools(
     IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>> eventTemplateListHandler,
     IQueryHandler<GetEventSessionTemplateListRequest, PaginatedResult<EventSessionTemplateListDto>> eventSessionTemplateListHandler,
     IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>> eventTemplateSyncHistoryHandler,
-    IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>> eventSessionTemplateSyncHistoryHandler,
+    IQueryHandler<GetManagedSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>> eventSessionTemplateSyncHistoryHandler,
     IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<EventTemplateDiffDto>> eventTemplateDiffHandler,
     IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<EventSessionTemplateDiffDto>> eventSessionTemplateDiffHandler,
-    IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>> managedEventDays,
+    IQueryHandler<GetManagedEventProgramRequest, ManagedEventProgramDto> managedEventProgram,
     IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
-    IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedAgendaItems,
-    IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>> managedEventSessionGroups,
-    IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>> customPropertyDefinitions,
-    IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>> customPropertyValues,
+    IQueryHandler<GetManagedEventCustomPropertiesRequest, ManagedEventCustomPropertiesDto> managedCustomProperties,
     IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>> eventRegistrationOrdersHandler,
-    IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>> eventTeamListHandler,
-    IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto> currentUserEventPermissionsHandler,
-    IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>> assignableEventRolePresetsHandler,
+    IQueryHandler<GetManagedEventTeamRequest, ManagedEventTeamDto> managedEventTeamHandler,
     IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>> publicSessionsByEvent,
-    IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>> managedSessionsByEvent,
     IQueryHandler<GetEventListRequest, PaginatedResult<EventListDto>> eventListHandler,
     IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>> myEventsHandler,
     IQueryHandler<GetEventCreationContextRequest, EventCreationContextDto> eventCreationContextHandler,
@@ -909,25 +903,18 @@ public sealed class EventManagementMcpTools(
         }
 
         var eventDto = gate.Event!;
-        var sessions = await managedSessionsByEvent.QueryAsync(new GetManagedSessionsByEventRequest { EventId = eventDto.Id }, cancellationToken);
-        var sessionGroups = await managedEventSessionGroups.QueryAsync(
-            new GetManagedEventSessionGroupsByEventRequest { EventId = eventDto.Id },
-            cancellationToken);
-        var days = await managedEventDays.QueryAsync(
-            new GetManagedEventDaysByEventRequest { EventId = eventDto.Id },
-            cancellationToken);
-        var agendaItems = await managedAgendaItems.QueryAsync(
-            new GetManagedEventAgendaItemsByEventRequest { EventId = eventDto.Id },
+        var program = await managedEventProgram.QueryAsync(
+            new GetManagedEventProgramRequest { EventId = eventDto.Id },
             cancellationToken);
 
-        locationDisclosureGuard.EnforceManagedProgramLocationDisclosureCeiling(sessions, sessionGroups);
+        locationDisclosureGuard.EnforceManagedProgramLocationDisclosureCeiling(program.Sessions, program.SessionGroups);
 
         return new EventMcpProgramManagementResultDescriptor(
             Found: true,
             EventId: eventDto.Id,
             Available: true,
             FailureCode: null,
-            Context: MapProgramManagementContext(eventDto, sessions, sessionGroups, days, agendaItems));
+            Context: MapProgramManagementContext(eventDto, program.Sessions, program.SessionGroups, program.Days, program.AgendaItems));
     }
 
     private async Task<EventMcpCustomPropertiesResultDescriptor> BuildCustomPropertiesContextAsync(
@@ -951,15 +938,16 @@ public sealed class EventManagementMcpTools(
         var (normalizedPageNumber, normalizedPageSize, pageSizeWasClamped) =
             NormalizeManagementPage(pageNumber, pageSize, MaxCustomPropertyDefinitions);
 
-        var definitions = await customPropertyDefinitions.QueryAsync(
-            new GetEventCustomPropertyDefinitionListRequest
+        var properties = await managedCustomProperties.QueryAsync(
+            new GetManagedEventCustomPropertiesRequest
             {
                 EventId = eventDto.Id,
                 PageNumber = normalizedPageNumber,
                 PageSize = normalizedPageSize
             },
             cancellationToken);
-        var values = await customPropertyValues.QueryAsync(new GetEventCustomPropertyValuesRequest { EventId = eventDto.Id }, cancellationToken);
+        var definitions = properties.Definitions;
+        var values = properties.Values;
 
         var truncatedFields = new List<string>();
         var returnedValues = values
@@ -1014,31 +1002,11 @@ public sealed class EventManagementMcpTools(
         }
 
         var eventDto = gate.Event!;
-        var userId = userContext.GetRequiredUserId();
-        var teamMembers = await eventTeamListHandler.QueryAsync(
-            new GetEventTeamListRequest
-            {
-                TenantId = tenantContext.TenantId,
-                EventId = eventDto.Id,
-                IncludeInactive = includeInactive
-            },
-            cancellationToken);
-        var permissions = await currentUserEventPermissionsHandler.QueryAsync(
-            new GetCurrentUserEventPermissionsRequest
-            {
-                TenantId = tenantContext.TenantId,
-                EventId = eventDto.Id,
-                UserId = userId
-            },
-            cancellationToken);
-        var assignablePresets = await assignableEventRolePresetsHandler.QueryAsync(
-            new GetAssignableEventRolePresetsRequest
-            {
-                TenantId = tenantContext.TenantId,
-                EventId = eventDto.Id,
-                AssignerUserId = userId
-            },
-            cancellationToken);
+        var team = await managedEventTeamHandler.QueryAsync(
+            new(eventDto.Id, includeInactive), cancellationToken);
+        var teamMembers = team.Members;
+        var permissions = team.Permissions;
+        var assignablePresets = team.AssignablePresets;
 
         var truncatedFields = new List<string>();
         var returnedMembers = teamMembers
@@ -1284,18 +1252,20 @@ public sealed class EventManagementMcpTools(
             return EventMcpSessionTemplateSyncContextResultDescriptor.Unavailable(eventId, sessionId);
         }
 
-        var sessions = await managedSessionsByEvent.QueryAsync(new GetManagedSessionsByEventRequest { EventId = eventId }, cancellationToken);
-        if (sessions.All(session => session.Id != sessionId))
-        {
-            return EventMcpSessionTemplateSyncContextResultDescriptor.NotFound(eventId, sessionId);
-        }
-
         var eventDto = gate.Event!;
         var (normalizedHistoryPageNumber, normalizedHistoryPageSize, historyPageSizeWasClamped) =
             NormalizeManagementPage(historyPageNumber, historyPageSize, MaxSyncHistoryItems);
-        var history = await eventSessionTemplateSyncHistoryHandler.QueryAsync(
-            new GetEventSessionTemplateSyncHistoryQuery(sessionId, normalizedHistoryPageNumber, normalizedHistoryPageSize),
-            cancellationToken);
+        PaginatedResult<EventSessionTemplateSyncHistoryItemDto> history;
+        try
+        {
+            history = await eventSessionTemplateSyncHistoryHandler.QueryAsync(
+                new GetManagedSessionTemplateSyncHistoryQuery(eventId, sessionId, normalizedHistoryPageNumber, normalizedHistoryPageSize),
+                cancellationToken);
+        }
+        catch (NotFoundException)
+        {
+            return EventMcpSessionTemplateSyncContextResultDescriptor.NotFound(eventId, sessionId);
+        }
         var diffRead = await ReadEventSessionTemplateDiffAsync(sessionId, targetTemplateVersion, cancellationToken);
         var truncatedFields = new List<string>();
 

@@ -5,6 +5,20 @@ namespace Event.Domain.UnitTests.Constants;
 public class ReservedTenantSlugsTests
 {
     [Test]
+    [Arguments("alive")]
+    [Arguments("vapid-public-key")]
+    [Arguments("scalar")]
+    [Arguments("quartz")]
+    [Arguments("Explore.Blazor.a1b2c3.styles.css")]
+    [Arguments("client.09af.js")]
+    [Arguments(".well-known")]
+    [Arguments("tenant.example")]
+    public async Task IsReserved_WithOperationalOrDottedRoot_ReturnsTrue(string slug)
+    {
+        await Assert.That(ReservedTenantSlugs.IsReserved(slug)).IsTrue();
+    }
+
+    [Test]
     public async Task IsReserved_WithBlazorRootSegments_ReturnsTrue()
     {
         string[] rootSegments =

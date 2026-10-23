@@ -1,12 +1,37 @@
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Domain.Enums;
-using System.Security.Cryptography;
 
 namespace Event.Application.UnitTests.DTOs.Onboarding;
 
 public class AuthProviderConfigurationDtoValidatorTests
 {
+    [Test]
+    [Arguments(false, true)]
+    [Arguments(false, false)]
+    [Arguments(true, false)]
+    public async Task GoogleReadinessUsesAuthoritativeOwnershipNotSubmittedMetadata(
+        bool authoritativeConfigured, bool submittedConfigured)
+    {
+        var current = new AuthProviderConfigurationDto
+        {
+            GoogleClientSecretOwnership = new() { Configured = authoritativeConfigured }
+        };
+        var requested = new AuthProviderConfigurationDto
+        {
+            GoogleSsoEnabled = true,
+            GoogleClientId = "client.apps.googleusercontent.com",
+            GoogleClientSecretOwnership = new() { Configured = submittedConfigured }
+        };
+
+        var result = await new AuthProviderConfigurationDtoValidator(current).ValidateAsync(requested);
+
+        await Assert.That(result.IsValid).IsEqualTo(authoritativeConfigured);
+        if (!authoritativeConfigured)
+            await Assert.That(result.Errors.Any(error =>
+                error.PropertyName == nameof(AuthProviderConfigurationDto.GoogleClientSecretOwnership))).IsTrue();
+    }
+
     [Test]
     public async Task Validate_KeycloakWithoutSecretAndNoConfiguredSecret_IsInvalid()
     {
@@ -16,7 +41,7 @@ public class AuthProviderConfigurationDtoValidatorTests
 
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Errors.Any(error =>
-            error.PropertyName == nameof(AuthProviderConfigurationDto.KeycloakClientSecret))).IsTrue();
+            error.PropertyName == nameof(AuthProviderConfigurationDto.KeycloakClientSecretOwnership))).IsTrue();
     }
 
     [Test]
@@ -50,7 +75,7 @@ public class AuthProviderConfigurationDtoValidatorTests
 
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Errors.Any(error =>
-            error.PropertyName == nameof(AuthProviderConfigurationDto.KeycloakClientSecret))).IsTrue();
+            error.PropertyName == nameof(AuthProviderConfigurationDto.KeycloakClientSecretOwnership))).IsTrue();
     }
 
     [Test]
@@ -118,9 +143,7 @@ public class AuthProviderConfigurationDtoValidatorTests
             AtprotoLoginEnabled = true,
             AtprotoPublicUrl = "https://events.example.test",
             GoogleSsoEnabled = true,
-            GoogleClientId = "client.apps.googleusercontent.com",
-            GoogleClientSecret = Convert.ToBase64String(
-                RandomNumberGenerator.GetBytes(32))
+            GoogleClientId = "client.apps.googleusercontent.com"
         };
 
         var result = await new AuthProviderConfigurationDtoValidator()
@@ -157,8 +180,7 @@ public class AuthProviderConfigurationDtoValidatorTests
             PrimaryProviderCode = "keycloak",
             PrimaryProviderName = "Keycloak",
             KeycloakAuthority = "https://id.example.test/realms/event",
-            KeycloakClientId = "islamu-event-blazor",
-            KeycloakClientSecret = string.Empty
+            KeycloakClientId = "islamu-event-blazor"
         };
     }
 }

@@ -1,0 +1,30 @@
+Change-Id: CHG-01M52YXTXBRSF7RF7HP8ME0K3W
+Title: "Add native webhook resource lineage observation and exclusion"
+Type: feat
+Scope: access
+Summary: "Project fixed webhook lineage and exclude contributor changes through original enrolled sessions."
+Group: native-human-webhook-resource-source
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Compulsory contributors share a private acquisition epoch while exact source, role, trigger and body admission rejects drift.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Explicit migrator installation provides the native prerequisite without production wiring.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Resource facts are not authorization or provider receipts; production installation and verified managed consumers remain required.

@@ -4,7 +4,9 @@ using System.Runtime.ExceptionServices;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Settings.Documents;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -15,6 +17,43 @@ public sealed class TenantSettingsDocumentRepository : GenericRepository<TenantS
     public TenantSettingsDocumentRepository(ExploreDbContext dbContext) : base(dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public async Task<TenantSettingsDocument> ApplyBrandingImportAsync(
+        Guid tenantId,
+        int schemaVersion,
+        string defaultsVersion,
+        string payloadJson,
+        Guid actorUserId,
+        DateTime occurredAt,
+        CancellationToken cancellationToken = default)
+    {
+        PostgresConfigurationImportBrandingContract.ValidateShape(schemaVersion, defaultsVersion, payloadJson);
+        if (_dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
+            return await native.WriteBrandingAsync(
+                tenantId, schemaVersion, defaultsVersion, payloadJson,
+                actorUserId, occurredAt, cancellationToken);
+
+        TenantSettingsDocument? current = await GetTrackedByTenantAndDocumentKey(
+            tenantId, SettingsDocumentKeys.Tenant.Branding, cancellationToken);
+        if (current is null)
+        {
+            current = TenantSettingsDocument.Create(
+                tenantId, SettingsDocumentKeys.Tenant.Branding, schemaVersion, defaultsVersion, payloadJson);
+            current.Id = Guid.CreateVersion7();
+            current.CreatedAt = occurredAt;
+            current.CreatedBy = actorUserId;
+            await Create(current);
+        }
+        else
+        {
+            current.UpdatePayload(schemaVersion, defaultsVersion, payloadJson);
+            current.UpdatedAt = occurredAt;
+            current.UpdatedBy = actorUserId;
+            await Update(current);
+        }
+        return current;
     }
 
     public async Task<TenantSettingsDocument> CreateIfMissingAsync(
@@ -120,6 +159,10 @@ public sealed class TenantSettingsDocumentRepository : GenericRepository<TenantS
         string documentKey,
         CancellationToken cancellationToken = default)
     {
+        if (_dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
+            return (await native.ReadTenantDocumentsAsync(
+                tenantId, [documentKey], cancellationToken)).SingleOrDefault();
         return await _dbContext.TenantSettingsDocuments
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .AsNoTracking()
@@ -154,6 +197,10 @@ public sealed class TenantSettingsDocumentRepository : GenericRepository<TenantS
         {
             return [];
         }
+
+        if (_dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(_dbContext) is { } native)
+            return await native.ReadTenantDocumentsAsync(tenantId, keys, cancellationToken);
 
         return await _dbContext.TenantSettingsDocuments
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)

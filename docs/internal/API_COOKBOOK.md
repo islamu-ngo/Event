@@ -83,7 +83,27 @@ For write operations (`POST`, `PUT`, `PATCH`, `DELETE`), send a stable idempoten
 Idempotency-Key: <stable-operation-key>
 ```
 
-Eligible responses are cached by key and tenant for a 24-hour window. The API only persists replay records for `2xx` through `4xx` responses whose body is at most 1 MB and whose content type is blank, `application/json`, or `application/problem+json`; `5xx`, large, or non-JSON responses are not replayed. Reusing the same key for a different logical operation can replay the wrong eligible response, so generate keys per operation, not per integration process.
+Eligible responses have a default 24-hour replay window, bounded by any shorter
+feature disclosure deadline. The API retains at most 1 MiB before response
+capture switches to direct forwarding. Replayable responses are bounded JSON
+(or blank content type), `2xx` through `4xx` except `400`/`415`, and must remain
+fully captured without an explicit response start/flush. Large, streamed,
+non-JSON, validation and server-error responses cannot prove business rollback.
+Their claims remain fenced rather than becoming safe retries.
+
+Reuse a key only for the identical method, target, content and caller authority.
+Changed requests receive `409 idempotency_key_reuse`. A matching operation with
+an unavailable response receives `409 idempotency_response_unavailable`; inspect
+the current authorized resource or feature-owned operation status before deciding
+on another business action. Do not rotate the key automatically after a timeout,
+abort, serialization failure or this conflict: the first operation may already
+have committed. Receipt expiry scrubs the cached body but preserves the identity
+fence, so waiting 24 hours does not reopen the operation.
+
+Authentication, authorization and tenant lifecycle admission remain ahead of
+replay. Protected receipts are private no-store and record-purpose-bound;
+one-time/API-key issuance bypasses generic receipt storage. The implementation
+and native rollback-proof boundary are described in [API](API.md#bounded-response-capture-and-ambiguous-operation-outcomes).
 
 ## Example Flow: Public Browse
 
@@ -100,7 +120,9 @@ Public browse endpoints are often anonymous, but the generated reference remains
 2. Send `X-API-Key` and tenant context (`X-Tenant-Slug` or tenant host).
 3. Send `Idempotency-Key` for create/update/delete calls that may be retried.
 4. Use `Prefer: return=minimal` if link affordances are not needed.
-5. On `409`, reload the relevant resource or diff and submit a new operation plan.
+5. On `409`, inspect its problem code and reload the authorized resource or
+   operation status. Reconcile unavailable outcomes before planning a new action;
+   do not resubmit an uncertain committed action with a new key.
 
 ## Example Flow: Template Sync
 

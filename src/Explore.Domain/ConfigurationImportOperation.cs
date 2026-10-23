@@ -44,6 +44,18 @@ public sealed class ConfigurationImportOperation
     public string? SnapshotDigest { get; private set; }
     public DateTime? SnapshotExpiresAt { get; private set; }
     public Guid? EffectOutboxId { get; private set; }
+    public string? EffectPayloadDigest { get; private set; }
+
+    public void BindEffectPayload(string? payload)
+    {
+        if (Status is not ConfigurationImportOperationStatus.Applied
+                and not ConfigurationImportOperationStatus.RolledBack
+            || EffectOutboxId is null || EffectPayloadDigest is not null)
+            throw new InvalidOperationException("Import effect receipt cannot be bound.");
+        EffectPayloadDigest = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(payload ?? string.Empty)));
+    }
     public bool FidelityVerified { get; private set; }
     public string FidelityDigest { get; private set; } = string.Empty;
     public string? FailureCode { get; private set; }

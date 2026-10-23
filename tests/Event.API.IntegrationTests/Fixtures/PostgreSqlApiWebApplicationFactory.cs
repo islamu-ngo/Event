@@ -1,112 +1,36 @@
-// Accepts a connection string from Testcontainers and optional configuration overrides per host profile.
-
-using Explore.Application.Contracts.Infrastructure;
-using Explore.Domain.Constants;
-using Explore.Persistence;
-using Microsoft.AspNetCore.Authentication;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Event.Api.IntegrationTests.Fixtures;
 
 /// <summary>
-/// WebApplicationFactory wired to a real PostgreSQL instance. Uses TestAuthHandler
-/// for authentication and StubAuthorizationProvider for authorization.
-/// Program.cs skips DB registration in Testing; this factory re-adds it with Npgsql.
+/// Retained PostgreSQL profiles reuse native purpose-role composition and lease-aware contexts.
+/// The caller initializes and disposes the enrolled database; disposing a host does not reset it.
+/// Header authentication remains a protocol transport, not native human mutation authority.
 /// </summary>
-public class PostgreSqlApiWebApplicationFactory : WebApplicationFactory<Program>
+public class PostgreSqlApiWebApplicationFactory : AuthenticatedWebApplicationFactory
 {
-    private readonly string _connectionString;
-    private readonly Dictionary<string, string?> _additionalConfig;
     private readonly Action<IServiceCollection>? _configureTestServices;
 
     public PostgreSqlApiWebApplicationFactory(
-        string connectionString,
+        PostgreSqlContainerFixture database,
         Dictionary<string, string?>? additionalConfig = null,
         Action<IServiceCollection>? configureTestServices = null)
+        : base(database)
     {
-        _connectionString = connectionString;
-        _additionalConfig = additionalConfig ?? [];
+        if (additionalConfig is not null)
+            foreach (var pair in additionalConfig)
+                AdditionalConfiguration[pair.Key] = pair.Value;
+        AdditionalConfiguration["Testing:UseRealDatabase"] = "true";
+        AuthorizationProviderOverride = new StubAuthorizationProvider();
         _configureTestServices = configureTestServices;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
-        foreach (var (key, value) in _additionalConfig)
-            builder.UseSetting(key, value);
-
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            var testConfig = new Dictionary<string, string?>
-            {
-                ["Keycloak:Authority"] = "https://localhost:8443/realms/ISLAMU",
-                ["Keycloak:Realm"] = "ISLAMU",
-                ["Keycloak:Audience"] = "islamu-event-api",
-                ["Keycloak:RequireHttpsMetadata"] = "false",
-                ["Keycloak:MetadataAddress"] = "https://localhost:8443/realms/ISLAMU/.well-known/openid-configuration",
-                ["S3Settings:Region"] = "us-east-1",
-                ["S3Settings:BucketName"] = "test-bucket",
-                ["S3Settings:Endpoint"] = "https://localhost:9000",
-                ["Deployment:Mode"] = "SingleTenant",
-                ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
-                ["Testing:UseRealDatabase"] = "true",
-                ["Testing:ApplyMigrations"] = "true",
-            };
-
-            TestDatabaseConfiguration.AddPostgreSql(testConfig, _connectionString);
-
-            foreach (var kvp in _additionalConfig)
-            {
-                testConfig[kvp.Key] = kvp.Value;
-            }
-
-            config.AddInMemoryCollection(testConfig);
-        });
-
-        builder.ConfigureServices(services =>
-        {
-            services.RemoveExploreDbContextRegistrations();
-
-            services.AddPostgreSqlExploreDbContext(_connectionString);
-
-            services.RemoveAll<IDistributedCache>();
-            services.AddDistributedMemoryCache();
-        });
-
-        builder.ConfigureTestServices(services =>
-        {
-            TestHostServicePruner.RemoveNoisyHostedServices(services);
-
-            services.AddAuthentication(options =>
-            {
-                options.DefaultScheme = TestAuthHandler.SchemeName;
-                options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
-                options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
-            })
-            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
-                TestAuthHandler.SchemeName, _ => { });
-
-            services.PostConfigure<AuthenticationOptions>(options =>
-            {
-                options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
-                options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
-                options.DefaultScheme = TestAuthHandler.SchemeName;
-                options.DefaultForbidScheme = TestAuthHandler.SchemeName;
-                options.DefaultSignInScheme = TestAuthHandler.SchemeName;
-                options.DefaultSignOutScheme = TestAuthHandler.SchemeName;
-            });
-
-            services.RemoveAll<IAuthorizationProvider>();
-            services.AddSingleton<IAuthorizationProvider>(new StubAuthorizationProvider());
-
-            _configureTestServices?.Invoke(services);
-        });
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(services => _configureTestServices?.Invoke(services));
     }
 }

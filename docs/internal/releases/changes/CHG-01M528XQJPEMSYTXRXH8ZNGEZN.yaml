@@ -1,0 +1,30 @@
+Change-Id: CHG-01M528XQJPEMSYTXRXH8ZNGEZN
+Title: "Bind webhook destination approval to delivery connections"
+Type: fix
+Scope: webhooks
+Summary: "Validate the complete connection-time DNS answer set, connect only to vetted literal addresses and preserve the original TLS hostname for both webhook delivery paths."
+Group: webhook-connection-destination-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Reject forbidden connection-time answers before body or signature handoff, disable proxies and keep metadata denial under private-network opt-in.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Existing webhook private CIDRs remain explicit operator opt-in and do not authorize metadata destinations.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Policy denial is permanent before handoff; connections are not reused so DNS and policy changes apply to the next request.

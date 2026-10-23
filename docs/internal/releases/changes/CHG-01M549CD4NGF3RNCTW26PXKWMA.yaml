@@ -1,0 +1,30 @@
+Change-Id: CHG-01M549CD4NGF3RNCTW26PXKWMA
+Title: "Define provider-bound AI credential references"
+Type: feat
+Scope: access
+Summary: "Define explicit provider and tenant credential scope policy without carrying secret values."
+Group: ai-credential-reference-policy
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Tenant-owned transport references reject instance credentials and Azure references remain instance-only.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Register compatible-provider and Azure key definitions under the existing selected secret authority.
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Registry definitions do not enable providers or replace runtime transport authorization.

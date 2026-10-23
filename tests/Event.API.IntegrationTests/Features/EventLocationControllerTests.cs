@@ -29,7 +29,6 @@ using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -273,8 +272,7 @@ public sealed class EventLocationControllerRuntimeTests(EventLocationRouteRuntim
         await Assert.That(management.Headers.CacheControl?.NoStore).IsTrue();
         await Assert.That(managementBody).Contains(scenario.Address);
 
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = fixture.CreateDbContext();
         int allowedAudits = await context.EventLocationExactReadAudits.CountAsync(item =>
             item.EventLocationId == scenario.EventLocationId && item.WasAuthorized);
         await Assert.That(allowedAudits).IsEqualTo(1);
@@ -427,8 +425,7 @@ public sealed class EventLocationControllerRuntimeTests(EventLocationRouteRuntim
     private async Task<EventLocationRouteScenario> SeedScenarioAsync()
     {
         await fixture.ResetDatabaseAsync();
-        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = fixture.CreateDbContext();
         TenantScenarioSeed.TenantScenarioResult tenant =
             await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
         DateTime now = DateTime.UtcNow;
@@ -606,33 +603,21 @@ public sealed class EventLocationControllerRuntimeTests(EventLocationRouteRuntim
 
 public sealed class EventLocationRouteRuntimeFixture : IAsyncInitializer, IAsyncDisposable
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:18-alpine")
-        .WithDatabase("event_location_routes")
-        .WithUsername("postgres")
-        .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
-        .Build();
+    private readonly Event.Persistence.IntegrationTests.Fixtures.PostgreSqlContainerFixture _database = new();
 
     private TestDatabaseReset _databaseReset = null!;
 
     public PostgreSqlApiWebApplicationFactory Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
 
+    public ExploreDbContext CreateDbContext() => _database.CreateDbContext();
+
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
-            .UseSnakeCaseNamingConvention()
-            .Options;
-        await using (var context = new ExploreDbContext(options))
-        {
-            await context.Database.MigrateAsync();
-            await LookupTableSeeder.SeedAsync(context);
-        }
+        await _database.InitializeAsync();
 
         Factory = new PostgreSqlApiWebApplicationFactory(
-            _container.GetConnectionString(),
+            _database,
             new Dictionary<string, string?>
             {
                 ["Testing:HostProfile"] = TestHostProfile.RealRuntime,
@@ -645,14 +630,13 @@ public sealed class EventLocationRouteRuntimeFixture : IAsyncInitializer, IAsync
             });
         Factory.UseKestrel();
         Client = Factory.CreateClient();
-        _databaseReset = await TestDatabaseReset.CreateAsync(_container.GetConnectionString());
+        _databaseReset = await TestDatabaseReset.CreateAsync(_database.ConnectionString);
     }
 
     public async Task ResetDatabaseAsync()
     {
         await _databaseReset.ResetAsync();
-        await using AsyncServiceScope scope = Factory.Services.CreateAsyncScope();
-        ExploreDbContext context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using ExploreDbContext context = _database.CreateDbContext();
         await LookupTableSeeder.SeedAsync(context);
     }
 
@@ -676,7 +660,7 @@ public sealed class EventLocationRouteRuntimeFixture : IAsyncInitializer, IAsync
             await Factory.DisposeAsync();
         }
 
-        await _container.DisposeAsync();
+        await _database.DisposeAsync();
         GC.SuppressFinalize(this);
     }
 }

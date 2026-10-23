@@ -15,7 +15,7 @@ public sealed class AdmissionCheckInOperationsService(
     IAdmissionTargetOperationsRepository targets,
     IAdmissionCheckInHealthProbe healthProbe,
     IAuditLogRepository auditLogs,
-    IUnitOfWork unitOfWork,
+    IAdmissionTargetTransaction targetTransaction,
     TimeProvider timeProvider)
 {
     public async Task<AdmissionCheckInHealthResult?> GetHealthAsync(
@@ -114,7 +114,7 @@ public sealed class AdmissionCheckInOperationsService(
             return null;
         }
 
-        return await unitOfWork.ExecuteInTransactionAsync(async token =>
+        return await targetTransaction.ExecuteAsync(request.TenantId, request.TargetId, async token =>
         {
             AdmissionTarget? target = await targets.GetAsync(
                 request.TenantId,

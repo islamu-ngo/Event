@@ -12,6 +12,7 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Explore.Infrastructure.Services.Privacy;
 using Explore.Persistence;
+using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Persistence.QueryFilters;
@@ -38,6 +39,12 @@ namespace Event.Persistence.IntegrationTests.Privacy;
 [NotInParallel("PersistenceDb")]
 public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyErasurePostgreSqlFixture fixture)
 {
+    private sealed record CorrectionTenant(Guid TenantId) : ITenantContext;
+    private sealed class CorrectionClock(DateTime now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(now);
+    }
+
     [Test]
     public async Task OwnerPrivateHomeQuery_ReturnsExactCrossTenantSetWithoutEnumeratingOtherRows()
     {
@@ -405,6 +412,43 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
                     || message.EventType == LocationPrivacyOutboxMessageFactory.LocationPrivacyCorrectionRequestedEventType)
                 .OrderBy(message => message.Id)
                 .ToArrayAsync();
+            LocationPrivacyCorrectionReceipt[] correctionReceipts = await committedContext
+                .Set<LocationPrivacyCorrectionReceipt>().IgnoreQueryFilters().AsNoTracking()
+                .Where(receipt => receipt.ErasureIntentId == retained.IntentId)
+                .ToArrayAsync();
+            await Assert.That(correctionReceipts.Length).IsEqualTo(graph.EventLocationIds.Length);
+            foreach (LocationPrivacyCorrectionReceipt receipt in correctionReceipts)
+            {
+                OutboxMessage correction = messages.Single(message => message.Id == receipt.Id);
+                EventLocation nativePlacement = eventLocations.Single(item => item.Id == receipt.EventLocationId);
+                await Assert.That(receipt.TenantId).IsEqualTo(nativePlacement.TenantId);
+                await Assert.That(receipt.EventId).IsEqualTo(nativePlacement.EventId);
+                await Assert.That(receipt.LocationId).IsEqualTo(nativePlacement.LocationId);
+                await Assert.That(receipt.PolicyVersion).IsEqualTo(3);
+                await Assert.That(receipt.AuthoritySequence).IsEqualTo(retained.AuthoritySequence);
+                await Assert.That(receipt.DisclosureAuditId).IsNull();
+                await Assert.That(receipt.CreatedAtUtc).IsEqualTo(correction.CreatedAt);
+                await Assert.That(correction.AggregateId).IsEqualTo(receipt.EventLocationId);
+            }
+            // This source is gone already: no PII/owner reconstruction is available
+            // to authorize a later correction, including a Delete when Event is missing.
+            LocationPrivacyCorrectionReceipt effect = correctionReceipts[0];
+            DateTime claimedAt = effect.CreatedAtUtc.AddMinutes(1);
+            var correctionOutbox = new OutboxRepository(committedContext);
+            DateTime lease = (await correctionOutbox.TryClaimForProcessing(effect.Id, claimedAt))!.Value;
+            OutboxMessage claimed = await committedContext.OutboxMessages.AsNoTracking()
+                .SingleAsync(message => message.Id == effect.Id);
+            await using (var consumer = fixture.CreateDbContext())
+            {
+                consumer.TenantContext = new CorrectionTenant(effect.TenantId);
+                var receipts = new LocationPrivacyCorrectionReceiptRepository(
+                    consumer, new CorrectionClock(claimedAt));
+                LocationPrivacyCorrectionReceipt? owned = await receipts.GetClaimedAsync(claimed, false, default);
+                await Assert.That(owned).IsNotNull();
+                await Assert.That(owned!.ErasureIntentId).IsEqualTo(retained.IntentId);
+                claimed.NextRetryAt = lease.AddSeconds(1);
+                await Assert.That(await receipts.GetClaimedAsync(claimed, false, default)).IsNull();
+            }
             PrivacyErasureReplayCheckpoint checkpoint = await committedContext
                 .PrivacyErasureReplayCheckpoints
                 .SingleAsync();
@@ -542,6 +586,9 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
                 message.EventType == LocationPrivacyOutboxMessageFactory.LocationPiiErasedEventType
                 || message.EventType == LocationPrivacyOutboxMessageFactory.LocationPrivacyCorrectionRequestedEventType))
                 .IsEqualTo(outboxCount);
+            await Assert.That(await finalContext.Set<LocationPrivacyCorrectionReceipt>()
+                .CountAsync(receipt => receipt.ErasureIntentId == retained.IntentId))
+                .IsEqualTo(graph.EventLocationIds.Length);
             await Assert.That(await finalContext.UserAuthenticationTokens
                 .CountAsync(token => token.UserId == graph.UnrelatedUserId)).IsEqualTo(1);
             await Assert.That(await finalContext.UserExternalLogins
@@ -626,6 +673,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
         var outboxRepository = new OutboxRepository(context);
         var stateRepository = new PrivacyErasureStateRepository(context);
         HybridCache cache = cacheProvider.GetRequiredService<HybridCache>();
+        var localEligibility = new LocalIdentityEligibilityRevocation(context, context, authority, TimeProvider.System);
         var applier = new PrivacyErasureApplier(
             userRepository,
             userPiiRepository,
@@ -641,7 +689,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             cache,
             TimeProvider.System,
             NullLogger<PrivacyErasureApplier>.Instance,
-            Options.Create(new PrivacyErasureOptions()));
+            Options.Create(new PrivacyErasureOptions()), localEligibility);
         var service = new RetainedAuthorityPrivacyErasureWorkflow(
             checkpointRepository,
             stateRepository,
@@ -649,7 +697,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             new EfCoreUnitOfWork(context),
             applier,
             Options.Create(new PrivacyErasureOptions()),
-            TimeProvider.System);
+            TimeProvider.System, localEligibility);
         return new ErasureRuntime(
             service,
             new PrivacyErasureReplayService(service),

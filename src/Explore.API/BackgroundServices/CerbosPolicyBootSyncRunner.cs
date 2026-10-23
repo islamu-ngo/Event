@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace Explore.API.BackgroundServices;
 
 /// <summary>
-/// Executes bounded deployment-selected authorization reconciliation during API startup.
+/// Checks deployment-selected PDP health and signed publication readiness without provider administration.
 /// </summary>
 public sealed class CerbosPolicyBootSyncRunner(
     IServiceScopeFactory scopeFactory,
@@ -62,7 +62,9 @@ public sealed class CerbosPolicyBootSyncRunner(
                 return false;
             }
 
-            logger.LogWarning("Authorization provider boot reconciliation did not complete: {Message}", result.Message);
+            logger.LogWarning(
+                "Authorization provider boot reconciliation did not complete. FailureCategory={FailureCategory}",
+                "reconciliation_incomplete");
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -77,11 +79,11 @@ public sealed class CerbosPolicyBootSyncRunner(
                 GetTimeout().TotalSeconds);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             logger.LogError(
-                "Cerbos policy boot sync failed with an unexpected error. FailureType={FailureType}",
-                ex.GetType().Name);
+                "Cerbos policy boot sync failed with an unexpected error. FailureCategory={FailureCategory}",
+                "reconciliation_failed");
             return true;
         }
     }

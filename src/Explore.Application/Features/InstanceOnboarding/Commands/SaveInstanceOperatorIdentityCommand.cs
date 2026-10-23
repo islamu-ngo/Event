@@ -3,7 +3,6 @@ namespace Explore.Application.Features.InstanceOnboarding.Commands;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Application.Contracts.Operations;
 
 /// <summary>
@@ -27,24 +26,8 @@ public sealed class SaveInstanceOperatorIdentityCommandHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var request = command.Request;
-        var candidate = new InstanceOperatorIdentitySettings
-        {
-            PublicName = request.PublicName,
-            LegalName = request.LegalName,
-            OperatorKindCode = request.OperatorKindCode,
-            JurisdictionCountryCode = request.JurisdictionCountryCode,
-            RegistrationIdentifier = request.RegistrationIdentifier,
-            PublicContactEmail = request.PublicContactEmail,
-            WebsiteUrl = request.WebsiteUrl,
-            LegalNoticeUrl = request.LegalNoticeUrl,
-            TermsUrl = request.TermsUrl,
-            PrivacyUrl = request.PrivacyUrl,
-            OfficialOrigin = request.OfficialOrigin
-        };
-
         BaseCommandResponse<InstanceOperatorIdentitySavedDocument> result =
-            await identityService.SaveAsync(candidate, request.ExpectedRevision, cancellationToken);
+            await identityService.SaveAsync(command, cancellationToken);
 
         if (result.IsSuccess)
         {

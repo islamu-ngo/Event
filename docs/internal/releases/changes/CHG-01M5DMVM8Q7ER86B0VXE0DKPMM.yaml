@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5DMVM8Q7ER86B0VXE0DKPMM
+Title: "Separate Listmonk recovery evidence from provider diagnostics"
+Type: fix
+Scope: notifications
+Summary: "Use typed C# lifecycle evidence for claim-fenced delivery and operator recovery; provider error text no longer authorizes recovery or affects ambiguity counts."
+Group: listmonk-recovery-evidence
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/communications-and-notifications/listmonk.md
+    Disposition: documented
+    Detail: Reprovision pre-release development databases containing old Listmonk queue work. Error strings are not migrated into typed lifecycle evidence; old uncertain work must not be blindly replayed.
+  Security:
+    Reference: docs/internal/integrations/listmonk-outbox.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Provider diagnostics cannot authorize ambiguity recovery or determine its health count. Conditional EF updates retain tenant and exact claim fencing; PostgreSQL health reads EvidenceKind instead of private LastError without widening Global private reads.
+  Migration:
+    Reference: docs/internal/integrations/listmonk-outbox.md
+    Disposition: documented
+    Detail: EF-generated application migrations add a required bounded evidence_kind integer for PostgreSQL, SQLite, SQL Server and shared MySQL/MariaDB. A schema downgrade drops recovery meaning; restore a matching application/database backup instead of downgrading an active queue.
+  Configuration:
+    Reference: docs/public/documentation/readme/communications-and-notifications/listmonk.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/communications-and-notifications/listmonk.md
+    Disposition: documented
+    Detail: Stop dispatch before schema changes or restore. Uncertain acceptance requires an authorized, evidence-backed decision; a timeout or diagnostic message alone does not establish safe retry.

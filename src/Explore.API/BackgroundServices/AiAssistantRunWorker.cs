@@ -44,12 +44,11 @@ public sealed class AiAssistantRunWorker(
         {
             // Host shutdown owns cancellation. Any in-progress run will be released by stale-run recovery.
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             logger.LogWarning(
-                ex,
-                "AI assistant background run processing failed for run {RunId}.",
-                item.RunId);
+                "AI assistant background run processing failed. FailureCategory={FailureCategory}",
+                "run_processing_failed");
         }
         finally
         {

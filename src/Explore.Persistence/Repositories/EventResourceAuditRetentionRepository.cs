@@ -9,20 +9,6 @@ namespace Explore.Persistence.Repositories;
 public sealed class EventResourceAuditRetentionRepository(ExploreDbContext context)
     : IEventResourceAuditRetentionRepository
 {
-    public async Task<IReadOnlyList<Tenant>> GetTenantsWithAuditAsync(
-        Guid? afterTenantId, int limit, CancellationToken cancellationToken)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, EventResourceAuditRetentionService.TenantPageSize);
-        var audits = context.Set<EventResourceAuditEntry>()
-            .IgnoreAllFilters(TenantFilterBypassReasons.EventResourceAuditRetention);
-        var tenants = context.Tenants.IgnoreAllFilters(TenantFilterBypassReasons.EventResourceAuditRetention)
-            .AsNoTracking().Where(tenant => audits.Any(audit => audit.TenantId == tenant.Id));
-        if (afterTenantId is { } cursor)
-            tenants = tenants.Where(tenant => tenant.Id.CompareTo(cursor) > 0);
-        return await tenants.OrderBy(tenant => tenant.Id).Take(limit).ToArrayAsync(cancellationToken);
-    }
-
     public async Task<int> DeleteExpiredBatchAsync(
         Guid tenantId, DateTime? inclusiveCutoffUtc, int limit, CancellationToken cancellationToken)
     {

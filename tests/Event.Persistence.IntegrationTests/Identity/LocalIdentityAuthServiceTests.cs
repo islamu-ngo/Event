@@ -4,12 +4,10 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -22,7 +20,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Identity;
 
@@ -75,24 +72,57 @@ public sealed class LocalIdentityAuthServiceTests
     }
 
     [Test]
+    public async Task MissingWrongAndLockedAttemptsEachPerformNativePasswordWorkWithoutIssuingAuthority()
+    {
+        await using TestFixture fixture = await CreateFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: true);
+        var hasher = new ObservedPasswordHasher(fixture.UserManager.PasswordHasher);
+        fixture.UserManager.PasswordHasher = hasher;
+        var missing = login with { Identifier = $"missing-{Guid.CreateVersion7():N}@example.test" };
+        var wrong = login with { Password = CreateValidPassword() };
+        foreach (LocalAuthRequestDto attempt in new[] { missing, wrong, missing, wrong, login })
+        {
+            hasher.Verifications.Clear();
+            LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(attempt, fixture.CancellationToken);
+            await Assert.That(result.Success).IsFalse();
+            await Assert.That(result.Token).IsNull();
+            await Assert.That(result.ReplacementChallenge).IsNull();
+            await Assert.That(hasher.Verifications.Count).IsEqualTo(1);
+            // A locked correct password takes dummy work, never validates the account's password.
+            if (ReferenceEquals(attempt, login))
+            {
+                await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.AccountLocked);
+                await Assert.That(hasher.Verifications.Single()).IsNotEqualTo(
+                    (await fixture.UserManager.FindByEmailAsync(login.Identifier))!.Id);
+            }
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CancellationDuringDummyWorkPropagatesForMissingAndLockedAccounts(bool locked)
+    {
+        await using TestFixture fixture = await CreateFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: true);
+        if (locked)
+        {
+            LocalIdentityUser user = (await fixture.UserManager.FindByEmailAsync(login.Identifier))!;
+            await Assert.That((await fixture.UserManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddMinutes(15))).Succeeded).IsTrue();
+        }
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(fixture.CancellationToken);
+        fixture.UserManager.PasswordHasher = new ObservedPasswordHasher(fixture.UserManager.PasswordHasher, cancellation.Cancel);
+        LocalAuthRequestDto attempt = locked ? login : login with { Identifier = $"missing-{Guid.CreateVersion7():N}@example.test" };
+        await Assert.That(async () => await fixture.Service.AuthenticateAsync(attempt, cancellation.Token))
+            .Throws<OperationCanceledException>();
+    }
+
+    [Test]
     public async Task LoginIssuesASecretBackedSignedToken()
     {
         byte[] key = RandomNumberGenerator.GetBytes(64);
-        var resolver = Substitute.For<ISecretResolver>();
-        resolver.ResolveAsync(
-                SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                null,
-                Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
-                SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                Convert.ToBase64String(key),
-                SecretSourceType.EnvironmentVariable,
-                SecretScope.Instance,
-                null,
-                Now)));
         var tokenGenerator = new LocalJwtTokenGenerator(
-            resolver,
-            Options.Create(new LocalIdentityOptions()),
+            Options.Create(new LocalIdentityOptions { JwtKey = Convert.ToBase64String(key) }),
             new FixedTimeProvider(Now));
         await using TestFixture fixture = await CreateFixtureAsync(tokenGenerator);
 
@@ -248,17 +278,9 @@ public sealed class LocalIdentityAuthServiceTests
 
     private static Task<TestFixture> CreateSignedFixtureAsync()
     {
-        var secrets = Substitute.For<ISecretResolver>();
-        secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, null, Arg.Any<CancellationToken>())
-            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
-                SettingKey: SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
-                Value: Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Source: SecretSourceType.EnvironmentVariable,
-                Scope: SecretScope.Instance,
-                ScopeId: null,
-                ResolvedAt: Now)));
         return TestFixture.CreateAsync(new LocalJwtTokenGenerator(
-            secrets, Options.Create(new LocalIdentityOptions()), new FixedTimeProvider(Now)));
+            Options.Create(new LocalIdentityOptions { JwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)) }),
+            new FixedTimeProvider(Now)));
     }
 
     private static string CreateValidPassword() =>
@@ -282,6 +304,20 @@ public sealed class LocalIdentityAuthServiceTests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class ObservedPasswordHasher(IPasswordHasher<LocalIdentityUser> native, Action? onVerify = null)
+        : IPasswordHasher<LocalIdentityUser>
+    {
+        internal List<Guid> Verifications { get; } = [];
+        public string HashPassword(LocalIdentityUser user, string password) => native.HashPassword(user, password);
+        public PasswordVerificationResult VerifyHashedPassword(LocalIdentityUser user, string hashedPassword, string providedPassword)
+        {
+            Verifications.Add(user.Id);
+            PasswordVerificationResult result = native.VerifyHashedPassword(user, hashedPassword, providedPassword);
+            onVerify?.Invoke();
+            return result;
+        }
     }
 
     private sealed class TestFixture : IAsyncDisposable
@@ -332,14 +368,13 @@ public sealed class LocalIdentityAuthServiceTests
                 await context.Database.EnsureCreatedAsync(fixture.CancellationToken);
                 fixture.Context = context;
                 await LookupTableSeeder.SeedAsync(context, fixture.CancellationToken);
-                fixture._systemSettings = new SystemSettingRepository(context,
+                fixture._systemSettings = SystemSettingRepository.CreateReadOnly(context,
                     new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
                 fixture.UserManager = scopedServices
                     .GetRequiredService<UserManager<LocalIdentityUser>>();
                 fixture.Service = new LocalIdentityAuthService(
                     fixture.UserManager,
                     tokenGenerator,
-                    fixture._systemSettings,
                     new LocalIdentityCredentialStateStore(
                         identityDbContext: context,
                         applicationDbContext: context,

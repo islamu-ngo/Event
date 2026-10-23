@@ -1,7 +1,4 @@
 
-using System.Collections.Immutable;
-using Explore.Application.Contracts.Identity;
-using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Notifications;
@@ -12,46 +9,24 @@ using Explore.Application.Contracts.Operations;
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
 public sealed class DisableEmailDeliveryCommandHandler(
-    IAdminContext adminContext,
-    ITenantContext tenantContext,
     IEmailDeliverySettingsWriter emailSettingsWriter,
-    ISettingMutationLock mutationLock,
-    IUnitOfWork unitOfWork,
     IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
-    IPlatformUserRoleRepository platformRoles,
-    ITenantUserRoleGrantRepository tenantRoles) : ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>>
+    IHumanCommitScopePreparation humanCommitScope) : ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         DisableEmailDeliveryCommand request,
         CancellationToken cancellationToken)
     {
-        if (await ResolveAuthorizedActorAsync(request.TenantId, cancellationToken) is null)
+        await humanCommitScope.PrepareAsync(cancellationToken);
+        Guid? actorId = humanCommitScope.Subject?.PrincipalId;
+        if (actorId is null)
             return BaseCommandResponse.Authorization<Guid>(
                 "Current administrator authority is required for the selected scope.");
         if (request.TenantId == Guid.Empty)
             return BaseCommandResponse.Validation<Guid>(["TenantId must not be empty."]);
 
-        var outcome = await mutationLock.ExecuteOrderedGroupsAsync(
-            [EmailDeliverySettingKeys.All],
-            token => unitOfWork.ExecuteSerializableAsync(
-                transactionToken => DisableAsync(request, transactionToken), token), cancellationToken);
-
-        foreach (var notification in outcome.Notifications)
-            await notificationHandlers.HandleAsync(notification, CancellationToken.None);
-        return outcome.Response;
-    }
-
-    private async Task<(BaseCommandResponse<Guid> Response, ImmutableArray<SettingChangedNotification> Notifications)> DisableAsync(
-        DisableEmailDeliveryCommand request,
-        CancellationToken cancellationToken)
-    {
-        Guid? actorId = await ResolveAuthorizedActorAsync(request.TenantId, cancellationToken);
-        if (actorId is null)
-        {
-            return (BaseCommandResponse.Authorization<Guid>(
-                "Current administrator authority is required for the selected scope."), []);
-        }
-
+        // The concrete Email writer prepares complete sources while idle, then owns its
+        // single physical attempt. Do not pre-open a transaction around that preparation.
         var result = await emailSettingsWriter.DisableAsync(new EmailDeliveryDisableConfirmation(
             TenantId: request.TenantId,
             ActorUserId: actorId.Value,
@@ -62,19 +37,8 @@ public sealed class DisableEmailDeliveryCommandHandler(
             ? BaseCommandResponse.Conflict(request.TenantId ?? Guid.Empty,
                 "Email delivery disable confirmation is no longer valid. Request a new preview.")
             : result.ToCommandResponse(request.TenantId ?? Guid.Empty, "Email delivery disabled.");
-        return (response,
-            result.IsAccepted() ? result.ToNotifications(actorId) : []);
-    }
-
-    private async Task<Guid?> ResolveAuthorizedActorAsync(Guid? targetTenantId, CancellationToken cancellationToken)
-    {
-        Guid? actorId = await adminContext.ResolveUserIdAsync(cancellationToken);
-        if (actorId is null || actorId == Guid.Empty)
-            return null;
-        return await platformRoles.IsUserPlatformAdmin(actorId.Value)
-            || (targetTenantId is Guid tenantId && tenantId != Guid.Empty
-                && tenantContext.TenantId == tenantId
-                && await tenantRoles.IsTenantAdminInCurrentTenantAsync(tenantId, actorId.Value, cancellationToken))
-            ? actorId : null;
+        foreach (var notification in result.IsAccepted() ? result.ToNotifications(actorId.Value) : [])
+            await notificationHandlers.HandleAsync(notification, CancellationToken.None);
+        return response;
     }
 }

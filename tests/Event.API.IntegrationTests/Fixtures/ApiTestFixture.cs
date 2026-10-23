@@ -1,6 +1,7 @@
 using Event.Api.IntegrationTests.Builders;
 using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.Persistence.Seed;
 using Microsoft.Extensions.DependencyInjection;
 using TUnit.Core;
 using TUnit.Core.Interfaces;
@@ -18,6 +19,7 @@ public class ApiTestFixture : IAsyncInitializer, IAsyncDisposable
         Client = Factory.CreateClient();
         using var scope = Factory.Services.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await LookupTableSeeder.SeedAsync(database);
         if (await database.Tenants.FindAsync(PlatformDefaults.DefaultTenantId) is null)
         {
             database.Tenants.Add(new TenantBuilder().WithId(PlatformDefaults.DefaultTenantId).Build());

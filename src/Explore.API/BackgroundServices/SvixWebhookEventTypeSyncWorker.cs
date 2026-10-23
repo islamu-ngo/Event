@@ -34,11 +34,11 @@ public sealed class SvixWebhookEventTypeSyncWorker(
         {
             logger.LogDebug("Svix webhook event type sync stopped before completion");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             logger.LogWarning(
-                "Svix webhook event type sync failed. FailureType={FailureType}",
-                ex.GetType().Name);
+                "Svix webhook event type sync failed. FailureCategory={FailureCategory}",
+                "event_type_sync_failed");
         }
     }
 }

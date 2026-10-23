@@ -22,8 +22,8 @@ public sealed class GetInstanceOperationsQueryHandlerTests
     public async Task Handle_WhenOperationalWarningsExist_ReturnsBoundedStatusCards()
     {
         var outboxRepository = Substitute.For<IOutboxRepository>();
-        var emailRepository = Substitute.For<IEmailDispatchOutboxRepository>();
-        var eventReportRepository = Substitute.For<IEventReportRepository>();
+        var emailRepository = Substitute.For<IEmailDispatchHealthSnapshotReader>();
+        var eventReportRepository = Substitute.For<IEventReportOperationsRepository>();
         var tenantRepository = Substitute.For<ITenantRepository>();
         var settingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
         var storageService = Substitute.For<IInstanceStorageSettingService>();
@@ -47,10 +47,9 @@ public sealed class GetInstanceOperationsQueryHandlerTests
                 CreateOutbox(OutboxMessageStatus.Failed),
                 CreateOutbox(OutboxMessageStatus.DeadLettered)
             ]);
-        emailRepository.CountDueDispatchAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(5);
-        emailRepository.CountRetryScheduledAsync(Arg.Any<CancellationToken>()).Returns(2);
-        emailRepository.CountStaleProcessingAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(1);
-        emailRepository.CountDeadLetteredAsync(Arg.Any<CancellationToken>()).Returns(1);
+        emailRepository.ReadAsync(Arg.Any<DateTime>(), Arg.Any<DateTime>(), 1, Arg.Any<CancellationToken>())
+            .Returns(new EmailDispatchHealthSnapshot(5, 2, 1, 1, 0, 0, null, false, false, false,
+                new Dictionary<Guid, int>()));
         eventReportRepository.CountExternalLinksBySyncStateAsync(EventReportSyncState.Pending, Arg.Any<CancellationToken>()).Returns(7);
         eventReportRepository.CountExternalLinksBySyncStateAsync(EventReportSyncState.Failed, Arg.Any<CancellationToken>()).Returns(2);
         eventReportRepository.CountExternalLinksBySyncStateAsync(EventReportSyncState.Disabled, Arg.Any<CancellationToken>()).Returns(1);

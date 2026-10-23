@@ -1,0 +1,320 @@
+using System.Data.Common;
+using System.Security.Cryptography;
+using System.Text;
+using Explore.Domain;
+using Explore.Persistence.Database;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
+
+namespace Explore.Persistence.Security;
+
+public static partial class PostgresConfigurationImportEventResourceContract
+{
+    private const string PolicyName = "configuration_import_resource_owner";
+    private const string RestrictivePolicyName = "configuration_import_resource_owner_boundary";
+    private const string FingerprintPrefix = "event-configuration-import-resource:v1:";
+
+    /// <summary>
+    /// Migration-owned installation on the migration caller's existing transaction.
+    /// Global login enrollment and parent-owned ordinary table policies are separate.
+    /// No runtime role is enrolled or given private-table privileges.
+    /// </summary>
+    public static async Task ApplyAsync(ExploreDbContext context, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (!context.Database.IsNpgsql())
+            return;
+        context.ValidateTenantLease();
+        if (context.TenantFilterTenantId is not null || context.IsConfigurationInstanceImportOwner)
+            throw new InvalidOperationException("Resource installation requires migration authority, not an import owner.");
+        await using var transaction = context.Database.CurrentTransaction is null
+            ? await context.Database.BeginTransactionAsync(ct) : null;
+        await using DbCommand command = context.Database.GetDbConnection().CreateCommand();
+        command.Transaction = (context.Database.CurrentTransaction
+            ?? throw new InvalidOperationException("Resource installation requires the migration transaction."))
+            .GetDbTransaction();
+        command.CommandText = BuildSql(context);
+        await command.ExecuteNonQueryAsync(ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
+    }
+
+    private static string Schema(ExploreDbContext context, Type type) =>
+        context.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>()?.TargetSchema
+        ?? context.Model.FindEntityType(type)!.GetSchema() ?? "public";
+
+    private static string FunctionSql(ExploreDbContext context, string operation) =>
+        context.GetService<ISqlGenerationHelper>().DelimitIdentifier(
+            "configuration_import_resource_" + operation, Schema(context, typeof(SystemSetting)));
+
+    private static string Table(ExploreDbContext context, Type type) =>
+        context.GetService<ISqlGenerationHelper>().DelimitIdentifier(
+            context.Model.FindEntityType(type)!.GetTableName()!, Schema(context, type));
+
+    private static string ColumnName(ExploreDbContext context, Type type, string property)
+    {
+        IEntityType entity = context.Model.FindEntityType(type)!;
+        return entity.FindProperty(property)!.GetColumnName(
+            StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!;
+    }
+
+    private static string Column(ExploreDbContext context, Type type, string property) =>
+        context.GetService<ISqlGenerationHelper>().DelimitIdentifier(ColumnName(context, type, property));
+
+    private static string Text(string value) =>
+        "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
+
+    private static string Hash(string source) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
+
+    private static string BuildSql(ExploreDbContext context)
+    {
+        var installation = new PostgresConfigurationImportInstallationSql(
+            OwnerRole, MigratorRole, GlobalRole, FingerprintPrefix, "__STATE_MIGRATOR_LOGIN__");
+        string roles = $"'{OwnerRole}', '{MigratorRole}', '{GlobalRole}'";
+        string elevated = "rolcanlogin OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication OR rolinherit";
+        string schema = context.GetService<ISqlGenerationHelper>()
+            .DelimitIdentifier(Schema(context, typeof(SystemSetting)));
+        string schemas = string.Join(", ", new[]
+        {
+            Schema(context, typeof(SystemSetting)), Schema(context, typeof(TenantSetting))
+        }.Distinct(StringComparer.Ordinal).Select(name =>
+            context.GetService<ISqlGenerationHelper>().DelimitIdentifier(name)));
+        (Type Type, string[] Select, string[] Insert, string[] Update)[] relations =
+        [
+            (typeof(SystemSetting),
+                ["Id", "SettingKey", "Value", "SettingValueTypeId", "IsLocked", "AllowedValues",
+                    "Description", "Category", "DisplayOrder", "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy"],
+                ["Id", "SettingKey", "Value", "SettingValueTypeId", "IsLocked", "AllowedValues",
+                    "Description", "Category", "DisplayOrder", "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy"],
+                ["Value", "UpdatedAt", "UpdatedBy"]),
+            (typeof(TenantSetting),
+                ["Id", "TenantId", "SettingKey", "Value", "IsLocked", "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy"],
+                ["Id", "TenantId", "SettingKey", "Value", "IsLocked", "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy"],
+                ["Value", "UpdatedAt", "UpdatedBy"])
+        ];
+        string expectedColumns = string.Join(",\n", relations.SelectMany(relation =>
+            new[] { ("SELECT", relation.Select), ("INSERT", relation.Insert), ("UPDATE", relation.Update) }
+                .SelectMany(access => access.Item2.Select(property =>
+                    $"({Text(Table(context, relation.Type))}::regclass, " +
+                    $"{Text(ColumnName(context, relation.Type, property))}, {Text(access.Item1)})"))));
+        string requiredSchemaUsage = string.Join(" OR ", new[]
+        {
+            Schema(context, typeof(SystemSetting)), Schema(context, typeof(TenantSetting))
+        }.Distinct(StringComparer.Ordinal).Select(name =>
+            $"NOT pg_catalog.has_schema_privilege('{OwnerRole}', {Text(name)}, 'USAGE')"))
+            + $" OR NOT pg_catalog.has_schema_privilege('{GlobalRole}', {Text(Schema(context, typeof(SystemSetting)))}, 'USAGE')";
+        string membershipInvalid = $"""
+            EXISTS (SELECT 1 FROM pg_catalog.pg_auth_members edge
+                JOIN pg_catalog.pg_roles member ON member.oid = edge.member
+                JOIN pg_catalog.pg_roles parent ON parent.oid = edge.roleid
+                WHERE member.rolname IN ('{OwnerRole}', '{GlobalRole}')
+                    OR member.rolname = '{MigratorRole}' AND parent.rolname <> '{OwnerRole}'
+                    OR parent.rolname = '{OwnerRole}' AND member.rolname <> '{MigratorRole}'
+                    OR parent.rolname = '{MigratorRole}' AND member.rolname <> __STATE_MIGRATOR_LOGIN__
+                    OR parent.rolname IN ({roles}) AND edge.admin_option
+                    OR parent.rolname IN ('{OwnerRole}', '{MigratorRole}')
+                        AND (edge.inherit_option OR NOT edge.set_option))
+            """;
+        string membershipMissing = installation.MissingMemberships();
+        string ownershipInvalid = installation.NonRoutineOwnership();
+        string privilegeInvalid = $"""
+            EXISTS (SELECT 1 FROM pg_catalog.pg_class relation
+                JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
+                WHERE namespace.nspname NOT IN ('pg_catalog','information_schema')
+                    AND namespace.nspname NOT LIKE 'pg_toast%'
+                    AND relation.relkind IN ('r','p','v','m','f')
+                    AND (pg_catalog.has_table_privilege('{OwnerRole}', relation.oid,
+                            'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR pg_catalog.has_table_privilege('{OwnerRole}', relation.oid, 'DELETE')
+                        OR pg_catalog.has_table_privilege('{GlobalRole}', relation.oid,
+                            'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR pg_catalog.has_any_column_privilege('{GlobalRole}', relation.oid,
+                            'SELECT,INSERT,UPDATE,REFERENCES')
+                        OR pg_catalog.has_table_privilege('{MigratorRole}', relation.oid,
+                            'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR pg_catalog.has_any_column_privilege('{MigratorRole}', relation.oid,
+                            'SELECT,INSERT,UPDATE,REFERENCES')))
+            OR {installation.ColumnPrivilegeDrift(expectedColumns)}
+            OR {requiredSchemaUsage}
+            OR EXISTS (SELECT 1 FROM pg_catalog.pg_namespace
+                WHERE pg_catalog.has_schema_privilege('{OwnerRole}', oid, 'CREATE')
+                    OR pg_catalog.has_schema_privilege('{GlobalRole}', oid, 'CREATE')
+                    OR pg_catalog.has_schema_privilege('{MigratorRole}', oid, 'CREATE'))
+            OR {installation.ExtraneousGrants()}
+            """;
+        string read = ReadBody(context);
+        string write = WriteBody(context);
+        (string Name, string Signature, string Arguments, string Body)[] functions =
+        [
+            ("read", "", "", read),
+            ("write", "jsonb,jsonb,uuid,timestamp with time zone",
+                "p_current jsonb, p_original jsonb, p_actor uuid, p_at timestamp with time zone", write)
+        ];
+        string functionIds = string.Join(", ", functions.Select(function =>
+            Text(FunctionSql(context, function.Name) + "(" + function.Signature + ")") + "::regprocedure")
+            .Append(Text(FunctionSql(context, "assert_authority") + "()") + "::regprocedure"));
+        string optionalFunctionIds = string.Join(", ", functions.Select(function =>
+            $"(pg_catalog.to_regprocedure({Text(FunctionSql(context, function.Name) + "(" + function.Signature + ")")}))")
+            .Append($"(pg_catalog.to_regprocedure({Text(FunctionSql(context, "assert_authority") + "()")}))"));
+        string existingFunctionInvalid = $"""
+            EXISTS (SELECT 1 FROM pg_catalog.pg_proc function
+                WHERE function.proowner IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles}))
+                    AND (function.proowner <> (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{OwnerRole}')
+                        OR NOT EXISTS (SELECT 1 FROM (VALUES {optionalFunctionIds}) expected(function_id)
+                            WHERE expected.function_id = function.oid)))
+            """;
+        string functionInvalid = $"""
+            EXISTS (SELECT 1 FROM pg_catalog.pg_proc function WHERE function.oid IN ({functionIds})
+                AND (function.proowner <> (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{OwnerRole}')
+                    OR NOT function.prosecdef OR function.provolatile <> 'v'
+                    OR function.proparallel <> 'u' OR function.proleakproof OR function.proisstrict
+                    OR function.proretset OR function.prokind <> 'f' OR function.proargdefaults IS NOT NULL
+                    OR function.prolang <> (SELECT oid FROM pg_catalog.pg_language WHERE lanname = 'plpgsql')
+                    OR function.prorettype <> CASE WHEN function.oid =
+                        {Text(FunctionSql(context, "assert_authority") + "()")}::regprocedure
+                        THEN 'pg_catalog.void'::regtype ELSE 'pg_catalog.jsonb'::regtype END
+                    OR function.proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog']::text[]
+                    OR pg_catalog.obj_description(function.oid, 'pg_proc') IS DISTINCT FROM
+                        '{FingerprintPrefix}' || pg_catalog.encode(
+                            pg_catalog.sha256(pg_catalog.convert_to(function.prosrc, 'UTF8')), 'hex')
+                    OR NOT pg_catalog.has_function_privilege('{GlobalRole}', function.oid, 'EXECUTE')
+                    OR EXISTS (SELECT 1 FROM pg_catalog.aclexplode(
+                        COALESCE(function.proacl, pg_catalog.acldefault('f', function.proowner))) permission
+                        WHERE permission.grantee NOT IN (SELECT oid FROM pg_catalog.pg_roles
+                            WHERE rolname IN ('{OwnerRole}','{GlobalRole}'))
+                            OR permission.privilege_type <> 'EXECUTE' OR permission.grantor <> function.proowner
+                            OR permission.grantee = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{GlobalRole}')
+                                AND permission.is_grantable)))
+            OR EXISTS (SELECT 1 FROM (VALUES {string.Join(", ", functions.Select(function =>
+                $"({Text(FunctionSql(context, function.Name) + "(" + function.Signature + ")")}::regprocedure, {Text(Hash(function.Body))})"))})
+                    expected(function_id, hash)
+                JOIN pg_catalog.pg_proc function ON function.oid = expected.function_id
+                WHERE pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(function.prosrc, 'UTF8')), 'hex') <> expected.hash)
+            OR EXISTS (SELECT 1 FROM pg_catalog.pg_proc function WHERE function.oid NOT IN ({functionIds})
+                AND (function.proowner IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles}))
+                    OR EXISTS (SELECT 1 FROM pg_catalog.aclexplode(
+                        COALESCE(function.proacl, pg_catalog.acldefault('f', function.proowner))) permission
+                        WHERE permission.grantee IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ({roles})))))
+            """;
+        string policyInvalid = string.Join(" OR ", relations.Where(relation => relation.Type == typeof(TenantSetting)).Select(relation =>
+        {
+            string table = Table(context, relation.Type);
+            string predicate = Column(context, relation.Type, "SettingKey") + " = ANY (" + TenantKeysSql() + ")";
+            return $"""
+                NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy policy
+                    WHERE policy.polrelid = {Text(table)}::regclass AND policy.polname = '{PolicyName}'
+                        AND policy.polpermissive AND policy.polcmd = '*'
+                        AND policy.polroles = ARRAY[(SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{OwnerRole}')]
+                        AND pg_catalog.obj_description(policy.oid, 'pg_policy') =
+                            {Text(FingerprintPrefix + Hash(predicate) + ":")} ||
+                            pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(policy.polqual::text, 'UTF8')), 'hex') || ':' ||
+                            pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(policy.polwithcheck::text, 'UTF8')), 'hex'))
+                OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy policy
+                    WHERE policy.polrelid = {Text(table)}::regclass AND policy.polname = '{RestrictivePolicyName}'
+                        AND NOT policy.polpermissive AND policy.polcmd = '*'
+                        AND policy.polroles = ARRAY[(SELECT oid FROM pg_catalog.pg_roles WHERE rolname = '{OwnerRole}')]
+                        AND pg_catalog.obj_description(policy.oid, 'pg_policy') =
+                            {Text(FingerprintPrefix + Hash(predicate) + ":")} ||
+                            pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(policy.polqual::text, 'UTF8')), 'hex') || ':' ||
+                            pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(policy.polwithcheck::text, 'UTF8')), 'hex'))
+                """;
+        }));
+        string tableRlsInvalid = string.Join(" OR ", relations.Where(relation => relation.Type == typeof(TenantSetting)).Select(relation => $"""
+            NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid = {Text(Table(context, relation.Type))}::regclass
+                AND relrowsecurity AND relforcerowsecurity)
+            """));
+        string authority = $"""
+            BEGIN
+                IF CURRENT_USER <> '{OwnerRole}'
+                    OR NOT pg_catalog.pg_has_role(SESSION_USER, '{GlobalRole}', 'USAGE')
+                    OR pg_catalog.pg_has_role(SESSION_USER, '{OwnerRole}', 'MEMBER')
+                    OR pg_catalog.pg_has_role(SESSION_USER, '{MigratorRole}', 'MEMBER')
+                    OR NULLIF(pg_catalog.current_setting('app.current_tenant_id', true), '') IS NOT NULL
+                    OR pg_catalog.current_setting('transaction_isolation') <> 'serializable'
+                    OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles role
+                        WHERE (pg_catalog.pg_has_role(SESSION_USER, role.oid, 'USAGE')
+                            OR pg_catalog.pg_has_role(SESSION_USER, role.oid, 'SET'))
+                            AND (role.rolsuper OR role.rolbypassrls OR role.rolcreatedb
+                                OR role.rolcreaterole OR role.rolreplication))
+                    OR (SELECT count(*) FROM pg_catalog.pg_roles WHERE rolname IN ({roles})) <> 3
+                    OR EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname IN ({roles})
+                        AND (({elevated}) OR pg_catalog.shobj_description(oid, 'pg_authid') IS DISTINCT FROM
+                            '{FingerprintPrefix}role:' || rolname))
+                    OR {membershipInvalid} OR {membershipMissing} OR {ownershipInvalid}
+                    OR {privilegeInvalid} OR {functionInvalid} OR {policyInvalid} OR {tableRlsInvalid} THEN
+                    RAISE EXCEPTION 'configuration_import_resource_authority_not_ready' USING ERRCODE = '42501';
+                END IF;
+                {LockSql()}
+                RETURN;
+            END;
+            """;
+        string grants = string.Join("\n", relations.Select(relation =>
+        {
+            string Grant(string access, string[] properties) => $"GRANT {access} (" +
+                string.Join(", ", properties.Select(property => Column(context, relation.Type, property))) +
+                $") ON TABLE {Table(context, relation.Type)} TO {OwnerRole};";
+            return $"""
+                {Grant("SELECT", relation.Select)}
+                {Grant("INSERT", relation.Insert)}
+                {Grant("UPDATE", relation.Update)}
+                """;
+        }));
+        string policies = string.Join("\n", relations.Where(relation => relation.Type == typeof(TenantSetting)).Select(relation =>
+        {
+            string table = Table(context, relation.Type);
+            string predicate = Column(context, relation.Type, "SettingKey") + " = ANY (" + TenantKeysSql() + ")";
+            return string.Join("\n", new[] { (PolicyName, "PERMISSIVE"), (RestrictivePolicyName, "RESTRICTIVE") }
+                .Select(policy => $"""
+                    DROP POLICY IF EXISTS "{policy.Item1}" ON {table};
+                    CREATE POLICY "{policy.Item1}" ON {table} AS {policy.Item2}
+                        FOR ALL TO {OwnerRole} USING ({predicate}) WITH CHECK ({predicate});
+                    DO $stamp_policy$
+                    BEGIN
+                        EXECUTE (SELECT pg_catalog.format('COMMENT ON POLICY %I ON %s IS %L',
+                            p.polname, {Text(table)}, {Text(FingerprintPrefix + Hash(predicate) + ":")} ||
+                            pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.polqual::text, 'UTF8')), 'hex') || ':' ||
+                            pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.polwithcheck::text, 'UTF8')), 'hex'))
+                            FROM pg_catalog.pg_policy p WHERE p.polrelid = {Text(table)}::regclass
+                                AND p.polname = '{policy.Item1}');
+                    END; $stamp_policy$;
+                    """));
+        }));
+        string FunctionDdl(string name, string arguments, string returns, string body) => $"""
+            CREATE OR REPLACE FUNCTION {FunctionSql(context, name)}({arguments}) RETURNS {returns}
+                LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $body${body}$body$;
+            """;
+        string ddl = FunctionDdl("assert_authority", "", "void", authority) + "\n" +
+            string.Join("\n", functions.Select(function => FunctionDdl(function.Name, function.Arguments, "jsonb", function.Body)));
+        string acl = string.Join("\n", functions.Select(function => (function.Name, function.Signature))
+            .Append(("assert_authority", "")).Select(function => $"""
+                REVOKE ALL ON FUNCTION {FunctionSql(context, function.Item1)}({function.Item2}) FROM PUBLIC, {GlobalRole};
+                GRANT EXECUTE ON FUNCTION {FunctionSql(context, function.Item1)}({function.Item2}) TO {GlobalRole};
+                DO $stamp_function$
+                BEGIN
+                    EXECUTE (SELECT pg_catalog.format('COMMENT ON FUNCTION %s IS %L',
+                        function.oid::regprocedure, '{FingerprintPrefix}' || pg_catalog.encode(
+                            pg_catalog.sha256(pg_catalog.convert_to(function.prosrc, 'UTF8')), 'hex'))
+                        FROM pg_catalog.pg_proc function
+                        WHERE function.oid = {Text(FunctionSql(context, function.Item1) + "(" + function.Item2 + ")")}::regprocedure);
+                END; $stamp_function$;
+                """));
+        // Tenant overrides require forced RLS. Instance settings have no tenant
+        // column; their existing table grants remain unchanged. The Global group
+        // receives only fixed-function execution; the owner uses the exact columns above.
+        return installation.Build(schema,
+            schemaGrants: $"GRANT USAGE ON SCHEMA {schemas} TO {OwnerRole};",
+            grants, policies, ddl, acl,
+            installationInvalid: $"""
+                {membershipInvalid.Replace("__STATE_MIGRATOR_LOGIN__", "CURRENT_USER", StringComparison.Ordinal)}
+                    OR {ownershipInvalid} OR {existingFunctionInvalid} OR {tableRlsInvalid}
+                """,
+            closedInvalid: $"""
+                {membershipMissing.Replace("__STATE_MIGRATOR_LOGIN__", "CURRENT_USER", StringComparison.Ordinal)}
+                    OR {privilegeInvalid} OR {functionInvalid} OR {policyInvalid}
+                """,
+            diagnosticPrefix: "configuration_import_resource");
+    }
+}

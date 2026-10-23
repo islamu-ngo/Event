@@ -13,7 +13,7 @@ public sealed class RefundReconciliationHealthCheckTests
     [Test]
     public async Task CheckHealthAsync_WhenWorkIsStale_ReportsOnlyBoundedAggregateFields()
     {
-        var repository = Substitute.For<IRefundAttemptRepository>();
+        var repository = Substitute.For<IRefundReconciliationHealthObserver>();
         repository.GetReconciliationHealthAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(new RefundReconciliationHealth(3, 2, 1, 1, 1, 1, 1, 1, ObservedAt.AddMinutes(-15)));
         await using ServiceProvider provider = CreateProvider(repository);
@@ -38,7 +38,7 @@ public sealed class RefundReconciliationHealthCheckTests
     [Test]
     public async Task CheckHealthAsync_WhenNoActionIsRequired_IsHealthy()
     {
-        var repository = Substitute.For<IRefundAttemptRepository>();
+        var repository = Substitute.For<IRefundReconciliationHealthObserver>();
         repository.GetReconciliationHealthAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(new RefundReconciliationHealth(0, 0, 0, 0, 0, 0, 0, 0, null));
         await using ServiceProvider provider = CreateProvider(repository);
@@ -51,7 +51,25 @@ public sealed class RefundReconciliationHealthCheckTests
         await Assert.That(result.Status).IsEqualTo(HealthStatus.Healthy);
     }
 
-    private static ServiceProvider CreateProvider(IRefundAttemptRepository repository)
+    [Test]
+    public async Task CheckHealthAsync_WhenFleetAuthorityIsUnavailable_IsUnhealthyWithoutEmptyAggregates()
+    {
+        var repository = Substitute.For<IRefundReconciliationHealthObserver>();
+        repository.GetReconciliationHealthAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<RefundReconciliationHealth>(
+                new InvalidOperationException("refund_health_authority_unavailable")));
+        await using ServiceProvider provider = CreateProvider(repository);
+        var healthCheck = new RefundReconciliationHealthCheck(
+            provider.GetRequiredService<IServiceScopeFactory>(), new FixedTimeProvider(ObservedAt));
+
+        HealthCheckResult result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
+
+        await Assert.That(result.Status).IsEqualTo(HealthStatus.Unhealthy);
+        await Assert.That(result.Data.Count).IsEqualTo(0);
+        await Assert.That(result.Exception).IsNull();
+    }
+
+    private static ServiceProvider CreateProvider(IRefundReconciliationHealthObserver repository)
     {
         var services = new ServiceCollection();
         services.AddScoped(_ => repository);

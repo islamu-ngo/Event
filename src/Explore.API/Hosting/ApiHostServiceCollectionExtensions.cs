@@ -22,21 +22,24 @@ using Explore.Application.Services.Webhooks;
 using Explore.Application.Telemetry;
 using Explore.Application.Operations;
 using Explore.Infrastructure;
+using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Geocoding;
 using Explore.Infrastructure.HealthChecks;
 using Explore.Infrastructure.Messaging;
 using Explore.Infrastructure.NotificationFanout;
 using Explore.Infrastructure.Webhooks;
 using Explore.Persistence;
+using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
+using Explore.Persistence.Services;
 using Microsoft.AspNetCore.OutputCaching;
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;
 using Explore.Secrets.Extensions;
 using Explore.ServiceDefaults.Configuration;
+using Explore.ServiceDefaults.DataProtection;
 using Explore.ServiceDefaults.HealthChecks;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -47,6 +50,11 @@ using ModelContextProtocol.Server;
 using OpenFeature;
 using OpenFeature.Hosting.Providers.Memory;
 using Serilog;
+using Explore.API.Telemetry;
+using OpenTelemetry.Instrumentation.AspNetCore;
+using OpenTelemetry.Instrumentation.Http;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Trace;
 
 namespace Explore.API.Hosting;
 
@@ -54,7 +62,8 @@ public sealed record ApiHostCompositionState(
     bool IsOpenApiGeneration,
     bool UseQuartzScheduler,
     bool HttpsRedirectionEnabled,
-    bool OwnsDevelopmentMigrations = true);
+    bool OwnsDevelopmentMigrations = true,
+    bool OwnsConfigurationManifestStartup = true);
 
 public static class ApiHostServiceCollectionExtensions
 {
@@ -87,7 +96,9 @@ public static class ApiHostServiceCollectionExtensions
     public static ApiHostCompositionState AddApiHostServices(
         this WebApplicationBuilder builder,
         Func<bool> isShuttingDown,
-        bool ownsDevelopmentMigrations = true)
+        bool ownsDevelopmentMigrations = true,
+        SecretConsumer secretConsumer = SecretConsumer.Api,
+        bool ownsConfigurationManifestStartup = true)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(isShuttingDown);
@@ -106,7 +117,17 @@ public static class ApiHostServiceCollectionExtensions
                 TimeSpan.FromSeconds(ApiHostStartupExtensions.GracefulShutdownSeconds + 5);
         });
 
+        // Register before ServiceDefaults' exporters: OnEnd processors execute
+        // in registration order, including synchronous test/export sinks.
+        builder.Services.AddOpenTelemetry().WithTracing(tracing =>
+            tracing.AddProcessor(new ApiDiagnosticTraceProcessor()));
         builder.AddServiceDefaults();
+        builder.Services.Configure<AspNetCoreTraceInstrumentationOptions>(options =>
+            options.RecordException = false);
+        builder.Services.Configure<HttpClientTraceInstrumentationOptions>(options =>
+            options.RecordException = false);
+        builder.Logging.AddOpenTelemetry(options => options.IncludeScopes = false);
+        builder.Logging.AddFilter((category, _) => !ApiDiagnosticLogEnricher.IsFrameworkCategory(category));
         if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("cache")))
         {
             builder.AddRedisDistributedCache(connectionName: "cache");
@@ -128,7 +149,7 @@ public static class ApiHostServiceCollectionExtensions
             });
         }
         var secretProviderConfiguration = builder.Configuration.AddSecretAuthorityConfiguration(
-            builder.Environment.EnvironmentName);
+            builder.Environment.EnvironmentName, secretConsumer);
         builder.Services.AddSecretManagement(
             builder.Configuration,
             secretProviderConfiguration,
@@ -145,6 +166,8 @@ public static class ApiHostServiceCollectionExtensions
             builder.Services.Configure<OutputCacheOptions>(options => options.AddBasePolicy(policy => policy.Tag("agent-database")));
         }
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddFooterSetupReads();
+        builder.Services.AddScoped<IRegistrationCreationPrincipal, Explore.API.Authentication.HttpRegistrationCreationPrincipal>();
         builder.Services.AddScoped<
             IKeycloakOperatorAuthority,
             HttpKeycloakOperatorAuthority>();
@@ -164,6 +187,9 @@ public static class ApiHostServiceCollectionExtensions
             .GetSection(ForwardedHeadersTrustOptions.SectionName)
             .Get<ForwardedHeadersTrustOptions>() ?? new ForwardedHeadersTrustOptions();
 
+        // Optional Compose slots carry no trust when omitted or explicitly empty.
+        forwardedHeadersTrust.KnownProxies.RemoveAll(string.IsNullOrWhiteSpace);
+        forwardedHeadersTrust.KnownNetworks.RemoveAll(string.IsNullOrWhiteSpace);
         if ((builder.Environment.IsEnvironment("Testing") || builder.Environment.IsDevelopment()) &&
             builder.Configuration[$"{ForwardedHeadersTrustOptions.SectionName}:TrustLoopbackProxy"] is null &&
             !forwardedHeadersTrust.TrustLoopbackProxy &&
@@ -174,6 +200,18 @@ public static class ApiHostServiceCollectionExtensions
         }
 
         forwardedHeadersTrust.Validate();
+        builder.Services.AddOptions<EffectiveHostAuthorityOptions>()
+            .Bind(builder.Configuration.GetSection(EffectiveHostAuthorityOptions.SectionName))
+            .PostConfigure(options =>
+            {
+                options.InstanceHosts = options.InstanceHosts.Where(host => !string.IsNullOrWhiteSpace(host)).ToArray();
+                options.SubdomainBaseDomains = options.SubdomainBaseDomains.Where(host => !string.IsNullOrWhiteSpace(host)).ToArray();
+                var publicOrigin = builder.Configuration["PublicBaseUrl"] ?? builder.Configuration["PUBLIC_BASE_URL"];
+                if (builder.Configuration[$"{EffectiveHostAuthorityOptions.SectionName}:CanonicalOrigin"] is null
+                    && !string.IsNullOrWhiteSpace(publicOrigin)) options.CanonicalOrigin = publicOrigin;
+            })
+            .Validate(options => { options.Validate(); return true; })
+            .ValidateOnStart();
         builder.Services.Configure<ForwardedHeadersOptions>(options => forwardedHeadersTrust.ApplyTo(
             options,
             ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost));
@@ -210,7 +248,8 @@ public static class ApiHostServiceCollectionExtensions
         builder.Services.AddRouting(options => options.LowercaseUrls = true);
 
         builder.Services.ConfigureApplicationServices(builder.Configuration);
-        builder.Services.ConfigureInfrastructureServices(builder.Configuration, builder.Environment);
+        builder.Services.ConfigureInfrastructureServices(
+            builder.Configuration, builder.Environment, registerBackgroundWorkers: !isOpenApiGeneration);
         builder.Services.Configure<CerbosPolicyBootSyncOptions>(
             builder.Configuration.GetSection(CerbosPolicyBootSyncOptions.SectionName));
         builder.Services.PostConfigure<McpAdapterSettings>(settings =>
@@ -255,12 +294,18 @@ public static class ApiHostServiceCollectionExtensions
             skipDbContextRegistration: skipDbContext,
             skipLookupCacheInitializer: isOpenApiGeneration,
             environmentName: builder.Environment.EnvironmentName);
-        var dataProtection = builder.Services.AddDataProtection()
-            .SetApplicationName("islamu-event");
-        if (!skipDbContext)
+        builder.Services.AddSelectedWebhookManualRetryScheduling(provider =>
         {
-            dataProtection.PersistKeysToDbContext<DataProtectionKeyContext>();
-        }
+            var options = provider.GetRequiredService<IOptionsMonitor<WebhookOptions>>().CurrentValue;
+            return !options.IsDisabled &&
+                (options.IsProvider(WebhookOptions.ProviderLocal) ||
+                 options.IsProvider(WebhookOptions.ProviderComposite));
+        });
+        if (isOpenApiGeneration)
+            builder.Services.AddSingleton<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider,
+                OpenApiGenerationDataProtectionProvider>();
+        else
+            builder.Services.AddExternalDataProtection("api");
 
         builder.Services.AddScoped<ITenantResolverService, Explore.Infrastructure.Services.TenantResolverService>();
         builder.Services.AddScoped<ITenantContext, Explore.Infrastructure.Services.TenantContext>();
@@ -341,6 +386,7 @@ public static class ApiHostServiceCollectionExtensions
             options.AddDocumentTransformer<AdmissionScannerOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<HalDtoSchemaTransformer>();
             options.AddSchemaTransformer<ExternalApiKeyIssuanceSchemaTransformer>();
+            options.AddSchemaTransformer<LocalizationImportSchemaTransformer>();
             options.AddDocumentTransformer<QuotaExceededDetailsOpenApiTransformer>();
             options.AddDocumentTransformer<OpenApiStringEnumDocumentTransformer>();
             options.AddDocumentTransformer<OperatorIdentityManifestSchemaTransformer>();
@@ -366,15 +412,7 @@ public static class ApiHostServiceCollectionExtensions
             emailDispatchRabbitMqSettings);
 
         builder.Services.AddApiCors(builder.Configuration);
-        builder.Host.UseSerilog(
-            (context, services, loggerConfiguration) => loggerConfiguration
-                .ReadFrom.Configuration(context.Configuration)
-                .ReadFrom.Services(services)
-                .Enrich.FromLogContext()
-                // The framework's request-start/finish messages contain raw URLs
-                // before routing. RequestLoggingMiddleware owns safe HTTP events.
-                .MinimumLevel.Override("Microsoft.AspNetCore.Hosting.Diagnostics", Serilog.Events.LogEventLevel.Warning),
-            writeToProviders: true);
+        builder.Host.UseApiDiagnosticLogging();
         builder.Services.AddApiAuthentication(
             builder.Configuration,
             builder.Environment,
@@ -538,7 +576,8 @@ public static class ApiHostServiceCollectionExtensions
             isOpenApiGeneration,
             useQuartzScheduler,
             httpsRedirectionEnabled,
-            ownsDevelopmentMigrations);
+            ownsDevelopmentMigrations,
+            ownsConfigurationManifestStartup);
     }
 
 

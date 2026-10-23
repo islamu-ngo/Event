@@ -10,5 +10,6 @@ public interface IEventModerationNotificationFanoutService
 
     Task FanoutHeavyRedactionAsync(
         EventHeavyRedactedNotificationFanoutRequested request,
+        Guid expectedEventId,
         CancellationToken cancellationToken = default);
 }

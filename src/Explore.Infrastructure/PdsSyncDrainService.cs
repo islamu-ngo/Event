@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Federation.Atproto.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,10 +18,10 @@ public sealed class PdsSyncDrainService(
     public async Task<PdsSyncDrainResult> ProcessBatchAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<PdsSyncClaim> claims;
-        using (IServiceScope claimScope = scopeFactory.CreateScope())
+        await using (AsyncServiceScope claimScope = scopeFactory.CreateAsyncScope())
         {
-            var repository = claimScope.ServiceProvider.GetRequiredService<IPdsSyncOutboxRepository>();
-            claims = await repository.ClaimDueAsync(
+            var admission = claimScope.ServiceProvider.GetRequiredService<IPdsSyncQueueAdmission>();
+            claims = await admission.ClaimDueAsync(
                 _settings.BatchSize,
                 _leaseOwner,
                 timeProvider.GetUtcNow().UtcDateTime,
@@ -40,7 +41,9 @@ public sealed class PdsSyncDrainService(
             },
             async (claim, token) =>
             {
-                using IServiceScope scope = scopeFactory.CreateScope();
+                await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+                scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
+                    .BindExecutionTenant(claim.TenantId);
                 var processor = scope.ServiceProvider.GetRequiredService<AtprotoPdsDeliveryProcessor>();
                 AtprotoPdsClaimResult result = await processor.ProcessAsync(
                     claim,

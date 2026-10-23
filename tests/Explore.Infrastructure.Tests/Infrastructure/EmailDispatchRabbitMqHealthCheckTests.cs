@@ -1,12 +1,14 @@
 using System.Diagnostics.Metrics;
+using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Telemetry;
-using Explore.Infrastructure;
 using Explore.Infrastructure.HealthChecks;
 using Explore.Infrastructure.Messaging;
 using Explore.Infrastructure.Tests.Fixtures;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -16,6 +18,46 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 [Category(InfrastructureTestCategories.RabbitMQ)]
 public sealed class EmailDispatchRabbitMqHealthCheckTests
 {
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task NativeHealthOmitsConfiguredTopologyAndExceptionContentWithoutOpeningUnconfiguredBroker(bool enabled)
+    {
+        string canary = Guid.NewGuid().ToString("N");
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddOptions<EmailDispatchRabbitMqSettings>().Configure(options =>
+        {
+            options.Enabled = enabled;
+            options.ConnectionStringName = canary;
+            options.ExchangeName = canary;
+            options.DispatchQueueName = canary;
+            options.DeadLetterQueueName = canary;
+            options.ParkingQueueName = canary;
+        });
+        using var provider = services.BuildServiceProvider();
+        var logger = new TestListLogger<RabbitMqEmailDispatchTransport>();
+        await using var transport = new RabbitMqEmailDispatchTransport(
+            new ConfigurationBuilder().Build(),
+            provider.GetRequiredService<IOptionsMonitor<EmailDispatchRabbitMqSettings>>(),
+            new BusinessMetrics(provider.GetRequiredService<IMeterFactory>()), logger);
+
+        var health = await transport.CheckHealthAsync();
+
+        await Assert.That(health.Enabled).IsEqualTo(enabled);
+        await Assert.That(health.Healthy).IsEqualTo(!enabled);
+        await Assert.That(health.Data.Keys).IsEquivalentTo(["enabled"]);
+        await Assert.That(health.Data["enabled"]).IsEqualTo(enabled);
+        await Assert.That(logger.Entries.Count).IsEqualTo(enabled ? 1 : 0);
+        foreach (var entry in logger.Entries)
+        {
+            await Assert.That(entry.Level).IsEqualTo(LogLevel.Warning);
+            await Assert.That(entry.Exception).IsNull();
+            await Assert.That(entry.Message + JsonSerializer.Serialize(entry.State)).DoesNotContain(canary);
+        }
+        await Assert.That(JsonSerializer.Serialize(health)).DoesNotContain(canary);
+    }
+
     [Test]
     public async Task CheckHealthAsyncWhenRabbitMqModeDisabledReturnsHealthy()
     {
@@ -97,7 +139,7 @@ public sealed class EmailDispatchRabbitMqHealthCheckTests
         await Assert.That(health.Enabled).IsFalse();
         await Assert.That(health.Healthy).IsTrue();
         await Assert.That(health.Description).Contains("Basic Dispatch Mode remains independent");
-        await Assert.That(health.Data["connectionStringName"]).IsEqualTo("missing-broker");
+        await Assert.That(health.Data.ContainsKey("connectionStringName")).IsFalse();
     }
 
     [Test]

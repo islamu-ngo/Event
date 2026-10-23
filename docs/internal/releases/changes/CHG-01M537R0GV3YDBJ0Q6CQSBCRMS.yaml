@@ -1,0 +1,29 @@
+Change-Id: CHG-01M537R0GV3YDBJ0Q6CQSBCRMS
+Title: "Keep localization logs and metric labels confidential and bounded"
+Type: fix
+Scope: access
+Summary: "Retain useful provider and cache failure categories without private content and normalize localization metric labels to closed sets."
+Group: localization-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Provider/resolver/cache diagnostics and metrics cannot export raw exceptions, caller labels or translation content.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Counts, durations and cache fallback remain observable; TMS response-size and final publication gates remain separate.

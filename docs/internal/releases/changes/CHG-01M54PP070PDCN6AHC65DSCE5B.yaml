@@ -1,0 +1,30 @@
+Change-Id: CHG-01M54PP070PDCN6AHC65DSCE5B
+Title: "Bound Cerbos policy artifact parsing before publication"
+Type: fix
+Scope: access
+Summary: "Reject excessive policy packages and ambiguous YAML or JSON before hashing and provider handoff."
+Group: cerbos-artifact-budgets
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/self-hosting/coolify-cerbos-traefik.md
+    Disposition: documented
+    Detail: Packages using unbounded artifacts or YAML aliases, anchors, tags, merge keys, duplicate members, or multiple documents must be rewritten before Event compilation.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Bound file reads and parser expansion before artifact hashing and provider handoff.
+  Migration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/coolify-cerbos-traefik.md
+    Disposition: documented
+    Detail: Check file count, UTF-8 validity, byte size, nesting and YAML features before compiling a package in Event.

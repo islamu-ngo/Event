@@ -1,6 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Explore.Application.DTOs.Ai;
+using Explore.Application.Features.AiAssistant;
+using Explore.Domain.Ai;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
@@ -39,6 +42,9 @@ internal static class OpenApiStringEnumSchemaCatalog
 {
     private static IReadOnlyCollection<Type> EagerNestedEnumTypes { get; } =
     [
+        typeof(AiModelDiscoveryScope),
+        typeof(AiCredentialScope),
+        typeof(Explore.Domain.Secrets.AuthenticationCredentialCutover.CredentialConsumer),
         typeof(EventResourceKindEnum),
         typeof(EventResourceDeliveryTypeEnum),
         typeof(EventResourceDisclosureModeEnum),
@@ -74,6 +80,9 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     public static IReadOnlyCollection<Type> EnumTypes { get; } =
     [
+        typeof(AiModelDiscoveryScope),
+        typeof(AiCredentialScope),
+        typeof(Explore.Domain.Secrets.AuthenticationCredentialCutover.CredentialConsumer),
         typeof(ExternalApiKeyDisclosureStatus),
         typeof(EventResourceKindEnum),
         typeof(EventResourceDeliveryTypeEnum),

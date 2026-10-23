@@ -179,9 +179,9 @@ internal static class EventAggregateViewMapper
 
             return result;
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            logger.LogWarning(ex, "Failed to deserialize aggregate facet JSON. Returning empty facet list.");
+            logger.LogWarning("aggregate_facet_json_invalid fallback=empty");
             return [];
         }
     }

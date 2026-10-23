@@ -47,11 +47,11 @@ public class ExportFromTmsCommandHandler : ICommandHandler<ExportFromTmsCommand,
         {
             exports = await _translationProvider.ExportTranslationsAsync(request.LanguageCode, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "[LOCALIZATION] Export from TMS failed for {Language}", request.LanguageCode);
+            _logger.LogError("localization_tms_export_failed");
             _metrics.RecordStaticBundleOperation("export_from_tms", request.LanguageCode, "provider_error");
-            var message = $"Export from TMS failed for language '{request.LanguageCode}': {ex.Message}";
+            const string message = "Translation provider export failed.";
             return BaseCommandResponse.Validation<Guid>([message], message);
         }
 
@@ -78,11 +78,11 @@ public class ExportFromTmsCommandHandler : ICommandHandler<ExportFromTmsCommand,
             _metrics.RecordStaticBundleOperation("export_from_tms", request.LanguageCode, "success");
             return BaseCommandResponse.Success(Guid.CreateVersion7(), message);
         }
-        catch (BundleWriteException ex)
+        catch (BundleWriteException)
         {
-            _logger.LogError(ex, "[LOCALIZATION] Bundle persistence failed for {Language}", request.LanguageCode);
+            _logger.LogError("localization_bundle_persistence_failed");
             _metrics.RecordStaticBundleOperation("export_from_tms", request.LanguageCode, "write_error");
-            var message = $"Failed to persist bundle for '{request.LanguageCode}': {ex.Message}";
+            const string message = "Translation bundle persistence failed.";
             return BaseCommandResponse.Validation<Guid>([message], message);
         }
     }

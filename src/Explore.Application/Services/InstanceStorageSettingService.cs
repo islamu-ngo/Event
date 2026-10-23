@@ -1,12 +1,16 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Storage;
 using Explore.Application.Models.Storage;
 using Explore.Application.Telemetry;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
+using Microsoft.Extensions.DependencyInjection;
+using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 
@@ -16,25 +20,22 @@ public class InstanceStorageSettingService : IInstanceStorageSettingService
 {
     private readonly ISystemSettingRepository _systemSettingRepository;
     private readonly IStoragePolicyResolver _storagePolicyResolver;
-    private readonly IStorageUsageCounterRepository _usageCounterRepository;
-    private readonly IStorageObjectRepository _storageObjectRepository;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IInstanceStorageAdministration _storageAdministration;
     private readonly BusinessMetrics _metrics;
+    private readonly IPolicyMutationExecutionScopeFactory _scopeFactory;
 
     public InstanceStorageSettingService(
         ISystemSettingRepository systemSettingRepository,
         IStoragePolicyResolver storagePolicyResolver,
-        IStorageUsageCounterRepository usageCounterRepository,
-        IStorageObjectRepository storageObjectRepository,
-        IUnitOfWork unitOfWork,
-        BusinessMetrics metrics)
+        IInstanceStorageAdministration storageAdministration,
+        BusinessMetrics metrics,
+        IPolicyMutationExecutionScopeFactory scopeFactory)
     {
         _systemSettingRepository = systemSettingRepository;
         _storagePolicyResolver = storagePolicyResolver;
-        _usageCounterRepository = usageCounterRepository;
-        _storageObjectRepository = storageObjectRepository;
-        _unitOfWork = unitOfWork;
+        _storageAdministration = storageAdministration;
         _metrics = metrics;
+        _scopeFactory = scopeFactory;
     }
 
     public async Task<InstanceStorageSettingsDto> ReadSettingsAsync(CancellationToken cancellationToken = default)
@@ -53,7 +54,7 @@ public class InstanceStorageSettingService : IInstanceStorageSettingService
         var uploadExpiration = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Storage.UploadUrlExpirationMinutes, cancellationToken);
 
         var policy = await _storagePolicyResolver.ResolveAsync(null, cancellationToken);
-        var providerStatus = await TestProviderAsync(testWritePermissions: false, cancellationToken);
+        var providerStatus = await ReadProviderHealthAsync(cancellationToken);
         var usage = await ReadUsageAsync(cancellationToken);
 
         return new InstanceStorageSettingsDto
@@ -76,77 +77,41 @@ public class InstanceStorageSettingService : IInstanceStorageSettingService
         };
     }
 
-    public async Task ApplySettingsAsync(InstanceStorageSettingsDto settings, PatchInstanceStorageSettingsDto patch)
+    public Task<StorageSettingsMutation> ObserveConfigurationAsync(UpdateInstanceStorageSettingsCommand command,
+        CancellationToken cancellationToken = default) =>
+        StorageSettingsMutation.ObserveAsync(command, this, null, _scopeFactory, cancellationToken);
+
+    public Task ApplySettingsAsync(StorageSettingsMutation observation, CancellationToken cancellationToken = default)
     {
-        if (patch.Policy.HasValue)
-        {
-            var provider = NormalizeProvider(settings.Provider);
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.Provider,
-                JsonSerializer.Serialize(provider), SettingValueType.String, false,
-                "ObjectStorage", 1, "Selected storage provider. Local filesystem is default; S3-compatible storage is optional.");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.DefaultMaxUploadBytes,
-                JsonSerializer.Serialize(settings.DefaultMaxUploadBytes), SettingValueType.Long, false,
-                "ObjectStorage", 2, "Default maximum upload size in bytes for tenant storage policy.");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes,
-                JsonSerializer.Serialize(settings.DefaultTenantQuotaBytes), SettingValueType.Long, false,
-                "ObjectStorage", 3, "Default tenant storage quota in bytes.");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.InstanceMaxUploadBytes,
-                JsonSerializer.Serialize(settings.InstanceMaxUploadBytes), SettingValueType.Long, false,
-                "ObjectStorage", 4, "Instance-wide upload ceiling in bytes; tenant overrides cannot exceed this value.");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.TenantDelegation.LockStorage,
-                JsonSerializer.Serialize(settings.LockTenantStorage), SettingValueType.Boolean, false,
-                "Governance", 5, "Lock tenant-level storage overrides when running multi-tenant deployments.");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.RouteMatrix,
-                JsonSerializer.Serialize(ToRouteMatrix(settings.Routes)), SettingValueType.Json, false,
-                "ObjectStorage", 6, "Server-side route matrix that maps image, document, and general uploads to providers and byte limits.");
-        }
-
-        if (patch.S3Configuration.HasValue)
-        {
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.Endpoint,
-                JsonSerializer.Serialize(settings.S3Endpoint.Trim()), SettingValueType.String, false,
-                "ObjectStorage", 7, "S3-compatible endpoint URL (e.g., https://fsn1.your-objectstorage.com)");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.PublicEndpoint,
-                JsonSerializer.Serialize(settings.S3PublicEndpoint.Trim()), SettingValueType.String, false,
-                "ObjectStorage", 8, "Public endpoint for S3-compatible public object access when configured.");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.BucketName,
-                JsonSerializer.Serialize(settings.S3BucketName.Trim()), SettingValueType.String, false,
-                "ObjectStorage", 9, "S3 bucket name for object storage");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.Region,
-                JsonSerializer.Serialize(settings.S3Region.Trim()), SettingValueType.String, false,
-                "ObjectStorage", 12, "S3 region identifier (e.g., fsn1 for Hetzner, us-east-1 for AWS)");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.ForcePathStyle,
-                JsonSerializer.Serialize(settings.S3ForcePathStyle), SettingValueType.Boolean, false,
-                "ObjectStorage", 13, "Use path-style URLs (required by most non-AWS S3 providers)");
-
-            await UpsertSystemSettingAsync(GovernanceSettingKeys.Storage.UploadUrlExpirationMinutes,
-                JsonSerializer.Serialize(settings.S3UploadUrlExpirationMinutes > 0 ? settings.S3UploadUrlExpirationMinutes : 60),
-                SettingValueType.Integer, false,
-                "ObjectStorage", 14, "Legacy S3 presigned upload URL expiration time in minutes");
-        }
+        if (observation.TenantId is not null)
+            throw new UnauthorizedAccessException("Instance configuration requires its original Global observation.");
+        return observation.ExecuteAsync(this, cancellationToken);
     }
 
-    public async Task<InstanceStorageProviderStatusDto> TestProviderAsync(CancellationToken cancellationToken = default)
-        => await TestProviderAsync(testWritePermissions: true, cancellationToken);
+    public async Task<InstanceStorageProviderStatusDto> TestProviderAsync(
+        TestInstanceStorageProviderQuery query, CancellationToken cancellationToken = default)
+    {
+        await using var scope = await _scopeFactory.CreateAsync(PolicyMutationScope.Instance, cancellationToken);
+        var result = await scope.Services.GetRequiredService<IStorageProbeOriginalAction>().ExecuteAsync(query, cancellationToken);
+        _metrics.RecordStorageProviderTest(result.Provider, result.IsAvailable ? "succeeded" : "failed", result.FailureCode);
+        return result;
+    }
 
-    private async Task<InstanceStorageProviderStatusDto> TestProviderAsync(
-        bool testWritePermissions,
-        CancellationToken cancellationToken)
+    public async Task<InstanceStorageProviderStatusDto> TestProviderAsync(
+        TestInstanceStorageProviderDuringSetupQuery query, CancellationToken cancellationToken = default)
+    {
+        await using var scope = await _scopeFactory.CreateAsync(PolicyMutationScope.Instance, cancellationToken);
+        var result = await scope.Services.GetRequiredService<IStorageProbeOriginalAction>().ExecuteAsync(query, cancellationToken);
+        _metrics.RecordStorageProviderTest(result.Provider, result.IsAvailable ? "succeeded" : "failed", result.FailureCode);
+        return result;
+    }
+
+    private async Task<InstanceStorageProviderStatusDto> ReadProviderHealthAsync(CancellationToken cancellationToken)
     {
         try
         {
             var provider = await _storagePolicyResolver.ResolveProviderAsync(null, cancellationToken);
-            var status = await provider.TestAsync(cancellationToken, testWritePermissions);
+            var status = await provider.TestAsync(cancellationToken, testWritePermissions: false);
 
             _metrics.RecordStorageProviderTest(
                 status.Provider,
@@ -162,31 +127,21 @@ public class InstanceStorageSettingService : IInstanceStorageSettingService
         }
     }
 
-    public async Task<InstanceStorageUsageDto> RecalculateUsageAsync(CancellationToken cancellationToken = default)
+    public async Task<InstanceStorageUsageDto> RecalculateUsageAsync(
+        RecalculateInstanceStorageUsageCommand command, CancellationToken cancellationToken = default)
     {
-        return await _unitOfWork.ExecuteInTransactionAsync(async ct =>
-        {
-            var objects = await _storageObjectRepository.GetAllForInstanceStorageReportAsync(ct);
-            var counters = await _usageCounterRepository.GetAllTrackedForInstanceStorageRecalculationAsync(ct);
-            var scopes = counters.Select(counter => (counter.TenantId, Provider: NormalizeProvider(counter.Provider)))
-                .Concat(objects.Select(storageObject =>
-                    (storageObject.TenantId, Provider: NormalizeProvider(storageObject.Provider))))
-                .Distinct().OrderBy(scope => scope.TenantId).ThenBy(scope => scope.Provider, StringComparer.Ordinal);
-            var utcNow = DateTime.UtcNow;
-            foreach (var scope in scopes)
-            {
-                var counter = await _usageCounterRepository.RecalculateScopeAsync(
-                    scope.TenantId, scope.Provider, utcNow, ct);
-                await _usageCounterRepository.Update(counter);
-            }
+        return MapUsage(await _storageAdministration.RecalculateUsageAsync(command, cancellationToken));
+    }
 
-            return await ReadUsageAsync(ct);
-        }, cancellationToken);
+    public async Task<InstanceStorageUsageDto> RecalculateUsageAsync(
+        RecalculateInstanceStorageUsageDuringSetupCommand command, CancellationToken cancellationToken = default)
+    {
+        return MapUsage(await _storageAdministration.RecalculateUsageAsync(command, cancellationToken));
     }
 
     private async Task<InstanceStorageUsageDto> ReadUsageAsync(CancellationToken cancellationToken)
     {
-        var counters = await _usageCounterRepository.GetAllForInstanceStorageReportAsync(cancellationToken);
+        var counters = await _storageAdministration.ReadUsageAsync(cancellationToken);
         return MapUsage(counters);
     }
 
@@ -360,7 +315,7 @@ public class InstanceStorageSettingService : IInstanceStorageSettingService
             Preflight = status.Preflight
         };
 
-    private static InstanceStorageUsageDto MapUsage(IReadOnlyList<StorageUsageCounter> counters)
+    private static InstanceStorageUsageDto MapUsage(IReadOnlyList<InstanceStorageProviderTotals> counters)
     {
         var providerUsage = counters
             .GroupBy(counter => NormalizeProvider(counter.Provider))
@@ -395,26 +350,4 @@ public class InstanceStorageSettingService : IInstanceStorageSettingService
         };
     }
 
-    private async Task UpsertSystemSettingAsync(
-        string settingKey,
-        string value,
-        SettingValueType valueType,
-        bool isLocked,
-        string category,
-        int displayOrder,
-        string description)
-    {
-        await _systemSettingRepository.UpsertAsync(new SystemSetting
-        {
-            SettingKey = settingKey,
-            Value = value,
-            ValueType = valueType,
-            IsLocked = isLocked,
-            Description = description,
-            Category = category,
-            DisplayOrder = displayOrder,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        });
-    }
 }

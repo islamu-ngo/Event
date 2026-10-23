@@ -1,0 +1,31 @@
+Change-Id: CHG-01M521HDF0WRZAHSJRSW88VEGY
+Title: "require explicit database role credentials"
+Type: fix
+Scope: self-hosting
+Summary: "Database connection roles bind only their explicitly selected credential fields or aliases; generic and sibling credentials cannot fill missing role values."
+Group: database-role-credential-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Configure explicit username and password fields or aliases for every selected database role; generic root or sibling credentials no longer fill missing values.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Database roles select only their own credential authority; explicit empty values mask aliases and valid password bytes are preserved.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: .env.example
+    Disposition: documented
+    Detail: Provide role-specific structured credential fields or DATABASE role aliases; this binding foundation does not activate new deployment pools.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Populate each selected role independently before upgrade; empty structured credentials intentionally block environment aliases.

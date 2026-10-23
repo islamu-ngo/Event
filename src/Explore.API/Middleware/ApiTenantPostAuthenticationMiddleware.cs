@@ -58,12 +58,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                 "tenant_mismatch",
                 authenticatedApiKeyTenantId.ToString(),
                 apiKeyPrincipal?.OwnerType.ToString());
-            _logger.LogWarning(
-                "External API key {KeyId} for tenant {AuthenticatedTenantId} attempted mismatched tenant {RequestedTenantId} on {Path}.",
-                apiKeyPrincipal?.KeyId,
-                authenticatedApiKeyTenantId,
-                hintedTenantId,
-                context.Request.Path);
+            LogOutcome(context, "tenant_mismatch", LogLevel.Warning, StatusCodes.Status404NotFound);
             context.Response.StatusCode = StatusCodes.Status404NotFound;
 
             await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
@@ -75,7 +70,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                     Title = "Tenant mismatch",
                     Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
                     Detail = "The authenticated tenant does not match the requested tenant context.",
-                    Instance = context.Request.Path
+                    Instance = SafeRouteMetadata.GetRouteIdentityOrClassification(context)
                 }
             });
             return;
@@ -99,10 +94,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                         tenantContextAccessor.SetTenant(requestedInstanceAdminTenantId);
                         if (_logger.IsEnabled(LogLevel.Information))
                         {
-                            _logger.LogInformation(
-                                "InstanceAdmin external API key {KeyId} bound to requested tenant context for {Path}.",
-                                apiKeyPrincipal.KeyId,
-                                context.Request.Path);
+                            LogOutcome(context, "tenant_bound", LogLevel.Information, context.Response.StatusCode);
                         }
 
                         await _next(context);
@@ -113,10 +105,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                     {
                         if (_logger.IsEnabled(LogLevel.Information))
                         {
-                            _logger.LogInformation(
-                                "InstanceAdmin external API key {KeyId} continued without tenant context for host-administration path {Path}.",
-                                apiKeyPrincipal.KeyId,
-                                context.Request.Path);
+                            LogOutcome(context, "host_administration", LogLevel.Information, context.Response.StatusCode);
                         }
 
                         await _next(context);
@@ -127,10 +116,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                         "tenant_required",
                         "platform",
                         apiKeyPrincipal.OwnerType.ToString());
-                    _logger.LogWarning(
-                        "InstanceAdmin external API key {KeyId} attempted tenant-scoped API path {Path} without an explicit tenant context.",
-                        apiKeyPrincipal.KeyId,
-                        context.Request.Path);
+                    LogOutcome(context, "tenant_required", LogLevel.Warning, StatusCodes.Status404NotFound);
                     context.Response.StatusCode = StatusCodes.Status404NotFound;
 
                     await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
@@ -142,7 +128,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                             Title = "Tenant not resolved",
                             Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
                             Detail = "The tenant could not be resolved for this request.",
-                            Instance = context.Request.Path,
+                            Instance = SafeRouteMetadata.GetRouteIdentityOrClassification(context),
                             Extensions =
                             {
                                 ["code"] = ApiProblemCodes.TenantRequired
@@ -160,11 +146,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                         "tenant_mismatch",
                         requestedTenantIdForAuthenticatedKey.ToString(),
                         apiKeyPrincipal?.OwnerType.ToString());
-                    _logger.LogWarning(
-                        "External API key {KeyId} without a tenant claim attempted requested tenant {RequestedTenantId} on {Path}.",
-                        apiKeyPrincipal?.KeyId,
-                        requestedTenantIdForAuthenticatedKey,
-                        context.Request.Path);
+                    LogOutcome(context, "tenant_mismatch", LogLevel.Warning, StatusCodes.Status404NotFound);
                     context.Response.StatusCode = StatusCodes.Status404NotFound;
 
                     await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
@@ -176,7 +158,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                             Title = "Tenant mismatch",
                             Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
                             Detail = "The authenticated tenant does not match the requested tenant context.",
-                            Instance = context.Request.Path
+                            Instance = SafeRouteMetadata.GetRouteIdentityOrClassification(context)
                         }
                     });
                     return;
@@ -193,7 +175,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                         Title = "API key authentication failed",
                         Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2",
                         Detail = "The API key could not be authenticated for this request.",
-                        Instance = context.Request.Path
+                        Instance = SafeRouteMetadata.GetRouteIdentityOrClassification(context)
                     }
                 });
                 return;
@@ -207,10 +189,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                         "tenant_required",
                         "platform",
                         apiKeyPrincipal.OwnerType.ToString());
-                    _logger.LogWarning(
-                        "InstanceAdmin external API key {KeyId} attempted MCP path {Path} without an explicit tenant context.",
-                        apiKeyPrincipal.KeyId,
-                        context.Request.Path);
+                    LogOutcome(context, "tenant_required", LogLevel.Warning, StatusCodes.Status404NotFound);
                 }
 
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -224,7 +203,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                         Title = "Tenant not resolved",
                         Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
                         Detail = "The tenant could not be resolved for this request.",
-                        Instance = context.Request.Path,
+                        Instance = SafeRouteMetadata.GetRouteIdentityOrClassification(context),
                         Extensions =
                         {
                             ["code"] = ApiProblemCodes.TenantRequired
@@ -248,12 +227,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                 "tenant_mismatch",
                 resolvedPrincipalTenantId.ToString(),
                 apiKeyPrincipal?.OwnerType.ToString());
-            _logger.LogWarning(
-                "External API key {KeyId} for tenant {AuthenticatedTenantId} conflicted with resolved request tenant {ResolvedTenantId} on {Path}.",
-                apiKeyPrincipal?.KeyId,
-                resolvedPrincipalTenantId,
-                resolvedRequestTenantId,
-                context.Request.Path);
+            LogOutcome(context, "tenant_mismatch", LogLevel.Warning, StatusCodes.Status404NotFound);
             context.Response.StatusCode = StatusCodes.Status404NotFound;
 
             await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
@@ -265,7 +239,7 @@ public sealed class ApiTenantPostAuthenticationMiddleware
                     Title = "Tenant mismatch",
                     Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5",
                     Detail = "The authenticated tenant does not match the requested tenant context.",
-                    Instance = context.Request.Path
+                    Instance = SafeRouteMetadata.GetRouteIdentityOrClassification(context)
                 }
             });
             return;
@@ -273,6 +247,12 @@ public sealed class ApiTenantPostAuthenticationMiddleware
 
         await _next(context);
     }
+
+    private void LogOutcome(HttpContext context, string code, LogLevel level, int status) =>
+        _logger.Log(level,
+            "API key tenancy {Code} for {Method} {Route} responded {StatusCode} | TraceId={TraceId}",
+            code, SafeRouteMetadata.GetMethod(context),
+            SafeRouteMetadata.GetRouteIdentityOrClassification(context), status, context.TraceIdentifier);
 
     private static Guid? ResolveRequestedTenantId(HttpContext context)
     {

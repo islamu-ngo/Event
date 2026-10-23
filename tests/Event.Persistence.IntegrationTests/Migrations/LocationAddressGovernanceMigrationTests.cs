@@ -7,6 +7,7 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -175,6 +176,7 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
         {
             await using ExploreDbContext context = CreateApplicationContext(database);
             await context.Database.MigrateAsync();
+            await PostgresDiscoveryDisclosureContract.ApplyAsync(context);
             await LookupTableSeeder.SeedAsync(context);
             await InsertCurrentGraphAsync(context);
 

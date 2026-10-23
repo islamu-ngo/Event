@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -26,7 +27,10 @@ public sealed class EventDiscoveryDisclosureRepository(ExploreDbContext context)
             // Serializable existence reads retain shared revision locks on SQL Server
             // and MySQL. Taking the named lock afterwards would reverse native/named
             // order against another finalizer. Fence the parent without reading epochs.
-            await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(context, tenantId, cancellationToken);
+            if (DiscoveryRepositoryNativeOperations.For(context) is { } native)
+                await native.FenceTenantAsync(tenantId, cancellationToken);
+            else
+                await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(context, tenantId, cancellationToken);
             return true;
         }, cancellationToken);
     }
@@ -62,6 +66,27 @@ public sealed class EventDiscoveryDisclosureRepository(ExploreDbContext context)
         if (ordered.Length > Services.EventDiscoveryDisclosureMutationScope.MaximumAffectedTenants
             || ordered.Contains(Guid.Empty))
             throw new InvalidOperationException("discovery_disclosure_fanout_exceeded");
+        // A selected tenant does not imply an ordinary traversal owner. Credential
+        // issuers and other disclosure writers retain their own native capability,
+        // including when their affected set contains only the selected tenant.
+        bool nativeWriter = DiscoveryRepositoryNativeOperations.For(context) is { } native
+            && await native.CanFinalizeDisclosureAsync(ordered, cancellationToken);
+        if (nativeWriter)
+        {
+            // This invokes only a fixed database capability on the already-selected
+            // connection. An ordinary lease has no EXECUTE grant and fails closed.
+            await PostgresDiscoveryDisclosureContract.FenceTenantsAsync(context, ordered, cancellationToken);
+            context.DisclosureMutations.Seal();
+            foreach (Guid tenantId in ordered)
+                await RelationalNamedLock.AcquireTransactionAsync(
+                    context, $"discovery-epoch:{tenantId:N}", cancellationToken);
+            await PostgresDiscoveryDisclosureContract.FinalizeAsync(
+                context, ordered, tenantIds, identityRevisions, cancellationToken);
+            foreach (var entry in context.ChangeTracker.Entries<EventDiscoveryRevision>()
+                         .Where(entry => ordered.Contains(entry.Entity.TenantId)).ToArray())
+                entry.State = EntityState.Detached;
+            return;
+        }
         var operations = new EventDiscoveryDisclosureProviderOperations(context);
         // Epoch-row creation takes a Tenant FK lock. Acquire every possible parent
         // before the first epoch, never epoch(A) -> new source lock for tenant(B).

@@ -21,7 +21,8 @@ public sealed class TransitionInstanceTenantLifecycleCommandHandler(
     ICurrentUserService currentUserService,
     ISettingMutationLock mutationLock,
     TenantActivationCapacityPolicy capacityPolicy,
-    ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness)
+    ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
+    Func<IHumanSecuritySourceGate> securityGates)
     : ICommandHandler<TransitionInstanceTenantLifecycleCommand, BaseCommandResponse<InstanceTenantLifecycleTransitionDto>>
 {
     public async Task<BaseCommandResponse<InstanceTenantLifecycleTransitionDto>> ExecuteAsync(
@@ -40,9 +41,15 @@ public sealed class TransitionInstanceTenantLifecycleCommandHandler(
             return Failure($"{request.TargetStatus} requires a reason.");
         }
 
+        var securityGate = securityGates();
+        await using var ownedGate = securityGate.TryRequireCurrent()
+            ? null : await securityGate.AcquireAsync(cancellationToken);
+        securityGate.RequireCurrent();
+
         async Task<BaseCommandResponse<InstanceTenantLifecycleTransitionDto>> TransitionAsync(
             CancellationToken ct)
         {
+            securityGate.RequireCurrent();
             var tenant = await tenantRepository.GetByIdAsNoTrackingAsync(request.TenantId, ct);
             if (tenant is null)
             {
@@ -143,6 +150,8 @@ public sealed class TransitionInstanceTenantLifecycleCommandHandler(
                 CreatedBy = userId.Value
             }, ct);
 
+            securityGate.RequireCurrent();
+
             return Success(InstanceTenantMapper.ToTransition(
                 tenant.Id,
                 oldStatusId,
@@ -160,10 +169,12 @@ public sealed class TransitionInstanceTenantLifecycleCommandHandler(
         string[] lockKeys = capacityPolicy.IsEnforced
             ? [GovernanceSettingKeys.Deployment.Mode, identityLockKey]
             : [identityLockKey];
-        return await mutationLock.ExecuteManyAsync(
+        var response = await mutationLock.ExecuteManyAsync(
             lockKeys,
             TransitionAsync,
             cancellationToken);
+        securityGate.RequireCurrent();
+        return response;
     }
 
     private static bool RequiresReason(TenantStatusEnum targetStatus) =>

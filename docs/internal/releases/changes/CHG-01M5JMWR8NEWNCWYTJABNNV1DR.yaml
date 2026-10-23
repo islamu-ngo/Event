@@ -1,0 +1,31 @@
+Change-Id: CHG-01M5JMWR8NEWNCWYTJABNNV1DR
+Title: "Persist the application-owned programme model"
+Type: feat
+Scope: database
+Summary: "Preserve the EF-generated application and external-identity schema closure for federation settings, local eligibility, provisioning policy and typed integration evidence. Runtime acceptance remains deferred in the PR75 backlog handoff."
+Group: application-owned-programme-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: Development-only programme schema changes reject generic federation keys and introduce eligibility, provisioning-policy and typed outbox storage. Apply matching regenerated provider and external-identity migrations; no retained-data compatibility path or automatic database reset is supplied.
+  Security:
+    Reference: docs/internal/adr/ADR-application-owned-persistence.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: C# owns canonical creation, authorization and workflow completion. Constraints and useful tenant isolation support application-owned storage; purpose-bound permissions and operational acceptance remain separately required.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: Eight EF-generated application and external-identity migration pairs plus eight snapshots travel with their exact model source across PostgreSQL, SQLite, SQL Server and shared MySQL/MariaDB. Offline checks and SQLite lifecycle evidence do not establish the remaining physical provider matrix. Down can delete data; MySQL/MariaDB DDL is not atomically reversible.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: This is an incomplete development checkpoint. Stop workers before schema transitions and use matching application/database restores rather than an unsafe downgrade. Known runtime failures and all deferred acceptance are recorded in the PR75 backlog handoff.

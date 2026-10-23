@@ -10,6 +10,14 @@ on:
         description: Required only when DEPLOYMENT_FREEZE is true; explain the production override.
         required: false
         type: string
+      cerbos_publication_receipt:
+        description: Exact operator-signed publication JSON for this revision and production PDP.
+        required: true
+        type: string
+      cerbos_publication_signature:
+        description: Base64 RSA-PSS SHA-256 signature over the exact receipt bytes.
+        required: true
+        type: string
   push:
     branches: [main]
     tags: ["v*"]
@@ -76,6 +84,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  cerbos-publication:
+    uses: ./.github/workflows/_cerbos-publication.yml
+    with:
+      receipt: ${{ inputs.cerbos_publication_receipt || '' }}
+      signature: ${{ inputs.cerbos_publication_signature || '' }}
+
   # JOB 1: Detect Changes
   detect-changes:
     runs-on: ubuntu-latest
@@ -129,9 +143,10 @@ jobs:
           API_CHANGED: ${{ steps.filter.outputs.api }}
           UI_CHANGED: ${{ steps.filter.outputs.ui }}
           IS_TAG_REF: ${{ github.ref_type == 'tag' }}
+          IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           # Both changed if: (api AND ui) OR it's a tag push
-          if [ "$IS_TAG_REF" == "true" ] || { [ "$API_CHANGED" == "true" ] && [ "$UI_CHANGED" == "true" ]; }; then
+          if [ "$IS_MANUAL" == "true" ] || [ "$IS_TAG_REF" == "true" ] || { [ "$API_CHANGED" == "true" ] && [ "$UI_CHANGED" == "true" ]; }; then
             echo "both_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "both_changed=false" >> "$GITHUB_OUTPUT"
@@ -143,14 +158,15 @@ jobs:
           API_CHANGED: ${{ steps.filter.outputs.api }}
           UI_CHANGED: ${{ steps.filter.outputs.ui }}
           REF_TYPE: ${{ github.ref_type }}
+          IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           MATRIX_JSON="[]"
 
-          if [ "$API_CHANGED" == "true" ] || [ "$REF_TYPE" == "tag" ]; then
+          if [ "$IS_MANUAL" == "true" ] || [ "$API_CHANGED" == "true" ] || [ "$REF_TYPE" == "tag" ]; then
             MATRIX_JSON=$(echo "$MATRIX_JSON" | jq '. + [{"image-name": "islamu-event-api", "dockerfile": "src/Explore.API/Dockerfile", "context": "."}]')
           fi
 
-          if [ "$UI_CHANGED" == "true" ] || [ "$REF_TYPE" == "tag" ]; then
+          if [ "$IS_MANUAL" == "true" ] || [ "$UI_CHANGED" == "true" ] || [ "$REF_TYPE" == "tag" ]; then
             MATRIX_JSON=$(echo "$MATRIX_JSON" | jq '. + [{"image-name": "islamu-event-ui", "dockerfile": "src/Explore.Blazor/Dockerfile", "context": "."}]')
           fi
 
@@ -159,7 +175,7 @@ jobs:
   # JOB 2: Run Tests (Unified)
   run-tests:
     needs: detect-changes
-    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag'
+    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/_build-test.yml
     with:
       run-integration-tests: true
@@ -197,8 +213,8 @@ jobs:
 
   # JOB 4: Deploy to Production
   deploy:
-    needs: [detect-changes, build-and-push]
-    if: always() && needs.build-and-push.result == 'success'
+    needs: [detect-changes, build-and-push, cerbos-publication]
+    if: always() && needs.build-and-push.result == 'success' && needs.cerbos-publication.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -226,16 +242,35 @@ jobs:
 
       - name: Resolve API deploy image evidence
         id: api-evidence
-        if: ${{ needs.detect-changes.outputs.api == 'true' || github.ref_type == 'tag' }}
+        if: ${{ needs.detect-changes.outputs.api == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
         run: dotnet run .ci/scripts/resolve-deploy-image-evidence.cs -- artifacts/container-build islamu-event-api sha-
 
       - name: Resolve UI deploy image evidence
         id: ui-evidence
-        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' }}
+        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
         run: dotnet run .ci/scripts/resolve-deploy-image-evidence.cs -- artifacts/container-build islamu-event-ui sha-
 
+      - name: Download authenticated publication receipt
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cerbos-publication-receipt
+          path: artifacts/cerbos-publication
+
+      - name: Recheck publication freshness immediately before deployment
+        shell: bash
+        env:
+          PUBLIC_KEY: ${{ vars.CERBOS_PUBLICATION_PUBLIC_KEY_PEM }}
+          PDP_ENDPOINT: ${{ vars.CERBOS_PUBLICATION_PDP_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PUBLIC_KEY" > "$RUNNER_TEMP/cerbos-publication-public.pem"
+          dotnet run .ci/scripts/verify-cerbos-publication.cs -- \
+            artifacts/cerbos-publication/receipt.json artifacts/cerbos-publication/receipt.sig \
+            "$RUNNER_TEMP/cerbos-publication-public.pem" "$GITHUB_SHA" production \
+            "$PDP_ENDPOINT" cerbos/policies
+
       - name: Trigger Coolify Deployment (API)
-        if: ${{ needs.detect-changes.outputs.api == 'true' || github.ref_type == 'tag' }}
+        if: ${{ needs.detect-changes.outputs.api == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
         uses: ./.ci/actions/deploy-coolify
         with:
           environment-name: production
@@ -253,8 +288,22 @@ jobs:
           override-reason: ${{ inputs.override_reason }}
           require-smoke-check: "true"
 
+      - name: Recheck publication before the UI deployment
+        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
+        shell: bash
+        env:
+          PUBLIC_KEY: ${{ vars.CERBOS_PUBLICATION_PUBLIC_KEY_PEM }}
+          PDP_ENDPOINT: ${{ vars.CERBOS_PUBLICATION_PDP_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PUBLIC_KEY" > "$RUNNER_TEMP/cerbos-publication-public.pem"
+          dotnet run .ci/scripts/verify-cerbos-publication.cs -- \
+            artifacts/cerbos-publication/receipt.json artifacts/cerbos-publication/receipt.sig \
+            "$RUNNER_TEMP/cerbos-publication-public.pem" "$GITHUB_SHA" production \
+            "$PDP_ENDPOINT" cerbos/policies
+
       - name: Trigger Coolify Deployment (UI)
-        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' }}
+        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
         uses: ./.ci/actions/deploy-coolify
         with:
           environment-name: production

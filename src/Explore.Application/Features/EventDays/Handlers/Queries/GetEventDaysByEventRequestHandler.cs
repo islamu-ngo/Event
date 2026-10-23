@@ -36,14 +36,18 @@ public class GetEventDaysByEventRequestHandler :
 }
 
 public sealed class GetManagedEventDaysByEventRequestHandler(
-    IEventDayRepository eventDayRepository)
+    IEventDayRepository eventDayRepository,
+    IPrivateEventManagementReader? privateManagement = null)
     : IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>
 {
     public async Task<List<EventDayListDto>> QueryAsync(
         GetManagedEventDaysByEventRequest request,
         CancellationToken cancellationToken)
     {
-        var eventDays = await eventDayRepository.GetByEventAsync(request.EventId, cancellationToken);
+        var eventDays = privateManagement is null
+            ? await eventDayRepository.GetByEventAsync(request.EventId, cancellationToken)
+            : (await privateManagement.ReadAsync(new(PrivateEventManagementReadKind.Program, request.EventId), cancellationToken))
+                .Days.OrderBy(day => day.SortOrder).ThenBy(day => day.LocalDate).ToList();
         return eventDays.Select(EventMapper.ToListItem).ToList();
     }
 }

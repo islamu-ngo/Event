@@ -1,5 +1,11 @@
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence.Repositories;
+using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Persistence.Security;
+using Explore.Secrets.Database;
+using Explore.Application.Contracts.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
 
@@ -17,8 +23,8 @@ public sealed class AtprotoBootstrapReplayRepositoryTests(PostgreSqlContainerFix
 
         var attempts = Enumerable.Range(0, 24).Select(async _ =>
         {
-            await using var context = fixture.CreateDbContext();
-            return await new AtprotoBootstrapReplayRepository(context)
+            await using var context = CreateRuntimeContext(tenantId);
+            return await new AtprotoBootstrapReplayRepository(context, enrollment: fixture.NativeQueueEnrollment)
                 .TryConsumeAsync(jti, tenantId, expiresAt);
         });
         var results = await Task.WhenAll(attempts);
@@ -31,20 +37,34 @@ public sealed class AtprotoBootstrapReplayRepositoryTests(PostgreSqlContainerFix
     {
         await fixture.ResetAsync();
         var jti = Guid.NewGuid().ToString("D");
-        await using var firstContext = fixture.CreateDbContext();
-        await using var secondContext = fixture.CreateDbContext();
-        var first = new AtprotoBootstrapReplayRepository(firstContext);
-        var second = new AtprotoBootstrapReplayRepository(secondContext);
+        Guid firstTenantId = Guid.CreateVersion7(), secondTenantId = Guid.CreateVersion7();
+        await using var firstContext = CreateRuntimeContext(firstTenantId);
+        await using var secondContext = CreateRuntimeContext(secondTenantId);
+        var first = new AtprotoBootstrapReplayRepository(firstContext, enrollment: fixture.NativeQueueEnrollment);
+        var second = new AtprotoBootstrapReplayRepository(secondContext, enrollment: fixture.NativeQueueEnrollment);
 
-        var firstTenant = await first.TryConsumeAsync(jti, Guid.NewGuid(), DateTimeOffset.UtcNow.AddMinutes(2));
-        var secondTenant = await second.TryConsumeAsync(jti, Guid.NewGuid(), DateTimeOffset.UtcNow.AddMinutes(2));
+        var firstTenant = await first.TryConsumeAsync(jti, firstTenantId, DateTimeOffset.UtcNow.AddMinutes(2));
+        var secondTenant = await second.TryConsumeAsync(jti, secondTenantId, DateTimeOffset.UtcNow.AddMinutes(2));
         var expired = await second.TryConsumeAsync(
             Guid.NewGuid().ToString("D"),
-            Guid.NewGuid(),
+            secondTenantId,
             DateTimeOffset.UtcNow.AddSeconds(-1));
 
         await Assert.That(firstTenant).IsTrue();
         await Assert.That(secondTenant).IsTrue();
         await Assert.That(expired).IsFalse();
     }
+
+    private ExploreDbContext CreateRuntimeContext(Guid tenant)
+    {
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder,
+            fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime));
+        builder.AddInterceptors(PostgresTenantSessionInterceptor.RuntimeInstance);
+        var context = new ExploreDbContext(builder.Options) { TenantContext = new SelectedTenant(tenant) };
+        context.BindTenantLease();
+        return context;
+    }
+
+    private sealed record SelectedTenant(Guid TenantId) : ITenantContext;
 }

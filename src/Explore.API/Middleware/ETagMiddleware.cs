@@ -1,127 +1,83 @@
-using System.Buffers;
 using System.Security.Cryptography;
 using Explore.API.Filters;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IO;
 
 namespace Explore.API.Middleware;
 
 /// <summary>
-/// Handles ETag generation and conditional request processing for GET endpoints.
-/// Computes a weak ETag from the response body hash and returns 304 Not Modified
-/// when the client sends a matching If-None-Match header.
-/// Uses <see cref="RecyclableMemoryStreamManager"/> to eliminate per-request MemoryStream allocations.
-/// Skips ETag computation for responses larger than <see cref="MaxETagBodySize"/>.
+/// Computes weak validators only for completely captured, successful JSON responses.
+/// Retention is capped before allocation; streaming and uncaptured output has no validator.
 /// </summary>
-public sealed class ETagMiddleware
+public sealed class ETagMiddleware(RequestDelegate next)
 {
-    /// <summary>
-    /// Maximum response body size (256 KB) for which ETags are computed.
-    /// Larger responses skip ETag computation — they should rely on output cache alone.
-    /// </summary>
     private const int MaxETagBodySize = 256 * 1024;
-
-    private readonly RequestDelegate _next;
-    private readonly RecyclableMemoryStreamManager _streamManager;
-
-    public ETagMiddleware(RequestDelegate next, RecyclableMemoryStreamManager streamManager)
-    {
-        _next = next;
-        _streamManager = streamManager;
-    }
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // An event stream never completes, so it must bypass body capture before execution.
+        var produces = context.GetEndpoint()?.Metadata.GetMetadata<ProducesAttribute>();
         if (context.GetEndpoint()?.Metadata.GetMetadata<PrivateNoStoreAttribute>() is not null
-            || context.GetEndpoint()?.Metadata.GetMetadata<ProducesAttribute>()?.ContentTypes
-                .Contains("text/event-stream", StringComparer.OrdinalIgnoreCase) is true
+            || produces?.ContentTypes.Contains("text/event-stream", StringComparer.OrdinalIgnoreCase) is true
+            || produces is { ContentTypes.Count: > 0 } && !produces.ContentTypes.Any(IsJson)
             || !HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
         {
-            await _next(context);
+            await next(context);
             return;
         }
 
-        var originalBodyStream = context.Response.Body;
-        using var bufferStream = _streamManager.GetStream("etag-middleware");
-        context.Response.Body = bufferStream;
-
+        Stream original = context.Response.Body;
+        using var capture = new BoundedResponseCaptureStream(
+            original,
+            MaxETagBodySize,
+            () => !context.Response.HasStarted
+                && context.Response.StatusCode is >= 200 and < 300
+                && IsJson(context.Response.ContentType)
+                && context.Response.ContentLength is not > MaxETagBodySize,
+            () => HttpMethods.IsHead(context.Request.Method)
+                || context.Response.StatusCode is StatusCodes.Status204NoContent or StatusCodes.Status304NotModified);
+        context.Response.Body = capture;
         try
         {
-            await _next(context);
-        }
-        catch
-        {
-            context.Response.Body = originalBodyStream;
-            throw;
-        }
-
-        // Only process successful JSON responses
-        if (context.Response.StatusCode is not (>= 200 and < 300))
-        {
-            bufferStream.Position = 0;
-            await bufferStream.CopyToAsync(originalBodyStream);
-            context.Response.Body = originalBodyStream;
-            return;
-        }
-
-        var contentType = context.Response.ContentType;
-        if (contentType is null ||
-            (!contentType.Contains("application/json", StringComparison.OrdinalIgnoreCase) &&
-             !contentType.Contains("application/hal+json", StringComparison.OrdinalIgnoreCase)))
-        {
-            bufferStream.Position = 0;
-            await bufferStream.CopyToAsync(originalBodyStream);
-            context.Response.Body = originalBodyStream;
-            return;
-        }
-
-        var length = (int)bufferStream.Length;
-
-        // Skip ETag computation for large responses — rely on output cache alone
-        if (length > MaxETagBodySize)
-        {
-            bufferStream.Position = 0;
-            await bufferStream.CopyToAsync(originalBodyStream);
-            context.Response.Body = originalBodyStream;
-            return;
-        }
-
-        // Compute SHA256 hash without ToArray() — rent from ArrayPool to avoid heap allocation
-        bufferStream.Position = 0;
-        var buffer = ArrayPool<byte>.Shared.Rent(length);
-        try
-        {
-            _ = bufferStream.Read(buffer, 0, length);
-            var hash = SHA256.HashData(buffer.AsSpan(0, length));
-            var etag = $"W/\"{Convert.ToBase64String(hash.AsSpan(0, 8))}\"";
-
-            context.Response.Headers.ETag = etag;
-
-            var ifNoneMatch = context.Request.Headers.IfNoneMatch.FirstOrDefault();
-            if (!string.IsNullOrEmpty(ifNoneMatch) && ifNoneMatch == etag)
+            await next(context);
+            if (capture.IsCaptured && !context.Response.HasStarted
+                && context.Response.StatusCode is >= 200 and < 300
+                && context.Response.StatusCode != StatusCodes.Status204NoContent
+                && context.Response.ContentLength is not > MaxETagBodySize
+                && IsJson(context.Response.ContentType))
             {
-                context.Response.StatusCode = StatusCodes.Status304NotModified;
-                context.Response.Body = originalBodyStream;
-                context.Response.ContentLength = 0;
-                return;
+                var hash = SHA256.HashData(capture.CapturedBody.Span);
+                var etag = $"W/\"{Convert.ToBase64String(hash.AsSpan(0, 8))}\"";
+                context.Response.Headers.ETag = etag;
+                if (context.Request.Headers.IfNoneMatch.FirstOrDefault() == etag)
+                {
+                    context.Response.StatusCode = StatusCodes.Status304NotModified;
+                    context.Response.ContentLength = null;
+                    return;
+                }
+
+                if (HttpMethods.IsHead(context.Request.Method))
+                {
+                    context.Response.ContentLength ??= capture.Length;
+                }
             }
+
+            await capture.ForwardPrefixAsync(context.RequestAborted);
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(buffer);
+            context.Response.Body = original;
         }
+    }
 
-        bufferStream.Position = 0;
-        await bufferStream.CopyToAsync(originalBodyStream);
-        context.Response.Body = originalBodyStream;
+    private static bool IsJson(string? contentType)
+    {
+        string? mediaType = contentType?.Split(';', 2)[0].Trim();
+        return mediaType?.Equals("application/json", StringComparison.OrdinalIgnoreCase) is true
+            || mediaType?.Equals("application/hal+json", StringComparison.OrdinalIgnoreCase) is true;
     }
 }
 
 public static class ETagMiddlewareExtensions
 {
-    public static IApplicationBuilder UseETag(this IApplicationBuilder app)
-    {
-        return app.UseMiddleware<ETagMiddleware>();
-    }
+    public static IApplicationBuilder UseETag(this IApplicationBuilder app) =>
+        app.UseMiddleware<ETagMiddleware>();
 }

@@ -3,6 +3,36 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-18
+
+- **Breaking: remove plaintext provider credentials from API contracts.**
+  AI model creation and instance AI provider patches no longer accept `apiKey`.
+  Instance AI settings no longer return `apiKeyConfigured`. Authentication
+  settings and onboarding reads no longer return `googleClientSecret` or
+  `keycloakClientSecret`, and authentication provider patches no longer accept
+  `googleClientSecret`. Authorization-provider reads no longer expose
+  `cerbosAdminCredentialsOwnership`, `cerbosAdminPasswordConfigured`, or
+  `cerbosAdminUsernameConfigured`. Tenant onboarding settings and completion
+  no longer carry `aiAssistantApiKey`. Configure provider credentials through
+  the selected deployment secret authority, not administrative JSON payloads.
+- **Breaking: remove the internal authentication-provider onboarding GET.**
+  `GET /api/instanceonboarding/auth-provider-configuration/internal` is removed.
+  Regenerate callers against the supported onboarding and settings contracts;
+  do not restore the internal credential-bearing route.
+- **Breaking: require explicit action and order intent.**
+  Confirming an AI proposed action requires its request body.
+  `POST /api/events/{eventId}/registration-orders` requires `Idempotency-Key`.
+  Preserve the same key for retries of the same order intent.
+- **Breaking: publish localization import bounds.**
+  `POST /api/admin/localization/bundle` requires `languageCode` (1..35
+  characters) and `translations`; translation values are bounded at 16,384
+  characters. Existing duplicate-key and aggregate-budget validation still
+  applies independently of OpenAPI schema validation.
+- Deploy the API and regenerated clients together. Update automation that
+  populated removed fields or read removed credential-status properties.
+  Rollback must preserve secret isolation and idempotency rather than restoring
+  plaintext fields or retrying an uncertain order with a new operation key.
+
 ## 2026-10-12
 
 - **Breaking: native draft program schedule nullability.** Nested event-creation

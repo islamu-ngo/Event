@@ -6,6 +6,7 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -119,7 +120,8 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
             provider,
             repository,
             new EfCoreUnitOfWork(context),
-            new FixedTimeProvider(PreparedAt));
+            new FixedTimeProvider(PreparedAt),
+            new EventDiscoveryEnrollmentGate(context));
     }
 
     private static ExploreDbContext CreateContext(
@@ -140,7 +142,9 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
                 SqliteProjectionLockTransactionInterceptor.Instance)
             .AddInterceptors(interceptors)
             .Options;
-        return new ExploreDbContext(options);
+        var context = new ExploreDbContext(options);
+        context.BindTenantLease();
+        return context;
     }
 
     internal sealed class BootstrapConnectionBarrier : DbConnectionInterceptor
@@ -245,6 +249,8 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
         var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);
         builder.AddInterceptors(interceptors);
-        return new ExploreDbContext(builder.Options);
+        var context = new ExploreDbContext(builder.Options);
+        context.BindTenantLease();
+        return context;
     }
 }

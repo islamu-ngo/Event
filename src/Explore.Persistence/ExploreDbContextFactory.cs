@@ -22,6 +22,32 @@ public class ExploreDbContextFactory : IDesignTimeDbContextFactory<ExploreDbCont
             .AddEnvironmentVariables()
             .AddCommandLine(args)
             .Build();
+        if (new ConfigurationBuilder().AddCommandLine(args).Build()
+            .GetValue<bool>("DesignTime:ModelOnly"))
+        {
+            if (!SecretAuthorityConfiguration.IsDevelopmentOrTesting(
+                    SecretAuthorityConfiguration.GetEnvironmentName(bootstrap)))
+                throw new InvalidOperationException("Model-only scaffolding requires Development or Testing.");
+            string? selected = bootstrap["Database:Provider"] ?? bootstrap["DATABASE_PROVIDER"];
+            if (!Enum.TryParse(selected, true, out PrimaryDatabaseProvider provider) || !Enum.IsDefined(provider))
+                throw new InvalidOperationException("Model-only scaffolding requires an explicit supported provider.");
+            string? serverVersion = bootstrap["Database:ServerVersion"] ?? bootstrap["DATABASE_SERVER_VERSION"];
+            var modelOptions = new PrimaryDatabaseConnectionOptions
+            {
+                Provider = provider,
+                Role = PrimaryDatabaseRole.Migrator,
+                ServerFlavor = provider switch
+                {
+                    PrimaryDatabaseProvider.MariaDb => PrimaryDatabaseServerFlavor.MariaDb,
+                    PrimaryDatabaseProvider.MySql => PrimaryDatabaseServerFlavor.MySql,
+                    _ => null
+                },
+                ServerVersion = serverVersion is null ? null : Version.Parse(serverVersion)
+            };
+            var modelBuilder = new DbContextOptionsBuilder<ExploreDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureApplicationModel(modelBuilder, modelOptions);
+            return new ExploreDbContext(modelBuilder.Options);
+        }
         var configurationBuilder = new ConfigurationBuilder().AddConfiguration(
             SecretAuthorityConfiguration.Build(
                 bootstrap,

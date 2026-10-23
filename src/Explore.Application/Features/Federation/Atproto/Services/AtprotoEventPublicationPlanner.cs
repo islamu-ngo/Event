@@ -59,7 +59,7 @@ public sealed class AtprotoEventPublicationPlanner(
     AtprotoEventGovernanceResolver governanceResolver,
     IEventRepository eventRepository,
     IAtprotoRecordRepository recordRepository,
-    IUserAuthenticationTokenRepository sessionRepository,
+    IAtprotoSessionBindingReader sessionBindings,
     IUserExternalLoginRepository externalLoginRepository,
     IAtprotoPublicationPayloadBuilder payloadBuilder,
     IPdsSyncOutboxRepository outboxRepository,
@@ -236,14 +236,14 @@ public sealed class AtprotoEventPublicationPlanner(
             return Skipped(request, "consent_missing");
         }
 
-        IReadOnlyList<Explore.Domain.UserAuthenticationToken> sessions =
-            await sessionRepository.GetAtprotoSessionsForReadAsync(
+        var sessions =
+            await sessionBindings.ReadAsync(
                 request.TenantId,
                 ownerUserId,
-                RepositoryBackedAtprotoSession.Provider,
                 cancellationToken);
-        if (sessions.Count != 1
-            || string.IsNullOrWhiteSpace(sessions[0].SubjectDid)
+        string? subjectDid = sessions.Length == 1 ? sessions[0].SubjectDid : null;
+        if (sessions.Length != 1
+            || string.IsNullOrWhiteSpace(subjectDid)
             || !Uri.TryCreate(sessions[0].PdsHost, UriKind.Absolute, out Uri? pdsHost)
             || pdsHost.Scheme != Uri.UriSchemeHttps
             || !string.IsNullOrEmpty(pdsHost.Query)
@@ -253,19 +253,24 @@ public sealed class AtprotoEventPublicationPlanner(
         }
 
         if (unsettledPredecessor is not null
-            && (!string.Equals(sessions[0].SubjectDid, unsettledPredecessor.Did, StringComparison.Ordinal)
+            && (!string.Equals(subjectDid, unsettledPredecessor.Did, StringComparison.Ordinal)
                 || !SamePds(pdsHost, unsettledPredecessor.PdsHost)))
+        {
+            return Skipped(request, "session_binding_changed");
+        }
+        if (ownership?.AtprotoRecord is { } settledRecord
+            && !string.Equals(subjectDid, settledRecord.Did, StringComparison.Ordinal))
         {
             return Skipped(request, "session_binding_changed");
         }
 
         Explore.Domain.UserExternalLogin? login = await externalLoginRepository.GetByProviderAndKey(
             PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(
-                Explore.Domain.ValueObjects.AtprotoDid.Parse(sessions[0].SubjectDid)));
+                Explore.Domain.ValueObjects.AtprotoDid.Parse(subjectDid)));
         if (login is null
             || login.UserId != ownerUserId
             || login.AuthenticationProviderId != (int)AuthenticationProviderKind.Atproto
-            || !string.Equals(login.ProviderKey, sessions[0].SubjectDid, StringComparison.Ordinal))
+            || !string.Equals(login.ProviderKey, subjectDid, StringComparison.Ordinal))
         {
             return Skipped(request, "account_not_linked");
         }
@@ -325,7 +330,7 @@ public sealed class AtprotoEventPublicationPlanner(
             }
             else
             {
-                if (!HasActiveEventIdentity(graph.Event, sessions[0].SubjectDid))
+                if (!HasActiveEventIdentity(graph.Event, subjectDid))
                 {
                     if (request.RestoreOnly || !hasGroundedRemoteMutation)
                     {
@@ -363,7 +368,7 @@ public sealed class AtprotoEventPublicationPlanner(
             Id = request.OutboxId,
             TenantId = request.TenantId,
             UserId = ownerUserId,
-            Did = sessions[0].SubjectDid,
+            Did = subjectDid,
             Collection = EventCollection,
             RecordKey = recordKey,
             Operation = plannedOperation,
@@ -383,10 +388,7 @@ public sealed class AtprotoEventPublicationPlanner(
         };
 
         await outboxRepository.SupersedePriorAsync(
-            request.TenantId,
-            EventSourceType,
-            request.EventId,
-            request.OutboxId,
+            outbox,
             request.CreatedAtUtc,
             cancellationToken);
         await outboxRepository.AddAsync(outbox, cancellationToken);
@@ -400,16 +402,23 @@ public sealed class AtprotoEventPublicationPlanner(
             return null;
         }
 
-        DateTime? notBefore = priorCreate.NextRetryAt > createdAtUtc
-            ? priorCreate.NextRetryAt
+        return CompensationNotBefore(
+            priorCreate.Status, priorCreate.NextRetryAt, priorCreate.LeaseExpiresAt, createdAtUtc);
+    }
+
+    public static DateTime? CompensationNotBefore(
+        PdsSyncStatus status, DateTime? nextRetryAt, DateTime? leaseExpiresAt, DateTime createdAtUtc)
+    {
+        DateTime? notBefore = nextRetryAt > createdAtUtc
+            ? nextRetryAt
             : null;
-        if (priorCreate.Status != PdsSyncStatus.Processing)
+        if (status != PdsSyncStatus.Processing)
         {
             return notBefore;
         }
 
         DateTime remoteWindowEnd = createdAtUtc.Add(MaximumRemoteCallWindow);
-        DateTime leaseEnd = priorCreate.LeaseExpiresAt is { Kind: DateTimeKind.Utc } value
+        DateTime leaseEnd = leaseExpiresAt is { Kind: DateTimeKind.Utc } value
             ? value
             : remoteWindowEnd;
         DateTime processingSafetyEnd = (leaseEnd > remoteWindowEnd ? leaseEnd : remoteWindowEnd)
@@ -417,7 +426,7 @@ public sealed class AtprotoEventPublicationPlanner(
         return notBefore > processingSafetyEnd ? notBefore : processingSafetyEnd;
     }
 
-    private static bool SamePds(Uri current, string expected) =>
+    public static bool SamePds(Uri current, string expected) =>
         Uri.TryCreate(expected, UriKind.Absolute, out Uri? expectedUri)
         && string.Equals(current.Scheme, expectedUri.Scheme, StringComparison.OrdinalIgnoreCase)
         && string.Equals(current.Host, expectedUri.Host, StringComparison.OrdinalIgnoreCase)
@@ -460,13 +469,12 @@ public sealed class AtprotoEventPublicationPlanner(
             return AtprotoDeliveryGateResult.Deny("consent_missing");
         }
 
-        IReadOnlyList<Explore.Domain.UserAuthenticationToken> sessions =
-            await sessionRepository.GetAtprotoSessionsForReadAsync(
+        var sessions =
+            await sessionBindings.ReadAsync(
                 outbox.TenantId,
                 outbox.UserId,
-                RepositoryBackedAtprotoSession.Provider,
                 cancellationToken);
-        if (sessions.Count != 1
+        if (sessions.Length != 1
             || !string.Equals(sessions[0].SubjectDid, outbox.Did, StringComparison.Ordinal)
             || !string.Equals(sessions[0].PdsHost, outbox.PdsHost, StringComparison.Ordinal))
         {
@@ -493,29 +501,29 @@ public sealed class AtprotoEventPublicationPlanner(
             return AtprotoDeliveryGateResult.Deny("source_version_changed");
         }
 
+        if (outbox.AtprotoRecordId is Guid atprotoRecordId)
+        {
+            AtprotoOutboundRecordOwnership? ownership = await recordRepository.GetOwnedRecordForSourceAsync(
+                outbox.TenantId,
+                EventSourceType,
+                outbox.SourceEntityId,
+                cancellationToken);
+            if (ownership?.AtprotoRecord is not { } record
+                || ownership.AtprotoRecordId != atprotoRecordId
+                || ownership.UserId != outbox.UserId
+                || record.Id != atprotoRecordId
+                || !string.Equals(record.Did, outbox.Did, StringComparison.Ordinal)
+                || !string.Equals(record.Collection, outbox.Collection, StringComparison.Ordinal)
+                || !string.Equals(record.RecordKey, outbox.RecordKey, StringComparison.Ordinal)
+                || outbox.ExpectedCid is not null
+                    && !string.Equals(record.Cid, outbox.ExpectedCid, StringComparison.Ordinal))
+            {
+                return AtprotoDeliveryGateResult.Deny("ownership_invalid");
+            }
+        }
+
         if (outbox.Operation == PdsSyncOperation.Delete)
         {
-            if (outbox.AtprotoRecordId is Guid atprotoRecordId)
-            {
-                AtprotoOutboundRecordOwnership? ownership = await recordRepository.GetOwnedRecordForSourceAsync(
-                    outbox.TenantId,
-                    EventSourceType,
-                    outbox.SourceEntityId,
-                    cancellationToken);
-                if (ownership?.AtprotoRecord is not { } record
-                    || ownership.AtprotoRecordId != atprotoRecordId
-                    || ownership.UserId != outbox.UserId
-                    || record.Id != atprotoRecordId
-                    || !string.Equals(record.Did, outbox.Did, StringComparison.Ordinal)
-                    || !string.Equals(record.Collection, outbox.Collection, StringComparison.Ordinal)
-                    || !string.Equals(record.RecordKey, outbox.RecordKey, StringComparison.Ordinal)
-                    || outbox.ExpectedCid is not null
-                        && !string.Equals(record.Cid, outbox.ExpectedCid, StringComparison.Ordinal))
-                {
-                    return AtprotoDeliveryGateResult.Deny("ownership_invalid");
-                }
-            }
-
             if (!await eventRepository.IsPubliclyEligibleAsync(
                     outbox.TenantId,
                     outbox.SourceEntityId,

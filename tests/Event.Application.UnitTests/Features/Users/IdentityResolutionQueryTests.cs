@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Explore.Application;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Users.Handlers.Queries;
@@ -77,7 +78,7 @@ public sealed class IdentityResolutionQueryTests
         using var second = provider.CreateScope();
         var firstQuery = first.ServiceProvider.GetRequiredService<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>();
         var secondQuery = second.ServiceProvider.GetRequiredService<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>();
-        var firstStore = first.ServiceProvider.GetRequiredService<IUserExternalLoginRepository>();
+        var firstStore = first.ServiceProvider.GetRequiredService<LoginStore>();
         var login = (await firstStore.GetByUser(LinkedUser)).Single();
         await firstStore.Delete(login);
         await Assert.That(await firstQuery.ResolveCurrentUserIdAsync(Principal())).IsNull();
@@ -85,15 +86,16 @@ public sealed class IdentityResolutionQueryTests
     }
 
     [Test]
-    public async Task PreCancelledTokenRetainsExistingTokenlessRepositoryBehavior()
+    public async Task PreCancelledTokenStopsBeforeProviderLookup()
     {
         using var provider = Services();
         using var scope = provider.CreateScope();
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var query = scope.ServiceProvider.GetRequiredService<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>();
-        // The existing repository contract has no token. The cutover must not add an early cancellation check.
-        await Assert.That(await query.ResolveCurrentUserIdAsync(Principal(), cancellation.Token)).IsEqualTo(LinkedUser);
+        await Assert.That(() => query.ResolveCurrentUserIdAsync(Principal(), cancellation.Token))
+            .Throws<OperationCanceledException>();
+        await Assert.That(scope.ServiceProvider.GetRequiredService<LoginStore>().Lookups).IsEqualTo(0);
     }
 
     [Test]
@@ -105,7 +107,7 @@ public sealed class IdentityResolutionQueryTests
         using var scope = provider.CreateScope();
         using var cancellation = new CancellationTokenSource();
         var completion = new TaskCompletionSource<UserExternalLogin?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var store = (LoginStore)scope.ServiceProvider.GetRequiredService<IUserExternalLoginRepository>();
+        var store = scope.ServiceProvider.GetRequiredService<LoginStore>();
         store.PendingLookup = completion.Task;
         var query = scope.ServiceProvider.GetRequiredService<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>();
         Task<Guid?> pending = query.ResolveCurrentUserIdAsync(Principal(), cancellation.Token);
@@ -135,7 +137,9 @@ public sealed class IdentityResolutionQueryTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddScoped<IUserExternalLoginRepository>(_ => new LoginStore());
+        services.AddSingleton(NSubstitute.Substitute.For<IMachinePrincipalAccessor>());
+        services.AddScoped<LoginStore>();
+        services.AddScoped<IExternalLoginAuthenticationRepository>(provider => provider.GetRequiredService<LoginStore>());
         services.AddSingleton<IAuthorizationProvider, UnexpectedPolicy>();
         services.AddNativeOperations(
         [
@@ -153,7 +157,7 @@ public sealed class IdentityResolutionQueryTests
             throw new InvalidOperationException("Identity resolution must not ask the PDP for new authority.");
     }
 
-    private sealed class LoginStore : IUserExternalLoginRepository
+    private sealed class LoginStore : IExternalLoginAuthenticationRepository
     {
         private readonly List<UserExternalLogin> _logins = [new()
         {
@@ -161,16 +165,14 @@ public sealed class IdentityResolutionQueryTests
             AuthenticationProviderId = (int)AuthenticationProviderKind.Google, ProviderKey = Account
         }];
         public Task<UserExternalLogin?>? PendingLookup { get; set; }
-        public Task<UserExternalLogin?> GetByProviderAndKey(ProviderAccountKey key) => PendingLookup ?? Task.FromResult(_logins.SingleOrDefault(login =>
-            login.AuthenticationProviderId == (int)key.ProviderKind && string.Equals(login.ProviderKey, key.Value, StringComparison.Ordinal)));
+        public int Lookups { get; private set; }
+        public Task<UserExternalLogin?> GetByProviderAndKey(ProviderAccountKey key, CancellationToken cancellationToken = default)
+        {
+            Lookups++;
+            return PendingLookup ?? Task.FromResult(_logins.SingleOrDefault(login =>
+                login.AuthenticationProviderId == (int)key.ProviderKind && string.Equals(login.ProviderKey, key.Value, StringComparison.Ordinal)));
+        }
         public Task<List<UserExternalLogin>> GetByUser(Guid userId) => Task.FromResult(_logins.Where(login => login.UserId == userId).ToList());
-        public Task<UserExternalLogin?> GetById(Guid id) => Task.FromResult(_logins.SingleOrDefault(login => login.Id == id));
-        public Task<IReadOnlyList<UserExternalLogin>> GetAll() => Task.FromResult<IReadOnlyList<UserExternalLogin>>(_logins.ToArray());
-        public Task<(IReadOnlyList<UserExternalLogin> Items, int TotalCount)> GetAllPaged(int pageNumber, int pageSize) =>
-            Task.FromResult<(IReadOnlyList<UserExternalLogin>, int)>((_logins.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToArray(), _logins.Count));
-        public Task<bool> Exists(Guid id) => Task.FromResult(_logins.Any(login => login.Id == id));
-        public Task<UserExternalLogin> Create(UserExternalLogin entity) { _logins.Add(entity); return Task.FromResult(entity); }
-        public Task Update(UserExternalLogin entity) => throw new NotSupportedException();
         public Task Delete(UserExternalLogin entity) { _logins.Remove(entity); return Task.CompletedTask; }
     }
 }

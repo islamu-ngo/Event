@@ -18,20 +18,38 @@ public class DeleteGroupMemberCommandHandler : ICommandHandler<DeleteGroupMember
     private readonly IGroupMemberRepository _groupMemberRepository;
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
+    private readonly IHumanAccountAdministrativeActionPreparation _preparation;
+    private readonly ISerializableAttemptOwner _owner;
 
     public DeleteGroupMemberCommandHandler(
         IGroupMemberRepository groupMemberRepository,
         IUserContext userContext,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IHumanAccountAdministrativeActionPreparation preparation,
+        ISerializableAttemptOwner owner)
     {
         _groupMemberRepository = groupMemberRepository;
         _userContext = userContext;
         _tenantContext = tenantContext;
+        _preparation = preparation;
+        _owner = owner;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteGroupMemberCommand request, CancellationToken cancellationToken)
     {
-        var memberToDelete = await _groupMemberRepository.GetById(request.MemberId);
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        return await _owner.ExecuteAsync(async token =>
+        {
+            await prepared.AcquireAsync(request, token);
+            var result = await ExecuteBodyAsync(request, token);
+            if (result.IsSuccess) prepared.Complete(result.Id);
+            return result;
+        }, cancellationToken);
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(DeleteGroupMemberCommand request, CancellationToken cancellationToken)
+    {
+        var memberToDelete = await _groupMemberRepository.GetGroupMemberWithDetails(request.MemberId);
         if (memberToDelete == null)
         {
             return BaseCommandResponse.Validation<Guid>(["Member not found"], "Member not found");

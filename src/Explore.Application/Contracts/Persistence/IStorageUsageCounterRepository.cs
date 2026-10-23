@@ -13,6 +13,6 @@ public interface IStorageUsageCounterRepository : IGenericRepository<StorageUsag
     /// </summary>
     Task<StorageUsageCounter> RecalculateScopeAsync(
         Guid tenantId, string provider, DateTime utcNow, CancellationToken cancellationToken);
-    Task<IReadOnlyList<StorageUsageCounter>> GetAllForInstanceStorageReportAsync(CancellationToken cancellationToken);
-    Task<IReadOnlyList<StorageUsageCounter>> GetAllTrackedForInstanceStorageRecalculationAsync(CancellationToken cancellationToken);
+    Task RecalculateForInstanceStorageAdministrationAsync(
+        Guid tenantId, string provider, DateTime utcNow, CancellationToken cancellationToken);
 }

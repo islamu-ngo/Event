@@ -64,7 +64,7 @@ public sealed class SupportAccessAuditMiddleware(
             await auditEventRepository.CreateAsync(auditEvent, CancellationToken.None);
             metrics.RecordSupportAccessRequestAudit(metricEventType, metricOutcome, "persisted");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             metrics.RecordSupportAccessRequestAudit(
                 metricEventType,
@@ -73,7 +73,6 @@ public sealed class SupportAccessAuditMiddleware(
                 "support_access_audit_persistence_failed");
             System.Diagnostics.Activity.Current?.SetTag("support_access.audit.persistence_outcome", "failed");
             logger.LogWarning(
-                ex,
                 "Could not persist support-access request audit event for request={RequestName} statusCode={StatusCode}.",
                 ResolveRequestName(context),
                 context.Response.StatusCode);

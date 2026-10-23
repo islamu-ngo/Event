@@ -1,9 +1,11 @@
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Security;
 using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -115,6 +117,7 @@ public sealed class GeneratedInitMigrationBehaviorTests(
             await Assert.That(await context.Database.GetAppliedMigrationsAsync())
                 .IsEquivalentTo(migrations, CollectionOrdering.Matching);
             await PostgresModelConstraintApplier.ApplyAsync(context);
+            await PostgresDiscoveryDisclosureContract.ApplyAsync(context);
             await LookupTableSeeder.SeedAsync(context);
 
             await Assert.That(await ScalarIntAsync(
@@ -207,10 +210,11 @@ public sealed class GeneratedInitMigrationBehaviorTests(
             await Assert.That(await context.Database.GetAppliedMigrationsAsync())
                 .IsEquivalentTo(migrations, CollectionOrdering.Matching);
             await PostgresModelConstraintApplier.ApplyAsync(context);
+            await PostgresDiscoveryDisclosureContract.ApplyAsync(context);
             context.ChangeTracker.Clear();
             await LookupTableSeeder.SeedAsync(context);
             await Assert.That(await ScalarIntAsync(
-                "SELECT count(*)::integer FROM \"__EFMigrationsHistory\" WHERE migration_id = @id",
+                "SELECT count(*)::integer FROM islamu_event.\"__EFMigrationsHistory\" WHERE migration_id = @id",
                 new NpgsqlParameter("id", migrationId)))
                 .IsEqualTo(1);
         }
@@ -232,6 +236,7 @@ public sealed class GeneratedInitMigrationBehaviorTests(
 
             await Assert.That(await ScalarIntAsync(
                 "SELECT count(*)::integer FROM islamu_event.location_kinds")).IsEqualTo(0);
+            await PostgresDiscoveryDisclosureContract.ApplyAsync(context);
             await LookupTableSeeder.SeedAsync(context);
             await Assert.That(await ScalarIntAsync(
                 "SELECT count(*)::integer FROM islamu_event.location_kinds")).IsGreaterThanOrEqualTo(5);
@@ -437,9 +442,19 @@ public sealed class GeneratedInitMigrationBehaviorTests(
 
     private ExploreDbContext CreateExploreContext()
     {
-        var builder = TestDbContextOptions.Create<ExploreDbContext>()
-            .UseNpgsql(fixture.ConnectionString)
-            .UseSnakeCaseNamingConvention();
+        var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(builder, new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Migrator,
+            Provider = PrimaryDatabaseProvider.PostgreSql,
+            Host = connection.Host,
+            Port = connection.Port,
+            Database = connection.Database,
+            Username = connection.Username,
+            Password = connection.Password,
+            TlsMode = PrimaryDatabaseTlsMode.Disabled
+        });
         return new ExploreDbContext(builder.Options);
     }
 

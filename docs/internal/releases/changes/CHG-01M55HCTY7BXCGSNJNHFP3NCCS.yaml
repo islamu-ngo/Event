@@ -1,0 +1,28 @@
+Change-Id: CHG-01M55HCTY7BXCGSNJNHFP3NCCS
+Title: "Omit private BFF authentication metadata from logs"
+Type: fix
+Scope: privacy
+Summary: "Retain configuration presence and availability without exporting provider authorities client identifiers or exception contents."
+Group: bff-authentication-diagnostic-minimization
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Retain authentication configuration-presence and availability diagnostics without exporting provider authority URLs, client identifiers or exception contents from BFF scheme discovery and updates.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/RELEASE_CHECKLIST.md
+    Disposition: not-applicable

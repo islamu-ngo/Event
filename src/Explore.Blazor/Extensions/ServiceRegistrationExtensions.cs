@@ -100,7 +100,7 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<RegistrationPaymentCheckoutTicketStore>();
         services.AddScoped<IBffPreferenceForwardingService, BffPreferenceForwardingService>();
         services.AddMemoryCache();
-        RegisterBffDataProtection(services, configuration);
+        services.AddBffDataProtection();
         services.AddScoped<IBffResolverConfigurationProvider, BffResolverConfigurationProvider>();
         services.AddScoped<ITenantRouteContextAccessor, TenantRouteContextAccessor>();
         services.AddScoped<CircuitHandler, TenantCircuitHandler>();
@@ -135,9 +135,4 @@ public static class ServiceRegistrationExtensions
         return services;
     }
 
-    private static void RegisterBffDataProtection(IServiceCollection services, IConfiguration configuration)
-    {
-        var connectionString = configuration.GetConnectionString("cache");
-        services.AddBffDataProtection(connectionString);
-    }
 }

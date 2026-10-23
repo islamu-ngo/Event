@@ -23,7 +23,7 @@ public sealed class BusinessMetricsEventModerationTests
         var measurement = metricsCapture.Single("explore.events.moderation_actions");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
-        await Assert.That(measurement.Tags["tenant_id"]?.ToString()).IsEqualTo("tenant-a");
+        await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
         await Assert.That(measurement.Tags["action_kind"]?.ToString()).IsEqualTo("heavy_redacted");
         await Assert.That(measurement.Tags["outcome"]?.ToString()).IsEqualTo("pending_storage_deletion");
         await Assert.That(measurement.Tags["failure_category"]?.ToString()).IsEqualTo("storage_deletion_pending");
@@ -84,7 +84,7 @@ public sealed class BusinessMetricsEventModerationTests
         var measurement = metricsCapture.Single("explore.event_reports.workflow_actions");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
-        await Assert.That(measurement.Tags["tenant_id"]?.ToString()).IsEqualTo("tenant-a");
+        await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
         await Assert.That(measurement.Tags["action"]?.ToString()).IsEqualTo("execute");
         await Assert.That(measurement.Tags["outcome"]?.ToString()).IsEqualTo("failed");
         await Assert.That(measurement.Tags["failure_category"]?.ToString()).IsEqualTo("decision_execution_failed");
@@ -105,7 +105,7 @@ public sealed class BusinessMetricsEventModerationTests
         var measurement = metricsCapture.Single("explore.event_reports.provider_syncs");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
-        await Assert.That(measurement.Tags["tenant_id"]?.ToString()).IsEqualTo("tenant-a");
+        await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
         await Assert.That(measurement.Tags["provider"]?.ToString()).IsEqualTo("coop");
         await Assert.That(measurement.Tags["outcome"]?.ToString()).IsEqualTo("retryable_failure");
         await Assert.That(measurement.Tags["failure_category"]?.ToString()).IsEqualTo("provider_timeout");

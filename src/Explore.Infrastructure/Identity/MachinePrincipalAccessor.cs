@@ -8,7 +8,8 @@ namespace Explore.Infrastructure.Identity;
 /// Resolves the machine principal context from the current <see cref="HttpContext.User"/> when the request
 /// was authenticated via an external API key. Returns <c>null</c> for JWT, anonymous, or absent contexts.
 /// </summary>
-public sealed class MachinePrincipalAccessor : IMachinePrincipalAccessor, IMachinePrincipalExecutionAccessor
+public sealed class MachinePrincipalAccessor : IMachinePrincipalAccessor, IMachinePrincipalExecutionAccessor,
+    IPersistedApiKeyProofAccessor
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private ApiKeyPrincipalContext? _executionPrincipal;
@@ -36,6 +37,23 @@ public sealed class MachinePrincipalAccessor : IMachinePrincipalAccessor, IMachi
     }
 
     public bool IsMachineCaller => Current is not null;
+
+    public PersistedApiKeyAuthenticationProof? CurrentProof
+    {
+        get
+        {
+            var context = _httpContextAccessor.HttpContext;
+            if (_executionPrincipal is not null || context is null)
+                return null;
+            var proof = context.Features.Get<PersistedApiKeyAuthenticationProof>();
+            var principal = Current;
+            return proof is not null && proof.IsBoundTo(context.User) && principal is not null
+                && proof.KeyId == principal.KeyId && proof.TenantId == principal.TenantId
+                && proof.OwnerType == principal.OwnerType && proof.OwnerId == principal.OwnerId
+                && proof.Scopes.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(principal.Scopes)
+                    ? proof : null;
+        }
+    }
 
     public void SetPrincipal(ApiKeyPrincipalContext principal)
     {

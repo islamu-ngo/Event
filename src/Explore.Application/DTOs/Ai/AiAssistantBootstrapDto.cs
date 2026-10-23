@@ -1,3 +1,6 @@
+using Explore.Domain.Ai;
+using Explore.Application.Features.AiAssistant;
+
 namespace Explore.Application.DTOs.Ai;
 
 public sealed record AiAssistantBootstrapDto
@@ -35,8 +38,9 @@ public sealed record AiAssistantModelDto
 
 public sealed record AiAssistantModelDiscoveryRequestDto
 {
+    public AiModelDiscoveryScope Scope { get; init; } = AiModelDiscoveryScope.Tenant;
     public string EndpointUrl { get; init; } = string.Empty;
-    public string? ApiKey { get; init; }
+    public AiCredentialScope CredentialScope { get; init; } = AiCredentialScope.None;
 }
 
 public sealed record AiAssistantFeatureFlagsDto

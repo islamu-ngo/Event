@@ -3,9 +3,9 @@ namespace Explore.Application.Features.ConfigurationManifest.Importing;
 using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Application;
-using Explore.Application.Features.ConfigurationManifest.Catalog;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Domain;
@@ -23,6 +23,20 @@ public sealed class ConfigurationImportPreviewRequest
 
     [Required]
     public required IReadOnlyList<string> GrantedApprovalCodes { get; init; }
+
+    public ConfigurationImportPreviewRequest Capture()
+    {
+        if (SelectedSectionKeys is null || Mappings is null || GrantedApprovalCodes is null
+            || !Enum.IsDefined(ApplyMode))
+            throw new ConfigurationImportSessionException(ConfigurationImportFailureCodes.ContractInvalid);
+        return new()
+        {
+            SelectedSectionKeys = SelectedSectionKeys.ToImmutableArray(),
+            Mappings = Mappings.ToImmutableDictionary(StringComparer.Ordinal),
+            ApplyMode = ApplyMode,
+            GrantedApprovalCodes = GrantedApprovalCodes.ToImmutableArray()
+        };
+    }
 
     public override string ToString() =>
         nameof(ConfigurationImportPreviewRequest);
@@ -77,12 +91,15 @@ public sealed class ConfigurationImportSessionApplicationService(
     ConfigurationImportArtifactParser parser,
     ConfigurationManifestCurrentStateReader currentState,
     ITenantRepository tenants,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IHumanCommitScopePreparation humanScope,
+    IHumanConfigurationImportAdmission admission)
 {
     public async Task<ConfigurationImportSessionCreatedResult> CreateInstanceAsync(
         ReadOnlyMemory<byte> artifact,
         CancellationToken cancellationToken)
     {
+        artifact = artifact.ToArray();
         ConfigurationImportParsedArtifact parsed = parser.Parse(artifact);
         return await CreateAsync(
             ConfigurationImportTarget.ForInstance(),
@@ -96,10 +113,12 @@ public sealed class ConfigurationImportSessionApplicationService(
         Guid tenantId,
         ReadOnlyMemory<byte> artifact,
         CancellationToken cancellationToken)
-        => await CreateSetupLiveTenantAsync(
-            ConfigurationImportTarget.ForTenant(tenantId),
-            artifact,
-            cancellationToken);
+    {
+        artifact = artifact.ToArray();
+        ConfigurationImportParsedTenantPackage parsed = parser.ParseTenantPackage(artifact);
+        return await CreateAsync(ConfigurationImportTarget.ForTenant(tenantId), artifact,
+            ConfigurationImportArtifactSnapshotFactory.FromTenantPackage(parsed.Package), cancellationToken);
+    }
 
     internal async Task<ConfigurationImportSessionCreatedResult> CreateSetupLiveTenantAsync(
         ConfigurationImportTarget target,
@@ -108,12 +127,11 @@ public sealed class ConfigurationImportSessionApplicationService(
     {
         ConfigurationImportParsedTenantPackage parsed =
             parser.ParseTenantPackage(artifact);
-        return await CreateAsync(
-            target,
-            artifact,
+        var created = await manager.CreateSetupLiveAsync(target, artifact, UtcNow(),
+            ConfigurationImportSessionLimits.DefaultSessionLifetime, cancellationToken);
+        return MapCreated(created,
             ConfigurationImportArtifactSnapshotFactory.FromTenantPackage(
-                parsed.Package),
-            cancellationToken);
+                parsed.Package));
     }
 
     public Task<ConfigurationImportPreviewResult> PreviewInstanceAsync(
@@ -147,17 +165,16 @@ public sealed class ConfigurationImportSessionApplicationService(
         string accessToken,
         ConfigurationImportPreviewRequest request,
         CancellationToken cancellationToken) =>
-        PreviewAsync(sessionId, target, accessToken, request, cancellationToken);
+        PreviewCoreAsync(null, sessionId, target, accessToken, request, cancellationToken);
 
     public Task CancelInstanceAsync(
         Guid sessionId,
         string accessToken,
         CancellationToken cancellationToken) =>
-        manager.CancelAsync(
+        CancelAsync(
             sessionId,
             ConfigurationImportTarget.ForInstance(),
             accessToken,
-            UtcNow(),
             cancellationToken);
 
     public Task CancelTenantAsync(
@@ -165,26 +182,43 @@ public sealed class ConfigurationImportSessionApplicationService(
         Guid sessionId,
         string accessToken,
         CancellationToken cancellationToken) =>
-        manager.CancelAsync(
+        CancelAsync(
             sessionId,
             ConfigurationImportTarget.ForTenant(tenantId),
             accessToken,
-            UtcNow(),
             cancellationToken);
 
-    private async Task<ConfigurationImportSessionCreatedResult> CreateAsync(
+    private Task CancelAsync(Guid sessionId, ConfigurationImportTarget target, string accessToken,
+        CancellationToken cancellationToken) =>
+        ExecuteObservationAsync(target, async (owner, token) =>
+        {
+            await manager.CancelAsync(owner, sessionId, target,
+                NormalizeSessionAccessToken(accessToken), UtcNow(), token);
+            return true;
+        }, cancellationToken);
+
+    private Task<T> ExecuteObservationAsync<T>(ConfigurationImportTarget target,
+        Func<IPreparedHumanConfigurationImport, CancellationToken, Task<T>> observe,
+        CancellationToken cancellationToken) =>
+        admission.ExecuteObservationAsync(new HumanConfigurationImportObservation<T>(
+            humanScope.Subject
+                ?? throw new UnauthorizedAccessException("Import sessions require their original selected human."),
+            target, HumanConfigurationImportObservationAccess.Update, observe), cancellationToken);
+
+    private Task<ConfigurationImportSessionCreatedResult> CreateAsync(
         ConfigurationImportTarget target,
         ReadOnlyMemory<byte> artifact,
         IEnumerable<ConfigurationImportSectionSnapshot> availableSections,
-        CancellationToken cancellationToken)
-    {
-        ConfigurationImportSessionCreated created = await manager.CreateAsync(
-            target,
-            artifact,
-            UtcNow(),
-            ConfigurationImportSessionLimits.DefaultSessionLifetime,
+        CancellationToken cancellationToken) =>
+        ExecuteObservationAsync(target, async (owner, token) =>
+            MapCreated(await manager.CreateAsync(owner, target, artifact, UtcNow(),
+                ConfigurationImportSessionLimits.DefaultSessionLifetime, token), availableSections),
             cancellationToken);
-        return new ConfigurationImportSessionCreatedResult(
+
+    private static ConfigurationImportSessionCreatedResult MapCreated(
+        ConfigurationImportSessionCreated created,
+        IEnumerable<ConfigurationImportSectionSnapshot> availableSections) =>
+        new(
             created.Session.SessionId,
             created.AccessToken,
             created.Session.TargetScope,
@@ -195,33 +229,35 @@ public sealed class ConfigurationImportSessionApplicationService(
             [.. availableSections
                 .Select(section => section.SectionKey)
                 .Order(StringComparer.Ordinal)]);
-    }
 
-    private async Task<ConfigurationImportPreviewResult> PreviewAsync(
+    private Task<ConfigurationImportPreviewResult> PreviewAsync(
         Guid sessionId,
         ConfigurationImportTarget target,
         string accessToken,
         ConfigurationImportPreviewRequest request,
         CancellationToken cancellationToken)
     {
-        if (request is null
-            || request.SelectedSectionKeys is null
-            || request.Mappings is null
-            || request.GrantedApprovalCodes is null
-            || !Enum.IsDefined(request.ApplyMode))
-        {
-            throw new ConfigurationImportSessionException(
-                ConfigurationImportFailureCodes.ContractInvalid);
-        }
+        ValidatePreviewRequest(request);
+        var captured = request.Capture();
+        return ExecuteObservationAsync(target, (owner, token) =>
+            PreviewCoreAsync(owner, sessionId, target, accessToken, captured, token), cancellationToken);
+    }
+
+    private async Task<ConfigurationImportPreviewResult> PreviewCoreAsync(
+        IPreparedHumanConfigurationImport? owner,
+        Guid sessionId,
+        ConfigurationImportTarget target,
+        string accessToken,
+        ConfigurationImportPreviewRequest request,
+        CancellationToken cancellationToken)
+    {
+        ValidatePreviewRequest(request);
 
         DateTime occurredAt = UtcNow();
-        ConfigurationImportAuthorizedArtifact source =
-            await manager.ReadArtifactForPreviewAsync(
-                sessionId,
-                target,
-                accessToken,
-                occurredAt,
-                cancellationToken);
+        accessToken = NormalizeSessionAccessToken(accessToken);
+        ConfigurationImportAuthorizedArtifact source = owner is null
+            ? await manager.ReadSetupLiveArtifactAsync(sessionId, target, accessToken, occurredAt, cancellationToken)
+            : await manager.ReadArtifactForPreviewAsync(owner, sessionId, target, accessToken, occurredAt, cancellationToken);
         ConfigurationImportPreviewPreparation preparation =
             await PreparePreviewAsync(
                 target,
@@ -231,13 +267,11 @@ public sealed class ConfigurationImportSessionApplicationService(
         ConfigurationImportPreview preview;
         try
         {
-            preview = await manager.PreparePreviewAsync(
-                sessionId,
-                target,
-                accessToken,
-                preparation.Input,
-                occurredAt,
-                cancellationToken);
+            preview = owner is null
+                ? await manager.PrepareSetupLivePreviewAsync(sessionId, target, accessToken,
+                    preparation.Input, occurredAt, cancellationToken)
+                : await manager.PreparePreviewAsync(owner, sessionId, target, accessToken,
+                    preparation.Input, occurredAt, cancellationToken);
         }
         catch (ArgumentException)
         {
@@ -253,6 +287,19 @@ public sealed class ConfigurationImportSessionApplicationService(
             source.ExpiresAt,
             preview.IsApplyReady,
             preview.Items);
+    }
+
+    private static void ValidatePreviewRequest(ConfigurationImportPreviewRequest request)
+    {
+        if (request is null
+            || request.SelectedSectionKeys is null
+            || request.Mappings is null
+            || request.GrantedApprovalCodes is null
+            || !Enum.IsDefined(request.ApplyMode))
+        {
+            throw new ConfigurationImportSessionException(
+                ConfigurationImportFailureCodes.ContractInvalid);
+        }
     }
 
     internal async Task<ConfigurationImportPreviewPreparation> PreparePreviewAsync(
@@ -283,8 +330,8 @@ public sealed class ConfigurationImportSessionApplicationService(
         }
 
         ConfigurationManifestExportResult current =
-            await currentState.ReadAsync(
-                targetView,
+            await currentState.ReadImportSnapshotAsync(
+                targetView, target.Scope == ConfigurationImportScope.Instance ? null : target.TenantId,
                 cancellationToken);
         ConfigurationImportParsedArtifact parsedTarget =
             parser.Parse(current.Utf8Json);
@@ -395,6 +442,16 @@ public sealed class ConfigurationImportSessionApplicationService(
         if (applyMode == ConfigurationImportApplyMode.ReconcileManaged)
             approvals.Add("managed-reconciliation");
         return approvals.Order(StringComparer.Ordinal).ToArray();
+    }
+
+    private static string NormalizeSessionAccessToken(string accessToken)
+    {
+        // Preview and cancellation authorize the underlying session secret.
+        // Apply separately verifies the prefix against its explicit source operation.
+        return accessToken is { Length: > 37 } && accessToken[36] == '.'
+            && Guid.TryParseExact(accessToken.AsSpan(0, 36), "D", out Guid sourceOperationId)
+            && sourceOperationId.Version == 7
+                ? accessToken[37..] : accessToken;
     }
 
     private DateTime UtcNow() =>

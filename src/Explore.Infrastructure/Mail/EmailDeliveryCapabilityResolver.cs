@@ -14,7 +14,7 @@ using Explore.Domain.Services;
 namespace Explore.Infrastructure.Mail;
 
 public sealed class EmailDeliveryCapabilityResolver(
-    IHierarchicalSettingsResolver settings,
+    IHierarchicalSettingsReader settings,
     ISecretResolver secrets,
     ISecretBindingRepository bindings) : IEmailDeliveryCapabilityResolver
 {

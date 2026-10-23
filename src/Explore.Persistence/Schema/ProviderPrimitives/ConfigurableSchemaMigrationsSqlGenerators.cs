@@ -19,6 +19,35 @@ internal sealed class ConfigurableNpgsqlMigrationsSqlGenerator(
     INpgsqlSingletonOptions npgsqlOptions)
     : NpgsqlMigrationsSqlGenerator(dependencies, npgsqlOptions)
 {
+    protected override void Generate(
+        AlterColumnOperation operation,
+        IModel? model,
+        MigrationCommandListBuilder builder)
+    {
+        if (operation.ColumnType != "jsonb" || operation.OldColumn.ColumnType != "text")
+        {
+            base.Generate(operation, model, builder);
+            return;
+        }
+
+        var sql = Dependencies.SqlGenerationHelper;
+        string column = sql.DelimitIdentifier(operation.Name);
+        builder.Append("ALTER TABLE ").Append(sql.DelimitIdentifier(operation.Table, operation.Schema))
+            .Append(" ALTER COLUMN ").Append(column).Append(" TYPE jsonb USING ")
+            .Append(column).AppendLine("::jsonb;").EndCommand();
+        // Preserve all other generated alterations after the explicit provider cast.
+        // Restore the operation so generating the same migration again is equivalent.
+        operation.OldColumn.ColumnType = "jsonb";
+        try
+        {
+            base.Generate(operation, model, builder);
+        }
+        finally
+        {
+            operation.OldColumn.ColumnType = "text";
+        }
+    }
+
     public override IReadOnlyList<MigrationCommand> Generate(
         IReadOnlyList<MigrationOperation> operations,
         Microsoft.EntityFrameworkCore.Metadata.IModel? model = null,
@@ -150,6 +179,18 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
     IMySqlOptions options)
     : MySqlMigrationsSqlGenerator(dependencies, commandBatchPreparer, options)
 {
+    private readonly bool _isMariaDb = options.ServerVersion is MariaDbServerVersion;
+
+    protected override void Generate(
+        AddCheckConstraintOperation operation,
+        IModel? model,
+        MigrationCommandListBuilder builder)
+    {
+        if (_isMariaDb && MySqlVarcharNarrowingGuard.IsPreflight(operation))
+            builder.AppendLine("SET SESSION check_constraint_checks = ON;");
+        base.Generate(operation, model, builder);
+    }
+
     public override IReadOnlyList<MigrationCommand> Generate(
         IReadOnlyList<MigrationOperation> operations,
         Microsoft.EntityFrameworkCore.Metadata.IModel? model = null,
@@ -166,7 +207,7 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
             operations, Dependencies.SqlGenerationHelper, sqlite: false);
         operations = StorageSourceUriCutoverGuard.Prepare(
             operations, Dependencies.SqlGenerationHelper, sqlite: false, byteLengthFunction: "OCTET_LENGTH");
-        operations = PrepareStorageBindingIndexReplacements(operations);
+        operations = PrepareForeignKeyIndexReplacements(operations);
         var executableOperations = new List<MigrationOperation>(operations.Count);
         foreach (MigrationOperation operation in operations)
         {
@@ -197,13 +238,15 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
                     """
             });
         }
+        IReadOnlyList<MigrationOperation> guardedOperations = MySqlVarcharNarrowingGuard.Prepare(
+            executableOperations, Dependencies.SqlGenerationHelper);
         return ConfigurableSchemaMigrationOperations.AppendPromotionCodeBackfill(
-            base.Generate(executableOperations, model, sqlOptions),
+            base.Generate(guardedOperations, model, sqlOptions),
             executableOperations,
             Dependencies);
     }
 
-    private static IReadOnlyList<MigrationOperation> PrepareStorageBindingIndexReplacements(
+    private static IReadOnlyList<MigrationOperation> PrepareForeignKeyIndexReplacements(
         IReadOnlyList<MigrationOperation> operations)
     {
         var prepared = operations.ToList();
@@ -223,6 +266,34 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
             // including when downgrading the composite target index to its predecessor.
             prepared.Remove(replacement);
             prepared.Insert(prepared.IndexOf(drop), replacement);
+        }
+        foreach (var drop in operations.OfType<DropIndexOperation>().Where(operation =>
+                     operation.Table is not null
+                     && operation.Table.EndsWith("ai_tool_executions", StringComparison.Ordinal)
+                     && operation.Name == "ix_ai_tool_executions_proposed_action_id"))
+        {
+            var replacement = operations.OfType<CreateIndexOperation>().SingleOrDefault(operation =>
+                operation.Table == drop.Table && operation.Schema == drop.Schema
+                && operation.Name == drop.Name && operation.Columns[0] == "proposed_action_id");
+            if (replacement is null || prepared.IndexOf(replacement) < prepared.IndexOf(drop))
+                continue;
+
+            // Up and Down replace this FK-supporting index under the same name.
+            // A temporary nonunique index keeps the FK enforced across the replacement.
+            const string bridge = "ix_ai_tool_executions_proposed_action_bridge";
+            prepared.Insert(prepared.IndexOf(drop), new CreateIndexOperation
+            {
+                Name = bridge,
+                Schema = drop.Schema,
+                Table = drop.Table,
+                Columns = ["proposed_action_id"]
+            });
+            prepared.Insert(prepared.IndexOf(replacement) + 1, new DropIndexOperation
+            {
+                Name = bridge,
+                Schema = drop.Schema,
+                Table = drop.Table
+            });
         }
         return prepared;
     }

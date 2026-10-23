@@ -1,0 +1,29 @@
+Change-Id: CHG-01M53709S3SG2NY70ZFRBB9DE9
+Title: "Define the minimal dedicated lifecycle-client grant profile"
+Type: feat
+Scope: access
+Summary: "Define closed deployment and fresh authenticated response grant checks for the pinned dedicated Keycloak lifecycle client."
+Group: keycloak-lifecycle-domain-grant
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Extra management, client or realm grants and mismatched service identity are rejected; this helper is not bearer signature validation.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Provider bootstrap and lifecycle-send response admission remain required before production activation.

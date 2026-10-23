@@ -43,17 +43,17 @@ public sealed class StorageReadinessHealthCheck(
         {
             throw;
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
             return HealthCheckResult.Unhealthy(
                 "Selected storage provider could not be resolved.",
-                data: CreateFailureData(ProviderFailureCode, ex.GetType().Name));
+                data: CreateFailureData(ProviderFailureCode, "provider_unavailable"));
         }
         catch (Exception ex) when (ex is ArgumentException or SystemException)
         {
             return HealthCheckResult.Unhealthy(
                 "Storage policy could not be resolved.",
-                data: CreateFailureData(PolicyFailureCode, ex.GetType().Name));
+                data: CreateFailureData(PolicyFailureCode, "policy_unavailable"));
         }
     }
 

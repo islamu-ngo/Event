@@ -1,19 +1,15 @@
-using System.Net.Http;
-using System.Net.Sockets;
-using Amazon;
-using Amazon.S3;
-using Azure;
 using Azure.AI.OpenAI;
 using Azure.Identity;
+using System.ClientModel;
+using System.ClientModel.Primitives;
+using Explore.Application.Features.AiAssistant.Requests.Queries;
 using Cerbos.Sdk;
 using Cerbos.Sdk.Builder;
-using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Contracts.Infrastructure.Geocoding;
-using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -22,7 +18,6 @@ using Explore.Application.Contracts.Strategies;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.ConfigurationManifest.Managed;
 using Explore.Application.Management;
-using Explore.Application.Models;
 using Explore.Application.Services;
 using Explore.Application.Services.Registration;
 using Explore.Application.Services.Webhooks;
@@ -65,30 +60,30 @@ using Explore.Infrastructure.WebPush;
 using Explore.Infrastructure.Waitlist;
 using Explore.Infrastructure.Recovery;
 using Explore.Infrastructure.Deployment;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Explore.Application.Features.ConfigurationManifest.Ingestion;
 using Explore.Application.Contracts.Deployment;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Validation;
-using Polly;
 
 namespace Explore.Infrastructure;
 
 public static class InfrastructureServicesRegistration
 {
+    private static readonly HttpClient AzureIdentityHttpClient = new(
+        AiTransportAuthority.CreateHandler(new AiProviderSettings(), instanceScope: false));
+
     public static IServiceCollection ConfigureInfrastructureServices(
         this IServiceCollection services,
         IConfiguration configuration,
-        IHostEnvironment? environment = null)
+        IHostEnvironment? environment = null,
+        bool registerBackgroundWorkers = true)
     {
         services.AddScoped<IConfigurationTransferDestinationResolver,
             ConfigurationTransferDestinationResolver>();
@@ -145,7 +140,8 @@ public static class InfrastructureServicesRegistration
                 DisabledAddressSelectionProtector>();
         }
 
-        services.AddConfigurationManifestStartup(configuration);
+        services.AddConfigurationManifestStartup(configuration,
+            Explore.Application.Features.ConfigurationManifest.Application.ConfigurationManifestEffectDeliveryMode.DeferredToRuntime);
         services.AddScoped<ConfiguredAdministratorBootstrapProvider>();
         services.AddScoped<
             IConfiguredAdministratorBootstrapProvider>(provider =>
@@ -215,6 +211,8 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IPaymentIntentRetriever>(provider => provider.GetRequiredService<StripeCheckoutAdapter>());
         services.AddScoped<IPaymentCancellationProvider>(provider => provider.GetRequiredService<StripeCheckoutAdapter>());
         services.AddScoped<IPaymentProviderDescriptor>(provider => provider.GetRequiredService<StripeCheckoutAdapter>());
+        services.AddScoped<ICheckoutDispatchExecutionScopeFactory, CheckoutDispatchExecutionScopeFactory>();
+        services.AddScoped<Explore.Infrastructure.Services.RegistrationPaymentCheckoutDispatchService>();
         services.AddHttpClient(StripeRefundAdapter.HttpClientName, client =>
         {
             client.Timeout = TimeSpan.FromSeconds(15);
@@ -335,12 +333,9 @@ public static class InfrastructureServicesRegistration
         {
             client.Timeout = TimeSpan.FromSeconds(15);
         })
-        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            UseCookies = false,
-            ConnectTimeout = TimeSpan.FromSeconds(10)
-        });
+        .ConfigurePrimaryHttpMessageHandler(sp =>
+            sp.GetRequiredService<WebhookEndpointSafetyPolicy>()
+                .CreateHttpMessageHandler(TimeSpan.FromSeconds(10)));
         services.AddScoped<WebhookRegistrationProviderSubmissionSink>(sp => new WebhookRegistrationProviderSubmissionSink(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(WebhookRegistrationProviderSubmissionSink.HttpClientName),
             sp.GetRequiredService<Explore.Application.Contracts.Secrets.ISecretResolver>(),
@@ -350,6 +345,8 @@ public static class InfrastructureServicesRegistration
 
         // Legacy S3-compatible object storage service. New local-first flows use IFileStorageProvider.
         services.AddScoped<IS3ConfigResolver, S3ConfigResolver>();
+        services.AddHierarchicalSettingsReader();
+        services.AddSingleton<S3ConfigCacheRegistry>();
         services.AddSingleton<IS3ClientFactory, S3ClientFactory>();
         services.AddScoped<IS3PreflightVerifier, S3PreflightVerifier>();
         services.AddScoped<IObjectStorageService, ObjectStorageService>();
@@ -390,6 +387,11 @@ public static class InfrastructureServicesRegistration
         services.AddHttpClient(CoopReviewQueueProvider.HttpClientName, client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            AutomaticDecompression = System.Net.DecompressionMethods.None,
+            AllowAutoRedirect = false,
+            UseCookies = false
         });
         services.AddScoped<CoopReviewQueueProvider>();
         services.AddScoped<NoopReviewQueueProvider>();
@@ -446,12 +448,8 @@ public static class InfrastructureServicesRegistration
         .ConfigurePrimaryHttpMessageHandler(sp =>
         {
             var options = sp.GetRequiredService<IOptionsMonitor<WebhookOptions>>().CurrentValue;
-            return new SocketsHttpHandler
-            {
-                AllowAutoRedirect = false,
-                ConnectTimeout = TimeSpan.FromSeconds(options.Local.ConnectTimeoutSeconds),
-                UseCookies = false
-            };
+            return sp.GetRequiredService<WebhookEndpointSafetyPolicy>()
+                .CreateHttpMessageHandler(TimeSpan.FromSeconds(options.Local.ConnectTimeoutSeconds));
         });
         services.AddScoped<ISvixWebhookClient, SvixWebhookClient>();
         services.AddScoped<WebhookProviderPublicationDispatcher>();
@@ -477,6 +475,7 @@ public static class InfrastructureServicesRegistration
 
         // Settings and Module Governance services
         services.AddScoped<IHierarchicalSettingsResolver, HierarchicalSettingsResolver>();
+        services.AddHierarchicalSettingsReader();
         services.AddScoped<ITypedSettingsDocumentResolver, TypedSettingsDocumentResolver>();
         services.AddScoped<IResolverConfigService, ResolverConfigService>();
         services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
@@ -491,6 +490,7 @@ public static class InfrastructureServicesRegistration
         // Required so authorization providers (Cerbos + fallback) treat external API-key callers consistently with human users.
         services.AddScoped<MachinePrincipalAccessor>();
         services.AddScoped<IMachinePrincipalAccessor>(provider => provider.GetRequiredService<MachinePrincipalAccessor>());
+        services.AddScoped<IPersistedApiKeyProofAccessor>(provider => provider.GetRequiredService<MachinePrincipalAccessor>());
         services.AddScoped<IMachinePrincipalExecutionAccessor>(provider => provider.GetRequiredService<MachinePrincipalAccessor>());
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.AddScoped<ILocalJwtTokenGenerator, LocalJwtTokenGenerator>();
@@ -561,18 +561,25 @@ public static class InfrastructureServicesRegistration
             client.Timeout = TimeSpan.FromSeconds(30);
             client.MaxResponseContentBufferSize = 1024 * 1024;
         })
-            .ConfigurePrimaryHttpMessageHandler(CreateKeycloakAdminHttpHandler);
+            .ConfigurePrimaryHttpMessageHandler(() =>
+                new Explore.Infrastructure.Http.VettedAddressConnector(
+                    () => new Explore.Infrastructure.Http.OutboundEndpointPolicy(blockPrivateNetworks: false))
+                    .CreateHandler(TimeSpan.FromSeconds(10)));
         services.Configure<KeycloakLifecycleEmailOptions>(configuration.GetSection(KeycloakLifecycleEmailOptions.SectionName));
         services.AddHttpClient(KeycloakAccountAuthorityLifecycleEmailService.HttpClientName, client =>
         {
             client.Timeout = TimeSpan.FromSeconds(45);
         })
-        .ConfigurePrimaryHttpMessageHandler(CreateKeycloakAdminHttpHandler);
+        .ConfigurePrimaryHttpMessageHandler(() =>
+            new Explore.Infrastructure.Http.VettedAddressConnector(
+                () => new Explore.Infrastructure.Http.OutboundEndpointPolicy(blockPrivateNetworks: false))
+                .CreateHandler(TimeSpan.FromSeconds(10)));
         services.AddScoped<IAccountAuthorityLifecycleEmailProvider, KeycloakAccountAuthorityLifecycleEmailService>();
         services.AddScoped<IAccountAuthorityLifecycleEmailProvider, LocalIdentityLifecycleEmailService>();
         services.AddScoped<ILocalIdentityLifecycleSmtpTransport, LocalIdentityLifecycleSmtpTransport>();
         services.AddScoped<LocalIdentityLifecycleDeliveryProcessor>();
-        services.AddHostedService<LocalIdentityLifecycleDeliveryWorker>();
+        if (registerBackgroundWorkers)
+            services.AddHostedService<LocalIdentityLifecycleDeliveryWorker>();
 
         services.AddOptions<AuthorizationProviderDeploymentOptions>()
             .Bind(configuration.GetSection(AuthorizationProviderDeploymentOptions.SectionName))
@@ -593,7 +600,6 @@ public static class InfrastructureServicesRegistration
                 options.PoliciesPath = policyPackagePath;
             }
         });
-        services.AddSingleton<CerbosAdminEndpointValidator>();
 
         // Cerbos gRPC SDK client (singleton — gRPC channels are long-lived and thread-safe)
         services.AddSingleton<ICerbosClient>(sp =>
@@ -616,13 +622,111 @@ public static class InfrastructureServicesRegistration
 
         // Admin API client for policy package publishing (HTTP-based, separate from gRPC runtime)
         services.AddTransient<CorrelationIdDelegatingHandler>();
-        services.AddHttpClient("CerbosAdminClient", client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(10);
-        });
+        Explore.Infrastructure.Http.CerbosAdminTransport.AddClients(services);
 
         services.AddScoped<CerbosPrincipalBuilder>();
+        services.AddScoped<IHumanCerbosPrincipalReader>(provider => new HumanCerbosPrincipalReader(
+            provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanCommitScopePreparation>(),
+            provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+            provider.GetRequiredService<Explore.Application.Authentication.IHumanAuthenticationLifetimeObserver>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Identity.IMachinePrincipalAccessor>(),
+            provider.GetRequiredService<ITenantContext>(),
+            provider.GetRequiredService<TimeProvider>(),
+            () => provider.GetRequiredService<IHumanPrincipalSourceFence>()));
         services.AddScoped<CerbosAuthorizationService>();
+        services.AddHumanEventProviderMutationPreparation();
+        services.AddHumanWebhookMutationPreparation();
+        services.AddHumanTenantBrandingMutationPreparation();
+        services.AddHumanApiKeyManagementPreparation();
+        services.AddHumanAdministrativeActionPreparation();
+        services.AddHumanManagedProviderProvisioningPreparation();
+        services.AddHumanAccountAdministrativeActionPreparation();
+        services.AddScoped<IHumanActorContextReader>(provider => new HumanActorContextReader(
+            provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanCommitScopePreparation>(),
+            provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+            provider.GetRequiredService<Explore.Application.Authentication.IHumanAuthenticationLifetimeObserver>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Identity.IMachinePrincipalAccessor>(),
+            provider.GetRequiredService<ITenantContext>(),
+            provider.GetRequiredService<TimeProvider>(),
+            () => provider.GetRequiredService<IHumanPrincipalSourceFence>(),
+            () => provider.GetRequiredService<IPolicySourceSetFence>(),
+            () => provider.GetRequiredService<ISerializableAttemptOwner>(),
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
+            () => provider.GetRequiredService<IAiActorContextRepository>()));
+        services.AddScoped<IHumanEventCreationPublisherReader>(provider => new HumanEventCreationPublisherReader(
+            provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanCommitScopePreparation>(),
+            provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+            provider.GetRequiredService<Explore.Application.Authentication.IHumanAuthenticationLifetimeObserver>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Identity.IMachinePrincipalAccessor>(),
+            provider.GetRequiredService<ITenantContext>(),
+            provider.GetRequiredService<TimeProvider>(),
+            () => provider.GetRequiredService<IHumanPrincipalSourceFence>(),
+            () => provider.GetRequiredService<IPolicySourceSetFence>(),
+            () => provider.GetRequiredService<ISerializableAttemptOwner>(),
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
+            () => provider.GetRequiredService<IEventCreationPublisherRepository>()));
+        services.AddLocalAdministrationPreparation();
+        services.AddHumanEventTeamActionPreparation();
+        services.AddHumanPrivateEventManagement();
+        services.AddRegistrationPrivateReads();
+        services.AddHumanSupportAdministrationPreparation();
+        services.AddHumanSettingsMutationPreparation();
+        Explore.Infrastructure.Storage.StorageAccountingOriginalAuthorityRegistration
+            .AddStorageAccountingOriginalAuthority(services);
+        Explore.Infrastructure.Storage.StorageProbeOriginalActionRegistration
+            .AddStorageProbeOriginalAction(services);
+        services.AddHumanEmailMutationPreparation();
+        services.AddPlatformApiKeyPolicyPreparation();
+        services.AddHumanFooterOperations();
+        services.AddScoped<Explore.Application.Features.InstanceOnboarding.Services.ITrustedSetupSettingsAuthority,
+            TrustedSetupSettingsAuthority>();
+        services.AddScoped<Explore.Application.Features.InstanceOnboarding.Services.IProviderConfigurationSetupAuthority,
+            ProviderConfigurationSetupAuthority>();
+        services.AddProviderConfigurationMutationAuthority();
+        services.AddScoped<Explore.Application.Settings.IOperatorIdentityMutationAuthority,
+            OperatorIdentityMutationAuthority>();
+        services.AddScoped<Explore.Application.Settings.IResolverConfigurationMutationAuthority,
+            ResolverConfigurationMutationAuthority>();
+        services.AddStorageConfigurationAuthority();
+        services.AddScoped<IHumanTenantMutationPreparation>(provider => new HumanTenantMutationPreparation(
+            provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanCommitScopePreparation>(),
+            provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+            provider.GetRequiredService<Explore.Application.Authentication.IHumanAuthenticationLifetimeObserver>(),
+            provider.GetRequiredService<ITenantContext>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<CerbosAuthorizationService>(),
+            provider.GetRequiredService<IOptions<AuthorizationProviderDeploymentOptions>>(),
+            provider.GetRequiredService<IOptions<CerbosSettings>>(),
+            () => provider.GetRequiredService<IHumanPrincipalSourceFence>(),
+            () => provider.GetRequiredService<IHumanAuthorizationRouteSource>(),
+            () => provider.GetRequiredService<IHumanSupportAccessSourceFactory>(),
+            () => provider.GetRequiredService<IPolicySourceSetFence>(),
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
+            () => provider.GetRequiredService<Explore.Application.Contracts.Persistence.ISerializableAttemptOwner>(),
+            () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>()));
+        services.AddScoped<IManagedTenantWorkerCreationPort, ManagedTenantWorkerCreationPort>();
+        services.AddScoped<IHumanTenantCreationPort>(provider => new HumanTenantCreationPort(
+            provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanCommitScopePreparation>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Operations.IHumanOriginalCredentialCustody>(),
+            provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+            provider.GetRequiredService<Explore.Application.Authentication.IHumanAuthenticationLifetimeObserver>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Identity.IMachinePrincipalAccessor>(),
+            provider.GetRequiredService<ITenantContext>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<CerbosAuthorizationService>(),
+            provider.GetRequiredService<IOptions<AuthorizationProviderDeploymentOptions>>(),
+            provider.GetRequiredService<IOptions<CerbosSettings>>(),
+            provider.GetRequiredService<IOptions<Explore.Application.Management.ManagedControlPlaneOptions>>(),
+            () => provider.GetRequiredService<IHumanPrincipalSourceFence>(),
+            () => provider.GetRequiredService<IHumanAuthorizationRouteSource>(),
+            () => provider.GetRequiredService<IHumanSupportAccessSourceFactory>(),
+            () => provider.GetRequiredService<IPolicySourceSetFence>(),
+            () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
+            () => provider.GetRequiredService<Explore.Application.Authorization.AuthorizationResourceContextResolver>(),
+            () => provider.GetRequiredService<Explore.Application.Contracts.Persistence.ISerializableAttemptOwner>(),
+            () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>(),
+            () => provider.GetRequiredService<ISettingMutationLock>(),
+            () => provider.GetRequiredService<IHumanTenantCreationGraphWriter>()));
         services.AddScoped<FallbackAuthorizationService>();
         services.AddScoped<ICerbosConfigResolver, CerbosConfigResolver>();
         services.AddScoped<EventResourceProviderControlPlane>();
@@ -639,7 +743,6 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IAuthorizationProvider>(sp => sp.GetRequiredService<RuntimeAuthorizationProvider>());
         services.AddScoped<IAuthorizationProviderModeCacheInvalidator>(sp => sp.GetRequiredService<RuntimeAuthorizationProvider>());
         services.AddScoped<IPolicyPackageService, CerbosPolicyPackageService>();
-        services.AddScoped<IPolicySyncService, PolicySyncService>();
 
         // Event Strategies
         services.AddScoped<IEventStrategy, IslamicEventStrategy>();
@@ -681,38 +784,32 @@ public static class InfrastructureServicesRegistration
         // AI provider foundation. Strategy pattern dispatches to concrete adapters without if/else bloat.
         services.AddOptions<AiProviderSettings>()
             .Bind(configuration.GetSection(AiProviderSettings.SectionName));
+        services.AddOptions<AiResponseLimits>()
+            .Bind(configuration.GetSection(AiResponseLimits.SectionName))
+            .Validate(limits => limits.IsValid, "AI response limits must be positive and within the supported ceilings.")
+            .ValidateOnStart();
         var aiProviderSettingsValidator = new AiProviderSettingsValidator(environment);
         services.AddSingleton(aiProviderSettingsValidator);
         services.AddSingleton<IValidateOptions<AiProviderSettings>>(aiProviderSettingsValidator);
+        services.AddScoped<AiProviderConfigurationResolver>();
+        services.AddScoped<IAiProviderCapabilityResolver>(sp => sp.GetRequiredService<AiProviderConfigurationResolver>());
+        services.AddScoped<IAiModelDiscoveryGateway, AiModelDiscoveryGateway>();
         services.AddScoped<AiProviderHealthReporter>();
         if (aiProviderSettingsValidator.FakeProviderAllowed)
         {
             services.AddScoped<FakeAiChatProvider>();
         }
-        services.AddHttpClient(OpenAiResponsesChatProvider.HttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        RegisterAiHttpClients(services, OpenAiResponsesChatProvider.HttpClientName);
         services.AddScoped<OpenAiResponsesChatProvider>();
-        services.AddHttpClient(OpenAiCompatibleChatProvider.HttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        RegisterAiHttpClients(services, OpenAiCompatibleChatProvider.HttpClientName);
         services.AddScoped<OpenAiCompatibleChatProvider>();
-        services.AddHttpClient(AnthropicCompatibleChatProvider.HttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        RegisterAiHttpClients(services, AnthropicCompatibleChatProvider.HttpClientName);
         services.AddScoped<AnthropicCompatibleChatProvider>();
-        services.AddHttpClient(AnthropicChatProvider.HttpClientName, client =>
-        {
-            client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        RegisterAiHttpClients(services, AnthropicChatProvider.HttpClientName);
+        RegisterAiHttpClients(services, MicrosoftExtensionsAiChatProvider.HttpClientName);
         services.AddScoped<AnthropicChatProvider>();
         if (IsSdkBackedAiProvider(configuration))
         {
-            services.AddScoped<IChatClient>(sp => CreateSdkBackedChatClient(
-                sp.GetRequiredService<IOptions<AiProviderSettings>>().Value));
             services.AddScoped<MicrosoftExtensionsAiChatProvider>();
         }
 
@@ -741,6 +838,7 @@ public static class InfrastructureServicesRegistration
         // Translation Management System providers (runtime-switchable via GovernanceSettings "localization.tms_provider")
         // All concrete providers are always registered; RuntimeTranslationProvider delegates at runtime.
         // None → OfflineTranslationProvider (bundled .json files), Tolgee → TolgeeTranslationProvider, Weblate → WeblateTranslationProvider
+        services.AddTransient<TmsResponseBoundaryHandler>();
         services.AddHttpClient("TolgeeClient", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
@@ -755,6 +853,7 @@ public static class InfrastructureServicesRegistration
                 }
                 return null;
             }));
+        services.AddHttpClient("TolgeeClient").AddHttpMessageHandler<TmsResponseBoundaryHandler>();
         services.AddScoped<TolgeeTranslationProvider>();
 
         services.AddHttpClient("WeblateClient", client =>
@@ -771,6 +870,7 @@ public static class InfrastructureServicesRegistration
                 }
                 return ValueTask.FromResult<TimeSpan?>(null);
             }));
+        services.AddHttpClient("WeblateClient").AddHttpMessageHandler<TmsResponseBoundaryHandler>();
         services.AddScoped<WeblateTranslationProvider>();
         services.AddSingleton<OfflineTranslationProvider>();
         services.AddSingleton<IStaticTranslationBundleReader>(sp => sp.GetRequiredService<OfflineTranslationProvider>());
@@ -798,7 +898,8 @@ public static class InfrastructureServicesRegistration
         services.AddSingleton<IWebPushConfigurationProvider, WebPushConfigurationProvider>();
         services.AddSingleton<WebPushEndpointSafetyPolicy>();
         services.AddSingleton<WebPushDispatchDrainService>();
-        services.AddHostedService<WebPushDispatchProcessor>();
+        if (registerBackgroundWorkers)
+            services.AddHostedService<WebPushDispatchProcessor>();
         services.AddHttpClient<IWebPushNotificationSender, WebPushNotificationSender>((sp, client) =>
         {
             var webPushSettings = sp.GetRequiredService<IOptions<WebPushSettings>>().Value;
@@ -883,48 +984,43 @@ public static class InfrastructureServicesRegistration
         return providerId == AiProviderSettings.ProviderAzureOpenAi;
     }
 
-    private static SocketsHttpHandler CreateKeycloakAdminHttpHandler()
+    private static void RegisterAiHttpClients(IServiceCollection services, string name)
     {
-        // Keep bootstrap aligned with runtime OIDC backchannels: this deployment's Keycloak
-        // host publishes AAAA records, but IPv6 is unreachable from some developer machines.
-        // Forcing IPv4 avoids a 60s API request timeout while requesting the admin token.
-        return new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            UseCookies = false,
-            ConnectTimeout = TimeSpan.FromSeconds(10),
-            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
-            KeepAlivePingDelay = TimeSpan.FromSeconds(30),
-            KeepAlivePingTimeout = TimeSpan.FromSeconds(5),
-            KeepAlivePingPolicy = HttpKeepAlivePingPolicy.WithActiveRequests,
-            ConnectCallback = async (context, cancellationToken) =>
+        services.AddHttpClient(name, client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .ConfigurePrimaryHttpMessageHandler(sp =>
             {
-                var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                try
-                {
-                    await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
-                    return new NetworkStream(socket, ownsSocket: true);
-                }
-                catch
-                {
-                    socket.Dispose();
-                    throw;
-                }
-            }
-        };
+                var transport = AiTransportAuthority.CreateHandler(new AiProviderSettings(), instanceScope: false);
+                return name == MicrosoftExtensionsAiChatProvider.HttpClientName
+                    ? new AiResponseBudgetHandler(sp.GetRequiredService<IOptions<AiResponseLimits>>().Value) { InnerHandler = transport }
+                    : transport;
+            });
+        services.AddHttpClient(name + AiTransportAuthority.InstanceClientSuffix,
+                client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .ConfigurePrimaryHttpMessageHandler(sp =>
+            {
+                var transport = AiTransportAuthority.CreateHandler(
+                    sp.GetRequiredService<IOptions<AiProviderSettings>>().Value, instanceScope: true);
+                return name == MicrosoftExtensionsAiChatProvider.HttpClientName
+                    ? new AiResponseBudgetHandler(sp.GetRequiredService<IOptions<AiResponseLimits>>().Value) { InnerHandler = transport }
+                    : transport;
+            });
     }
 
-    private static IChatClient CreateSdkBackedChatClient(AiProviderSettings settings)
+    internal static IChatClient CreateSdkBackedChatClient(AiProviderSettings settings, string apiKey, HttpClient httpClient)
     {
         if (settings.Provider == AiProviderSettings.ProviderAzureOpenAi)
         {
             var endpoint = new Uri(settings.EndpointUrl.Trim(), UriKind.Absolute);
+            var clientOptions = new AzureOpenAIClientOptions
+            {
+                RetryPolicy = new ClientRetryPolicy(0),
+                Transport = new HttpClientPipelineTransport(httpClient)
+            };
             var client = settings.AzureCredentialMode.Equals(
                 AiProviderSettings.AzureCredentialModeDefaultAzureCredential,
                 StringComparison.OrdinalIgnoreCase)
-                    ? new AzureOpenAIClient(endpoint, CreateDefaultAzureCredential(settings))
-                    : new AzureOpenAIClient(endpoint, new AzureKeyCredential(settings.ApiKey.Trim()));
+                    ? new AzureOpenAIClient(endpoint, CreateDefaultAzureCredential(settings), clientOptions)
+                    : new AzureOpenAIClient(endpoint, new ApiKeyCredential(apiKey), clientOptions);
 
             return client
                 .GetChatClient(settings.ModelId.Trim())
@@ -936,14 +1032,12 @@ public static class InfrastructureServicesRegistration
 
     private static DefaultAzureCredential CreateDefaultAzureCredential(AiProviderSettings settings)
     {
-        if (string.IsNullOrWhiteSpace(settings.AzureTenantId))
-        {
-            return new DefaultAzureCredential();
-        }
-
         return new DefaultAzureCredential(new DefaultAzureCredentialOptions
         {
-            TenantId = settings.AzureTenantId.Trim()
+            TenantId = string.IsNullOrWhiteSpace(settings.AzureTenantId) ? null : settings.AzureTenantId.Trim(),
+            // Instance cloud identity never creates an exception for metadata traffic.
+            ExcludeManagedIdentityCredential = true,
+            Transport = new Azure.Core.Pipeline.HttpClientTransport(AzureIdentityHttpClient)
         });
     }
 }

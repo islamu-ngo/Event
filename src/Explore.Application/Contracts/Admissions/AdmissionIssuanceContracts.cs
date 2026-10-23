@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Application.Contracts.Persistence;
 
 namespace Explore.Application.Contracts.Admissions;
 
@@ -10,7 +11,8 @@ public enum AdmissionIssuanceOutcome
     NoAssignments,
     ReadinessPending,
     InvalidRequest,
-    CancelledBeforeCommit
+    CancelledBeforeCommit,
+    StaleFinalizationClaim
 }
 
 public enum AdmissionDeliveryOutcome
@@ -57,7 +59,10 @@ public sealed record AdmissionIssuanceRequest(
     Guid TenantId,
     Guid RegistrationOrderId,
     Guid FinalizationEffectId,
-    string Authority);
+    string Authority)
+{
+    public RegistrationFinalizationClaim? FinalizationClaim { get; init; }
+}
 
 public interface IAdmissionIssuanceService
 {
@@ -254,7 +259,10 @@ public sealed record AdmissionIssuancePersistenceRequest(
     Guid RegistrationOrderId,
     Guid FinalizationEffectId,
     IReadOnlyList<AdmissionTicket> Tickets,
-    IReadOnlyList<AdmissionDeliveryIntent> DeliveryIntents);
+    IReadOnlyList<AdmissionDeliveryIntent> DeliveryIntents)
+{
+    public RegistrationFinalizationClaim? FinalizationClaim { get; init; }
+}
 
 public sealed class AdmissionIssuanceResult
 {

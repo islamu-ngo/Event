@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using Explore.Domain.Common.Localization;
 
 namespace Explore.Application.Telemetry;
 
@@ -68,7 +69,7 @@ public sealed class TranslationMetrics
     {
         _fetchTotal.Add(1,
             new KeyValuePair<string, object?>("provider", provider),
-            new KeyValuePair<string, object?>("language", language),
+            new KeyValuePair<string, object?>("language", DiagnosticLanguage(language)),
             new KeyValuePair<string, object?>("result", result));
     }
 
@@ -79,7 +80,7 @@ public sealed class TranslationMetrics
     {
         _fetchDuration.Record(durationSeconds,
             new KeyValuePair<string, object?>("provider", provider),
-            new KeyValuePair<string, object?>("language", language));
+            new KeyValuePair<string, object?>("language", DiagnosticLanguage(language)));
     }
 
     /// <summary>
@@ -88,8 +89,8 @@ public sealed class TranslationMetrics
     public void RecordLanguageChange(string from, string to)
     {
         _changeLanguageTotal.Add(1,
-            new KeyValuePair<string, object?>("from", from),
-            new KeyValuePair<string, object?>("to", to));
+            new KeyValuePair<string, object?>("from", DiagnosticLanguage(from)),
+            new KeyValuePair<string, object?>("to", DiagnosticLanguage(to)));
     }
 
     /// <summary>
@@ -119,7 +120,10 @@ public sealed class TranslationMetrics
     {
         _staticBundleOperationTotal.Add(1,
             new KeyValuePair<string, object?>("operation", operation),
-            new KeyValuePair<string, object?>("language", language),
+            new KeyValuePair<string, object?>("language", DiagnosticLanguage(language)),
             new KeyValuePair<string, object?>("result", result));
     }
+
+    private static string DiagnosticLanguage(string language) =>
+        CultureRegistry.TryGetEntry(language, out var entry) ? entry.Code : "unknown";
 }

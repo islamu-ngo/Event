@@ -18,7 +18,7 @@ public sealed class SvixAppPortalServiceTests
     {
         var fixture = new Fixture();
         SvixAppPortalAccessRequest? portalRequest = null;
-        var before = DateTimeOffset.UtcNow;
+        var before = fixture.Clock.GetUtcNow();
         var instanceId = Guid.CreateVersion7();
         var capabilityProfile = WebhookProviderCapabilityProfile.Create(
             WebhookProviderKind.Svix,
@@ -45,6 +45,7 @@ public sealed class SvixAppPortalServiceTests
             ProviderMode = WebhookProviderMode.Svix,
             CreatedAt = DateTime.UtcNow
         };
+        consumer.ProviderBindings.Add(binding);
         fixture.ConsumerRepository.GetByIdForOwnerOperationAsync(
                 ConsumerId,
                 false,
@@ -77,15 +78,14 @@ public sealed class SvixAppPortalServiceTests
             new WebhookProviderPortalAccessInput(
                 ConsumerId,
                 "session-1",
-                TimeSpan.FromHours(2)),
+                TimeSpan.FromHours(2), WebhookPortalConsumerCustody.From(consumer)),
             CancellationToken.None);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(result.Url).IsEqualTo("https://svix.example/app-portal");
         await Assert.That(result.Token).IsEqualTo("portal_token");
         await Assert.That(result.ExpiresAt).IsNotNull();
-        await Assert.That(result.ExpiresAt!.Value).IsGreaterThan(before);
-        await Assert.That(result.ExpiresAt.Value).IsLessThan(DateTimeOffset.UtcNow.AddMinutes(61));
+        await Assert.That(result.ExpiresAt!.Value).IsEqualTo(before.AddHours(1));
         await Assert.That(portalRequest).IsNotNull();
         await Assert.That(portalRequest!.AppId).IsEqualTo("app_custom");
         await Assert.That(portalRequest.SessionId).IsEqualTo("session-1");
@@ -105,7 +105,7 @@ public sealed class SvixAppPortalServiceTests
         });
 
         var result = await fixture.Service.CreateAccessAsync(
-            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null),
+            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null, fixture.Custody),
             CancellationToken.None);
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -127,7 +127,7 @@ public sealed class SvixAppPortalServiceTests
             .Returns((WebhookConsumer?)null);
 
         var result = await fixture.Service.CreateAccessAsync(
-            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null),
+            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null, fixture.Custody),
             CancellationToken.None);
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -156,16 +156,31 @@ public sealed class SvixAppPortalServiceTests
                         ProviderVersion = "1.96.1",
                         CapabilityPolicyVersion = "svix-1.96.1-v1"
                     }
-                }));
+                }), Clock);
         }
 
         public ISvixWebhookClient SvixClient { get; }
+        public TimeProvider Clock { get; } = new PortalClock();
+        public WebhookPortalConsumerCustody Custody { get; } = WebhookPortalConsumerCustody.From(new WebhookConsumer
+        {
+            Id = ConsumerId,
+            TenantId = TenantId,
+            ConsumerKind = WebhookConsumerKind.Tenant,
+            Name = "Retained missing consumer",
+            Status = WebhookConsumerStatus.Active,
+            ProviderMode = WebhookProviderMode.Svix
+        });
 
         public IWebhookConsumerRepository ConsumerRepository { get; }
 
         public IWebhookConsumerProviderBindingRepository BindingRepository { get; }
 
         public SvixAppPortalService Service { get; }
+    }
+
+    private sealed class PortalClock : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(2026, 10, 11, 12, 0, 0, TimeSpan.Zero);
     }
 
     private sealed class StaticOptionsMonitor<T>(T currentValue) : IOptionsMonitor<T>

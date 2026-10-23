@@ -4,7 +4,9 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IEventCustomPropertyRepository : IGenericRepository<EventCustomPropertyDefinition, Guid>
 {
-    Task<EventCustomPropertyDefinition?> GetDefinitionWithDetails(Guid id);
+    /// <summary>Holds the visible exact-tenant parent in the caller's Serializable definition transaction.</summary>
+    Task<Event?> GetParentForMutationAsync(Guid eventId, CancellationToken cancellationToken);
+    Task<EventCustomPropertyDefinition?> GetDefinitionWithDetails(Guid id, CancellationToken cancellationToken = default);
     Task<EventCustomPropertyDefinition?> GetTrackedDefinitionWithOptions(Guid id, CancellationToken cancellationToken);
 
     Task<(List<EventCustomPropertyDefinition> Items, int TotalCount)> GetDefinitionsForEventPaged(
@@ -32,6 +34,7 @@ public interface IEventCustomPropertyRepository : IGenericRepository<EventCustom
         CancellationToken cancellationToken);
 
     Task<bool> DeleteDefinition(Guid id, CancellationToken cancellationToken);
+    Task<bool> FenceDefinitionForPurgeAsync(Guid id, CancellationToken cancellationToken);
     Task<CustomPropertyPurgeDependencySummary?> GetPurgeDependencies(Guid id, CancellationToken cancellationToken);
     Task<bool> PurgeDefinition(Guid id, CancellationToken cancellationToken);
 

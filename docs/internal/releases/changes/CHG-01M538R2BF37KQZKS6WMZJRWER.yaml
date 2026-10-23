@@ -1,0 +1,30 @@
+Change-Id: CHG-01M538R2BF37KQZKS6WMZJRWER
+Title: "Bound localization HTTP imports and preserve rejected bundle state"
+Type: fix
+Scope: access
+Summary: "Declare the import request byte ceiling and verify malformed authenticated imports cannot replace existing bundles."
+Group: localization-http-boundary
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Reject malformed import requests without changing persisted bundle bytes.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Import endpoint declares a 413 response for oversized requests.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Documents import size allowance and malformed candidate rejection.

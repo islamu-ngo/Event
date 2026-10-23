@@ -4,6 +4,8 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IFooterLinkGroupRepository : IGenericRepository<TenantFooterLinkGroup, Guid>
 {
+    Task<TenantFooterLinkGroup?> GetForMutationAsync(Guid id, CancellationToken ct = default);
+
     /// <summary>
     /// Gets all active link groups for a tenant with their links included, ordered by Order.
     /// When the tenant has no groups and instance groups are not locked, returns instance-default groups.

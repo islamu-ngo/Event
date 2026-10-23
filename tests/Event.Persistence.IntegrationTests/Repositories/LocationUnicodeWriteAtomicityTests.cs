@@ -13,12 +13,10 @@ using Explore.Infrastructure.Identity;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -43,13 +41,11 @@ internal static class LocationUnicodeWriteAtomicityTests
         await context.SaveChangesAsync();
         var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
         using var cache = new MemoryCache(new MemoryCacheOptions());
-        var settings = new HierarchicalSettingsResolver(
-            new SystemSettingRepository(context, mutationLock), new TenantSettingRepository(context, mutationLock),
+        var settings = new HierarchicalSettingsReader(
+            SystemSettingRepository.CreateReadOnly(context, mutationLock), TenantSettingRepository.CreateReadOnly(context, mutationLock),
             new OrganizationSettingRepository(context), new GroupSettingRepository(context),
-            new GroupTenantRepository(context), new UserPreferenceRepository(context),
-            context.TenantContext!, mutationLock, cache, NullLogger<HierarchicalSettingsResolver>.Instance,
-            EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, mutationLock),
-            new EventResourceSettingsWriter(context, mutationLock, new EfCoreUnitOfWork(context)));
+            UserPreferenceRepository.CreateReadOnly(context), cache,
+            new AtprotoFederationSettingRepository(context, null));
         // Cerbos is the external authorization boundary; all local policy and persistence behavior is real.
         var authorization = Substitute.For<IAuthorizationProvider>();
         authorization.AuthorizeAsync(Arg.Any<AuthorizationRequest>(), Arg.Any<CancellationToken>())

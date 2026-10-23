@@ -1,0 +1,32 @@
+Change-Id: CHG-01M55HQRWPGETWS62HXDQ30K3H
+Title: "Compose original native owners across runtime scopes"
+Type: fix
+Scope: access
+Summary: "Wire the existing feature-owned native operations, scoped factories, startup selection and shared fixtures without restoring generic privileged execution."
+Group: staged-programme-composition
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Deploy matching native owners and original-source operation scopes together. Prior reconstructed privileged execution and older runtime composition are no longer accepted.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Wire the existing feature-owned native operations, scoped factories, startup selection and shared fixtures without restoring generic privileged execution.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Select the matching runtime and credential authorities and deploy original-source native operation wiring together with the application.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Update generated wire schemas with the matching endpoint authorization and guarded contract classifications.
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Review the paired public operator guidance and complete final composed assurance before release. Packaging does not establish deployment readiness.

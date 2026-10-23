@@ -447,9 +447,50 @@ public sealed class AnonymousRetentionReadBoundaryTests
                     TenantStatus = null!
                 });
                 await fixture.Context.SaveChangesAsync();
-                await fixture.Context.StorageObjects.Where(item => item.Id == scope.Storage.Id)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.TenantId, foreignTenantId));
-                fixture.Context.TenantContext = new TenantScope(foreignTenantId);
+                await using var replica = fixture.CreateReplica(new TenantScope(foreignTenantId));
+                await using var foreignScope = replica.CreateAsyncScope();
+                var services = foreignScope.ServiceProvider;
+                var context = services.GetRequiredService<ExploreDbContext>();
+                var bindings = services.GetRequiredService<IStorageProviderBindingService>();
+                var binding = await bindings.CaptureAsync(StorageProviders.Local, foreignTenantId, CancellationToken.None);
+                await context.SaveChangesAsync();
+                var storage = new StorageObject
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = foreignTenantId,
+                    Tenant = null!,
+                    FileTypeId = (int)FileTypeEnum.Document,
+                    FileType = null!,
+                    Provider = StorageProviders.Local,
+                    StorageProviderBindingId = binding.Id,
+                    FullName = "private.csv",
+                    SafeDisplayName = "private.csv",
+                    Extension = ".csv",
+                    ContentType = "text/csv",
+                    Visibility = StorageObjectVisibilities.AuthenticatedTenant,
+                    Purpose = StorageObjectPurposes.Document,
+                    LifecycleState = StorageObjectLifecycleStates.Active,
+                    OwningResourceKind = "registration_submission_sink",
+                    OwningResourceId = scope.Storage.OwningResourceId,
+                    RegistrationContentRetentionUntilUtc = scope.Deadline,
+                    ConcurrencyStamp = Guid.CreateVersion7()
+                };
+                var provider = await bindings.ResolveAsync(binding.Id, CancellationToken.None);
+                await using var content = new MemoryStream("private answer"u8.ToArray());
+                var written = await provider.WriteAsync(new(foreignTenantId, content, "text/csv", "private.csv", ".csv",
+                    content.Length, 1024, $"tenants/{foreignTenantId:N}/retention-tests/{storage.Id:N}.csv"), CancellationToken.None);
+                try
+                {
+                    storage.ObjectKey = written.ObjectKey;
+                    context.StorageObjects.Add(storage);
+                    await context.SaveChangesAsync();
+                    context.ChangeTracker.Clear();
+                    // The artifact is visible to its real owner, but its submission belongs to the original tenant.
+                    await Assert.That(await services.GetRequiredService<IStorageObjectContentReader>()
+                        .OpenAsync(storage.Id, false, CancellationToken.None)).IsNull();
+                }
+                finally { await provider.DeleteAsync(new(written.ObjectKey), CancellationToken.None); }
+                return;
             }
             if (scenario == "claimed-expired")
             {
@@ -823,6 +864,68 @@ public sealed class AnonymousRetentionReadBoundaryTests
             await Assert.That(await fixture.Context.RegistrationAnswerFileReleases.CountAsync()).IsEqualTo(1);
         }
         finally { await DeleteStorageAsync(fixture, scope.Storage); }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task StorageReadFailuresKeepNativeContentAndProviderIdentityOutOfDiagnostics(bool missingObject)
+    {
+        var clock = new Clock();
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(
+            services => services.AddSingleton<TimeProvider>(clock));
+        var scope = await SeedReadScopeAsync(fixture, legalHold: true);
+        clock.Now = new DateTimeOffset(scope.Deadline.AddTicks(-1));
+        string canary = "provider-private-" + Guid.CreateVersion7().ToString("N");
+        Exception fault = missingObject ? new FileNotFoundException(canary) : new InvalidOperationException(canary);
+        var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(scope.Storage.Provider);
+        provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<FileStorageReadResult>(fault));
+        var bindings = Substitute.For<IStorageProviderBindingService>();
+        bindings.ResolveAsync(scope.Storage.StorageProviderBindingId!.Value, Arg.Any<CancellationToken>())
+            .Returns(provider);
+        var logger = new StorageFailureLogger();
+        var reader = new StorageObjectContentReader(
+            fixture.Services.GetRequiredService<IStorageObjectRepository>(), bindings,
+            fixture.Services.GetRequiredService<ICurrentUserService>(), logger,
+            fixture.Services.GetRequiredService<BusinessMetrics>(), clock);
+        try
+        {
+            await Assert.That(await reader.OpenAsync(scope.Storage.Id, false, default)).IsNull();
+            await Assert.That(logger.Fields.Count).IsEqualTo(1);
+            await Assert.That(logger.Fields.Single()["FailureCategory"]).IsEqualTo(
+                missingObject ? "object_not_found" : "provider_unavailable");
+            await Assert.That(logger.Exceptions.All(value => value is null)).IsTrue();
+            string output = string.Join('|', logger.Messages.Concat(logger.Fields.SelectMany(
+                fields => fields.Select(pair => pair.Key + "=" + pair.Value))));
+            foreach (string privateValue in new[]
+            {
+                canary, scope.Storage.Id.ToString("D"), fixture.TenantId.ToString("D"),
+                fixture.UserId.ToString("D"), scope.Storage.ObjectKey!
+            })
+                await Assert.That(output).DoesNotContain(privateValue);
+            await Assert.That((await fixture.Services.GetRequiredService<IStorageObjectRepository>()
+                .GetById(scope.Storage.Id))!.ObjectKey).IsEqualTo(scope.Storage.ObjectKey);
+        }
+        finally { await DeleteStorageAsync(fixture, scope.Storage); }
+    }
+
+    private sealed class StorageFailureLogger : ILogger<StorageObjectContentReader>
+    {
+        public List<string> Messages { get; } = [];
+        public List<Exception?> Exceptions { get; } = [];
+        public List<Dictionary<string, object?>> Fields { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+            Exceptions.Add(exception);
+            Fields.Add(((IEnumerable<KeyValuePair<string, object?>>)(object)state!)
+                .ToDictionary(pair => pair.Key, pair => pair.Value));
+        }
     }
 
     private static async Task<ReadScope> SeedReadScopeAsync(EventVisitorCapabilitySqliteFixture fixture, bool legalHold, bool anonymous = true)

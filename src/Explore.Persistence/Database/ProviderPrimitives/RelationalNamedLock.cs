@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 
 namespace Explore.Persistence.Database;
 
@@ -111,6 +112,7 @@ internal static class RelationalNamedLock
     {
         ArgumentNullException.ThrowIfNull(dbContext);
         ArgumentException.ThrowIfNullOrWhiteSpace(resource);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!dbContext.Database.IsRelational())
         {
@@ -127,37 +129,150 @@ internal static class RelationalNamedLock
             return new SemaphoreLease(semaphore);
         }
 
+        var originalContextId = dbContext.ContextId;
         DbConnection connection = dbContext.Database.GetDbConnection();
         bool ownsConnection = connection.State != ConnectionState.Open;
         if (ownsConnection)
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await dbContext.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         }
 
         string providerResource = NormalizeProviderResource(providerName, resource);
+        var postgres = connection as NpgsqlConnection;
+        int? originalBackend = postgres?.ProcessID;
+        string originalDatabase = connection.Database;
+        int connectorChanged = 0;
+        bool acquisitionStarted = false;
+        bool previouslyHeld = false;
+        void ObserveConnectorChange(object? sender, StateChangeEventArgs args) =>
+            Interlocked.Exchange(ref connectorChanged, 1);
+        bool IsOriginalPostgresSession()
+        {
+            try
+            {
+                return postgres is not null && originalBackend.HasValue
+                    && Volatile.Read(ref connectorChanged) == 0
+                    && dbContext.ContextId == originalContextId
+                    && ReferenceEquals(dbContext.Database.GetDbConnection(), connection)
+                    && connection.State == ConnectionState.Open && postgres.ProcessID == originalBackend
+                    && string.Equals(connection.Database, originalDatabase, StringComparison.Ordinal);
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+        }
+        if (providerName == PostgreSqlProvider)
+            connection.StateChange += ObserveConnectorChange;
         try
         {
+            if (providerName == PostgreSqlProvider)
+            {
+                if (!IsOriginalPostgresSession())
+                    throw new InvalidOperationException("named_lock_session_custody_lost");
+                previouslyHeld = await PostgreSqlSessionAlreadyHoldsAsync(connection,
+                    ComputeStableKey(providerResource), originalBackend!.Value, originalDatabase,
+                    cancellationToken).ConfigureAwait(false);
+                if (!IsOriginalPostgresSession())
+                    throw new InvalidOperationException("named_lock_session_custody_lost");
+            }
             await using DbCommand command = CreateAcquireCommand(
                 connection,
                 transaction: null,
                 providerName,
                 providerResource,
                 transactionOwner: false);
+            cancellationToken.ThrowIfCancellationRequested();
+            acquisitionStarted = true;
             object? result = providerName == PostgreSqlProvider
                 ? await ExecuteNonQueryAsync(command, cancellationToken).ConfigureAwait(false)
                 : await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             EnsureAcquireSucceeded(providerName, result);
-            return new SessionLease(connection, providerName, providerResource, ownsConnection);
+            if (providerName == PostgreSqlProvider && !IsOriginalPostgresSession())
+                throw new InvalidOperationException("named_lock_session_custody_lost");
+            return new SessionLease(dbContext, connection, providerName, providerResource, ownsConnection);
         }
-        catch
+        catch (Exception acquisitionFailure)
         {
-            if (connection.State != ConnectionState.Closed)
+            if (providerName == PostgreSqlProvider)
+            {
+                if (!IsOriginalPostgresSession())
+                    throw new InvalidOperationException("named_lock_session_custody_lost", acquisitionFailure);
+                if (!acquisitionStarted || !previouslyHeld)
+                {
+                    try
+                    {
+                        if (acquisitionStarted)
+                        {
+                            // Cancellation can race a grant. Reconcile only this previously-unheld
+                            // key; never consume an earlier reentrant lease to guess an outcome.
+                            using var cleanupTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                            await using DbCommand release = CreateReleaseCommand(connection, providerName, providerResource);
+                            object? released = await release.ExecuteScalarAsync(cleanupTimeout.Token).ConfigureAwait(false);
+                            if (released is not bool || !IsOriginalPostgresSession())
+                                throw new InvalidOperationException("named_lock_acquisition_cleanup_unconfirmed");
+                        }
+                    }
+                    catch (Exception cleanupFailure)
+                    {
+                        if (IsOriginalPostgresSession())
+                        {
+                            if (ownsConnection)
+                                await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
+                            else
+                                await connection.CloseAsync().ConfigureAwait(false);
+                        }
+                        throw new InvalidOperationException("named_lock_acquisition_cleanup_failed",
+                            new AggregateException(acquisitionFailure, cleanupFailure));
+                    }
+                    if (ownsConnection)
+                        await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
+                    throw;
+                }
+
+                // A sent reentrant command may have added a count before failing. Neither
+                // unlocking nor closing can preserve the earlier leases with certainty.
+                // Keep their original session intact; any surplus count lasts until that
+                // physical session ends or is reset, rather than silently losing exclusion.
+                throw new InvalidOperationException("named_lock_acquisition_cleanup_unconfirmed", acquisitionFailure);
+            }
+            if (ownsConnection)
+            {
+                await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
+            }
+            else if (connection.State != ConnectionState.Closed)
             {
                 await connection.CloseAsync().ConfigureAwait(false);
             }
 
             throw;
         }
+        finally
+        {
+            if (providerName == PostgreSqlProvider)
+                connection.StateChange -= ObserveConnectorChange;
+        }
+    }
+
+    private static async Task<bool> PostgreSqlSessionAlreadyHoldsAsync(
+        DbConnection connection, long key, int backend, string database, CancellationToken cancellationToken)
+    {
+        await using DbCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT CASE WHEN pg_catalog.pg_backend_pid() = @backend
+                AND pg_catalog.current_database() = @database THEN EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_locks held
+                    WHERE held.locktype = 'advisory' AND held.granted AND held.pid = @backend
+                        AND held.database = (SELECT oid FROM pg_catalog.pg_database WHERE datname = @database)
+                        AND held.classid::bigint = ((@key >> 32) & 4294967295)
+                        AND held.objid::bigint = (@key & 4294967295) AND held.objsubid = 1)
+                ELSE NULL END
+            """;
+        AddParameter(command, "key", key);
+        AddParameter(command, "backend", backend);
+        AddParameter(command, "database", database);
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is bool held
+            ? held : throw new InvalidOperationException("named_lock_session_ownership_unknown");
     }
 
     internal static string NormalizeProviderResource(string providerName, string resource)
@@ -306,6 +421,7 @@ internal static class RelationalNamedLock
     }
 
     private sealed class SessionLease(
+        DbContext dbContext,
         DbConnection connection,
         string providerName,
         string resource,
@@ -322,7 +438,11 @@ internal static class RelationalNamedLock
 
             if (connection.State != ConnectionState.Open)
             {
-                if (connection.State != ConnectionState.Closed)
+                if (ownsConnection)
+                {
+                    await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
+                }
+                else if (connection.State != ConnectionState.Closed)
                 {
                     await connection.CloseAsync().ConfigureAwait(false);
                 }
@@ -344,9 +464,9 @@ internal static class RelationalNamedLock
             }
             finally
             {
-                if (ownsConnection && connection.State != ConnectionState.Closed)
+                if (ownsConnection)
                 {
-                    await connection.CloseAsync().ConfigureAwait(false);
+                    await dbContext.Database.CloseConnectionAsync().ConfigureAwait(false);
                 }
             }
         }

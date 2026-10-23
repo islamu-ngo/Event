@@ -89,24 +89,24 @@ public sealed class ListmonkSyncService(
                 ? ListmonkSyncResult.Retryable("Listmonk API rate limit rejected the request.")
                 : ListmonkSyncResult.DefiniteFailure($"Listmonk API returned HTTP {ex.StatusCode}.");
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException)
         {
-            logger.LogWarning("Listmonk subscriber sync transport failed. FailureType={FailureType}", ex.GetType().Name);
+            logger.LogWarning("Listmonk subscriber sync transport failed. FailureCategory={FailureCategory}", "transport_failure");
             return ListmonkSyncResult.Ambiguous("Listmonk API request outcome is uncertain.");
         }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning("Listmonk subscriber sync timed out. FailureType={FailureType}", ex.GetType().Name);
+            logger.LogWarning("Listmonk subscriber sync timed out. FailureCategory={FailureCategory}", "provider_timeout");
             return ListmonkSyncResult.Ambiguous("Listmonk API request outcome is uncertain.");
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            logger.LogWarning("Listmonk subscriber payload is invalid. FailureType={FailureType}", ex.GetType().Name);
+            logger.LogWarning("Listmonk subscriber payload is invalid. FailureCategory={FailureCategory}", "invalid_payload");
             return ListmonkSyncResult.DefiniteFailure("Listmonk subscriber payload is invalid.");
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
-            logger.LogWarning("Listmonk subscriber configuration is invalid. FailureType={FailureType}", ex.GetType().Name);
+            logger.LogWarning("Listmonk subscriber configuration is invalid. FailureCategory={FailureCategory}", "configuration_unavailable");
             return ListmonkSyncResult.DefiniteFailure("Listmonk subscriber configuration is invalid.");
         }
     }

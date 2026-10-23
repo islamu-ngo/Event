@@ -10,7 +10,7 @@
             <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">Beta</MudChip>
         </MudStack>
         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
-            Configure the AI provider for the assistant rail. API keys are optional for local providers such as llama.cpp.
+            Configure the AI provider and select an existing credential reference. Use None only for a credential-free compatible provider.
         </MudText>
     </div>
     <MudStack Spacing="3">
@@ -22,10 +22,10 @@
             Enable AI Assistant
         </MudSwitch>
 
-        @if (AiAssistant.Enabled == true)
-        {
-            <MudSelect T="string" Label="Provider" @bind-Value="AiAssistant.Provider" Disabled="_isSaving" Variant="Variant.Outlined">
+            <MudSelect T="string" Label="Provider" Value="AiAssistant.Provider" ValueChanged="OnProviderChanged" Disabled="_isSaving" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("openai")">OpenAI</MudSelectItem>
                 <MudSelectItem Value="@("openai-compatible")">OpenAI-compatible</MudSelectItem>
+                <MudSelectItem Value="@("anthropic")">Anthropic</MudSelectItem>
                 <MudSelectItem Value="@("anthropic-compatible")">Anthropic-compatible</MudSelectItem>
             </MudSelect>
 
@@ -46,9 +46,11 @@
             </MudSwitch>
 
             <MudAlert Severity="Severity.Info" Dense="true">
-                The navbar AI button appears only after an endpoint URL and model ID are saved.
+                Save a model ID and a valid credential selection. Compatible providers also require an endpoint URL.
             </MudAlert>
 
+            @if (UsesCompatibleProvider)
+            {
             <MudTextField T="string"
                           Value="AiAssistant.EndpointUrl"
                           ValueChanged="OnEndpointUrlChanged"
@@ -58,14 +60,18 @@
                           Variant="Variant.Outlined"
                           Placeholder="http://127.0.0.1:1337/v1"
                           HelperText="Provider base URL. Model discovery calls the provider's models endpoint automatically." />
+            }
 
-            <MudTextField T="string"
-                          Label="API key (leave blank to keep configured key)"
-                          @bind-Value="_apiKey"
-                           Variant="Variant.Outlined"
-                           InputType="InputType.Password"
-                           Disabled="_isSaving"
-                          HelperText="@(AiAssistant.ApiKeyConfigured == true ? "A provider key is configured on the server. Enter a replacement only when rotating it." : "Enter the provider key to use for model discovery and save with this provider configuration.")" />
+            <MudSelect T="string"
+                       Label="Credential scope"
+                       Value="AiAssistant.CredentialScope"
+                       ValueChanged="OnCredentialScopeChanged"
+                       Variant="Variant.Outlined"
+                       Disabled="_isSaving"
+                       HelperText="Credentials are provisioned through the secret authority, never entered here. Instance selects the provider-bound instance reference.">
+                <MudSelectItem Value="@("none")" Disabled="@(!UsesCompatibleProvider)">None (credential-free)</MudSelectItem>
+                <MudSelectItem Value="@("instance")">Instance credential</MudSelectItem>
+            </MudSelect>
 
             <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2" Class="flex-wrap">
                 @if (HasDiscoveredModels)
@@ -145,7 +151,7 @@
             @if (HasIncompleteConfiguration)
             {
                 <MudAlert Severity="Severity.Warning" Dense="true">
-                    Enter an endpoint URL and model ID before saving, otherwise the AI Assistant cannot be enabled.
+                    Select a valid credential scope and model ID before saving. Compatible providers also require an endpoint URL.
                 </MudAlert>
             }
 
@@ -157,8 +163,6 @@
                        Disabled="@(_isSaving || HasIncompleteConfiguration)">
                 @(_isSaving ? "Saving..." : "Save provider configuration")
             </MudButton>
-        }
-
         @if (!IsSingleTenant)
         {
             <MudDivider Class="my-2" />
@@ -181,7 +185,6 @@
     private bool _isLoadingModels;
     private string? _modelLoadMessage;
     private Color _modelLoadMessageColor = Color.Secondary;
-    private string _apiKey = string.Empty;
     private bool _isSaving;
     private string? _saveStatus;
     private string? _saveError;
@@ -204,12 +207,22 @@
 
     private bool HasDiscoveredModels => _discoveredModels.Count > 0;
 
+    private bool UsesCompatibleProvider =>
+        AiAssistant.Provider is "openai-compatible" or "anthropic-compatible";
+
+    private bool HasInvalidCredentialScope =>
+        AiAssistant.CredentialScope is not ("none" or "instance")
+        || (!UsesCompatibleProvider && AiAssistant.CredentialScope != "instance");
+
     private bool HasIncompleteConfiguration =>
-        string.IsNullOrWhiteSpace(AiAssistant.EndpointUrl)
-        || string.IsNullOrWhiteSpace(AiAssistant.ModelId);
+        (UsesCompatibleProvider && string.IsNullOrWhiteSpace(AiAssistant.EndpointUrl))
+        || string.IsNullOrWhiteSpace(AiAssistant.ModelId)
+        || HasInvalidCredentialScope;
 
     private bool CanLoadModels =>
         !_isLoadingModels
+        && UsesCompatibleProvider
+        && !HasInvalidCredentialScope
         && !string.IsNullOrWhiteSpace(AiAssistant.EndpointUrl);
 
     private IReadOnlyCollection<string> SelectedAllowedModelIds => AiAssistant.AllowedModelIds?.ToArray() ?? [];
@@ -255,6 +268,9 @@
 
     protected override void OnParametersSet()
     {
+        if (AiAssistant.Provider is null or "" or "none")
+            AiAssistant.Provider = "openai-compatible";
+        AiAssistant.CredentialScope ??= "none";
         EnsureDefaultModelAllowed();
     }
 
@@ -284,16 +300,14 @@
 
     private async Task SaveProviderConfigurationAsync()
     {
-        BaseCommandResponseOfGuid response = await SaveAsync(() => SaveAiProviderConfigurationAsync(new AiAssistantProviderConfigurationWriteDto
+        await SaveAsync(() => SaveAiProviderConfigurationAsync(new AiAssistantProviderConfigurationWriteDto
         {
             Provider = AiAssistant.Provider ?? string.Empty,
             EndpointUrl = AiAssistant.EndpointUrl ?? string.Empty,
-            ApiKey = _apiKey,
+            CredentialScope = AiAssistant.CredentialScope ?? "none",
             ModelId = AiAssistant.ModelId ?? string.Empty,
             AllowedModelIds = AiAssistant.AllowedModelIds?.ToArray() ?? []
         }), "AI provider configuration");
-        if (response.Success == true)
-            _apiKey = string.Empty;
     }
 
     private Task<BaseCommandResponseOfGuid> SaveAsync(AiAssistantGovernanceSettingsDto patch, string label) =>
@@ -335,6 +349,22 @@
         ClearDiscoveredModels();
     }
 
+    private void OnCredentialScopeChanged(string credentialScope)
+    {
+        AiAssistant.CredentialScope = credentialScope;
+        _modelLoadVersion++;
+        _isLoadingModels = false;
+        ClearDiscoveredModels();
+    }
+
+    private void OnProviderChanged(string provider)
+    {
+        AiAssistant.Provider = provider;
+        _modelLoadVersion++;
+        _isLoadingModels = false;
+        ClearDiscoveredModels();
+    }
+
     private void OnModelIdChanged(string modelId)
     {
         AiAssistant.ModelId = modelId;
@@ -364,14 +394,17 @@
         SetModelLoadMessage(null, Color.Secondary);
         long requestVersion = ++_modelLoadVersion;
         string endpointUrl = AiAssistant.EndpointUrl;
-        string apiKey = _apiKey;
+        string credentialScope = AiAssistant.CredentialScope ?? "none";
+        string? provider = AiAssistant.Provider;
 
         try
         {
-            var models = await TenantOnboardingService.GetAiModelsAsync(endpointUrl, apiKey);
+            var models = await TenantOnboardingService.GetAiModelsAsync(
+                endpointUrl, credentialScope, AiModelDiscoveryScope.Instance);
             if (requestVersion != _modelLoadVersion
                 || !string.Equals(endpointUrl, AiAssistant.EndpointUrl, StringComparison.Ordinal)
-                || !string.Equals(apiKey, _apiKey, StringComparison.Ordinal))
+                || !string.Equals(credentialScope, AiAssistant.CredentialScope, StringComparison.Ordinal)
+                || !string.Equals(provider, AiAssistant.Provider, StringComparison.Ordinal))
             {
                 return;
             }

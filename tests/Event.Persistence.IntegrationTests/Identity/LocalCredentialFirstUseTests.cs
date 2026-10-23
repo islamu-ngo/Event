@@ -7,12 +7,10 @@ using System.Text.Json;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -27,10 +25,10 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Identity;
 
+[NotInParallel]
 public sealed class LocalCredentialFirstUseTests
 {
     public enum SessionMutation
@@ -661,6 +659,7 @@ public sealed class LocalCredentialFirstUseTests
     {
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"first-use-app-{Guid.CreateVersion7():N}.db");
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"first-use-identity-{Guid.CreateVersion7():N}.db");
+        private readonly string _passwordBlocklistPath = Path.Combine(Path.GetTempPath(), $"first-use-password-policy-{Guid.CreateVersion7():N}.json");
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
         private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private readonly byte[] _signingKey = RandomNumberGenerator.GetBytes(64);
@@ -672,6 +671,7 @@ public sealed class LocalCredentialFirstUseTests
         internal CancellationToken CancellationToken => _timeout.Token;
         internal LocalCredentialOperationReceipt Receipt { get; private set; } = null!;
         internal string TemporaryPassword { get; private set; } = string.Empty;
+        internal string BlockedPassword { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(48));
         internal ControlledClock Clock { get; } = new();
         internal ReplacementWriteFault WriteFault { get; } = new();
         internal AuthenticationStateReadBarrier StateReadBarrier { get; } = new();
@@ -725,21 +725,16 @@ public sealed class LocalCredentialFirstUseTests
             return await authentication.AuthenticateAsync(new LocalAuthRequestDto(Identifier: _email, Password: password), CancellationToken);
         }
 
-        internal LocalIdentityAuthService Authentication(AsyncServiceScope scope)
+        internal LocalIdentityAuthService Authentication(AsyncServiceScope scope) =>
+            Authentication(scope.ServiceProvider, StateStore(scope));
+
+        internal LocalIdentityAuthService Authentication(IServiceProvider services, LocalIdentityCredentialStateStore selectedStates)
         {
-            var application = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-            var settings = new SystemSettingRepository(dbContext: application,
-                mutationLock: new RelationalSettingMutationLock(dbContext: application, unitOfWork: new EfCoreUnitOfWork(application)));
-            var secrets = Substitute.For<ISecretResolver>();
-            secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, null, Arg.Any<CancellationToken>())
-                .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
-                    SettingKey: SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, Value: Convert.ToBase64String(_signingKey),
-                    Source: SecretSourceType.EnvironmentVariable, Scope: SecretScope.Instance, ScopeId: null, ResolvedAt: Clock.GetUtcNow())));
-            var signer = new LocalJwtTokenGenerator(secretResolver: secrets,
-                options: Options.Create(new LocalIdentityOptions()), timeProvider: Clock);
+            var signer = new LocalJwtTokenGenerator(
+                options: Options.Create(new LocalIdentityOptions { JwtKey = Convert.ToBase64String(_signingKey) }), timeProvider: Clock);
             return new LocalIdentityAuthService(
-                userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), tokenGenerator: signer,
-                systemSettings: settings, credentialStates: StateStore(scope));
+                userManager: services.GetRequiredService<UserManager<LocalIdentityUser>>(), tokenGenerator: signer,
+                credentialStates: selectedStates);
         }
 
         internal async Task<LocalSessionAuthority> IssueReadySessionAsync(bool emailConfirmed = true)
@@ -845,11 +840,32 @@ public sealed class LocalCredentialFirstUseTests
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddDbContext<ExploreDbContext>(options => Configure(options, _applicationPath));
+            services.AddScoped(provider =>
+            {
+                var application = new ExploreDbContext(provider.GetRequiredService<DbContextOptions<ExploreDbContext>>());
+                application.ClearTenantFilterBypass();
+                application.BindTenantLease();
+                return application;
+            });
             services.AddSingleton<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(
                 new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
             IdentityBuilder identity = services.AddIdentityCore<LocalIdentityUser>().AddRoles<LocalIdentityRole>()
                 .AddUserValidator<OptionalEmailLocalIdentityUserValidator>()
                 .AddLocalLifecycleTokenProviders();
+            byte[] snapshot = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                Version = 1,
+                Revision = Guid.CreateVersion7().ToString("N"),
+                Source = "Runtime-generated native fixture authority",
+                License = "Project-owned test data",
+                Passwords = new[] { BlockedPassword }
+            });
+            await File.WriteAllBytesAsync(_passwordBlocklistPath, snapshot, CancellationToken);
+            services.AddLocalPasswordPolicy(new LocalIdentityOptions
+            {
+                PasswordBlocklistPath = _passwordBlocklistPath,
+                PasswordBlocklistSha256 = Convert.ToHexString(SHA256.HashData(snapshot))
+            }, required: true);
             services.AddSingleton<IPasswordValidator<LocalIdentityUser>>(ValidationExpiry);
             if (_topology == IdentityDatabaseTopology.External)
             {
@@ -917,10 +933,10 @@ public sealed class LocalCredentialFirstUseTests
             }
             await using (AsyncServiceScope activate = Provider.CreateAsyncScope())
             {
-                LocalCredentialProvisioningSnapshot snapshot = (await StateStore(activate).ReadProvisioningAsync(Receipt.OperationId, CancellationToken))!;
+                LocalCredentialProvisioningSnapshot activationSnapshot = (await StateStore(activate).ReadProvisioningAsync(Receipt.OperationId, CancellationToken))!;
                 LocalCredentialActivationOutcome result = await StateStore(activate).ActivateChangeRequiredAsync(
                     new LocalCredentialActivationRequest(operationId: Receipt.OperationId,
-                        expectedOperationConcurrencyStamp: snapshot.OperationConcurrencyStamp), CancellationToken);
+                        expectedOperationConcurrencyStamp: activationSnapshot.OperationConcurrencyStamp), CancellationToken);
                 await Assert.That(result).IsEqualTo(LocalCredentialActivationOutcome.Activated);
                 await Assert.That(await activate.ServiceProvider.GetRequiredService<ExploreDbContext>().LocalIdentityUsers.CountAsync(CancellationToken))
                     .IsEqualTo(_topology == IdentityDatabaseTopology.Colocated ? 1 : 0);
@@ -939,7 +955,7 @@ public sealed class LocalCredentialFirstUseTests
             finally
             {
                 _metadataCache.Dispose();
-                foreach (string path in new[] { _applicationPath, _identityPath })
+                foreach (string path in new[] { _applicationPath, _identityPath, _passwordBlocklistPath })
                 {
                     File.Delete(path); File.Delete(path + "-wal"); File.Delete(path + "-shm");
                 }

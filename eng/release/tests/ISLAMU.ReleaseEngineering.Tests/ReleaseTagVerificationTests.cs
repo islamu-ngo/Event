@@ -228,6 +228,7 @@ public sealed class ReleaseTagVerificationTests
             Prepare();
             Git("add", "docs/internal/releases/1.1.0");
             B = Commit("docs(release): prepare 1.1.0\n\nChangelog: skip\nChangelog-Reason: release metadata commit");
+            SecurityExecutionEvidenceFixture.Write(ReleaseDirectory, B, repositoryPath: RepositoryPath);
             Git("branch", "-f", "v1.1", B);
         }
 

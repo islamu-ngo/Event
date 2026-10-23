@@ -1,12 +1,9 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.Exceptions;
-using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
-using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Domain.ValueObjects;
 using NSubstitute;
@@ -102,115 +99,6 @@ public sealed class InstanceOperatorIdentityCommandTests
     }
 
     [Test]
-    public async Task SaveAsync_PendingBootstrap_SavesNormalizedDraftWithFreshServerControlledFields()
-    {
-        var scenario = new InstanceOperatorIdentityServiceScenario();
-
-        BaseCommandResponse<InstanceOperatorIdentitySavedDocument> response = await scenario.Service.SaveAsync(
-            new InstanceOperatorIdentitySettings { PublicName = "  Independent Operator  " },
-            expectedRevision: null);
-
-        await Assert.That(response.IsSuccess).IsTrue();
-        await Assert.That(scenario.Upserted).IsNotNull();
-        await Assert.That(scenario.Upserted!.SettingKey)
-            .IsEqualTo(InstanceOperatorIdentitySettingKeys.OperatorIdentity);
-        InstanceOperatorIdentitySettings saved = Parse(scenario.Upserted.Value);
-        await Assert.That(saved.PublicName).IsEqualTo("Independent Operator");
-        await Assert.That(saved.OperatorId is { } operatorId && operatorId.Version == 7).IsTrue();
-        await Assert.That(saved.IsOfficialInstance).IsFalse();
-        await Assert.That(saved.Revision is { } revision && revision.Version == 7).IsTrue();
-        await Assert.That(response.Id!.PublicDisclosure.IsReady).IsFalse();
-        await Assert.That(response.Id.PaidCommerce.IsReady).IsFalse();
-        await Assert.That(response.Id.PaidCommerce.FailureCode)
-            .IsEqualTo("instance_operator_identity_incomplete");
-    }
-
-    [Test]
-    public async Task SaveAsync_StaleRevision_ThrowsConcurrencyConflict()
-    {
-        Guid storedRevision = Guid.CreateVersion7();
-        var staleScenario = new InstanceOperatorIdentityServiceScenario()
-            .WithStoredPayload(CompleteCandidate() with { Revision = storedRevision });
-        var missingScenario = new InstanceOperatorIdentityServiceScenario();
-
-        _ = await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
-            staleScenario.Service.SaveAsync(CompleteCandidate(), expectedRevision: Guid.CreateVersion7()));
-        _ = await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
-            missingScenario.Service.SaveAsync(CompleteCandidate(), expectedRevision: Guid.CreateVersion7()));
-        await Assert.That(staleScenario.Upserted).IsNull();
-        await Assert.That(missingScenario.Upserted).IsNull();
-    }
-
-    [Test]
-    public async Task SaveAsync_CompletedBootstrap_PersistsValidIncompleteDraftWithoutGrantingReadiness()
-    {
-        Guid storedRevision = Guid.CreateVersion7();
-        var scenario = new InstanceOperatorIdentityServiceScenario()
-            .WithCompletedBootstrap()
-            .WithStoredPayload(CompleteCandidate() with { Revision = storedRevision });
-
-        BaseCommandResponse<InstanceOperatorIdentitySavedDocument> response = await scenario.Service.SaveAsync(
-            new InstanceOperatorIdentitySettings { PublicName = "Independent Operator" },
-            expectedRevision: storedRevision);
-
-        await Assert.That(response.IsSuccess).IsTrue();
-        await Assert.That(scenario.Upserted).IsNotNull();
-        await Assert.That(response.Id!.PublicDisclosure.IsReady).IsFalse();
-        await Assert.That(response.Id.PaidCommerce.IsReady).IsFalse();
-        await Assert.That(response.Id.PaidCommerce.ReasonCodes)
-            .Contains("instance_operator_identity_terms_url_missing");
-        await Assert.That(response.Id.Revision).IsNotEqualTo(storedRevision);
-    }
-
-    [Test]
-    public async Task SaveAsync_CompletedBootstrap_AcceptsValidReplacementWithRotatedRevision()
-    {
-        Guid storedRevision = Guid.CreateVersion7();
-        var scenario = new InstanceOperatorIdentityServiceScenario()
-            .WithCompletedBootstrap()
-            .WithStoredPayload(CompleteCandidate() with { Revision = storedRevision });
-
-        BaseCommandResponse<InstanceOperatorIdentitySavedDocument> response = await scenario.Service.SaveAsync(
-            CompleteCandidate(),
-            expectedRevision: storedRevision);
-
-        await Assert.That(response.IsSuccess).IsTrue();
-        InstanceOperatorIdentitySettings saved = Parse(scenario.Upserted!.Value);
-        await Assert.That(saved.Revision).IsNotEqualTo(storedRevision);
-        await Assert.That(response.Id!.Revision).IsEqualTo(saved.Revision);
-        await Assert.That(response.Id.PublicDisclosure.IsReady).IsTrue();
-        await Assert.That(response.Id.PaidCommerce.IsReady).IsTrue();
-    }
-
-    [Test]
-    public async Task SaveAsync_RejectsClientAssertionsOfServerControlledFields()
-    {
-        Guid storedOperatorId = Guid.Parse("0198e2a4-5340-7f89-8abc-b8bdf43e0ea8");
-        Guid storedRevision = Guid.CreateVersion7();
-        var scenario = new InstanceOperatorIdentityServiceScenario()
-            .WithStoredPayload(CompleteCandidate() with
-            {
-                OperatorId = storedOperatorId,
-                IsOfficialInstance = true,
-                Revision = storedRevision
-            });
-
-        BaseCommandResponse<InstanceOperatorIdentitySavedDocument> response = await scenario.Service.SaveAsync(
-            CompleteCandidate() with
-            {
-                OperatorId = Guid.CreateVersion7(),
-                IsOfficialInstance = false
-            },
-            expectedRevision: storedRevision);
-
-        await Assert.That(response.IsSuccess).IsTrue();
-        InstanceOperatorIdentitySettings saved = Parse(scenario.Upserted!.Value);
-        await Assert.That(saved.OperatorId).IsEqualTo(storedOperatorId);
-        await Assert.That(saved.IsOfficialInstance).IsTrue();
-        await Assert.That(saved.Revision).IsNotEqualTo(storedRevision);
-    }
-
-    [Test]
     public async Task EvaluateAsync_DisclosureWithoutTerms_DoesNotAuthorizePaidCommerce()
     {
         var scenario = new InstanceOperatorIdentityServiceScenario()
@@ -225,9 +113,6 @@ public sealed class InstanceOperatorIdentityCommandTests
         await Assert.That(commerce.Identity).IsNull();
         await Assert.That(commerce.ReasonCodes).IsEquivalentTo(["instance_operator_identity_terms_url_missing"]);
     }
-
-    private static InstanceOperatorIdentitySettings Parse(string json) =>
-        JsonSerializer.Deserialize<InstanceOperatorIdentitySettings>(json, SerializerOptions)!;
 
     private static InstanceOperatorIdentitySettings CompleteCandidate() => new()
     {
@@ -250,35 +135,16 @@ public sealed class InstanceOperatorIdentityCommandTests
     {
         public InstanceOperatorIdentityServiceScenario()
         {
-            BootstrapStates.GetCurrent(Arg.Any<CancellationToken>())
-                .Returns(PendingBootstrap());
             SystemSettings.GetByKey(
                     InstanceOperatorIdentitySettingKeys.OperatorIdentity,
                     Arg.Any<CancellationToken>())
                 .Returns((SystemSetting?)null);
-            SystemSettings.UpsertInCurrentTransactionAsync(
-                    Arg.Do<SystemSetting>(setting => Upserted = setting),
-                    Arg.Any<CancellationToken>())
-                .Returns((string?)null);
-            UnitOfWork.ExecuteSerializableAsync(
-                    Arg.Any<Func<CancellationToken, Task<BaseCommandResponse<InstanceOperatorIdentitySavedDocument>>>>(),
-                    Arg.Any<CancellationToken>())
-                .Returns(callInfo => callInfo.Arg<Func<CancellationToken, Task<BaseCommandResponse<InstanceOperatorIdentitySavedDocument>>>>()(
-                    CancellationToken.None));
-
-            Service = new InstanceOperatorIdentityService(SystemSettings, UnitOfWork, Substitute.For<IOutboxRepository>());
+            Service = new InstanceOperatorIdentityService(SystemSettings, new ObservationOnlyScopeFactory(), TimeProvider.System);
         }
 
         public ISystemSettingRepository SystemSettings { get; } = Substitute.For<ISystemSettingRepository>();
 
-        public IInstanceBootstrapStateRepository BootstrapStates { get; } =
-            Substitute.For<IInstanceBootstrapStateRepository>();
-
-        public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
-
         public InstanceOperatorIdentityService Service { get; }
-
-        public SystemSetting? Upserted { get; private set; }
 
         public InstanceOperatorIdentityServiceScenario WithStoredSetting(string value)
         {
@@ -293,13 +159,6 @@ public sealed class InstanceOperatorIdentityCommandTests
             InstanceOperatorIdentitySettings payload) =>
             WithStoredSetting(JsonSerializer.Serialize(payload, SerializerOptions));
 
-        public InstanceOperatorIdentityServiceScenario WithCompletedBootstrap()
-        {
-            BootstrapStates.GetCurrent(Arg.Any<CancellationToken>())
-                .Returns(CompletedBootstrap());
-            return this;
-        }
-
         private static SystemSetting Stored(string value) => new()
         {
             Id = Guid.CreateVersion7(),
@@ -308,17 +167,12 @@ public sealed class InstanceOperatorIdentityCommandTests
             ValueType = SettingValueType.Json
         };
 
-        private static InstanceBootstrapState PendingBootstrap() =>
-            InstanceBootstrapState.CreateInteractivePending(
-                Guid.CreateVersion7(),
-                DeploymentMode.MultiTenant,
-                DateTime.UtcNow);
+    }
 
-        private static InstanceBootstrapState CompletedBootstrap()
-        {
-            InstanceBootstrapState bootstrap = PendingBootstrap();
-            _ = bootstrap.CompleteInteractive(Guid.CreateVersion7(), DateTime.UtcNow);
-            return bootstrap;
-        }
+    private sealed class ObservationOnlyScopeFactory : Explore.Application.Contracts.Operations.IPolicyMutationExecutionScopeFactory
+    {
+        public ValueTask<Explore.Application.Contracts.Operations.IPolicyMutationExecutionScope> CreateAsync(
+            Explore.Application.Contracts.Operations.PolicyMutationScope selection, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("An observation fixture cannot acquire mutation authority.");
     }
 }

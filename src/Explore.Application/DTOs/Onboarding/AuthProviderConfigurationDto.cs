@@ -17,7 +17,6 @@ public sealed record AuthProviderConfigurationDto
     // Keycloak
     public string KeycloakAuthority { get; init; } = string.Empty;
     public string KeycloakClientId { get; init; } = string.Empty;
-    public string KeycloakClientSecret { get; set; } = string.Empty;
     public bool KeycloakDetectedFromEnvironment { get; init; }
     public SecretOwnershipDto KeycloakClientSecretOwnership { get; init; } = new();
 
@@ -28,7 +27,7 @@ public sealed record AuthProviderConfigurationDto
     // Google SSO
     public bool GoogleSsoEnabled { get; init; }
     public string GoogleClientId { get; init; } = string.Empty;
-    public string GoogleClientSecret { get; set; } = string.Empty;
+    public SecretOwnershipDto GoogleClientSecretOwnership { get; init; } = new();
 
     public global::Explore.Domain.Enums.PublicOnboardingPolicy KeycloakPublicOnboardingPolicy { get; init; }
     public string KeycloakPublicSignupUrl { get; init; } = string.Empty;

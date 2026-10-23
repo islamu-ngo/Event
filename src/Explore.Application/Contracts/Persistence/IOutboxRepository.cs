@@ -24,6 +24,14 @@ public interface IOutboxRepository
     /// </summary>
     Task<List<OutboxMessage>> GetPendingBatch(int batchSize, CancellationToken ct = default);
 
+    /// <summary>Reloads the exact original notification claim after selecting its admitted Runtime tenant.</summary>
+    Task<OutboxMessage?> GetClaimedNotificationAsync(
+        Guid id, DateTime processingLeaseExpiresAt, CancellationToken ct = default);
+
+    /// <summary>Reloads a generic row under the admitted status and original expiry using the execution clock's UTC observation.</summary>
+    Task<OutboxMessage?> GetClaimedGenericAsync(
+        Guid id, DateTime leaseExpiresAt, OutboxMessageStatus status, DateTime observedAtUtc, CancellationToken ct = default);
+
     /// <summary>
     /// Atomically claims a due message for processing and returns its exact persisted
     /// lease-expiry timestamp. Returns null if another processor owns the message.
@@ -32,6 +40,7 @@ public interface IOutboxRepository
 
     Task<bool> TryReplaceProcessingPayloadAsync(
         Guid id,
+        DateTime processingLeaseExpiresAt,
         string expectedPayload,
         string replacementPayload,
         CancellationToken ct = default);

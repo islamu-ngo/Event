@@ -143,8 +143,8 @@ public sealed class SetupLivePersistenceInvariantTests(
         };
         var gate = new ClaimReadRendezvousInterceptor();
 
-        await using ExploreDbContext firstContext = fixture.CreateDbContext(gate);
-        await using ExploreDbContext secondContext = fixture.CreateDbContext(gate);
+        await using ExploreDbContext firstContext = CreateApplicationContext(tenantId, gate);
+        await using ExploreDbContext secondContext = CreateApplicationContext(tenantId, gate);
         SetupLiveApplicationService first = ApplicationService(
             firstContext, tenantId);
         SetupLiveApplicationService second = ApplicationService(
@@ -194,7 +194,7 @@ public sealed class SetupLivePersistenceInvariantTests(
             RequestedScopes = [SetupEnrollmentScope.SecretBindingWrite]
         };
         SetupLiveEnrollmentResult enrollmentResult;
-        await using (ExploreDbContext enrollmentContext = fixture.CreateDbContext())
+        await using (ExploreDbContext enrollmentContext = CreateApplicationContext(tenantId))
         {
             enrollmentResult = await ApplicationService(enrollmentContext, tenantId)
                 .CreateAsync(
@@ -221,8 +221,8 @@ public sealed class SetupLivePersistenceInvariantTests(
         byte[] secret = RandomNumberGenerator.GetBytes(64);
         try
         {
-            await using ExploreDbContext firstContext = fixture.CreateDbContext();
-            await using ExploreDbContext secondContext = fixture.CreateDbContext();
+            await using ExploreDbContext firstContext = CreateApplicationContext(tenantId);
+            await using ExploreDbContext secondContext = CreateApplicationContext(tenantId);
             await secondContext.Database.OpenConnectionAsync();
             int secondPid = await secondContext.Database
                 .SqlQuery<int>($"SELECT pg_backend_pid() AS \"Value\"")
@@ -302,7 +302,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         await fixture.ResetAsync();
         (Guid tenantId, Guid userId) = await SeedApplicationActorAsync();
         SetupLiveEnrollmentResult enrollmentResult;
-        await using (ExploreDbContext enrollmentContext = fixture.CreateDbContext())
+        await using (ExploreDbContext enrollmentContext = CreateApplicationContext(tenantId))
         {
             enrollmentResult = await ApplicationService(enrollmentContext, tenantId)
                 .CreateAsync(
@@ -326,8 +326,8 @@ public sealed class SetupLivePersistenceInvariantTests(
         byte[] secret = RandomNumberGenerator.GetBytes(64);
         try
         {
-            await using ExploreDbContext firstContext = fixture.CreateDbContext();
-            await using ExploreDbContext secondContext = fixture.CreateDbContext();
+            await using ExploreDbContext firstContext = CreateApplicationContext(tenantId);
+            await using ExploreDbContext secondContext = CreateApplicationContext(tenantId);
             await secondContext.Database.OpenConnectionAsync();
             int secondPid = await secondContext.Database
                 .SqlQuery<int>($"SELECT pg_backend_pid() AS \"Value\"")
@@ -401,7 +401,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         await fixture.ResetAsync();
         (Guid tenantId, Guid userId) = await SeedApplicationActorAsync();
         SetupLiveEnrollmentResult enrollment;
-        await using (ExploreDbContext setup = fixture.CreateDbContext())
+        await using (ExploreDbContext setup = CreateApplicationContext(tenantId))
         {
             enrollment = await ApplicationService(setup, tenantId).CreateAsync(
                 tenantId,
@@ -423,7 +423,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         Guid operationKey = Guid.CreateVersion7();
         try
         {
-            await using ExploreDbContext firstContext = fixture.CreateDbContext();
+            await using ExploreDbContext firstContext = CreateApplicationContext(tenantId);
             IUnitOfWork failing = new FailBeforeSerializableExecutionUnitOfWork(
                 new EfCoreUnitOfWork(firstContext),
                 failOnInvocation: 3);
@@ -446,7 +446,7 @@ public sealed class SetupLivePersistenceInvariantTests(
             await Assert.That(async () => await firstWrite)
                 .Throws<TimeoutException>();
 
-            await using ExploreDbContext retryContext = fixture.CreateDbContext();
+            await using ExploreDbContext retryContext = CreateApplicationContext(tenantId);
             SetupLiveSecretBindingResult retry = await ApplicationService(
                 retryContext,
                 tenantId,
@@ -479,7 +479,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         await fixture.ResetAsync();
         (Guid tenantId, Guid userId) = await SeedApplicationActorAsync();
         SetupLiveEnrollmentResult enrollment;
-        await using (ExploreDbContext setup = fixture.CreateDbContext())
+        await using (ExploreDbContext setup = CreateApplicationContext(tenantId))
         {
             enrollment = await ApplicationService(setup, tenantId).CreateAsync(
                 tenantId,
@@ -504,8 +504,8 @@ public sealed class SetupLivePersistenceInvariantTests(
         byte[] secret = RandomNumberGenerator.GetBytes(64);
         try
         {
-            await using ExploreDbContext writeContext = fixture.CreateDbContext();
-            await using ExploreDbContext revokeContext = fixture.CreateDbContext();
+            await using ExploreDbContext writeContext = CreateApplicationContext(tenantId);
+            await using ExploreDbContext revokeContext = CreateApplicationContext(tenantId);
             await revokeContext.Database.OpenConnectionAsync();
             int revokePid = await revokeContext.Database
                 .SqlQuery<int>($"SELECT pg_backend_pid() AS \"Value\"")
@@ -554,7 +554,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         await fixture.ResetAsync();
         (Guid tenantId, Guid userId) = await SeedApplicationActorAsync();
         SetupLiveEnrollmentResult enrollment;
-        await using (ExploreDbContext setup = fixture.CreateDbContext())
+        await using (ExploreDbContext setup = CreateApplicationContext(tenantId))
         {
             enrollment = await ApplicationService(setup, tenantId).CreateAsync(
                 tenantId,
@@ -579,8 +579,8 @@ public sealed class SetupLivePersistenceInvariantTests(
         byte[] secret = RandomNumberGenerator.GetBytes(64);
         try
         {
-            await using ExploreDbContext revokeContext = fixture.CreateDbContext();
-            await using ExploreDbContext writeContext = fixture.CreateDbContext();
+            await using ExploreDbContext revokeContext = CreateApplicationContext(tenantId);
+            await using ExploreDbContext writeContext = CreateApplicationContext(tenantId);
             await writeContext.Database.OpenConnectionAsync();
             int writePid = await writeContext.Database
                 .SqlQuery<int>($"SELECT pg_backend_pid() AS \"Value\"")
@@ -1032,6 +1032,13 @@ public sealed class SetupLivePersistenceInvariantTests(
             CreatedAt = Now
         };
 
+    private ExploreDbContext CreateApplicationContext(Guid tenantId, params IInterceptor[] interceptors)
+    {
+        var context = fixture.CreateEnrolledTenantDbContext(new TenantContext(tenantId), interceptors);
+        context.BindTenantLease();
+        return context;
+    }
+
     private SetupLiveApplicationService ApplicationService(
         ExploreDbContext context,
         Guid tenantId,
@@ -1042,7 +1049,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         new SetupLiveRepository(context),
         new SecretBindingRepository(context),
         unitOfWork ?? new EfCoreUnitOfWork(context),
-        new ActorRepository(context),
+        new ActorOwnershipReader(context, fixture.NativeQueueEnrollment),
         new AllowAuthorizationProvider(),
         new TenantContext(tenantId),
         writer ?? new NoopSetupSecretBindingWriter(),

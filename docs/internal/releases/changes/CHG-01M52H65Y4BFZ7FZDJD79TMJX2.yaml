@@ -1,0 +1,28 @@
+Change-Id: CHG-01M52H65Y4BFZ7FZDJD79TMJX2
+Title: "Bound AI client fallback parsing and private failure diagnostics"
+Type: fix
+Scope: privacy
+Summary: "Remove private exception and resource details from AI client logs and bound fallback response parsing."
+Group: ai-client-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Client logs retain only fixed failure categories and status codes; fallback parsing rejects oversized, deep or ambiguous inputs.
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable

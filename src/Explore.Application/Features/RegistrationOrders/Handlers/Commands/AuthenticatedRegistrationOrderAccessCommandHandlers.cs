@@ -22,6 +22,13 @@ public sealed class StartAuthenticatedRegistrationOrderCommandHandler(
         StartAuthenticatedRegistrationOrderCommand request,
         CancellationToken cancellationToken)
     {
+        if (!RegistrationOrderCreationReceipt.IsValidOperationKey(request.OperationKey))
+        {
+            return Task.FromResult(BaseCommandResponse.Failure<Guid>(
+                "registration_order_operation_key_invalid",
+                "A bounded registration operation key is required.", id: request.EventId));
+        }
+
         if (!currentUser.IsAuthenticated || currentUser.UserId is not { } userId)
         {
             return Task.FromResult(BaseCommandResponse.Failure<Guid>(
@@ -36,6 +43,7 @@ public sealed class StartAuthenticatedRegistrationOrderCommandHandler(
             EventId = request.EventId,
             TicketCatalogVersionId = request.TicketCatalogVersionId,
             AccountUserId = userId,
+            OperationKey = request.OperationKey,
             BookingPartyType = request.BookingPartyType,
             PlatformContributionBasisPoints = request.PlatformContributionBasisPoints,
             Lines = request.Lines

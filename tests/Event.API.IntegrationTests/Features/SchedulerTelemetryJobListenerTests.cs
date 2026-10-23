@@ -3,7 +3,6 @@ using Explore.Application.Contracts.Scheduling;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Quartz;
-using TUnit.Core;
 
 namespace ApiIntegrationTests.Features;
 
@@ -13,7 +12,8 @@ public sealed class SchedulerTelemetryJobListenerTests
     public async Task ASuccessfulExecutionIsRecordedWithItsJobIdentityAndOutcome()
     {
         var telemetry = Substitute.For<ISchedulerJobTelemetry>();
-        var listener = CreateListener(telemetry);
+        var clock = new ExecutionClock();
+        var listener = CreateListener(telemetry, clock);
         IJobExecutionContext context = CreateContext(
             ScheduledJobNames.EmailDispatchDrain,
             QuartzSchedulerKeys.RecurringGroup);
@@ -79,20 +79,21 @@ public sealed class SchedulerTelemetryJobListenerTests
     public async Task ExecutionDurationIsMeasuredAcrossTheExecution()
     {
         var telemetry = Substitute.For<ISchedulerJobTelemetry>();
-        var listener = CreateListener(telemetry);
+        var clock = new ExecutionClock();
+        var listener = CreateListener(telemetry, clock);
         IJobExecutionContext context = CreateContext(
             ScheduledJobNames.EmailDispatchDrain,
             QuartzSchedulerKeys.RecurringGroup);
 
         await listener.JobToBeExecuted(context);
-        await Task.Delay(TimeSpan.FromMilliseconds(25));
+        clock.Advance(TimeSpan.FromMilliseconds(25));
         await listener.JobWasExecuted(context, jobException: null);
 
         telemetry.Received(1).RecordSchedulerJobExecution(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Is<double>(seconds => seconds > 0));
+            Arg.Is<double>(seconds => seconds == 0.025));
     }
 
     /// <summary>
@@ -145,8 +146,16 @@ public sealed class SchedulerTelemetryJobListenerTests
         await Assert.That(listener.Name).IsEqualTo("explore-scheduler-telemetry");
     }
 
-    private static SchedulerTelemetryJobListener CreateListener(ISchedulerJobTelemetry telemetry)
-        => new(telemetry, NullLogger<SchedulerTelemetryJobListener>.Instance);
+    private static SchedulerTelemetryJobListener CreateListener(ISchedulerJobTelemetry telemetry, TimeProvider? clock = null)
+        => new(telemetry, NullLogger<SchedulerTelemetryJobListener>.Instance, clock ?? TimeProvider.System);
+
+    private sealed class ExecutionClock : TimeProvider
+    {
+        private long _timestamp;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => _timestamp;
+        public void Advance(TimeSpan elapsed) => _timestamp += elapsed.Ticks;
+    }
 
     /// <summary>
     /// Backs the context's <c>Put</c>/<c>Get</c> with a real dictionary so the listener's duration hand-off

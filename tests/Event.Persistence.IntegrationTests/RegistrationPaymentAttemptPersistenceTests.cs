@@ -1,4 +1,6 @@
+using Explore.Persistence.Database.ProviderPrimitives;
 using System.Data.Common;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Payments;
@@ -9,10 +11,16 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Infrastructure.Services;
+using RegistrationPaymentCheckoutDispatchService = Explore.Infrastructure.Services.RegistrationPaymentCheckoutDispatchService;
+using RegistrationPaymentCheckoutDispatchRequest = Explore.Application.Contracts.Payments.RegistrationPaymentCheckoutDispatchRequest;
+using RegistrationPaymentCheckoutDispatchResult = Explore.Application.Contracts.Payments.RegistrationPaymentCheckoutDispatchResult;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -25,6 +33,142 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
     private static readonly Guid TenantId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000001");
     private static readonly Guid OtherTenantId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000002");
     private static readonly Guid OrderId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000010");
+
+    [Test]
+    [Arguments("valid")]
+    [Arguments("effect")]
+    [Arguments("tenant")]
+    [Arguments("order")]
+    [Arguments("payment")]
+    [Arguments("token")]
+    [Arguments("fence")]
+    [Arguments("attempt")]
+    [Arguments("expiry")]
+    [Arguments("expired")]
+    [Arguments("revoked")]
+    [Arguments("replaced")]
+    public async Task CheckoutHandoffRequiresOriginalLivePersistedIdentity(string change)
+    {
+        await using var context = await CreateContextAsync();
+        var repository = new RegistrationPaymentAttemptRepository(context);
+        var first = await repository.ClaimAsync(Claim(TenantId, OrderId, "checkout-authority"), CancellationToken.None);
+        var foreign = await repository.ClaimAsync(Claim(OtherTenantId, Guid.CreateVersion7(), "foreign-checkout"), CancellationToken.None);
+        await context.CheckoutDispatchEffects.Where(value => value.Id == foreign.DispatchEffect.Id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.NextAttemptAt, UtcNow.AddHours(1)));
+        var admission = new CheckoutDispatchAdmission(new CheckoutDispatchAdmissionDbContextFactory(
+            new ReconciliationContextFactory(context)));
+        CheckoutDispatchClaim original = (await admission.ClaimDueDispatchEffectsAsync(
+            "identity-admission", 1, UtcNow.AddSeconds(1), TimeSpan.FromMinutes(2), CancellationToken.None)).Single();
+        var persisted = await context.CheckoutDispatchEffects.AsNoTracking().SingleAsync(value => value.Id == original.EffectId);
+        await Assert.That(original.LeaseExpiresAt).IsEqualTo(persisted.ProcessingLeaseExpiresAt);
+        CheckoutDispatchClaim supplied = change switch
+        {
+            "effect" => original with { EffectId = foreign.DispatchEffect.Id },
+            "tenant" => original with { TenantId = OtherTenantId },
+            "order" => original with { RegistrationOrderId = foreign.Attempt.RegistrationOrderId },
+            "payment" => original with { PaymentAttemptId = foreign.Attempt.Id },
+            "token" => original with { LeaseToken = Guid.CreateVersion7() },
+            "fence" => original with { ProcessingFence = original.ProcessingFence + 1 },
+            "attempt" => original with { AttemptCount = original.AttemptCount + 1 },
+            "expiry" => original with { LeaseExpiresAt = original.LeaseExpiresAt.AddTicks(1) },
+            _ => original
+        };
+        if (change == "revoked")
+            await repository.ParkDispatchAsync(original, "revoked", UtcNow.AddSeconds(2), CancellationToken.None);
+        if (change == "replaced")
+            _ = await admission.ClaimDueDispatchEffectsAsync(
+                "replacement", 1, UtcNow.AddMinutes(3), TimeSpan.FromMinutes(2), CancellationToken.None);
+        DateTime observedAt = change == "expired" ? original.LeaseExpiresAt : UtcNow.AddSeconds(3);
+        await using var runtime = await new ReconciliationContextFactory(context)
+            .CreateDbContextAsync(supplied.TenantId);
+        var executionRepository = new RegistrationPaymentAttemptRepository(runtime);
+        PaymentAttempt? owned = await executionRepository.GetClaimedAttemptAsync(supplied, observedAt, CancellationToken.None);
+        await Assert.That(owned is not null).IsEqualTo(change == "valid");
+        bool settled = await executionRepository.CompleteCheckoutDispatchAsync(
+            supplied, "cs_identity", "req_identity", observedAt, CancellationToken.None);
+        await Assert.That(settled).IsEqualTo(change == "valid");
+        if (change == "valid")
+            await Assert.That(await executionRepository.GetClaimedAttemptAsync(
+                original with
+                {
+                    TenantId = OtherTenantId,
+                    EffectId = foreign.DispatchEffect.Id,
+                    PaymentAttemptId = foreign.Attempt.Id,
+                    RegistrationOrderId = foreign.Attempt.RegistrationOrderId
+                },
+                observedAt, CancellationToken.None)).IsNull();
+        context.ChangeTracker.Clear();
+        var foreignEffect = await context.CheckoutDispatchEffects.AsNoTracking()
+            .SingleAsync(value => value.Id == foreign.DispatchEffect.Id);
+        await Assert.That(foreignEffect.Status).IsEqualTo(OutboxMessageStatus.Pending);
+        await Assert.That(foreignEffect.ProcessingFence).IsEqualTo(0);
+        await Assert.That((await context.PaymentAttempts.AsNoTracking()
+            .SingleAsync(value => value.Id == first.Attempt.Id)).ProviderIdempotencyKey)
+            .IsEqualTo(first.Attempt.ProviderIdempotencyKey);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CheckoutScopeRejectsOriginalExpiryReachedDuringClaimRead(bool expire)
+    {
+        await using var context = await CreateContextAsync();
+        var repository = new RegistrationPaymentAttemptRepository(context);
+        var owned = await repository.ClaimAsync(Claim(TenantId, OrderId, "handoff-expiry"), default);
+        var contexts = new ReconciliationContextFactory(context);
+        var admission = new CheckoutDispatchAdmission(new CheckoutDispatchAdmissionDbContextFactory(contexts));
+        var claim = (await admission.ClaimDueDispatchEffectsAsync(
+            "original", 1, UtcNow.AddSeconds(1), TimeSpan.FromMinutes(2), default)).Single();
+        var clock = new MutableTimeProvider(claim.LeaseExpiresAt.AddTicks(-1));
+        var signal = new CheckoutReadExpiry(clock,
+            expire ? claim.LeaseExpiresAt : claim.LeaseExpiresAt.AddTicks(-1));
+        var services = new ServiceCollection();
+        services.AddHttpContextAccessor();
+        services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
+        services.AddSingleton<ITenantExploreDbContextFactory>(new ReconciliationContextFactory(context, signal));
+        services.AddSingleton<IGlobalExploreDbContextFactory>(contexts);
+        services.AddSingleton<TimeProvider>(clock);
+        services.AddCheckoutDispatchPersistence();
+        bool constructed = false;
+        services.AddScoped(provider =>
+        {
+            constructed = true;
+            return GenericOutboxExecutionScopeFactory.GetSelectedRuntimeContext(provider)
+                ?? throw new InvalidOperationException("Missing selected checkout context.");
+        });
+        await using var provider = services.BuildServiceProvider();
+        await using var parent = provider.CreateAsyncScope();
+        DateTime observedAt = clock.GetUtcNow().UtcDateTime;
+        signal.Armed = true;
+        await using var execution = await parent.ServiceProvider.GetRequiredService<ICheckoutDispatchRuntimeScopeFactory>()
+            .CreateAsync(claim, observedAt, default);
+        await Assert.That(signal.Fired).IsTrue();
+        await Assert.That(execution is not null).IsEqualTo(!expire);
+        await Assert.That(constructed).IsEqualTo(!expire);
+        var retained = await context.CheckoutDispatchEffects.AsNoTracking().SingleAsync(row => row.Id == claim.EffectId);
+        await Assert.That(retained.ProcessingLeaseToken).IsEqualTo(claim.LeaseToken);
+        await Assert.That(retained.ProcessingFence).IsEqualTo(claim.ProcessingFence);
+        await Assert.That(retained.ProcessingLeaseExpiresAt).IsEqualTo(claim.LeaseExpiresAt);
+        await Assert.That((await context.PaymentAttempts.AsNoTracking().SingleAsync(row => row.Id == owned.Attempt.Id))
+            .ProviderIdempotencyKey).IsEqualTo(owned.Attempt.ProviderIdempotencyKey);
+    }
+
+    private sealed class CheckoutReadExpiry(MutableTimeProvider clock, DateTime expiresAt) : DbCommandInterceptor
+    {
+        public bool Armed { get; set; }
+        public bool Fired { get; private set; }
+        public override ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData,
+            DbDataReader result, CancellationToken cancellationToken = default)
+        {
+            if (Armed && command.CommandText.Contains("checkout_dispatch_effects", StringComparison.Ordinal))
+            {
+                clock.Set(expiresAt);
+                Armed = false;
+                Fired = true;
+            }
+            return ValueTask.FromResult(result);
+        }
+    }
 
     [Test]
     public async Task DatabaseRejectsChargeTotalThatDiffersFromPersistedComposition()
@@ -822,6 +966,92 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AcquisitionRecoversCommittedRowsAfterLostAcknowledgementWithoutClaimingFreshWork(bool cancelAfterCommit)
+    {
+        await using var context = await CreateContextAsync();
+        var repository = new RegistrationPaymentAttemptRepository(context);
+        for (int index = 0; index < 3; index++)
+        {
+            RegistrationPaymentAttemptClaimOutcome payment = await repository.ClaimAsync(
+                Claim(TenantId, Guid.CreateVersion7(), $"lost-acquisition-{index}"), CancellationToken.None);
+            await repository.EnsureReconciliationDueAsync(payment.Attempt, null, UtcNow, CancellationToken.None);
+        }
+        using var cancellation = new CancellationTokenSource();
+        var lostAck = new LostReconciliationAcquisitionAcknowledgement(cancelAfterCommit ? cancellation : null);
+        var admission = new PaymentReconciliationAdmission(new ReconciliationContextFactory(context, lostAck));
+        PaymentReconciliationAcquisition acquisition = PaymentReconciliationAcquisition.Create(
+            "lost-acquisition", 2, UtcNow, TimeSpan.FromMinutes(1));
+
+        IReadOnlyList<PaymentReconciliationClaim> recovered = await admission.ClaimDueReconciliationsAsync(
+            acquisition, UtcNow, cancellation.Token);
+        IReadOnlyList<PaymentReconciliationClaim> replay = await admission.ClaimDueReconciliationsAsync(
+            acquisition, UtcNow.AddSeconds(1), CancellationToken.None);
+
+        await Assert.That(lostAck.CommittedRows).IsEqualTo(2);
+        await Assert.That(cancellation.IsCancellationRequested).IsEqualTo(cancelAfterCommit);
+        await Assert.That(recovered.Count).IsEqualTo(2);
+        await Assert.That(replay.SequenceEqual(recovered)).IsTrue();
+        await Assert.That(await admission.ClaimDueReconciliationsAsync(
+            acquisition with { LeaseOwner = "other-owner" }, UtcNow.AddSeconds(1), CancellationToken.None)).IsEmpty();
+        await Assert.That(await admission.RecoverReconciliationAcquisitionAsync(
+            acquisition with { LeaseToken = Guid.CreateVersion7() }, UtcNow.AddSeconds(1), CancellationToken.None)).IsEmpty();
+        context.ChangeTracker.Clear();
+        PaymentReconciliationEffect[] effects = await context.PaymentReconciliationEffects.AsNoTracking().ToArrayAsync();
+        await Assert.That(effects.Count(effect => effect.Status == OutboxMessageStatus.Pending)).IsEqualTo(1);
+        foreach (PaymentReconciliationEffect effect in effects.Where(effect => effect.Status == OutboxMessageStatus.Processing))
+        {
+            await Assert.That(effect.ProcessingLeaseToken).IsEqualTo(acquisition.LeaseToken);
+            await Assert.That(effect.ProcessingLeaseExpiresAt).IsEqualTo(acquisition.LeaseExpiresAt);
+            await Assert.That(effect.UpdatedAt).IsEqualTo(acquisition.ClaimedAt);
+            await Assert.That(effect.ProcessingFence).IsEqualTo(1);
+            await Assert.That(effect.AttemptCount).IsEqualTo(1);
+        }
+    }
+
+    [Test]
+    public async Task AcquisitionRecoveryRejectsChangedIdentityAndExpiredOrReclaimedOwnership()
+    {
+        await using var context = await CreateContextAsync();
+        var repository = new RegistrationPaymentAttemptRepository(context);
+        RegistrationPaymentAttemptClaimOutcome payment = await repository.ClaimAsync(
+            Claim(TenantId, OrderId, "acquisition-fences"), CancellationToken.None);
+        await repository.EnsureReconciliationDueAsync(payment.Attempt, null, UtcNow, CancellationToken.None);
+        PaymentReconciliationAcquisition acquisition = PaymentReconciliationAcquisition.Create(
+            "original-owner", 1, UtcNow, TimeSpan.FromMinutes(1));
+        PaymentReconciliationClaim original = (await repository.ClaimDueReconciliationsAsync(
+            acquisition, UtcNow, CancellationToken.None)).Single();
+        foreach (PaymentReconciliationAcquisition changed in new[]
+        {
+            acquisition with { LeaseOwner = "competing-owner" },
+            acquisition with { LeaseToken = Guid.CreateVersion7() },
+            acquisition with { ClaimedAt = UtcNow.AddSeconds(1) },
+            acquisition with { LeaseExpiresAt = UtcNow.AddMinutes(2) }
+        })
+        {
+            await Assert.That(await repository.RecoverReconciliationAcquisitionAsync(
+                changed, UtcNow.AddSeconds(2), CancellationToken.None)).IsEmpty();
+        }
+        await Assert.That(await repository.RecoverReconciliationAcquisitionAsync(
+            acquisition, acquisition.LeaseExpiresAt, CancellationToken.None)).IsEmpty();
+        PaymentReconciliationAcquisition successor = PaymentReconciliationAcquisition.Create(
+            "successor", 1, acquisition.LeaseExpiresAt, TimeSpan.FromMinutes(1));
+        PaymentReconciliationClaim reclaimed = (await repository.ClaimDueReconciliationsAsync(
+            successor, successor.ClaimedAt, CancellationToken.None)).Single();
+
+        await Assert.That(reclaimed.EffectId).IsEqualTo(original.EffectId);
+        await Assert.That(reclaimed.ProcessingFence).IsEqualTo(original.ProcessingFence + 1);
+        await Assert.That(reclaimed.AttemptCount).IsEqualTo(original.AttemptCount + 1);
+        await Assert.That(await repository.RecoverReconciliationAcquisitionAsync(
+            acquisition, UtcNow.AddSeconds(2), CancellationToken.None)).IsEmpty();
+        await Assert.That(await repository.GetReconciliationAttemptAsync(
+            original, UtcNow.AddSeconds(2), CancellationToken.None)).IsNull();
+        await Assert.That(await repository.GetReconciliationAttemptAsync(
+            reclaimed with { TenantId = OtherTenantId }, successor.ClaimedAt, CancellationToken.None)).IsNull();
+    }
+
+    [Test]
     public async Task CheckoutCompletionCreatesOneDurableReconciliationEffectAndRecoversExpiredLease()
     {
         await using var context = await CreateContextAsync();
@@ -834,9 +1064,11 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         bool completed = await repository.CompleteCheckoutDispatchAsync(
             dispatch, "cs_reconcile", "req_create", UtcNow.AddSeconds(2), CancellationToken.None);
         PaymentReconciliationClaim first = (await repository.ClaimDueReconciliationsAsync(
-            "reconcile-a", 1, UtcNow.AddSeconds(3), TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+            PaymentReconciliationAcquisition.Create("reconcile-a", 1, UtcNow.AddSeconds(3), TimeSpan.FromMinutes(1)),
+            UtcNow.AddSeconds(3), CancellationToken.None)).Single();
         IReadOnlyList<PaymentReconciliationClaim> recovered = await repository.ClaimDueReconciliationsAsync(
-            "reconcile-b", 1, UtcNow.AddMinutes(1).AddSeconds(4), TimeSpan.FromMinutes(1), CancellationToken.None);
+            PaymentReconciliationAcquisition.Create("reconcile-b", 1, UtcNow.AddMinutes(1).AddSeconds(4), TimeSpan.FromMinutes(1)),
+            UtcNow.AddMinutes(1).AddSeconds(4), CancellationToken.None);
 
         await Assert.That(completed).IsTrue();
         PaymentAttempt persistedAttempt = await context.PaymentAttempts.AsNoTracking().SingleAsync(value => value.Id == outcome.Attempt.Id);
@@ -859,7 +1091,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         _ = await repository.MarkCheckoutDispatchPendingAsync(dispatch, UtcNow.AddSeconds(1), CancellationToken.None);
         _ = await repository.CompleteCheckoutDispatchAsync(dispatch, "cs_success", "req_create", UtcNow.AddSeconds(2), CancellationToken.None);
         PaymentReconciliationClaim claim = (await repository.ClaimDueReconciliationsAsync(
-            "reconcile", 1, UtcNow.AddSeconds(3), TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+            PaymentReconciliationAcquisition.Create("reconcile", 1, UtcNow.AddSeconds(3), TimeSpan.FromMinutes(1)),
+            UtcNow.AddSeconds(3), CancellationToken.None)).Single();
         var decision = new PaymentReconciliationDecision(
             PaymentReconciliationDisposition.Complete,
             PaymentAttemptStatusEnum.Succeeded,
@@ -903,7 +1136,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         first.Attempt.MarkRequiresAction("cs_first", UtcNow.AddSeconds(1), null);
         await payments.EnsureReconciliationDueAsync(first.Attempt, null, UtcNow.AddSeconds(2), CancellationToken.None);
         PaymentReconciliationClaim firstClaim = (await payments.ClaimDueReconciliationsAsync(
-            "first-success", 1, UtcNow.AddSeconds(2), TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+            PaymentReconciliationAcquisition.Create("first-success", 1, UtcNow.AddSeconds(2), TimeSpan.FromMinutes(1)),
+            UtcNow.AddSeconds(2), CancellationToken.None)).Single();
         await Assert.That(await payments.SettleReconciliationAsync(
             firstClaim,
             new PaymentReconciliationDecision(
@@ -917,7 +1151,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
             CancellationToken.None)).IsTrue();
 
         var finalization = new RegistrationFinalizationRepository(context);
-        RegistrationFinalizationClaim completedClaim = (await finalization.ClaimDueAsync(
+        var finalizationQueue = new RegistrationFinalizationQueueRepository(new ReconciliationContextFactory(context));
+        RegistrationFinalizationClaim completedClaim = (await finalizationQueue.ClaimDueAsync(
             "finalize-first", 1, UtcNow.AddSeconds(4), TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
         await Assert.That(await finalization.CompleteAsync(
             completedClaim, UtcNow.AddSeconds(5), CancellationToken.None)).IsTrue();
@@ -931,7 +1166,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         await context.SaveChangesAsync();
         await payments.EnsureReconciliationDueAsync(second, null, UtcNow.AddSeconds(7), CancellationToken.None);
         PaymentReconciliationClaim secondClaim = (await payments.ClaimDueReconciliationsAsync(
-            "second-success", 1, UtcNow.AddSeconds(7), TimeSpan.FromMinutes(1), CancellationToken.None)).Single();
+            PaymentReconciliationAcquisition.Create("second-success", 1, UtcNow.AddSeconds(7), TimeSpan.FromMinutes(1)),
+            UtcNow.AddSeconds(7), CancellationToken.None)).Single();
 
         await Assert.That(await payments.SettleReconciliationAsync(
             secondClaim,
@@ -1003,7 +1239,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         await repository.SaveChangesAsync(CancellationToken.None);
         await repository.EnsureReconciliationDueAsync(outcome.Attempt, null, UtcNow.AddSeconds(2), CancellationToken.None);
         PaymentReconciliationClaim claim = (await repository.ClaimDueReconciliationsAsync(
-            "reconcile", 1, UtcNow.AddSeconds(2), TimeSpan.FromMinutes(5), CancellationToken.None)).Single();
+            PaymentReconciliationAcquisition.Create("reconcile", 1, UtcNow.AddSeconds(2), TimeSpan.FromMinutes(5)),
+            UtcNow.AddSeconds(2), CancellationToken.None)).Single();
         PaymentAttempt current = await context.PaymentAttempts.SingleAsync(value => value.Id == outcome.Attempt.Id);
         current.MarkProcessing("cs_stale", "pi_stale", UtcNow.AddSeconds(4), "req_processing");
         await context.SaveChangesAsync();
@@ -1057,7 +1294,10 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         var checkout = Substitute.For<IHostedCheckoutSessionRetriever>();
         var payment = Substitute.For<IPaymentIntentRetriever>();
         var time = new MutableTimeProvider(UtcNow.AddSeconds(3));
-        var reconciliation = new RegistrationPaymentReconciliationService(repository, checkout, payment, time);
+        var contexts = new ReconciliationContextFactory(context);
+        var reconciliation = new RegistrationPaymentReconciliationService(
+            new PaymentReconciliationAdmission(contexts),
+            new PaymentReconciliationExecutionScopeFactory(contexts), checkout, payment, time);
         PaymentReconciliationEffect recoveryEffect = await context.PaymentReconciliationEffects.AsNoTracking().SingleAsync();
         await Assert.That(recoveryEffect.CheckoutDispatchEffectId).IsEqualTo(firstDispatch.EffectId);
         await Assert.That(recoveryEffect.CheckoutDispatchUnknownAt).IsEqualTo(UtcNow.AddSeconds(2));
@@ -1068,7 +1308,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         await Assert.That(unknownDispatch.ProcessingFence).IsEqualTo(recoveryEffect.CheckoutDispatchProcessingFence);
         await Assert.That(unknownDispatch.AttemptCount).IsEqualTo(recoveryEffect.CheckoutDispatchAttemptCount);
         PaymentReconciliationClaim initialRecoveryClaim = (await repository.ClaimDueReconciliationsAsync(
-            "reconcile-inspect", 1, UtcNow.AddSeconds(3), TimeSpan.FromMinutes(2), CancellationToken.None)).Single();
+            PaymentReconciliationAcquisition.Create("reconcile-inspect", 1, UtcNow.AddSeconds(3), TimeSpan.FromMinutes(2)),
+            UtcNow.AddSeconds(3), CancellationToken.None)).Single();
         await Assert.That(initialRecoveryClaim.CheckoutDispatchEffectId).IsEqualTo(firstDispatch.EffectId);
         await Assert.That(initialRecoveryClaim.CheckoutDispatchUnknownAt).IsEqualTo(UtcNow.AddSeconds(2));
         await Assert.That(initialRecoveryClaim.CheckoutDispatchProcessingFence).IsEqualTo(firstDispatch.ProcessingFence);
@@ -1110,16 +1351,17 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
             .Returns(HostedCheckoutCreateResult.Succeeded(new HostedCheckoutSession(
                 "cs_recovered", null, HostedCheckoutSessionStatus.Open, HostedCheckoutPaymentStatus.Unpaid,
                 null, UtcNow.AddMinutes(30), 1_125, "EUR"), "req_replayed"));
-        var dispatch = new RegistrationPaymentCheckoutDispatchService(
-            repository,
+        await using var dispatchGraph = CreateCheckoutDispatcher(
+            context,
             creator,
             checkout,
             payment,
             Substitute.For<IRegistrationOrderLifecycleService>(),
             time,
             ReadyActivation(),
-            CurrentAcceptance());
-        _ = await dispatch.DispatchDueAsync(new RegistrationPaymentCheckoutDispatchRequest(
+            CurrentAcceptance(),
+            ReplayDescriptor(TimeSpan.FromHours(24)));
+        _ = await dispatchGraph.Dispatch.DispatchDueAsync(new RegistrationPaymentCheckoutDispatchRequest(
             "checkout-replay",
             1,
             TimeSpan.FromMinutes(2),
@@ -1147,6 +1389,68 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
     }
 
     [Test]
+    [Arguments("missing")]
+    [Arguments("boundary")]
+    [Arguments("renewed-cutoff")]
+    [Arguments("revision")]
+    [Arguments("late-prepare")]
+    public async Task UnknownRedriveRequiresCurrentProviderRetentionRatherThanRenewedCheckoutCutoff(string invalidity)
+    {
+        await using var context = await CreateContextAsync();
+        var repository = new RegistrationPaymentAttemptRepository(context);
+        var original = await repository.ClaimAsync(Claim(TenantId, OrderId, "retention-bound"), CancellationToken.None);
+        CheckoutDispatchClaim first = (await repository.ClaimDueDispatchEffectsAsync(
+            "first-handoff", 1, UtcNow.AddSeconds(1), TimeSpan.FromMinutes(2), CancellationToken.None)).Single();
+        await repository.MarkCheckoutDispatchPendingAsync(first, UtcNow.AddSeconds(1), CancellationToken.None);
+        await repository.MarkCheckoutDispatchUnknownAsync(first, null, UtcNow.AddSeconds(2), CancellationToken.None);
+        if (invalidity == "renewed-cutoff")
+            await context.PaymentAttempts.Where(value => value.Id == original.Attempt.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.ExpiresAt, UtcNow.AddHours(48)));
+        await repository.RequeueUnknownDispatchAsync(
+            TenantId, first.EffectId, UtcNow.AddSeconds(2), first.ProcessingFence, first.AttemptCount,
+            UtcNow.AddMinutes(9), UtcNow.AddMinutes(9), CancellationToken.None);
+        var time = new MutableTimeProvider(UtcNow.AddMinutes(invalidity == "late-prepare" ? 9 : 10));
+        var freshness = CurrentAcceptance();
+        if (invalidity == "late-prepare")
+            freshness.IsCurrentAsync(Arg.Any<PaymentAttempt>(), Arg.Any<CancellationToken>())
+                .Returns(_ => { time.Set(UtcNow.AddMinutes(10)); return true; });
+        int providerHandoffs = 0;
+        var creator = Substitute.For<IHostedCheckoutSessionCreator>();
+        creator.CreateAsync(Arg.Any<HostedCheckoutCreateRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                providerHandoffs++;
+                return Task.FromException<HostedCheckoutCreateResult>(
+                    new InvalidOperationException("Unproven replay reached the provider."));
+            });
+        await using var dispatchGraph = CreateCheckoutDispatcher(
+            context, creator,
+            Substitute.For<IHostedCheckoutSessionRetriever>(),
+            Substitute.For<IPaymentIntentRetriever>(),
+            Substitute.For<IRegistrationOrderLifecycleService>(),
+            time, ReadyActivation(), freshness,
+            ReplayDescriptor(invalidity == "missing" ? null : TimeSpan.FromMinutes(11),
+                invalidity == "revision" ? "changed-api-revision" : original.Attempt.ProviderApiRevision));
+
+        RegistrationPaymentCheckoutDispatchResult result = await dispatchGraph.Dispatch.DispatchDueAsync(new RegistrationPaymentCheckoutDispatchRequest(
+            "retention-gate", 1, TimeSpan.FromMinutes(2),
+            new Uri("https://events.example.test"), new Uri("https://events.example.test/success"),
+            new Uri("https://events.example.test/cancel")), CancellationToken.None);
+
+        await Assert.That(result.Claimed).IsEqualTo(1);
+        await Assert.That(result.Unknown).IsEqualTo(1);
+        await Assert.That(result.Completed).IsEqualTo(0);
+        await Assert.That(providerHandoffs).IsEqualTo(0);
+        context.ChangeTracker.Clear();
+        PaymentAttempt persisted = await context.PaymentAttempts.SingleAsync();
+        await Assert.That(persisted.Id).IsEqualTo(original.Attempt.Id);
+        await Assert.That(persisted.ProviderIdempotencyKey).IsEqualTo(original.Attempt.ProviderIdempotencyKey);
+        await Assert.That(persisted.ActiveUniquenessSlot).IsEqualTo(PaymentAttempt.ActiveUniquenessSlotValue);
+        await Assert.That(persisted.PaymentAttemptStatusId).IsEqualTo((int)PaymentAttemptStatusEnum.Unknown);
+        await Assert.That((await context.CheckoutDispatchEffects.SingleAsync()).Status).IsEqualTo(OutboxMessageStatus.Unknown);
+    }
+
+    [Test]
     public async Task SucceededSettlementFailureRollsBackAttemptObservationAndEffectTogether()
     {
         await using var context = await CreateContextAsync();
@@ -1157,7 +1461,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         await repository.SaveChangesAsync(CancellationToken.None);
         await repository.EnsureReconciliationDueAsync(outcome.Attempt, null, UtcNow.AddSeconds(2), CancellationToken.None);
         PaymentReconciliationClaim claim = (await repository.ClaimDueReconciliationsAsync(
-            "reconcile", 1, UtcNow.AddSeconds(2), TimeSpan.FromMinutes(2), CancellationToken.None)).Single();
+            PaymentReconciliationAcquisition.Create("reconcile", 1, UtcNow.AddSeconds(2), TimeSpan.FromMinutes(2)),
+            UtcNow.AddSeconds(2), CancellationToken.None)).Single();
         var invalid = new PaymentReconciliationDecision(
             PaymentReconciliationDisposition.Complete,
             PaymentAttemptStatusEnum.Succeeded,
@@ -1188,7 +1493,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         await repository.SaveChangesAsync(CancellationToken.None);
         await repository.EnsureReconciliationDueAsync(outcome.Attempt, null, UtcNow.AddSeconds(2), CancellationToken.None);
         PaymentReconciliationClaim claim = (await repository.ClaimDueReconciliationsAsync(
-            "reconcile", 1, UtcNow.AddSeconds(2), TimeSpan.FromSeconds(1), CancellationToken.None)).Single();
+            PaymentReconciliationAcquisition.Create("reconcile", 1, UtcNow.AddSeconds(2), TimeSpan.FromSeconds(1)),
+            UtcNow.AddSeconds(2), CancellationToken.None)).Single();
         PaymentAttempt? read = await repository.GetReconciliationAttemptAsync(claim, UtcNow.AddMilliseconds(2500), CancellationToken.None);
 
         bool settled = await repository.SettleReconciliationAsync(
@@ -1224,11 +1530,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
     {
         await release;
         return await repository.ClaimDueReconciliationsAsync(
-            leaseOwner,
-            1,
-            UtcNow,
-            TimeSpan.FromMinutes(1),
-            CancellationToken.None);
+            PaymentReconciliationAcquisition.Create(leaseOwner, 1, UtcNow, TimeSpan.FromMinutes(1)),
+            UtcNow, CancellationToken.None);
     }
 
     private static async Task<IReadOnlyList<PaymentReconciliationClaim>> ClaimAfterReleaseAsync(
@@ -1239,11 +1542,8 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
     {
         await release.WaitAsync(cancellationToken);
         return await repository.ClaimDueReconciliationsAsync(
-            leaseOwner,
-            1,
-            UtcNow,
-            TimeSpan.FromMinutes(1),
-            cancellationToken);
+            PaymentReconciliationAcquisition.Create(leaseOwner, 1, UtcNow, TimeSpan.FromMinutes(1)),
+            UtcNow, cancellationToken);
     }
 
     private static async Task<bool> CompleteDispatchAfterReleaseAsync(
@@ -1325,6 +1625,17 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         return order;
     }
 
+    private static IPaymentProviderDescriptor ReplayDescriptor(TimeSpan? retention, string revision = "2026-08-20.acacia")
+    {
+        var descriptor = Substitute.For<IPaymentProviderDescriptor>();
+        descriptor.Describe().Returns(new PaymentProviderDescriptor(
+            "stripe", "OrganizerDirect", revision, "test", "instance-operator")
+        {
+            CheckoutMutationIdempotencyRetentionFloor = retention
+        });
+        return descriptor;
+    }
+
     private static IPaidOrderAcceptanceFreshnessService CurrentAcceptance()
     {
         var freshness = Substitute.For<IPaidOrderAcceptanceFreshnessService>();
@@ -1354,6 +1665,86 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
             false,
             null);
     }
+
+    private sealed class ReconciliationContextFactory(ExploreDbContext owner, IInterceptor? interceptor = null)
+        : IGlobalExploreDbContextFactory, IPaymentReconciliationAdmissionDbContextFactory, ITenantExploreDbContextFactory
+    {
+        public Task<ExploreDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
+            CreateAsync(null, cancellationToken);
+
+        public Task<ExploreDbContext> CreateDbContextAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+            CreateAsync(tenantId, cancellationToken);
+
+        private Task<ExploreDbContext> CreateAsync(Guid? tenant, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var builder = new DbContextOptionsBuilder<ExploreDbContext>(
+                (DbContextOptions<ExploreDbContext>)owner.GetService<IDbContextOptions>())
+                .UseSqlite(owner.Database.GetDbConnection(), contextOwnsConnection: false);
+            if (interceptor is not null)
+                builder.AddInterceptors(interceptor);
+            var context = new ExploreDbContext(builder.Options)
+            {
+                TenantContext = tenant.HasValue ? new ReconciliationTenant(tenant.Value) : null
+            };
+            context.BindTenantLease();
+            return Task.FromResult(context);
+        }
+    }
+
+    private static CheckoutDispatchTestGraph CreateCheckoutDispatcher(
+        ExploreDbContext context,
+        IHostedCheckoutSessionCreator creator,
+        IHostedCheckoutSessionRetriever retriever,
+        IPaymentIntentRetriever payment,
+        IRegistrationOrderLifecycleService lifecycle,
+        TimeProvider time,
+        IPaidCheckoutActivationService activation,
+        IPaidOrderAcceptanceFreshnessService freshness,
+        IPaymentProviderDescriptor descriptor)
+    {
+        var services = new ServiceCollection();
+        services.AddHttpContextAccessor();
+        services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
+        var contexts = new ReconciliationContextFactory(context);
+        services.AddSingleton<IGlobalExploreDbContextFactory>(contexts);
+        services.AddSingleton<ITenantExploreDbContextFactory>(contexts);
+        services.AddCheckoutDispatchPersistence();
+        services.AddScoped(provider => GenericOutboxExecutionScopeFactory.GetSelectedRuntimeContext(provider)
+            ?? throw new InvalidOperationException("Checkout dependencies require the selected Runtime context."));
+        services.AddScoped<IRegistrationPaymentAttemptRepository, RegistrationPaymentAttemptRepository>();
+        services.AddScoped<ICheckoutDispatchExecutionScopeFactory, CheckoutDispatchExecutionScopeFactory>();
+        services.AddSingleton(creator);
+        services.AddSingleton(retriever);
+        services.AddSingleton(payment);
+        services.AddSingleton(lifecycle);
+        services.AddSingleton(time);
+        services.AddSingleton(activation);
+        services.AddSingleton(freshness);
+        services.AddSingleton(descriptor);
+        services.AddScoped<RegistrationPaymentCheckoutDispatchService>();
+        return new(services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true }));
+    }
+
+    private sealed class CheckoutDispatchTestGraph : IAsyncDisposable
+    {
+        private readonly ServiceProvider provider;
+        private readonly AsyncServiceScope scope;
+        internal CheckoutDispatchTestGraph(ServiceProvider provider)
+        {
+            this.provider = provider;
+            scope = provider.CreateAsyncScope();
+            Dispatch = scope.ServiceProvider.GetRequiredService<RegistrationPaymentCheckoutDispatchService>();
+        }
+        internal RegistrationPaymentCheckoutDispatchService Dispatch { get; }
+        public async ValueTask DisposeAsync()
+        {
+            await scope.DisposeAsync();
+            await provider.DisposeAsync();
+        }
+    }
+
+    private sealed record ReconciliationTenant(Guid TenantId) : ITenantContext;
 
     private static async Task<ExploreDbContext> CreateContextAsync()
     {
@@ -1444,5 +1835,28 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         public void Set(DateTime value) => current = value;
 
         public override DateTimeOffset GetUtcNow() => current;
+    }
+
+    private sealed class LostReconciliationAcquisitionAcknowledgement(CancellationTokenSource? cancellation)
+        : DbCommandInterceptor
+    {
+        public int CommittedRows { get; private set; }
+
+        public override ValueTask<int> NonQueryExecutedAsync(
+            DbCommand command, CommandExecutedEventData eventData, int result,
+            CancellationToken cancellationToken = default)
+        {
+            if (CommittedRows == 0 && result > 0 &&
+                command.CommandText.StartsWith("UPDATE", StringComparison.OrdinalIgnoreCase) &&
+                command.CommandText.Contains("payment_reconciliation_effects", StringComparison.OrdinalIgnoreCase))
+            {
+                CommittedRows = result;
+                cancellation?.Cancel();
+                if (cancellation is not null)
+                    throw new OperationCanceledException(cancellation.Token);
+                throw new IOException("Committed reconciliation acquisition acknowledgement lost.");
+            }
+            return ValueTask.FromResult(result);
+        }
     }
 }

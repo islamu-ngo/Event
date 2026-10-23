@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Application.Features.ExternalApiKeys.Requests.Queries;
 
 namespace Explore.Application.Contracts.Persistence;
 
@@ -66,3 +67,9 @@ public record TenantApiKeyUsageSummary(
     long TotalRequestCount,
     int TotalCreditsUsed,
     int CreditLimit);
+
+public interface IExternalApiKeyTenantUsageReader
+{
+    Task<IReadOnlyList<TenantApiKeyUsageSummary>> ReadAsync(
+        GetExternalApiKeyUsageReportRequest request, CancellationToken cancellationToken);
+}

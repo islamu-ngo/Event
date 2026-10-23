@@ -1,6 +1,6 @@
 using System.Net.Mail;
 using Explore.Application.Features.Authentication.Local.Models;
-using Explore.Application.Configuration;
+using Explore.Domain.Authentication;
 using FluentValidation;
 
 namespace Explore.Application.Features.Authentication.Local.Validators;
@@ -22,8 +22,7 @@ public sealed class LocalAuthRequestDtoValidator : AbstractValidator<LocalAuthRe
             .WithMessage("A bounded username or valid email identifier is required.");
 
         RuleFor(request => request.Password)
-            .NotEmpty()
-            .MinimumLength(LocalIdentityOptions.MinimumPasswordLength)
-            .MaximumLength(LocalIdentityOptions.MaximumPasswordLength);
+            .Must(password => LocalPasswordPolicy.TryNormalizeForVerification(password, out _))
+            .WithMessage("A bounded Local credential is required.");
     }
 }

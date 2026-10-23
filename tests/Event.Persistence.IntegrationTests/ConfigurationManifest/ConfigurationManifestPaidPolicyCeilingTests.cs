@@ -1,16 +1,13 @@
 using Event.Persistence.IntegrationTests.Fixtures;
-using Explore.Application.Contracts.Persistence;
+using Event.Persistence.IntegrationTests.TenantIsolation;
 using Explore.Application.DTOs.PaidEventPolicies;
-using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Domain.Services.Registration;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
-using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
@@ -33,15 +30,7 @@ public sealed class ConfigurationManifestPaidPolicyCeilingTests(
 
         await using (ExploreDbContext bootstrap = fixture.CreateDbContext())
         {
-            var failureRecorder =
-                Substitute.For<IConfigurationManifestFailureRecorder>();
-            var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(
-                bootstrap,
-                new ConfigurationManifestApplicationTestSupport.ExistencePreflight(
-                    new TenantRepository(bootstrap),
-                    new PaidEventPolicyRepository(bootstrap)),
-                new ConfigurationManifestOperationRepository(bootstrap),
-                failureRecorder);
+            await using var handler = ConfigurationManifestApplicationTestSupport.CreateHandler(fixture);
 
             var applied = await handler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(
@@ -51,8 +40,6 @@ public sealed class ConfigurationManifestPaidPolicyCeilingTests(
                 CancellationToken.None);
 
             await Assert.That(applied.IsSuccess).IsTrue();
-            await failureRecorder.DidNotReceiveWithAnyArgs()
-                .RecordAsync(default!, default);
         }
 
         await using (ExploreDbContext revision = fixture.CreateDbContext())
@@ -108,4 +95,40 @@ public sealed class ConfigurationManifestPaidPolicyCeilingTests(
         RequiresFirstPaidEventReview = false,
         FarFutureReviewThresholdDays = null
     };
+
+    [Test]
+    public async Task CurrentTransactionCeilingRejectionPreservesManifestPolicyVersionFence()
+    {
+        await using var rows = await PostgresPaidPolicyCeilingAuthorityTests.CeilingRows.CreateAsync(fixture);
+        await using var context = await rows.Runtime.CreateDbContextAsync(rows.A);
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        PaidEventPolicyMutationResult result = await PostgresPaidPolicyCeilingAuthorityTests.Boundary(context)
+            .ReviseInstanceInCurrentTransactionAsync(
+                new InstancePaidEventPolicyMutationInput(EurOnlyRevision(), rows.InstanceVersion),
+                CancellationToken.None);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.FailureCode).IsEqualTo(PaidEventPolicyMutationFailureCodes.ValidationFailed);
+        await transaction.RollbackAsync();
+        await rows.AssertUnchangedAsync();
+        await using var verify = fixture.CreateDbContext();
+        await Assert.That(await verify.ConfigurationManifestOperations.CountAsync()).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task CurrentTransactionStaleInstanceVersionStillReturnsManifestConflict()
+    {
+        await using var rows = await PostgresPaidPolicyCeilingAuthorityTests.CeilingRows.CreateAsync(fixture);
+        await using var context = await rows.Runtime.CreateDbContextAsync(rows.A);
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        PaidEventPolicyMutationResult result = await PostgresPaidPolicyCeilingAuthorityTests.Boundary(context)
+            .ReviseInstanceInCurrentTransactionAsync(
+                new InstancePaidEventPolicyMutationInput(EurOnlyRevision(), rows.InstanceVersion - 1),
+                CancellationToken.None);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.FailureCode).IsEqualTo(PaidEventPolicyMutationFailureCodes.ConcurrencyConflict);
+        await transaction.RollbackAsync();
+        await rows.AssertUnchangedAsync();
+    }
 }

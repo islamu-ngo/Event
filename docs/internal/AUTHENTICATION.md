@@ -15,6 +15,55 @@
 8. `UserExternalLogin` is instance-global identity authority. Tenant participation exists only through `TenantUser`; a provider binding never derives authorization from a tenant ID.
 9. Public Local enrollment is closed. Instance email-delivery intent governs unverified Local token issuance, independently of SMTP availability and tenant overrides. It never changes provider-owned verification facts.
 
+## Keycloak API Access Context
+
+`AuthenticationExtensions.AddApiAuthentication` requires the configured
+`Keycloak:Audience` (`islamu-event-api` when absent). This replaces the former
+API-or-BFF audience list and the `aud`-or-`azp` fallback. The retired
+`Keycloak:ValidAudiences` and `Authentication:ValidAudiences` keys no longer
+control bearer admission. Operators must configure a resource audience, not
+a login client ID.
+
+The framework authenticates signature, issuer, resource audience and lifetime
+before `OnTokenValidated` calls `KeycloakTokenContextPolicy`. The policy uses
+the raw signed JSON payload so duplicate properties and arrays/numbers/nulls
+cannot become trusted strings through claim projection. Both current
+`JsonWebToken` and legacy `JwtSecurityToken` are accepted representations;
+every other token representation fails closed.
+
+`aud` must appear once, as the exact resource string or a nonempty array of
+distinct nonblank strings containing that resource. Payload `typ` must appear
+once as the case-sensitive string `Bearer`. The JOSE header must be `JWT`,
+but that header alone is insufficient: Keycloak ID tokens use it too, with
+payload `typ=ID`. Missing, duplicated (even identical), conflicting, null,
+numeric or array purpose claims fail.
+
+`Keycloak:PermittedClients` is an optional process-owned exact client-ID
+allowlist, separate from the resource audience. An absent or empty list
+means no client restriction. A nonempty list requires exactly one nonblank
+string `azp` in the list. Without a restriction, missing `azp` is allowed,
+but duplicate, empty, null, numeric and array `azp` fail. Blank or duplicate
+configuration entries fail registration; comparisons are ordinal and
+case-sensitive. Add every deliberately authorized service client when
+enabling the list. Client admission never supplies a missing resource
+audience and never grants roles, tenant membership or administrator authority.
+
+The pinned native-provider lane asserts actual Keycloak 26.1.2 metadata,
+public RSA signing keys and access/ID token shape. The test realm's
+`oidc-audience-mapper` adds `islamu-event-api` only to access tokens.
+A deliberately unmapped client and an explicitly admitted service client
+exercise the same production HTTP handler without replacing authentication.
+Generated signing-authority tests isolate expired, future, wrong-key, issuer,
+resource, client, header and payload-purpose failures; they are not native
+Keycloak/MFA evidence.
+
+Normal Keycloak access-token validation retains five minutes of clock skew.
+Local bearer validation, Local current-session authority, zero-skew Local
+credential replacement and ATProto bootstrap/session/transient contracts
+remain separately owned. Dynamic issuer/JWKS refresh does not change this
+deployment-owned resource/client/purpose policy. Configuration changes take
+effect on process restart. Browser tokens remain server-owned by the BFF.
+
 ## Embedded Account Correlation
 
 `IIdentityAccountResolver` is implemented by the embedded Application
@@ -76,6 +125,24 @@ removes that binding's obsolete proof, retains independently supported proof,
 and leaves the conflicting owner's claim intact. Validated native Local
 receipts and configured-administrator completion write evidence with their
 identity graph; provider kind alone never supplies verification.
+
+Single-tenant completion binds immutable default-tenant creation data into the
+original `TrustedSetupSettingsApply` capsule. `TrustedSetupSettingsWriter`
+supplies a private executor only to that capsule's original continuation, on its
+original Serializable context/transaction and current setup source. The executor
+accepts no tenant, subject, entity or callback parameters: it prepares the two
+authoritative documents through `TenantCreationService.Prepare`, then ensures
+the bound subject's exact default membership and tenant-scoped administrator
+grant. Existing documents and unrelated grants are not replaced. Calls are
+ordered, single-use and closed when the continuation exits; commit revalidation
+checks persisted membership/grant state independently of the disposed capsule.
+Profile-only and multi-tenant capsules cannot invoke these effects.
+
+The Global setup owner does not acquire an ambient tenant grant. Ordinary
+repositories retain their matching-tenant guard, including during completion.
+The writer rejects unrelated dirty tracked rows before its first setting write,
+and private tenant steps reject pending changes before attaching their own rows,
+so `SaveChangesAsync` cannot flush caller-staged effects under setup custody.
 
 External enrollment enters `PrivacyIdentityFenceOperation` before resolution
 and holds retained-authority serialization through application commit.
@@ -301,6 +368,18 @@ Local login carries `SuppressIdempotencyResponseStorage` and `PrivateNoStore` me
 
 ## Local Verification, Email Change And Password Recovery
 
+Local login maps missing identifiers, incorrect passwords and locked accounts to
+the same HTTP 401 ProblemDetails status, type, title, detail and
+`code=invalid_credentials`. Trace/timestamp metadata remains request-specific.
+The native result still distinguishes `AccountLocked` from `InvalidCredentials`;
+Identity retains account-bound failed-attempt counters and lockout deadlines.
+A correct password cannot bypass an active lockout or obtain an ordinary token
+or replacement challenge. Missing and already-locked paths each verify the
+per-service dummy hash with the configured native password hasher; unlocked
+incorrect-password attempts perform native account password verification.
+Cancellation is rechecked after password work. This is comparable adaptive hash
+work, not a claim of exact timing indistinguishability or hardware calibration.
+
 `DefaultAccountAuthorityLifecycleEmailService` resolves the exact persisted
 `UserExternalLogin` owned by the target user. Provider kind and account key do not
 come from email matching or a global notification default. The Keycloak adapter
@@ -347,6 +426,29 @@ without retaining or recreating the token. Cache eviction follows committed work
 The five Local lifecycle POST operations are private/no-store and exclude generic
 idempotency response storage. Public current-address verification and recovery
 requests return empty 202 responses without disclosing target eligibility.
+Recovery read boundaries classify only provider-declared transient database
+failures. The native `BeginAsync` owner also classifies expected concurrency,
+provider write contention and its own lifecycle primary-key conflict, after
+the existing bounded execution/retry path has finished. It replaces an eligible
+pre-commit failure with `LocalIdentityIntakeException`, carrying only
+`StoreUnavailable` or `Conflict`, without the target or original provider message.
+The Local adapter returns a bounded `ProviderRequestFailed` status; anonymous
+recovery intake hides this just as it hides an ineligible or missing target.
+Cancellation, permanent constraints, unknown failures and programming/invariant
+exceptions are not indiscriminately translated.
+
+The native intake owner latches possible durable ownership immediately before
+`CommitAsync`, or on finding an existing live operation. That latch survives
+execution-strategy retries: a failed commit acknowledgement is never relabeled
+as uncommitted intake. Once ownership is possible, exceptions propagate for
+the existing operation/reconciliation path. An empty 202 response promises neither
+commit nor delivery; a classified uncommitted failure has no new ledger row,
+outbox entry or durable retry. Committed Local lifecycle operations remain in
+the Identity ledger, not the tenant notification outbox. Their existing delivery
+processor owns transport admission, bounded known-nonacceptance retries and
+uncertain-acceptance fencing. Intake does not call SMTP or change the selected
+login authority when provider/configuration/delivery capability is unavailable.
+
 Proposed-address verification requires the original validated ordinary Local
 session and cannot select another account. Consume returns 204 only for its
 permitted operation and mirror synchronization; a fresh ordinary login is separate.
@@ -484,6 +586,52 @@ and a trimmed audit reason limited to 1,000 characters. The administrative
 handler independently authorizes that actor; the inner port is not a public
 authorization boundary.
 
+Human administrative handlers now enter `ILocalHumanCredentialAdministration`
+with one privately issued original invocation. Each lifecycle stage reacquires
+the original administrator, route and support sources inside the actual Local
+physical transaction, then validates persisted sources and original credential/
+support deadlines before settlement or disclosure. A caller-owned Application
+transaction is not an Identity fence. Self-reset uses the actual writer's private
+complete postimage, never an expected stamp supplied by the caller. Binding is a
+closed physical-owner operation rather than a repository callback; it retains
+exact graph replay and rejects partial/conflicting bindings.
+
+The custody adapter now has co-located SQLite and PostgreSQL source paths;
+PostgreSQL installation/acceptance remains unexecuted and external Identity/other providers
+remain refused. This limit concerns the new human administrative path, not
+bootstrap/worker or restricted replacement ownership. Twenty-six authentic
+controls are authored but unrun; installation/runtime acceptance remains open.
+
+The separate PostgreSQL DATA contract is now authored in
+`PostgresLocalAdministrationContract`. Its reviewed inventory covers 90 scalars
+across eight lifecycle/binding relations, including PII. Fixed execute-only
+Runtime routines retain request, preimage and physical-attempt custody, compile
+the complete expected transition, apply it once and compare the full persisted
+postimage. The writer epoch protects absent rows, uniqueness and page ranges;
+completion erases sensitive retained state but keeps a transaction/backend
+tombstone. Deferred settlement checks only that completion seal.
+
+The migrator installs this contract after S/P/route/H for co-located Identity;
+the PostgreSQL fixture preserves its epoch through reset. These are source
+hooks, not executed installation. Sixty native cases are authored and unrun:
+52 contract cases, four additional custody cases and four genuine authenticated
+API cases. The private capability-backed Identity store and all six physical
+stages are integrated. Native Complete follows original asynchronous source
+validation and precedes synchronous original deadlines. The compiler postimage
+guards subsequent issuance/disclosure; self-reset never adopts a new database
+stamp as its expectation. Three Persistence partials retain unresolved fixture
+ambiguity diagnostics; production and the new API cases have clean diagnostics.
+
+Retained binding/recovery human controls now belong to the API test project
+and use real Local credentials, authentication and production-issued lifetimes.
+Independent Core controls still cover both Identity topologies. External human
+reconciliation is explicitly rejected before effects: its Identity connector
+is not the retained Application owner. Four stale positive handler variants
+now check full unchanged images, pending metadata and no graph; they do not
+pretend external Core provisioning establishes human mutation custody.
+All 28 retained/new cases remain unrun; current five-file diagnostic requests
+timed out after the worker's earlier clean source receipt.
+
 Within one selected Identity serializable transaction, reset requires a coherent
 Ready/Replaced or ChangeRequired/ChangeRequired predecessor and its exact active
 application binding. It inserts a Reset/ChangeRequired receipt, supersedes the
@@ -526,8 +674,11 @@ after validation and hashing before writes, and after the final awaited update
 before commit. Expiry observed at that boundary rolls back the receipt, token,
 password hash and stamps together and returns `InvalidChallenge`; this does not
 claim that the database commit itself cannot cross the deadline.
-Fixed 12–128-character bounds are
-shared with login. Completion returns no token: log in afresh with the privately
+New credentials use 15–128 NFC-normalized Unicode scalars and a whole-password
+operator blocklist; login shape accepts 1–128 scalars without the creation minimum.
+Both hashing and verification normalize. See [Local password policy](LOCAL_PASSWORD_POLICY.md)
+for source ownership, snapshot custody/readiness and hash calibration.
+Completion returns no token: log in afresh with the privately
 chosen password. Consumed or superseded authority cannot replace it again.
 
 `POST /api/auth/local/credential-replacement` accepts the challenge as a Bearer
@@ -543,7 +694,7 @@ user synchronization.
 The controller executes `CompleteLocalCredentialReplacementCommand` through its native command handler
 to the existing credential administration port. Closed replacement outcomes map
 to empty 204 success, bounded 400 password validation, 401 invalid authority or
-409 concurrency conflict. Password limits are 12–128 characters; unknown body
+409 concurrency conflict. New passwords use the shared 15–128 normalized-scalar policy; unknown body
 fields are rejected. Responses are private/no-store, including authentication
 rejection before MVC. Generic idempotency response storage is suppressed: a
 repeated key cannot replay a prior password-change success. No session or cookie

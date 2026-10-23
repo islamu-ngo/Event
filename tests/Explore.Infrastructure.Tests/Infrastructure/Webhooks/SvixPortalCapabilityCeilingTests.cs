@@ -30,7 +30,7 @@ public sealed class SvixPortalCapabilityCeilingTests
             WebhookProviderCapability.EndpointManagement);
 
         var result = await fixture.Service.CreateAccessAsync(
-            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null),
+            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null, fixture.Custody),
             CancellationToken.None);
 
         await Assert.That(authorization.Resource).IsEqualTo(ResourceKinds.Webhook);
@@ -50,7 +50,7 @@ public sealed class SvixPortalCapabilityCeilingTests
             persistBinding: false);
 
         var result = await fixture.Service.CreateAccessAsync(
-            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null),
+            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null, fixture.Custody),
             CancellationToken.None);
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -67,7 +67,7 @@ public sealed class SvixPortalCapabilityCeilingTests
             WebhookProviderCapability.AppPortal | WebhookProviderCapability.EndpointManagement);
 
         var result = await fixture.Service.CreateAccessAsync(
-            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null),
+            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null, fixture.Custody),
             CancellationToken.None);
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -84,7 +84,7 @@ public sealed class SvixPortalCapabilityCeilingTests
             WebhookProviderCapability.EndpointManagement);
 
         var result = await fixture.Service.CreateAccessAsync(
-            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null),
+            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null, fixture.Custody),
             CancellationToken.None);
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -102,7 +102,7 @@ public sealed class SvixPortalCapabilityCeilingTests
             providerVersion: "unknown");
 
         var result = await fixture.Service.CreateAccessAsync(
-            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null),
+            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null, fixture.Custody),
             CancellationToken.None);
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -120,7 +120,7 @@ public sealed class SvixPortalCapabilityCeilingTests
             capabilityPolicyVersion: "svix-stale-v1");
 
         var result = await fixture.Service.CreateAccessAsync(
-            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null),
+            new WebhookProviderPortalAccessInput(ConsumerId, "session-1", null, fixture.Custody),
             CancellationToken.None);
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -180,6 +180,7 @@ public sealed class SvixPortalCapabilityCeilingTests
             .Returns(consumer);
         if (persistBinding)
         {
+            consumer.ProviderBindings.Add(binding);
             bindingRepository.GetVerifiedByConsumerAsync(
                     TenantId,
                     ConsumerId,
@@ -207,16 +208,17 @@ public sealed class SvixPortalCapabilityCeilingTests
             .Returns(new SvixAppPortalAccessResult("https://svix.example/app-portal", "portal-token"));
 
         return new Fixture(
-            new SvixAppPortalService(svixClient, consumerRepository, bindingRepository, options),
+            new SvixAppPortalService(svixClient, consumerRepository, bindingRepository, options, TimeProvider.System),
             svixClient,
-            () => portalRequest);
+            () => portalRequest, WebhookPortalConsumerCustody.From(consumer));
     }
 
     private sealed class Fixture(
         SvixAppPortalService service,
         ISvixWebhookClient svixClient,
-        Func<SvixAppPortalAccessRequest?> portalRequest)
+        Func<SvixAppPortalAccessRequest?> portalRequest, WebhookPortalConsumerCustody custody)
     {
+        public WebhookPortalConsumerCustody Custody { get; } = custody;
         public SvixAppPortalService Service { get; } = service;
         public ISvixWebhookClient SvixClient { get; } = svixClient;
         public SvixAppPortalAccessRequest? PortalRequest => portalRequest();

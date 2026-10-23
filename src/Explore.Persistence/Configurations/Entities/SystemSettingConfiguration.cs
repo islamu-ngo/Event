@@ -11,6 +11,8 @@ public class SystemSettingConfiguration : IEntityTypeConfiguration<SystemSetting
 {
     public void Configure(EntityTypeBuilder<SystemSetting> builder)
     {
+        builder.ToTable(table => table.HasCheckConstraint("ck_system_settings_no_dedicated_atproto_federation",
+            "setting_key NOT IN ('federation.atproto_events_enabled', 'federation.atproto_events_backfill_enabled', 'federation.atproto_events_backfill_mode')"));
         builder.HasKey(e => e.Id);
 
         // UUID v7 generation for better index performance

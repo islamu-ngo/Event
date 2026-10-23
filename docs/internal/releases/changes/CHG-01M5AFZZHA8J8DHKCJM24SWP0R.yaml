@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5AFZZHA8J8DHKCJM24SWP0R
+Title: "Preserve earlier locks after an uncertain PostgreSQL reacquisition"
+Type: fix
+Scope: database
+Summary: "Keep the original caller session and earlier lock leases intact when a sent same-key acquisition fails; report uncertainty instead of silently releasing exclusion."
+Group: named-lock-reentrant-failure
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: A sent same-key acquisition with an intact original PostgreSQL session must not unlock an unknown reentrant count or close the caller connection, because either could release earlier owners' exclusion. Return no new lease and preserve the original error under named_lock_acquisition_cleanup_unconfirmed. No permissions or business routines are added.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: An uncertain extra reentrant lock count can continue blocking until the physical backend ends or its state is reset. Unwind earlier owners before recycling their session; do not retry indefinitely on the same session or assume logical pooled closure confirms cleanup.

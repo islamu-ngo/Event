@@ -119,18 +119,96 @@ public sealed class AiAssistantDbBackedApiFlowTests(AiAssistantDbBackedApiFixtur
         await SendMessageAsync(seeded.UserId, conversationId, "db-confirm-proposal", "Draft an event.");
 
         await Assert.That(await CountEventsAsync()).IsEqualTo(eventCountBeforeSend);
-        var proposedActionId = await GetOnlyProposedActionIdAsync(seeded.UserId, conversationId);
+        var preview = await GetOnlyProposedActionPreviewAsync(seeded.UserId, conversationId);
 
-        var firstEventId = await ConfirmProposedActionAsync(seeded.UserId, conversationId, proposedActionId, "db-confirm-action");
-        var duplicateEventId = await ConfirmProposedActionAsync(seeded.UserId, conversationId, proposedActionId, "db-confirm-action-duplicate");
+        var firstEventId = await ConfirmProposedActionAsync(seeded.UserId, conversationId,
+            preview.Id, preview.Version, "db-confirm-action");
+        var duplicateEventId = await ConfirmProposedActionAsync(seeded.UserId, conversationId,
+            preview.Id, preview.Version, "db-confirm-action-duplicate");
 
         await Assert.That(duplicateEventId).IsEqualTo(firstEventId);
+        await Assert.That(await CountEventsAsync()).IsEqualTo(eventCountBeforeSend + 1);
+        using var staleReplayRequest = _fixture.CreateAuthenticatedRequest(
+            HttpMethod.Post,
+            $"/api/ai/assistant/conversations/{conversationId}/proposed-actions/{preview.Id}/confirm",
+            seeded.UserId);
+        staleReplayRequest.Headers.Add("Idempotency-Key", "db-confirm-action");
+        staleReplayRequest.Content = JsonContent.Create(new ConfirmAiProposedActionRequestDto
+        {
+            ExpectedVersion = new string(preview.Version[0] == 'a' ? 'b' : 'a', 64)
+        });
+        using var staleReplayResponse = await _fixture.Client.SendAsync(staleReplayRequest);
+        await Assert.That(staleReplayResponse.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        using var staleReplayProblem = await JsonDocument.ParseAsync(await staleReplayResponse.Content.ReadAsStreamAsync());
+        await Assert.That(staleReplayProblem.RootElement.GetProperty("code").GetString())
+            .IsEqualTo("proposed_action_version_changed");
         await Assert.That(await CountEventsAsync()).IsEqualTo(eventCountBeforeSend + 1);
         await using var scope = _fixture.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var created = await db.Events.SingleAsync(e => e.Id == firstEventId);
         await Assert.That(created.TenantId).IsEqualTo(seeded.TenantId);
         await Assert.That(created.EventStatusId).IsEqualTo(1);
+
+        using var detailRequest = _fixture.CreateAuthenticatedRequest(
+            HttpMethod.Get, $"/api/ai/assistant/conversations/{conversationId}", seeded.UserId);
+        using var detailResponse = await _fixture.Client.SendAsync(detailRequest);
+        await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var detail = await JsonDocument.ParseAsync(await detailResponse.Content.ReadAsStreamAsync());
+        var executed = detail.RootElement.GetProperty("proposedActions")[0];
+        await Assert.That(executed.GetProperty("version").GetString()).IsEqualTo(preview.Version);
+        await Assert.That(executed.GetProperty("resultResourceId").GetGuid()).IsEqualTo(firstEventId);
+    }
+
+    [Test]
+    [Arguments("missing")]
+    [Arguments("null")]
+    [Arguments("empty")]
+    [Arguments("stale")]
+    public async Task Confirm_WithoutExactPreviewConsent_RejectsBeforeCreatingDraftAndAllowsReviewedRetry(string consent)
+    {
+        var seeded = await ResetAndSeedAsync();
+        var conversationId = await CreateConversationAsync(
+            seeded.UserId, "Exact preview review", seeded.OrganizationActorId);
+        await SendMessageAsync(seeded.UserId, conversationId, "consent-proposal", "Draft an event.");
+        var preview = await GetOnlyProposedActionPreviewAsync(seeded.UserId, conversationId);
+        var eventCount = await CountEventsAsync();
+        using var request = _fixture.CreateAuthenticatedRequest(
+            HttpMethod.Post,
+            $"/api/ai/assistant/conversations/{conversationId}/proposed-actions/{preview.Id}/confirm",
+            seeded.UserId);
+        // A valid idempotency key cannot replace the caller's displayed preview consent.
+        request.Headers.Add("Idempotency-Key", "consent-retry");
+        string body = consent switch
+        {
+            "missing" => "{}",
+            "null" => """{"expectedVersion":null}""",
+            "empty" => """{"expectedVersion":""}""",
+            _ => JsonSerializer.Serialize(new ConfirmAiProposedActionRequestDto
+            {
+                ExpectedVersion = new string(preview.Version[0] == 'a' ? 'b' : 'a', 64)
+            }, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        };
+        request.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+
+        using var response = await _fixture.Client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(
+            consent is "missing" or "null" ? HttpStatusCode.BadRequest : HttpStatusCode.Conflict);
+        if (consent is "empty" or "stale")
+        {
+            using var problem = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            await Assert.That(problem.RootElement.GetProperty("code").GetString())
+                .IsEqualTo("proposed_action_version_changed");
+        }
+        await Assert.That(await CountEventsAsync()).IsEqualTo(eventCount);
+        var retainedPreview = await GetOnlyProposedActionPreviewAsync(seeded.UserId, conversationId);
+        await Assert.That(retainedPreview.Id).IsEqualTo(preview.Id);
+        await Assert.That(retainedPreview.Version).IsEqualTo(preview.Version);
+
+        var eventId = await ConfirmProposedActionAsync(
+            seeded.UserId, conversationId, preview.Id, preview.Version, "consent-retry");
+        await Assert.That(eventId).IsNotEqualTo(Guid.Empty);
+        await Assert.That(await CountEventsAsync()).IsEqualTo(eventCount + 1);
     }
 
     private async Task<TenantScenarioSeed.TenantOrganizationScenarioResult> ResetAndSeedAsync()
@@ -229,6 +307,7 @@ public sealed class AiAssistantDbBackedApiFlowTests(AiAssistantDbBackedApiFixtur
         Guid userId,
         Guid conversationId,
         Guid proposedActionId,
+        string expectedVersion,
         string idempotencyKey)
     {
         using var request = _fixture.CreateAuthenticatedRequest(
@@ -236,6 +315,7 @@ public sealed class AiAssistantDbBackedApiFlowTests(AiAssistantDbBackedApiFixtur
             $"/api/ai/assistant/conversations/{conversationId}/proposed-actions/{proposedActionId}/confirm",
             userId);
         request.Headers.Add("Idempotency-Key", idempotencyKey);
+        request.Content = JsonContent.Create(new ConfirmAiProposedActionRequestDto { ExpectedVersion = expectedVersion });
 
         var response = await _fixture.Client.SendAsync(request);
         var content = await response.Content.ReadAsStringAsync();
@@ -247,7 +327,7 @@ public sealed class AiAssistantDbBackedApiFlowTests(AiAssistantDbBackedApiFixtur
         return body.Id;
     }
 
-    private async Task<Guid> GetOnlyProposedActionIdAsync(Guid userId, Guid conversationId)
+    private async Task<(Guid Id, string Version)> GetOnlyProposedActionPreviewAsync(Guid userId, Guid conversationId)
     {
         using var request = _fixture.CreateAuthenticatedRequest(
             HttpMethod.Get,
@@ -264,7 +344,9 @@ public sealed class AiAssistantDbBackedApiFlowTests(AiAssistantDbBackedApiFixtur
         await Assert.That(proposedAction.GetProperty("status").GetString()).IsEqualTo("Proposed");
         await Assert.That(proposedAction.GetProperty("_links").TryGetProperty("confirm-action", out _)).IsTrue();
         await Assert.That(proposedAction.GetProperty("_links").TryGetProperty("reject-action", out _)).IsTrue();
-        return proposedAction.GetProperty("id").GetGuid();
+        var version = proposedAction.GetProperty("version").GetString();
+        await Assert.That(string.IsNullOrWhiteSpace(version)).IsFalse();
+        return (proposedAction.GetProperty("id").GetGuid(), version!);
     }
 
     private async Task<int> CountEventsAsync()

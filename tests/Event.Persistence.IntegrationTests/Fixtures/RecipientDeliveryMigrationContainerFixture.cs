@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;
@@ -9,7 +10,7 @@ public sealed class RecipientDeliveryMigrationContainerFixture : IAsyncInitializ
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("recipient_delivery_migration_" + Guid.NewGuid().ToString("N"))
         .WithUsername("postgres")
-        .WithPassword("postgres")
+        .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
         .WithCommand("-c", "max_locks_per_transaction=512")
         .Build();
 

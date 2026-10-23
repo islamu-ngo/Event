@@ -1,0 +1,30 @@
+Change-Id: CHG-01M55HP2HEGPBDEJNNGH46NXG9
+Title: "Bind registration payment and ticket recovery to persisted custody"
+Type: fix
+Scope: registration
+Summary: "Retain original reservation, payment, refund and ticket operation identity through admission, provider effects, settlement and uncertain outcomes."
+Group: staged-programme-registration
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Deploy matching native owners and original-source operation scopes together. Prior reconstructed privileged execution and older runtime composition are no longer accepted.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Retain original reservation, payment, refund and ticket operation identity through admission, provider effects, settlement and uncertain outcomes.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Review the paired public operator guidance and complete final composed assurance before release. Packaging does not establish deployment readiness.

@@ -13,15 +13,19 @@ using Explore.API.Controllers;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.DTOs.Ai;
+using Explore.Application.Features.AiAssistant;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
+using Explore.Application.Features.AiAssistant.Handlers.Queries;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.TenantOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Serialization;
+using Explore.Domain.Ai;
 using Explore.Infrastructure.Ai;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -199,7 +203,7 @@ public sealed class AiAssistantControllerTests
     }
 
     [Test]
-    public async Task GetModels_WhenLocalEndpointIsAllowed_AppendsModelsPathAndOmitsBearerWithoutApiKey()
+    public async Task GetModels_WhenAuthorizedInstanceOriginIsLocal_AppendsModelsPathAndOmitsBearerWithoutApiKey()
     {
         var handler = new RecordingModelDiscoveryHandler(_ => JsonResponse("""
             {
@@ -213,28 +217,28 @@ public sealed class AiAssistantControllerTests
             .Returns(new TenantOnboardingStatusDto
             {
                 IsAuthenticated = true,
-                IsCurrentUserTenantAdministrator = true
+                IsCurrentUserPlatformAdministrator = true
             });
-        var controller = CreateController();
+        var discovery = new DiscoverAiAssistantModelsQueryHandler(
+            _tenantOnboardingStatus,
+            new AiModelDiscoveryGateway(httpClientFactory, new AiProviderConfigurationResolver(Options.Create(new AiProviderSettings
+            {
+                Enabled = true,
+                Provider = AiProviderSettings.ProviderOpenAiCompatible,
+                EndpointUrl = "http://127.0.0.1:1337/v1",
+                ModelId = "configured-model",
+                AllowLocalProviderEndpoints = true
+            }), Substitute.For<IHierarchicalSettingsResolver>(), _tenantContext,
+                Substitute.For<ISecretResolver>(), new AiProviderSettingsValidator())));
+        var controller = CreateController(discovery);
 
         var actionResult = await controller.GetModels(
             new AiAssistantModelDiscoveryRequestDto
             {
                 EndpointUrl = "http://127.0.0.1:1337/v1",
-                ApiKey = string.Empty
+                Scope = AiModelDiscoveryScope.Instance,
+                CredentialScope = AiCredentialScope.None
             },
-            httpClientFactory,
-            new AiProviderSettingsValidator(),
-            Options.Create(new AiProviderSettings
-            {
-                AllowLocalProviderEndpoints = true,
-                MaxInputTokens = 8000,
-                MaxOutputTokens = 1024,
-                Temperature = 0.2m,
-                TimeoutSeconds = 30,
-                RetentionDays = 30,
-                DailyMessageLimit = 50
-            }),
             CancellationToken.None);
 
         var ok = actionResult.Result as OkObjectResult;
@@ -289,30 +293,36 @@ public sealed class AiAssistantControllerTests
     }
 
     [Test]
-    public async Task ConfirmProposedAction_PropagatesIdempotencyHeaderAndReturnsOk()
+    public async Task ConfirmProposedAction_PropagatesExactPreviewSeparatelyFromIdempotencyAndReturnsOk()
     {
         var conversationId = Guid.CreateVersion7();
         var proposedActionId = Guid.CreateVersion7();
         var eventId = Guid.CreateVersion7();
         var response = Success(eventId);
+        ConfirmAiProposedActionCommand? submitted = null;
         _confirmProposedActionHandler.ExecuteAsync(Arg.Any<ConfirmAiProposedActionCommand>(), Arg.Any<CancellationToken>())
-            .Returns(response);
+            .Returns(call =>
+            {
+                submitted = call.ArgAt<ConfirmAiProposedActionCommand>(0);
+                return Task.FromResult(response);
+            });
         var controller = CreateController();
 
         var actionResult = await controller.ConfirmProposedAction(
             conversationId,
             proposedActionId,
+            new ConfirmAiProposedActionRequestDto { ExpectedVersion = "preview-version" },
             "confirm-key",
             CancellationToken.None);
 
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(response);
-        await _confirmProposedActionHandler.Received(1).ExecuteAsync(
-            Arg.Is<ConfirmAiProposedActionCommand>(command =>
-                command.ProposedActionId == proposedActionId &&
-                command.IdempotencyKey == "confirm-key"),
-            Arg.Any<CancellationToken>());
+        await Assert.That(submitted).IsNotNull();
+        await Assert.That(submitted!.ConversationId).IsEqualTo(conversationId);
+        await Assert.That(submitted.ProposedActionId).IsEqualTo(proposedActionId);
+        await Assert.That(submitted.ExpectedVersion).IsEqualTo("preview-version");
+        await Assert.That(submitted.IdempotencyKey).IsEqualTo("confirm-key");
     }
 
     [Test]
@@ -325,6 +335,7 @@ public sealed class AiAssistantControllerTests
         var actionResult = await controller.ConfirmProposedAction(
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
+            new ConfirmAiProposedActionRequestDto { ExpectedVersion = "preview-version" },
             "confirm-key",
             CancellationToken.None);
 
@@ -354,6 +365,7 @@ public sealed class AiAssistantControllerTests
         var actionResult = await controller.ConfirmProposedAction(
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
+            new ConfirmAiProposedActionRequestDto { ExpectedVersion = "preview-version" },
             "confirm-key",
             CancellationToken.None);
 
@@ -602,7 +614,8 @@ public sealed class AiAssistantControllerTests
         await Assert.That(json).Contains(conversationId.ToString());
     }
 
-    private AiAssistantController CreateController()
+    private AiAssistantController CreateController(
+        IQueryHandler<DiscoverAiAssistantModelsQuery, AiModelDiscoveryResult>? discovery = null)
     {
         var httpContext = new DefaultHttpContext
         {
@@ -624,7 +637,7 @@ public sealed class AiAssistantControllerTests
             _confirmProposedActionHandler,
             _rejectProposedActionHandler,
             _cancelRunHandler,
-            _tenantOnboardingStatus,
+            discovery ?? Substitute.For<IQueryHandler<DiscoverAiAssistantModelsQuery, AiModelDiscoveryResult>>(),
             _linkGenerator,
             _conversationAssembler,
             _runQueue,

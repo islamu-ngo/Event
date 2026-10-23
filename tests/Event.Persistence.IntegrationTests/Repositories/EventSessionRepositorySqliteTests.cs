@@ -33,7 +33,7 @@ public sealed class EventSessionRepositorySqliteTests
             CreateSession(@event, "Earlier", earlier));
         await context.SaveChangesAsync();
 
-        var repository = new EventSessionRepository(context);
+        var repository = new EventSessionRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         List<EventSession> sessions = await repository.GetSessionsByEvent(@event.Id);
 
         await Assert.That(sessions).Count().IsEqualTo(2);
@@ -58,7 +58,7 @@ public sealed class EventSessionRepositorySqliteTests
         context.EventSessions.AddRange(laterSession, earlierSession);
         await context.SaveChangesAsync();
 
-        var sessions = await new EventSessionRepository(context)
+        var sessions = await new EventSessionRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor())
             .GetPublicSessionsByEventAsync(@event.Id, CancellationToken.None);
 
         await Assert.That(sessions.Select(session => session.Id))
@@ -79,7 +79,7 @@ public sealed class EventSessionRepositorySqliteTests
         MoveGraph graph = await SeedMoveGraphAsync(context, tenantId);
         await using var transaction = await context.Database.BeginTransactionAsync();
 
-        await new EventSessionRepository(context).MoveToEventAsync(
+        await new EventSessionRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor()).MoveToEventAsync(
             graph.Session,
             graph.TargetEvent.Id,
             graph.TargetPlacement,
@@ -107,7 +107,7 @@ public sealed class EventSessionRepositorySqliteTests
         MoveGraph graph = await SeedMoveGraphAsync(context, tenantId);
         await using var transaction = await context.Database.BeginTransactionAsync();
 
-        await new EventAgendaItemRepository(context).MoveToEventAsync(
+        await new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor()).MoveToEventAsync(
             graph.AgendaItem,
             graph.TargetEvent.Id,
             graph.TargetPlacement,
@@ -139,7 +139,7 @@ public sealed class EventSessionRepositorySqliteTests
         await using var transaction = await foreignContext.Database.BeginTransactionAsync();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new EventSessionRepository(foreignContext).MoveToEventAsync(
+            new EventSessionRepository(foreignContext, new Microsoft.AspNetCore.Http.HttpContextAccessor()).MoveToEventAsync(
                 graph.Session,
                 graph.TargetEvent.Id,
                 graph.TargetPlacement,
@@ -168,7 +168,7 @@ public sealed class EventSessionRepositorySqliteTests
         await using var transaction = await foreignContext.Database.BeginTransactionAsync();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new EventAgendaItemRepository(foreignContext).MoveToEventAsync(
+            new EventAgendaItemRepository(foreignContext, new Microsoft.AspNetCore.Http.HttpContextAccessor()).MoveToEventAsync(
                 graph.AgendaItem,
                 graph.TargetEvent.Id,
                 graph.TargetPlacement,
@@ -198,7 +198,7 @@ public sealed class EventSessionRepositorySqliteTests
         await using var transaction = await context.Database.BeginTransactionAsync();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new EventSessionRepository(context).MoveToEventAsync(
+            new EventSessionRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor()).MoveToEventAsync(
                 graph.Session,
                 graph.TargetEvent.Id,
                 graph.TargetPlacement,
@@ -230,7 +230,7 @@ public sealed class EventSessionRepositorySqliteTests
         await using var transaction = await context.Database.BeginTransactionAsync();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new EventAgendaItemRepository(context).MoveToEventAsync(
+            new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor()).MoveToEventAsync(
                 graph.AgendaItem,
                 graph.TargetEvent.Id,
                 graph.TargetPlacement,
@@ -278,7 +278,7 @@ public sealed class EventSessionRepositorySqliteTests
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        var repository = new EventAgendaItemRepository(context);
+        var repository = new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         Func<Guid, CancellationToken, Task<List<EventAgendaItem>>> read = publicOnly
             ? repository.GetPublicByEventAsync : repository.GetByEventAsync;
         var items = await read(parent.Id, CancellationToken.None);
@@ -290,7 +290,7 @@ public sealed class EventSessionRepositorySqliteTests
         await Assert.That(await read(Guid.CreateVersion7(), CancellationToken.None)).IsEmpty();
 
         await using var foreignContext = CreateContext(connection, Guid.CreateVersion7());
-        var foreignRepository = new EventAgendaItemRepository(foreignContext);
+        var foreignRepository = new EventAgendaItemRepository(foreignContext, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         var foreignItems = publicOnly
             ? await foreignRepository.GetPublicByEventAsync(parent.Id, CancellationToken.None)
             : await foreignRepository.GetByEventAsync(parent.Id, CancellationToken.None);

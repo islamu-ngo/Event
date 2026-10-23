@@ -124,6 +124,15 @@ public static class SensitiveCollectionCatalog
                 "Session-template counterpart of the template sync audit history, with the same exposure."),
 
         new(
+            CollectionName: "GetManagedSessionTemplateSyncHistoryQuery",
+            ResourceKind: ResourceKinds.Event,
+            Action: AuthorizationActions.Events.ViewManagement,
+            Scope: SensitiveCollectionScope.Event,
+            Sensitivity:
+                "Session-template audit history scoped to one live session and its selected event. "
+                + "Rows, counts and operator identities must retain the original event-management authority."),
+
+        new(
             CollectionName: "GetCustomPropertyProjectionDirtyScopesQuery",
             ResourceKind: ResourceKinds.CustomPropertyProjection,
             Action: AuthorizationActions.View,

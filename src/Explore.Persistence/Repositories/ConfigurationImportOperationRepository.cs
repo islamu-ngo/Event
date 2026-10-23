@@ -2,6 +2,8 @@ namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Security;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
 public sealed class ConfigurationImportOperationRepository(
@@ -12,20 +14,27 @@ public sealed class ConfigurationImportOperationRepository(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(operation);
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+        {
+            await native.StoreOperationAsync(operation, cancellationToken);
+            return;
+        }
         await dbContext.ConfigurationImportOperations.AddAsync(
             operation,
             cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<ConfigurationImportOperation?> GetByIdAsync(
+    public async Task<ConfigurationImportOperation?> GetByIdAsync(
         Guid operationId,
         string targetAuthorityKey,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(operationId, Guid.Empty);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetAuthorityKey);
-        return dbContext.ConfigurationImportOperations
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+            return await native.ReadOperationAsync(operationId, targetAuthorityKey, cancellationToken);
+        return await dbContext.ConfigurationImportOperations
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 operation => operation.Id == operationId
@@ -53,6 +62,8 @@ public sealed class ConfigurationImportOperationRepository(
         ArgumentException.ThrowIfNullOrWhiteSpace(targetAuthorityKey);
         if (maximumCount is < 1 or > 200)
             throw new ArgumentOutOfRangeException(nameof(maximumCount));
+        if (ConfigurationRepositoryNativeOperations.ForInstanceImport(dbContext) is { } native)
+            return await native.ListOperationsAsync(targetAuthorityKey, maximumCount, cancellationToken);
         return await dbContext.ConfigurationImportOperations
             .AsNoTracking()
             .Where(operation =>

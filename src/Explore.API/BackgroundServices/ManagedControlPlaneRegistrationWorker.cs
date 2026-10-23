@@ -34,26 +34,23 @@ public sealed class ManagedControlPlaneRegistrationWorker(
                     stoppingToken);
                 if (result.Success)
                 {
-                    logger.LogInformation(
-                        "Managed Control Plane registration {RegistrationAttemptId} is registered.",
-                        result.RegistrationAttemptId);
+                    logger.LogInformation("Managed Control Plane registration completed.");
                     return;
                 }
 
                 logger.LogWarning(
-                    "Managed Control Plane registration remains {State} with failure code {FailureCode}.",
-                    result.State,
-                    result.FailureCode);
+                    "Managed Control Plane registration is pending. FailureCategory={FailureCategory}",
+                    "registration_pending");
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 return;
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 logger.LogWarning(
-                    "Managed Control Plane registration retry failed with {ExceptionType}.",
-                    exception.GetType().Name);
+                    "Managed Control Plane registration retry failed. FailureCategory={FailureCategory}",
+                    "registration_retry_failed");
             }
 
             await Task.Delay(RetryDelay, stoppingToken);

@@ -18,6 +18,7 @@ public sealed class AtprotoJwtService(
     TimeProvider timeProvider) : IAtprotoSessionTokenIssuer
 {
     private const string Es256 = SecurityAlgorithms.EcdsaSha256;
+    internal static readonly TimeSpan ValidationClockSkew = TimeSpan.FromSeconds(5);
     private readonly JwtSecurityTokenHandler _handler = new() { MapInboundClaims = false };
 
     public async Task<AtprotoBootstrapIdentity?> ValidateBootstrapAsync(
@@ -35,7 +36,7 @@ public sealed class AtprotoJwtService(
         var ring = await ResolveRingAsync(
             SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks,
             cancellationToken).ConfigureAwait(false);
-        var principal = Validate(token, ring, AtprotoJwtOptions.BootstrapIssuer, AtprotoJwtOptions.BootstrapAudience);
+        var principal = Validate(token, ring, AtprotoJwtOptions.BootstrapIssuer, AtprotoJwtOptions.BootstrapAudience, out _);
         var did = principal?.FindFirstValue(AtprotoJwtOptions.DidClaim);
         var classification = principal?.FindFirstValue(AtprotoJwtOptions.ClassificationClaim);
         var targetActorIdClaims = principal?.FindAll(AtprotoJwtOptions.TargetActorIdClaim).Take(2).ToArray() ?? [];
@@ -142,7 +143,8 @@ public sealed class AtprotoJwtService(
             token,
             ring,
             AtprotoJwtOptions.SessionBridgeIssuer,
-            AtprotoJwtOptions.SessionBridgeAudience);
+            AtprotoJwtOptions.SessionBridgeAudience,
+            out _);
         if (principal is null
             || !HasSingleClaim(principal, JwtRegisteredClaimNames.Iss, AtprotoJwtOptions.SessionBridgeIssuer)
             || !HasSingleClaim(principal, JwtRegisteredClaimNames.Aud, AtprotoJwtOptions.SessionBridgeAudience)
@@ -169,7 +171,11 @@ public sealed class AtprotoJwtService(
     public async Task<ClaimsPrincipal?> ValidateSessionAsync(
         string token,
         Guid tenantId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        (await ValidateSessionCredentialAsync(token, tenantId, cancellationToken).ConfigureAwait(false))?.Principal;
+
+    internal async Task<ValidatedAtprotoSession?> ValidateSessionCredentialAsync(
+        string token, Guid tenantId, CancellationToken cancellationToken)
     {
         if (!IsBoundedCompactJwt(token, AtprotoJwtOptions.MaximumSessionTokenBytes))
         {
@@ -179,7 +185,8 @@ public sealed class AtprotoJwtService(
         var ring = await ResolveRingAsync(
             SecretDefinitionRegistry.Keys.Atproto.SessionJwtPrivateJwks,
             cancellationToken).ConfigureAwait(false);
-        var principal = Validate(token, ring, AtprotoJwtOptions.SessionIssuer, AtprotoJwtOptions.SessionAudience);
+        var principal = Validate(token, ring, AtprotoJwtOptions.SessionIssuer, AtprotoJwtOptions.SessionAudience,
+            out SecurityToken? validatedToken);
         return principal is not null
                && Guid.TryParse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub), out var userId)
                && userId != Guid.Empty
@@ -188,7 +195,7 @@ public sealed class AtprotoJwtService(
                && principal.FindFirstValue(AtprotoJwtOptions.DidClaim) is { Length: > 4 and <= 2048 } did
                && did.StartsWith("did:", StringComparison.Ordinal)
                && string.Equals(principal.FindFirstValue("auth_provider"), "atproto", StringComparison.Ordinal)
-            ? principal
+            ? new ValidatedAtprotoSession(principal, validatedToken!)
             : null;
     }
 
@@ -246,8 +253,10 @@ public sealed class AtprotoJwtService(
         string token,
         InfrastructureAtprotoKeyRing ring,
         string issuer,
-        string audience)
+        string audience,
+        out SecurityToken? validatedToken)
     {
+        validatedToken = null;
         if (!ring.IsReady)
         {
             return null;
@@ -277,9 +286,9 @@ public sealed class AtprotoJwtService(
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = CreateTransientKey(ecdsa, keyId),
                 ValidAlgorithms = [Es256],
-                ClockSkew = TimeSpan.FromSeconds(5),
+                ClockSkew = ValidationClockSkew,
                 NameClaimType = JwtRegisteredClaimNames.Sub
-            }, out _);
+            }, out validatedToken);
             return result;
         }
         catch (Exception exception) when (exception is ArgumentException
@@ -315,6 +324,11 @@ public sealed class AtprotoJwtService(
         && token.Length <= maximumBytes
         && token.Count(character => character == '.') == 2
         && token.All(character => character is >= '!' and <= '~');
+}
+
+internal sealed record ValidatedAtprotoSession(ClaimsPrincipal Principal, SecurityToken Token)
+{
+    public override string ToString() => nameof(ValidatedAtprotoSession);
 }
 
 public sealed record AtprotoBootstrapIdentity(

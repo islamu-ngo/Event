@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Explore.API.Middleware;
 
 using ApplicationValidationException = Explore.Application.Exceptions.ValidationException;
 using FluentValidationException = FluentValidation.ValidationException;
@@ -15,26 +16,16 @@ internal sealed class ValidationExceptionHandler(
         Exception exception,
         CancellationToken cancellationToken)
     {
-        var errors = exception switch
-        {
-            ApplicationValidationException appValidationException => new Dictionary<string, string[]>
-            {
-                ["validation"] = appValidationException.Errors.ToArray()
-            },
-            FluentValidationException fluentValidationException => fluentValidationException.Errors
-                .GroupBy(error => error.PropertyName)
-                .ToDictionary(
-                    group => group.Key.ToLowerInvariant(),
-                    group => group.Select(error => error.ErrorMessage).ToArray()),
-            _ => null
-        };
-
-        if (errors is null)
+        if (exception is not (ApplicationValidationException or FluentValidationException))
         {
             return false;
         }
 
-        logger.LogWarning(exception, "Validation failure for {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+        logger.LogWarning(
+            "API failure {Code} for {Method} {Route} responded {StatusCode} | TraceId={TraceId} CorrelationId={CorrelationId}",
+            ApiProblemCodes.ValidationFailed, SafeRouteMetadata.GetMethod(httpContext),
+            SafeRouteMetadata.GetRouteIdentityOrClassification(httpContext), StatusCodes.Status400BadRequest,
+            httpContext.TraceIdentifier, httpContext.Items["CorrelationId"] as string);
 
         httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
 
@@ -44,11 +35,16 @@ internal sealed class ValidationExceptionHandler(
             Title = "Validation failed",
             Type = ApiProblemTypes.BadRequest,
             Detail = "One or more validation errors occurred.",
-            Instance = httpContext.Request.Path
+            Instance = SafeRouteMetadata.GetRouteIdentityOrClassification(httpContext)
         };
 
         problemDetails.Extensions["code"] = ApiProblemCodes.ValidationFailed;
-        problemDetails.Extensions["errors"] = errors;
+        // Both exception variants permit arbitrary messages and field names.
+        // Keep the dictionary/array contract without exporting their contents.
+        problemDetails.Extensions["errors"] = new Dictionary<string, string[]>
+        {
+            ["validation"] = ["The request failed validation."]
+        };
         problemDetails.Extensions["traceId"] = httpContext.TraceIdentifier;
         problemDetails.Extensions["timestamp"] = DateTimeOffset.UtcNow;
 
@@ -60,7 +56,6 @@ internal sealed class ValidationExceptionHandler(
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
-            Exception = exception,
             ProblemDetails = problemDetails
         });
     }

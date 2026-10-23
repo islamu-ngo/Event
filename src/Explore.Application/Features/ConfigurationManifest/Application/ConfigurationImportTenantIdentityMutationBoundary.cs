@@ -2,7 +2,6 @@ namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Importing;
-using Explore.Domain;
 
 public interface IConfigurationImportTenantIdentityMutationBoundary
 {
@@ -29,12 +28,9 @@ public sealed class ConfigurationImportTenantIdentityMutationBoundary(
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
         if (occurredAt.Kind != DateTimeKind.Utc)
             throw new ArgumentException("UTC timestamp required.", nameof(occurredAt));
-        Tenant tenant = await tenants.GetById(tenantId)
-            ?? throw new ConfigurationImportSessionException(
+        if (!await tenants.ApplyConfigurationImportIdentityAsync(
+                tenantId, displayName.Trim(), actorUserId, occurredAt, cancellationToken))
+            throw new ConfigurationImportSessionException(
                 ConfigurationImportFailureCodes.TargetMismatch);
-        tenant.FullName = displayName.Trim();
-        tenant.UpdatedAt = occurredAt;
-        tenant.UpdatedBy = actorUserId;
-        await tenants.Update(tenant);
     }
 }

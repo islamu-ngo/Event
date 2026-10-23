@@ -12,7 +12,8 @@ public static class ReservedTenantSlugs
         "registration", "settings", "setup", "startup", "status", "studio", "terms", "tickets",
         "users", "oauth", "test-endpoint",
         "_blazor", "_framework", "_content", "_host",
-        "api", "bff", "health", "healthz", "metrics", "prometheus", "swagger", "openapi", "mcp",
+        "api", "bff", "alive", "health", "healthz", "metrics", "prometheus", "swagger", "openapi", "mcp",
+        "vapid-public-key", "scalar", "quartz",
         "connect", "signin-atproto", "signin-oidc", "signout-callback-oidc",
         "root", "administrator", "security", "help", "support", "billing", "official", "event",
         "islamu", "system", "instance", "test",
@@ -22,5 +23,6 @@ public static class ReservedTenantSlugs
         "push-service-worker.js", "appsettings.json", "appsettings.Development.json"
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    public static bool IsReserved(string slug) => All.Contains(slug);
+    // Dotted asset/metadata filenames, including build fingerprints, cannot be tenant roots.
+    public static bool IsReserved(string slug) => All.Contains(slug) || slug.Contains('.');
 }

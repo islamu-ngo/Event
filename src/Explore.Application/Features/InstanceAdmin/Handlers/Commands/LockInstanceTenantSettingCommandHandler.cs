@@ -2,6 +2,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
+using Explore.Application.Features.EmailDispatch;
+using Explore.Application.Features.Settings.Handlers;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
@@ -19,14 +21,20 @@ public sealed class LockInstanceTenantSettingCommandHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
-    IUnitOfWork unitOfWork,
-    IVisitorAccessSettingsWriter visitorSettings)
+    IVisitorAccessSettingsWriter visitorSettings,
+    IInstanceAdministratorCommitAuthority commitAuthority,
+    IHumanCommitScopePreparation humanCommitScope,
+    IHumanSettingsMutationPreparation settingsPreparation,
+    IEventResourceSettingsWriter eventResourceSettings,
+    IHumanEmailMutationPreparation emailPreparation,
+    IAtprotoFederationSettingsWriter federationSettings)
     : ICommandHandler<LockInstanceTenantSettingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         LockInstanceTenantSettingCommand request,
         CancellationToken cancellationToken)
     {
+        await humanCommitScope.PrepareAsync(cancellationToken);
         Guid? actorUserId = currentUserService.UserId;
         if (actorUserId is null)
         {
@@ -61,94 +69,135 @@ public sealed class LockInstanceTenantSettingCommandHandler(
                 "The setting cannot be locked.");
         }
 
-        (BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification) outcome =
-            EmailDeliverySettingKeys.Contains(request.Key) || VisitorAccessSettingMutationGuard.Handles(request.Key)
-                ? await mutationLock.ExecuteOrderedGroupsAsync(
-                    [VisitorAccessSettingMutationGuard.Handles(request.Key)
-                        ? Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys : EmailDeliverySettingKeys.All],
-                    token => unitOfWork.ExecuteSerializableAsync(ApplyAsync, token),
-                    cancellationToken)
-                : await mutationLock.ExecuteAsync(request.Key, ApplyAsync, cancellationToken);
-
-        if (outcome.Notification is not null)
+        bool specialized = EmailDeliverySettingKeys.Contains(request.Key);
+        var prepared = specialized ? null : await settingsPreparation.PrepareAsync(request, cancellationToken);
+        Exception? primaryFailure = null;
+        try
         {
-            settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
-            await notificationHandlers.HandleAsync(outcome.Notification, CancellationToken.None);
-        }
+            var email = specialized ? await emailPreparation.PrepareAsync(request, cancellationToken) : null;
+            if (prepared is not null)
+                SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId);
+            (BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification) outcome =
+                specialized
+                    ? await emailPreparation.ExecutePreparedAsync(email!, ApplyAsync, cancellationToken)
+                    : await mutationLock.ExecuteOrderedGroupsAsync(
+                        [VisitorAccessSettingMutationGuard.Handles(request.Key)
+                        ? Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys : [],
+                     EventResourceSettingMutationGuard.Handles(request.Key) ? EventResourceSettingMutationGuard.Keys : [],
+                     [request.Key]], token => settingsPreparation.ExecutePreparedAsync(
+                        prepared!, (_, ownerToken) => ApplyAsync(ownerToken), token), cancellationToken);
 
-        return outcome.Response;
-
-        async Task<(BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification)>
-            ApplyAsync(CancellationToken token)
-        {
-            if (await systemSettingRepository.IsLocked(request.Key, token))
+            if (outcome.Notification is not null)
             {
-                return (InstanceTenantSettingSecurity.Failure(
-                    request.TenantId, "setting_system_locked", "The setting is locked at system scope."), null);
+                settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
+                await notificationHandlers.HandleAsync(outcome.Notification, CancellationToken.None);
             }
 
-            TenantSetting? existing = await repository.GetByTenantAndKey(
-                request.TenantId,
-                request.Key,
-                token);
-            if (existing is null)
-            {
-                return (InstanceTenantSettingSecurity.Failure(
-                    request.TenantId, "setting_override_not_found", "No tenant override exists for the setting."), null);
-            }
+            return outcome.Response;
 
-            if (existing.IsLocked)
+            async Task<(BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification)>
+                ApplyAsync(CancellationToken token)
             {
-                return (InstanceTenantSettingSecurity.Failure(
-                    request.TenantId, "setting_state_conflict", "The tenant setting is already locked."), null);
-            }
+                if (!await commitAuthority.IsInstanceAdministratorForCommitAsync(actorUserId.Value, token))
+                    return (BaseCommandResponse.Authorization<Guid>(
+                        "Current instance administrator authority is required."), null);
+                if (AtprotoFederationSettingPolicy.IsDedicatedKey(request.Key))
+                {
+                    var written = await federationSettings.ApplyCurrentAsync(new(
+                        HumanSettingsOperation.InstanceTenantSettings, SettingScope.Tenant, request.TenantId, null,
+                        request.Key, HumanSettingsMutationKind.SetLock, IsLocked: true), token);
+                    if (!written.Applied)
+                        return (InstanceTenantSettingSecurity.Failure(request.TenantId,
+                            written.FailureCode ?? "federation_setting_not_applied", "The federation setting lock was not applied."), null);
+                    return (BaseCommandResponse.Success(request.TenantId, "Tenant setting locked."),
+                        new SettingChangedNotification(request.Key, written.PreviousValue, written.CurrentValue,
+                            SettingSource.TenantLocked, request.TenantId, actorUserId, DateTime.UtcNow));
+                }
+                if (await systemSettingRepository.IsLocked(request.Key, token))
+                {
+                    return (InstanceTenantSettingSecurity.Failure(
+                        request.TenantId, "setting_system_locked", "The setting is locked at system scope."), null);
+                }
 
-            if (VisitorAccessSettingMutationGuard.Handles(request.Key))
-            {
-                var result = await visitorSettings.ApplyAsync(
-                    [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetLock, IsLocked: true)],
-                    actorUserId, token);
-                return (result.ToCommandResponse(request.TenantId), result.DeferredNotifications.SingleOrDefault());
-            }
+                TenantSetting? existing = await repository.GetByTenantAndKey(
+                    request.TenantId,
+                    request.Key,
+                    token);
+                if (existing is null)
+                {
+                    return (InstanceTenantSettingSecurity.Failure(
+                        request.TenantId, "setting_override_not_found", "No tenant override exists for the setting."), null);
+                }
 
-            if (EmailDeliverySettingKeys.Contains(request.Key))
-            {
-                EmailDeliverySettingsWriteResult result = await emailDeliverySettingsWriter.ApplyAsync(
-                    [new EmailDeliverySettingMutation(
+                if (existing.IsLocked)
+                {
+                    return (InstanceTenantSettingSecurity.Failure(
+                        request.TenantId, "setting_state_conflict", "The tenant setting is already locked."), null);
+                }
+
+                if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+                {
+                    var result = await visitorSettings.ApplyAsync(
+                        [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetLock, IsLocked: true)],
+                        SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId),
+                        SettingsMutationOperation.InstanceTenantSettings,
+                        actorUserId, token);
+                    return (result.ToCommandResponse(request.TenantId), result.DeferredNotifications.SingleOrDefault());
+                }
+
+                if (EmailDeliverySettingKeys.Contains(request.Key))
+                {
+                    EmailDeliverySettingsWriteResult result = await emailDeliverySettingsWriter.ApplyInstanceTenantAsync(
+                        [new EmailDeliverySettingMutation(
                             TenantId: request.TenantId,
                             Key: request.Key,
                             Kind: EmailDeliverySettingMutationKind.SetLock,
                             IsLocked: true)],
-                    actorUserId,
+                        actorUserId,
+                        token);
+                    return (
+                        result.ToCommandResponse(request.TenantId, "Tenant setting locked."),
+                        result.IsAccepted() ? result.ToNotifications(actorUserId).SingleOrDefault() : null);
+                }
+
+                if (EventResourceSettingMutationGuard.Handles(request.Key))
+                {
+                    var result = await eventResourceSettings.ApplyAsync(
+                        [new(request.TenantId, request.Key, EventResourceSettingMutationKind.SetLock, IsLocked: true)],
+                        SettingCommandHelper.RequireHumanSubject(humanCommitScope, actorUserId),
+                        SettingsMutationOperation.InstanceTenantSettings, actorUserId, token);
+                    return (result.Success ? BaseCommandResponse.Success(request.TenantId, "Resource policy updated.")
+                        : BaseCommandResponse.Failure<Guid>(result.FailureCode!,
+                            "The resource policy change conflicts with the current instance ceilings or setting locks."),
+                        result.DeferredNotifications.SingleOrDefault());
+                }
+
+                bool applied = await repository.LockAsync(
+                    request.TenantId,
+                    request.Key,
+                    actorUserId.Value,
                     token);
-                return (
-                    result.ToCommandResponse(request.TenantId, "Tenant setting locked."),
-                    result.IsAccepted() ? result.ToNotifications(actorUserId).SingleOrDefault() : null);
-            }
+                if (!applied)
+                {
+                    return (InstanceTenantSettingSecurity.Failure(
+                        request.TenantId, "setting_state_conflict", "The tenant setting state changed before it could be locked."), null);
+                }
 
-            bool applied = await repository.LockAsync(
-                request.TenantId,
-                request.Key,
-                actorUserId.Value,
-                token);
-            if (!applied)
-            {
-                return (InstanceTenantSettingSecurity.Failure(
-                    request.TenantId, "setting_state_conflict", "The tenant setting state changed before it could be locked."), null);
+                BaseCommandResponse<Guid> response = BaseCommandResponse.Success(
+                    request.TenantId,
+                    "Tenant setting locked.");
+                var notification = new SettingChangedNotification(
+                    request.Key,
+                    existing.Value,
+                    existing.Value,
+                    SettingSource.TenantLocked,
+                    request.TenantId,
+                    actorUserId,
+                    DateTime.UtcNow);
+                return (response, notification);
             }
-
-            BaseCommandResponse<Guid> response = BaseCommandResponse.Success(
-                request.TenantId,
-                "Tenant setting locked.");
-            var notification = new SettingChangedNotification(
-                request.Key,
-                existing.Value,
-                existing.Value,
-                SettingSource.TenantLocked,
-                request.TenantId,
-                actorUserId,
-                DateTime.UtcNow);
-            return (response, notification);
         }
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { if (prepared is not null) await settingsPreparation.CloseAsync(prepared, primaryFailure); }
     }
 }

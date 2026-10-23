@@ -2,6 +2,9 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Exceptions;
+using Explore.Application.Features.Events.Requests.Commands;
+using Explore.Application.Features.EventTemplates.Requests.Commands;
+using Explore.Application.Features.EventSessionTemplates.Requests.Commands;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
@@ -30,7 +33,10 @@ public sealed class AuthorizationResourceContextResolver(
     ITenantContext? tenantContext = null,
     IGroupTenantRepository? groupTenantRepository = null,
     IOrganizationTenantRepository? organizationTenantRepository = null,
-    IStorageUploadSessionRepository? storageUploadSessionRepository = null)
+    IStorageUploadSessionRepository? storageUploadSessionRepository = null,
+    IEventOrganizerClaimRepository? eventOrganizerClaimRepository = null,
+    IEventTemplateRepository? eventTemplateRepository = null,
+    IEventSessionTemplateRepository? eventSessionTemplateRepository = null)
 {
     public async Task<AuthorizationContext> ResolveAsync<TRequest>(
         TRequest request,
@@ -41,6 +47,69 @@ public sealed class AuthorizationResourceContextResolver(
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (resourceKind == ResourceKinds.Tenant && request is CreateEventTemplateCommand)
+        {
+            if (tenantContext is null || tenantContext.TenantId == Guid.Empty)
+                throw new AuthorizationException(resourceKind, action);
+            return new AuthorizationContext(tenantContext.TenantId.ToString("D"),
+                new TenantScopedAuthorizationFacts(tenantContext.TenantId));
+        }
+        Guid? templateTargetId = request switch
+        {
+            CreateEventSessionTemplateCommand sessionCreation => sessionCreation.SessionTemplateDto.EventTemplateId,
+            DeleteEventTemplateCommand deletion => deletion.Id,
+            UpdateEventTemplateCommand update => update.TemplateId,
+            _ => null
+        };
+        if (resourceKind == ResourceKinds.Tenant && templateTargetId is { } templateId)
+        {
+            var template = eventTemplateRepository is null ? null
+                : await eventTemplateRepository.GetTemplateWithDetails(templateId, cancellationToken);
+            if (template is null || template.IsDeleted || !IsInCurrentTenant(template.TenantId))
+                throw new AuthorizationException(resourceKind, action);
+            return new AuthorizationContext(template.TenantId.ToString("D"), new TenantScopedAuthorizationFacts(template.TenantId));
+        }
+        Guid? sessionTemplateTargetId = request switch
+        {
+            DeleteEventSessionTemplateCommand deletion => deletion.Id,
+            UpdateEventSessionTemplateCommand update => update.SessionTemplateId,
+            _ => null
+        };
+        if (resourceKind == ResourceKinds.Tenant && sessionTemplateTargetId is { } sessionTemplateId)
+        {
+            var template = eventSessionTemplateRepository is null ? null
+                : await eventSessionTemplateRepository.GetSessionTemplateWithDetails(sessionTemplateId, cancellationToken);
+            if (template is null || template.IsDeleted || !IsInCurrentTenant(template.TenantId)
+                || template.EventTemplate is not { IsDeleted: false } parent || parent.TenantId != template.TenantId)
+                throw new AuthorizationException(resourceKind, action);
+            return new AuthorizationContext(template.TenantId.ToString("D"), new TenantScopedAuthorizationFacts(template.TenantId));
+        }
+        if (request is CreateEventCommand eventCreation
+            && resourceKind == ResourceKinds.Event && action == AuthorizationActions.Create)
+        {
+            if (tenantContext is null || tenantContext.TenantId == Guid.Empty
+                || resourceId != CreateEventCommand.PreCreateResourceId)
+                throw new AuthorizationException(resourceKind, action);
+            declaredFacts = new PreCreateAuthorizationFacts(tenantContext.TenantId,
+                OrganizationId: eventCreation.EventDto.OrganizationId,
+                GroupId: eventCreation.EventDto.GroupId);
+        }
+
+        if (declaredFacts is PreCreateAuthorizationFacts creation)
+        {
+            if (action != AuthorizationActions.Create
+                || resourceKind != ResourceKinds.Organization
+                    && (tenantContext is null || tenantContext.TenantId == Guid.Empty
+                        || creation.TenantId != tenantContext.TenantId)
+                || resourceKind == ResourceKinds.Organization && creation.TenantId != Guid.Empty)
+                throw new AuthorizationException(resourceKind, action);
+
+            if (creation.ParentEventId is { } parentEventId
+                && !await IsEventInCurrentTenantAsync(parentEventId, cancellationToken))
+                throw new AuthorizationException(resourceKind, action);
+        }
+
         if (resourceKind == ResourceKinds.EventResource)
         {
             if (tenantContext is null || tenantContext.TenantId == Guid.Empty
@@ -89,6 +158,14 @@ public sealed class AuthorizationResourceContextResolver(
             return new AuthorizationContext(groupId.ToString("D"), groupFacts);
         }
 
+        if (request is GetStorageObjectListRequest && resourceKind == ResourceKinds.StorageObject)
+        {
+            if (declaredFacts is not StorageObjectCollectionAuthorizationFacts collection
+                || !IsInCurrentTenant(collection.TenantId))
+                throw new AuthorizationException(resourceKind, action);
+            return new AuthorizationContext(resourceId, new StorageObjectCollectionAuthorizationFacts(tenantContext!.TenantId));
+        }
+
         if (request is FinalizeStorageUploadSessionCommand finalization
             && resourceKind == ResourceKinds.StorageObject
             && action == AuthorizationActions.StorageObjects.Create)
@@ -101,8 +178,11 @@ public sealed class AuthorizationResourceContextResolver(
             && resourceKind == ResourceKinds.StorageObject && action == AuthorizationActions.Delete)
         {
             var uploadFacts = await ResolveStorageUploadFinalizationFactsAsync(cancellation.UploadSessionId, cancellationToken);
+            if (uploadFacts is null)
+                throw new AuthorizationException(resourceKind, action);
             return new AuthorizationContext(cancellation.UploadSessionId.ToString("D"),
-                uploadFacts is EventResourceUploadAuthorizationFacts ? uploadFacts : declaredFacts);
+                uploadFacts is EventResourceUploadAuthorizationFacts ? uploadFacts
+                    : new StorageObjectCollectionAuthorizationFacts(tenantContext!.TenantId));
         }
 
         if (request is GetStorageObjectContentRequest download
@@ -119,7 +199,11 @@ public sealed class AuthorizationResourceContextResolver(
 
         var facts = await ResolveTrustedFactsAsync(resourceKind, resourceId, declaredFacts, cancellationToken);
 
-        if (resourceKind is ResourceKinds.RegistrationForm or ResourceKinds.RegistrationOrder && facts is null)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (facts is null && (resourceKind is ResourceKinds.Event or ResourceKinds.EventSession
+            or ResourceKinds.OrganizationMember or ResourceKinds.CustomPropertyProjection
+            or ResourceKinds.EventOrganizerClaim or ResourceKinds.RegistrationForm or ResourceKinds.RegistrationOrder
+            || resourceKind == ResourceKinds.StorageObject && action != AuthorizationActions.Create))
         {
             throw new AuthorizationException(resourceKind, action);
         }
@@ -166,7 +250,7 @@ public sealed class AuthorizationResourceContextResolver(
         return resourceKind switch
         {
             ResourceKinds.Event => await ResolveEventFactsAsync(resourceId, declaredFacts, cancellationToken),
-            ResourceKinds.EventOrganizerClaim => await ResolveOrganizerClaimFactsAsync(declaredFacts, cancellationToken),
+            ResourceKinds.EventOrganizerClaim => await ResolveOrganizerClaimFactsAsync(resourceId, declaredFacts, cancellationToken),
             ResourceKinds.RegistrationForm => await ResolveRegistrationFormFactsAsync(declaredFacts, cancellationToken),
             ResourceKinds.RegistrationOrder => await ResolveRegistrationOrderFactsAsync(
                 resourceId, declaredFacts, cancellationToken),
@@ -194,7 +278,7 @@ public sealed class AuthorizationResourceContextResolver(
             orderId,
             tenantContext.TenantId,
             cancellationToken);
-        if (order is null ||
+        if (order is null || order.IsDeleted || !IsInCurrentTenant(order.TenantId) ||
             declaredFacts is RegistrationOrderAuthorizationFacts requested &&
             requested.EventId != Guid.Empty &&
             requested.EventId != order.EventId)
@@ -250,23 +334,35 @@ public sealed class AuthorizationResourceContextResolver(
         IAuthorizationFacts? declaredFacts,
         CancellationToken cancellationToken)
     {
-        if (eventRepository is null || !Guid.TryParse(resourceId, out var eventId))
-            return declaredFacts;
+        if (eventRepository is null || !Guid.TryParse(resourceId, out var eventId) || eventId == Guid.Empty)
+            return null;
 
-        var eventEntity = await eventRepository.GetEventWithDetails(eventId);
-        if (!IsInCurrentTenant(eventEntity?.TenantId))
+        var eventEntity = await eventRepository.GetAuthorizationTargetByIdAsync(eventId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!IsInCurrentTenant(eventEntity?.TenantId) || eventEntity!.IsDeleted)
             return null;
 
         return CreateEventFacts(eventEntity!);
     }
 
     private async Task<IAuthorizationFacts?> ResolveOrganizerClaimFactsAsync(
+        string resourceId,
         IAuthorizationFacts? declaredFacts,
         CancellationToken cancellationToken)
     {
         if (declaredFacts is EventOrganizerClaimAuthorizationFacts claimFacts)
         {
-            return await IsEventInCurrentTenantAsync(claimFacts.EventId) ? claimFacts : null;
+            if (eventOrganizerClaimRepository is null || !Guid.TryParse(resourceId, out Guid claimId)
+                || claimId != claimFacts.ClaimId)
+                return null;
+            var claim = await eventOrganizerClaimRepository.GetDetailsAsync(claimId, false, cancellationToken);
+            if (claim is null || claim.IsDeleted || !IsInCurrentTenant(claim.TenantId)
+                || claim.ClaimantActor is null || claim.ClaimantActor.IsDeleted
+                || !await IsEventInCurrentTenantAsync(claim.EventId, cancellationToken))
+                return null;
+            return new EventOrganizerClaimAuthorizationFacts(claim.TenantId, claim.EventId, claim.Id,
+                claim.ClaimantActorId, claim.ClaimantActor.UserId, claim.ClaimantActor.OrganizationId,
+                claim.ClaimantActor.GroupId, claim.Status?.MasterCode ?? claim.StatusId.ToString());
         }
 
         if (declaredFacts is EventScopedAuthorizationFacts scopedFacts)
@@ -294,8 +390,9 @@ public sealed class AuthorizationResourceContextResolver(
         if (eventId is null || eventRepository is null)
             return null;
 
-        var eventEntity = await eventRepository.GetEventWithDetails(eventId.Value);
-        return IsInCurrentTenant(eventEntity?.TenantId)
+        var eventEntity = await eventRepository.GetEventWithDetails(eventId.Value, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return IsInCurrentTenant(eventEntity?.TenantId) && !eventEntity!.IsDeleted
             ? CreateEventFacts(eventEntity!)
             : null;
     }
@@ -305,11 +402,13 @@ public sealed class AuthorizationResourceContextResolver(
         IAuthorizationFacts? declaredFacts,
         CancellationToken cancellationToken)
     {
-        if (eventSessionRepository is null || !Guid.TryParse(resourceId, out var eventSessionId))
-            return declaredFacts;
+        if (eventSessionRepository is null || !Guid.TryParse(resourceId, out var eventSessionId) || eventSessionId == Guid.Empty)
+            return null;
 
-        var session = await eventSessionRepository.GetSessionWithDetails(eventSessionId);
-        if (!IsInCurrentTenant(session?.TenantId))
+        var session = await eventSessionRepository.GetSessionWithDetails(eventSessionId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!IsInCurrentTenant(session?.TenantId) || session!.IsDeleted
+            || !await IsEventInCurrentTenantAsync(session.EventId, cancellationToken))
             return null;
 
         return new EventScopedAuthorizationFacts(
@@ -323,11 +422,14 @@ public sealed class AuthorizationResourceContextResolver(
         IAuthorizationFacts? declaredFacts,
         CancellationToken cancellationToken)
     {
-        if (organizationMemberRepository is null || !Guid.TryParse(resourceId, out var memberId))
-            return declaredFacts;
+        if (organizationMemberRepository is null || !Guid.TryParse(resourceId, out var memberId) || memberId == Guid.Empty)
+            return null;
 
-        var member = await organizationMemberRepository.GetOrganizationMemberWithDetails(memberId);
-        if (!IsInCurrentTenant(member?.TenantId))
+        var member = await organizationMemberRepository.GetOrganizationMemberWithDetails(memberId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!IsInCurrentTenant(member?.TenantId) || member!.IsDeleted
+            || member.OrganizationTenant.IsDeleted || member.OrganizationTenant.Organization.IsDeleted
+            || member.OrganizationTenant.TenantId != member.TenantId)
             return null;
 
         return new OrganizationMemberAuthorizationFacts(
@@ -382,11 +484,11 @@ public sealed class AuthorizationResourceContextResolver(
         IAuthorizationFacts? declaredFacts,
         CancellationToken cancellationToken)
     {
-        if (declaredFacts is StorageObjectCollectionAuthorizationFacts or StorageUploadIntentFacts)
-            return declaredFacts;
+        if (declaredFacts is StorageUploadIntentFacts upload)
+            return IsInCurrentTenant(upload.TenantId) ? upload : null;
 
-        if (storageObjectRepository is null || !Guid.TryParse(resourceId, out var storageObjectId))
-            return declaredFacts;
+        if (storageObjectRepository is null || !Guid.TryParse(resourceId, out var storageObjectId) || storageObjectId == Guid.Empty)
+            return null;
 
         var storageObject = await storageObjectRepository.GetForGenericAccessAsync(storageObjectId, cancellationToken);
         if (!IsInCurrentTenant(storageObject?.TenantId))
@@ -408,47 +510,53 @@ public sealed class AuthorizationResourceContextResolver(
         CancellationToken cancellationToken)
     {
         if (declaredFacts is not CustomPropertyProjectionAuthorizationFacts projectionFacts)
-            return declaredFacts;
-
-        if (projectionFacts.TenantId != Guid.Empty)
-            return projectionFacts;
-
-        if (projectionFacts.EventId is { } eventId && eventRepository is not null)
-        {
-            var eventEntity = await eventRepository.GetEventWithDetails(eventId);
-            return eventEntity is null
-                ? projectionFacts
-                : projectionFacts with { TenantId = eventEntity.TenantId, EventId = eventEntity.Id };
-        }
+            return null;
 
         if (projectionFacts.EventSessionId is { } eventSessionId && eventSessionRepository is not null)
         {
-            var session = await eventSessionRepository.GetSessionWithDetails(eventSessionId);
-            return session is null
-                ? projectionFacts
-                : projectionFacts with
-                {
-                    TenantId = session.TenantId,
-                    EventId = session.EventId,
-                    EventSessionId = session.Id
-                };
+            var session = await eventSessionRepository.GetSessionWithDetails(eventSessionId, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return session is null || session.IsDeleted || !IsInCurrentTenant(session.TenantId)
+                || projectionFacts.EventId is { } requestedParent && requestedParent != session.EventId
+                || !await IsEventInCurrentTenantAsync(session.EventId, cancellationToken)
+                ? null
+                : new CustomPropertyProjectionAuthorizationFacts(session.TenantId, session.EventId, session.Id);
         }
 
-        return projectionFacts;
+        if (projectionFacts.EventSessionId is not null)
+            return null;
+
+        // Tenant-wide rebuild/status requests have no single parent. Their scope
+        // must match the server lease; the selected provider still checks the role.
+        if (projectionFacts.EventId is null)
+            return IsInCurrentTenant(projectionFacts.TenantId)
+                ? new CustomPropertyProjectionAuthorizationFacts(tenantContext!.TenantId) : null;
+
+        if (projectionFacts.EventId is { } eventId && eventRepository is not null)
+        {
+            var eventEntity = await eventRepository.GetEventWithDetails(eventId, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return eventEntity is null || eventEntity.IsDeleted || !IsInCurrentTenant(eventEntity.TenantId)
+                ? null
+                : new CustomPropertyProjectionAuthorizationFacts(eventEntity.TenantId, eventEntity.Id);
+        }
+
+        return null;
     }
 
-    private async Task<bool> IsEventInCurrentTenantAsync(Guid eventId)
+    private async Task<bool> IsEventInCurrentTenantAsync(Guid eventId, CancellationToken cancellationToken)
     {
         if (eventRepository is null)
-            return true;
+            return false;
 
-        var eventEntity = await eventRepository.GetEventWithDetails(eventId);
-        return IsInCurrentTenant(eventEntity?.TenantId);
+        var eventEntity = await eventRepository.GetAuthorizationTargetByIdAsync(eventId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return IsInCurrentTenant(eventEntity?.TenantId) && !eventEntity!.IsDeleted;
     }
 
     private bool IsInCurrentTenant(Guid? resourceTenantId) =>
-        resourceTenantId is not null &&
-        (tenantContext is null || resourceTenantId == tenantContext.TenantId);
+        tenantContext is not null && tenantContext.TenantId != Guid.Empty &&
+        resourceTenantId == tenantContext.TenantId;
 
     private static EventAuthorizationFacts CreateEventFacts(Event eventEntity) => new(
         eventEntity.TenantId,

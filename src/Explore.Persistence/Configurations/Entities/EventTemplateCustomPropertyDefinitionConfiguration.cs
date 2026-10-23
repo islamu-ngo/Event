@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Domain.CustomProperties;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -42,7 +43,7 @@ public class EventTemplateCustomPropertyDefinitionConfiguration : IEntityTypeCon
             .HasMaxLength(1000);
 
         builder.Property(e => e.RegexPattern)
-            .HasMaxLength(1000);
+            .HasMaxLength(CustomPropertyPatternPolicy.MaximumPatternLength);
 
         builder.Property(e => e.AllowedUrlSchemes)
             .HasMaxLength(500);

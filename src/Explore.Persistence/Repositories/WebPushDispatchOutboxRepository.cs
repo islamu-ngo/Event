@@ -2,6 +2,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -13,10 +14,12 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
     private const int MaxErrorLength = 2000;
 
     private readonly ExploreDbContext _dbContext;
+    private readonly PostgresNativeQueueEnrollment? _nativeEnrollment;
 
-    public WebPushDispatchOutboxRepository(ExploreDbContext dbContext)
+    public WebPushDispatchOutboxRepository(ExploreDbContext dbContext, PostgresNativeQueueEnrollment? nativeEnrollment = null)
     {
         _dbContext = dbContext;
+        _nativeEnrollment = nativeEnrollment;
     }
 
     public async Task<WebPushDispatchOutbox> Create(WebPushDispatchOutbox entity, CancellationToken cancellationToken = default)
@@ -28,6 +31,19 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
 
     public async Task<bool> CreateIfNotExistsAsync(WebPushDispatchOutbox entity, CancellationToken cancellationToken = default)
     {
+        if (PostgresPublicationFanoutExecutionContract.Applies(_dbContext))
+            return (await PostgresPublicationFanoutExecutionContract.ExecuteAsync(_dbContext, _nativeEnrollment,
+                "enqueue_push", new
+                {
+                    entity.Id,
+                    entity.TenantId,
+                    entity.UserId,
+                    entity.NotificationId,
+                    entity.SubscriptionId,
+                    entity.CategoryId,
+                    entity.Status,
+                    entity.PayloadJson
+                }, cancellationToken)).GetBoolean();
         var exists = await _dbContext.WebPushDispatchOutbox
             .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushTenantOperation)
             .AsNoTracking()
@@ -103,6 +119,7 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
     }
 
     public async Task<bool> TryMarkAsProcessing(
+        Guid tenantId,
         Guid id,
         Guid leaseToken,
         DateTime startedAt,
@@ -110,7 +127,7 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
     {
         var updated = await _dbContext.WebPushDispatchOutbox
             .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushWorkerCrossTenantQueue)
-            .Where(row => row.Id == id
+            .Where(row => row.TenantId == tenantId && row.Id == id
                 && (row.Status == WebPushDispatchStatus.Pending || row.Status == WebPushDispatchStatus.RetryScheduled)
                 && (row.NextAttemptAt == null || row.NextAttemptAt <= startedAt))
             .ExecuteUpdateAsync(setters => setters
@@ -130,10 +147,8 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
         CancellationToken cancellationToken = default)
     {
         return _dbContext.WebPushDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushWorkerCrossTenantQueue)
             .AsNoTracking()
             .Include(row => row.Category)
-            .Include(row => row.User)
             .FirstOrDefaultAsync(row =>
                 row.TenantId == tenantId &&
                 row.Id == dispatchId &&
@@ -144,10 +159,39 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
                 cancellationToken);
     }
 
+    public Task<WebPushDispatchOutbox?> GetSenderEntryClaimAsync(
+        Guid tenantId,
+        Guid dispatchId,
+        Guid leaseToken,
+        DateTime processingStartedAfter,
+        DateTime now,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.WebPushDispatchOutbox
+            .AsNoTracking()
+            .Include(row => row.Subscription)
+            .FirstOrDefaultAsync(row =>
+                row.TenantId == tenantId &&
+                row.Id == dispatchId &&
+                row.Status == WebPushDispatchStatus.Processing &&
+                row.ProcessingLeaseToken == leaseToken &&
+                row.ProcessingStartedAt != null &&
+                row.ProcessingStartedAt > processingStartedAfter &&
+                row.User != null &&
+                !row.User.IsDeleted &&
+                !_dbContext.PrivacyErasureSagas.Any(saga => saga.SubjectId == row.UserId) &&
+                row.Subscription != null &&
+                row.Subscription.TenantId == tenantId &&
+                row.Subscription.UserId == row.UserId &&
+                row.Subscription.IsActive &&
+                !row.Subscription.IsDeleted &&
+                (row.Subscription.ExpirationTime == null || row.Subscription.ExpirationTime > now),
+                cancellationToken);
+    }
+
     public async Task<bool> MarkAsDelivered(Guid id, Guid leaseToken, DateTime deliveredAt, CancellationToken cancellationToken = default)
     {
         var updated = await _dbContext.WebPushDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushWorkerCrossTenantQueue)
             .Where(row => row.Id == id
                 && row.Status == WebPushDispatchStatus.Processing
                 && row.ProcessingLeaseToken == leaseToken)
@@ -177,7 +221,6 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
         CancellationToken cancellationToken = default)
     {
         var attemptState = await _dbContext.WebPushDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushWorkerCrossTenantQueue)
             .AsNoTracking()
             .Where(row => row.Id == id
                 && row.Status == WebPushDispatchStatus.Processing
@@ -191,7 +234,6 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
 
         var exhausted = !isRetryable || attemptState.AttemptCount >= Math.Min(attemptState.MaxAttempts, maxAttempts);
         var updated = await _dbContext.WebPushDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushWorkerCrossTenantQueue)
             .Where(row => row.Id == id
                 && row.Status == WebPushDispatchStatus.Processing
                 && row.ProcessingLeaseToken == leaseToken)
@@ -218,7 +260,6 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
         CancellationToken cancellationToken = default)
     {
         var updated = await _dbContext.WebPushDispatchOutbox
-            .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushWorkerCrossTenantQueue)
             .Where(row => row.Id == id
                 && row.Status == WebPushDispatchStatus.Processing
                 && row.ProcessingLeaseToken == leaseToken)
@@ -292,7 +333,6 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
         {
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
             var updatedDispatch = await _dbContext.WebPushDispatchOutbox
-                .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushTenantOperation)
                 .Where(row => row.TenantId == tenantId
                     && row.Id == dispatchId
                     && row.SubscriptionId == subscriptionId
@@ -315,7 +355,6 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
             }
 
             var updatedSubscription = await _dbContext.WebPushSubscriptions
-                .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushTenantOperation)
                 .Where(subscription => subscription.TenantId == tenantId
                     && subscription.Id == subscriptionId
                     && subscription.IsActive)
@@ -339,7 +378,6 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
     private async Task<bool> SameTenantInactiveSubscriptionExists(Guid tenantId, Guid subscriptionId, CancellationToken cancellationToken)
     {
         return await _dbContext.WebPushSubscriptions
-            .IgnoreTenantFilter(TenantFilterBypassReasons.WebPushTenantOperation)
             .AsNoTracking()
             .AnyAsync(subscription => subscription.TenantId == tenantId
                 && subscription.Id == subscriptionId

@@ -1,0 +1,32 @@
+Change-Id: CHG-01M5DY1RKA01XD7D2K04ZMJD6P
+Title: "Select email retention tenants through EF Core"
+Type: fix
+Scope: notifications
+Summary: "Keep retention eligibility in C# and expose only the seven non-secret queue metadata columns needed by the EF Core discovery query."
+Group: email-retention-ef-discovery
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Retired email-retention business routines and cluster-global capability roles are refused. Provision a fresh isolated development cluster, or perform explicit operator-owned dependency-checked decommissioning before using the new fixed metadata profile; installation does not delete or normalize old objects.
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: The configured Global login receives direct nongrantable SELECT on exactly seven queue metadata columns. A stolen credential can enumerate that metadata; private content, recipients, related attempt and receipt data, and writes remain denied. C# owns retention eligibility and verifies its original connection across retries.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: No EF model or data migration is required. Matching installation tooling installs and attests the fixed metadata permissions and refuses partial drift or obsolete routine authority without automatic repair.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Uses the existing configured Global login; no additional credential or configuration key is introduced.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Preserve only the fixed seven-column profile and matching RLS policies. Do not restore the retired discovery routine, broaden table grants or expect automatic destructive cleanup of obsolete cluster roles.

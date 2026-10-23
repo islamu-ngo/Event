@@ -1,6 +1,7 @@
 using Explore.Application.Authorization;
-using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Features.InstanceOnboarding.Services;
 
 namespace Explore.Application.Contracts.Services;
 
@@ -9,6 +10,10 @@ namespace Explore.Application.Contracts.Services;
 /// </summary>
 public interface IAuthorizationProviderConfigurationService
 {
+    Task<ProviderConfigurationMutation> ObserveConfigurationAsync(UpdateAuthorizationProviderConfigurationCommand command, CancellationToken token);
+    Task<ProviderConfigurationMutation> ObserveConfigurationAsync(UpdateAuthorizationProviderConfigurationDuringSetupCommand command, CancellationToken token);
+    Task ApplyConfigurationAsync(ProviderConfigurationMutation observation, CancellationToken token);
+
     /// <summary>
     /// Reads current authorization provider configuration from SystemSetting records
     /// and environment-detected state.
@@ -18,7 +23,11 @@ public interface IAuthorizationProviderConfigurationService
     /// <summary>
     /// Applies authorization provider configuration to SystemSetting records.
     /// </summary>
-    Task ApplyConfigurationAsync(AuthorizationProviderConfigurationDto configuration);
+    Task ApplyConfigurationAsync(UpdateAuthorizationProviderConfigurationCommand command,
+        CancellationToken cancellationToken = default);
+
+    Task ApplySetupConfigurationAsync(UpdateAuthorizationProviderConfigurationDuringSetupCommand command,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Checks whether an authorization provider has been explicitly configured.
@@ -35,9 +44,8 @@ public interface IAuthorizationProviderConfigurationService
 
     /// <summary>
     /// Reconciles an explicit deployment-selected provider. Local becomes ready immediately;
-    /// Cerbos is ready only after PDP verification and policy publication both succeed.
+    /// Cerbos requires PDP health and an authenticated publication declaration; no Admin API call occurs.
     /// </summary>
     Task<AuthorizationProviderReconciliationResult> ReconcileDeploymentProviderAsync(
-        CancellationToken cancellationToken = default,
-        PolicyPackageAdminCredentials? oneTimeCredentials = null);
+        CancellationToken cancellationToken = default);
 }

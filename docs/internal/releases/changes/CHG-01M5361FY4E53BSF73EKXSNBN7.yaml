@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5361FY4E53BSF73EKXSNBN7
+Title: "Align local credential HTTP and manual admission"
+Type: fix
+Scope: access
+Summary: "Share Unicode-aware new-credential and verification shape across HTTP annotations and manually instantiated validators."
+Group: local-password-request-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: New credentials require 15 through 128 normalized Unicode scalars; existing shorter credential verification remains allowed.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Malformed and overlong credential input is rejected through the same policy on HTTP and manual validation paths.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Request shape validation does not replace backend blocklist and credential lifecycle enforcement.

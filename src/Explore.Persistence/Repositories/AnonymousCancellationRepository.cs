@@ -44,14 +44,8 @@ public sealed class AnonymousCancellationRepository(
             await RelationalEntityRowFence.AcquireAsync<AdmissionTicket>(
                 dbContext, tenantId, ticket => ticket.Id, ticketId, cancellationToken);
 
-        // Event targets include currently empty scopes. Ticket fences exclude first-ever check-in too.
-        Guid[] targetIds = await dbContext.AdmissionTargets.AsNoTracking()
-            .Where(target => target.TenantId == tenantId && target.EventId == eventId)
-            .Select(target => target.Id).ToArrayAsync(cancellationToken);
-        foreach (Guid targetId in targetIds.Order())
-            await RelationalEntityRowFence.AcquireAsync<AdmissionTarget>(
-                dbContext, tenantId, target => target.Id, targetId, cancellationToken);
-
+        // Ticket fences exclude first-ever attendance too; never wait for target
+        // coordination here while holding tickets needed by an arriving check-in.
         var tickets = await dbContext.AdmissionTickets.Include(ticket => ticket.Credentials)
             .Where(ticket => ticket.TenantId == tenantId && ticket.RegistrationOrderId == orderId)
             .OrderBy(ticket => ticket.Id).ToArrayAsync(cancellationToken);

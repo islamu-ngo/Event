@@ -1,4 +1,5 @@
 using System.Data;
+using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -7,11 +8,19 @@ using NpgsqlTypes;
 
 namespace Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 
-public sealed partial class EfCorePrivacyErasureAuthorityRepository
+public sealed partial class EfCorePrivacyErasureAuthorityRepository : IOriginalPrivacyIdentityFenceAuthority
 {
     private const string FactColumns =
         "authority_sequence, intent_id, subject_kind, subject_id, reason_code, policy_version, requested_at_utc, recorded_at_utc, retention_expires_at_utc, is_legal_hold_pseudonymized";
     private readonly AsyncLocal<bool> _identityGate = new();
+
+    public Task<T> ExecuteOriginalEnrollmentAsync<T>(
+        Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
+    {
+        if (_identityGate.Value)
+            throw new InvalidOperationException("Original enrollment cannot borrow another identity gate.");
+        return ExecuteSerializedAsync(operation, cancellationToken);
+    }
 
     public async Task<T> ExecuteSerializedAsync<T>(
         Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)

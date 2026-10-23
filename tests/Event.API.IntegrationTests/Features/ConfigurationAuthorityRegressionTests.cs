@@ -21,6 +21,37 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class ConfigurationAuthorityRegressionTests
 {
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Api_InfisicalGlobalCredentialsCannotInheritLowerAuthority(bool present)
+    {
+        string username = Guid.CreateVersion7().ToString("N");
+        string password = " " + Guid.CreateVersion7().ToString("N") + " ";
+        await using var server = await SecretServer.StartAsync(path => path == "/database"
+            ? present
+                ? [new("DATABASE_GLOBAL_USERNAME", username, path), new("DATABASE_GLOBAL_PASSWORD", password, path)]
+                : []
+            : []);
+        using var environment = BootstrapEnvironment(server.Url, Guid.CreateVersion7().ToString("N"), structured: false);
+        var builder = Bootstrap("Infisical");
+        builder.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DATABASE_GLOBAL_USERNAME"] = Guid.CreateVersion7().ToString("N"),
+            ["DATABASE_GLOBAL_PASSWORD"] = Guid.CreateVersion7().ToString("N"),
+            ["Database:Global:Username"] = Guid.CreateVersion7().ToString("N"),
+            ["Database:Global:Password"] = Guid.CreateVersion7().ToString("N"),
+        });
+
+        builder.AddSecretAuthorityConfiguration("Testing");
+        var configuration = builder.Build();
+
+        await Assert.That(configuration["Database:Global:Username"]).IsEqualTo(present ? username : null);
+        await Assert.That(configuration["Database:Global:Password"]).IsEqualTo(present ? password : null);
+        await Assert.That(configuration["DATABASE_GLOBAL_USERNAME"]).IsNull();
+        await Assert.That(configuration["DATABASE_GLOBAL_PASSWORD"]).IsNull();
+    }
+
+    [Test]
     public async Task Api_RemovedDurabilityInputCannotSilentlySelectEmbeddedAuthority()
     {
         using var environment = new EnvironmentScope(new()
@@ -86,8 +117,17 @@ public sealed class ConfigurationAuthorityRegressionTests
         await Assert.That(options.Infisical.Environment).IsEqualTo("testing");
         string[] expectedPaths =
         [
-            "/keycloak", "/database", "/database/erasure", "/database/identity", "/api",
-            "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/stripe", "/integrations/listmonk",
+            "/runtime/api/authentication/keycloak", "/runtime/api/keycloak/lifecycle",
+            "/runtime/api/authorization/cerbos",
+            "/database", "/database/erasure", "/database/identity", "/postgresql",
+            "/api", "/api/operator-identity", "/api/operatoridentity",
+            "/api/bootstrap", "/api/instance-bootstrap", "/api/instancebootstrap",
+            "/api/controlplane", "/api/control-plane", "/api/webpush", "/api/web-push",
+            "/api/ratelimiting", "/api/rate-limiting",
+            "/mcp", "/ai", "/storage", "/smtp", "/stripe", "/integrations/listmonk",
+            "/setup", "/promotions", "/admissions", "/ticketing/recovery",
+            "/atproto", "/webhook", "/messaging", "/reporting",
+            "/registration-providers", "/analytics", "/localization"
         ];
         await Assert.That(options.Infisical.Paths.SequenceEqual(expectedPaths)).IsTrue();
 
@@ -102,18 +142,20 @@ public sealed class ConfigurationAuthorityRegressionTests
     [Test]
     public async Task Api_InfisicalModularSettingsReachTheirRuntimeConsumers()
     {
-        await using var server = await SecretServer.StartAsync(path => path == "/api"
-            ? [
-                new("PUBLIC_NAME", "Community Operator", "/api/operator-identity"),
-                new("MODE", "configured", "/api/bootstrap"),
-                new("VAPID_PUBLIC_KEY", "public-key", "/api/webpush"),
-                new("PUBLIC_KEY", "ignored-public-key", "/api/webpush"),
-                new("ANONYMOUSREGISTRATION_IPPERMITLIMIT", "7", "/api/ratelimiting"),
-                new("ANONYMOUSREGISTRATION__IPPERMITLIMIT", "11", "/api/ratelimiting"),
-                new("RATELIMITING__ANONYMOUSREGISTRATION_IPPERMITLIMIT", "12", "/api/ratelimiting"),
-                new("RATE_LIMITING__ANONYMOUSREGISTRATION_IPPERMITLIMIT", "13", "/api/rate-limiting"),
-            ]
-            : []);
+        await using var server = await SecretServer.StartAsync(path => path switch
+        {
+            "/api/operator-identity" => [new("PUBLIC_NAME", "Community Operator", path)],
+            "/api/bootstrap" => [new("MODE", "configured", path)],
+            "/api/webpush" => [new("VAPID_PUBLIC_KEY", "public-key", path), new("PUBLIC_KEY", "ignored-public-key", path)],
+            "/api/ratelimiting" =>
+            [
+                new("ANONYMOUSREGISTRATION_IPPERMITLIMIT", "7", path),
+                new("ANONYMOUSREGISTRATION__IPPERMITLIMIT", "11", path),
+                new("RATELIMITING__ANONYMOUSREGISTRATION_IPPERMITLIMIT", "12", path)
+            ],
+            "/api/rate-limiting" => [new("RATE_LIMITING__ANONYMOUSREGISTRATION_IPPERMITLIMIT", "13", path)],
+            _ => []
+        });
         using var environment = BootstrapEnvironment(server.Url, Guid.CreateVersion7().ToString("N"), false);
         var builder = Bootstrap("Infisical");
         builder.AddSecretAuthorityConfiguration("Testing");
@@ -127,7 +169,7 @@ public sealed class ConfigurationAuthorityRegressionTests
     }
 
     [Test]
-    public async Task Infisical_RecursiveResponseRetainsSiblingNamespacesAndCannotOverwritePrimaryDatabase()
+    public async Task Infisical_RecursiveResponseCannotPublishAnyConfiguration()
     {
         await using var server = await SecretServer.StartAsync(_ =>
         [
@@ -145,38 +187,51 @@ public sealed class ConfigurationAuthorityRegressionTests
             Environment = "testing",
             Paths = ["/database"],
         });
-        source.Load();
+        await Assert.That(() => source.Load()).Throws<InvalidOperationException>();
         source.TryGet("Database:Host", out string? primary);
         source.TryGet("Database:One:Token", out string? first);
         source.TryGet("Database:Two:Token", out string? second);
         source.TryGet("DATABASE_HOST", out string? flatPrimary);
 
-        await Assert.That(primary).IsEqualTo("primary.example.test");
-        await Assert.That(flatPrimary).IsEqualTo("primary.example.test");
-        await Assert.That(first).IsEqualTo("first-value");
-        await Assert.That(second).IsEqualTo("second-value");
+        await Assert.That(primary).IsNull();
+        await Assert.That(flatPrimary).IsNull();
+        await Assert.That(first).IsNull();
+        await Assert.That(second).IsNull();
     }
 
     [Test]
-    public async Task Bff_RecursiveResponseRetainsNestedNamespaces()
+    public async Task Bff_RecursiveResponseOutsideExactPurposeFailsClosed()
     {
         await using var server = await SecretServer.StartAsync(_ =>
         [
-            new("TOKEN", "first-value", "/blazor/one"),
-            new("TOKEN", "second-value", "/blazor/two"),
+            new("KEYCLOAK_BLAZOR_CLIENT_SECRET", Guid.CreateVersion7().ToString("N"),
+                "/runtime/bff/oidc/keycloak/one"),
         ]);
-        var source = FrontendSource(server.Url, "/blazor");
-        using var configuration = (ConfigurationRoot)new ConfigurationBuilder().Add(source).Build();
+        var source = FrontendSource(server.Url, "/runtime/bff/oidc/keycloak");
+        var builder = new ConfigurationBuilder().Add(source);
+        var exception = await Assert.That(() => builder.Build()).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).Contains("secret_authority_invalid");
+    }
 
-        await Assert.That(configuration["Blazor:One:Token"]).IsEqualTo("first-value");
-        await Assert.That(configuration["Blazor:Two:Token"]).IsEqualTo("second-value");
-        await Assert.That(configuration["TOKEN"]).IsNull();
+    [Test]
+    public async Task Bff_ExactPurposeResponseProjectsOnlyApprovedCredentialKeys()
+    {
+        string secret = Guid.CreateVersion7().ToString("N");
+        await using var server = await SecretServer.StartAsync(_ =>
+        [
+            new("KEYCLOAK_BLAZOR_CLIENT_SECRET", secret, "/runtime/bff/oidc/keycloak")
+        ]);
+        var source = FrontendSource(server.Url, "/runtime/bff/oidc/keycloak");
+        using var configuration = (ConfigurationRoot)new ConfigurationBuilder().Add(source).Build();
+        await Assert.That(configuration["Keycloak:BlazorClientSecret"]).IsEqualTo(secret);
+        await Assert.That(configuration["KEYCLOAK_BLAZOR_CLIENT_SECRET"]).IsNull();
     }
 
     [Test]
     [Arguments("/")]
     [Arguments("/database")]
     [Arguments("/api")]
+    [Arguments("/blazor")]
     public async Task Bff_BackendSecretRootsAreRejectedBeforeFetching(string path)
     {
         await using var server = await SecretServer.StartAsync(_ => []);
@@ -194,10 +249,12 @@ public sealed class ConfigurationAuthorityRegressionTests
     public async Task Bff_DatabaseSecretsInsideFrontendFoldersFailClosed(string key)
     {
         string secret = Guid.CreateVersion7().ToString("N");
-        await using var server = await SecretServer.StartAsync(_ => [new(key, secret, "/blazor")]);
-        var builder = new ConfigurationBuilder().Add(FrontendSource(server.Url, "/blazor"));
+        await using var server = await SecretServer.StartAsync(_ =>
+            [new(key, secret, "/runtime/bff/oidc/keycloak")]);
+        var builder = new ConfigurationBuilder().Add(FrontendSource(server.Url, "/runtime/bff/oidc/keycloak"));
 
         var exception = await Assert.That(() => builder.Build()).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message).Contains("bff_database_configuration_forbidden");
         await Assert.That(exception!.Message).DoesNotContain(secret);
     }
 

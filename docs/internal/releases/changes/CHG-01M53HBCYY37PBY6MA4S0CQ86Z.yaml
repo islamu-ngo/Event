@@ -1,0 +1,30 @@
+Change-Id: CHG-01M53HBCYY37PBY6MA4S0CQ86Z
+Title: "Admit execute-only Runtime reference catalogue reads"
+Type: fix
+Scope: access
+Summary: "Populate reference caches through a closed native projection without direct source-table access."
+Group: runtime-reference-catalogue-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Runtime executes a closed lookup projection; other accounts and tenant-owned event types remain excluded.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Requires the native reference catalogue contract and enrolled Runtime executor.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Diagnose empty caches without granting direct role-table access or switching to Global.

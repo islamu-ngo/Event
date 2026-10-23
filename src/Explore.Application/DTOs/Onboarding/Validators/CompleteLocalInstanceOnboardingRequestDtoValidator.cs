@@ -1,6 +1,6 @@
 
 using System.Net.Mail;
-using Explore.Application.Configuration;
+using Explore.Domain.Authentication;
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Onboarding.Validators;
@@ -16,9 +16,8 @@ public sealed class CompleteLocalInstanceOnboardingRequestDtoValidator : Abstrac
         RuleFor(request => request.Username).NotEmpty().MaximumLength(256)
             .Must(username => username.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '.' or '_' or '+'))
             .WithMessage("A bounded Local username without an email separator is required.");
-        RuleFor(request => request.TemporaryPassword).NotEmpty()
-            .MinimumLength(LocalIdentityOptions.MinimumPasswordLength)
-            .MaximumLength(LocalIdentityOptions.MaximumPasswordLength);
+        RuleFor(request => request.TemporaryPassword)
+            .Must(password => LocalPasswordPolicy.TryNormalizeNewCredential(password, out _));
         RuleFor(request => request.Email).MaximumLength(256)
             .Must(email => email is null || (MailAddress.TryCreate(email, out var address)
                 && string.Equals(address.Address, email, StringComparison.OrdinalIgnoreCase)))

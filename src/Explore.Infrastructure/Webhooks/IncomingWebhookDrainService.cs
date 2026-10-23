@@ -82,9 +82,9 @@ public sealed class IncomingWebhookDrainService(
     private async Task<IReadOnlyList<IncomingWebhookClaim>> ClaimBatchAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IIncomingWebhookMessageRepository>();
+        var repository = scope.ServiceProvider.GetRequiredService<IIncomingWebhookQueueRepository>();
         var claimedAt = GetUtcNow();
-        return await repository.ClaimDueAsync(
+        return await repository.ClaimMessagesAsync(
             new IncomingWebhookClaimRequest(
                 CreateLeaseOwner(),
                 _settings.BatchSize,
@@ -142,13 +142,9 @@ public sealed class IncomingWebhookDrainService(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var repository = scope.ServiceProvider.GetRequiredService<IIncomingWebhookMessageRepository>();
-                renewed = await repository.TryRenewClaimAsync(
-                    claim.TenantId,
-                    claim.IncomingWebhookMessageId,
-                    claim.LeaseToken,
-                    claim.ProcessingFence,
-                    claim.ProcessingGeneration,
+                var repository = scope.ServiceProvider.GetRequiredService<IIncomingWebhookQueueRepository>();
+                renewed = await repository.TryRenewMessageAsync(
+                    claim,
                     observedAt,
                     leaseExpiresAt,
                     executionCancellation.Token);

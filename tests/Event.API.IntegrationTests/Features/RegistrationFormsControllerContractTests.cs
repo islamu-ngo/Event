@@ -7,6 +7,7 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationAnalytics;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.RegistrationAnalytics;
@@ -25,6 +26,19 @@ namespace Event.Api.IntegrationTests.Features;
 
 public sealed class RegistrationFormsControllerContractTests
 {
+    [Test]
+    public async Task TemplateCreationSuppliesItsSourceEventForPersistedAuthorization()
+    {
+        Guid eventId = Guid.CreateVersion7(), formId = Guid.CreateVersion7();
+        ISecureRequest request = new CreateRegistrationFormTemplateCommand(new(
+            "Template", "Source form", "event", null, eventId, formId, Guid.CreateVersion7(), false));
+        await Assert.That(request.ResourceId).IsEqualTo(formId.ToString());
+        await Assert.That(request.AuthorizationFacts).IsTypeOf<EventScopedAuthorizationFacts>();
+        var facts = (EventScopedAuthorizationFacts)request.AuthorizationFacts!;
+        await Assert.That(facts.EventId).IsEqualTo(eventId);
+        await Assert.That(facts.TenantId).IsEqualTo(Guid.Empty);
+    }
+
     [Test]
     public async Task Preflight_UsesPrimaryPostRouteAndOperationId()
     {

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5374W9PE6THV1CYANCBF1XK
+Title: "Retain original registration creation identity beyond response cleanup"
+Type: feat
+Scope: access
+Summary: "Model immutable registration creation evidence scoped to original tenant, account, trusted principal scope and exact operation key."
+Group: registration-creation-domain-receipt
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Tenant attribution cannot change and retained fingerprints do not reopen operation identity after response cleanup.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Domain receipt only; persistence retention, generated migration parity and native creation admission remain required.

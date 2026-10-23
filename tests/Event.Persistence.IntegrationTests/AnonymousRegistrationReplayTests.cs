@@ -82,10 +82,19 @@ public sealed class AnonymousRegistrationReplayTests
         interruptedRequest.Cancel();
         await Assert.That(async () => await pending).Throws<OperationCanceledException>();
 
-        var changed = await observer.ServiceProvider.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
-            [new(null, GovernanceSettingKeys.PublicExperience.VisitorAccessMode, VisitorAccessSettingMutationKind.SetValue,
-                "\"DirectoryListingOnly\"")], fixture.UserId);
-        await Assert.That(changed.Success).IsTrue();
+        // Arrange a separately committed policy image, not a provider-setup request
+        // impersonated by the recovering visitor.
+        await using (var setup = EmailDispatchSqliteFixture.CreateContext(fixture.DatabasePath))
+        {
+            setup.SystemSettings.Add(new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
+                Value = "\"DirectoryListingOnly\"",
+                ValueType = SettingValueType.String
+            });
+            await setup.SaveChangesAsync();
+        }
         clock.Now = proof.Challenge.ExpiresAt.AddMinutes(1);
         var retryRequest = await EventVisitorCapabilitySqliteFixture.ValidateGuestProofAsync(observer.ServiceProvider, proof);
         var starter = observer.ServiceProvider.GetRequiredService<IRegistrationOrderStarter>();
@@ -107,11 +116,11 @@ public sealed class AnonymousRegistrationReplayTests
         await Assert.That(hold.ConcurrencyStamp).IsEqualTo(originalHold.ConcurrencyStamp);
         await Assert.That(await inventory.GetAllocatedQuantityAsync(hold.CapacityPoolId, fixture.TenantId, CancellationToken.None)).IsEqualTo(1);
         await Assert.That(deadline.CallCount).IsEqualTo(1);
-        var durableClaim = await observer.ServiceProvider.GetRequiredService<IIdempotencyRepository>()
-            .FindAsync(proof.Binding.IdempotencyKey, fixture.TenantId);
+        var database = observer.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var durableClaim = await database.IdempotencyRecords.AsNoTracking().SingleAsync(
+            record => record.Key == proof.Binding.IdempotencyKey && record.TenantId == fixture.TenantId);
         await Assert.That(durableClaim!.StatusCode).IsEqualTo(IdempotencyRecord.InProgressStatusCode);
         await Assert.That(durableClaim.ResponseBody).IsNull();
-        var database = observer.ServiceProvider.GetRequiredService<ExploreDbContext>();
         await Assert.That(await database.RegistrationOrders.CountAsync()).IsEqualTo(1);
         await Assert.That(await database.RegistrationOrderLines.CountAsync()).IsEqualTo(1);
         await Assert.That(await database.RegistrationInventoryHolds.CountAsync()).IsEqualTo(1);

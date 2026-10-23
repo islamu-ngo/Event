@@ -14,6 +14,7 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -104,7 +105,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         values.Remove("INSTANCE_BOOTSTRAP_ADMIN_EMAIL");
         var provider = CreateProvider(database.Repository, BuildConfiguration(values));
         await new ConfiguredAdministratorBootstrapStartupRunner(provider, database.Repository, database.UnitOfWork,
-            new FixedTimeProvider(PreparedAt)).PrepareAsync();
+            new FixedTimeProvider(PreparedAt), database.EnrollmentGate).PrepareAsync();
         ProviderAccountKey account = providerCode == "keycloak"
             ? PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(Authority, subject)
             : PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(AtprotoDid.Parse(subject));
@@ -299,7 +300,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         IConfigurationRoot configuration = ConfiguredConfiguration();
         ConfiguredAdministratorBootstrapProvider provider = CreateProvider(database.Repository, configuration);
         var runner = new ConfiguredAdministratorBootstrapStartupRunner(
-            provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt));
+            provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt), database.EnrollmentGate);
         await runner.PrepareAsync();
         ProviderAccountKey exact = provider.ReadConfiguration().AccountKey!;
 
@@ -328,7 +329,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         IConfigurationRoot configuration = ConfiguredConfiguration();
         ConfiguredAdministratorBootstrapProvider provider = CreateProvider(database.Repository, configuration);
         var runner = new ConfiguredAdministratorBootstrapStartupRunner(
-            provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt));
+            provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt), database.EnrollmentGate);
 
         await runner.PrepareAsync();
         await runner.PrepareAsync();
@@ -354,7 +355,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         IConfigurationRoot configuration = ConfiguredConfiguration();
         ConfiguredAdministratorBootstrapProvider provider = CreateProvider(database.Repository, configuration);
         var runner = new ConfiguredAdministratorBootstrapStartupRunner(
-            provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt));
+            provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt), database.EnrollmentGate);
         await runner.PrepareAsync();
         BootstrapEvidence before = Evidence((await database.Repository.GetAll()).Single());
 
@@ -386,7 +387,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         IConfigurationRoot configuration = ConfiguredConfiguration();
         ConfiguredAdministratorBootstrapProvider provider = CreateProvider(database.Repository, configuration);
         var runner = new ConfiguredAdministratorBootstrapStartupRunner(
-            provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt));
+            provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt), database.EnrollmentGate);
         await runner.PrepareAsync();
         InstanceBootstrapState current = (await database.Repository.GetCurrent())!;
         _ = current.CompleteConfiguredAdministrator(
@@ -434,7 +435,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
             IConfigurationRoot configuration = ConfiguredConfiguration();
             ConfiguredAdministratorBootstrapProvider provider = CreateProvider(database.Repository, configuration);
             var runner = new ConfiguredAdministratorBootstrapStartupRunner(
-                provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt));
+                provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt), database.EnrollmentGate);
             await runner.PrepareAsync();
             InstanceBootstrapState current = (await database.Repository.GetCurrent())!;
             _ = current.CompleteConfiguredAdministrator(
@@ -465,14 +466,14 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         ConfiguredAdministratorBootstrapProvider interactiveProvider =
             CreateProvider(database.Repository, interactiveConfiguration);
         var interactiveRunner = new ConfiguredAdministratorBootstrapStartupRunner(
-            interactiveProvider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt));
+            interactiveProvider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt), database.EnrollmentGate);
         await interactiveRunner.PrepareAsync();
         await Assert.That(await database.Repository.GetCurrent()).IsNull();
 
         ConfiguredAdministratorBootstrapProvider configuredProvider =
             CreateProvider(database.Repository, ConfiguredConfiguration());
         var configuredRunner = new ConfiguredAdministratorBootstrapStartupRunner(
-            configuredProvider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt));
+            configuredProvider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt), database.EnrollmentGate);
         await configuredRunner.PrepareAsync();
         BootstrapEvidence before = Evidence((await database.Repository.GetCurrent())!);
         await Assert.That(async () => await interactiveRunner.PrepareAsync())
@@ -531,6 +532,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         services.AddScoped<ExploreDbContext>(_ => database.Context);
         services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+        services.AddScoped<IEventDiscoveryEnrollmentGate, EventDiscoveryEnrollmentGate>();
         services.ConfigureInfrastructureServices(configuration);
         await using ServiceProvider serviceProvider = services.BuildServiceProvider();
         await using AsyncServiceScope scope = serviceProvider.CreateAsyncScope();
@@ -713,11 +715,13 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
             Context = context;
             Repository = repository;
             UnitOfWork = new EfCoreUnitOfWork(context);
+            EnrollmentGate = new EventDiscoveryEnrollmentGate(context);
         }
 
         public ExploreDbContext Context { get; }
         public InstanceBootstrapStateRepository Repository { get; }
         public EfCoreUnitOfWork UnitOfWork { get; }
+        public EventDiscoveryEnrollmentGate EnrollmentGate { get; }
 
         public static async Task<BootstrapDatabase> CreateAsync()
         {
@@ -732,6 +736,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
             });
             var options = builder.UseSqlite(connection).UseSnakeCaseNamingConvention().Options;
             var context = new ExploreDbContext(options);
+            context.BindTenantLease();
             await context.Database.EnsureCreatedAsync();
             return new BootstrapDatabase(
                 connection,
@@ -741,6 +746,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
 
         public async ValueTask DisposeAsync()
         {
+            await EnrollmentGate.DisposeAsync();
             await Context.DisposeAsync();
             await _connection.DisposeAsync();
         }

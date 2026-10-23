@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Admissions;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Notifications;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -31,6 +32,15 @@ public sealed class AdmissionIssuanceRepository(
         bool acquireAuthorityFences,
         CancellationToken cancellationToken)
     {
+        if (request.FinalizationClaim is { } claim)
+        {
+            if (!acquireAuthorityFences ||
+                claim.TenantId != request.TenantId || claim.RegistrationOrderId != request.RegistrationOrderId ||
+                claim.EffectId != request.FinalizationEffectId ||
+                !await new RegistrationFinalizationRepository(dbContext, timeProvider)
+                    .TryAcquireExecutionAsync(claim, cancellationToken))
+                throw new RegistrationFinalizationCustodyLostException();
+        }
         if (acquireAuthorityFences)
         {
             await RelationalEntityRowFence.AcquireAsync<RegistrationFinalizationEffect>(
@@ -288,6 +298,13 @@ public sealed class AdmissionIssuanceRepository(
         AdmissionIssuancePersistenceRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.FinalizationClaim is { } claim &&
+            (claim.TenantId != request.TenantId || claim.RegistrationOrderId != request.RegistrationOrderId ||
+             claim.EffectId != request.FinalizationEffectId ||
+             !await new RegistrationFinalizationRepository(dbContext, timeProvider)
+                 .TryAcquireExecutionAsync(claim, cancellationToken)))
+            throw new RegistrationFinalizationCustodyLostException();
+
         List<AdmissionTicket> existing = await dbContext.AdmissionTickets
             .Include(ticket => ticket.Credentials)
             .Where(ticket => ticket.TenantId == request.TenantId &&
@@ -309,6 +326,11 @@ public sealed class AdmissionIssuanceRepository(
             await dbContext.AdmissionDeliveryIntents.AddRangeAsync(intents, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+
+        if (request.FinalizationClaim is { } original &&
+            !await new RegistrationFinalizationRepository(dbContext, timeProvider)
+                .TryAcquireExecutionAsync(original, cancellationToken))
+            throw new RegistrationFinalizationCustodyLostException();
 
         AdmissionTicket[] all = existing.Concat(issued).ToArray();
         return new AdmissionIssuanceResult(

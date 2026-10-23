@@ -2,6 +2,7 @@
 using System.Collections.Immutable;
 using Explore.Application.Notifications;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 
 namespace Explore.Application.Contracts.Services;
 
@@ -61,6 +62,14 @@ public static class VisitorAccessSettingMutationGuard
 public interface IVisitorAccessSettingsWriter
 {
     Task<VisitorAccessSettingsWriteResult> ApplyAsync(
+        ImmutableArray<VisitorAccessSettingMutation> mutations,
+        HumanCommitSubject subject,
+        SettingsMutationOperation operation,
+        Guid? actorUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Trusted internal entry, never selected from the nullable audit actor.</summary>
+    Task<VisitorAccessSettingsWriteResult> ApplyInternalAsync(
         ImmutableArray<VisitorAccessSettingMutation> mutations,
         Guid? actorUserId,
         CancellationToken cancellationToken = default);

@@ -22,16 +22,6 @@ public sealed record AuthorizationProviderConfigurationDto
     public string CerbosAdminEndpoint { get; init; } = string.Empty;
 
     /// <summary>
-    /// Whether a deployment-provided Admin API username is available. The value is never returned.
-    /// </summary>
-    public bool CerbosAdminUsernameConfigured { get; init; }
-
-    /// <summary>
-    /// Whether a deployment-provided Admin API password is available. The value is never returned.
-    /// </summary>
-    public bool CerbosAdminPasswordConfigured { get; init; }
-
-    /// <summary>
     /// Whether a Cerbos gRPC endpoint is available from deployment configuration.
     /// The endpoint can prefill application-managed setup without selecting Cerbos or locking the provider choice.
     /// </summary>
@@ -72,8 +62,4 @@ public sealed record AuthorizationProviderConfigurationDto
     /// </summary>
     public SecretOwnershipDto CerbosEndpointOwnership { get; init; } = new();
 
-    /// <summary>
-    /// Ownership metadata for Cerbos Admin API credentials. Values are never returned.
-    /// </summary>
-    public SecretOwnershipDto CerbosAdminCredentialsOwnership { get; init; } = new();
 }

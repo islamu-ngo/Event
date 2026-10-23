@@ -32,14 +32,14 @@ public static class AiAssistantSettingDefinitions
         Description: "Optional AI provider endpoint URL (for self-hosted or compatible APIs)",
         MaxScope: SettingScope.Tenant);
 
-    public static readonly SettingDefinition ApiKey = new(
-        Key: GovernanceSettingKeys.AiAssistant.ApiKey,
+    public static readonly SettingDefinition CredentialScope = new(
+        Key: GovernanceSettingKeys.AiAssistant.CredentialScope,
         ValueType: SettingValueType.String,
-        DefaultValue: "\"\"",
+        DefaultValue: "\"none\"",
         Category: "AiAssistant",
-        Description: "AI provider API key",
+        Description: "AI credential reference scope; secret values remain in the selected secret authority",
         MaxScope: SettingScope.Tenant,
-        IsSensitive: true);
+        AllowedValues: ["none", "instance", "tenant"]);
 
     public static readonly SettingDefinition ModelId = new(
         Key: GovernanceSettingKeys.AiAssistant.ModelId,
@@ -171,7 +171,7 @@ public static class AiAssistantSettingDefinitions
 
     public static IReadOnlyList<SettingDefinition> All =>
     [
-        Enabled, Provider, EndpointUrl, ApiKey, ModelId, AllowedModelIds, MaxInputTokens, MaxOutputTokens,
+        Enabled, Provider, EndpointUrl, CredentialScope, ModelId, AllowedModelIds, MaxInputTokens, MaxOutputTokens,
         Temperature, TimeoutSeconds, RetentionDays, DailyMessageLimit, DailyTenantMessageLimit,
         ConcurrentRunLimit, SelectedReferenceLimit,
         ToolProposalsEnabled, StreamingEnabled, AllowAnonymousAccess, MaxAiContextSensitivity, PiiDisclosureEnabled

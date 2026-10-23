@@ -7,15 +7,18 @@ using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Domain.ValueObjects;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Authorization;
+using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventPublicActions.Handlers.Commands;
 
 public sealed class UpdateEventPublicActionCommandHandler(
-    IEventRepository eventRepository,
     IEventPublicActionRepository actionRepository,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
-    ICurrentUserService currentUserService)
+    ICurrentUserService currentUserService,
+    RequestAuthorization<UpdateEventPublicActionCommand> authorization,
+    ILogger<UpdateEventPublicActionCommandHandler> logger)
     : ICommandHandler<UpdateEventPublicActionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -29,43 +32,43 @@ public sealed class UpdateEventPublicActionCommandHandler(
             return Failure(request.ActionId, "Public action failed validation.", validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        if (currentUserService.UserId is null)
+        if (!currentUserService.IsAuthenticated || currentUserService.UserId is not { } userId)
         {
             return Failure(request.ActionId, "Public action could not be updated.", ["An authenticated user is required."]);
         }
 
-        var action = await actionRepository.GetForUpdateAsync(request.ActionId, cancellationToken);
-        if (action is null || action.EventId != request.EventId || action.TenantId != tenantContext.TenantId)
+        await authorization.AuthorizeAsync(request, logger, cancellationToken);
+        return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            return Failure(request.ActionId, "Public action could not be updated.", ["Public action was not found for this event."]);
-        }
+            var @event = await actionRepository.GetAuthorizedEventForMutationAsync(
+                tenantContext.TenantId, userId, request.EventId, token);
+            if (@event is null)
+                return BaseCommandResponse.Authorization<Guid>();
 
-        var @event = await eventRepository.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
-        if (@event is null || @event.TenantId != tenantContext.TenantId)
-        {
-            return Failure(request.ActionId, "Public action could not be updated.", ["Event was not found in the current tenant."]);
-        }
+            var action = await actionRepository.GetForUpdateAsync(request.ActionId, token);
+            if (action is null || action.EventId != request.EventId || action.TenantId != tenantContext.TenantId)
+            {
+                return Failure(request.ActionId, "Public action could not be updated.", ["Public action was not found for this event."]);
+            }
 
-        if (@event.ParticipationConfiguration is null
-            || !EventAuthorityRules.IsPublicActionAllowed(
-                @event.ParticipationConfiguration.ParticipationHandlingModeId,
-                request.Action.KindId))
-        {
-            return Failure(
-                request.ActionId,
-                "Public action could not be updated.",
-                ["Public action kind is not available for this event's participation mode."]);
-        }
+            if (@event.ParticipationConfiguration is null
+                || !EventAuthorityRules.IsPublicActionAllowed(
+                    @event.ParticipationConfiguration.ParticipationHandlingModeId,
+                    request.Action.KindId))
+            {
+                return Failure(
+                    request.ActionId,
+                    "Public action could not be updated.",
+                    ["Public action kind is not available for this event's participation mode."]);
+            }
 
-        if (action.ConcurrencyStamp != request.Action.ExpectedConcurrencyStamp)
-        {
-            return Failure(request.ActionId, "Public action could not be updated.", ["Public action changed since it was loaded."]);
-        }
+            if (action.ConcurrencyStamp != request.Action.ExpectedConcurrencyStamp)
+            {
+                return Failure(request.ActionId, "Public action could not be updated.", ["Public action changed since it was loaded."]);
+            }
 
-        async Task<BaseCommandResponse<Guid>> PersistAsync(CancellationToken ct)
-        {
             if (request.Action.IsPrimary
-                && await actionRepository.HasOtherPrimaryAsync(request.EventId, request.ActionId, ct))
+                && await actionRepository.HasOtherPrimaryAsync(request.EventId, request.ActionId, token))
             {
                 return Failure(request.ActionId, "Public action could not be updated.", ["The event already has a primary public action."]);
             }
@@ -77,13 +80,11 @@ public sealed class UpdateEventPublicActionCommandHandler(
             action.IsPrimary = request.Action.IsPrimary;
             action.SetDestination(ExternalActionUrl.Create(request.Action.Url));
 
+            token.ThrowIfCancellationRequested();
             await actionRepository.Update(action);
+            token.ThrowIfCancellationRequested();
             return Success(action.Id, "Public action updated pending review.");
-        }
-
-        return request.Action.IsPrimary
-            ? await unitOfWork.ExecuteSerializableAsync(PersistAsync, cancellationToken)
-            : await PersistAsync(cancellationToken);
+        }, cancellationToken);
     }
 
     private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -93,6 +93,7 @@ public sealed record PatchAuthProviderConfigurationDto
     public bool HasChanges() => Configuration.HasValue;
 }
 
+[System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
 public sealed record AuthProviderConfigurationWriteDto
 {
     public int PrimaryProviderId { get; init; } =
@@ -104,7 +105,6 @@ public sealed record AuthProviderConfigurationWriteDto
     public string AtprotoPublicUrl { get; init; } = string.Empty;
     public bool GoogleSsoEnabled { get; init; }
     public string GoogleClientId { get; init; } = string.Empty;
-    public string GoogleClientSecret { get; init; } = string.Empty;
     public bool LockAtprotoLoginEnabled { get; init; }
     public bool LockGoogleSsoEnabled { get; init; }
     public global::Explore.Domain.Enums.PublicOnboardingPolicy KeycloakPublicOnboardingPolicy { get; init; }

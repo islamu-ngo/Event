@@ -25,6 +25,15 @@ This runbook guides operators through deploying and operating an external **Cerb
 
 ## 1. Architecture Overview
 
+Keep Cerbos server verifier/database values in the Cerbos resources, not the
+Event API/BFF environment or their Infisical read roots. The API reads only
+decision metadata from `/runtime/api/authorization/cerbos`. Publish through
+operator-owned authority and supply the independently signed deployment receipt;
+Event has no startup/role-change publisher or standing Cerbos administrator.
+Use separate runtime machine identities and complete the
+[consumer isolation cutover](../configuration-and-operations/infisical.md#consumer-isolation-cutover)
+before revoking old grants.
+
 ```
                           Internet / Clients
                                  │
@@ -282,6 +291,34 @@ docker run --rm -it \
 ---
 
 ## 10. Connecting ISLAMU Event to Cerbos
+
+For Event's Admin API operations, configure an origin such as
+`https://admin.example.org:3593`, without an endpoint path, credentials, query or
+fragment. Tenant BYO origins must use HTTPS and resolve only to public addresses.
+Private operator-managed origins are permitted only when explicitly configured
+for the instance. Redirects and cloud metadata destinations are blocked for both.
+The former insecure/private BYO opt-out options are removed; use a public HTTPS
+BYO endpoint rather than relying on those development switches.
+
+Keep policy and schema files stable while exporting a package from Event. Export
+checks each file against the manifest's recorded size and SHA-256 immediately
+before adding it to the ZIP. If a file changes, export fails instead of returning
+an archive with mismatched contents. Stabilize the package and request a new export.
+
+Event publication and status logs report bounded categories and HTTP status,
+not provider exception types, endpoints, package identifiers, content hashes, or
+raw transport errors. Use the operation's issue code for recovery. If an unexpected
+publication failure occurs, inspect the provider before retrying: a failed local
+operation does not prove that remote changes were rolled back.
+
+When Event compiles a package for publication or export, it limits the combined
+policy/schema set to 256 files, 2 MiB per file, and 16 MiB total. Files must be
+valid UTF-8. Rewrite YAML anchors, aliases, explicit tags, merge keys, duplicate
+keys, and multiple documents as explicit mappings. JSON duplicate members and
+`$type` metadata are rejected. Nesting is limited to 32; YAML also limits parser
+events to 65,536 and individual scalar text to 65,536 characters. Rejection occurs
+before provider handoff. These are Event compiler limits, not claims about direct
+`cerbosctl` upload behavior.
 
 In your ISLAMU Event `.env` configuration file (see [Environment Variables Reference](../configuration-and-operations/environment-variables.md#10-advanced-authorization-cerbos-pdp)), configure the Cerbos PDP connection:
 

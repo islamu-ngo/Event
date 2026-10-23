@@ -2,6 +2,7 @@ namespace Explore.Blazor.Client.Contracts.InstanceAdmin;
 
 public static class InstanceAdminLinkRelations
 {
+    public const string AuthenticationCredentialCutovers = "authentication-credential-cutovers";
     public const string LocalIdentities = "local-identities";
     public const string CreateLocalIdentity = "create-local-identity";
     public const string IssueTemporaryCredential = "issue-temporary-credential";

@@ -54,7 +54,7 @@ public sealed class AnonymousRegistrationChallengeIssueTests
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
         var target = await fixture.SeedEventAsync(published: true);
         await Assert.That((await IssueAsync(fixture, target.Id)).IsSuccess).IsTrue();
-        var changed = await fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(
+        var changed = await fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyInternalAsync(
             [new(null, GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
                 VisitorAccessSettingMutationKind.SetValue, "\"DirectoryListingOnly\"")], fixture.UserId);
         await Assert.That(changed.Success).IsTrue();

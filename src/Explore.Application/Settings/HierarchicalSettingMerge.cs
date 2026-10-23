@@ -18,6 +18,31 @@ public static class HierarchicalSettingMerge
         IReadOnlyDictionary<string, UserPreference>? userPreferences = null)
     {
         systemSettings.TryGetValue(key, out var systemSetting);
+        TenantSetting? tenantSetting = null;
+        tenantSettings?.TryGetValue(key, out tenantSetting);
+        OrganizationSetting? organizationSetting = null;
+        organizationSettings?.TryGetValue(key, out organizationSetting);
+        GroupSetting? groupSetting = null;
+        groupSettings?.TryGetValue(key, out groupSetting);
+        UserPreference? userPreference = null;
+        userPreferences?.TryGetValue(key, out userPreference);
+        systemSettings.TryGetValue(GovernanceSettingKeys.TenantDelegation.LockSmtp, out var delegation);
+
+        return Resolve(key, new SettingMergeFacts(
+            systemSetting is null ? null : new SystemSettingFacts(
+                systemSetting.Value, systemSetting.ValueType, systemSetting.IsLocked,
+                systemSetting.Description, systemSetting.Category, systemSetting.AllowedValues),
+            tenantSetting is null ? null : new TenantSettingFacts(tenantSetting.Value, tenantSetting.IsLocked),
+            organizationSetting?.Value,
+            groupSetting?.Value,
+            userPreference?.Value,
+            tenantSettings is not null,
+            delegation?.Value));
+    }
+
+    public static ResolvedSetting? Resolve(string key, SettingMergeFacts facts)
+    {
+        var systemSetting = facts.System;
         var definition = SettingRegistry.Get(key);
 
         if (systemSetting is null && definition is null)
@@ -31,10 +56,9 @@ public static class HierarchicalSettingMerge
 
         // Instance locks stop all overrides in both single-tenant and multi-tenant deployments.
         // A non-null tenant map denotes tenant resolution even when no overrides exist.
-        var smtpDelegationLocked = tenantSettings is not null
+        var smtpDelegationLocked = facts.HasTenantContext
             && EmailSettingDefinitions.All.Any(setting => setting.Key == key)
-            && (!systemSettings.TryGetValue(GovernanceSettingKeys.TenantDelegation.LockSmtp, out var delegation)
-                || SettingValueSerializer.DeserializeBool(delegation.Value, true));
+            && SettingValueSerializer.DeserializeBool(facts.SmtpDelegationValue, true);
         var isInstanceLocked = systemSetting?.IsLocked == true || smtpDelegationLocked;
         if (isInstanceLocked)
         {
@@ -54,8 +78,7 @@ public static class HierarchicalSettingMerge
         var source = SettingSource.SystemDefault;
         var isTenantLocked = false;
         if (AllowsScope(definition, SettingScope.Tenant)
-            && tenantSettings is not null
-            && tenantSettings.TryGetValue(key, out var tenantOverride))
+            && facts.Tenant is { } tenantOverride)
         {
             effectiveValue = tenantOverride.Value;
             source = SettingSource.TenantOverride;
@@ -79,27 +102,25 @@ public static class HierarchicalSettingMerge
         }
 
         if (AllowsScope(definition, SettingScope.Organization)
-            && organizationSettings is not null
-            && organizationSettings.TryGetValue(key, out var orgOverride))
+            && facts.Organization is { } organizationValue)
         {
-            effectiveValue = orgOverride.Value;
+            effectiveValue = organizationValue;
             source = SettingSource.OrganizationOverride;
         }
 
         if (AllowsScope(definition, SettingScope.Group)
-            && groupSettings is not null
-            && groupSettings.TryGetValue(key, out var groupOverride))
+            && facts.Group is { } groupValue)
         {
-            effectiveValue = groupOverride.Value;
+            effectiveValue = groupValue;
             source = SettingSource.GroupOverride;
         }
 
-        if (userPreferences is not null && userPreferences.TryGetValue(key, out var userPref))
+        if (facts.User is { } userValue)
         {
             var maxScope = definition?.MaxScope ?? SettingScope.Tenant;
             if (maxScope >= SettingScope.User)
             {
-                effectiveValue = userPref.Value;
+                effectiveValue = userValue;
                 source = SettingSource.UserPreference;
             }
         }

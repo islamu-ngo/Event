@@ -12,19 +12,21 @@ public sealed class AnthropicChatProvider : AnthropicCompatibleChatProvider
 
     public AnthropicChatProvider(
         IHttpClientFactory httpClientFactory,
-        IOptions<AiProviderSettings> options,
+        AiProviderConfigurationResolver configuration,
         AiProviderSettingsValidator validator,
-        BusinessMetrics metrics)
+        BusinessMetrics metrics,
+        IOptions<AiResponseLimits>? responseLimits = null)
         : base(
             httpClientFactory,
-            options,
+            configuration,
             validator,
             metrics,
             AiProviderSettings.ProviderAnthropic,
             AiProviderDefaults.ProviderAnthropic,
             HttpClientName,
             DefaultEndpointUrl,
-            "Anthropic provider is not enabled or configured.")
+            "Anthropic provider is not enabled or configured.",
+            responseLimits)
     {
     }
 }

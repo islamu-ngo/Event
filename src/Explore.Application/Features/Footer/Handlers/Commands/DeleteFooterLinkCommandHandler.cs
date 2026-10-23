@@ -10,12 +10,14 @@ public sealed class DeleteFooterLinkCommandHandler(
     IFooterLinkGroupRepository footerLinkGroupRepository,
     IFooterLinkRepository footerLinkRepository,
     ITenantContext tenantContext,
-    FooterLinkMutationGuard mutationGuard)
+    FooterLinkMutationGuard mutationGuard,
+    IFooterOperationExecution footerExecution)
     : ICommandHandler<DeleteFooterLinkCommand, bool>
 {
     public async Task<bool> ExecuteAsync(
         DeleteFooterLinkCommand request, CancellationToken cancellationToken)
     {
+        await footerExecution.RequireOwnedAsync(request, cancellationToken);
         await mutationGuard.EnsureAllowedAsync(tenantContext.TenantId, cancellationToken);
 
         var link = await footerLinkRepository.GetById(request.LinkId);

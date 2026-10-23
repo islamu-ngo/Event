@@ -538,13 +538,13 @@ public sealed class FairReturnOrchestrationEffectConfiguration :
             {
                 table.HasCheckConstraint(
                     "ck_fair_return_effect_status",
-                    "status_id BETWEEN 1 AND 4");
+                    "status_id BETWEEN 1 AND 5");
                 table.HasCheckConstraint(
                     "ck_fair_return_effect_attempts",
                     "attempt_count >= 0 AND maximum_attempts BETWEEN 1 AND 100");
                 table.HasCheckConstraint(
                     "ck_fair_return_effect_state",
-                    "(status_id = 1 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NULL AND dead_lettered_at IS NULL) OR (status_id = 2 AND lease_expires_at IS NOT NULL AND lease_owner IS NOT NULL AND completed_at IS NULL AND dead_lettered_at IS NULL) OR (status_id = 3 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NOT NULL AND dead_lettered_at IS NULL) OR (status_id = 4 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NULL AND dead_lettered_at IS NOT NULL)");
+                    "(status_id IN (1, 5) AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NULL AND dead_lettered_at IS NULL) OR (status_id = 2 AND lease_expires_at IS NOT NULL AND lease_owner IS NOT NULL AND completed_at IS NULL AND dead_lettered_at IS NULL) OR (status_id = 3 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NOT NULL AND dead_lettered_at IS NULL) OR (status_id = 4 AND lease_expires_at IS NULL AND lease_owner IS NULL AND completed_at IS NULL AND dead_lettered_at IS NOT NULL)");
             });
         FairReturnSupplyPolicyConfiguration
             .ConfigureTenantEntity(builder);

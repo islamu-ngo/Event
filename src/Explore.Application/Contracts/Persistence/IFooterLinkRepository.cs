@@ -19,6 +19,10 @@ public interface IFooterLinkRepository : IGenericRepository<TenantFooterLink, Gu
     /// </summary>
     Task<int> GetMaxOrderInGroupAsync(Guid groupId, CancellationToken ct = default);
 
+    Task FenceByGroupIdAsync(Guid groupId, CancellationToken ct = default);
+
+    Task<TenantFooterLink?> GetForMutationAsync(Guid id, Guid groupId, CancellationToken ct = default);
+
     /// <summary>
     /// Deletes all links belonging to a group. Used when deleting the parent group.
     /// </summary>

@@ -343,6 +343,83 @@ An explicit authoritative Actor target is not authorized by DID verification alo
 
 ### Public projection and outbound compensation
 
+`SupersedePriorAsync` takes the constructed successor and matches its tenant,
+source type, source ID, user, DID, collection and record key before changing
+predecessor state. Completed and already-superseded work stays terminal.
+Supersession clears only matching predecessors' processing leases; payload,
+ExpectedCid and dependency evidence remain intact. The caller persists these
+changes with successor insertion in its owning transaction, so rollback restores
+the prior lease and evidence without leaving a successor.
+
+Compensation evidence traversal uses the same complete lineage, including
+source ID, even when a stored predecessor points to the requested successor.
+A matching remote DID/key and successor pointer cannot admit another source's
+payload or CID into conditional remote-write evidence. Traversal retains its
+depth bound and fails closed when that bound is exceeded.
+
+Governance evaluation accepts immutable scalar `SettingMergeFacts` rather than
+requiring persistence entities. The existing entity overload adapts only the
+requested key's values into these facts; the same pure merge preserves registry
+defaults, scope limits, metadata, instance/tenant locks, user precedence and
+SMTP's distinction between instance resolution and an empty tenant context.
+`AtprotoEventGovernanceResolver.Evaluate` then applies the existing typed setting
+group to resolved values. Bounded authority readers can use this path without
+inventing partial entities or reimplementing precedence in native SQL.
+
+Ordinary planning also compares the current session DID with settled record
+ownership before reusing its key or CID, including tombstoned restoration.
+The delivery gate checks exact owned record ID, user, DID, collection/key and
+any expected CID for updates/creates as well as deletes. Account switching
+cannot redirect an old record's authority to a newly linked DID.
+
+Actor moderation acquires the tracked scalar aggregate through
+`GetForModerationAsync`, disabling automatic profile navigation loading. Domain
+suspend/reinstate methods still create the audit record and change the existing
+concurrency stamp. The two moderation commands use a separate closed routing
+selector inside `MutationScopeCommandHandler`; the nine policy command contracts
+remain separate. Domain audit factories assign UUIDv7 IDs; the two audit entity
+configurations use `ValueGeneratedNever` so EF inserts new records discovered
+on tracked subjects instead of treating their assigned keys as existing rows.
+Generated `DomainAssignedModerationAuditKeys` companions align all four provider
+catalogs with those Domain-assigned IDs. Their Up/Down methods are empty because
+this corrects EF key-generation metadata without changing columns or stored data.
+
+Authorization stays outside timing and scope acquisition.
+
+The moderation handlers own a Serializable transaction for subject state,
+audit, disclosure and compensation. `AtprotoModerationCompensationPlanner`
+evaluates bounded immutable facts, retains every exact lineage, and reserves
+successor IDs outside the retry delegate. It preserves the planning-time
+60-second remote window plus five-second processing margin, taking the longest
+predecessor retry/lease delay. No-op suspension still reconciles compensation;
+cache invalidation follows commit. The store rejects weaker transactions and
+cannot open or commit an independent tenant transaction.
+Portable compensation projections restore UTC `DateTime.Kind` on stored
+timestamps before applying that safety calculation; otherwise providers that
+discard Kind could shorten a still-active predecessor lease to the remote-call
+window.
+
+Moderation replacement inserts its fixed Delete temporarily as `Failed`,
+supersedes exact predecessors, then promotes the successor to `Pending` before
+returning. `Failed` is unclaimable and outside active uniqueness; staging first
+satisfies the immediate successor foreign key without competing for the old
+Delete's active slot. Every step belongs to the same Serializable transaction.
+An activation error propagates and rolls back staging and supersession; no
+staging state is committed. PostgreSQL uses a narrowly shaped owner-only
+activation policy, without granting caller DML or adding a role or lease.
+
+`PdsExactLineageActiveUniqueness` includes tenant, source type/ID, user, DID,
+collection and record key, plus source version, operation and payload hash.
+Distinct remote records for one source version no longer collide. Protocol
+identifiers use portable ordinal ASCII mappings, keeping the full key within
+SQL Server/MySQL limits without prefix truncation. MySQL/MariaDB use a nullable
+computed `active_slot`: only Pending/Processing unsuperseded rows have slot 1;
+inactive evidence has null, preserving filtered-uniqueness semantics. Other
+providers retain the active filtered index. Apply generated migrations and the
+migration-owned capability installer before running updated API/workers.
+Downgrade requires reconciling active rows that differ only in the newly added
+lineage fields, because the old coarse unique key cannot represent them.
+
 Inbound event projections use the current tenant presentation, record source version, record tombstone, Event visibility and lifecycle, active Actor, and exact active DID identity as one base gate. Public Draft, Cancelled, and Completed imported projections remain visible. Published imported projections are deduplicated to the local Event branch. Moderated, Archived, deleted, non-public, stale-presentation, tombstoned, Actor-suspended, and identity-ineligible projections are hidden. Exact source redirects use the same visible projection gate, so a hidden record cannot retain a public source redirect.
 
 Outbound publication checks the exact active DID identity at planning and again immediately before delivery. An ineligible Create with no grounded remote mutation is skipped. Grounded `PdsSyncOutbox` work that becomes ineligible because of Actor or exact-DID suspension transactionally converts to a fenced Delete. Moderation reconciliation includes settled ownership and pending or processing Event mutations; exact-identity moderation limits unsettled work to the affected DID. Delete delivery requires the original tenant, user, DID, PDS session, source version, exact outbound-owned record, collection, record key, and, when present, CID to still match. Once those fences pass, a Delete may compensate for later Actor, identity, participation, Event, or payload ineligibility. Source Events remain selectable after soft deletion so privileged remote cleanup can finish. In-flight Create compensation waits beyond the predecessor retry or processing lease safety window. RSVP planning and delivery retain their existing behavior.

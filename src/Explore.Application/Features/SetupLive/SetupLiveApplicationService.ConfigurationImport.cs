@@ -6,6 +6,8 @@ using Explore.Application.Contracts.SetupLive;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using ISLAMU.Wire.Contracts.SetupLive;
+using Explore.Application.Exceptions;
+using System.Runtime.ExceptionServices;
 
 public sealed partial class SetupLiveApplicationService
 {
@@ -60,15 +62,33 @@ public sealed partial class SetupLiveApplicationService
             throw UnavailableConfigurationImport();
 
         // Rotation and revocation share this enrollment-generation fence.
-        await using IAsyncDisposable lease = await operationCoordinator.AcquireAsync(
+        IAsyncDisposable lease = await operationCoordinator.AcquireAsync(
             new SetupSecretBindingCoordinationRequest(
                 tenantId, enrollmentId, admission.Enrollment.Generation),
             cancellationToken);
-        if (!await ValidateConfigurationImportAsync(
-                tenantId, enrollmentId, userId, capability, cancellationToken))
-            throw UnavailableConfigurationImport();
+        Exception? primary = null;
+        T result = default!;
+        try
+        {
+            if (!await ValidateConfigurationImportAsync(
+                    tenantId, enrollmentId, userId, capability, cancellationToken))
+                throw UnavailableConfigurationImport();
 
-        return await action(admission.Enrollment.Generation, cancellationToken);
+            result = await action(admission.Enrollment.Generation, cancellationToken);
+        }
+        catch (Exception failure) { primary = failure; }
+        try { await lease.DisposeAsync(); }
+        catch (Exception cleanup)
+        {
+            Exception evidence = primary is null ? cleanup : new AggregateException(primary, cleanup);
+            if (primary is HumanMutationOutcomeUnknownException)
+                throw new HumanMutationOutcomeUnknownException(evidence);
+            if (primary is TransactionCommittedCleanupException)
+                throw new TransactionCommittedCleanupException(evidence);
+            throw new ConfigurationImportCoordinationCleanupException(evidence);
+        }
+        if (primary is not null) ExceptionDispatchInfo.Capture(primary).Throw();
+        return result;
     }
 
     private static ConfigurationImportSessionException UnavailableConfigurationImport() =>

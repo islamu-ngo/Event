@@ -55,6 +55,12 @@ fence or authorize a delayed synchronization to recreate its personal data.
 
 ## Fresh Registration After Erasure
 
+Erasure removes stored HTTP and AI retry responses, their account linkage and
+request metadata. The original tenant/idempotency-key pair remains reserved
+without a replayable response, so an old request cannot execute again under
+another account. Use a new idempotency key for a new operation. These rejection
+fences are separate from the short-lived `ErasureReceipt` status token.
+
 Ordinary erasure removes profile PII, provider bindings and verified-address
 proofs. It does not create an external-identity registration ban. Otherwise
 admissible external authentication may automatically create a fresh account,

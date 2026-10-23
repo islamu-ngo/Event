@@ -1,6 +1,6 @@
 # Event API Security Remediation - Planning Assessment
 
-Last Updated: 2026-10-07
+Last Updated: 2026-10-18
 
 ## Review Metadata
 
@@ -8,13 +8,17 @@ Last Updated: 2026-10-07
 - Subject: complete pre-release API security remediation and prevention; unified phased programme with delivered one-time issuance baseline
 - Workstream: event-api-security-remediation
 - Report kind: planning-assessment
-- Report status: current
-- Disposition: plan-aligned
-- Evidence cutoff: 2026-10-07
-- Reviewed input: `event-api-security-remediation-r5-cto-20261007`; exact triad hashes in R5 Revalidation Evidence. Read-only source snapshot `0d4ab8d5a62e74ebcd9476a1b47eddda7ea270e1`; prior R1-R4 and PC-CTO-r2 claims retain their historical limits.
+- Report status: current for the scoped R6 EF-first amendment; historical R5 verdict remains revision-bound
+- Disposition: plan-aligned for the scoped R6 design; implementation and operational evidence remain open
+- Evidence cutoff: 2026-10-18
+- Reviewed input: the approved 2026-10-18 Persistence/EF-first plan amendment, active task ledger and external-login ownership packet; bounded evidence recorded under R6. Earlier revisions and their verdicts retain their historical limits.
 - Supersedes: none; the maintained consultation remains the source assessment
 
 ## Executive Summary
+
+R6 reviews the approved EF-first trust-boundary change for account holders, tenants and operators. Proceed with the approved direction while documenting that the selected Global database login gains direct read access to nine identity-binding columns: exact account selection becomes an Application responsibility, not a database-enforced restriction on consumers sharing that login. The mitigation remains planned; implementation, adversarial acceptance and five-provider evidence are not established by this amendment. The scoped review is current / plan-aligned after rechecking the explicit plan mappings and active task ownership. No renewed user approval is required.
+
+The following R5 summary is historical and does not attest the changed R6 database boundary.
 
 The complete API-security programme is **current / plan-aligned to event-api-security-remediation-r5-cto-20261007 for planning**, not implemented, independently security-reviewed or release-certified. The user requested one authoritative phase-ordered triad rather than scattered mandatory backlog. All 31 API finding/mitigation pairs, 209 reference assignments, 53 families, S01–S50 and 22 bug/vulnerability classes remain; provider-credential findings keep a qualified namespace. API-key one-time disclosure is now a delivered baseline from merged PR71, not a pending history rewrite. Broader authority, privacy, custody, resource consumption and operational findings remain open for their actual evidence.
 
@@ -217,6 +221,308 @@ The user's explicit 2026-10-07 instruction satisfies programme execution authori
 
 Evidence level: revision-bound design validation with supplied implementation traceability. The independent read-only assessment performed no product build/test, provider operation, deployment or runtime security verification. The 42-test baseline is lead-executed evidence, not an independently rerun assessment result. Subsequent status/packet-only synchronization does not change the reviewed behavior contracts.
 
+### R6 Scoped EF-first Revalidation — 2026-10-18
+
+**Approved design, planned mitigation; no implementation or operational certification.** The maintainer approved the full EF-first refactor and reaffirmed the shared-Global/no-new-credential choice after handoff. This resolves direction without resolving the evidence obligations below. R6 preserves all historical findings and verdicts; only the affected applications of IVSD-F002/M002, IVSD-F024/M024, IVSD-F025/M025 and IVSD-F027/M027 are revalidated here.
+
+An account holder's external binding can link a provider account to an internal user. Under the approved replacement, Application owns the exact `AuthenticationProviderId` and `ProviderKey` predicates and Persistence executes one untracked EF query returning the existing Domain entity. The selected Global login receives fixed column-level SELECT on `Id`, `UserId`, `AuthenticationProviderId`, `ProviderKey`, `ProviderDisplayName`, `CreatedAt`, `CreatedBy`, `UpdatedAt` and `UpdatedBy`, with physical names resolved from EF metadata. Every consumer sharing that login can query those columns; factory aliases do not isolate database authority. Excluding `User`/`UserPii` joins limits additional disclosure but does not make identity-binding columns anonymous. A deleted user's binding remains subject to the separate current-user and erasure decisions; existence of a binding alone must not restore account authority.
+
+This makes Amanah (stewardship of entrusted identity data) and Rights of People concrete: maintainers control which code receives that login and whether current account checks precede use; operators need truthful documentation of its reach. Sidq requires withdrawing the old exact-account database-isolation claim. The accepted trade-off simplifies shared C# ownership and provider portability while reducing isolation between consumers of the same Global credential. It introduces no new purpose, retention policy, credential authority or authorization waiver.
+
+| Existing finding / mitigation | Scoped lifecycle, severity and claim | Required mitigation and owner |
+| --- | --- | --- |
+| IVSD-F002 / IVSD-M002 | Accepted for remediation; Medium assurance concern; design validation | Persistence/documentation owners publish matching internal and operator descriptions of the fixed-column grant, shared-login exposure and Application predicates; remove obsolete routine/readiness guarantees. |
+| IVSD-F024 / IVSD-M024 | Accepted for remediation; High isolation evidence priority; design validation | Persistence owners retain simple tenant RLS and ordinary-role isolation; fixed explicit nine-column SELECT only, no table-wide SELECT, write, grant option, Runtime read/grant, universal grants or new secret. Prove actual privileges, including inheritance and wrong-login failures. |
+| IVSD-F025 / IVSD-M025 | Accepted for remediation; Medium caller-authority concern; design validation | Application/Persistence owners prove exact provider/account matches, cross-account/provider negatives, untracked results, no User/UserPii join and separate current-user/erasure admission. Shared Global consumers remain inside this trust boundary. |
+| IVSD-F027 / IVSD-M027 | Accepted for remediation; Medium-High by effect; design validation | Capability owners preserve original committing connection/transaction, concurrency and revocation ordering, lease fencing, idempotency, uncertain-commit recovery, erasure anti-resurrection and transactional outbox atomicity throughout later stored-authority removal. |
+
+These mitigations map to S24 (effective tenant database boundary), S25 (persisted resource authorization) and S27/S33 (durable recovery and atomicity), plus the active authentication/lookup, workflow, schema/documentation and final assurance ledger entries. Removing routines must not merely move SQL into C# while losing those guarantees. Final evidence remains PostgreSQL, SQLite, SQL Server, MariaDB and MySQL behavior/migration tests, with actual affected-boundary verification before individual security claims. No new scholarly or legal determination is required by this scoped design review; deployment and release remain separate authorities.
+
+Rejected alternatives within the approved scope are universal/table-wide privileges, inferring grants from live ACLs or future entity properties, treating factory aliases as isolation, joining private user data for convenience, and keeping duplicate stored authorization as a compatibility mechanism. Requiring a new credential was not selected; this assessment records the resulting shared-login risk explicitly instead of silently promising per-consumer isolation.
+
+R6 evidence is the plan's top approved amendment, including **First capability and ethical/security traceability**, the current task ledger, the current-context handoff, and `dev/active/event-api-security-remediation/external-login-ef-ownership.md` (SHA-256 `44004f6599e570d75fe08eacd14c265f1a170c6681fe46594e9a16ac263df5a5`). The reconciled plan SHA-256 is `812a471a9fae079235c303b4d66a57706fab50115dd0a03325d1ef881483be35`; task-ledger SHA-256 is `f67b74ac75df11ccedcee9f6505d5a7b96000ebed1cc6b45aa596443409591b1`. Reviewed HEAD was `bf6aeabd8990b62e656e2e0f7bdf341775a597ea`; the uncommitted design packet is authoritative for this review, not an assertion that HEAD implements it. The parent reports the five EF-first Red tests actually produced four failures, one pass and zero skips; the unexpected Runtime assertion is under fixture-authority investigation. This review did not execute or independently verify that run, and the result supplies no product guarantee. Stakeholder, operational and release evidence remains missing.
+
+#### First capability implementation evidence — 2026-10-18
+
+The external-login capability now uses the shared EF query and fixed direct Global
+column permissions. The obsolete stored routine implementation is removed; an
+existing installation containing its routine or roles is refused without dropping
+data or silently repairing privileges. Paired operator documentation makes fresh
+isolated development provisioning and the shared-Global trust boundary explicit.
+
+The five-test Red result above is historical: its unexpected Runtime result used
+an ad-hoc test login with explicit reads, not the enrolled Runtime identity. The
+corrected native class uses the real enrolled identities. Parent-executed
+`dotnet run --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/ExternalLoginReadEnrollmentTests/*" --minimum-expected-tests 34 --progress off --maximum-parallel-tests 1`
+passed **34/34**, zero failures/skips, exit 0, in 1m25.969s. Independent security
+rereview inspected that receipt and the corrected source. Cases include exact
+account selection, Runtime denial, wrong identities, system-column/grant-option
+drift and direct/nested ADMIN membership escalation. The admission checks inspect
+transitive membership, not merely privileges initially available through inheritance
+or SET ROLE. No other reachable role may hold binding privileges on Global's behalf.
+
+This is evidence for one PostgreSQL capability, not complete implementation of
+the four workstream mitigations. Five-provider behavior, broader current-user/
+erasure flows, later workflow transitions and operational/release assurance remain
+open. Release record: `CHG-01M57X9PSZWNQ67TDK6NZTBVGQ`.
+
+#### Lookup catalogue: shared Runtime reads and truthful cache failure — 2026-10-18
+
+The next bounded capability moves seventeen reference-entity reads from a stored
+selector routine to ordinary, detached EF queries. Every consumer of the enrolled
+Runtime login can now read the explicitly declared reference columns; a factory
+name does not isolate those consumers. This is a documented trust change, not a
+claim that the former execute-only database boundary survives. Role metadata is
+limited to six declared columns; private role assignments, RolePermission and
+UserPii remain outside this capability. Tenant-private EventType rows remain
+protected by the existing tenant filter and forced database RLS.
+
+This applies the existing IVSD-F002/M002 and IVSD-F024/M024 obligations to tenants,
+operators and maintainers: publish the actual shared-login reach, grant only fixed
+columns, reject inherited/grantable/system-column expansion, and retain distinct
+owners' authority. Global receives no catalogue-source permission. Email policy's
+independently governed Role projections remain its own responsibility; Runtime
+cannot borrow email mutation roles or cross membership with either email account.
+No private source inventory or capability is merged for code reuse.
+
+The cache change also implements Sidq (truthful reporting) and Amanah (responsible
+custody): a failed or cancelled load must fail visibly, not present an empty or
+partially refreshed catalogue as success. All seventeen maps are built privately;
+only a complete load whose context has been disposed is atomically published.
+Failure leaves the prior complete snapshot intact. This protects callers from a
+mixed catalogue without pretending the retained snapshot is newly refreshed.
+Queries retain their original Serializable owner and connection; this does not
+claim a transaction-wide snapshot across independent cache queries.
+
+Parent-executed native catalogue verification passed **36/36**, zero failures or
+skips, exit0,5m50.405s (`pr75-catalogue-owner-green.Cbifaf.log`), using
+`dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persistence.IntegrationTests.dll --treenode-filter "/*/*/GlobalLookupCatalogueNativeContractTests/*" --minimum-expected-tests 36 --progress off --maximum-parallel-tests 1`.
+SQLite `LookupDataCacheAtomicityTests` separately passed **4/4**, zero failures or
+skips, exit0,43.473s (`pr75-cache-atomicity-green2.SRdtXz.log`). These are targeted
+runtime receipts, not final provider-matrix or release assurance.
+
+The first refreshed eleven-case actor/fence coexistence run passed ten and failed
+one because a PUBLIC grant was rejected by the shared privilege guard earlier
+than the test expected. The corrected test retains that attack and independently
+asserts Publisher, actor and fence denial; its completed rerun passed **11/11**,
+zero failures/skips, exit0,4m52.974s (`pr75-actor-catalogue-corrected.aQkxd4.log`),
+using the exact filter `/*/*/PostgresAiActorContextReadContractTests/Catalogue*`,
+minimum11. No database guard was relaxed.
+
+The event-read correction intersects each owner's own registered reference sources
+with the fixed Runtime catalogue descriptor; it does not allow table-wide,
+inherited, grantable, system-column or private-source access. The combined working
+tree subsequently passed PublicDetail **39/39**, including twelve catalogue
+coexistence cases, and ResponseClock **21/21**, both with zero failures/skips and
+exit0 (`pr75-catalogue-projection-coexistence.QFPApB.log`). PublicDiscovery26 plus
+native moderation-compensation15 also passed **41/41**, zero failures/skips,
+exit0,27m22.059s (`pr75-public-discovery-compensation-native.mfMxLD.log`). These
+receipts supersede the earlier detail source-guard failure; they are not isolated
+catalogue-candidate evidence or proof of the separate federation-storage vertical.
+
+The combined working-tree private-management/registration API run passed **2/2**,
+zero failures/skips, exit0,4m35.016s
+(`pr75-private-reader-runtime-factory-green.m5JAgD.log`). Its fixture correction
+is separately committed at `56c51e8aeced59cecd7d05ba6d7f4f9915eca262`.
+The exact exported candidate tree `727cc4daa5db7880fbc79ba64866e874be8e5576`
+also compiled: Persistence integration build1422 warnings, zero errors,
+exit0,1m28.65s; API build751 warnings, zero errors, exit0,54s
+(`pr75-exact-catalogue-candidate-build.Jy28KR.log`). The same exported tree then
+passed native catalogue/actor/cache **27/27**, zero failures/skips, exit0,2m38.513s,
+and projection **15/15**, zero failures/skips, exit0,2m27.128s
+(`pr75-exact-catalogue-native-corrected.VUgqth.log`). These are isolated candidate
+receipts. Isolated API2 also passed **2/2**, zero failures/skips, exit0,4m35.682s
+in the same log: 44 targeted tests (27+15+2), distinct from combined API2 evidence.
+This closes isolated catalogue acceptance only. The coordinator owns broader
+validation. This I-VSD addition is documentation-only; the exported product/test
+tree is unchanged. Five-provider behavior and final scanner gates remain open.
+The latest recorded Sonar scan is at `0992e28c7`, before the fixture commit:
+15054/327453 = 4.597301% duplicated new lines, gate ERROR. It supersedes the older
+81d32756b scan, but does not analyze the pending catalogue changes. No current
+catalogue Sonar pass or completed multi-provider assurance is claimed.
+
+Release record: `CHG-01M57ZK3SQYGXXCMHQFQ56EWC2`. Operators must preserve needed
+development data and provision a fresh isolated PostgreSQL cluster when obsolete
+cluster-global roles remain; installation never silently drops them or repairs
+drift. No new credential, personal-data purpose or retention policy is introduced.
+
+### Dedicated federation storage and API-owned discovery metadata amendment
+
+Status: explicit maintainer authorization and reviewed design; runtime assurance
+remains open. The three non-secret ATProto governance settings move to dedicated
+EF-mapped storage so background readers can observe the complete bounded override
+set in one query without gaining private generic-setting access. Domain validates
+the finite keys/values; Application retains lock precedence and the SingleTenant
+exception. Scoped readers must retain the original selected tenant, connection and
+transaction; independent Global reads must include inactive tenants. This is an
+internal backend authority change, not a new public read endpoint or permission
+to expose audit identifiers in telemetry. Dedicated entities retain actor audit
+IDs; those remain backend records, not public DTO fields or diagnostic payloads.
+
+The maintainer separately approved fixed Runtime/Global revision-metadata access
+and complete Global Tenant.Id observation. C# must enforce original human action,
+actual effects, source custody, exact concurrency and atomic completion; simple
+tenant RLS and relational constraints remain. A stolen database credential can now
+tamper with the metadata and undermine revision-based freshness/invalidation.
+The previous function-only protection against that attack is deliberately not
+promised. No Tenant.Id UPDATE, private Tenant/User columns, private generic-setting
+grants, role union or generic privileged executor is authorized by this decision.
+
+The design uses the original pre-transaction membership gate and pre-existing
+revision rows, then ordered epoch locks, exact coverage and EF expected-image
+updates. Managed provisioning already creates its canonical revision; it must not
+insert a second copy. Canonical native writes for unmoved settings retain their
+effect and physical-finished proofs while one C# owner consumes actual private
+completion receipts and advances each affected epoch once. Source or finalization
+failure must poison the original attempt even when caught. Unknown commits are
+not replayed as though rollback were proven.
+
+The maintainer explicitly approved bounded four-column revision INSERT by Runtime
+and Global on each creator's original transaction, with canonical creation and
+workflow authorization in C#. This includes an INSERT-only sealed-null Runtime
+creation boundary, not tenantless Runtime SELECT or UPDATE. A stolen credential
+can fabricate a missing revision within these explicit database privileges; the
+API must not turn that permission into lazy repair or duplicate insertion.
+
+The read-only Runtime parent-setting boundary is now resolved in favor of
+API-owned coordination: shared ordered setting-key leases before transactions,
+retained through settlement, with current-parent revalidation. The maintainer
+rejected a new privileged parent-row-locking routine; no Runtime parent UPDATE
+is authorized. A direct parent-setting write using stolen Global credentials can
+bypass this cooperative protocol. That accepted threat boundary is distinct from
+tenant RLS, and must not be described as database-enforced parent stability.
+Scoped adversarial evidence now exists for participating federation API writers;
+this is not a promise against direct database edits or complete operational readiness.
+
+Historical evidence before the 2026-10-19 checkpoint remains capability-specific: Domain58, storage/compiler15,
+Application facts/routing/background81 and SQLite reader/gate32 passed. All four
+provider migration pairs were generated and source-reviewed, not all applied.
+PostgreSQL enrolled-reader controls2 and exact metadata installation1 passed.
+Reader drift36 passed34/failed2; metadata38 passed37/failed1. Their demonstrated
+RLS/owner-membership gaps have source fixes pending fresh GREEN. The initial-open
+gate test also reproduced an open connector after readiness rejection; its fix is
+source-reviewed, not natively verified. Mutation9 failed host composition before
+authentication/preparation and provides no writer-behavior proof. Production
+source/writer integration, all membership producers, zero-PII diagnostics, real
+native revocation/concurrency/rollback and all five providers remain acceptance gates.
+The new tests and fail-closed scaffolds are not operational capability. No release,
+deployment, old-data deletion or compatibility migration is authorized by this
+design receipt.
+
+Scoped evidence refresh, cutoff2026-10-19, working tree at53f4dc27c plus the
+uncommitted federation amendment: PostgreSQL metadata60 passed with bounded
+INSERT, exact installed permissions, tenant/null-session boundaries and forbidden
+key/deletion/private-source writes. Creation/deletion16 passed, including two
+savepoint counterexamples reproduced before the fix. The private creation receipt
+now becomes unusable after EF savepoint rollback; only whole-attempt recovery is
+supported. Raw provider rollback methods and raw rollback SQL bypass that protocol
+and are explicitly unsupported. This is a recovery obligation, not a claim that
+tracked EF state automatically rewinds with the database.
+
+One real PostgreSQL parent/child test passed after catalog-proven contention and
+committed parent lock: the waiting child was rejected before its write callback,
+with exact audit/epoch and unchanged foreign/private images. That supports the
+approved cooperative API boundary. It does not protect against a stolen login
+choosing another tenant session within its fixed privileges or ignoring API
+coordination. PostgreSQL RLS uses application-selected session state; it is not
+cryptographic proof of the human's identity against the credential holder.
+
+Assurance remains partial. The complete SQLite bootstrap atomicity class passed
+all11cases, including canonical creation/skip, revision failure rollback, strict
+effect envelopes and failed-history handling. The real co-located tenant-creation
+workflow also passed twice. PostgreSQL's failed-history status guard and read-only
+validation passed2cases after a real string-conversion regression was reproduced
+and corrected; this is not full native failed-history completion. Bootstrap's column-permission case passed; its
+earlier pairing cases failed admission before exercising their claimed invariant.
+The maintainer subsequently explicitly approved cooperative API-only coordination
+for generic bootstrap inputs as well. The inherited table/row locks and redundant
+native mutex are removed without widening permissions; C# acquires enrollment and
+ordered setting leases before BEGIN and retains them through settlement. Direct
+database writers can bypass that protocol and race, including absent-setting
+inserts. Serializable snapshots and exact-effect checks do not imply universal
+detection. The obsolete independent-insert blocking test is replaced by retained
+API custody and absence-of-native-fence checks, with real cooperating-owner
+contention coverage. Those changed native cohorts await completed verification;
+approval of the risk is not execution evidence. Exact commands and results are
+in the task's `pr75-persistence-verification-current.md`; full provider lifecycle,
+zero-PII, complete source/creator coverage and deployment acceptance remain open.
+
+## Bootstrap delivery privacy and truthful completion — 2026-10-19
+
+The maintainer approved a versioned durable effect containing only changed
+setting-key names, Created tenant identifiers and original notification time.
+C# constructs it from the complete bound Applied receipt and result set in the
+same physical transaction. The Runtime worker no longer reads private bootstrap
+audit tables to reconstruct those instructions; no additional audit grants,
+setting values, secrets or document contents are carried into delivery. Tenant
+identifiers remain restricted operational metadata, not public or harmless data.
+
+This serves IVSD-F024/M024 least privilege and IVSD-F027/M027 truthful durable
+completion: startup commit is not a claim that notifications already succeeded.
+Production startup leaves the same effect to a genuine admitted Runtime worker.
+Strict bounded JSON validation and exact original claim/route/byte checks precede
+effects; manifest instruction replacement is denied in the native and portable
+paths without removing redaction capabilities from other routes. Cache failure
+retries the same effect and does not fabricate rollback of committed configuration.
+At-least-once effects may repeat after partial delivery; no exactly-once external
+notification guarantee is asserted. Diagnostics must retain categorical errors,
+not this payload or raw exception content; full zero-PII telemetry acceptance is
+still a broader workstream gate.
+
+Evidence is scoped: the genuine PostgreSQL startup-to-worker cohort passed9cases
+with zero failures/skips in6m53.550s, including actual private-table SELECT denial,
+stale claims, direct mutation denial, cache-fault retry, malformed-version refusal
+and same-claim substitutions. Three affected projects built with zero errors;
+startup composition passed3cases. Independent asymmetric source reviews found no
+concrete defect. Subsequent shared-tree receipt/admission/custody/atomicity and
+bootstrap regressions passed42cases with no failures/skips. A separate isolated
+22-image payload/startup candidate excludes all federation/migration changes;
+its four builds, payload34, startup3 and native custody9 passed. The first SQLite
+run passed seven assertions but exited9 because its minimum incorrectly used the
+later shared count11. Unchanged-binary continuation corrected the minimum:
+SQLite7/0/0 in1m55.166s and genuine native worker9/0/0 in7m35.366s, both exit0.
+Those isolated receipts do not establish full provider/
+migration or HTTP-host acceptance. The live
+digest is not an independent historical receipt digest and does not protect
+against privileged database rewrites before admission. Null legacy payloads are
+not silently repaired. Preserve matching application/native definitions and a
+coherent backup checkpoint; no deployment or host-ready signal is issued here.
+
+## Navigation minimum-data read and explicit credential trust — 2026-10-19
+
+The maintainer explicitly approved configured Global SELECT on exactly User.Id,
+IsDeleted and LastActiveTenantId so all providers can use one ordinary EF Core
+projection instead of a navigation business routine. Authenticated-current-user
+equality and separate active-membership selection remain Application authority;
+neither a saved preference nor a navigation response grants tenant access.
+Runtime receives no User-table permission. Profile/audit fields and writes remain
+outside this read inventory; unrelated preference mutation authority stays narrow.
+
+This supports IVSD-F024/M024 minimum necessary authority and avoids copying user
+PII merely to choose navigation. The remaining credential-compromise risk is
+explicit, not eliminated: someone holding Global credentials can enumerate
+user/preferred-tenant associations. Those identifiers are protected operational
+metadata, not anonymous or harmless data. API subject checks and credential
+custody carry that boundary; tenant RLS does not authenticate a human credential
+holder. No new public data purpose, telemetry field or retention policy is added.
+
+Permission admission rejects copied/substituted identities, table/extra-column/
+write/grant-option authority and recoverable Runtime ownership, including dormant
+membership with revoked ordinary rights. Exact deployment-name lookup preserves
+accepted casing and punctuation. Old routines/cluster roles and ACL drift are
+rejected without destructive cleanup. Fresh development provisioning or reviewed
+dependency-checked decommissioning must preserve retained data rather than hide
+failed readiness through broad grants or automatic deletion.
+
+Evidence remains scoped: unchanged Application ownership/membership9 passed;
+initial native controls passed4/failed3 for missing EF authority/retirement.
+Independent reviewers found two guard edge cases, corrected before GREEN. The
+first expanded run passed39/failed1 because schema denial preceded typed role
+rejection; a catalog-only identity precheck corrected the ordering without extra
+rights or relaxed tests. Isolated Release299warnings/0errors31.71s then native
+40/0/0 in1m10.996s and preference8/0/0 in2m26.199s, all exit0. Complete provider,
+connector-interruption, zero-PII telemetry and workstream acceptance remain open.
+
 ## Recommendations
 
 1. Preserve all stable finding and reference IDs in a candidate-bound, machine-consumed security evidence register. A green check with no executed tests is not closure evidence.
@@ -316,6 +622,17 @@ The historical shared evidence packet includes parent investigation plus three b
 
 ## Planning Handoff
 
+### R6 EF-first amendment handoff
+
+- Status: current / plan-aligned for the scoped R6 design after explicit mapping reconciliation; approved architecture execution requires no repeated permission.
+- Reviewed input: 2026-10-18 top plan amendment and external-login ownership packet named above.
+- Required plan mappings: IVSD-F002/M002 to paired privilege/operator documentation; IVSD-F024/M024 to fixed-nine-column enrollment and ordinary-role/RLS negative tests; IVSD-F025/M025 to exact account/provider and no-private-user-join scenarios; IVSD-F027/M027 to concurrency, revocation, erasure, recovery/outbox and five-provider exit evidence.
+- Mapping result: the plan's **First capability and ethical/security traceability** table explicitly binds all four pairs to these controls and S24/S25/S27/S33. The active task ledger assigns authentication/lookup, workflow, schema/documentation and final five-provider assurance work. The scoped mapping is complete; it does not revalidate unrelated historical programme findings.
+- Owner/next validation: parent maintains the triad mappings; external-login source and its 34-case PostgreSQL receipt are recorded above. Capability owners continue provider/caller acceptance and the remaining EF-first replacements. None of the broader workstream findings is closed by this amendment.
+- Refresh triggers: changed columns, shared-login consumers, identity predicate, User/UserPii joins, Runtime authority, retention/erasure purpose, credential selection, concurrency/recovery guarantees or evidence requirements.
+
+### Historical R5 handoff
+
 - Workstream: event-api-security-remediation
 - Status: current; disposition plan-aligned for r5 design, not runtime/security/release certification
 - Reviewed input: event-api-security-remediation-r5-cto-20261007, complete plan/tasks/context and existing assessment; exact hashes in R5 Revalidation Evidence
@@ -337,3 +654,5 @@ The historical shared evidence packet includes parent investigation plus three b
 
 | 2026-10-06 | current for bounded R3 | current | Substantive r4-unified revalidation after user-directed programme reunification and delivered PR71 baseline | Complete triad hashes above; all original and qualified provider mappings retained; 29 outstanding phases, 158 records; plan-aligned design only |
 | 2026-10-07 | current for r4; stale for r5 | current | Complete r5 revalidation of key lifecycle, lease identity, non-reopening recovery, safe cutover order, all 31 mappings and bounded delivery admission | Exact r5 triad hashes; plan-aligned design only; execution authorization separate from operational/release approval |
+| 2026-10-18 | current for r5; stale for changed database boundary | draft | Approved EF-first amendment moves exact-account selection into Application and grants fixed columns to shared Global login | Scoped R6 design validation and external-login packet; explicit triad mapping reconciliation pending; no runtime or operational closure |
+| 2026-10-18 | draft for R6 | current | Explicit four-pair plan mappings and active task ownership revalidated | R6 plan/task hashes above; scoped plan-aligned design only; reported four-failure/one-pass Red run and Runtime investigation do not establish implementation acceptance |

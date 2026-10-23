@@ -63,16 +63,15 @@ public sealed class DynamicJwtConfigurationService : IJwtAuthorityRefreshNotifie
 
                     _state = next;
                     _logger.LogInformation(
-                        "[JWT] Dynamic JWT configuration reloaded. Authority={Authority}, Source={Source}, SigningKeys={KeyCount}",
-                        next.Authority ?? "<none>",
+                        "[JWT] Dynamic JWT configuration reloaded. Source={Source}, SigningKeys={KeyCount}",
                         next.Source,
                         keyCount);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // New manager couldn't fetch keys. Keep the old state which still has
                     // cached signing keys from the last successful fetch.
-                    _logger.LogWarning(ex,
+                    _logger.LogWarning(
                         "[JWT] New ConfigurationManager failed to prefetch OIDC/JWKS metadata. " +
                         "Retaining existing state (Source={Source}) with cached keys.",
                         _state.Source);
@@ -83,8 +82,7 @@ public sealed class DynamicJwtConfigurationService : IJwtAuthorityRefreshNotifie
                 // No manager (e.g. pre-onboarding or authority not yet configured).
                 _state = next;
                 _logger.LogInformation(
-                    "[JWT] Dynamic JWT configuration reloaded. Authority={Authority}, Source={Source}",
-                    next.Authority ?? "<none>",
+                    "[JWT] Dynamic JWT configuration reloaded. Source={Source}",
                     next.Source);
             }
         }
@@ -116,9 +114,9 @@ public sealed class DynamicJwtConfigurationService : IJwtAuthorityRefreshNotifie
             var authority = dto.KeycloakAuthority.TrimEnd('/');
             return BuildState(authority, source: "Database");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "[JWT] Failed to read auth provider configuration from DB; falling back to environment.");
+            _logger.LogWarning("[JWT] Failed to read auth provider configuration from DB; falling back to environment.");
             return null;
         }
     }

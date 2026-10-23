@@ -14,20 +14,31 @@ public class GetEventCustomPropertyDefinitionListRequestHandler : IQueryHandler<
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
     private readonly HybridCache _cache;
     private readonly ITenantContext _tenantContext;
+    private readonly IPrivateEventManagementReader? _privateManagement;
 
     public GetEventCustomPropertyDefinitionListRequestHandler(
         IEventCustomPropertyRepository eventCustomPropertyRepository,
         HybridCache cache,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IPrivateEventManagementReader? privateManagement = null)
     {
         _eventCustomPropertyRepository = eventCustomPropertyRepository;
         _cache = cache;
         _tenantContext = tenantContext;
+        _privateManagement = privateManagement;
     }
 
     public async Task<PaginatedResult<EventCustomPropertyDefinitionListDto>> QueryAsync(GetEventCustomPropertyDefinitionListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<EventCustomPropertyDefinitionListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
+        if (_privateManagement is not null)
+        {
+            var graph = await _privateManagement.ReadAsync(new(PrivateEventManagementReadKind.CustomProperties, request.EventId), cancellationToken);
+            var ordered = graph.Definitions.OrderBy(definition => definition.SortOrder).ThenBy(definition => definition.DisplayName);
+            return PaginatedResult<EventCustomPropertyDefinitionListDto>.Create(
+                ordered.Skip(checked((pageNumber - 1) * pageSize)).Take(pageSize).Select(CustomPropertyMapper.ToListItem).ToList(),
+                graph.Definitions.Count, pageNumber, pageSize);
+        }
         var tenantId = _tenantContext.TenantId;
         var cacheKey = EventCustomPropertyCache.ListKey(tenantId, request.EventId, pageNumber, pageSize);
 

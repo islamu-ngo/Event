@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5389E2HGMDZR4DVAXGGR97N
+Title: "Bound localization handler admission and failure diagnostics"
+Type: fix
+Scope: access
+Summary: "Validate direct import candidates and omit raw provider and filesystem failures from localization responses and logs."
+Group: localization-handler-boundary
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Handler failures retain fixed categories without raw exception content.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Explicit schema transformation preserves required languageCode and bounded flat translations; regenerated artifacts also synchronize already-landed password annotations.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Localization failures return fixed messages and invalid direct import candidates are rejected before file effects.

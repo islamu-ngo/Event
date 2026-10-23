@@ -220,7 +220,7 @@ public class SchedulingConstraintTests
         using var context = _fixture.CreateDbContext();
         var (tenant, @event) = await SetupEventAsync(context);
         var calculator = new EventScheduleProjectionCalculator();
-        var repository = new EventAgendaItemRepository(context);
+        var repository = new EventAgendaItemRepository(context, new Microsoft.AspNetCore.Http.HttpContextAccessor());
 
         var item = new EventAgendaItem
         {

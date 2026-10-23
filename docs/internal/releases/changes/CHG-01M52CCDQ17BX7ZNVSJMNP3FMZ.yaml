@@ -1,0 +1,29 @@
+Change-Id: CHG-01M52CCDQ17BX7ZNVSJMNP3FMZ
+Title: "Keep scheduler diagnostics free of private record identifiers"
+Type: fix
+Scope: privacy
+Summary: "Export fixed scheduler failure categories and bounded control outcomes without job keys, operator identity, caller correlation or runtime exception subtypes."
+Group: scheduler-diagnostic-confidentiality
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Default scheduler diagnostics omit private job and audit-record identifiers.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Use a separate access-controlled audit sink for identity-bearing scheduler control accountability.

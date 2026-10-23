@@ -3,6 +3,7 @@ namespace Explore.Infrastructure.ConfigurationManifest;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Ingestion;
+using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Infrastructure.Mail;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,10 +20,21 @@ public static class ConfigurationManifestStartupServicesRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        if (!Enum.IsDefined(effectDeliveryMode))
+            throw new ArgumentOutOfRangeException(nameof(effectDeliveryMode));
 
         services.AddDataProtection();
+        services.AddHttpContextAccessor();
         services.TryAddScoped<IEmailDeliveryDisableTokenService, EmailDeliveryDisableTokenService>();
-        services.AddConfigurationManifestApplication(effectDeliveryMode);
+        services.AddConfigurationManifestApplication();
+        // Startup owns delivery timing; common Application registration never chooses a claimer.
+        services.RemoveAll<IConfigurationManifestEffectDeliveryStrategy>();
+        if (effectDeliveryMode == ConfigurationManifestEffectDeliveryMode.DeferredToRuntime)
+            services.AddScoped<IConfigurationManifestEffectDeliveryStrategy, DeferredConfigurationManifestEffectDelivery>();
+        else
+            services.AddScoped<IConfigurationManifestEffectDeliveryStrategy, ConfigurationManifestEffectDelivery>();
+        services.RemoveAll<IHumanConfigurationImportAdmission>();
+        services.AddScoped<IHumanConfigurationImportAdmission, HumanConfigurationImportAdmission>();
         services.AddOptions<ConfigurationManifestOptions>()
             .Configure(options =>
             {
@@ -38,13 +50,6 @@ public static class ConfigurationManifestStartupServicesRegistration
         services.TryAddSingleton<
             IConfigurationManifestReader,
             ConfigurationManifestReader>();
-        services.TryAddScoped<
-            IConfigurationManifestStartupRunner,
-            ConfigurationManifestStartupRunner>();
-        services.TryAddScoped<
-            IConfigurationManifestPostMigrationSequence,
-            ConfigurationManifestPostMigrationSequence>();
-
         return services;
     }
 }

@@ -28,6 +28,13 @@ public class LockSettingCommandHandler
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
     private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
+    private readonly IInstanceAdministratorCommitAuthority _instanceCommitAuthority;
+    private readonly ITenantAdministratorCommitAuthority _tenantCommitAuthority;
+    private readonly IHumanSubjectCommitAuthority _subjectCommitAuthority;
+    private readonly IHumanCommitScopePreparation _humanCommitScope;
+    private readonly IHumanSettingsMutationPreparation _settingsPreparation;
+    private readonly ISystemSettingRepository _systemSettings;
+    private readonly IAtprotoFederationSettingsWriter _federationSettings;
 
     public LockSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -42,6 +49,13 @@ public class LockSettingCommandHandler
         IEmailDeliverySettingsWriter emailSettingsWriter,
         IVisitorAccessSettingsWriter visitorSettings,
         IEventResourceSettingsWriter eventResourceSettingsWriter,
+        IInstanceAdministratorCommitAuthority instanceCommitAuthority,
+        ITenantAdministratorCommitAuthority tenantCommitAuthority,
+        IHumanSubjectCommitAuthority subjectCommitAuthority,
+        IHumanCommitScopePreparation humanCommitScope,
+        IHumanSettingsMutationPreparation settingsPreparation,
+        ISystemSettingRepository systemSettings,
+        IAtprotoFederationSettingsWriter federationSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null)
     {
         _resolver = resolver;
@@ -57,6 +71,13 @@ public class LockSettingCommandHandler
         _emailSettingsWriter = emailSettingsWriter;
         _visitorSettings = visitorSettings;
         _eventResourceSettingsWriter = eventResourceSettingsWriter;
+        _instanceCommitAuthority = instanceCommitAuthority;
+        _tenantCommitAuthority = tenantCommitAuthority;
+        _subjectCommitAuthority = subjectCommitAuthority;
+        _humanCommitScope = humanCommitScope;
+        _settingsPreparation = settingsPreparation;
+        _systemSettings = systemSettings;
+        _federationSettings = federationSettings;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -92,14 +113,19 @@ public class LockSettingCommandHandler
             return BaseCommandResponse.Authorization<Guid>(authError);
         }
 
+        Guid? resolvedUserId = await SettingCommandHelper.ResolveCurrentUserIdAsync(
+            _adminContext, _currentUserService, cancellationToken);
         var (scopeId, actorId) = SettingCommandHelper.GetScopeAndActorIds(
-            request.Scope, _tenantContext, _currentUserService);
+            request.Scope, _tenantContext, resolvedUserId);
 
         if (VisitorAccessSettingMutationGuard.Handles(request.Key))
         {
             var result = await _visitorSettings.ApplyAsync(
                 [new(request.Scope == SettingScope.Tenant ? scopeId : null, request.Key,
-                    VisitorAccessSettingMutationKind.SetLock, IsLocked: true)], actorId, cancellationToken);
+                    VisitorAccessSettingMutationKind.SetLock, IsLocked: true)],
+                SettingCommandHelper.RequireHumanSubject(_humanCommitScope, resolvedUserId),
+                request.Scope == SettingScope.Instance ? SettingsMutationOperation.InstanceSettings : SettingsMutationOperation.TenantSettings,
+                actorId, cancellationToken);
             return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, scopeId);
         }
 
@@ -109,6 +135,8 @@ public class LockSettingCommandHandler
                 [new EventResourceSettingMutation(
                     request.Scope == SettingScope.Tenant ? scopeId : null,
                     request.Key, EventResourceSettingMutationKind.SetLock, IsLocked: true)],
+                SettingCommandHelper.RequireHumanSubject(_humanCommitScope, resolvedUserId),
+                request.Scope == SettingScope.Instance ? SettingsMutationOperation.InstanceSettings : SettingsMutationOperation.TenantSettings,
                 actorId, cancellationToken);
             return await result.CompleteAsync(
                 _resolver, _notificationHandlers, request.Scope, scopeId);
@@ -137,79 +165,118 @@ public class LockSettingCommandHandler
 
         if (isGuardedPublicationPolicyMutation)
         {
-            var context = SettingCommandHelper.BuildSettingContext(
-                request.Scope, _tenantContext, _currentUserService);
-            ResolvedSetting? resolved = await _resolver.ResolveWithMetadataAsync(
-                request.Key, context, cancellationToken);
-            string value = resolved?.Value ?? definition.DefaultValue;
-            DateTime occurredAtUtc = DateTime.UtcNow;
-            PublicationPolicyMutationResult mutationResult = await _unitOfWork.ExecuteInTransactionAsync(
-                token => _publicationPolicyMutationBoundary.ApplyInstanceAsync(
-                    new PublicationPolicyInstanceMutationRequest(
-                        actorId,
-                        occurredAtUtc,
-                        [new PublicationPolicySettingMutation(
+            var publicationPreparation = await _settingsPreparation.PrepareAsync(request, cancellationToken);
+            Exception? publicationFailure = null;
+            try
+            {
+                SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
+                DateTime occurredAtUtc = DateTime.UtcNow;
+                PublicationPolicyMutationResult mutationResult = await _mutationLock.ExecuteOrderedGroupsAsync(
+                    [PublicationPolicySettingKeys.All],
+                    outerToken => _settingsPreparation.ExecutePreparedAsync(publicationPreparation, async (_, token) =>
+                    {
+                        var resolved = await _systemSettings.GetByKey(request.Key, token);
+                        string value = resolved?.Value ?? definition.DefaultValue;
+                        await SettingCommandHelper.RequireCommitAuthorizationAsync(
+                            request.Scope, resolvedUserId, _tenantContext.TenantId,
+                            _instanceCommitAuthority, _tenantCommitAuthority, _subjectCommitAuthority, token);
+                        return await _publicationPolicyMutationBoundary.ApplyInstanceAsync(
+                        new PublicationPolicyInstanceMutationRequest(
+                            actorId,
+                            occurredAtUtc,
+                            [new PublicationPolicySettingMutation(
                             request.Key,
                             PublicationPolicyMutationKind.Set,
                             value,
                             TenantId: null,
                             IsLocked: true)]),
-                    token),
-                cancellationToken);
-            if (!mutationResult.Success)
-            {
-                string failureCode = string.IsNullOrWhiteSpace(mutationResult.FailureCode)
-                    ? "event_reporting_intake_policy_invalid"
-                    : mutationResult.FailureCode;
-                string failureMessage = string.IsNullOrWhiteSpace(mutationResult.Message)
-                    ? PublicationPolicyMutationMessages.InvalidPolicy
-                    : mutationResult.Message;
-                return BaseCommandResponse.Failure<Guid>(failureCode, failureMessage);
-            }
+                        token);
+                    }, outerToken),
+                    cancellationToken);
+                if (!mutationResult.Success)
+                {
+                    string failureCode = string.IsNullOrWhiteSpace(mutationResult.FailureCode)
+                        ? "event_reporting_intake_policy_invalid"
+                        : mutationResult.FailureCode;
+                    string failureMessage = string.IsNullOrWhiteSpace(mutationResult.Message)
+                        ? PublicationPolicyMutationMessages.InvalidPolicy
+                        : mutationResult.Message;
+                    return BaseCommandResponse.Failure<Guid>(failureCode, failureMessage);
+                }
 
-            _resolver.InvalidateCache(request.Scope, scopeId);
-            foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
-            {
-                await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
+                _resolver.InvalidateCache(request.Scope, scopeId);
+                foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
+                {
+                    await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
+                }
+
+                return BaseCommandResponse.Success(
+                    scopeId,
+                    $"Setting '{request.Key}' locked at {request.Scope} scope.");
             }
+            catch (Exception failure) { publicationFailure = failure; throw; }
+            finally { await _settingsPreparation.CloseAsync(publicationPreparation, publicationFailure); }
+        }
+
+        var prepared = await _settingsPreparation.PrepareAsync(request, cancellationToken);
+        Exception? primaryFailure = null;
+        try
+        {
+            SettingCommandHelper.RequireHumanSubject(_humanCommitScope, actorId);
+            AtprotoFederationSettingWriteResult? federationWrite = null;
+            await _mutationLock.ExecuteOrderedGroupsAsync(
+                [[request.Key]],
+                token => _settingsPreparation.ExecutePreparedAsync(prepared, async (_, transactionToken) =>
+                {
+                    if (AtprotoFederationSettingPolicy.IsDedicatedKey(request.Key))
+                    {
+                        federationWrite = await _federationSettings.ApplyCurrentAsync(new(
+                            request.Scope == SettingScope.Instance ? HumanSettingsOperation.InstanceSettings : HumanSettingsOperation.TenantSettings,
+                            request.Scope, request.Scope == SettingScope.Tenant ? scopeId : null, null,
+                            request.Key, HumanSettingsMutationKind.SetLock, IsLocked: true), transactionToken);
+                        return federationWrite.Applied;
+                    }
+                    if (request.Scope == SettingScope.Instance)
+                    {
+                        var setting = await _systemSettings.GetByKey(request.Key, transactionToken)
+                            ?? throw new InvalidOperationException($"Setting '{request.Key}' does not exist at Instance scope.");
+                        setting.IsLocked = true;
+                        setting.UpdatedAt = DateTime.UtcNow;
+                        setting.UpdatedBy = actorId;
+                        await _systemSettings.UpsertLockAsync(setting, transactionToken);
+                    }
+                    else
+                    {
+                        await _resolver.LockAsync(request.Key, request.Scope, scopeId, actorId, transactionToken);
+                    }
+                    return true;
+                }, token),
+                cancellationToken);
+
+            if (federationWrite is { Applied: false })
+                return BaseCommandResponse.Failure<Guid>(federationWrite.FailureCode ?? "federation_setting_not_applied",
+                    "The federation setting lock was not applied.");
+            _resolver.InvalidateCache(request.Scope, scopeId);
+            CerbosSettingsCacheInvalidation.InvalidateIfCerbosSettingChanged(
+                _cerbosConfigResolver, request.Key, request.Scope, scopeId);
+
+            var lockSource = request.Scope == SettingScope.Instance
+                ? SettingSource.SystemLocked
+                : SettingSource.TenantLocked;
+
+            _logger.LogInformation(
+                "Setting locked: {SettingKey} at {Scope} scope. Actor: {ActorId}",
+                request.Key, request.Scope, actorId);
+
+            await _notificationHandlers.HandleAsync(new SettingChangedNotification(
+                request.Key, null, null, lockSource,
+                _tenantContext.TenantId, actorId, DateTime.UtcNow), CancellationToken.None);
 
             return BaseCommandResponse.Success(
                 scopeId,
                 $"Setting '{request.Key}' locked at {request.Scope} scope.");
         }
-
-        await _mutationLock.ExecuteAsync(
-            request.Key,
-            async token =>
-            {
-                await _resolver.LockAsync(
-                    request.Key,
-                    request.Scope,
-                    scopeId,
-                    actorId,
-                    token);
-                return true;
-            },
-            cancellationToken);
-
-        _resolver.InvalidateCache(request.Scope, scopeId);
-        CerbosSettingsCacheInvalidation.InvalidateIfCerbosSettingChanged(
-            _cerbosConfigResolver, request.Key, request.Scope, scopeId);
-
-        var lockSource = request.Scope == SettingScope.Instance
-            ? SettingSource.SystemLocked
-            : SettingSource.TenantLocked;
-
-        _logger.LogInformation(
-            "Setting locked: {SettingKey} at {Scope} scope. Actor: {ActorId}",
-            request.Key, request.Scope, actorId);
-
-        await _notificationHandlers.HandleAsync(new SettingChangedNotification(
-            request.Key, null, null, lockSource,
-            _tenantContext.TenantId, actorId, DateTime.UtcNow), CancellationToken.None);
-
-        return BaseCommandResponse.Success(
-            scopeId,
-            $"Setting '{request.Key}' locked at {request.Scope} scope.");
+        catch (Exception failure) { primaryFailure = failure; throw; }
+        finally { await _settingsPreparation.CloseAsync(prepared, primaryFailure); }
     }
 }

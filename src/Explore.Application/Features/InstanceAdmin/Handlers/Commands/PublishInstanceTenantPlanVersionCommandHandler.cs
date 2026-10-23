@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.InstanceAdmin.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
@@ -9,17 +10,27 @@ namespace Explore.Application.Features.InstanceAdmin.Handlers.Commands;
 
 public sealed class PublishInstanceTenantPlanVersionCommandHandler(
     ITenantPlanRepository tenantPlanRepository,
-    IUnitOfWork unitOfWork)
+    ISerializableAttemptOwner owner,
+    ICurrentUserService currentUserService,
+    IInstanceAdministratorCommitAuthority commitAuthority,
+    IHumanAdministrativeActionPreparation preparation)
     : ICommandHandler<PublishInstanceTenantPlanVersionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         PublishInstanceTenantPlanVersionCommand request,
         CancellationToken cancellationToken)
     {
-        return await unitOfWork.ExecuteInTransactionAsync(ExecuteAsync, cancellationToken);
+        Guid? principalId = currentUserService.UserId;
+        if (principalId is not { } actorId || actorId == Guid.Empty)
+            return BaseCommandResponse.Authorization<Guid>("Current instance administrator authority is required.");
+        var prepared = await preparation.PrepareAsync(request, actorId, cancellationToken);
+        return await owner.ExecuteAsync(ExecuteAsync, cancellationToken);
 
         async Task<BaseCommandResponse<Guid>> ExecuteAsync(CancellationToken token)
         {
+            await prepared.AcquireAsync(request, actorId, token);
+            if (!await commitAuthority.IsInstanceAdministratorForCommitAsync(actorId, token))
+                return BaseCommandResponse.Authorization<Guid>("Current instance administrator authority is required.");
             TenantPlanVersion? version = await tenantPlanRepository.GetVersionAsync(request.VersionId, token);
             if (version is null)
             {

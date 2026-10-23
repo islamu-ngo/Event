@@ -2,14 +2,38 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
-using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class RegistrationFinalizationRepository(ExploreDbContext dbContext)
+public sealed class RegistrationFinalizationRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null)
     : IRegistrationFinalizationRepository
 {
+    public async Task<bool> TryAcquireExecutionAsync(
+        RegistrationFinalizationClaim claim,
+        CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Finalization execution custody requires an owning transaction.");
+        if (claim.EffectId == Guid.Empty || claim.TenantId == Guid.Empty ||
+            claim.RegistrationOrderId == Guid.Empty || claim.LeaseToken == Guid.Empty || claim.ProcessingFence <= 0)
+            return false;
+
+        await RelationalEntityRowFence.AcquireAsync<RegistrationFinalizationEffect>(
+            dbContext, claim.TenantId, effect => effect.Id, claim.EffectId, cancellationToken);
+        // Never authorize from an entity retained before the row fence or from
+        // a clock observation captured before an awaited database operation.
+        DateTime? expiresAt = await dbContext.RegistrationFinalizationEffects.AsNoTracking()
+            .Where(value => value.TenantId == claim.TenantId && value.Id == claim.EffectId &&
+                value.RegistrationOrderId == claim.RegistrationOrderId &&
+                value.Status == OutboxMessageStatus.Processing &&
+                value.ProcessingLeaseToken == claim.LeaseToken &&
+                value.ProcessingFence == claim.ProcessingFence)
+            .Select(value => value.ProcessingLeaseExpiresAt)
+            .SingleOrDefaultAsync(cancellationToken);
+        return expiresAt > (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime;
+    }
+
     public async Task<IReadOnlyList<RegistrationRequirementFulfillment>> GetFulfillmentsAsync(
         Guid tenantId,
         Guid registrationOrderId,
@@ -221,58 +245,6 @@ public sealed class RegistrationFinalizationRepository(ExploreDbContext dbContex
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<RegistrationFinalizationClaim>> ClaimDueAsync(
-        string leaseOwner,
-        int batchSize,
-        DateTime claimedAt,
-        TimeSpan leaseDuration,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(leaseOwner) || leaseOwner.Trim().Length > RegistrationFinalizationEffect.MaxLeaseOwnerLength ||
-            batchSize is < 1 or > 1000 || leaseDuration <= TimeSpan.Zero || claimedAt.Kind != DateTimeKind.Utc)
-        {
-            return [];
-        }
-
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-            await using IAsyncDisposable claimLock =
-                await RelationalNamedLock.AcquireTransactionAsync(
-                    dbContext,
-                    "registration-finalization-claim",
-                    cancellationToken);
-
-            List<RegistrationFinalizationEffect> effects = await dbContext.RegistrationFinalizationEffects
-                .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
-                .Where(value =>
-                    ((value.Status == OutboxMessageStatus.Pending || value.Status == OutboxMessageStatus.Failed) &&
-                     (value.NextAttemptAt == null || value.NextAttemptAt <= claimedAt)) ||
-                    (value.Status == OutboxMessageStatus.Processing && value.ProcessingLeaseExpiresAt <= claimedAt))
-                .OrderBy(value => value.NextAttemptAt ?? value.CreatedAt)
-                .ThenBy(value => value.Id)
-                .Take(batchSize)
-                .ToListAsync(cancellationToken);
-            List<RegistrationFinalizationClaim> claims = new(effects.Count);
-            foreach (RegistrationFinalizationEffect effect in effects)
-            {
-                if (effect.Status == OutboxMessageStatus.Processing)
-                {
-                    effect.RecoverExpiredClaim(claimedAt);
-                }
-
-                Guid leaseToken = Guid.CreateVersion7();
-                effect.Claim(leaseOwner, leaseToken, claimedAt.Add(leaseDuration), claimedAt);
-                claims.Add(new(effect.Id, effect.TenantId, effect.RegistrationOrderId, leaseToken, effect.ProcessingFence));
-            }
-
-            await dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return claims;
-        });
-    }
-
     public async Task<bool> CompleteAsync(
         RegistrationFinalizationClaim claim,
         DateTime completedAt,
@@ -406,7 +378,6 @@ public sealed class RegistrationFinalizationRepository(ExploreDbContext dbContex
     private IQueryable<RegistrationFinalizationEffect> ActiveClaim(
         RegistrationFinalizationClaim claim,
         DateTime observedAt) => dbContext.RegistrationFinalizationEffects
-        .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationFinalizationWorkerCrossTenantQueue)
         .Where(value =>
             value.TenantId == claim.TenantId && value.Id == claim.EffectId &&
             value.RegistrationOrderId == claim.RegistrationOrderId &&

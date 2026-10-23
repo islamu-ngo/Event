@@ -1,14 +1,84 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;
-using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class RegistrationProviderSubscriptionStateRepository(ExploreDbContext dbContext)
-    : IRegistrationProviderSubscriptionStateRepository
+public sealed class RegistrationProviderSubscriptionStateRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null)
+    : IRegistrationProviderSubscriptionCustodyRepository
 {
+    private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
+
+    public async Task<RegistrationProviderSubscriptionState?> GetActiveClaimAsync(
+        RegistrationProviderSubscriptionClaim claim, CancellationToken cancellationToken)
+    {
+        var state = await ActiveClaim(claim).AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+        return state is not null && claim.LeaseExpiresAt > _clock.GetUtcNow().UtcDateTime ? state : null;
+    }
+
+    public async Task<bool> IsCurrentAsync(
+        RegistrationProviderSubscriptionClaim claim,
+        RegistrationProviderBinding? binding,
+        CancellationToken cancellationToken)
+    {
+        IQueryable<RegistrationProviderSubscriptionState> rows = ActiveClaim(claim);
+        if (binding is not null)
+        {
+            if (binding.TenantId != claim.TenantId || binding.Id != claim.RegistrationProviderBindingId ||
+                binding.Connection is null || binding.Connection.TenantId != claim.TenantId)
+                return false;
+            Guid connectionId = binding.Connection.Id;
+            Guid bindingStamp = binding.ConcurrencyStamp;
+            Guid connectionStamp = binding.Connection.ConcurrencyStamp;
+            rows = rows.Where(state => state.Binding != null &&
+                state.Binding.ConcurrencyStamp == bindingStamp &&
+                state.Binding.RegistrationProviderConnectionId == connectionId &&
+                state.Binding.Connection != null && state.Binding.Connection.ConcurrencyStamp == connectionStamp);
+        }
+        bool current = await rows.AsNoTracking().AnyAsync(cancellationToken);
+        return current && claim.LeaseExpiresAt > _clock.GetUtcNow().UtcDateTime;
+    }
+
+    public async Task<RegistrationProviderSubscriptionState> FenceAsync(
+        RegistrationProviderSubscriptionClaim claim,
+        RegistrationProviderBinding? binding,
+        CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Subscription custody fencing requires its local transaction.");
+        await using var claimLock = await RelationalNamedLock.AcquireTransactionAsync(
+            dbContext, "registration-provider-subscription-state-claim", cancellationToken);
+        // Match admission's claim-lock-before-state order. A no-op update takes a native
+        // row lock without changing the original token, generation, expiry or row version.
+        if (await ActiveClaim(claim).ExecuteUpdateAsync(
+                setters => setters.SetProperty(state => state.ConcurrencyStamp, state => state.ConcurrencyStamp),
+                cancellationToken) != 1 || !await IsCurrentAsync(claim, binding, cancellationToken))
+            throw new RegistrationProviderSubscriptionClaimLostException();
+
+        var tracked = dbContext.ChangeTracker.Entries<RegistrationProviderSubscriptionState>()
+            .SingleOrDefault(entry => entry.Entity.Id == claim.StateId);
+        if (tracked is not null)
+            tracked.State = EntityState.Detached;
+        var state = await ActiveClaim(claim).SingleOrDefaultAsync(cancellationToken);
+        if (state is null || claim.LeaseExpiresAt <= _clock.GetUtcNow().UtcDateTime)
+            throw new RegistrationProviderSubscriptionClaimLostException();
+        return state;
+    }
+
+    private IQueryable<RegistrationProviderSubscriptionState> ActiveClaim(RegistrationProviderSubscriptionClaim claim)
+    {
+        bool selected = claim.TenantId != Guid.Empty && claim.LeaseToken != Guid.Empty &&
+            claim.ProcessingGeneration > 0 && claim.LeaseExpiresAt.Kind == DateTimeKind.Utc &&
+            !dbContext.IsTenantFilterBypassed && dbContext.BindTenantLease() == claim.TenantId;
+        DateTime now = _clock.GetUtcNow().UtcDateTime;
+        return dbContext.RegistrationProviderSubscriptionStates.Where(state => selected &&
+            state.Id == claim.StateId && state.TenantId == claim.TenantId &&
+            state.RegistrationProviderBindingId == claim.RegistrationProviderBindingId &&
+            state.LeaseToken == claim.LeaseToken && state.ProcessingGeneration == claim.ProcessingGeneration &&
+            state.LeaseExpiresAt == claim.LeaseExpiresAt && state.LeaseExpiresAt > now);
+    }
+
     public Task<RegistrationProviderSubscriptionState?> GetAsync(
         Guid tenantId,
         Guid registrationProviderBindingId,
@@ -58,7 +128,6 @@ public sealed class RegistrationProviderSubscriptionStateRepository(ExploreDbCon
         if (expiresBefore.Kind != DateTimeKind.Utc || limit is < 1 or > 1000) return [];
         return await dbContext.RegistrationProviderSubscriptionStates
             .AsNoTracking()
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubscriptionStateWorkerCrossTenantQueue)
             .Where(value => value.WatchExpiresAt <= expiresBefore)
             .OrderBy(value => value.WatchExpiresAt)
             .ThenBy(value => value.Id)
@@ -113,7 +182,6 @@ public sealed class RegistrationProviderSubscriptionStateRepository(ExploreDbCon
                 cancellationToken);
 
         IQueryable<RegistrationProviderSubscriptionState> claimable = dbContext.RegistrationProviderSubscriptionStates
-            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubscriptionStateWorkerCrossTenantQueue)
             .Where(value => value.LeaseExpiresAt == null || value.LeaseExpiresAt <= claimedAt);
         List<RegistrationProviderSubscriptionState> rows = await order(filter(claimable))
             .Take(batchSize)

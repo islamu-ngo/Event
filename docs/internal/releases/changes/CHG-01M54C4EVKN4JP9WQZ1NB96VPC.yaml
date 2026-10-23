@@ -1,0 +1,33 @@
+Change-Id: CHG-01M54C4EVKN4JP9WQZ1NB96VPC
+Title: "Resolve AI credentials only at the selected provider boundary"
+Type: fix
+Scope: access
+Summary: "Replace plaintext AI settings and request fields with authorized provider-specific credential references and owner-selected transports."
+Group: ai-runtime-credential-custody
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Replace ApiKey and ApiKeyConfigured fields with CredentialScope and require explicit discovery scope; retired ordinary setting writes are rejected.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Resolve exact scoped secrets after fresh settings validation without fallback and constrain instance transports to their configured origin.
+  Migration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Provision provider-specific secret bindings and select their scope; no schema migration or automatic deletion of retired rows occurs.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: AI_CREDENTIAL_SCOPE selects metadata; AI_API_KEY no longer seeds ordinary provider settings.
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Regenerate credential scope and discovery scope contracts without plaintext credential fields.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Use selected secret authority bindings; instance discovery requires platform administration and the configured compatible-provider origin.

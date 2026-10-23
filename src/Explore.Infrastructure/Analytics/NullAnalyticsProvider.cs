@@ -18,25 +18,25 @@ public class NullAnalyticsProvider : IAnalyticsProvider, IAnalyticsFeatureFlagPr
 
     public Task IdentifyAsync(string distinctId, IDictionary<string, object>? traits = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Analytics disabled: Identify not tracked for {DistinctId}", distinctId);
+        _logger.LogDebug("analytics_identify_disabled");
         return Task.CompletedTask;
     }
 
     public Task TrackAsync(string distinctId, string eventName, IDictionary<string, object>? properties = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Analytics disabled: {EventName} not tracked for {DistinctId}", eventName, distinctId);
+        _logger.LogDebug("analytics_track_disabled");
         return Task.CompletedTask;
     }
 
     public Task PageViewAsync(string distinctId, string pagePath, IDictionary<string, object>? properties = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Analytics disabled: PageView not tracked for {DistinctId}:{PagePath}", distinctId, pagePath);
+        _logger.LogDebug("analytics_pageview_disabled");
         return Task.CompletedTask;
     }
 
     public Task GroupIdentifyAsync(string groupType, string groupKey, IDictionary<string, object>? properties = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Analytics disabled: GroupIdentify not tracked for {GroupType}:{GroupKey}", groupType, groupKey);
+        _logger.LogDebug("analytics_group_identify_disabled");
         return Task.CompletedTask;
     }
 

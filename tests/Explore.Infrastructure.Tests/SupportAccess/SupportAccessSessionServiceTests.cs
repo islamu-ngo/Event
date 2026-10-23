@@ -45,7 +45,8 @@ public sealed class SupportAccessSessionServiceTests
             _adminContext,
             _tenantContextAccessor,
             _settingsResolver,
-            _sessionRepository);
+            _sessionRepository,
+            TimeProvider.System);
     }
 
     [Test]

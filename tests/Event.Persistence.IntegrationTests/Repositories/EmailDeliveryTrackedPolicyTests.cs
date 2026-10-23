@@ -35,7 +35,7 @@ public sealed class EmailDeliveryTrackedPolicyTests
             var pending = AddUnrelatedPendingSetting(contextA);
 
             var incoming = HostMutation(sameTrackedInput ? tracked.Value : "\"smtp.first.test\"");
-            var result = await CreateEmailSettingsWriter(contextA).ApplyAsync([incoming], actorUserId: null);
+            var result = await CreateInternalEmailSettingsWriter(contextA).ApplyInternalAsync([incoming], actorUserId: null);
 
             var committed = await repositoryB.GetByKey(GovernanceSettingKeys.Email.SmtpHost);
             await Assert.That(result.Status).IsEqualTo(EmailDeliverySettingsWriteStatus.Applied);
@@ -67,7 +67,7 @@ public sealed class EmailDeliveryTrackedPolicyTests
                     Kind: EmailDeliverySettingMutationKind.SetLock, IsLocked: true)]);
             var pending = AddUnrelatedPendingSetting(contextA);
 
-            var result = await CreateEmailSettingsWriter(contextA).ApplyAsync(
+            var result = await CreateInternalEmailSettingsWriter(contextA).ApplyInternalAsync(
                 [new(TenantId: null, Key: GovernanceSettingKeys.Email.SmtpHost,
                     Kind: EmailDeliverySettingMutationKind.SetLock, IsLocked: false)], actorUserId: null);
 
@@ -130,10 +130,10 @@ public sealed class EmailDeliveryTrackedPolicyTests
     }
 
     private static SystemSettingRepository SystemRepository(ExploreDbContext context) =>
-        new(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+        SystemSettingRepository.CreateReadOnly(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
     private static TenantSettingRepository TenantRepository(ExploreDbContext context) =>
-        new(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+        TenantSettingRepository.CreateReadOnly(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
     private static EmailDeliverySettingMutation HostMutation(string value) =>
         new(TenantId: null, Key: GovernanceSettingKeys.Email.SmtpHost,

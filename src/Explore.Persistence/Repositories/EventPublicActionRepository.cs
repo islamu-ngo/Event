@@ -1,22 +1,42 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class EventPublicActionRepository(ExploreDbContext dbContext)
+public sealed class EventPublicActionRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null)
     : GenericRepository<EventPublicAction, Guid>(dbContext), IEventPublicActionRepository
 {
+    public Task<Event?> GetAuthorizedEventForMutationAsync(
+        Guid tenantId, Guid userId, Guid eventId, CancellationToken cancellationToken) =>
+        new EventMutationAuthority(dbContext, timeProvider)
+            .ForPublicActionsAsync(tenantId, userId, eventId, cancellationToken);
+
     public Task<EventPublicAction?> GetDetailsAsync(Guid id, bool trackChanges, CancellationToken cancellationToken)
     {
         return DetailsQuery(trackChanges)
             .FirstOrDefaultAsync(action => action.Id == id, cancellationToken);
     }
 
-    public Task<EventPublicAction?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<EventPublicAction?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken)
     {
-        return DetailsQuery(trackChanges: true)
+        var persisted = await DetailsQuery(trackChanges: false)
             .FirstOrDefaultAsync(action => action.Id == id, cancellationToken);
+        if (persisted is null)
+            return null;
+        var tracked = dbContext.EventPublicActions.Local.FirstOrDefault(action => action.Id == id);
+        if (tracked is not null)
+        {
+            // A previously tracked object cannot rewrite the persisted parent used
+            // by the caller's exact-event authority check.
+            if (tracked.TenantId != persisted.TenantId || tracked.EventId != persisted.EventId
+                || tracked.ConcurrencyStamp != persisted.ConcurrencyStamp || tracked.IsDeleted)
+                return null;
+            return tracked;
+        }
+        dbContext.Entry(persisted).State = EntityState.Unchanged;
+        return persisted;
     }
 
     public async Task<IReadOnlyList<EventPublicAction>> ListByEventAsync(

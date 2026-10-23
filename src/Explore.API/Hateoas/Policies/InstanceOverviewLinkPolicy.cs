@@ -8,6 +8,7 @@ using Explore.Application.Features.Authentication.Local.Requests.Queries;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Features.InstanceAdmin.Requests.Queries;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Hateoas;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Http;
@@ -16,6 +17,19 @@ public sealed class InstanceOverviewLinkPolicy : ILinkPolicy<InstanceOverviewDto
 {
     public IEnumerable<LinkDefinition> GetLinks(InstanceOverviewDto dto, ClaimsPrincipal? user)
     {
+        if (dto.AuthenticationCredentialProfileRevision is not null
+            && dto.AuthenticationCredentialAuthority is not null)
+        {
+            yield return InstanceSettingLink(LinkRelations.AuthenticationCredentialCutovers,
+                RouteNames.GetCurrentAuthenticationCredentialCutover, "GET",
+                "Authentication credential cutover receipts", PrepareAuthenticationCredentialCutoverCommand.ResourceKey);
+            yield return new LinkDefinition(LinkRelations.PrepareAuthenticationCredentialCutover,
+                    RouteNames.PrepareAuthenticationCredentialCutover, null, "POST",
+                    "Approve independently verified replacement inventory", RequiresAuth: true)
+                .RequirePermission(AuthorizationActions.InstanceSettings.Update, ResourceKinds.InstanceSetting,
+                    PrepareAuthenticationCredentialCutoverCommand.ResourceKey,
+                    facts: InstanceScopedAuthorizationFacts.Instance);
+        }
         yield return InstanceSettingLink(
             LinkRelations.Self,
             RouteNames.GetInstanceAdminOverview,

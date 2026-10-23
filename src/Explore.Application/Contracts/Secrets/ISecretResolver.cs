@@ -27,6 +27,11 @@ public interface ISecretResolver
         Guid? tenantId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Resolves only the exact key, scope and qualifier. An empty qualifier selects
+    /// the unqualified binding at that exact scope; no instance inheritance or
+    /// registry-default lookup occurs when the selected binding is absent.
+    /// </summary>
     Task<SecretResolutionResult> ResolveQualifiedAsync(
         string settingKey,
         SecretScope scope,

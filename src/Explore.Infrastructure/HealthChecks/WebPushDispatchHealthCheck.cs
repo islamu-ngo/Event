@@ -1,6 +1,5 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Infrastructure.WebPush;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
@@ -8,7 +7,7 @@ namespace Explore.Infrastructure.HealthChecks;
 
 public sealed class WebPushDispatchHealthCheck(
     IOptions<WebPushSettings> options,
-    IServiceScopeFactory scopeFactory) : IHealthCheck
+    IWebPushDispatchAdmission admission) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
@@ -33,12 +32,10 @@ public sealed class WebPushDispatchHealthCheck(
 
         var now = DateTime.UtcNow;
         var processingStartedBefore = now.AddSeconds(-settings.ProcessingLeaseTimeoutSeconds);
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IWebPushDispatchOutboxRepository>();
-        var dueDispatchCount = await repository.CountDueDispatchAsync(now, cancellationToken);
-        var retryScheduledCount = await repository.CountRetryScheduledAsync(cancellationToken);
-        var staleProcessingCount = await repository.CountStaleProcessingAsync(processingStartedBefore, cancellationToken);
-        var terminalFailureCount = await repository.CountTerminalFailureAsync(cancellationToken);
+        var dueDispatchCount = await admission.CountDueDispatchAsync(now, cancellationToken);
+        var retryScheduledCount = await admission.CountRetryScheduledAsync(cancellationToken);
+        var staleProcessingCount = await admission.CountStaleProcessingAsync(processingStartedBefore, cancellationToken);
+        var terminalFailureCount = await admission.CountTerminalFailureAsync(cancellationToken);
 
         data["dueDispatchCount"] = dueDispatchCount;
         data["retryScheduledCount"] = retryScheduledCount;

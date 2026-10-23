@@ -1,7 +1,6 @@
 
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
-using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 
 namespace Explore.Application.Features.Authentication.Local.Models;
@@ -53,8 +52,7 @@ public sealed record LocalPasswordRecoveryCompletionRequestDto
     [Required]
     [StringLength(8192, MinimumLength = 1)]
     public required string Token { get; init; }
-    [Required]
-    [StringLength(LocalIdentityOptions.MaximumPasswordLength, MinimumLength = LocalIdentityOptions.MinimumPasswordLength)]
+    [LocalPassword]
     public required string NewPassword { get; init; }
     public override string ToString() => nameof(LocalPasswordRecoveryCompletionRequestDto);
 }

@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M6D2XZTRYHD5698SDNMPVJ
+Title: "Admit profile collection only with current procedure and consent"
+Type: feat
+Scope: privacy
+Summary: "Qualify profile ingress through current assessment, procedure, consent and child-age policy with buffered terminal disclosure; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Current collection assessment/procedure/consent/observation and child-age policy qualify private ingress and buffered terminal disclosure; declared birthdate is not an assured-age claim. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned private collection/provenance models and generated histories; no provider model, migration or cascade assurance was executed."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: planned
+    Detail: "Native collection procedure, assessment adoption and child-age policy govern collection eligibility; portable definitions alone do not activate collection permission."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Child-age, collection assessment/procedure/consent/subject-observation endpoints and ingress source ship here; cumulative generated API contracts ship once at final composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete paired private collection, consent withdrawal and retention guidance with native schema/composition and provider assurance before deployment."

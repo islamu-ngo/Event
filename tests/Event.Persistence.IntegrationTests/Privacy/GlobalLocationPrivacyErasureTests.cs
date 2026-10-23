@@ -661,7 +661,8 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
     internal static ErasureRuntime CreateRuntime(
         ExploreDbContext context,
         IPrivacyErasureAuthority authority,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        PrivacyErasureProviderLocatorProtector? protector = null)
     {
         var time = clock ?? TimeProvider.System;
         var services = new ServiceCollection();
@@ -702,7 +703,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
             erasureRepository,
             new AiConversationRepository(context),
             new PrivacyErasureProviderWorkRepository(context),
-            new PrivacyErasureProviderLocatorProtector(new EphemeralDataProtectionProvider()),
+            protector ?? new PrivacyErasureProviderLocatorProtector(new EphemeralDataProtectionProvider()),
             checkpointRepository,
             stateRepository,
             outboxRepository,

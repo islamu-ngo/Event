@@ -448,25 +448,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
 
     private static GlobalLocationPrivacyErasureTests.ErasureRuntime CreateRuntime(
         ExploreDbContext context, IPrivacyErasureAuthority authority, PrivacyErasureProviderLocatorProtector protector)
-    {
-        var services = new ServiceCollection();
-        services.AddHybridCache();
-        ServiceProvider cacheProvider = services.BuildIsolatedServiceProvider();
-        var erasure = new UserLocationPrivacyErasureRepository(context);
-        var checkpoints = new PrivacyErasureReplayCheckpointRepository(context);
-        var state = new PrivacyErasureStateRepository(context);
-        var options = Options.Create(new PrivacyErasureOptions());
-        var localEligibility = new LocalIdentityEligibilityRevocation(context, context, authority, TimeProvider.System);
-        var applier = new PrivacyErasureApplier(new UserRepository(context),
-            new GenericRepository<UserPii, Guid>(context), new UserAuthenticationTokenRepository(context),
-            erasure, erasure, new AiConversationRepository(context),
-            new PrivacyErasureProviderWorkRepository(context), protector, checkpoints, state,
-            new OutboxRepository(context), cacheProvider.GetRequiredService<HybridCache>(), TimeProvider.System,
-            NullLogger<PrivacyErasureApplier>.Instance, options, localEligibility);
-        var workflow = new RetainedAuthorityPrivacyErasureWorkflow(checkpoints, state, authority,
-            new EfCoreUnitOfWork(context), applier, options, TimeProvider.System, localEligibility);
-        return new(workflow, new PrivacyErasureReplayService(workflow), cacheProvider);
-    }
+        => GlobalLocationPrivacyErasureTests.CreateRuntime(context, authority, protector: protector);
 
     private static async Task<StorageGraph> SeedStorageAsync(
         ExploreDbContext seed, GlobalLocationPrivacyErasureTests.ErasureGraph graph, Guid tenantA)

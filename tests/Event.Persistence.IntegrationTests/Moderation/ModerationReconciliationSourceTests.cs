@@ -627,9 +627,9 @@ public sealed class ModerationReconciliationSourceTests
                 new SelectedSecret(this), new FixedClock());
 
         private static AdminContext Admin(ExploreDbContext context) =>
-            new(new HttpContextAccessor(), new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
+            new(new HttpContextAccessor(), new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 new OrganizationMemberRepository(context), new GroupMemberRepository(context),
-                new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+                new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
 
         public ModerationMachineSubjectBindingRepository Bindings(ExploreDbContext context, MachinePrincipalAccessor machine) =>
             new(context, Admin(context), machine,
@@ -647,9 +647,9 @@ public sealed class ModerationReconciliationSourceTests
                     [new Claim(ClaimTypes.NameIdentifier, OwnerId.ToString())], "reconciliation-publication"))
                 }
             };
-            var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
+            var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 new OrganizationMemberRepository(context), new GroupMemberRepository(context),
-                new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+                new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
             var epoch = await context.ModerationQualificationEpochs.AsNoTracking().SingleAsync();
             ModerationPolicyPublicationRequest request;
             if (Publications.TryGetValue(jurisdiction, out var previous))

@@ -269,9 +269,9 @@ public sealed partial class ModerationNoticeCleanupTests
         {
             Context = fixture.Context(interceptors);
             SetCaller(fixture.Database.SubjectId);
-            var identity = new AdminContext(_http, new PlatformUserRoleRepository(Context),
-                new TenantUserRoleGrantRepository(Context), new OrganizationMemberRepository(Context),
-                new GroupMemberRepository(Context), new UserExternalLoginRepository(Context), NullLogger<AdminContext>.Instance);
+            var identity = new AdminContext(_http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Context)),
+                new OrganizationMemberRepository(Context),
+                new GroupMemberRepository(Context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Context), null), NullLogger<AdminContext>.Instance);
             var machine = new MachinePrincipalAccessor(_http);
             _handler = new(new ModerationNoticeStatusRepository(Context, identity, machine, fixture.Clock,
                 fixture.Privacy.Authority(Context, fixture.Clock)),

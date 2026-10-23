@@ -386,9 +386,9 @@ public sealed partial class ModerationPolicyPublicationTests
             privacy ?? fixture.Privacy, fixture.Database.Inventory, fixture.Clock);
 
     private static AdminContext ObservationAdmin(IndividualPolicyFixture fixture, HttpContextAccessor http) =>
-        new(http, new PlatformUserRoleRepository(fixture.Context), new TenantUserRoleGrantRepository(fixture.Context),
+        new(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(fixture.Context)),
             new OrganizationMemberRepository(fixture.Context), new GroupMemberRepository(fixture.Context),
-            new UserExternalLoginRepository(fixture.Context), NullLogger<AdminContext>.Instance);
+            new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(fixture.Context), null), NullLogger<AdminContext>.Instance);
 
     private static async Task<ModerationProfileCollectionSubjectObservation?> ReadSubjectObservationAsync(
         IndividualPolicyFixture fixture, HttpContextAccessor http, Guid id)

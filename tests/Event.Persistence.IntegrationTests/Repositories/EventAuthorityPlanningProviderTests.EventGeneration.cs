@@ -146,9 +146,9 @@ public sealed partial class EventAuthorityPlanningProviderTests
             new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, administrator.Id.ToString("D"))], "event-generation-witness"))
             }
         };
-        AdminContext Identity(ExploreDbContext context) => new(http, new PlatformUserRoleRepository(context),
-            new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-            new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+        AdminContext Identity(ExploreDbContext context) => new(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context),
+            new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);
         var trustDomainId = host?.TrustDomainId ?? Guid.CreateVersion7();
         var solutionId = host?.SolutionId ?? Guid.CreateVersion7();

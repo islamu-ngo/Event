@@ -324,8 +324,8 @@ public sealed class EventOwnershipTransferMutationTests
             new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, fixture.UserId.ToString("D"))], "event-transfer-native"))
             }
         };
-        var identity = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+        var identity = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);
         var provider = new Provider(context, beforeAuthorize);
         return new(new EventRoleAssignmentMutationBoundary(context, privacy ?? fixture.Database.Privacy.Authority(context, clock),

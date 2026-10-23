@@ -262,8 +262,8 @@ public sealed partial class GroupMemberMutationBoundaryTests
     {
         var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = Principal(actor) } };
         var members = new GroupMemberRepository(context);
-        var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
-            new OrganizationMemberRepository(context), members, new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context), members, new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
         return (new(context, privacy, new UserContext(http), admin, new MachinePrincipalAccessor(http), new Provider(context, allowed), members), http);
     }
 

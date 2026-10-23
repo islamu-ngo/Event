@@ -95,9 +95,9 @@ public sealed partial class ModerationNoticeCleanupTests
         public ModerationNoticeCleanupRepository Repository(
             ExploreDbContext context, MachinePrincipalAccessor machine, bool nativeNotificationOwner = false)
         {
-            var admin = new AdminContext(new HttpContextAccessor(), new PlatformUserRoleRepository(context),
-                new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-                new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+            var admin = new AdminContext(new HttpContextAccessor(), new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new OrganizationMemberRepository(context),
+                new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
             var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), Clock);

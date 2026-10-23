@@ -633,9 +633,9 @@ public sealed partial class ModerationNoticeReadTests
             }
             Context.TenantContext = Tenant;
             SetCaller(userId);
-            var identity = new AdminContext(_http, new PlatformUserRoleRepository(Context),
-                new TenantUserRoleGrantRepository(Context), new OrganizationMemberRepository(Context),
-                new GroupMemberRepository(Context), new UserExternalLoginRepository(Context), NullLogger<AdminContext>.Instance);
+            var identity = new AdminContext(_http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Context)),
+                new OrganizationMemberRepository(Context),
+                new GroupMemberRepository(Context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Context), null), NullLogger<AdminContext>.Instance);
             var machine = new MachinePrincipalAccessor(_http);
             var activation = new ModerationNativeActivationQualification(Context, fixture.Database.Inventory,
                 null, new ModerationQualificationPolicySourceOwner(Context, fixture.Clock), fixture.Clock);

@@ -261,8 +261,8 @@ public sealed class ModerationNativeTargetCompositionTests
             var http = new HttpContextAccessor();
             var machine = new MachinePrincipalAccessor(http);
             machine.SetPrincipal(principal);
-            var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
-                new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
+            var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
                 NullLogger<AdminContext>.Instance);
             var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,

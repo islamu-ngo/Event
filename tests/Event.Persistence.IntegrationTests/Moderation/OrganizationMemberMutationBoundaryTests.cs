@@ -279,8 +279,8 @@ public sealed partial class OrganizationMemberMutationBoundaryTests
             [new Claim(ClaimTypes.NameIdentifier, actor.ToString())], "organization-membership-witness"))
             }
         };
-        var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
+        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
             NullLogger<AdminContext>.Instance);
         return (new(context, privacy, new UserContext(http), admin,
             new MachinePrincipalAccessor(http), new Provider(context, allowed)), http);

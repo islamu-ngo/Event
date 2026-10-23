@@ -3,7 +3,6 @@ using Explore.API.Controllers;
 using Explore.API.Filters;
 using Explore.API.Middleware;
 using Microsoft.AspNetCore.Http;
-using Microsoft.IO;
 
 namespace Event.API.IntegrationTests.Features;
 
@@ -28,7 +27,7 @@ public sealed class ModerationNoticeCorrectionCacheTests
             originalStreamObserved = ReferenceEquals(stream, context.Response.Body);
             context.Response.ContentType = "application/json";
             await context.Response.Body.WriteAsync("{}"u8.ToArray());
-        }, new RecyclableMemoryStreamManager());
+        });
         await middleware.InvokeAsync(http);
         await Assert.That(originalStreamObserved).IsTrue();
         await Assert.That(http.Response.Headers.ContainsKey("ETag")).IsFalse();

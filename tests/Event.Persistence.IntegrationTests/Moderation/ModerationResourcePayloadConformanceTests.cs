@@ -216,9 +216,9 @@ public sealed partial class ModerationConsumerMeasurementReceiptObservationTests
                     [new Claim(ClaimTypes.NameIdentifier, database.AdministratorId.ToString())], "native-conformance"))
             }
         };
-        var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
-            new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-            new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context),
+            new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);
         var source = await new ModerationQualificationAuthority(context, admin, machine)
             .AcquireAsync(database.Scope, fixture.Receipt.Binding.PublicationId, token)

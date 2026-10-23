@@ -326,9 +326,9 @@ public sealed partial class ModerationCaseNarrativeCustodyTests
             context.CurrentUserService = new NarrativeCaller(http);
         }
 
-        public AdminContext Admin(ExploreDbContext context) => new(http, new PlatformUserRoleRepository(context),
-            new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-            new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+        public AdminContext Admin(ExploreDbContext context) => new(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context),
+            new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
 
         public MachinePrincipalAccessor Machine => new(http);
 

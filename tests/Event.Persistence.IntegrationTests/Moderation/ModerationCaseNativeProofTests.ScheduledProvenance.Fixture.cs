@@ -74,9 +74,9 @@ public sealed partial class ModerationCaseNativeProofTests
             var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
             var caller = new NativeCaller(Guid.Empty) { UserId = null, IsAuthenticated = false };
             context.CurrentUserService = caller;
-            var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
-                new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-                new GroupMemberRepository(context), new UserExternalLoginRepository(context),
+            var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new OrganizationMemberRepository(context),
+                new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
                 NullLogger<AdminContext>.Instance);
             var machine = new MachinePrincipalAccessor(http);
             machine.SetPrincipal(Principal);
@@ -126,9 +126,9 @@ public sealed partial class ModerationCaseNativeProofTests
                     "native-response"));
             var caller = new NativeCaller(human);
             context.CurrentUserService = caller;
-            var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
-                new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-                new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+            var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new OrganizationMemberRepository(context),
+                new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
             var machine = new MachinePrincipalAccessor(http);
             var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,
@@ -299,9 +299,9 @@ public sealed partial class ModerationCaseNativeProofTests
                     new System.Security.Claims.ClaimsIdentity(
                         [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier,
                             original.Assessor.ToString())], "scheduled-policy"));
-                var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
-                    new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-                    new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+                var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                    new OrganizationMemberRepository(context),
+                    new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
                 context.ChangeTracker.Clear();
                 context.ModerationTrustDomainId = null;
                 await Assert.That((await new ModerationPolicyPublicationRepository(context, admin,

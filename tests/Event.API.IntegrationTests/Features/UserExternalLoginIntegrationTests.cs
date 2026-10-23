@@ -184,7 +184,9 @@ public class UserExternalLoginIntegrationTests
             .Returns(BaseCommandResponse.Failure<Guid>("claim_rejected", "Claim rejected."));
         var logins = Substitute.For<IUserExternalLoginRepository>();
         var tokenIssuer = Substitute.For<IAtprotoSessionTokenIssuer>();
+        using var scope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
+            scope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -318,7 +320,10 @@ public class UserExternalLoginIntegrationTests
                 new string('b', 64),
                 DateTime.UtcNow));
 
+        using var firstScope = _fixture.Factory.Services.CreateScope();
+        using var secondScope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler first = CreateAtprotoHandler(
+            firstScope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -326,6 +331,7 @@ public class UserExternalLoginIntegrationTests
             out _,
             bootstrapRepository);
         BootstrapAtprotoSessionCommandHandler second = CreateAtprotoHandler(
+            secondScope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -435,7 +441,9 @@ public class UserExternalLoginIntegrationTests
         var tokenIssuer = Substitute.For<IAtprotoSessionTokenIssuer>();
         tokenIssuer.IssueAsync(userId, Arg.Any<Guid>(), did, Arg.Any<CancellationToken>())
             .Returns(new AtprotoIssuedSessionToken("platform-token", DateTimeOffset.UtcNow.AddMinutes(5)));
+        using var scope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
+            scope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -502,7 +510,9 @@ public class UserExternalLoginIntegrationTests
         var tokenIssuer = Substitute.For<IAtprotoSessionTokenIssuer>();
         tokenIssuer.IssueAsync(userId, Arg.Any<Guid>(), did, Arg.Any<CancellationToken>())
             .Returns(new AtprotoIssuedSessionToken("platform-token", DateTimeOffset.UtcNow.AddMinutes(5)));
+        using var scope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
+            scope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -559,7 +569,9 @@ public class UserExternalLoginIntegrationTests
             {
                 AtprotoLoginEnabled = false
             });
+        using var scope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
+            scope.ServiceProvider,
             gateway,
             Substitute.For<IAtprotoSessionTokenIssuer>(),
             Substitute.For<ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>>>(),
@@ -587,6 +599,7 @@ public class UserExternalLoginIntegrationTests
             new byte[] { 1 });
 
     private static BootstrapAtprotoSessionCommandHandler CreateAtprotoHandler(
+        IServiceProvider services,
         IAtprotoOAuthSecurityGateway gateway,
         IAtprotoSessionTokenIssuer tokenIssuer,
         ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>> claimAdministratorHandler,
@@ -719,7 +732,7 @@ public class UserExternalLoginIntegrationTests
             configuration,
             TimeProvider.System,
             new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority, recognition,
-                TimeProvider.System, logins),
+                TimeProvider.System, logins, services.GetRequiredService<IHumanActionCommitFinalizer>),
             null!); // These legacy scenarios exercise Person login; membership participants have native-store coverage.
     }
 

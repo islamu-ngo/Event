@@ -592,8 +592,8 @@ public sealed partial class ModerationNoticeReadTests
         var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
         http.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, caller.ToString())], "correction-native-witness"));
-        return (new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
+        return (new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
             NullLogger<AdminContext>.Instance), new MachinePrincipalAccessor(http));
     }
 

@@ -130,9 +130,9 @@ public sealed partial class ModerationContentResponseTests
             var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
             http.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
                 [new Claim(ClaimTypes.NameIdentifier, caller.ToString())], "response-native-witness"));
-            var identity = new AdminContext(http, new PlatformUserRoleRepository(Context),
-                new TenantUserRoleGrantRepository(Context), new OrganizationMemberRepository(Context),
-                new GroupMemberRepository(Context), new UserExternalLoginRepository(Context), NullLogger<AdminContext>.Instance);
+            var identity = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Context)),
+                new OrganizationMemberRepository(Context),
+                new GroupMemberRepository(Context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(Context), null), NullLogger<AdminContext>.Instance);
             Repository = new(Context, identity, new MachinePrincipalAccessor(http), null!,
                 new ModerationNativeActivationQualification(Context, fixture.Database.Inventory,
                     null, new ModerationQualificationPolicySourceOwner(Context, fixture.Clock), fixture.Clock),

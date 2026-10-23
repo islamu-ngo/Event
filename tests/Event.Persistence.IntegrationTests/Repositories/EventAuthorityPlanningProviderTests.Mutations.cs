@@ -126,8 +126,8 @@ public sealed partial class EventAuthorityPlanningProviderTests
             new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, manager.Id.ToString("D"))], "window-source-witness"))
             }
         };
-        var identity = new AdminContext(http, new PlatformUserRoleRepository(owner), new TenantUserRoleGrantRepository(owner),
-            new OrganizationMemberRepository(owner), new GroupMemberRepository(owner), new UserExternalLoginRepository(owner), NullLogger<AdminContext>.Instance);
+        var identity = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(owner)),
+            new OrganizationMemberRepository(owner), new GroupMemberRepository(owner), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(owner), null), NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);
         var provider = new EventOwnershipTransferMutationTests.Provider(owner);
         var boundary = new EventRoleAssignmentMutationBoundary(owner, privacy.Authority(owner, TimeProvider.System),

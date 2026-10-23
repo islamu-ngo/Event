@@ -143,8 +143,8 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
             new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, actor.ToString("D"))], "event-resource-native"))
             }
         };
-        var identity = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
+        var identity = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
             NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);
         return new(repository, unit, new EventResourceStorageLifecycleService(

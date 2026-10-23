@@ -390,7 +390,7 @@ public sealed class ModerationMeasurementJournalAttribute(EventReceiverStage sta
             if (session is not null)
             {
                 json.WriteBoolean("lifecycleCompleted", true);
-                json.WriteBoolean("sessionHasFailures", session.HasFailures);
+                json.WriteBoolean("sessionHasFailures", session.AllTests.Any(test => HasFailure(test.Execution.Result)));
                 json.WriteBoolean("sessionCancelled", session.SessionCancellationToken.IsCancellationRequested);
                 json.WriteNumber("observedTestCount", Observations.Count);
                 json.WriteBoolean("failureObserved", Observations.Values.Any(value => value.FailureObserved));

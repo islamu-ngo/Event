@@ -96,9 +96,9 @@ public sealed partial class ModerationPolicyPublicationTests
                 User = provider ? fixture.ProviderPrincipal() : IndividualPrincipal(fixture.SubjectId)
             }
         };
-        var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
-            new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-            new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context),
+            new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);
         if (provider)
         {

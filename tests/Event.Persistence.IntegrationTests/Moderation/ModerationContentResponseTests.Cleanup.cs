@@ -51,9 +51,9 @@ public sealed partial class ModerationContentResponseTests
             machine.SetPrincipal(new ApiKeyPrincipalContext(keyId, null, ExternalApiKeyOwnerType.InstanceAdmin,
                 fixture.Database.AdministratorId, ["events:read"])
             { CredentialSource = ApiKeyCredentialSource.Persisted });
-            var admin = new AdminContext(new HttpContextAccessor(), new PlatformUserRoleRepository(context),
-                new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-                new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+            var admin = new AdminContext(new HttpContextAccessor(), new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new OrganizationMemberRepository(context),
+                new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
             var keys = new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context));
             var bindings = new ModerationMachineSubjectBindingRepository(context, admin, machine, keys,
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), fixture.Clock);

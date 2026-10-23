@@ -353,9 +353,9 @@ public sealed class ModerationAuthoritySourceInstallationTests(PostgreSqlContain
                 User = new ClaimsPrincipal(new ClaimsIdentity(claims, authenticated ? "installation-test" : null))
             }
         };
-        var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
-            new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-            new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context),
+            new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);
         if (machineCaller)
             machine.SetPrincipal(new ApiKeyPrincipalContext(

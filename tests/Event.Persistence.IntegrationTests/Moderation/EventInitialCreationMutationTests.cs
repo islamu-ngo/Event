@@ -614,8 +614,8 @@ public sealed partial class EventInitialCreationMutationTests
             new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, database.SubjectId.ToString("D"))], "initial-event-native"))
             }
         };
-        var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
         return (new EventRoleAssignmentMutationBoundary(context, privacy ?? database.Privacy.Authority(context, clock),
             new UserContext(http), admin, new MachinePrincipalAccessor(http),
             new EventOwnershipTransferMutationTests.Provider(context), clock, ModerationRecognitionResourceFixture.Reader(context)), http);

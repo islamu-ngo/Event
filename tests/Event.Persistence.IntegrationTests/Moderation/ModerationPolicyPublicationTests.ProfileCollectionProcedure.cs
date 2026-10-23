@@ -218,9 +218,9 @@ public sealed partial class ModerationPolicyPublicationTests
         if (change is ProcedureChange.Machine or ProcedureChange.Anonymous)
         {
             var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
-            var anonymous = new AdminContext(http, new PlatformUserRoleRepository(context),
-                new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-                new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+            var anonymous = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new OrganizationMemberRepository(context),
+                new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
             var caller = new MachinePrincipalAccessor(http);
             if (change == ProcedureChange.Machine)
                 caller.SetPrincipal(new("procedure-machine", database.TenantId, ExternalApiKeyOwnerType.User, owner, []));

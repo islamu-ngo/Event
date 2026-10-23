@@ -1,4 +1,5 @@
 using Explore.API.Controllers;
+using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventAddOns;

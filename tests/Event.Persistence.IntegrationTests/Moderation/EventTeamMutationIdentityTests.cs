@@ -33,8 +33,8 @@ public sealed class EventTeamMutationIdentityTests
                 failure == "anonymous" ? null : "event-team-native-witness"))
             }
         };
-        var identity = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
-            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new UserExternalLoginRepository(context),
+        var identity = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context), new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null),
             NullLogger<AdminContext>.Instance);
         var machine = new MachinePrincipalAccessor(http);
         var provider = new DenyingProvider(failure == "unavailable");

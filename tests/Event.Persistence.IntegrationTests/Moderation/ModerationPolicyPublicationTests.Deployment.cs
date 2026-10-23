@@ -261,9 +261,9 @@ public sealed partial class ModerationPolicyPublicationTests
                 [new Claim(ClaimTypes.NameIdentifier, userId.ToString())], "deployment-witness"))
             }
         };
-        return (new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
+        return (new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context),
-            new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance), new MachinePrincipalAccessor(http));
+            new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance), new MachinePrincipalAccessor(http));
     }
 
     private sealed class DeploymentClock : TimeProvider

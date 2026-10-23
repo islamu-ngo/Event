@@ -151,9 +151,9 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         services.AddScoped<IModerationMachineSubjectBindingRepository>(provider =>
         {
             var context = provider.GetRequiredService<ExploreDbContext>();
-            var admin = new AdminContext(new HttpContextAccessor(), new PlatformUserRoleRepository(context),
-                new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-                new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+            var admin = new AdminContext(new HttpContextAccessor(), new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new OrganizationMemberRepository(context),
+                new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
             return new ModerationMachineSubjectBindingRepository(context, admin,
                 provider.GetRequiredService<MachinePrincipalAccessor>(), provider.GetRequiredService<IExternalApiKeyAuthenticationRepository>(),
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), fixture.Clock);

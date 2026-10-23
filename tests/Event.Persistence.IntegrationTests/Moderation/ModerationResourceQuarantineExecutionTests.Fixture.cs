@@ -370,9 +370,9 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
             var http = new HttpContextAccessor();
             var machine = new MachinePrincipalAccessor(http);
             machine.SetPrincipal(credential ?? throw new InvalidOperationException("Installed maintenance authentication failed."));
-            var admin = new AdminContext(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
+            var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 new OrganizationMemberRepository(context), new GroupMemberRepository(context),
-                new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+                new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
             return (machine, new(context, admin, machine,
                 new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
                 new ModerationNativeAuthorityParticipantTests.UnconfiguredKeys(), Clock));

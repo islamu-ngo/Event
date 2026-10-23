@@ -426,7 +426,7 @@ public sealed class ConfigurationManifestBootstrapWorkerNativeTests(PostgreSqlCo
             processManagedTenantProvisioningOperationCommandHandler: null!, reconcileManagedTenantProvisioningDeadLetterCommandHandler: null!,
             logger: NullLogger<CompositeOutboxMessageDispatcher>.Instance,
             configurationManifestEffectDispatcher: provider.GetRequiredService<IConfigurationManifestEffectDispatcher>(),
-            configurationImportEffectDelivery: null!, notificationOutboxExecutionAuthority: null!,
+            configurationImportEffectDelivery: null!, moderationEffectDispatcher: null!, notificationOutboxExecutionAuthority: null!,
             genericOutboxExecutionAuthority: provider.GetRequiredService<IGenericOutboxExecutionAuthority>()));
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
     }

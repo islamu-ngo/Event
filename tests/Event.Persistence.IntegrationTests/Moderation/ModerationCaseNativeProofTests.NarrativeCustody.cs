@@ -212,9 +212,9 @@ public sealed partial class ModerationCaseNativeProofTests
                     [new Claim(ClaimTypes.NameIdentifier, caller.UserId!.Value.ToString())], "native-case-witness"))
             }
         };
-        return new(http, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
+        return new(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context),
-            new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+            new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
     }
 
     private static async Task QualifyNarrativeCustodyAsync(NativeDatabase database, ModerationCaseTargetKind kind)

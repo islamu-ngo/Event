@@ -337,9 +337,9 @@ public sealed partial class ModerationPolicyPublicationTests
     private static ModerationProfileCollectionAssessmentRepository AssessmentWithdrawalOwner(
         IndividualPolicyFixture fixture, HttpContextAccessor http, IPrivacyIdentityFenceAuthority? privacy = null)
     {
-        var admin = new AdminContext(http, new PlatformUserRoleRepository(fixture.Context),
-            new TenantUserRoleGrantRepository(fixture.Context), new OrganizationMemberRepository(fixture.Context),
-            new GroupMemberRepository(fixture.Context), new UserExternalLoginRepository(fixture.Context),
+        var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(fixture.Context)),
+            new OrganizationMemberRepository(fixture.Context),
+            new GroupMemberRepository(fixture.Context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(fixture.Context), null),
             NullLogger<AdminContext>.Instance);
         return new(fixture.Context, admin, new MachinePrincipalAccessor(http), http,
             privacy ?? fixture.Privacy, fixture.Clock, fixture.Database.Inventory);

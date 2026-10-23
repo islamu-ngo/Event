@@ -112,9 +112,9 @@ public sealed partial class ModerationNoticeEmailTests
         public ModerationNoticeEmailAuthority CreateAuthority(ExploreDbContext context)
         {
             var http = new HttpContextAccessor();
-            var admin = new AdminContext(http, new PlatformUserRoleRepository(context),
-                new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-                new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+            var admin = new AdminContext(http, new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+                new OrganizationMemberRepository(context),
+                new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
             var activation = new ModerationNativeActivationQualification(context, Notice.Database.Inventory,
                 null, new ModerationQualificationPolicySourceOwner(context, Notice.Clock), Notice.Clock);
             var privacy = Authority(context);

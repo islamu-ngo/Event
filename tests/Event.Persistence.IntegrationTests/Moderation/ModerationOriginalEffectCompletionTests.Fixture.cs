@@ -42,9 +42,9 @@ public sealed partial class ModerationResourceQuarantineExecutionTests
         Fixture fixture, ExploreDbContext context, IMachinePrincipalAccessor machine,
         IModerationMachineSubjectBindingRepository bindings)
     {
-        var admin = new AdminContext(new HttpContextAccessor(), new PlatformUserRoleRepository(context),
-            new TenantUserRoleGrantRepository(context), new OrganizationMemberRepository(context),
-            new GroupMemberRepository(context), new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
+        var admin = new AdminContext(new HttpContextAccessor(), new AdministrativeAuthorityRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            new OrganizationMemberRepository(context),
+            new GroupMemberRepository(context), new ExternalLoginAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context), null), NullLogger<AdminContext>.Instance);
         var inventory = fixture.Database.Inventory;
         var runtime = fixture.Database.ConsumerRuntimeSources;
         var definitions = new ModerationPolicyDefinitionSourceOwner(context, admin, machine, inventory, fixture.Clock);

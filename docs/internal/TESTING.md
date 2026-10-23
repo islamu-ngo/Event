@@ -767,9 +767,22 @@ These tests verify structural accessibility requirements:
 
 ### Authorization Parity Tests
 
-- `RegisteredResourceKinds_ShouldHave_FallbackCase` — every resource kind handles unknown permissions
-- `RegisteredResourceKinds_ShouldHave_CerbosPolicy` — policy file exists per resource
-- `CerbosPolicies_ShouldHave_FallbackCase` — Cerbos YAML includes default deny
+`AuthorizationParityTests` checks the compiled resource catalog and parsed
+Cerbos policy, schema and derived-role artifacts. Missing artifact roots fail
+closed, and YAML comments cannot substitute for policy identifiers. These
+artifact checks do not establish runtime authorization behavior.
+
+Infrastructure tests exercise the real Local evaluator's allow/deny corpus,
+dedicated event-resource ceilings, ticket and paid-commerce boundaries, and
+persisted principal enrichment. Captured Cerbos SDK projections verify typed
+request facts; the native Cerbos CLI policy tests separately execute policy
+outcomes. Neither the captured SDK seam nor artifact parsing proves a live PDP
+request. API permission-action and missing-action controls exercise the actual
+HAL adapter and link assembly without claiming an HTTP round trip.
+
+Keep these evidence seams distinct. Source-token or method-presence checks are
+not runtime authorization proof; final affected-project and provider gates
+remain separate requirements.
 
 ## TDD Workflow
 

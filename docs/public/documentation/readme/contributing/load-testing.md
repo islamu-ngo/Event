@@ -5,11 +5,16 @@ exercise its public language lookup. They run for both split hosting and the
 combined standalone host. The runner starts its own environment; it does not
 accept a URL for an existing developer instance or deployed service.
 
-Install k6 **2.3.0** separately, verify the release checksum, and set
+Install Linux x64 k6 **2.3.0** separately. Verify the release archive's SHA-256
+`39c3117b6af817592dcd0ce4242105c0a7af10948c2a425306f0be8f7a8a8ab1`
+and the extracted executable's SHA-256
+`e001bbf39ba67424a85c9c8516440ba5c73ecf7a6021be96c76194380c15f260`, then set
 `ISLAMU_K6_PATH` to the executable's absolute path. k6 is an AGPL-3.0 external
 tool admitted for this contributor workflow. It is not included in ISLAMU
 build artifacts. Do not add it to redistributed packages without a separate
 license/distribution review.
+The runner rejects any other executable digest before starting a process;
+matching version output does not authorize an alternate binary or platform.
 
 Use an approved secret authority and the distributed test project's documented
 local runtime prerequisites. Never put credentials into the workload or its

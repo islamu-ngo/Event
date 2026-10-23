@@ -14,7 +14,7 @@ The [official repository metadata](https://api.github.com/repos/grafana/k6) decl
 
 No external k6 implementation source or workload expression is incorporated. Workloads derive from Event's public contracts, independent test cases and the programme's source-free requirements. Dependencies/extensions/remote imports are excluded unless separately reviewed.
 
-The selected release is [k6 v2.3.0](https://github.com/grafana/k6/releases/tag/v2.3.0). The Linux AMD64 archive `k6-v2.3.0-linux-amd64.tar.gz` has SHA-256 `39c3117b6af817592dcd0ce4242105c0a7af10948c2a425306f0be8f7a8a8ab1`; it was verified against that release's published checksums before execution. The observed binary reports commit `e088784614`, Go `1.26.8`, Linux AMD64. This records provenance, not a redistribution of the archive or a capacity result.
+The selected release is [k6 v2.3.0](https://github.com/grafana/k6/releases/tag/v2.3.0). The Linux AMD64 archive `k6-v2.3.0-linux-amd64.tar.gz` has SHA-256 `39c3117b6af817592dcd0ce4242105c0a7af10948c2a425306f0be8f7a8a8ab1`; it was verified against that release's published checksums before execution. Streaming the executable directly from that verified archive independently yields SHA-256 `e001bbf39ba67424a85c9c8516440ba5c73ecf7a6021be96c76194380c15f260`, matching the installed executable. The runner pins this executable digest before starting either version inspection or a workload; version text alone cannot admit a replacement binary. The observed binary reports commit `e088784614`, Go `1.26.8`, Linux AMD64. This records provenance, not a redistribution of the archive or a capacity result.
 
 ## Required Evidence
 

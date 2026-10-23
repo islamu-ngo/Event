@@ -12,8 +12,10 @@ internal static class K6LoadRunner
     internal const int DurationSeconds = 5;
     internal const int VirtualUsers = 4;
     internal const int OfferedRate = 8;
+    private const string AdmittedExecutableDigest = "E001BBF39BA67424A85C9C8516440BA5C73ECF7A6021BE96C76194380C15F260";
     private const string WorkloadId = "owned-language-read-v1";
     private const long MemoryBudgetBytes = 512 * 1024 * 1024;
+    private static readonly JsonSerializerOptions EvidenceJsonOptions = new() { WriteIndented = true };
     private static readonly string[] SummaryFields =
     [
         "schema", "mode", "attempts", "responses", "correct", "iterations", "httpRequests",
@@ -27,7 +29,9 @@ internal static class K6LoadRunner
         string executable = Environment.GetEnvironmentVariable("ISLAMU_K6_PATH") ?? "";
         if (!Path.IsPathFullyQualified(executable) || !File.Exists(executable))
             throw new InvalidOperationException("load_k6_absolute_executable_required");
-        string version = await ReadVersionAsync(executable, cancellationToken);
+        var versionStartInfo = StartInfo(executable);
+        versionStartInfo.ArgumentList.Add("version");
+        string version = await ReadVersionAsync(versionStartInfo, cancellationToken);
         string script = Path.Combine(AppContext.BaseDirectory, "Workloads", "owned-runtime.js");
         if (!File.Exists(script))
             throw new InvalidOperationException("load_reviewed_workload_missing");
@@ -104,7 +108,7 @@ internal static class K6LoadRunner
                 Scope = "public cached lookup reads; no authenticated writes, settlement, SLO or capacity claim"
             };
             await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, $"load-{topology}-{mode}.json"),
-                JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
+                JsonSerializer.Serialize(evidence, EvidenceJsonOptions), cancellationToken);
         }
     }
 
@@ -146,8 +150,8 @@ internal static class K6LoadRunner
         {
             if (!process.HasExited)
                 process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
-            await Task.WhenAll(output, error).WaitAsync(TimeSpan.FromSeconds(5));
+            await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+            await Task.WhenAll(output, error).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
         }
         wall.Stop();
         if (process.ExitCode != 0 || !File.Exists(summaryPath) || new FileInfo(summaryPath).Length > 4096)
@@ -235,12 +239,14 @@ internal static class K6LoadRunner
         return info;
     }
 
-    private static async Task<string> ReadVersionAsync(string executable, CancellationToken cancellationToken)
+    internal static async Task<string> ReadVersionAsync(ProcessStartInfo startInfo, CancellationToken cancellationToken)
     {
+        if (!Path.IsPathFullyQualified(startInfo.FileName) || !File.Exists(startInfo.FileName) ||
+            Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(startInfo.FileName, cancellationToken))) != AdmittedExecutableDigest)
+            throw new InvalidOperationException("load_k6_digest_not_admitted");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(5));
-        using var process = new Process { StartInfo = StartInfo(executable) };
-        process.StartInfo.ArgumentList.Add("version");
+        using var process = new Process { StartInfo = startInfo };
         process.Start();
         var output = process.StandardOutput.ReadToEndAsync(deadline.Token);
         var error = process.StandardError.BaseStream.CopyToAsync(Stream.Null, CancellationToken.None);
@@ -256,8 +262,8 @@ internal static class K6LoadRunner
         {
             if (!process.HasExited)
                 process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
-            await error.WaitAsync(TimeSpan.FromSeconds(5));
+            await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+            await error.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
         }
     }
 }

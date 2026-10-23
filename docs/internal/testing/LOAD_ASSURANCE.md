@@ -17,6 +17,17 @@ credentials, or redirects. JavaScript independently checks the same allowlist.
 
 ## What fails the gate
 
+Before any version or workload process starts, the owner requires the admitted
+Linux x64 k6 2.3.0 executable's SHA-256:
+`e001bbf39ba67424a85c9c8516440ba5c73ecf7a6021be96c76194380c15f260`.
+This executable pin was independently derived from the admitted Linux AMD64
+archive, whose published SHA-256 is
+`39c3117b6af817592dcd0ce4242105c0a7af10948c2a425306f0be8f7a8a8ab1`.
+Matching version text alone cannot admit another executable. The process
+harness proves this with an owned child that emits accepted version text and
+creates a sentinel when launched: checksum rejection must leave that sentinel
+absent. No alternate platform executable or automatic fallback is admitted.
+
 Warmup requires HTTP 200, JSON, a nonempty lookup list, positive unique IDs, and
 nonempty `masterCode` and `fullName`. Three identical response digests establish
 the read-only comparison value. Every measured request must return the same
@@ -79,9 +90,10 @@ seams. Passing this read foundation must not close that outstanding work.
 ## Execution and integration
 
 `ISLAMU_K6_PATH` must name an absolute, separately installed k6 **2.3.0**
-executable. It is not a secret. The test verifies its reported version and
-records its executable SHA-256. Release integrity must be verified during
-installation; a version string alone is not a signature check. The external
+executable. It is not a secret. The test verifies the fixed admitted executable
+SHA-256 before starting version inspection, then verifies its reported version
+and records the digest. Verify archive release integrity during installation;
+a version string alone cannot admit another binary. The external
 executable is not downloaded, vendored, packaged, or distributed by this lane.
 The runner clears the child environment, supplies only workload parameters and
 the selected temporary directory,
@@ -97,11 +109,12 @@ The owning project must copy the reviewed workload as content:
          CopyToOutputDirectory="PreserveNewest" />
 ```
 
-After building `tests/Event.Distributed.IntegrationTests` in Release, the pure
-parser/admission tests require no network, Docker, k6 executable or AppHost:
+After building `tests/Event.Distributed.IntegrationTests` in Release, the
+parser/admission and owned child-process tests require no network, Docker,
+k6 executable or AppHost:
 
 ```bash
-dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter '/*/*/K6Load*HarnessTests/*' --minimum-expected-tests 37
+dotnet run --project tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter '/*/*/K6Load*HarnessTests/*' --minimum-expected-tests 38
 ```
 
 The explicit runtime category requires the real owned environment and external
@@ -115,7 +128,7 @@ The Harness category also starts controlled copies of its own executable to
 exercise the actual process boundary: full stdout/stderr pipes, cancellation
 and deadline cleanup of a parent and descendant, nonzero exit, absent or
 oversized summaries, and an inherited secret canary. The controlled child mode
-accepts only seven fixed scenarios and an owned temporary directory with a
+accepts only eight fixed scenarios and an owned temporary directory with a
 matching marker; it cannot select arbitrary commands or delete files. A guarded
 module initializer intercepts only the exact first child flag, preserving
 TUnit's generated entry point. Ordinary discovery allocates no child process,

@@ -122,13 +122,47 @@ public sealed class K6LoadHarnessTests
 public sealed class K6LoadProcessHarnessTests
 {
     [Test]
+    public async Task AVersionCompatibleUnapprovedExecutableIsRejectedBeforeItStarts()
+    {
+        using var root = new OwnedProcessDirectory();
+        string sentinel = System.IO.Path.Combine(root.Path, "version-launched");
+        using (var canary = Process.Start(K6LoadHarnessChild.ChildStartInfo("version", root.Path))
+            ?? throw new InvalidOperationException("load_version_canary_start_failed"))
+        {
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
+            deadline.CancelAfter(TimeSpan.FromSeconds(5));
+            try
+            {
+                var output = canary.StandardOutput.ReadToEndAsync(deadline.Token);
+                await canary.WaitForExitAsync(deadline.Token);
+                await Assert.That(canary.ExitCode).IsEqualTo(0);
+                await Assert.That(await output).StartsWith("k6 v2.3.0 ");
+            }
+            finally
+            {
+                if (!canary.HasExited)
+                    canary.Kill(entireProcessTree: true);
+                await canary.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+            }
+        }
+        await Assert.That(File.Exists(sentinel)).IsTrue();
+        File.Delete(sentinel);
+
+        var rejection = await Assert.That(async () => await K6LoadRunner.ReadVersionAsync(
+            K6LoadHarnessChild.ChildStartInfo("version", root.Path), TestContext.Current!.Execution.CancellationToken))
+            .Throws<InvalidOperationException>();
+        await Assert.That(rejection!.Message).IsEqualTo("load_k6_digest_not_admitted");
+        await Assert.That(File.Exists(sentinel)).IsFalse();
+    }
+
+    [Test]
     public async Task CompletedChildDrainsBothFullPipesAndReturnsItsValidatedSummary()
     {
         using var root = new OwnedProcessDirectory();
         var result = await RunChildAsync(root, "success", TimeSpan.FromSeconds(10));
         await Assert.That(result.Summary.Attempts).IsEqualTo(40L);
         await Assert.That(result.WallMilliseconds).IsGreaterThan(0);
-        await Assert.That(Directory.GetFiles(root.Path).Select(System.IO.Path.GetFileName).Order())
+        await Assert.That(Directory.GetFiles(root.Path).Select(path => System.IO.Path.GetFileName(path)!).Order())
             .IsEquivalentTo(new[] { ".load-process-owner", "summary.json" });
     }
 
@@ -247,7 +281,7 @@ internal static class K6LoadHarnessChild
 {
     internal const string CanaryName = "ISLAMU_LOAD_HARNESS_SECRET_CANARY";
     private const string ChildFlag = "--assurance-process-child";
-    private static readonly string[] Scenarios = ["success", "nonzero", "missing", "oversized", "tree", "descendant", "secrets"];
+    private static readonly string[] Scenarios = ["success", "nonzero", "missing", "oversized", "tree", "descendant", "secrets", "version"];
 
     [ModuleInitializer]
     internal static void DispatchChild()
@@ -260,7 +294,7 @@ internal static class K6LoadHarnessChild
         try
         {
             if (arguments.Length == 4 && Scenarios.Contains(arguments[2], StringComparer.Ordinal) && IsOwnedRoot(arguments[3]))
-                exitCode = RunChildAsync(arguments[2], arguments[3]).GetAwaiter().GetResult();
+                exitCode = RunChild(arguments[2], arguments[3]);
         }
         catch (Exception) { exitCode = 70; }
         Environment.Exit(exitCode);
@@ -292,15 +326,22 @@ internal static class K6LoadHarnessChild
         return info;
     }
 
-    private static async Task<int> RunChildAsync(string scenario, string root)
+    // Async continuations can deadlock behind the CLR's module-initialization lock.
+    private static int RunChild(string scenario, string root)
     {
         string summary = System.IO.Path.Combine(root, "summary.json");
+        if (scenario == "version")
+        {
+            File.WriteAllText(System.IO.Path.Combine(root, "version-launched"), "launched");
+            Console.WriteLine("k6 v2.3.0 owned-version-canary");
+            return 0;
+        }
         if (scenario == "secrets" && Environment.GetEnvironmentVariable(CanaryName) is not null)
             return 73;
         if (scenario is "tree" or "descendant")
         {
             string pidName = scenario == "tree" ? "parent.pid" : "descendant.pid";
-            await File.WriteAllTextAsync(System.IO.Path.Combine(root, pidName), Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+            File.WriteAllText(System.IO.Path.Combine(root, pidName), Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
             if (scenario == "tree")
             {
                 var descendantStart = ChildStartInfo("descendant", root);
@@ -308,25 +349,28 @@ internal static class K6LoadHarnessChild
                 descendantStart.RedirectStandardError = false;
                 using var descendant = Process.Start(descendantStart)
                     ?? throw new InvalidOperationException("load_child_descendant_start_failed");
-                await descendant.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(20));
+                if (!descendant.WaitForExit(20_000))
+                    throw new TimeoutException("load_child_descendant_deadline");
             }
             else
             {
-                await File.WriteAllTextAsync(System.IO.Path.Combine(root, "descendant.ready"), "ready");
+                File.WriteAllText(System.IO.Path.Combine(root, "descendant.ready"), "ready");
                 // Bound synthetic descendants even if a process-cleanup regression leaves one alive.
-                await Task.Delay(TimeSpan.FromSeconds(15));
+                Thread.Sleep(TimeSpan.FromSeconds(15));
             }
             return 74;
         }
         byte[] noise = new byte[65536];
         Array.Fill(noise, (byte)'x');
+        using Stream output = Console.OpenStandardOutput();
+        using Stream error = Console.OpenStandardError();
         for (int block = 0; block < 16; block++)
         {
-            await Console.OpenStandardOutput().WriteAsync(noise);
-            await Console.OpenStandardError().WriteAsync(noise);
+            output.Write(noise);
+            error.Write(noise);
         }
         if (scenario != "missing")
-            await File.WriteAllTextAsync(summary, scenario == "oversized" ? new string('x', 4097) : K6LoadHarnessTests.CompleteSummary);
+            File.WriteAllText(summary, scenario == "oversized" ? new string('x', 4097) : K6LoadHarnessTests.CompleteSummary);
         return scenario == "nonzero" ? 71 : 0;
     }
 }

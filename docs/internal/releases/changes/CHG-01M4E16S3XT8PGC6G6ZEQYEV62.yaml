@@ -28,4 +28,4 @@ Impacts:
   Operator:
     Reference: docs/public/self-hosting/setup-assistant.md
     Disposition: documented
-    Detail: "Install Configurator separately, load the Event definition by exact revision and digest, and prepare restricted output with a native client. Browser launch supports public partial templates only and grants no live administration."
+    Detail: "Install Configurator separately, load the Event definition by exact revision and digest, and prepare protected output with a native client. Browser launch supports public partial templates only and grants no live administration."

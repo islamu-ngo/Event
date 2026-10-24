@@ -825,6 +825,11 @@ public sealed class AuthenticationCredentialCutoverHttpBoundaryTests
         public AuthenticationCredentialProfile Current { get; set; } =
             new(AuthenticationCredentialCutover.CredentialAuthority.Environment, Guid.CreateVersion7());
         public AuthenticationCredentialProfile ReadCurrent() => Current;
+        public AuthenticationCredentialProfileObservation ObserveCurrent()
+        {
+            var current = Current;
+            return new(current.Authority, current.Revision);
+        }
     }
 
     private sealed class ControlledClock : TimeProvider

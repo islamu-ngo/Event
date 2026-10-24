@@ -110,16 +110,25 @@ and database-provider assurance remains pending.
 
 ### Provider configuration transaction settlement
 
-Administrator provider changes remain tied to the original configuration image
-and identity binding through completion. A denial before commit restores the
-previous configuration and prevents activation. If authority changes during a
-write, reload current state and begin a new observation; an attempted observation
-cannot be replayed.
+Administrator and setup changes remain tied to the configuration image and
+accepted authority that began the operation. Detected grant, identity binding or
+setup authority changes before commit reject settlement and prevent activation.
+Setup writes retain their original coordination through completion.
 
-Native SQLite verification covers administrator authorization-provider writes:
-unchanged authority commits, while grant removal or binding-key drift after the
-write rejects settlement. Setup writes and other database/provider configurations
-have separate verification gates.
+Saving a Local configuration does not acquire unrelated Keycloak or Google
+credentials. Concurrent configuration and binding changes still invalidate the
+operation. In Split deployments the API never borrows browser-backend
+credentials: required credential ownership that cannot be established is refused,
+not treated as configured. An absent credential profile revision is not readiness
+evidence, and a malformed configured revision is rejected. Deployment-configured
+remote sign-in remains a separate path.
+
+The normal authentication write flow refreshes authentication only after
+settlement is acknowledged; observing or validating a configuration does not
+activate it. A denial before commit leaves the previous configuration in place.
+If a response or commit outcome is uncertain, read current configuration before
+another write instead of assuming rollback or retrying automatically. Begin a new
+observation when a change is still needed; an attempted observation cannot replay.
 
 ## Supported Provider States
 

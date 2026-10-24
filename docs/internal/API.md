@@ -755,18 +755,84 @@ and cleanup failures after commit retain their existing unit-of-work distinction
 An attempted observation cannot replay, and a retry must observe current state
 again.
 
-Executed native SQLite Release evidence comprises all three
-`ProviderHumanCommit_RechecksAuthorityAfterOriginalWriterCompletion` cases:
-3 passed with zero skips. The unchanged authorization-provider write activates
-only after both canonical rows are independently visible and the transaction has
-ended. Real grant removal and binding-key drift occur after both rows have been
-written in the original Serializable transaction, with an affected-row witness.
-Denial restores the original setting rows, grant identity and binding key and
-prevents authorization-provider activation. Binding drift can be rejected by the
+The human authorization-provider controls retain both canonical rows in the
+original Serializable transaction before grant removal or binding-key drift,
+with an affected-row witness. Denial restores the setting rows, grant identity
+and binding key and prevents activation. Binding drift can be rejected by the
 writer's original-login data-image check before the final held-source callback;
-the grant case verifies current authority beyond that data image. These controls
-do not certify setup writes, other provider families, PostgreSQL or cross-server
-cache propagation.
+the grant case verifies current authority beyond that data image.
+
+#### Setup transaction settlement
+
+`IProviderConfigurationSetupSource.AcquireCoordinationAsync` requires the exact
+original child `IUnitOfWork` and its selected idle context and connection. It
+reuses `HumanSettingsMutationPreparation.SettingsCoordination` to acquire the
+existing cooperative Human and Discovery gates before keyed locks and BEGIN.
+The same leases remain held through settlement and notification completion and
+are released in reverse order. Setup retains its genuinely accepted setup secret
+and trusted setup lease; it does not manufacture a human receipt or expiration.
+
+Cleanup runs after the operation's captured failure, outside a C# `finally`
+block. The original exception and stack are rethrown when cleanup succeeds;
+cleanup evidence preserves the existing precommit, unknown-outcome and
+committed-cleanup classifications. A controlled commit fault can leave observed
+persisted rollback while still reporting `HumanMutationOutcomeUnknownException`.
+That observation does not downgrade the caller's unknown outcome or allow replay.
+
+#### Authentication credential materials
+
+Credential relevance is projected once from the complete original and requested
+provider groups and the frozen deployment selection. It limits material
+acquisition, while the writer still retains the complete database and binding
+image, including unrelated remote keys. The Application contract carries
+Keycloak status and public authority/client coordinates and Google status;
+retained references, credential values and value equality stay private to the
+native source.
+
+The source captures detached actual consumer/provider coordinates and selected
+credential-authority metadata before reading the original image.
+`ObserveCurrent` distinguishes genuine revision absence from malformed configured
+revisions, which fail closed. Strict maintenance `ReadCurrent` still requires a
+usable revision. Profile metadata never establishes credential readiness. An
+irrelevant provider causes no acquisition; forbidden paths remain `Invalid`
+without capture or resolution, and relevant permitted material without a profile
+revision remains `Unavailable`. Denied and unavailable entries remain in the late
+comparison even without a retained handle. Genuine permitted Combined material
+acquisition retains its native provenance and private value comparison.
+
+Empty Local material sets still retain command, consumer, authority-coordinate
+and profile custody. Existing request, acquired-fact and terminal-time checks
+recheck those inputs synchronously, including after fresh held-source reads.
+No credential provider is queried between the final authority cycle and commit.
+The API never borrows BFF-only credential roots. This adds no Split remote-readiness
+authority.
+
+Direct `AuthProviderConfigurationService.ApplyConfigurationAsync` settles the
+observed mutation. The authentication command handler separately invalidates
+mode and refreshes JWT authority after acknowledged settlement. A direct-service
+test must not expect that handler callback. Actual-handler controls require
+activation only after independently visible committed effects and reject a
+skipped writer.
+
+#### Executed native evidence and limits
+
+Sixteen distinct controlled-HTTP/native SQLite cases passed across two admitted
+API-test DLL cohorts, with zero skips. The earlier checkpoint contributes genuine
+setup authorization (1), human authorization-provider authority (3), and Local
+binding/profile/profile-installation refusal (3). Its separate unchanged Local
+case failed an incorrect positive handler-callback assertion; that failure is
+retained and is not counted as a pass.
+
+After the one-line direct-service assertion correction, the second cohort passed
+the corrected unchanged Local case (1), remote credential-ownership denial (2),
+setup authorization-provider settlement (4), and actual authentication-handler
+activation (2). The unchanged case reaches independent persisted effects,
+warm configuration readback and replay checks. Setup controls witness pre-BEGIN
+gates, late setup lock/header changes and the controlled commit-fault outcome. The
+earlier seven passes are not relabeled as a fresh sixteen-case single-DLL run.
+The separate local profile-reader class passed all nineteen cases, with zero
+skips. These receipts do not certify PostgreSQL readiness, Combined execution,
+upstream remote sign-in, other startup paths or cross-server cache propagation.
 
 ## Diagnostic Scope Ownership
 

@@ -7,11 +7,14 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
+using Explore.Application.DTOs.Instance;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Services;
+using Explore.Application.Services;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.SupportAccess;
+using Explore.Secrets.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -103,6 +106,7 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
         private readonly IServiceProvider requestServices;
         private readonly Guid ambientTenant;
         private readonly string requestShape;
+        private readonly string commandImage;
         private readonly IConfigurationProvider[] providers;
         private readonly string declarations;
         private readonly AuthorizationProviderDeploymentOptions deploymentOptions;
@@ -110,6 +114,11 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
         private readonly AuthorizationProviderBootstrapState bootstrap;
         private readonly AuthorizationProviderBootstrapSnapshot bootstrapSnapshot;
         private readonly List<RetainedSecretReference> references = [];
+        private readonly Dictionary<string, SecretResolutionResult> unacquired = new(StringComparer.Ordinal);
+        private readonly AuthProviderConfigurationWriteDto? authenticationRequested;
+        private readonly IAuthenticationCredentialProfileReader? credentialProfiles;
+        private readonly AuthenticationCredentialProfileObservation? originalProfile;
+        private readonly MaterialSourceCoordinates? materialCoordinates;
         private string? materials;
         private bool observed;
         private IPolicyPackageService? packages;
@@ -135,6 +144,7 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
             requestServices = request.RequestServices;
             ambientTenant = owner._tenants.TenantId;
             requestShape = RequestShape(request);
+            commandImage = JsonSerializer.Serialize(command, command.GetType());
             if (owner._configuration is not IConfigurationRoot root) throw Denied();
             providers = root.Providers.ToArray();
             declarations = Declarations();
@@ -144,6 +154,20 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
             providerOption = JsonSerializer.Serialize(deploymentOptions);
             bootstrap = owner._services.GetRequiredService<AuthorizationProviderBootstrapState>();
             bootstrapSnapshot = bootstrap.Read();
+            if (command is UpdateAuthProviderConfigurationCommand or UpdateAuthProviderConfigurationDuringSetupCommand)
+            {
+                var group = command switch
+                {
+                    UpdateAuthProviderConfigurationCommand value => JsonSerializer.Deserialize<UpdateAuthProviderConfigurationCommand>(JsonSerializer.Serialize(value))!.Patch.Configuration,
+                    UpdateAuthProviderConfigurationDuringSetupCommand value => JsonSerializer.Deserialize<UpdateAuthProviderConfigurationDuringSetupCommand>(JsonSerializer.Serialize(value))!.Patch.Configuration,
+                    _ => throw Denied()
+                };
+                authenticationRequested = group is { HasValue: true, Value: { } requested } ? requested
+                    : throw new ArgumentException("A complete authentication provider group is required.");
+                credentialProfiles = owner._services.GetRequiredService<IAuthenticationCredentialProfileReader>();
+                originalProfile = credentialProfiles.ObserveCurrent() ?? throw Denied();
+                materialCoordinates = ReadMaterialCoordinates();
+            }
         }
 
         public object OriginalCommand { get; }
@@ -192,11 +216,26 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
             Request.RequestAborted.ThrowIfCancellationRequested();
             if (!ReferenceEquals(Owner._contexts.HttpContext, Request) || !ReferenceEquals(Request.User, Principal)
                 || !ReferenceEquals(Request.RequestServices, requestServices) || RequestShape(Request) != requestShape
+                || JsonSerializer.Serialize(OriginalCommand, OriginalCommand.GetType()) != commandImage
                 || Owner._tenants.TenantId != ambientTenant
                 || Owner._configuration is not IConfigurationRoot root || !root.Providers.SequenceEqual(providers)
                 || Declarations() != declarations || JsonSerializer.Serialize(deploymentOptions) != providerOption
                 || !ReferenceEquals(bootstrap.Read(), bootstrapSnapshot)
                 || publicationOptions is not null && PublicationDeclarations() != publicationDeclarations) throw Denied();
+            if (credentialProfiles is not null
+                && (credentialProfiles.ObserveCurrent() != originalProfile || ReadMaterialCoordinates() != materialCoordinates))
+                throw Denied();
+        }
+
+        private sealed record MaterialSourceCoordinates(SecretConsumer Consumer, Explore.Secrets.Abstractions.SecretProviderType Provider,
+            string? Url, string? ProjectId, string Environment, string Paths);
+
+        private MaterialSourceCoordinates ReadMaterialCoordinates()
+        {
+            var options = Owner._services.GetRequiredService<IOptions<SecretProviderOptions>>().Value;
+            if (!Enum.IsDefined(options.Consumer)) throw Denied();
+            return new(options.Consumer, options.Provider, options.Infisical.Url, options.Infisical.ProjectId,
+                options.Infisical.Environment, JsonSerializer.Serialize(options.Infisical.Paths.Order(StringComparer.Ordinal)));
         }
 
         public async Task RequireSourcesAsync(CancellationToken token)
@@ -226,15 +265,36 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
             if (observed) throw Denied();
             observed = true;
             var results = new Dictionary<string, SecretResolutionResult>(StringComparer.Ordinal);
-            if (OriginalCommand is UpdateAuthProviderConfigurationCommand or UpdateAuthProviderConfigurationDuringSetupCommand)
+            ProviderAuthenticationMaterialRequirements? requirements = null;
+            if (authenticationRequested is not null)
             {
+                RequireCustody();
+                requirements = Owner._services.GetRequiredService<AuthProviderConfigurationService>()
+                    .DescribeMaterialRequirements(state, authenticationRequested, Deployment);
                 var resolver = Owner._services.GetRequiredService<IRetainedSecretResolver>();
                 using var bindings = JsonDocument.Parse(state.Bindings);
-                foreach (string key in ProviderConfigurationState.SecretKeys)
+                foreach (string key in ProviderConfigurationState.SecretKeys.Where(key =>
+                    key == SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret
+                        ? requirements.GoogleRelevant : requirements.KeycloakRelevant))
                 {
+                    RequireCustody();
+                    if (!SecretAcquisitionPolicy.AllowsPath(materialCoordinates!.Consumer,
+                        SecretDefinitionRegistry.GetRequired(key).DefaultInfisicalPath))
+                    {
+                        unacquired.Add(key, SecretResolutionResult.Invalid);
+                        results.Add(key, SecretResolutionResult.Invalid);
+                        continue;
+                    }
+                    if (originalProfile!.Revision is null)
+                    {
+                        unacquired.Add(key, SecretResolutionResult.Unavailable);
+                        results.Add(key, SecretResolutionResult.Unavailable);
+                        continue;
+                    }
                     // Guid.Empty is the existing retained resolver's explicit instance selection.
                     // It does not create a tenant or select an ambient request tenant.
                     var reference = await resolver.CaptureAsync(key, Guid.Empty, token);
+                    RequireCustody();
                     var row = bindings.RootElement.EnumerateArray().SingleOrDefault(item =>
                         item.GetProperty("SettingKey").GetString() == key
                         && item.GetProperty("SettingScopeId").GetInt32() == 1
@@ -254,6 +314,7 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
                         throw Denied();
                     references.Add(reference);
                     results.Add(key, await resolver.ResolveAsync(reference, token));
+                    RequireCustody();
                 }
             }
             else if (deploymentOptions.GetProvider() == AuthorizationProviderDeploymentOptions.CerbosProvider
@@ -271,13 +332,14 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
                 publicationReady = VerifyPublication();
             }
             materials = MaterialSnapshot(results);
-            var keycloak = results.Count == 0 ? KeycloakConnectionResolution.Failed(KeycloakConnectionStatus.Unconfigured)
+            var keycloak = requirements?.KeycloakRelevant != true ? KeycloakConnectionResolution.Failed(KeycloakConnectionStatus.Unconfigured)
                 : await new KeycloakConnectionResolver(new OriginalSecrets(results), Deployment,
                     Owner._services.GetRequiredService<KeycloakCredentialBindingRevision>()).ResolveRuntimeAsync(token);
             await RequireSourcesAsync(token);
             RequireTime();
-            return new(keycloak, results.GetValueOrDefault(SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)
-                ?? SecretResolutionResult.Unconfigured, publicationReady);
+            return new(new(keycloak.Status, keycloak.Authority, keycloak.BlazorClientId),
+                (results.GetValueOrDefault(SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)
+                    ?? SecretResolutionResult.Unconfigured).Status, publicationReady, requirements);
         }
 
         public async Task RequireExternalSourcesAsync(CancellationToken token)
@@ -285,9 +347,14 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
             Owner._services.GetRequiredService<IProviderConfigurationSettingsWriter>().RequireIdle();
             if (!observed) throw Denied();
             var resolver = Owner._services.GetRequiredService<IRetainedSecretResolver>();
-            var results = new Dictionary<string, SecretResolutionResult>(StringComparer.Ordinal);
+            RequireCustody();
+            var results = new Dictionary<string, SecretResolutionResult>(unacquired, StringComparer.Ordinal);
             foreach (var reference in references)
+            {
+                RequireCustody();
                 results.Add(reference.SettingKey, await resolver.ResolveAsync(reference, token));
+                RequireCustody();
+            }
             if (MaterialSnapshot(results) != materials) throw Denied();
             if (packages is not null && ManifestImage(await ReadPublicationManifestAsync(token)) != manifestImage) throw Denied();
             await RequireSourcesAsync(token);
@@ -401,6 +468,32 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
         : Source(owner, command, request, principal, ticket), IProviderConfigurationSetupSource
     {
         public ITrustedSetupSettingsAuthorityLease Setup => setup;
+        public async Task<IAsyncDisposable> AcquireCoordinationAsync(IUnitOfWork originalOwner, CancellationToken token)
+        {
+            Owner.RequireIssued(this);
+            if (!ReferenceEquals(originalOwner, Owner._services.GetRequiredService<IUnitOfWork>())) throw Denied();
+            var writer = Owner._services.GetRequiredService<IProviderConfigurationSettingsWriter>();
+            writer.RequireIdle();
+            await RequireSourcesAsync(token);
+            RequireTime();
+            writer.RequireIdle();
+            var coordination = await HumanSettingsMutationPreparation.SettingsCoordination.AcquireAsync(Owner._services, token);
+            try
+            {
+                writer.RequireIdle();
+                await RequireSourcesAsync(token);
+                RequireTime();
+                writer.RequireIdle();
+                coordination.RequireCurrent();
+                return coordination;
+            }
+            catch (Exception failure)
+            {
+                await HumanSettingsMutationPreparation.FinishSettingsAttemptAsync(failure, false, coordination);
+                throw;
+            }
+        }
+
         protected override Task RequireOriginalAuthorityAsync(CancellationToken token)
         {
             if (Owner._human.Subject is not null) throw Denied();

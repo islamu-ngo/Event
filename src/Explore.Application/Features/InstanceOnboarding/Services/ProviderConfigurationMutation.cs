@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -6,6 +7,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Domain;
@@ -239,7 +241,7 @@ public sealed class ProviderConfigurationMutation : IAsyncDisposable
         if (!ReferenceEquals(originalIssuer, issuer) || Interlocked.Exchange(ref consumed, 1) != 0)
             throw new UnauthorizedAccessException("Provider observations cannot change issuer or replay.");
         var validation = await ValidateAsync(token);
-        if (!validation.IsValid) throw new ValidationException(validation.Errors);
+        if (!validation.IsValid) throw new FluentValidation.ValidationException(validation.Errors);
         var writer = Services.GetRequiredService<IProviderConfigurationSettingsWriter>();
         await Source.RequireExternalSourcesAsync(token);
         if (!IsAuthentication && !AuthorizationCurrent.AuthorizationProviderManagedByDeployment
@@ -261,8 +263,12 @@ public sealed class ProviderConfigurationMutation : IAsyncDisposable
             _ => null
         };
         Exception? primaryFailure = null;
+        IAsyncDisposable? setupCoordination = null;
+        bool settled = false;
         try
         {
+            if (Source is IProviderConfigurationSetupSource setup)
+                setupCoordination = await setup.AcquireCoordinationAsync(OriginalOwner, token);
             var notifications = await Services.GetRequiredService<ISettingMutationLock>().ExecuteOrderedGroupsAsync(
                 [ProviderConfigurationState.Keys], ct => IsSetup
                     ? ((ISerializableAttemptOwner)OriginalOwner).ExecuteAsync(inner =>
@@ -272,11 +278,27 @@ public sealed class ProviderConfigurationMutation : IAsyncDisposable
                     }, ct)
                     : preparation.ExecutePreparedAsync(prepared!, (owner, inner) =>
                         preparation.ExecuteProviderJoinedAsync(owner, this, (_, joined) => writer.ExecuteAsync(this, joined), inner), ct), token);
+            settled = true;
             foreach (var notification in notifications)
                 await Services.GetServices<INotificationHandler<SettingChangedNotification>>().HandleAsync(notification, CancellationToken.None);
         }
-        catch (Exception failure) { primaryFailure = failure; throw; }
-        finally { if (prepared is not null) await preparation.CloseAsync(prepared, primaryFailure); }
+        catch (Exception failure) { primaryFailure = failure; }
+        if (prepared is not null) await preparation.CloseAsync(prepared, primaryFailure);
+        if (setupCoordination is not null)
+        {
+            try { await setupCoordination.DisposeAsync(); }
+            catch (Exception cleanup)
+            {
+                var evidence = primaryFailure is null ? cleanup
+                    : new AggregateException("Provider setup operation and coordination cleanup evidence.", primaryFailure, cleanup);
+                if (primaryFailure is HumanMutationOutcomeUnknownException)
+                    throw new HumanMutationOutcomeUnknownException(evidence);
+                if (settled || primaryFailure is TransactionCommittedCleanupException)
+                    throw new TransactionCommittedCleanupException(evidence);
+                throw new AggregateException("Provider setup coordination cleanup failed before settlement.", evidence);
+            }
+        }
+        if (primaryFailure is not null) ExceptionDispatchInfo.Capture(primaryFailure).Throw();
     }
 
     public void ClaimOnce()

@@ -7,6 +7,7 @@ using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
@@ -1955,6 +1956,8 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
 
     public async Task InitializeAsync()
     {
+        long started = Stopwatch.GetTimestamp();
+        WriteProgress(nameof(InitializeAsync), "host-start", started);
         Factory = new SetupLiveAuthorityWebApplicationFactory(
             Clock,
             Capture,
@@ -1968,12 +1971,15 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
         };
         Factory.AdditionalConfiguration["SecretProvider:Provider"] = "Environment";
         Client = Factory.CreateClient();
+        WriteProgress(nameof(InitializeAsync), "host-ready", started);
         Capture.Start();
         await ResetAsync();
     }
 
-    public async Task ResetAsync()
+    public async Task ResetAsync([CallerMemberName] string testName = "fixture")
     {
+        long started = Stopwatch.GetTimestamp();
+        WriteProgress(testName, "reset-start", started);
         Authorization.AllowAll = true;
         Authorization.CheckPredicate = null;
         Writer.Reset();
@@ -1988,16 +1994,32 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
         _databaseReset ??= await TestDatabaseReset.CreateAsync(
             db.Database.GetConnectionString()
             ?? throw new InvalidOperationException("The setup fixture requires its migrator connection."));
+        WriteProgress(testName, "reset-catalog-ready", started);
         await _databaseReset.ResetAsync();
+        WriteProgress(testName, "reset-complete", started);
         IHostEnvironment environment =
             scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
         await DatabaseSeeder.SeedAsync(db, environment);
+        WriteProgress(testName, "lookup-seed-complete", started);
         ILookupDataCache? cache =
             scope.ServiceProvider.GetService<ILookupDataCache>();
         if (cache is not null)
             await cache.RefreshAsync();
+        WriteProgress(testName, "lookup-cache-ready", started);
         Primary = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(db);
+        WriteProgress(testName, "primary-scenario-ready", started);
         Secondary = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(db);
+        WriteProgress(testName, "fixture-ready", started);
+    }
+
+    private static void WriteProgress(string testName, string phase, long started)
+    {
+        // Write directly to the process stream so test-output capture cannot hide a stalled stage.
+        using var output = new StreamWriter(
+            Console.OpenStandardError(), new UTF8Encoding(false), leaveOpen: true);
+        output.WriteLine(FormattableString.Invariant(
+            $"[setup-security] test={testName} phase={phase} elapsed_ms={Stopwatch.GetElapsedTime(started).TotalMilliseconds:F0}"));
+        output.Flush();
     }
 
     public async Task<Guid> AddBinding(SecretBinding binding)

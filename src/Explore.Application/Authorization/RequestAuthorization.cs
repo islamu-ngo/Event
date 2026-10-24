@@ -8,6 +8,7 @@ using Explore.Application.Features.OrganizationMembers.Requests.Commands;
 using Explore.Application.Features.OrganizationMembers.Requests.Queries;
 using Explore.Application.Features.TenantUserRoleGrants.Requests.Commands;
 using Explore.Application.Features.TenantUserRoleGrants.Requests.Queries;
+using Explore.Application.Features.Tenants.Requests.Commands;
 using Explore.Application.Features.SupportAccess.Requests.Commands;
 using Explore.Application.Features.SupportAccess.Requests.Queries;
 using Explore.Application.Features.Events.Requests.Queries;
@@ -46,6 +47,11 @@ public sealed class RequestAuthorization<TRequest>(
         // The Footer owner evaluates the unchanged annotation on original source inputs,
         // outside the physical attempt. Machine operations retain this existing evaluator.
         if (machinePrincipalAccessor.Current is null && FooterOperationScope.Handles(typeof(TRequest)))
+            return;
+
+        // The creator selects its Global owner before evaluating this same annotation
+        // from original human sources; earlier principal projection would bind Standard authority.
+        if (machinePrincipalAccessor.Current is null && request is CreateTenantCommand)
             return;
 
         // Mandatory private readers evaluate these annotated actions from original

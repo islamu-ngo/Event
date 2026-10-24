@@ -398,6 +398,13 @@ therefore has fixed column-level INSERT permissions for membership and role-gran
 rows, with only the necessary tenant, role and capacity metadata reads. Runtime
 receives no new rights, and this does not grant private account or credential reads.
 
+The administrator's active tenant does not become the database owner of a newly
+created tenant. The API selects its dedicated creation owner before checking
+current native administrator authority and the instance's authorization provider.
+Cerbos refusal or unavailability remains a refusal, not a local administrator
+fallback. This ordering correction requires no new permission, credential,
+setting or migration; compilation alone does not certify the creation workflow.
+
 Creation readiness also rejects unexpected database columns, executable defaults
 and altered or non-enforced CHECK constraints on its write tables. If schema drift
 blocks startup or creation, investigate it against the generated migrations and

@@ -1,7 +1,9 @@
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Security;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +22,8 @@ public sealed partial class TenantDiscoveryCreationNativeTests
         var probe = new HumanCreatorGateProbe();
         await using var authentication = await AuthenticatedSettingsFixture.CreateForTenantCreationApiAsync(
             OpenMigrator, database, probe, services => services.AddScoped<IEventDiscoveryEnrollmentGate>(provider =>
-                new ObservedCreatorEnrollment(provider.GetRequiredService<ExploreDbContext>(), probe)));
+                new ObservedCreatorEnrollment(provider.GetRequiredService<ExploreDbContext>(),
+                    provider.GetRequiredService<ExploreDbContextExecutionLease>(), probe)));
         probe.Armed = true;
 
         _ = await CreateAndVerifyAsync(authentication, Request());
@@ -32,13 +35,19 @@ public sealed partial class TenantDiscoveryCreationNativeTests
     }
 
     /// <summary>Observation only: the unchanged production enrollment gate owns acquisition and cleanup.</summary>
-    private sealed class ObservedCreatorEnrollment(ExploreDbContext context, HumanCreatorGateProbe observation)
+    private sealed class ObservedCreatorEnrollment(ExploreDbContext context, ExploreDbContextExecutionLease selection,
+        HumanCreatorGateProbe observation)
         : IEventDiscoveryEnrollmentGate, IAsyncDisposable
     {
         private readonly EventDiscoveryEnrollmentGate original = new(context);
 
         public Task<IAsyncDisposable> AcquireAsync(CancellationToken cancellationToken = default)
         {
+            selection.RequireOriginalOwner(context);
+            if (selection.PolicyPurpose != PolicyMutationPurpose.TenantCreation
+                || selection.HumanScope?.Purpose != HumanAdministratorCommitPurpose.TenantCreation
+                || selection.SelectedTenantId is not null || selection.HumanLifetime is null)
+                throw new InvalidOperationException("human_creator_test_dedicated_purpose_missing");
             observation.BeforeEnrollment(context);
             return original.AcquireAsync(cancellationToken);
         }

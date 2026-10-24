@@ -158846,7 +158846,10 @@
         "type": "object",
         "properties": {
           "items": {
-            "type": "array"
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HalResourceOfModerationContentResponseSummary"
+            }
           }
         }
       },
@@ -158964,7 +158967,10 @@
         "type": "object",
         "properties": {
           "items": {
-            "type": "array"
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HalResourceOfRecognitionCorrectionProofDto"
+            }
           }
         }
       },
@@ -158972,7 +158978,10 @@
         "type": "object",
         "properties": {
           "items": {
-            "type": "array"
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HalResourceOfRecognitionRecoveryEscalationDto"
+            }
           }
         }
       },
@@ -175468,7 +175477,87 @@
           }
         }
       },
-      "HalResourceOfModerationPreFindingView": { },
+      "HalResourceOfModerationPreFindingView": {
+        "required": [
+          "noticeId",
+          "revision",
+          "caseId",
+          "caseRevision",
+          "notice",
+          "retainUntil",
+          "acknowledgedAt",
+          "respondedAt",
+          "response"
+        ],
+        "type": "object",
+        "properties": {
+          "noticeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "notice": {
+            "$ref": "#/components/schemas/ModerationPreFindingText"
+          },
+          "retainUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acknowledgedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "respondedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "response": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfModerationReferenceCatalogueView": {
         "required": [
           "revision",
@@ -176514,8 +176603,106 @@
           }
         }
       },
-      "HalResourceOfModerationResourceQuarantineReviewState": { },
-      "HalResourceOfModerationResourceQuarantineStateHeader": { },
+      "HalResourceOfModerationResourceQuarantineReviewState": {
+        "required": [
+          "resourceId",
+          "materialVersionId",
+          "quarantineId",
+          "tipId",
+          "adoptionId",
+          "validUntil",
+          "chain"
+        ],
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quarantineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adoptionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "chain": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationResourceQuarantineReviewStateItem"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfModerationResourceQuarantineStateHeader": {
+        "required": [
+          "resourceId",
+          "page",
+          "hasNext"
+        ],
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "hasNext": {
+            "type": "boolean"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfMyEventReportDto": {
         "required": [
           "statusCode",
@@ -180342,8 +180529,326 @@
           }
         }
       },
-      "HalResourceOfRecognitionRecoveryContextDto": { },
-      "HalResourceOfRecognitionRecoveryEscalationDto": { },
+      "HalResourceOfRecognitionCorrectionProofDto": {
+        "required": [
+          "id",
+          "intentId",
+          "sourceId",
+          "pendingRevision",
+          "grounds",
+          "protectedAt",
+          "remedyUntil",
+          "retainUntil"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pendingRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "grounds": {
+            "type": "integer"
+          },
+          "protectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "remedyUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retainUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfRecognitionRecoveryContextDto": {
+        "required": [
+          "escalationId",
+          "intentId",
+          "pendingRevision",
+          "state",
+          "failure",
+          "receivedAt",
+          "settleBy",
+          "escalateAt",
+          "requiredSourceCount",
+          "sourceId",
+          "sourceRevision",
+          "sourceGeneration",
+          "adoptionId",
+          "adoptionRevision",
+          "adoptionGeneration",
+          "maximumValidUntil",
+          "availableGrounds",
+          "dispositionId",
+          "dispositionRevision",
+          "assessedGrounds",
+          "assessedAt",
+          "assessmentValidUntil",
+          "authorizedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "escalationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pendingRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "state": {
+            "type": "integer"
+          },
+          "failure": {
+            "type": "integer"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settleBy": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "escalateAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requiredSourceCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "sourceGeneration": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "adoptionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adoptionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "adoptionGeneration": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maximumValidUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "availableGrounds": {
+            "type": "integer"
+          },
+          "dispositionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "dispositionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "assessedGrounds": {
+            "type": "integer"
+          },
+          "assessedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "assessmentValidUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "authorizedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfRecognitionRecoveryEscalationDto": {
+        "required": [
+          "id",
+          "intentId",
+          "sourceId",
+          "actionRecoveryId",
+          "capturedPendingRevision",
+          "stage",
+          "requiredAt",
+          "originalDeadline",
+          "deliveredAt",
+          "acknowledgedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actionRecoveryId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "capturedPendingRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "stage": {
+            "type": "integer"
+          },
+          "requiredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "originalDeadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deliveredAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "acknowledgedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfRefundCampaignDto": {
         "type": "object",
         "properties": {
@@ -194341,6 +194846,73 @@
           }
         }
       },
+      "ModerationPreFindingView": {
+        "required": [
+          "noticeId",
+          "revision",
+          "caseId",
+          "caseRevision",
+          "notice",
+          "retainUntil",
+          "acknowledgedAt",
+          "respondedAt",
+          "response"
+        ],
+        "type": "object",
+        "properties": {
+          "noticeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "notice": {
+            "$ref": "#/components/schemas/ModerationPreFindingText"
+          },
+          "retainUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acknowledgedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "respondedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "response": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ModerationPrivateDisclosureMode": {
         "enum": [
           "CurrentAudience",
@@ -196513,6 +197085,53 @@
           }
         }
       },
+      "ModerationResourceQuarantineReviewState": {
+        "required": [
+          "resourceId",
+          "materialVersionId",
+          "quarantineId",
+          "tipId",
+          "adoptionId",
+          "validUntil",
+          "chain"
+        ],
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quarantineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adoptionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "chain": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationResourceQuarantineReviewStateItem"
+            }
+          }
+        }
+      },
       "ModerationResourceQuarantineReviewStateIntent": {
         "required": [
           "resourceId",
@@ -196574,6 +197193,92 @@
               "string"
             ],
             "format": "int64"
+          }
+        }
+      },
+      "ModerationResourceQuarantineReviewStateItem": {
+        "required": [
+          "id",
+          "purposeId",
+          "predecessorId",
+          "step",
+          "attestation",
+          "requiredApprovals",
+          "maximumEvidenceLifetimeTicks",
+          "recordedAt",
+          "validUntil"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purposeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "predecessorId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "attestation": {
+            "type": "integer"
+          },
+          "requiredApprovals": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maximumEvidenceLifetimeTicks": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ModerationResourceQuarantineStateHeader": {
+        "required": [
+          "resourceId",
+          "page",
+          "hasNext"
+        ],
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "hasNext": {
+            "type": "boolean"
           }
         }
       },

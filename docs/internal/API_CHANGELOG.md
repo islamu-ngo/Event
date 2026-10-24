@@ -3,6 +3,18 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-24
+
+- The explicit HAL schema catalog now describes the existing pre-finding notice,
+  resource-quarantine review/header and recognition-recovery detail responses,
+  with typed content-response, correction-proof and recovery-escalation collection
+  items. Generated clients can consume those existing payloads instead of empty
+  wrapper types. JSON-ignored authority facts remain excluded. The two adjudicated
+  case-read grant/revoke operation names now use central route constants with the
+  same values; URLs, verbs, operation IDs and authorization are unchanged.
+  Native schema/client generation accompanies this correction. The existing
+  strict contract regressions remain unchanged; fresh remote CI must verify it.
+
 ## 2026-10-23
 
 - Source integration adds `GET /api/moderation/notice-corrections/{originalNoticeId}`

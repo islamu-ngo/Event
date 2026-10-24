@@ -11,6 +11,13 @@ classification correction is the only reference profile extended to Event scope.
 This model support does not enable a policy, authorize disclosure or certify
 provider migrations and native enforcement.
 
+The generated API contract describes the existing subject-safe pre-finding,
+quarantine-review and recognition-recovery HAL responses and their collection
+items. This corrects empty or untyped generated wrappers; it does not add an
+endpoint, expand disclosure, change grant permissions or make a HAL link an
+authorization substitute. Existing case-read grant/revoke operation names and
+URLs are unchanged.
+
 **SQLite upgrade caution:** the combined develop/moderation histories include
 resource-table rebuilds. The migration generator rejects an unexpected physical
 column layout instead of silently discarding material or quarantine evidence.

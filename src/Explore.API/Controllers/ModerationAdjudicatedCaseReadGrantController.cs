@@ -41,7 +41,7 @@ public sealed class ModerationAdjudicatedCaseReadGrantController(
 
     /// <summary>Commits finite adjudicated case access without returning confidential material or minting a receipt.</summary>
     [SuppressIdempotencyResponseStorage]
-    [HttpPost("{caseId:guid}", Name = "GrantModerationAdjudicatedCaseReadPurpose")]
+    [HttpPost("{caseId:guid}", Name = RouteNames.GrantModerationAdjudicatedCaseReadPurpose)]
     [ProducesResponseType<BaseCommandResponse<Guid>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Grant(Guid caseId,
         [FromBody] GrantModerationAdjudicatedCaseReadPurposeCommand command, CancellationToken cancellationToken)
@@ -52,7 +52,7 @@ public sealed class ModerationAdjudicatedCaseReadGrantController(
 
     /// <summary>Revokes the exact live grant under independently verified current native administrative authority.</summary>
     [SuppressIdempotencyResponseStorage]
-    [HttpPost("{grantId:guid}/revoke", Name = "RevokeModerationAdjudicatedCaseReadPurpose")]
+    [HttpPost("{grantId:guid}/revoke", Name = RouteNames.RevokeModerationAdjudicatedCaseReadPurpose)]
     [ProducesResponseType<BaseCommandResponse<Guid>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Revoke(Guid grantId,
         [FromBody] RevokeModerationAdjudicatedCaseReadPurposeCommand command, CancellationToken cancellationToken)

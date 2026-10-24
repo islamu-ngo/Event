@@ -7,6 +7,8 @@ namespace Explore.API.Hateoas;
 public static class RouteNames
 {
     public const string GetModerationNoticeCorrection = nameof(GetModerationNoticeCorrection);
+    public const string GrantModerationAdjudicatedCaseReadPurpose = nameof(GrantModerationAdjudicatedCaseReadPurpose);
+    public const string RevokeModerationAdjudicatedCaseReadPurpose = nameof(RevokeModerationAdjudicatedCaseReadPurpose);
     public const string GetUserProfileCompletion = nameof(GetUserProfileCompletion);
     public const string RecordPrivateBirthDate = nameof(RecordPrivateBirthDate);
     public const string ClearPrivateBirthDate = nameof(ClearPrivateBirthDate);

@@ -194823,7 +194823,7 @@ namespace Explore.Blazor.Client.Clients
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("items")]
-        public System.Collections.Generic.ICollection<object>? Items { get; set; } = default!;
+        public System.Collections.Generic.ICollection<HalResourceOfModerationContentResponseSummary>? Items { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -195021,7 +195021,7 @@ namespace Explore.Blazor.Client.Clients
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("items")]
-        public System.Collections.Generic.ICollection<object>? Items { get; set; } = default!;
+        public System.Collections.Generic.ICollection<HalResourceOfRecognitionCorrectionProofDto>? Items { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -195039,7 +195039,7 @@ namespace Explore.Blazor.Client.Clients
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("items")]
-        public System.Collections.Generic.ICollection<object>? Items { get; set; } = default!;
+        public System.Collections.Generic.ICollection<HalResourceOfRecognitionRecoveryEscalationDto>? Items { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -206049,6 +206049,53 @@ namespace Explore.Blazor.Client.Clients
     public partial class HalResourceOfModerationPreFindingView
     {
 
+        [System.Text.Json.Serialization.JsonPropertyName("noticeId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid NoticeId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("revision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long Revision { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("caseId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid CaseId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("caseRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long CaseRevision { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("notice")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public ModerationPreFindingText Notice { get; set; } = new ModerationPreFindingText();
+
+        [System.Text.Json.Serialization.JsonPropertyName("retainUntil")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset RetainUntil { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("acknowledgedAt")]
+        public System.DateTimeOffset? AcknowledgedAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("respondedAt")]
+        public System.DateTimeOffset? RespondedAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("response")]
+        public string? Response { get; set; } = default!;
+
+        /// <summary>
+        /// HAL hypermedia links
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_links")]
+        public System.Collections.Generic.IDictionary<string, HalLink>? _links { get; set; } = default!;
+
+        /// <summary>
+        /// Embedded related resources
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_embedded")]
+        public object? _embedded { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -206387,6 +206434,45 @@ namespace Explore.Blazor.Client.Clients
     public partial class HalResourceOfModerationResourceQuarantineReviewState
     {
 
+        [System.Text.Json.Serialization.JsonPropertyName("resourceId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid ResourceId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("materialVersionId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid MaterialVersionId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("quarantineId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid QuarantineId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("tipId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid TipId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("adoptionId")]
+        public System.Guid? AdoptionId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("validUntil")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset ValidUntil { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("chain")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<ModerationResourceQuarantineReviewStateItem> Chain { get; set; } = new System.Collections.Generic.List<ModerationResourceQuarantineReviewStateItem>();
+
+        /// <summary>
+        /// HAL hypermedia links
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_links")]
+        public System.Collections.Generic.IDictionary<string, HalLink>? _links { get; set; } = default!;
+
+        /// <summary>
+        /// Embedded related resources
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_embedded")]
+        public object? _embedded { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -206401,6 +206487,30 @@ namespace Explore.Blazor.Client.Clients
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class HalResourceOfModerationResourceQuarantineStateHeader
     {
+
+        [System.Text.Json.Serialization.JsonPropertyName("resourceId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid ResourceId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("page")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int Page { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("hasNext")]
+        public bool HasNext { get; set; } = default!;
+
+        /// <summary>
+        /// HAL hypermedia links
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_links")]
+        public System.Collections.Generic.IDictionary<string, HalLink>? _links { get; set; } = default!;
+
+        /// <summary>
+        /// Embedded related resources
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_embedded")]
+        public object? _embedded { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -208320,8 +208430,169 @@ namespace Explore.Blazor.Client.Clients
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class HalResourceOfRecognitionCorrectionProofDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid Id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("intentId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid IntentId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("sourceId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid SourceId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("pendingRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long PendingRevision { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("grounds")]
+        public int Grounds { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("protectedAt")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset ProtectedAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("remedyUntil")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset RemedyUntil { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("retainUntil")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset RetainUntil { get; set; } = default!;
+
+        /// <summary>
+        /// HAL hypermedia links
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_links")]
+        public System.Collections.Generic.IDictionary<string, HalLink>? _links { get; set; } = default!;
+
+        /// <summary>
+        /// Embedded related resources
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_embedded")]
+        public object? _embedded { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class HalResourceOfRecognitionRecoveryContextDto
     {
+
+        [System.Text.Json.Serialization.JsonPropertyName("escalationId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid EscalationId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("intentId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid IntentId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("pendingRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long PendingRevision { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("state")]
+        public int State { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("failure")]
+        public int Failure { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("receivedAt")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset ReceivedAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("settleBy")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset SettleBy { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("escalateAt")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset EscalateAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("requiredSourceCount")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int RequiredSourceCount { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("sourceId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid SourceId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("sourceRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long SourceRevision { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("sourceGeneration")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long SourceGeneration { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("adoptionId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid AdoptionId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("adoptionRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long AdoptionRevision { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("adoptionGeneration")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long AdoptionGeneration { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("maximumValidUntil")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset MaximumValidUntil { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("availableGrounds")]
+        public int AvailableGrounds { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("dispositionId")]
+        public System.Guid? DispositionId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("dispositionRevision")]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long? DispositionRevision { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("assessedGrounds")]
+        public int AssessedGrounds { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("assessedAt")]
+        public System.DateTimeOffset? AssessedAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("assessmentValidUntil")]
+        public System.DateTimeOffset? AssessmentValidUntil { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("authorizedAt")]
+        public System.DateTimeOffset? AuthorizedAt { get; set; } = default!;
+
+        /// <summary>
+        /// HAL hypermedia links
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_links")]
+        public System.Collections.Generic.IDictionary<string, HalLink>? _links { get; set; } = default!;
+
+        /// <summary>
+        /// Embedded related resources
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_embedded")]
+        public object? _embedded { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -208337,6 +208608,55 @@ namespace Explore.Blazor.Client.Clients
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class HalResourceOfRecognitionRecoveryEscalationDto
     {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid Id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("intentId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid IntentId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("sourceId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid SourceId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("actionRecoveryId")]
+        public System.Guid? ActionRecoveryId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("capturedPendingRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long CapturedPendingRevision { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("stage")]
+        public int Stage { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("requiredAt")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset RequiredAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("originalDeadline")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset OriginalDeadline { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("deliveredAt")]
+        public System.DateTimeOffset? DeliveredAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("acknowledgedAt")]
+        public System.DateTimeOffset? AcknowledgedAt { get; set; } = default!;
+
+        /// <summary>
+        /// HAL hypermedia links
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_links")]
+        public System.Collections.Generic.IDictionary<string, HalLink>? _links { get; set; } = default!;
+
+        /// <summary>
+        /// Embedded related resources
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_embedded")]
+        public object? _embedded { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -220175,6 +220495,61 @@ namespace Explore.Blazor.Client.Clients
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class ModerationPreFindingView
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("noticeId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid NoticeId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("revision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long Revision { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("caseId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid CaseId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("caseRevision")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long CaseRevision { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("notice")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public ModerationPreFindingText Notice { get; init; } = new ModerationPreFindingText();
+
+        [System.Text.Json.Serialization.JsonPropertyName("retainUntil")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset RetainUntil { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("acknowledgedAt")]
+        public System.DateTimeOffset? AcknowledgedAt { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("respondedAt")]
+        public System.DateTimeOffset? RespondedAt { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("response")]
+        public string? Response { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum ModerationPrivateDisclosureMode
     {
 
@@ -221822,6 +222197,53 @@ namespace Explore.Blazor.Client.Clients
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class ModerationResourceQuarantineReviewState
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("resourceId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid ResourceId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("materialVersionId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid MaterialVersionId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("quarantineId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid QuarantineId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("tipId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid TipId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("adoptionId")]
+        public System.Guid? AdoptionId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("validUntil")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset ValidUntil { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("chain")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<ModerationResourceQuarantineReviewStateItem> Chain { get; init; } = new System.Collections.Generic.List<ModerationResourceQuarantineReviewStateItem>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ModerationResourceQuarantineReviewStateIntent
     {
 
@@ -221874,6 +222296,93 @@ namespace Explore.Blazor.Client.Clients
         }
 
     }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class ModerationResourceQuarantineReviewStateItem
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid Id { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("purposeId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid PurposeId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("predecessorId")]
+        public System.Guid? PredecessorId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("step")]
+        public int Step { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("attestation")]
+        public int Attestation { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("requiredApprovals")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int RequiredApprovals { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("maximumEvidenceLifetimeTicks")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public long MaximumEvidenceLifetimeTicks { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("recordedAt")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset RecordedAt { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("validUntil")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.DateTimeOffset ValidUntil { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class ModerationResourceQuarantineStateHeader
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("resourceId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public System.Guid ResourceId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("page")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
+        public int Page { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("hasNext")]
+        public bool HasNext { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ModerationResourceQuarantineStateIntent

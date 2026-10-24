@@ -1,6 +1,7 @@
 using Event.Persistence.IntegrationTests.Fixtures;
 using Event.Persistence.IntegrationTests.Moderation;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Features.EventRoleAssignments.Handlers.Commands;

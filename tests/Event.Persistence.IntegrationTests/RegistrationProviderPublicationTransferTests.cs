@@ -1,3 +1,4 @@
+using System.Reflection;
 using Event.Persistence.IntegrationTests.Database;
 using Explore.Domain;
 using Explore.Persistence;

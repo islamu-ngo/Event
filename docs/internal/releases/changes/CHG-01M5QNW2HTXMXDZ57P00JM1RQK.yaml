@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5QNW2HTXMXDZ57P00JM1RQK
+Title: "Read setup binding identities without provider coordinates"
+Type: fix
+Scope: access
+Summary: "Project only the exact setup instance binding ID and upgrade the verified Runtime metadata catalogue without granting private provider coordinates or widening Global access."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: mitigated
+    Detail: "Setup projects only an exact instance binding ID on its original tenant owner. Runtime gains only SELECT(Id) beyond its existing four metadata columns; Global and private provider-coordinate access remain unchanged. Native regression sources are locally uncompiled and unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: "Normal migration accepts only fresh, exact previous four/four, or current five/four metadata catalogues. No schema migration or setting is added, and corrupted grants are not repaired. Provider-side full-entity lookup and dispatch remain a separate unresolved composition boundary, not certified by this correction."

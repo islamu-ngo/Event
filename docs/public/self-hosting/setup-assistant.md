@@ -152,6 +152,15 @@ checks to resolve an enrollment error. This correction adds no configuration
 setting or schema migration and does not enable live control in Configurator.
 Its native permission regressions remain subject to remote CI acceptance.
 
+Setup's binding discovery reads only the ID of the exact instance signing or
+encryption binding, never its provider coordinates or value. The normal
+PostgreSQL migrator adds only Runtime's binding-ID read to the verified previous
+metadata catalogue; Global's access is unchanged. Unexpected grants or incomplete
+catalogues fail closed rather than being repaired. No setting or schema migration
+is added. This does not resolve or certify the separate provider-side binding
+lookup and dispatch boundary; do not broaden coordinate permissions to work
+around it.
+
 Live configuration import remains a server-controlled workflow, separate from
 offline Configurator:
 

@@ -1116,6 +1116,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IWebPushSubscriptionRepository, WebPushSubscriptionRepository>();
         services.AddScoped<IAppSettingRepository, AppSettingRepository>();
         services.AddScoped<ISecretBindingRepository, SecretBindingRepository>();
+        services.AddScoped<ISetupSecretBindingCatalog, SetupSecretBindingCatalog>();
         services.AddScoped<ILocalizationSecretStatusReader, LocalizationSecretStatusReader>();
         services.AddScoped<IUiThemeRepository, UiThemeRepository>();
         services.AddScoped<IUiThemePresetRepository, UiThemePresetRepository>();

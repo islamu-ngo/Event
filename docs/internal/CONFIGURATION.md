@@ -451,6 +451,29 @@ database migration, setting or alternate credential authority. Native lifecycle,
 cross-tenant and grant-drift regressions were authored but not locally compiled
 or executed; remote CI remains the runtime acceptance gate.
 
+Setup binding discovery uses `ISetupSecretBindingCatalog`, not the general
+secret-binding entity repository. It accepts only `setup.signing` and
+`setup.encryption`, selects an instance binding with an empty qualifier and no
+scope ID, and projects only its ID. The reader retains the original tenant
+context, physical connection and transaction across awaits; provider coordinates
+and values are not materialized by this control-plane lookup.
+
+The PostgreSQL metadata catalogue grants Runtime the four existing status
+columns plus `Id`; Global retains exactly the four status columns. The normal
+migrator accepts a fresh catalogue, the current exact catalogue, or the exact
+previous four/four catalogue and adds only Runtime `SELECT(Id)`. Partial or
+widened predecessors and foreign-grantor ACL entries are rejected without repair.
+The last cancellable ownership check precedes savepoint release; release and any
+installer-owned commit are non-cancellable, so completion wins late cancellation
+rather than reporting failure after retaining a grant. Lookup cleanup closes only
+an internally opened connection still belonging to the complete original owner;
+it does not close a replacement transaction's connection. This changes neither secret
+resolution authority nor provider-coordinate permissions. In particular, the
+provider-side full-entity binding lookup is a separate unresolved composition
+boundary; this control-plane correction does not certify live provider dispatch.
+Native projection, privilege-denial, predecessor-upgrade and rollback regression
+sources remain uncompiled and unrun locally, pending remote CI.
+
 Configurator's own release-capability metadata governs its offline surfaces.
 The old bundled capability generator is removed. Retained Event backend
 authority and the relocated client adapter do not activate live control in

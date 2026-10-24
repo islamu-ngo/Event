@@ -41,21 +41,34 @@ public sealed class SecretAuthorityConfigurationTests
     [Test]
     public async Task PreserveProviderSelection_WhenAuthorityContainsConflictingSelectors_KeepsUserSecrets()
     {
-        IConfiguration conflictingAuthority = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["SecretProvider:Provider"] = "Environment",
-                ["SECRET_PROVIDER"] = "Infisical",
-            })
-            .Build();
+        string instancePassword = Guid.CreateVersion7().ToString("N");
+        string tenantPassword = Guid.CreateVersion7().ToString("N");
+        using var conflictingAuthority = new ConfigurationManager();
+        conflictingAuthority.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["SecretProvider:Provider"] = "Environment",
+            ["SECRET_PROVIDER"] = "Infisical",
+            ["Database:EmailPolicyInstanceMutation:Username"] = null,
+            ["Database:EmailPolicyInstanceMutation:Password"] = string.Empty,
+            ["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"] = instancePassword,
+            ["Database:EmailPolicyTenantMutation:Password"] = " ",
+            ["DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD"] = tenantPassword,
+        });
 
         IConfiguration locked = SecretAuthorityConfiguration.PreserveProviderSelection(
             conflictingAuthority,
             SecretProviderType.UserSecrets);
+        using var lockedOwner = (IDisposable)locked;
 
         await Assert.That(SecretAuthorityConfiguration.GetRequiredProvider(locked))
             .IsEqualTo(SecretProviderType.UserSecrets);
         await Assert.That(locked["SECRET_PROVIDER"]).IsNull();
+        await Assert.That(locked["Database:EmailPolicyInstanceMutation:Username"] is null
+            && locked["Database:EmailPolicyInstanceMutation:Password"] == string.Empty
+            && locked["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"] == instancePassword
+            && locked["Database:EmailPolicyTenantMutation:Password"] == " "
+            && locked["DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD"] == tenantPassword).IsTrue()
+            .Because("Selected startup authority preserves declared null, empty and whitespace without borrowing flat credentials.");
     }
 
     private static IConfiguration ProviderConfiguration(SecretProviderType provider) =>

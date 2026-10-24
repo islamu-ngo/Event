@@ -483,7 +483,7 @@ if (hostingTopology == HostingTopology.Split)
         exploreAPI = WithExternalPrimaryDatabase(builder, exploreAPI, PrimaryDatabaseRole.Runtime);
         exploreAPI = WithExternalPrimaryDatabase(builder, exploreAPI, PrimaryDatabaseRole.Global);
     }
-    exploreAPI = WithInstanceApiKeyCapabilities(builder, exploreAPI);
+    exploreAPI = WithApplicationDatabaseCapabilities(builder, exploreAPI);
 
     if (privacyErasureDatabase is not null)
     {
@@ -667,7 +667,7 @@ else
         eventStandalone = WithExternalPrimaryDatabase(builder, eventStandalone, PrimaryDatabaseRole.Runtime);
         eventStandalone = WithExternalPrimaryDatabase(builder, eventStandalone, PrimaryDatabaseRole.Global);
     }
-    eventStandalone = WithInstanceApiKeyCapabilities(builder, eventStandalone);
+    eventStandalone = WithApplicationDatabaseCapabilities(builder, eventStandalone);
 
     if (privacyErasureDatabase is not null)
     {
@@ -1773,7 +1773,7 @@ static IResourceBuilder<ProjectResource> WithExternalPrimaryDatabase(
     return WithSelectedPrimaryDatabaseCredentials(builder, project, database);
 }
 
-static IResourceBuilder<ProjectResource> WithInstanceApiKeyCapabilities(
+static IResourceBuilder<ProjectResource> WithApplicationDatabaseCapabilities(
     IDistributedApplicationBuilder builder,
     IResourceBuilder<ProjectResource> project)
 {
@@ -1782,7 +1782,8 @@ static IResourceBuilder<ProjectResource> WithInstanceApiKeyCapabilities(
     PrimaryDatabaseRole[] roles =
     [
         PrimaryDatabaseRole.InstanceKeyRead, PrimaryDatabaseRole.InstanceKeyWrite,
-        PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport
+        PrimaryDatabaseRole.InstanceKeyIssuance, PrimaryDatabaseRole.PlatformKeyReport,
+        PrimaryDatabaseRole.EmailPolicyInstanceMutation, PrimaryDatabaseRole.EmailPolicyTenantMutation
     ];
     foreach (var role in roles)
         project = WithSelectedPrimaryDatabaseCredentials(

@@ -2,6 +2,8 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
 using Explore.AppHost;
+using Explore.Secrets.Database;
+using Microsoft.Extensions.Configuration;
 
 namespace Event.Distributed.IntegrationTests;
 
@@ -268,8 +270,83 @@ public sealed class AppHostCompositionContractTests
                                 .Because("An empty named-connection denial placeholder grants no erasure authority.");
                         }
                         else if (ReferenceEquals(project, backend))
+                        {
                             await Assert.That(BffHasNoDeclaredDatabaseAuthority(environment)).IsFalse()
                                 .Because("The API role receives its selected primary database authority.");
+                            foreach (var purpose in new[]
+                            {
+                                PrimaryDatabaseRole.EmailPolicyInstanceMutation,
+                                PrimaryDatabaseRole.EmailPolicyTenantMutation
+                            })
+                            {
+                                string prefix = $"Database__{purpose}__";
+                                bool projected = HasActiveEnvironmentEntry(environment, prefix + "Username")
+                                    && HasActiveEnvironmentEntry(environment, prefix + "Password");
+                                await Assert.That(projected).IsTrue()
+                                    .Because("API and Combined require both selected email-policy database authorities.");
+                                bool selectedBinding = false, declaredEmptyDenied = false;
+                                CancellationToken token = TestContext.Current!.Execution.CancellationToken;
+                                try
+                                {
+                                    string? username = environment.EnvironmentVariables[prefix + "Username"] switch
+                                    {
+                                        string text => text,
+                                        IValueProvider provider => await provider.GetValueAsync(token),
+                                        _ => null
+                                    };
+                                    string? password = environment.EnvironmentVariables[prefix + "Password"] switch
+                                    {
+                                        string text => text,
+                                        IValueProvider provider => await provider.GetValueAsync(token),
+                                        _ => null
+                                    };
+                                    var shared = PrimaryDatabaseConfiguration.BindRuntime(builder.Configuration);
+                                    var selected = PrimaryDatabaseConfiguration.Bind(builder.Configuration, purpose);
+                                    string alias = purpose == PrimaryDatabaseRole.EmailPolicyInstanceMutation
+                                        ? "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_" : "DATABASE_EMAIL_POLICY_TENANT_MUTATION_";
+                                    // Use owned nonsecret coordinates; model endpoints have not been allocated.
+                                    var inputs = new Dictionary<string, string?>
+                                    {
+                                        ["Database:Provider"] = shared.Provider.ToString(),
+                                        ["Database:Host"] = shared.Host, ["Database:Database"] = shared.Database,
+                                        ["Database:Schema"] = shared.Schema, ["Database:TlsMode"] = shared.TlsMode.ToString(),
+                                        ["Database:TrustServerCertificate"] = shared.TrustServerCertificate.ToString(),
+                                        [$"Database:{purpose}:Username"] = username,
+                                        [$"Database:{purpose}:Password"] = password,
+                                        [alias + "USERNAME"] = shared.Username,
+                                        [alias + "PASSWORD"] = shared.Password
+                                    };
+                                    using var projectedConfiguration = new ConfigurationManager();
+                                    projectedConfiguration.AddInMemoryCollection(inputs);
+                                    var bound = PrimaryDatabaseConfiguration.Bind(projectedConfiguration, purpose);
+                                    selectedBinding = bound.Role == purpose && bound.Username == selected.Username
+                                        && bound.Password == selected.Password && password != shared.Password;
+                                    inputs[$"Database:{purpose}:Password"] = string.Empty;
+                                    inputs[alias + "PASSWORD"] = selected.Password;
+                                    try
+                                    {
+                                        using var denied = new ConfigurationManager();
+                                        denied.AddInMemoryCollection(inputs);
+                                        _ = PrimaryDatabaseConfiguration.Bind(denied, purpose);
+                                    }
+                                    catch (Microsoft.Extensions.Options.OptionsValidationException failure)
+                                    {
+                                        declaredEmptyDenied = failure.Failures.Contains("PostgreSql requires Password.", StringComparer.Ordinal);
+                                    }
+                                }
+                                catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+                                catch (Exception) { selectedBinding = false; }
+                                await Assert.That(selectedBinding && declaredEmptyDenied).IsTrue()
+                                    .Because("Native email-policy role binding must preserve selected authority and declared-empty denial.");
+                            }
+                        }
+                        if (!ReferenceEquals(project, backend))
+                            foreach (string purpose in new[] { "EmailPolicyInstanceMutation", "EmailPolicyTenantMutation" })
+                                await Assert.That(!HasActiveEnvironmentEntry(environment, $"Database__{purpose}__Password")
+                                    && !HasActiveEnvironmentEntry(environment, purpose == "EmailPolicyInstanceMutation"
+                                        ? "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"
+                                        : "DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD")).IsTrue()
+                                    .Because("BFF-only and migration resources must not receive email-policy workflow passwords.");
                         if (!bff && erasure == "EmbeddedSqlite")
                         {
                             string root = builder.Configuration["ISLAMU_TEST_ROOT"]!;

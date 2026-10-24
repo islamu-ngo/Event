@@ -639,6 +639,20 @@ unavailable. An explicit Aspire target value survives when no canonical
 operator value is declared. BFF remains excluded, and Infisical consumers
 continue acquiring configuration through their own selected authority.
 
+`EmailPolicyInstanceMutation` and `EmailPolicyTenantMutation` use their existing
+dedicated username/password pairs. For Environment and permitted User Secrets
+authorities, AppHost projects these pairs as structured `Database:<role>:*`
+values only to API and Combined resources. The API also maps these purposes from
+its own selected authority, including Infisical's `/database` root. A declared
+canonical value takes precedence over its flat alias, including an empty value;
+missing selected values mask lower-priority credentials rather than inheriting
+them. Startup composition snapshots all declared values, including null, empty
+and whitespace, before adding locked provider metadata.
+`PreserveProviderSelection` borrows its input; `SecretAuthorityConfiguration.Build`
+disposes its private source roots after capture. API isolation owns its private
+snapshot and retains the caller's host configuration. Neither the migration
+worker nor the BFF receives these purpose passwords.
+
 `InstanceApiKeyDbContextFactories` checks the common database/namespace/TLS
 target and distinct server logins/passwords before creating four independent
 pools. Startup admission opens every purpose and verifies ordinary-role RLS

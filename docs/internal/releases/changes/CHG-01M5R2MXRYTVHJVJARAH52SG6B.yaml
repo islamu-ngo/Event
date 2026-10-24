@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5R2MXRYTVHJVJARAH52SG6B
+Title: "Preserve selected database purpose credentials"
+Type: fix
+Scope: self-hosting
+Summary: "Deliver existing email-policy credentials to API and Combined hosts and preserve declared blank values during selected startup authority composition."
+Group: database-purpose-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: Existing email-policy purpose passwords reach only API and Combined resources. Selected startup composition preserves canonical empty and whitespace declarations so flat aliases cannot replace a declared denial. Private source roots are disposed after capture while borrowed authority and caller-owned host configuration remain alive.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: The existing EmailPolicyInstanceMutation and EmailPolicyTenantMutation pairs use their current structured keys or flat aliases from the selected authority. Startup snapshots preserve declarations before provider metadata is applied; canonical blank values remain unavailable. No configuration key or provider choice is added.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/infisical.md
+    Disposition: documented
+    Detail: Supply the two existing purpose pairs through the selected authority. After changing Aspire-projected Environment or permitted User Secrets credentials, restart the AppHost and its managed applications. For direct Infisical acquisition, restart the owning API or Combined host. Keep purpose passwords out of the migration worker and BFF. No database reset, schema change or new grant is introduced.

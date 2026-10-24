@@ -23,10 +23,12 @@ public static class ConfigurationExtensions
             environmentName,
             consumer,
             SecretAcquisitionPolicy.Roots(consumer).ToArray());
+        using var authorityOwner = (IDisposable)authority;
         _ = PrivacyErasureDurabilityOptions.FromConfiguration(authority);
-        var isolatedAuthority = new ConfigurationBuilder().AddConfiguration(authority);
+        using var isolatedAuthority = new ConfigurationManager();
+        isolatedAuthority.AddInMemoryCollection(authority.AsEnumerable());
         PrivacyErasureAuthorityDatabaseConfiguration.ProjectDiscreteConfiguration(isolatedAuthority);
-        ApplyMapping(configBuilder, isolatedAuthority.Build(), bootstrapConfig);
+        ApplyMapping(configBuilder, isolatedAuthority, bootstrapConfig);
 
         // Runtime provider binding must use the authority and bootstrap source that loaded
         // startup secrets, not lower-priority settings or a vault-supplied provider selector.
@@ -248,6 +250,10 @@ public static class ConfigurationExtensions
             ["DATABASE_PLATFORM_KEY_REPORT_PASSWORD"] = null,
             ["Database:PlatformKeyReport:Username"] = null,
             ["Database:PlatformKeyReport:Password"] = null,
+            ["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME"] = null,
+            ["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"] = null,
+            ["DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME"] = null,
+            ["DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD"] = null,
             ["Database:Migrator:Username"] = null,
             ["Database:Migrator:Password"] = null,
             ["Database:TlsMode"] = null,
@@ -379,6 +385,10 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "Database:InstanceKeyIssuance:Password", config["DATABASE_INSTANCE_KEY_ISSUANCE_PASSWORD"] ?? config["Database:InstanceKeyIssuance:Password"]);
         TrySet(mappedConfig, config, "Database:PlatformKeyReport:Username", config["DATABASE_PLATFORM_KEY_REPORT_USERNAME"] ?? config["Database:PlatformKeyReport:Username"]);
         TrySet(mappedConfig, config, "Database:PlatformKeyReport:Password", config["DATABASE_PLATFORM_KEY_REPORT_PASSWORD"] ?? config["Database:PlatformKeyReport:Password"]);
+        mappedConfig["Database:EmailPolicyInstanceMutation:Username"] = config["Database:EmailPolicyInstanceMutation:Username"] ?? config["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_USERNAME"];
+        mappedConfig["Database:EmailPolicyInstanceMutation:Password"] = config["Database:EmailPolicyInstanceMutation:Password"] ?? config["DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"];
+        mappedConfig["Database:EmailPolicyTenantMutation:Username"] = config["Database:EmailPolicyTenantMutation:Username"] ?? config["DATABASE_EMAIL_POLICY_TENANT_MUTATION_USERNAME"];
+        mappedConfig["Database:EmailPolicyTenantMutation:Password"] = config["Database:EmailPolicyTenantMutation:Password"] ?? config["DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD"];
         TrySet(mappedConfig, config, "Database:Migrator:Username", ReadFirst(config, "DATABASE_MIGRATOR_USERNAME", "Database:Migrator:Username"));
         TrySet(mappedConfig, config, "Database:Migrator:Password", ReadFirst(config, "DATABASE_MIGRATOR_PASSWORD", "Database:Migrator:Password"));
         TrySet(mappedConfig, config, "Database:TlsMode", ReadFirst(config, "DATABASE_TLS_MODE", "Database:TlsMode"));

@@ -695,6 +695,19 @@ tenant email-policy database credential pairs already listed in `.env.example`:
 these pairs only to the API. Provision the corresponding limited database roles;
 ordinary Runtime or Migrator credentials are not substitutes for these profiles.
 
+Aspire forwards these existing pairs to API and Combined hosts when Environment
+or permitted User Secrets is selected. With Infisical, the API acquires them
+through its own selected `/database` authority. Structured
+`Database:EmailPolicyInstanceMutation:*` and
+`Database:EmailPolicyTenantMutation:*` values take precedence over the flat
+aliases, including an explicitly empty value. Missing selected credentials do
+not inherit lower-priority values; whitespace-only declarations also remain
+unavailable. These startup declarations are captured as a snapshot. After
+changing Environment or permitted User Secrets credentials projected by Aspire,
+restart the AppHost and its managed applications. For direct Infisical
+acquisition, restart the owning API or Combined host. Keep both purpose passwords
+out of the migration worker and BFF configuration.
+
 The enrolled setup writer has two dedicated instance binding purposes:
 `setup.signing` and `setup.encryption`, with default names `SETUP_SIGNING` and
 `SETUP_ENCRYPTION` in `/setup`. These optional targets accept Infisical bindings

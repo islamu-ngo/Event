@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Security.Cryptography;
+using Event.Testing.PostgreSql;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -510,24 +511,8 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         return new ExploreDbContext(builder.Options) { TenantContext = tenantContext };
     }
 
-    private async Task ProvisionNativeQueueLoginsAsync()
-    {
-        NativeQueueEnrollment.Validate();
-        await using var connection = new NpgsqlConnection(_container.GetConnectionString());
-        await connection.OpenAsync();
-        foreach (var (role, login) in _nativeQueueLogins)
-        {
-            await using var command = connection.CreateCommand();
-            string username = "\"" + login.Username.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
-            string password = "'" + login.Password.Replace("'", "''", StringComparison.Ordinal) + "'";
-            // Only the opt-in migration administrator is demoted after creating its own schema.
-            string attributes = role == PrimaryDatabaseRole.Migrator
-                ? "SUPERUSER CREATEDB CREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
-                : "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS";
-            command.CommandText = $"CREATE ROLE {username} LOGIN {attributes} PASSWORD {password}";
-            await command.ExecuteNonQueryAsync();
-        }
-    }
+    private Task ProvisionNativeQueueLoginsAsync() =>
+        PostgresTestRoleBootstrap.ProvisionAsync(_container.GetConnectionString(), NativeQueueEnrollment, _nativeQueueLogins);
 
     private ExploreDbContext CreateDbContextInternal(
         PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime,

@@ -4,6 +4,7 @@
        privacy-instrumented services, so no lane invents its own meter root. -->
   <ItemGroup>
     <Compile Include="..\Shared\ExternalDataProtectionTestAuthority.cs" Link="Fixtures\ExternalDataProtectionTestAuthority.cs" />
+    <Compile Include="..\Shared\PostgresTestRoleBootstrap.cs" Link="Fixtures\PostgresTestRoleBootstrap.cs" />
     <Compile Include="..\Shared\TransactionCleanupFault.cs" Link="Fixtures\TransactionCleanupFault.cs" />
     <Compile Include="..\Shared\Telemetry\EventLocationPrivacyMetricsFactory.cs" Link="Telemetry\EventLocationPrivacyMetricsFactory.cs" />
     <Compile Include="..\Explore.Infrastructure.Tests\Fixtures\CurrentHumanPrincipalFixture.cs" Link="Fixtures\CurrentHumanPrincipalFixture.cs" />

@@ -443,7 +443,7 @@ public static class SecurityControlRegister
         }
 
         if (!requirements.ContainsKey("security-integration") || !requirements.ContainsKey("cerbos-policy-contract") ||
-            requirements.Count is not (2 or 7)) throw new InvalidDataException();
+            requirements.Count != 7) throw new InvalidDataException();
         return requirements;
     }
 

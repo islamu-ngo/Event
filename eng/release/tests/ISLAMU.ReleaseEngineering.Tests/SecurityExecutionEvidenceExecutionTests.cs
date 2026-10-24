@@ -96,6 +96,126 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
             "..", "..", "..", "security", "security-control-register.json"));
 }
 
+public sealed class SecurityExecutionEvidenceManagedHintTests
+{
+    [Test]
+    [Arguments("complete", true)]
+    [Arguments("lead-without-inputs", true)]
+    [Arguments("lead-null-inputs", true)]
+    [Arguments("selected-peer", true)]
+    [Arguments("wrong-schema", false)]
+    [Arguments("wrong-owner", false)]
+    [Arguments("unknown-resource", false)]
+    [Arguments("invalid-pid", false)]
+    [Arguments("missing-instance", false)]
+    [Arguments("unknown-field", false)]
+    [Arguments("wrong-ancestry-head", false)]
+    [Arguments("duplicate-file", false)]
+    [Arguments("negative-file-stamp", false)]
+    [Arguments("duplicate-json-field", false)]
+    public async Task PrivateHintGrammarPreservesExactLeadsWithoutGrantingNativeAuthority(string variant, bool expected)
+    {
+        string owner = new('1', 32);
+        string instance = new('A', 64);
+        const string entry = "/candidate/src/Explore.MigrationService/bin/Release/net10.0/Explore.MigrationService.dll";
+        string[] files = ["/runtime/dotnet", entry, Path.ChangeExtension(entry, ".deps.json"),
+            Path.ChangeExtension(entry, ".runtimeconfig.json")];
+        JsonObject document = new()
+        {
+            ["Schema"] = 1, ["RunId"] = owner,
+            ["Hint"] = new JsonObject
+            {
+                ["Resource"] = "event-migrationservice", ["InstanceSha256"] = instance, ["Pid"] = 123,
+                ["Diagnostic"] = "managed_launch_os_inputs_observed",
+                ["Inputs"] = new JsonObject
+                {
+                    ["Ancestry"] = new JsonArray(new JsonObject
+                    {
+                        ["Pid"] = 123, ["Parent"] = 122, ["User"] = 1000, ["Group"] = 123,
+                        ["Session"] = 123, ["Start"] = 42, ["State"] = "S"
+                    }),
+                    ["Executable"] = files[0], ["WorkingDirectory"] = "/candidate/src/Explore.MigrationService",
+                    ["Entry"] = entry,
+                    ["Files"] = new JsonArray(files.Select(path => (JsonNode)new JsonObject
+                    {
+                        ["Path"] = path, ["Bytes"] = 16, ["Sha256"] = new string('B', 64),
+                        ["LastWriteUtcTicks"] = 638000000000000000L, ["CreationUtcTicks"] = 638000000000000000L
+                    }).ToArray())
+                }
+            }
+        };
+        byte[] baselineBytes = Encoding.UTF8.GetBytes(document.ToJsonString());
+        await Assert.That(SecurityExecutionEvidence.TryReadManagedLaunchHint(baselineBytes, owner,
+            out var baseline, out string diagnostic)).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+        await Assert.That(baseline!.RunId).IsEqualTo(owner);
+        await Assert.That(baseline.Resource).IsEqualTo("event-migrationservice");
+        await Assert.That(baseline.InstanceSha256).IsEqualTo(instance);
+        await Assert.That(baseline.Pid).IsEqualTo(123);
+        await Assert.That(baseline.Inputs.HasValue).IsTrue();
+        JsonElement baselineInputs = baseline.Inputs.GetValueOrDefault();
+        await Assert.That(baselineInputs.GetProperty("Entry").GetString()).IsEqualTo(entry);
+        await Assert.That(baselineInputs.GetProperty("Files").EnumerateArray()
+            .Select(file => file.GetProperty("Path").GetString()).SequenceEqual(files)).IsTrue();
+        JsonObject hint = document["Hint"]!.AsObject();
+        switch (variant)
+        {
+            case "lead-without-inputs": hint.Remove("Inputs"); hint["Diagnostic"] = "managed_launch_inputs_unavailable"; break;
+            case "lead-null-inputs": hint["Inputs"] = null; hint["Diagnostic"] = "managed_launch_inputs_unavailable"; break;
+            case "selected-peer":
+                hint["Resource"] = "explore-blazor-peer";
+                hint["InstanceSha256"] = new string('C', 64);
+                hint["Pid"] = 321;
+                hint["Inputs"]!["Ancestry"]![0]!["Pid"] = 321;
+                hint["Inputs"]!["Ancestry"]![0]!["Parent"] = 320;
+                hint["Inputs"]!["Ancestry"]![0]!["Group"] = 321;
+                hint["Inputs"]!["Ancestry"]![0]!["Session"] = 321;
+                hint["Inputs"]!["Ancestry"]![0]!["Start"] = 43;
+                const string peerEntry = "/candidate/src/Explore.Blazor/bin/Release/net10.0/Explore.Blazor.dll";
+                hint["Inputs"]!["WorkingDirectory"] = "/candidate/src/Explore.Blazor";
+                hint["Inputs"]!["Entry"] = peerEntry;
+                hint["Inputs"]!["Files"]![1]!["Path"] = peerEntry;
+                hint["Inputs"]!["Files"]![2]!["Path"] = Path.ChangeExtension(peerEntry, ".deps.json");
+                hint["Inputs"]!["Files"]![3]!["Path"] = Path.ChangeExtension(peerEntry, ".runtimeconfig.json");
+                break;
+            case "wrong-schema": document["Schema"] = 2; break;
+            case "wrong-owner": document["RunId"] = new string('2', 32); break;
+            case "unknown-resource": hint["Resource"] = "unselected-host"; break;
+            case "invalid-pid": hint["Pid"] = 0; break;
+            case "missing-instance": hint.Remove("InstanceSha256"); break;
+            case "unknown-field": hint["Environment"] = "untrusted"; break;
+            case "wrong-ancestry-head": hint["Inputs"]!["Ancestry"]![0]!["Pid"] = 124; break;
+            case "duplicate-file":
+                hint["Inputs"]!["Entry"] = files[0];
+                hint["Inputs"]!["Files"]![1] = hint["Inputs"]!["Files"]![0]!.DeepClone();
+                hint["Inputs"]!["Files"]![2]!["Path"] = Path.ChangeExtension(files[0], ".deps.json");
+                hint["Inputs"]!["Files"]![3]!["Path"] = Path.ChangeExtension(files[0], ".runtimeconfig.json");
+                break;
+            case "negative-file-stamp": hint["Inputs"]!["Files"]![0]!["LastWriteUtcTicks"] = -1; break;
+        }
+        string json = document.ToJsonString();
+        if (variant == "duplicate-json-field") json = json.Replace("\"Schema\":1", "\"Schema\":1,\"Schema\":1", StringComparison.Ordinal);
+        bool accepted = SecurityExecutionEvidence.TryReadManagedLaunchHint(Encoding.UTF8.GetBytes(json), owner,
+            out var result, out _);
+        await Assert.That(accepted).IsEqualTo(expected);
+        if (expected)
+        {
+            await Assert.That(result!.RunId).IsEqualTo(owner);
+            await Assert.That(result.Resource).IsEqualTo(variant == "selected-peer" ? "explore-blazor-peer" : "event-migrationservice");
+            await Assert.That(result.InstanceSha256).IsEqualTo(variant == "selected-peer" ? new string('C', 64) : instance);
+            await Assert.That(result.Pid).IsEqualTo(variant == "selected-peer" ? 321 : 123);
+            await Assert.That(result.Inputs.HasValue).IsEqualTo(variant is not ("lead-without-inputs" or "lead-null-inputs"));
+            if (result.Inputs is JsonElement inputs)
+            {
+                await Assert.That(inputs.GetProperty("Entry").GetString()).IsEqualTo(variant == "selected-peer"
+                    ? "/candidate/src/Explore.Blazor/bin/Release/net10.0/Explore.Blazor.dll" : entry);
+                await Assert.That(inputs.GetProperty("Ancestry")[0].GetProperty("Pid").GetInt32())
+                    .IsEqualTo(variant == "selected-peer" ? 321 : 123);
+            }
+        }
+    }
+}
+
 public sealed class SecurityExecutionEvidenceNativeUidChildTests
 {
     [Test]
@@ -1038,6 +1158,93 @@ public sealed class SecurityExecutionEvidenceTransportTests
 
 public sealed class SecurityExecutionEvidenceProcessTests
 {
+    [Test]
+    public async Task LiveObserverReceivesActualOwnedIdentityAndClosesItsResourceBeforeReturn()
+    {
+        using var fixture = new ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("clean");
+        string resource = Path.Combine(command.WorkingDirectory, "observer-resource");
+        using var fallback = new FileStream(resource, FileMode.CreateNew, FileAccess.ReadWrite,
+            FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.DeleteOnClose);
+        var handle = fallback.SafeFileHandle;
+        await Assert.That(File.Exists(resource)).IsTrue();
+        SecurityExecutionEvidence.OwnedNativeProcessContext? observed = null;
+        bool liveIdentityMatched = false;
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(10), CancellationToken.None, async (identity, token) =>
+            {
+                observed = identity;
+                string value = File.ReadAllText("/proc/" + identity.Pid + "/stat");
+                string[] fields = value[(value.LastIndexOf(')') + 2)..].Split(' ');
+                liveIdentityMatched = identity.Pid != Environment.ProcessId && identity.Group == identity.Pid &&
+                    identity.Session == identity.Pid && identity.Start > 0 &&
+                    fields[2] == identity.Group.ToString(System.Globalization.CultureInfo.InvariantCulture) &&
+                    fields[3] == identity.Session.ToString(System.Globalization.CultureInfo.InvariantCulture) &&
+                    fields[19] == identity.Start.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                try { await Task.Delay(Timeout.InfiniteTimeSpan, token); }
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+                finally { fallback.Dispose(); }
+            });
+        await Assert.That(result.ExitCode).IsEqualTo(0);
+        await Assert.That(Encoding.UTF8.GetString(result.StandardOutput)).Contains(fixture.Canary);
+        await Assert.That(observed is not null).IsTrue();
+        await Assert.That(liveIdentityMatched).IsTrue();
+        await Assert.That(handle.IsClosed).IsTrue();
+        await Assert.That(File.Exists(resource)).IsFalse();
+        await Assert.That(result.ObserverSettled).IsTrue();
+        await Assert.That(result.ObserverFailures.Count).IsEqualTo(0);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+    }
+
+    [Test]
+    [Arguments(0, false)]
+    [Arguments(1200, false)]
+    [Arguments(0, true)]
+    public async Task ObserverAndCancellationCallbackFailuresBothSurviveJoinedNativeCleanup(
+        int callbackDelayMilliseconds, bool propagateStopCancellation)
+    {
+        using var fixture = new ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("clean");
+        string resource = Path.Combine(command.WorkingDirectory, "observer-failure-resource");
+        using var fallback = new FileStream(resource, FileMode.CreateNew, FileAccess.ReadWrite,
+            FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.DeleteOnClose);
+        var handle = fallback.SafeFileHandle;
+        await Assert.That(File.Exists(resource)).IsTrue();
+        Exception primary = new IOException("observer_primary");
+        var cleanupFailure = new InvalidOperationException("observer_cancellation_callback");
+        var cancellationObserved = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(10), CancellationToken.None, async (_, token) =>
+            {
+                try
+                {
+                    using var registration = token.Register(() =>
+                    {
+                        Thread.Sleep(callbackDelayMilliseconds);
+                        cancellationObserved.TrySetResult(true);
+                        throw cleanupFailure;
+                    });
+                    await cancellationObserved.Task;
+                    if (propagateStopCancellation) primary = new OperationCanceledException(token);
+                    throw primary;
+                }
+                finally { fallback.Dispose(); }
+            });
+        await Assert.That(result.ExitCode).IsEqualTo(0);
+        await Assert.That(Encoding.UTF8.GetString(result.StandardOutput)).Contains(fixture.Canary);
+        Exception[] failures = result.ObserverFailures.SelectMany(failure => failure is AggregateException aggregate
+            ? aggregate.Flatten().InnerExceptions.AsEnumerable() : Enumerable.Repeat(failure, 1)).ToArray();
+        await Assert.That(failures.Any(failure => ReferenceEquals(failure, primary))).IsTrue();
+        await Assert.That(failures.Any(failure => ReferenceEquals(failure, cleanupFailure))).IsTrue();
+        await Assert.That(handle.IsClosed).IsTrue();
+        await Assert.That(File.Exists(resource)).IsFalse();
+        await Assert.That(result.ObserverSettled).IsTrue();
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.CleanupSucceeded).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+    }
+
     [Test]
     public async Task CleanCompiledChildDrainsBothPrivateStreamsAndCompletes()
     {

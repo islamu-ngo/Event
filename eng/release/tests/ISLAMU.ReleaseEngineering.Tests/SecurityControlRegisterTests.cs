@@ -6,6 +6,27 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class SecurityControlRegisterTests
 {
     [Test]
+    public async Task TwoApiLanesCannotReplaceTheCompleteSevenProfileRegistration()
+    {
+        await Assert.That(SecurityControlRegister.TryValidate(RegisterPath(), out _)).IsTrue();
+        JsonObject register = JsonNode.Parse(File.ReadAllBytes(RegisterPath()))!.AsObject();
+        JsonArray requirements = register["executionRequirements"]!.AsArray();
+        await Assert.That(requirements.Count).IsEqualTo(7);
+        for (int index = requirements.Count - 1; index >= 0; index--)
+            if (requirements[index]!["laneId"]!.GetValue<string>().StartsWith("owned-", StringComparison.Ordinal))
+                requirements.RemoveAt(index);
+        await Assert.That(requirements.Count).IsEqualTo(2);
+        string directory = Directory.CreateTempSubdirectory("native-seven-register-").FullName;
+        try
+        {
+            string path = Path.Combine(directory, "register.json");
+            File.WriteAllText(path, register.ToJsonString());
+            await Assert.That(SecurityControlRegister.TryValidate(path, out _)).IsFalse();
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
     [Arguments("complete", true)]
     [Arguments("partial-group", false)]
     [Arguments("unknown-lane", false)]

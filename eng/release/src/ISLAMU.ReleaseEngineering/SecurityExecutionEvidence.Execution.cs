@@ -12,6 +12,91 @@ namespace ISLAMU.ReleaseEngineering;
 
 public static partial class SecurityExecutionEvidence
 {
+    internal sealed record NativeManagedLaunchHint(string RunId, string Resource, string InstanceSha256,
+        int Pid, string Diagnostic, JsonElement? Inputs);
+
+    internal static bool TryReadManagedLaunchHint(byte[] bytes, string fixtureRunId,
+        out NativeManagedLaunchHint? hint, out string diagnostic)
+    {
+        hint = null;
+        diagnostic = "managed_launch_hint_invalid";
+        try
+        {
+            if (bytes.Length is < 1 or > 65_536 || fixtureRunId.Length != 32 || !LowerHex(fixtureRunId)) return false;
+            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+            JsonElement root = document.RootElement;
+            if (!UniqueProperties(root) || !ExactFields(root, "Schema", "RunId", "Hint") ||
+                root.GetProperty("Schema").GetInt32() != 1 || Text(root, "RunId") != fixtureRunId) return false;
+            JsonElement value = root.GetProperty("Hint");
+            bool hasInputs = value.TryGetProperty("Inputs", out JsonElement inputs);
+            if (hasInputs ? !ExactFields(value, "Resource", "InstanceSha256", "Pid", "Diagnostic", "Inputs")
+                : !ExactFields(value, "Resource", "InstanceSha256", "Pid", "Diagnostic")) return false;
+            string resource = Text(value, "Resource");
+            string instance = Text(value, "InstanceSha256");
+            int pid = value.GetProperty("Pid").GetInt32();
+            string reason = Text(value, "Diagnostic");
+            if (resource is not ("event-migrationservice" or "explore-api" or "explore-blazor" or
+                    "event-standalone" or "explore-blazor-peer") ||
+                instance.Length != 64 || !instance.All(char.IsAsciiHexDigit) || pid <= 0 ||
+                reason.Length is < 1 or > 128 || reason.Any(character =>
+                    !char.IsAsciiLetterOrDigit(character) && character is not ('_' or '-' or '.' or ':'))) return false;
+            JsonElement? capturedInputs = null;
+            if (hasInputs && inputs.ValueKind != JsonValueKind.Null)
+            {
+                if (!ValidManagedHintInputs(inputs, pid)) return false;
+                capturedInputs = inputs.Clone();
+            }
+            hint = new(fixtureRunId, resource, instance, pid, reason, capturedInputs);
+            diagnostic = string.Empty;
+            return true;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or InvalidOperationException or
+            ArgumentException or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool ValidManagedHintInputs(JsonElement inputs, int pid)
+    {
+        if (!ExactFields(inputs, "Ancestry", "Executable", "WorkingDirectory", "Entry", "Files")) return false;
+        string executable = Text(inputs, "Executable"), directory = Text(inputs, "WorkingDirectory"), entry = Text(inputs, "Entry");
+        if (!HintAbsolutePath(executable) || !HintAbsolutePath(directory) || !HintAbsolutePath(entry)) return false;
+        JsonElement ancestry = inputs.GetProperty("Ancestry");
+        if (ancestry.ValueKind != JsonValueKind.Array || ancestry.GetArrayLength() is < 1 or > 128) return false;
+        var pids = new HashSet<int>();
+        int expected = pid;
+        foreach (JsonElement identity in ancestry.EnumerateArray())
+        {
+            if (!ExactFields(identity, "Pid", "Parent", "User", "Group", "Session", "Start", "State")) return false;
+            int current = identity.GetProperty("Pid").GetInt32(), parent = identity.GetProperty("Parent").GetInt32();
+            string state = Text(identity, "State");
+            if (current <= 0 || current != expected || !pids.Add(current) || parent < 0 ||
+                !identity.GetProperty("User").TryGetUInt32(out _) || identity.GetProperty("Group").GetInt32() <= 0 ||
+                identity.GetProperty("Session").GetInt32() <= 0 || identity.GetProperty("Start").GetUInt64() == 0 ||
+                state.Length != 1 || !"RSDTtZXIKWP".Contains(state[0], StringComparison.Ordinal)) return false;
+            expected = parent;
+        }
+        JsonElement files = inputs.GetProperty("Files");
+        if (files.ValueKind != JsonValueKind.Array || files.GetArrayLength() != 4) return false;
+        string[] paths = [executable, entry, Path.ChangeExtension(entry, ".deps.json"), Path.ChangeExtension(entry, ".runtimeconfig.json")];
+        if (paths.Distinct(StringComparer.Ordinal).Count() != paths.Length) return false;
+        int ordinal = 0;
+        foreach (JsonElement file in files.EnumerateArray())
+        {
+            string digest = Text(file, "Sha256");
+            if (!ExactFields(file, "Path", "Bytes", "Sha256", "LastWriteUtcTicks", "CreationUtcTicks") ||
+                Text(file, "Path") != paths[ordinal++] || file.GetProperty("Bytes").GetInt64() is < 0 or > 1_073_741_824 ||
+                digest.Length != 64 || !digest.All(char.IsAsciiHexDigit) ||
+                file.GetProperty("LastWriteUtcTicks").GetInt64() is < 0 or > 3155378975999999999L ||
+                file.GetProperty("CreationUtcTicks").GetInt64() is < 0 or > 3155378975999999999L) return false;
+        }
+        return true;
+    }
+
+    private static bool HintAbsolutePath(string path) => path.Length is >= 1 and <= 8192 &&
+        !path.Any(char.IsControl) && Path.IsPathFullyQualified(path) && Path.GetFullPath(path) == path;
+
     internal sealed record ObservedOwnedResource(string ContainerId, string ImageId, string Resource, bool Running);
 
     internal static bool TryReadOwnedResourceSnapshot(byte[] bytes, string owner,
@@ -1023,7 +1108,8 @@ public static partial class SecurityExecutionEvidence
     }
 
     internal static async Task<OwnedNativeProcessResult> RunOwnedNativeProcessAsync(ProcessStartInfo command,
-        TimeSpan timeout, CancellationToken cancellationToken)
+        TimeSpan timeout, CancellationToken cancellationToken,
+        Func<OwnedNativeProcessContext, CancellationToken, Task>? observer = null)
     {
         if (!OperatingSystem.IsLinux() || command.FileName != ReleaseToolPaths.Dotnet || command.UseShellExecute ||
             command.Arguments.Length != 0 || command.ArgumentList.Count == 0 ||
@@ -1042,6 +1128,10 @@ public static partial class SecurityExecutionEvidence
         using var overflow = new CancellationTokenSource();
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, overflow.Token);
         using var drain = new CancellationTokenSource();
+        using var observerStop = new CancellationTokenSource();
+        Task? observation = null;
+        var observerFailures = new List<Exception>();
+        bool observerSettled = observer is null;
         stop.CancelAfter(timeout);
         Task<NativeOutputCapture>? stdout = null;
         Task<NativeOutputCapture>? stderr = null;
@@ -1072,7 +1162,17 @@ public static partial class SecurityExecutionEvidence
                 await Task.Delay(1, stop.Token).ConfigureAwait(false);
             }
             if (leader is null) throw new InvalidDataException("native_process_custody_missing");
-            await process.WaitForExitAsync(stop.Token).ConfigureAwait(false);
+            if (observer is null)
+                await process.WaitForExitAsync(stop.Token).ConfigureAwait(false);
+            else
+            {
+                var context = new OwnedNativeProcessContext(process.Id, leader.Group, leader.Session, leader.Start);
+                observation = Task.Run(() => observer(context, observerStop.Token), CancellationToken.None);
+                Task exit = process.WaitForExitAsync(stop.Token);
+                Task completed = await Task.WhenAny(exit, observation).ConfigureAwait(false);
+                if (completed != observation || observation.IsCompletedSuccessfully)
+                    await exit.ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -1086,58 +1186,97 @@ public static partial class SecurityExecutionEvidence
         }
         finally
         {
-            if (started)
+            try
             {
-                try
+                if (started)
                 {
-                    if (leader is not null)
-                    {
-                        residual = process.HasExited && NativeGroupHasLiveMembers(process.Id, leader);
-                        if (!process.HasExited || NativeGroupHasLiveMembers(process.Id, leader))
-                        {
-                            await SignalNativeGroupAsync(process.Id, leader, "-INT").ConfigureAwait(false);
-                            if (!await WaitNativeGroupAsync(process.Id, leader, TimeSpan.FromSeconds(2)).ConfigureAwait(false))
-                                await SignalNativeGroupAsync(process.Id, leader, "-KILL").ConfigureAwait(false);
-                        }
-                        await process.WaitForExitAsync(CancellationToken.None)
-                            .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false);
-                        cleanup = await WaitNativeGroupAsync(process.Id, leader, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        // Without a witnessed session/group, only the directly started process tree is an owned target.
-                        if (!process.HasExited) process.Kill(entireProcessTree: true);
-                        await process.WaitForExitAsync(CancellationToken.None)
-                            .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false);
-                    }
-                    if (stdout is not null && stderr is not null)
-                    {
-                        NativeOutputCapture[] streams = await Task.WhenAll(stdout, stderr)
-                            .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false);
-                        output = streams[0];
-                        error = streams[1];
-                        cleanup &= output.Complete && error.Complete;
-                    }
-                }
-                catch (Exception exception) when (exception is IOException or InvalidDataException or Win32Exception or InvalidOperationException or
-                    TimeoutException or UnauthorizedAccessException)
-                {
-                    cleanup = false;
-                }
-                finally
-                {
-                    await drain.CancelAsync().ConfigureAwait(false);
                     try
                     {
-                        if (stdout is not null) output = await stdout.WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None).ConfigureAwait(false);
-                        if (stderr is not null) error = await stderr.WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None).ConfigureAwait(false);
+                        if (leader is not null)
+                        {
+                            residual = process.HasExited && NativeGroupHasLiveMembers(process.Id, leader);
+                            if (!process.HasExited || NativeGroupHasLiveMembers(process.Id, leader))
+                            {
+                                await SignalNativeGroupAsync(process.Id, leader, "-INT").ConfigureAwait(false);
+                                if (!await WaitNativeGroupAsync(process.Id, leader, TimeSpan.FromSeconds(2)).ConfigureAwait(false))
+                                    await SignalNativeGroupAsync(process.Id, leader, "-KILL").ConfigureAwait(false);
+                            }
+                            await process.WaitForExitAsync(CancellationToken.None)
+                                .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false);
+                            cleanup = await WaitNativeGroupAsync(process.Id, leader, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            // Without a witnessed session/group, only the directly started process tree is an owned target.
+                            if (!process.HasExited) process.Kill(entireProcessTree: true);
+                            await process.WaitForExitAsync(CancellationToken.None)
+                                .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false);
+                        }
+                        if (stdout is not null && stderr is not null)
+                        {
+                            NativeOutputCapture[] streams = await Task.WhenAll(stdout, stderr)
+                                .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false);
+                            output = streams[0];
+                            error = streams[1];
+                            cleanup &= output.Complete && error.Complete;
+                        }
                     }
-                    catch (TimeoutException) { cleanup = false; }
+                    catch (Exception exception) when (exception is IOException or InvalidDataException or Win32Exception or InvalidOperationException or
+                        TimeoutException or UnauthorizedAccessException)
+                    {
+                        cleanup = false;
+                    }
+                    finally
+                    {
+                        await drain.CancelAsync().ConfigureAwait(false);
+                        try
+                        {
+                            if (stdout is not null) output = await stdout.WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None).ConfigureAwait(false);
+                            if (stderr is not null) error = await stderr.WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None).ConfigureAwait(false);
+                        }
+                        catch (TimeoutException) { cleanup = false; }
+                    }
+                }
+            }
+            finally
+            {
+                if (observation is not null)
+                {
+                    Task cancellation = observerStop.CancelAsync();
+                    try { await cancellation.WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None).ConfigureAwait(false); }
+                    catch (Exception exception) { observerFailures.Add(exception); }
+                    try { await observation.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false); }
+                    catch (Exception exception) { observerFailures.Add(exception); }
+                    bool observationCompleted = observation.IsCompleted;
+                    bool cancellationCompleted = cancellation.IsCompleted;
+                    if (observationCompleted)
+                    {
+                        try { await observation.ConfigureAwait(false); }
+                        catch (Exception exception)
+                        {
+                            if (!observerFailures.Any(failure => ReferenceEquals(failure, exception)))
+                                observerFailures.Add(exception);
+                        }
+                    }
+                    if (cancellationCompleted)
+                    {
+                        try { await cancellation.ConfigureAwait(false); }
+                        catch (Exception exception)
+                        {
+                            if (!observerFailures.Any(failure => ReferenceEquals(failure, exception)))
+                                observerFailures.Add(exception);
+                        }
+                    }
+                    observerSettled = observationCompleted && cancellationCompleted;
                 }
             }
         }
         return new OwnedNativeProcessResult(started && process.HasExited ? process.ExitCode : -1,
-            timedOut, cancelled, residual, output.Exceeded || error.Exceeded, cleanup && !invocationFailed, output.Bytes, error.Bytes);
+            timedOut, cancelled, residual, output.Exceeded || error.Exceeded, cleanup && !invocationFailed, output.Bytes, error.Bytes)
+        {
+            ObserverSettled = observerSettled,
+            ObserverFailures = observerFailures.AsReadOnly()
+        };
     }
 
     private static async Task<NativeOutputCapture> CaptureNativeOutputAsync(Stream stream, int maximum,
@@ -1240,13 +1379,16 @@ public static partial class SecurityExecutionEvidence
 
     private sealed record NativeProcessIdentity(int Group, int Session, ulong Start, char State);
     private sealed record NativeOutputCapture(byte[] Bytes, bool Complete, bool Exceeded);
+    internal sealed record OwnedNativeProcessContext(int Pid, int Group, int Session, ulong Start);
 
     internal sealed record OwnedNativeProcessResult(int ExitCode, bool TimedOut, bool Cancelled,
         bool ResidualOwnedChildren, bool OutputLimitExceeded, bool CleanupSucceeded,
         byte[] StandardOutput, byte[] StandardError)
     {
+        internal bool ObserverSettled { get; init; } = true;
+        internal IReadOnlyList<Exception> ObserverFailures { get; init; } = [];
         internal bool Succeeded => ExitCode == 0 && !TimedOut && !Cancelled && !ResidualOwnedChildren &&
-            !OutputLimitExceeded && CleanupSucceeded;
+            !OutputLimitExceeded && CleanupSucceeded && ObserverSettled && ObserverFailures.Count == 0;
     }
 
     internal static ProcessStartInfo NativeTestStartInfo(string assemblyPath, IReadOnlyList<string> selectedUids,

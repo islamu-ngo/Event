@@ -183,15 +183,19 @@ public sealed class SecurityExecutionEvidenceTests
     }
 
     [Test]
-    public async Task OwnedProfilesCannotBeAdmittedByAnExplicitTwoLaneRegistration()
+    public async Task IncompleteTwoLaneRegistrationCannotAdmitASevenProfilePacket()
     {
         using var fixture = new EvidenceFixture(owned: true);
+        await Assert.That(SecurityControlRegister.TryValidate(fixture.RegisterPath!, out _)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, fixture.CandidateOid,
+            fixture.RegisterPath!, out _, out _)).IsTrue();
         JsonObject register = JsonNode.Parse(File.ReadAllBytes(fixture.RegisterPath!))!.AsObject();
         JsonArray requirements = register["executionRequirements"]!.AsArray();
+        await Assert.That(requirements.Count).IsEqualTo(7);
         while (requirements.Count > 2) requirements.RemoveAt(requirements.Count - 1);
         File.WriteAllText(fixture.RegisterPath!, register.ToJsonString());
-        await Assert.That(SecurityControlRegister.TryValidate(fixture.RegisterPath!, out _)).IsTrue();
-        await Assert.That(SecurityControlRegister.ReadExecutionRequirements(fixture.RegisterPath!).Count).IsEqualTo(2);
+        await Assert.That(requirements.Count).IsEqualTo(2);
+        await Assert.That(SecurityControlRegister.TryValidate(fixture.RegisterPath!, out _)).IsFalse();
         await Assert.That(SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, fixture.CandidateOid,
             fixture.RegisterPath!, out _, out _)).IsFalse();
     }

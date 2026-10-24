@@ -286,6 +286,7 @@ public static partial class SecurityExecutionEvidence
     {
         owner = child.Owner, child.Process.ExitCode, child.Process.TimedOut, child.Process.Cancelled,
         child.Process.ResidualOwnedChildren, child.Process.OutputLimitExceeded, child.Process.CleanupSucceeded,
+        child.Process.ObserverSettled, observerFailureCount = child.Process.ObserverFailures.Count,
         child.ResourcesAdmitted, child.TemporaryRemoved,
         reportCaptured = child.Report.Length != 0, reportBytes = child.Report.Length,
         stdoutSha256 = DigestBytes(child.Process.StandardOutput), stderrSha256 = DigestBytes(child.Process.StandardError),

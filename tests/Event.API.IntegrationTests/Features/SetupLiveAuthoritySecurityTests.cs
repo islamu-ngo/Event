@@ -509,7 +509,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         using HttpRequestMessage readiness = ReadinessRequest(enrollment);
         using HttpResponseMessage readinessResponse = await fixture.Client.SendAsync(readiness);
         string readinessBody = await readinessResponse.Content.ReadAsStringAsync();
-        await Assert.That(readinessResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(readinessResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.Capture.FailureMetadata);
         await Assert.That(readinessBody).DoesNotContain(canary);
         await Assert.That(readinessBody).DoesNotContain("provider", StringComparison.OrdinalIgnoreCase);
         await Assert.That(readinessBody).DoesNotContain("environment", StringComparison.OrdinalIgnoreCase);
@@ -545,7 +546,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
 
         using HttpRequestMessage readiness = ReadinessRequest(enrollment);
         using HttpResponseMessage response = await fixture.Client.SendAsync(readiness);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.Capture.FailureMetadata);
         using JsonDocument document = JsonDocument.Parse(
             await response.Content.ReadAsStringAsync());
         JsonElement[] items = document.RootElement.GetProperty("_embedded")
@@ -572,7 +574,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         using HttpRequestMessage deniedReadiness = ReadinessRequest(enrollment);
         using HttpResponseMessage deniedResponse =
             await fixture.Client.SendAsync(deniedReadiness);
-        await Assert.That(deniedResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(deniedResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.Capture.FailureMetadata);
         using JsonDocument deniedDocument = JsonDocument.Parse(
             await deniedResponse.Content.ReadAsStringAsync());
         foreach (JsonElement item in deniedDocument.RootElement.GetProperty("_embedded")
@@ -601,7 +604,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         using HttpRequestMessage request = ReadinessRequest(enrollment);
         using HttpResponseMessage response = await fixture.Client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(fixture.Capture.FailureMetadata);
         using JsonDocument document = JsonDocument.Parse(
             await response.Content.ReadAsStringAsync());
         JsonElement signing = document.RootElement.GetProperty("_embedded")
@@ -842,7 +846,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         using HttpResponseMessage response = await fixture.Client.SendAsync(write);
         string body = await response.Content.ReadAsStringAsync();
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted)
+            .Because(fixture.Capture.FailureMetadata);
         OperationReceipt receipt = await AssertOperationReceipt(
             response,
             enrollment,
@@ -965,7 +970,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
             enrollment, "setup.encryption", secret, operationKey);
         using HttpResponseMessage response = await fixture.Client.SendAsync(write);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted)
+            .Because(fixture.Capture.FailureMetadata);
         OperationReceipt receipt = await AssertOperationReceipt(
             response,
             enrollment,
@@ -1588,7 +1594,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         return await ReadUnavailableProblem(response);
     }
 
-    private static async Task<ProblemTuple> ReadUnavailableProblem(
+    private async Task<ProblemTuple> ReadUnavailableProblem(
         HttpResponseMessage response)
     {
         await AssertUnavailableProblem(response);
@@ -1606,9 +1612,10 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
             response.Headers.CacheControl?.NoStore == true);
     }
 
-    private static async Task AssertUnavailableProblem(HttpResponseMessage response)
+    private async Task AssertUnavailableProblem(HttpResponseMessage response)
     {
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound)
+            .Because(fixture.Capture.FailureMetadata);
         await Assert.That(response.Content.Headers.ContentType?.MediaType)
             .IsEqualTo("application/problem+json");
         await Assert.That(response.Headers.CacheControl?.Private).IsTrue();

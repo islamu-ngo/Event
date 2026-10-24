@@ -231,7 +231,7 @@ public class SafeModeLatchTests : IAsyncDisposable
     private static string CreateTenantJson()
     {
         var suffix = Guid.NewGuid().ToString("N");
-        return $"{{\"fullName\":\"Security Test Tenant {suffix}\",\"slug\":\"security-test-tenant-{suffix}\",\"isActive\":true}}";
+        return $"{{\"fullName\":\"Security Test Tenant {suffix}\",\"slug\":\"security-test-tenant-{suffix}\",\"isActive\":false}}";
     }
 
     private static HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string url, string token, string? jsonBody = null)

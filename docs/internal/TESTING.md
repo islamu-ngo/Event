@@ -972,6 +972,25 @@ Per Test: ResetAsync (Respawn) → Seed scenario data → Execute test
 
 Respawn resets ALL tables except `__EFMigrationsHistory` and 27 lookup tables.
 
+The bare `RecipientDeliveryMigrationContainerFixture` leaves migrations and
+scenario setup to its caller. Its ordinary default remains PostgreSQL 18. The
+existing test selector `EVENT_PERSISTENCE_TEST_POSTGRES_PROFILE=PostgreSql16`
+chooses the fixture's checked-in PostgreSQL 16.14 image digest; arbitrary image
+selection is not supported. The PostgreSQL 16 profile requires the existing
+validated Linux assurance ownership context. Before constructing a container,
+the fixture durably records its intended name and labels, then uses the validated endpoint
+and cached image without pulling. Instrumented PostgreSQL 18 follows the same
+protocol; an ordinary PostgreSQL 18 run with both ownership inputs absent keeps
+its existing behavior without ownership records.
+Disposal joins active initialization and attempts stop and disposal independently;
+a stage record alone proves neither successful creation nor complete cleanup.
+
+The declared-capability guard control has passed on actual PostgreSQL 16 and 18
+in the integrated candidate. It proves an ordinary callable baseline before
+checking an unavailable capability on PostgreSQL 16 or a retained grant option
+on PostgreSQL 18. The complete public migration/idempotency case on PostgreSQL 16
+and three unexpected-MAINTAIN denial controls remain separate, pending verification.
+
 ### Testcontainers Benchmarks Versus Tests
 
 `Event.Benchmarks` has a PostgreSQL/Testcontainers API benchmark lane that intentionally borrows the integration-test infrastructure shape without becoming a test project:

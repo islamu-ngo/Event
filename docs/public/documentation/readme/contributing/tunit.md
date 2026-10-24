@@ -153,6 +153,14 @@ missing observations or cleanup failures reject admission. These are bounded
 snapshots, not authenticated creation or continuous daemon-lifecycle proof.
 Ordinary tests without ownership context keep their existing fixture behavior.
 
+The bare migration fixture keeps PostgreSQL 18 as its ordinary default and offers
+one fixed, pinned PostgreSQL 16 prerequisite profile. That profile requires the
+parent-prepared ownership context; instrumented PostgreSQL 18 uses the same
+private creation-intent protocol and cached-image requirement. Ordinary
+PostgreSQL 18 without ownership inputs remains available. A passing native
+capability control proves only its baseline and refusal checks: full public migration, retry safety and
+the remaining unexpected-permission controls require their own results.
+
 Release tooling structurally validates the supplied packet and retained artifact
 digests under the existing trusted operator boundary. A workflow name, run ID or
 URL does not authenticate its CI origin. Maintainers separately check required

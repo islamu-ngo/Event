@@ -661,6 +661,15 @@ administration. Failed business results roll back local work; uncertain rollback
 is reported as conflict. Remote provider workflows and final runtime controls
 remain unfinished.
 
+On PostgreSQL, `human_event_provider_source_drift` can indicate that a provider
+source column does not match its declared schema or comparison semantics.
+Publication mapping hashes deliberately use ordinal (`C`) collation; the source
+guard now recognizes that declaration without accepting unexpected collations
+on ordinary columns. It still rejects mismatches rather than repairing them.
+Do not bypass the check or alter columns just to silence it. This correction
+adds no setting, permission or migration; native runtime acceptance still
+depends on the provider verification gates.
+
 Webhook endpoint archive, pause and resume now use prepared current requester
 authority in the state/audit transaction. Already-archived requests are checked
 too, and failed results roll back. Other webhook administration and portal token

@@ -1062,6 +1062,20 @@ principal rather than the mutable Draft key. Native save guards reject orphan
 publication insertion, evidence replacement/deletion and partial or mismatched
 attempt provenance. These guards are not a claim of direct-SQL append-only enforcement.
 
+The PostgreSQL human Event-provider source guard also checks each mapped
+column's comparison semantics. Publication mapping hashes are marked
+`UsePortableOrdinalAscii`, whose PostgreSQL representation is `C` collation in
+both the model and the generated publication migration. The guard now requires
+that exact collation for marked properties; unmarked properties retain the
+existing non-collatable/default rule. It does not accept `C` for arbitrary source
+columns. Type, nullability, table ownership, native privileges, routine, epoch,
+RLS and trigger checks are unchanged. A mismatched collation still rejects
+runtime observation and installation with `human_event_provider_source_drift`;
+installation does not repair it. No model, migration, permission or configuration
+setting changes. Two native regression variants exercise opposite collation
+drifts with healthy observations before mutation and after restoration; they
+remain locally unbuilt and unrun pending remote provider verification.
+
 Two Domain and nineteen native persistence cases are authored UNRUN/unbuilt.
 Both insertion-order cases now include an exact provider attempt in the same
 save as publication, and malformed half-null attempt coordinates are rejected.

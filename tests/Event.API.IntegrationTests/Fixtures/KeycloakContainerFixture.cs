@@ -90,7 +90,8 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
             });
         }
 
-        _container = new ContainerBuilder()
+        var builder = await SecurityInfrastructureFixture.WithAssuranceOwnershipAsync(new ContainerBuilder(), "keycloak");
+        _container = builder
             .WithImage(KeycloakImage)
             .WithPortBinding(8080, true)
             .WithResourceMapping(JsonSerializer.SerializeToUtf8Bytes(realm),

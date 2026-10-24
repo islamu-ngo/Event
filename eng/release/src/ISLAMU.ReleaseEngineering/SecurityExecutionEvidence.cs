@@ -18,13 +18,7 @@ public static partial class SecurityExecutionEvidence
         out string? packetSha256, out string diagnostic) =>
         Validate(directory, candidateOid, registerPath, out packetSha256, out diagnostic);
 
-    internal static string Command(string id, SecurityControlRegister.ExecutionRequirement requirement) =>
-        "dotnet test --project " + requirement.Project +
-        " --configuration Release --no-build --verbosity minimal -- --treenode-filter \"" + requirement.Selector +
-        "\" --minimum-expected-tests " + (id.StartsWith("owned-", StringComparison.Ordinal)
-            ? requirement.Tests.Count.ToString(CultureInfo.InvariantCulture) : "1") +
-        (id == "cerbos-policy-contract" ? string.Empty : " --maximum-parallel-tests 1") +
-        " --no-progress --report-trx --report-trx-filename " + requirement.ReportFileName;
+    internal const string ExecutionCommandName = "execute-security-execution";
 
     public static bool TryValidate(
         string directory,
@@ -54,6 +48,13 @@ public static partial class SecurityExecutionEvidence
             if (!UniqueProperties(packet))
             {
                 diagnostic = "duplicate_json_properties";
+                return false;
+            }
+
+            if (!ExactFields(packet, "schemaVersion", "candidateOid", "workflowPath", "runId", "runAttempt",
+                    "eventName", "selection", "lanes"))
+            {
+                diagnostic = "invalid_packet_fields";
                 return false;
             }
 
@@ -87,10 +88,15 @@ public static partial class SecurityExecutionEvidence
             var laneIds = new HashSet<string>(StringComparer.Ordinal);
             var artifactPaths = new HashSet<string>(StringComparer.Ordinal);
             var reportDigests = new HashSet<string>(StringComparer.Ordinal);
-            var reportIds = new HashSet<Guid>();
-            var executionIds = new HashSet<Guid>();
+            var invocationRecordDigests = new HashSet<string>(StringComparer.Ordinal);
             foreach (JsonElement lane in lanes.EnumerateArray())
             {
+                if (!ExactFields(lane, "id", "project", "selector", "command", "runId", "runAttempt",
+                        "outcome", "exitCode", "counts", "executionContext", "artifacts"))
+                {
+                    diagnostic = "invalid_lane_fields";
+                    return false;
+                }
                 string id = Text(lane, "id");
                 if (!laneIds.Add(id))
                 {
@@ -101,7 +107,7 @@ public static partial class SecurityExecutionEvidence
                 if (!requirements.TryGetValue(id, out var requirement) ||
                     Text(lane, "project") != requirement.Project ||
                     Text(lane, "selector") != requirement.Selector ||
-                    Text(lane, "command") != Command(id, requirement) ||
+                    Text(lane, "command") != ExecutionCommandName ||
                     Text(lane, "runId") != runId ||
                     lane.GetProperty("runAttempt").GetInt32() != runAttempt)
                 {
@@ -109,7 +115,13 @@ public static partial class SecurityExecutionEvidence
                     return false;
                 }
 
-                ExecutionCounts counts = JsonCounts(lane.GetProperty("counts"));
+                JsonElement countFields = lane.GetProperty("counts");
+                if (!ExactFields(countFields, "selected", "executed", "passed", "failed", "skipped"))
+                {
+                    diagnostic = "invalid_execution_counts";
+                    return false;
+                }
+                ExecutionCounts counts = JsonCounts(countFields);
                 if (Text(lane, "outcome") != "passed" || lane.GetProperty("exitCode").GetInt32() != 0 ||
                     counts.Selected < 1 || counts.Selected != counts.Executed ||
                     counts.Executed != counts.Passed || counts.Failed != 0 || counts.Skipped != 0)
@@ -119,19 +131,25 @@ public static partial class SecurityExecutionEvidence
                 }
 
                 JsonElement context = lane.GetProperty("executionContext");
-                if (Text(context, "kind") != "test-host" || Text(context, "environment") != requirement.Environment ||
+                if (!ExactFields(context, "kind", "environment", "hostProfile", "databaseProvider", "databaseRole",
+                        "authenticationScheme", "authenticationAuthority") ||
+                    Text(context, "kind") != "test-host" || Text(context, "environment") != requirement.Environment ||
                     Text(context, "hostProfile") != requirement.HostProfile ||
                     Text(context, "databaseProvider") != "not-attested" ||
                     Text(context, "databaseRole") != "not-attested" ||
-                    Text(context, "authenticationScheme") != "not-attested")
+                    Text(context, "authenticationScheme") != "not-attested" ||
+                    Text(context, "authenticationAuthority") != "not-attested")
                 {
                     diagnostic = "invalid_execution_context";
                     return false;
                 }
 
-                int reports = 0;
+                var proofs = new List<byte[]>();
+                int measuredCount = 0;
                 JsonElement artifacts = lane.GetProperty("artifacts");
-                if (artifacts.GetArrayLength() is < 1 or > 8)
+                int expectedInvocations = id is "owned-load-control" or "owned-load-correctness"
+                    ? requirement.Tests.Count : 1;
+                if (artifacts.GetArrayLength() != expectedInvocations)
                 {
                     diagnostic = "artifact_inventory_invalid";
                     return false;
@@ -139,12 +157,22 @@ public static partial class SecurityExecutionEvidence
 
                 foreach (JsonElement artifact in artifacts.EnumerateArray())
                 {
+                    if (!ExactFields(artifact, "kind", "path", "sha256", "invocation", "privateInvocationSha256"))
+                    {
+                        diagnostic = "invalid_artifact_fields";
+                        return false;
+                    }
                     string kind = Text(artifact, "kind");
                     string relativePath = Text(artifact, "path");
                     string expectedDigest = Text(artifact, "sha256");
-                    if (kind is not ("trx" or "log") || !artifactPaths.Add(relativePath) ||
-                        (kind == "trx" && !reportDigests.Add(expectedDigest)) ||
-                        expectedDigest.Length != 64 || !LowerHex(expectedDigest))
+                    string invocationRecordDigest = Text(artifact, "privateInvocationSha256");
+                    int invocation = artifact.GetProperty("invocation").GetInt32();
+                    string expectedPath = "proofs/" + id + "/" + proofs.Count.ToString(CultureInfo.InvariantCulture) + ".json";
+                    if (kind != "native-proof" || invocation != proofs.Count || relativePath != expectedPath ||
+                        !artifactPaths.Add(relativePath) ||
+                        expectedDigest.Length != 64 || !LowerHex(expectedDigest) ||
+                        invocationRecordDigest.Length != 64 || !LowerHex(invocationRecordDigest) ||
+                        !invocationRecordDigests.Add(invocationRecordDigest))
                     {
                         diagnostic = "artifact_inventory_invalid";
                         return false;
@@ -158,34 +186,22 @@ public static partial class SecurityExecutionEvidence
                         return false;
                     }
 
-                    if (kind == "trx")
+                    using (JsonDocument proofDocument = JsonDocument.Parse(bytes, DocumentOptions))
                     {
-                        reports++;
-                        if (!TryReadReport(bytes, out ExecutionReport measured) || measured.Counts != counts)
+                        JsonElement proof = proofDocument.RootElement;
+                        if (!reportDigests.Add(Text(proof, "privateTrxSha256")))
                         {
-                            diagnostic = "report_counts_mismatch";
+                            diagnostic = "replayed_private_report";
                             return false;
                         }
-                        if (!reportIds.Add(measured.RunId) || executionIds.Overlaps(measured.Executions))
-                        {
-                            diagnostic = "replayed_report_execution";
-                            return false;
-                        }
-                        executionIds.UnionWith(measured.Executions);
-                        bool namedTestsMatch = id.StartsWith("owned-", StringComparison.Ordinal)
-                            ? requirement.Tests.SetEquals(measured.Tests)
-                            : requirement.Tests.IsSubsetOf(measured.Tests);
-                        if (!namedTestsMatch)
-                        {
-                            diagnostic = "required_test_missing";
-                            return false;
-                        }
+                        measuredCount = checked(measuredCount + JsonCounts(proof.GetProperty("counts")).Selected);
                     }
+                    proofs.Add(bytes);
                 }
 
-                if (reports != 1)
+                if (!TryValidateNativeLaneProofs(proofs, id, registerPath, out _) || measuredCount != counts.Selected)
                 {
-                    diagnostic = "report_inventory_invalid";
+                    diagnostic = "native_proof_inventory_invalid";
                     return false;
                 }
             }
@@ -201,7 +217,7 @@ public static partial class SecurityExecutionEvidence
             return true;
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or
-            JsonException or XmlException or InvalidOperationException or KeyNotFoundException or ArgumentException or FormatException)
+            JsonException or XmlException or InvalidOperationException or KeyNotFoundException or ArgumentException or FormatException or OverflowException)
         {
             diagnostic = "invalid_packet";
             return false;

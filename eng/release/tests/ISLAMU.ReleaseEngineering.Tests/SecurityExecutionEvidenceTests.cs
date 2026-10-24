@@ -1,9 +1,153 @@
 using System.Security.Cryptography;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
+
+public sealed class SecurityExecutionEvidenceInputBindingTests
+{
+    [Test]
+    [Arguments("valid")]
+    [Arguments("missing")]
+    [Arguments("short")]
+    [Arguments("uppercase")]
+    [Arguments("duplicate")]
+    public async Task EveryNativeProofRequiresItsDistinctWholeOwnedInvocationDigest(string variant)
+    {
+        string root = Directory.CreateTempSubdirectory("synthetic-invocation-binding-").FullName;
+        try
+        {
+            string candidate = new('a', 40);
+            SecurityExecutionEvidenceFixture.Write(root, candidate);
+            string packetPath = Path.Combine(root, SecurityExecutionEvidence.PacketFileName);
+            JsonObject packet = JsonNode.Parse(File.ReadAllBytes(packetPath))!.AsObject();
+            var artifacts = packet["lanes"]!.AsArray().SelectMany(lane => lane!["artifacts"]!.AsArray())
+                .Select(artifact => artifact!.AsObject()).ToArray();
+            string privateDirectory = Path.Combine(root, "private-synthetic-invocations");
+            Directory.CreateDirectory(privateDirectory);
+            for (int ordinal = 0; ordinal < artifacts.Length; ordinal++)
+            {
+                byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new { synthetic = true, candidateOid = candidate, ordinal });
+                File.WriteAllBytes(Path.Combine(privateDirectory, ordinal + ".json"), bytes);
+                artifacts[ordinal]["privateInvocationSha256"] = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+            }
+            File.WriteAllText(packetPath, packet.ToJsonString());
+            await Assert.That(SecurityExecutionEvidence.TryValidate(root, candidate, out _, out _)).IsTrue();
+            if (variant == "valid") return;
+
+            switch (variant)
+            {
+                case "missing": artifacts[0].Remove("privateInvocationSha256"); break;
+                case "short": artifacts[0]["privateInvocationSha256"] = new string('a', 63); break;
+                case "uppercase": artifacts[0]["privateInvocationSha256"] = new string('A', 64); break;
+                case "duplicate":
+                    artifacts[1]["privateInvocationSha256"] = artifacts[0]["privateInvocationSha256"]!.GetValue<string>();
+                    break;
+            }
+            File.WriteAllText(packetPath, packet.ToJsonString());
+            await Assert.That(SecurityExecutionEvidence.TryValidate(root, candidate, out _, out _)).IsFalse();
+        }
+        finally { Directory.Delete(root, true); }
+    }
+}
+
+public sealed class SecurityExecutionEvidencePrivacyBoundaryTests
+{
+    [Test]
+    [Arguments("raw-trx")]
+    [Arguments("packet-uid")]
+    [Arguments("lane-display")]
+    [Arguments("context-authority")]
+    [Arguments("artifact-uid")]
+    public async Task DataBearingPublicFieldsAndRawReportsCannotBecomeSafeEvidence(string variant)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "native-public-evidence-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string candidate = new('a', 40);
+            SecurityExecutionEvidenceFixture.Write(root, candidate);
+            await Assert.That(SecurityExecutionEvidence.TryValidate(root, candidate, out _, out _)).IsTrue();
+            string packetPath = Path.Combine(root, SecurityExecutionEvidence.PacketFileName);
+            JsonObject packet = JsonNode.Parse(File.ReadAllBytes(packetPath))!.AsObject();
+            JsonObject lane = packet["lanes"]![0]!.AsObject();
+            string canary = "private-native-identity-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+            switch (variant)
+            {
+                case "packet-uid": packet["uid"] = canary; break;
+                case "lane-display": lane["displayName"] = canary; break;
+                case "context-authority": lane["executionContext"]!["authenticationAuthority"] = canary; break;
+                case "artifact-uid": lane["artifacts"]![0]!["nativeUid"] = canary; break;
+                case "raw-trx":
+                    XNamespace ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
+                    XDocument raw = XDocument.Load(Path.Combine(root, "security-execution-reports",
+                        lane["id"]!.GetValue<string>() + ".trx"));
+                    XElement result = new(raw.Descendants(ns + "UnitTestResult").First());
+                    XElement definition = new(raw.Descendants(ns + "UnitTest").First());
+                    string testId = Guid.NewGuid().ToString("D");
+                    string executionId = Guid.NewGuid().ToString("D");
+                    result.SetAttributeValue("testId", testId);
+                    result.SetAttributeValue("executionId", executionId);
+                    result.SetAttributeValue("testName", canary);
+                    definition.SetAttributeValue("id", testId);
+                    definition.SetAttributeValue("name", canary);
+                    definition.Element(ns + "Execution")!.SetAttributeValue("id", executionId);
+                    definition.Element(ns + "TestMethod")!.SetAttributeValue("className", canary + ".Class");
+                    definition.Element(ns + "TestMethod")!.SetAttributeValue("name", canary + "Method");
+                    raw.Root!.Element(ns + "Results")!.Add(result);
+                    raw.Root.Element(ns + "TestDefinitions")!.Add(definition);
+                    int selected = lane["counts"]!["selected"]!.GetValue<int>() + 1;
+                    foreach (string count in new[] { "selected", "executed", "passed" }) lane["counts"]![count] = selected;
+                    foreach (string count in new[] { "total", "executed", "passed" })
+                        raw.Descendants(ns + "Counters").Single().SetAttributeValue(count, selected);
+                    JsonNode artifact = lane["artifacts"]![0]!;
+                    string relative = artifact["path"]!.GetValue<string>();
+                    raw.Save(Path.Combine(root, relative));
+                    artifact["kind"] = "trx";
+                    artifact["sha256"] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(root, relative)))).ToLowerInvariant();
+                    break;
+            }
+            File.WriteAllText(packetPath, packet.ToJsonString());
+            bool accepted = SecurityExecutionEvidence.TryValidate(root, candidate, out _, out string diagnostic);
+            await Assert.That(accepted).IsFalse();
+            await Assert.That(diagnostic.Contains(canary, StringComparison.Ordinal)).IsFalse();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceOwnedCommandTests
+{
+    [Test]
+    public async Task PublicCommandIdentifiesTheOwnerAndRejectsTheHistoricalUnownedCommand()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "owned-command-" + Guid.NewGuid().ToString("N"));
+        string candidate = new('a', 40);
+        try
+        {
+            SecurityExecutionEvidenceFixture.Write(root, candidate);
+            await Assert.That(SecurityExecutionEvidence.TryValidate(root, candidate, out _, out _)).IsTrue();
+            string path = Path.Combine(root, SecurityExecutionEvidence.PacketFileName);
+            JsonObject packet = JsonNode.Parse(File.ReadAllBytes(path))!.AsObject();
+            JsonNode lane = packet["lanes"]!.AsArray().Single(item =>
+                item!["id"]!.GetValue<string>() == "security-integration")!;
+            await Assert.That(lane["command"]!.GetValue<string>()).IsEqualTo("execute-security-execution");
+            lane["command"] = "dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj" +
+                " --configuration Release --no-build --verbosity minimal -- --treenode-filter \"/*/*/*/*[Category=Security]\"" +
+                " --minimum-expected-tests 1 --maximum-parallel-tests 1 --no-progress --report-trx" +
+                " --report-trx-filename security-integration-tests.trx";
+            File.WriteAllText(path, packet.ToJsonString());
+            await Assert.That(SecurityExecutionEvidence.TryValidate(root, candidate, out _, out string diagnostic)).IsFalse();
+            await Assert.That(diagnostic).IsEqualTo("lane_identity_mismatch");
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+}
 
 public sealed class SecurityExecutionEvidenceTests
 {
@@ -19,19 +163,22 @@ public sealed class SecurityExecutionEvidenceTests
     }
 
     [Test]
-    public async Task ProducerAndValidatorUseTheSameValidatedOwnedRegistration()
+    public async Task PrivateAndPublicParsersUseTheSameValidatedOwnedRegistration()
     {
         using var fixture = new EvidenceFixture(owned: true);
-        string repository = fixture.ReportRepository();
-        string destination = Path.Combine(repository, "artifacts", "security-tests");
-        using var output = new StringWriter();
-        int code = SecurityExecutionEvidence.Run(
-            ["produce-security-execution", destination, fixture.CandidateOid, "42", "1", "push"],
-            output, repository, fixture.RegisterPath!);
-        await Assert.That(code).IsEqualTo(Program.Success);
-        await Assert.That(SecurityExecutionEvidence.TryValidate(destination, fixture.CandidateOid,
+        await Assert.That(fixture.TryPrivateAdmission(out string diagnostic, out var proofs)).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+        foreach ((string id, var invocations) in proofs!)
+        {
+            for (int invocation = 0; invocation < invocations.Count; invocation++)
+            {
+                byte[] retained = File.ReadAllBytes(Path.Combine(fixture.DirectoryPath, "proofs", id, invocation + ".json"));
+                await Assert.That(retained.SequenceEqual(invocations[invocation])).IsTrue();
+            }
+        }
+        await Assert.That(SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, fixture.CandidateOid,
             fixture.RegisterPath!, out _, out _)).IsTrue();
-        var packet = JsonNode.Parse(File.ReadAllBytes(Path.Combine(destination, SecurityExecutionEvidence.PacketFileName)))!;
+        var packet = fixture.Packet();
         await Assert.That(packet["lanes"]!.AsArray().Count).IsEqualTo(7);
     }
 
@@ -100,7 +247,7 @@ public sealed class SecurityExecutionEvidenceTests
             default:
                 XNamespace ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
                 JsonNode artifact = lane["artifacts"]![0]!;
-                string reportPath = Path.Combine(fixture.DirectoryPath, artifact["path"]!.GetValue<string>());
+                string reportPath = Path.Combine(fixture.DirectoryPath, "security-execution-reports", "owned-runtime.trx");
                 XDocument report = XDocument.Load(reportPath);
                 var results = report.Root!.Element(ns + "Results")!.Elements().ToArray();
                 var definitions = report.Root!.Element(ns + "TestDefinitions")!.Elements().ToArray();
@@ -142,8 +289,13 @@ public sealed class SecurityExecutionEvidenceTests
         }
 
         await File.WriteAllTextAsync(fixture.PacketPath, packet.ToJsonString());
-        await Assert.That(SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, candidate,
-            fixture.RegisterPath!, out string? digest, out string diagnostic)).IsFalse();
+        bool privateFailure = failure is "missing-named-variant" or "renamed-variant" or "reused-named-variant" or
+            "unregistered-passing-variant";
+        string? digest = null;
+        string diagnostic;
+        bool accepted = privateFailure ? fixture.TryPrivateAdmission(out diagnostic) :
+            SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, candidate, fixture.RegisterPath!, out digest, out diagnostic);
+        await Assert.That(accepted).IsFalse();
         await Assert.That(digest).IsNull();
         await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
     }
@@ -164,7 +316,7 @@ public sealed class SecurityExecutionEvidenceTests
     }
 
     [Test]
-    public async Task ProducerRetainsMeasuredReportsThatAdmissionCanRead()
+    public async Task LegacyReportHarvestingCannotMintAnAdmissiblePacket()
     {
         using var fixture = new EvidenceFixture();
         string repository = fixture.ReportRepository();
@@ -178,9 +330,9 @@ public sealed class SecurityExecutionEvidenceTests
         bool accepted = SecurityExecutionEvidence.TryValidate(outputDirectory, fixture.CandidateOid,
             out string? digest, out _);
 
-        await Assert.That(exitCode).IsEqualTo(Program.Success);
-        await Assert.That(accepted).IsTrue();
-        await Assert.That(digest).IsNotNull();
+        await Assert.That(exitCode).IsNotEqualTo(Program.Success);
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(digest).IsNull();
     }
 
     [Test]
@@ -266,8 +418,13 @@ public sealed class SecurityExecutionEvidenceTests
         JsonObject counts = lane["counts"]?.AsObject() ?? throw new InvalidDataException();
         JsonArray artifacts = lane["artifacts"]?.AsArray() ?? throw new InvalidDataException();
         JsonObject artifact = artifacts[0]?.AsObject() ?? throw new InvalidDataException();
-        string reportPath = Path.Combine(fixture.DirectoryPath,
-            artifact["path"]?.GetValue<string>() ?? throw new InvalidDataException());
+        bool privateFailure = failure is "external-entity" or "replayed-report-identities" or "replayed-execution-identities" or
+            "missing-test-id" or "missing-test-name" or "duplicate-test-id" or "missing-definition" or "renamed-required-method" or
+            "wrong-required-class" or "unrelated-passing-test" or "definition-execution-mismatch" or "duplicate-named-result" or
+            "duplicate-summary" or "duplicate-counters";
+        string reportPath = privateFailure ?
+            Path.Combine(fixture.DirectoryPath, "security-execution-reports", lane["id"]!.GetValue<string>() + ".trx") :
+            Path.Combine(fixture.DirectoryPath, artifact["path"]?.GetValue<string>() ?? throw new InvalidDataException());
 
         switch (failure)
         {
@@ -343,7 +500,8 @@ public sealed class SecurityExecutionEvidenceTests
                 XNamespace replayNamespace = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
                 XDocument union = XDocument.Load(reportPath);
                 JsonObject otherArtifact = lanes[1]!["artifacts"]![0]!.AsObject();
-                string otherReport = Path.Combine(fixture.DirectoryPath, otherArtifact["path"]!.GetValue<string>());
+                string otherReport = Path.Combine(fixture.DirectoryPath, "security-execution-reports",
+                    lanes[1]!["id"]!.GetValue<string>() + ".trx");
                 XDocument other = XDocument.Load(otherReport);
                 foreach (string container in new[] { "Results", "TestDefinitions" })
                     union.Root!.Element(replayNamespace + container)!.Add(other.Root!.Element(replayNamespace + container)!.Elements());
@@ -356,9 +514,33 @@ public sealed class SecurityExecutionEvidenceTests
                     currentLane["counts"]!["passed"] = 3;
                 }
                 union.Save(reportPath);
-                union.Root!.Add(new XComment("Different bytes do not create a new execution."));
-                if (failure == "replayed-execution-identities") union.Root.SetAttributeValue("id", Guid.NewGuid());
-                union.Save(otherReport);
+                var independent = new XDocument(union);
+                independent.Root!.SetAttributeValue("id", Guid.NewGuid());
+                foreach (XElement currentResult in independent.Descendants(replayNamespace + "UnitTestResult"))
+                {
+                    string execution = Guid.NewGuid().ToString("D");
+                    currentResult.SetAttributeValue("executionId", execution);
+                    independent.Descendants(replayNamespace + "UnitTest").Single(definition =>
+                        (string?)definition.Attribute("id") == (string?)currentResult.Attribute("testId"))
+                        .Element(replayNamespace + "Execution")!.SetAttributeValue("id", execution);
+                }
+                independent.Save(otherReport);
+                fixture.SetPrivateDiscovery(lane["id"]!.GetValue<string>(), union);
+                fixture.SetPrivateDiscovery(lanes[1]!["id"]!.GetValue<string>(), independent);
+                await Assert.That(fixture.TryPrivateAdmission(out _)).IsTrue();
+                if (failure == "replayed-report-identities")
+                    independent.Root!.SetAttributeValue("id", union.Root!.Attribute("id")!.Value);
+                else
+                {
+                    string reused = union.Descendants(replayNamespace + "UnitTestResult").First().Attribute("executionId")!.Value;
+                    XElement first = independent.Descendants(replayNamespace + "UnitTestResult").First();
+                    first.SetAttributeValue("executionId", reused);
+                    independent.Descendants(replayNamespace + "UnitTest").Single(definition =>
+                        (string?)definition.Attribute("id") == (string?)first.Attribute("testId"))
+                        .Element(replayNamespace + "Execution")!.SetAttributeValue("id", reused);
+                }
+                independent.Root!.Add(new XComment("Different bytes do not create a new execution."));
+                independent.Save(otherReport);
                 artifact["sha256"] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(reportPath))).ToLowerInvariant();
                 otherArtifact["sha256"] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(otherReport))).ToLowerInvariant();
                 break;
@@ -439,8 +621,10 @@ public sealed class SecurityExecutionEvidenceTests
             File.WriteAllText(fixture.PacketPath, packet.ToJsonString());
         }
 
-        bool accepted = SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, fixture.CandidateOid,
-            out string? digest, out string diagnostic);
+        string? digest = null;
+        string diagnostic;
+        bool accepted = privateFailure ? fixture.TryPrivateAdmission(out diagnostic) :
+            SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, fixture.CandidateOid, out digest, out diagnostic);
 
         await Assert.That(accepted).IsFalse();
         await Assert.That(digest).IsNull();
@@ -472,6 +656,52 @@ public sealed class SecurityExecutionEvidenceTests
 
         internal JsonObject Packet() =>
             JsonNode.Parse(File.ReadAllBytes(PacketPath))?.AsObject() ?? throw new InvalidDataException();
+
+        internal void SetPrivateDiscovery(string laneId, XDocument report)
+        {
+            XNamespace ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                schemaVersion = 1,
+                tests = report.Descendants(ns + "UnitTest").Select((definition, ordinal) =>
+                {
+                    XElement method = definition.Element(ns + "TestMethod")!;
+                    string className = method.Attribute("className")!.Value;
+                    int split = className.LastIndexOf('.');
+                    return new
+                    {
+                        uid = "synthetic private uid " + ordinal,
+                        displayName = definition.Attribute("name")!.Value,
+                        type = new { @namespace = className[..split], typeName = className[(split + 1)..],
+                            methodName = method.Attribute("name")!.Value }
+                    };
+                })
+            });
+            File.WriteAllBytes(Path.Combine(DirectoryPath, "security-execution-reports", laneId + ".discovery.json"), bytes);
+        }
+
+        internal bool TryPrivateAdmission(out string diagnostic) => TryPrivateAdmission(out diagnostic, out _);
+
+        internal bool TryPrivateAdmission(out string diagnostic,
+            out IReadOnlyDictionary<string, IReadOnlyList<byte[]>>? proofs)
+        {
+            var requirements = RegisterPath is null ? SecurityControlRegister.ExecutionRequirements :
+                SecurityControlRegister.ReadExecutionRequirements(RegisterPath);
+            var inputs = new Dictionary<string, SecurityExecutionEvidence.NativeLaneInput>(StringComparer.Ordinal);
+            foreach ((string id, _) in requirements)
+            {
+                string reports = Path.Combine(DirectoryPath, "security-execution-reports");
+                byte[] discovery = File.ReadAllBytes(Path.Combine(reports, id + ".discovery.json"));
+                string[] uids = JsonNode.Parse(discovery)!["tests"]!.AsArray()
+                    .Select(node => node!["uid"]!.GetValue<string>()).ToArray();
+                var invocations = id is "owned-load-control" or "owned-load-correctness"
+                    ? uids.Select((uid, ordinal) => new SecurityExecutionEvidence.NativeInvocationInput([uid],
+                        File.ReadAllBytes(Path.Combine(reports, id + "." + ordinal + ".trx")))).ToArray()
+                    : new[] { new SecurityExecutionEvidence.NativeInvocationInput(uids, File.ReadAllBytes(Path.Combine(reports, id + ".trx"))) };
+                inputs.Add(id, new(discovery, invocations));
+            }
+            return SecurityExecutionEvidence.TryCreateNativeRunProofs(inputs, RegisterPath, out proofs, out diagnostic);
+        }
 
         internal string ReportRepository()
         {

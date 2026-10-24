@@ -37,10 +37,11 @@ separate runtime evidence and are never inferred from Harness results.
 The existing `security-execution.v1.json` packet is governed by the embedded
 `executionRequirements` in `eng/security/security-control-register.json`.
 Producer and validator derive each registered lane's project, closed host
-profile, environment, selector, command and report filename from the same
-validated requirements. Admission requires every registered lane and its exact
-named TRX variants, with no missing/skipped results or reused report/execution
-identities. Candidate, run/attempt and retained artifact byte hashes must agree.
+profile, environment, selector and required identities from the same validated
+requirements. The owning verb is `execute-security-execution`. Admission requires
+every registered lane and its exact native result variants, with no
+missing/skipped results or reused report/execution identities. Candidate,
+run/attempt and retained artifact byte hashes must agree.
 Provider, database role and authentication remain `not-attested`.
 
 The API lanes require their registered key witnesses within the complete
@@ -56,6 +57,47 @@ contract does not register or certify those profiles: their final names and
 counts require compiled same-candidate discovery and successful physical TRX
 before the register and workflow activate together. Synthetic parser fixtures
 and isolated browser-module controls never certify a healthy owned host.
+
+The owning producer has bounded compiler and helper verification, with workflow
+activation held. Clean committed-candidate API execution, its fresh successor
+against copied old reports, and final seven-profile source/evidence admission
+remain pending. The source phase retains the two shipped lanes while those
+runtime gates remain open. Rebuilding
+must bind the actual committed candidate revision; any later candidate source,
+input, registration or workflow change invalidates the final execution proof.
+
+The producer owns a fresh private run root, same-DLL discovery, typed opaque UID
+execution and fresh named TRX joins. It captures clean Git HEAD/tree, managed
+project revisions/dependencies, copied prerequisite content and tool/runtime
+bytes before and after execution. Each selected load UID has its own native
+invocation and temporary directory; other profiles batch. Public proof files
+contain only closed registered references, ordinals, counts, outcomes and whole
+artifact/record digests. UIDs, native GUIDs, display identities, paths, argv,
+TRX, configuration and process output remain private. Detached report harvesting
+through `produce-security-execution` rejects and invalidates its designated
+packet; a supplied or deserialized record cannot mint owning evidence.
+
+Instrumented API fixtures require an admitted explicit Unix `DOCKER_HOST` and
+caller-selected `TESTCONTAINERS_RYUK_DISABLED=true`, private owner context and
+cached images; their builders pin that endpoint and never pull. Ordinary fixture
+execution retains its existing behavior when ownership context is absent.
+Fixture credentials are generated at runtime; structured resource observations
+omit credential, realm, environment and configuration values. The observer
+records actual local image/full container identities and bounded point-in-time
+snapshots. Initially present and foreign IDs are never cleanup targets; known
+selected IDs require an identity recheck and final successful absence inventory.
+No foreign/named-volume deletion is admitted. Missing observations, failed
+cleanup or missing live managed-entry/served-input witnesses deny eligibility.
+Labels associate resources with the private run; they do not authenticate a
+creator, daemon incarnation or continuous lifecycle. Public uploads must include
+only the admitted public directory, never private logs, TRX or run roots.
+
+The public release consumer validates the operator-supplied execution packet
+within the existing trusted default-branch/operator release boundary. Workflow
+paths, provider run IDs and URLs are correlation metadata; they do not
+authenticate CI origin. Required GitHub checks must be verified separately
+against the final candidate. Packet validation does not replace those checks or
+add another signing/promotion authority.
 
 The security workflow runs the complete `Category=Security` selection with
 `--maximum-parallel-tests 1`. Each case may still exercise concurrent HTTP

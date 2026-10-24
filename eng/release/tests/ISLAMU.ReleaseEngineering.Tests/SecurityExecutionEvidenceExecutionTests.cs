@@ -1,0 +1,1774 @@
+using System.Runtime.CompilerServices;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json.Nodes;
+using System.Xml.Linq;
+using System.Text.Json;
+using System.Reflection;
+
+namespace ISLAMU.ReleaseEngineering.Tests;
+
+public sealed class SecurityExecutionEvidenceNativeUidChildTests
+{
+    [Test]
+    public async Task IndependentCompiledTestExecutesItsDiscoveredUidAndProducesOneFreshJoinedResult()
+    {
+        string root = Directory.CreateTempSubdirectory("native-uid-proof-").FullName;
+        try
+        {
+            const string targetClass = "SecurityExecutionEvidenceOwnedCommandTests";
+            const string targetMethod = "PublicCommandIdentifiesTheOwnerAndRejectsTheHistoricalUnownedCommand";
+            string assembly = typeof(SecurityExecutionEvidenceNativeUidChildTests).Assembly.Location;
+            var discovery = new ProcessStartInfo(ReleaseToolPaths.Dotnet)
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
+                CreateNoWindow = true, WorkingDirectory = root
+            };
+            discovery.Environment["TMPDIR"] = root;
+            foreach (string argument in new[] { assembly, "--list-tests", "json", "--treenode-filter",
+                "/*/*/" + targetClass + "/" + targetMethod, "--no-ansi" })
+                discovery.ArgumentList.Add(argument);
+            var listed = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(discovery,
+                TimeSpan.FromSeconds(15), CancellationToken.None);
+            await Assert.That(listed.Succeeded).IsTrue();
+            await Assert.That(listed.StandardError.Length).IsEqualTo(0);
+            using JsonDocument document = JsonDocument.Parse(listed.StandardOutput);
+            await Assert.That(document.RootElement.GetProperty("schemaVersion").GetInt32()).IsEqualTo(1);
+            JsonElement nodes = document.RootElement.GetProperty("tests");
+            await Assert.That(nodes.GetArrayLength()).IsEqualTo(1);
+            JsonElement node = nodes[0];
+            JsonElement type = node.GetProperty("type");
+            await Assert.That(type.GetProperty("namespace").GetString()).IsEqualTo("ISLAMU.ReleaseEngineering.Tests");
+            await Assert.That(type.GetProperty("typeName").GetString()).IsEqualTo(targetClass);
+            await Assert.That(type.GetProperty("methodName").GetString()).IsEqualTo(targetMethod);
+            string uid = node.GetProperty("uid").GetString()!;
+            string invocation = Path.Combine(root, "invocation");
+            Directory.CreateDirectory(invocation);
+            string results = Path.Combine(invocation, "results");
+            string reportPath = Path.Combine(results, "native-uid-child.trx");
+            await Assert.That(File.Exists(reportPath)).IsFalse();
+            var command = SecurityExecutionEvidence.NativeTestStartInfo(assembly, [uid], results,
+                invocation, "native-uid-child.trx", 15);
+            var executed = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+                TimeSpan.FromSeconds(20), CancellationToken.None);
+            await Assert.That(executed.Succeeded).IsTrue();
+            await Assert.That(File.Exists(reportPath)).IsTrue();
+            await Assert.That(Directory.EnumerateFiles(results, "*.trx", SearchOption.AllDirectories)
+                .ToHashSet(StringComparer.Ordinal).SetEquals([reportPath])).IsTrue();
+            await Assert.That(SecurityExecutionEvidence.TryReadOwnedChildReport(results, "native-uid-child.trx", out byte[] report)).IsTrue();
+            var required = new SecurityControlRegister.RequiredTest("ISLAMU.ReleaseEngineering.Tests." + targetClass,
+                targetMethod, node.GetProperty("displayName").GetString()!);
+            bool joined = SecurityExecutionEvidence.TryCreateNativeProof(listed.StandardOutput, report,
+                [required], exactSelection: true, out byte[]? proof, out string diagnostic);
+            await Assert.That(joined).IsTrue();
+            await Assert.That(diagnostic).IsEqualTo(string.Empty);
+            using JsonDocument publicProof = JsonDocument.Parse(proof!);
+            await Assert.That(publicProof.RootElement.GetProperty("counts").GetProperty("passed").GetInt32()).IsEqualTo(1);
+            await Assert.That(publicProof.RootElement.GetProperty("nodes")[0].GetProperty("requiredTest").GetInt32()).IsEqualTo(0);
+            await Assert.That(Encoding.UTF8.GetString(proof!)).DoesNotContain(uid);
+            // The native child and its cleanup have genuinely completed before the local report failure.
+            using (FileStream oversized = File.Open(reportPath, FileMode.Open, FileAccess.Write, FileShare.None))
+                oversized.SetLength(16_777_217);
+            await Assert.That(SecurityExecutionEvidence.TryReadOwnedChildReport(results, "native-uid-child.trx", out byte[] rejected)).IsFalse();
+            await Assert.That(rejected.Length).IsEqualTo(0);
+            await Assert.That(executed.CleanupSucceeded).IsTrue();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+        await Assert.That(Directory.Exists(root)).IsFalse();
+    }
+}
+
+public sealed class SecurityExecutionEvidencePublicationTests
+{
+    [Test]
+    [Arguments("valid")]
+    [Arguments("readback-false")]
+    [Arguments("readback-io-failure")]
+    public async Task FailedPublicationReadbackCannotLeaveAnAdmissibleDesignatedPacket(string variant)
+    {
+        const string candidate = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        string root = Directory.CreateTempSubdirectory("public-proof-move-").FullName;
+        try
+        {
+            string stage = Path.Combine(root, "synthetic-stage");
+            string destination = Path.Combine(root, "public-output");
+            SecurityExecutionEvidenceFixture.Write(stage, candidate);
+            await Assert.That(SecurityExecutionEvidence.TryValidate(stage, candidate, out _, out _)).IsTrue();
+            Exception? failure = null;
+            try
+            {
+                SecurityExecutionEvidence.PublishFreshPublicDirectory(stage, destination, directory =>
+                {
+                    if (variant == "readback-io-failure")
+                    {
+                        using FileStream missing = File.OpenRead(Path.Combine(directory, "absent-readback-file"));
+                        return missing.Length == 0;
+                    }
+                    return variant == "valid" && SecurityExecutionEvidence.TryValidate(directory, candidate, out _, out _);
+                });
+            }
+            catch (Exception exception) { failure = exception; }
+            if (variant == "valid")
+            {
+                await Assert.That(Directory.Exists(stage)).IsFalse();
+                await Assert.That(Directory.Exists(destination)).IsTrue();
+                await Assert.That(failure).IsNull();
+                await Assert.That(SecurityExecutionEvidence.TryValidate(destination, candidate, out _, out _)).IsTrue();
+            }
+            else
+            {
+                await Assert.That(failure).IsNotNull();
+                if (variant == "readback-io-failure") await Assert.That(failure is FileNotFoundException).IsTrue();
+                await Assert.That(File.Exists(Path.Combine(destination, SecurityExecutionEvidence.PacketFileName))).IsFalse();
+                await Assert.That(SecurityExecutionEvidence.TryValidate(destination, candidate, out _, out _)).IsFalse();
+            }
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceResourceSnapshotTests
+{
+    [Test]
+    [Arguments("valid")]
+    [Arguments("additional-owned-instance")]
+    [Arguments("foreign-malformed-identity")]
+    [Arguments("short-id")]
+    [Arguments("uppercase-id")]
+    [Arguments("duplicate-id")]
+    [Arguments("unknown-resource")]
+    [Arguments("unadmitted-image")]
+    [Arguments("retargeted-image")]
+    [Arguments("missing-owner")]
+    [Arguments("missing-image-id")]
+    [Arguments("unknown-state")]
+    [Arguments("duplicate-json-property")]
+    [Arguments("preexisting-id")]
+    public async Task OnlyFullObservedOwnedIdentitiesBindToPrelaunchCachedImages(string variant)
+    {
+        string owner = new('a', 32);
+        string image = "sha256:" + new string('b', 64);
+        var admitted = new Dictionary<string, string>(StringComparer.Ordinal) { ["cached:test"] = image };
+        var initialContainerIds = new HashSet<string>(StringComparer.Ordinal) { new string('f', 64) };
+        JsonObject Resource(char id, string kind) => new()
+        {
+            ["Id"] = new string(id, 64), ["ImageID"] = image, ["Image"] = "cached:test", ["State"] = "running",
+            ["Labels"] = new JsonObject { ["islamu.assurance.owner"] = owner, ["islamu.assurance.resource"] = kind }
+        };
+        var snapshot = new JsonArray(Resource('c', "keycloak"), Resource('d', "cerbos"));
+        byte[] Bytes() => Encoding.UTF8.GetBytes(snapshot.ToJsonString());
+        await Assert.That(SecurityExecutionEvidence.TryReadOwnedResourceSnapshot(Bytes(), owner, admitted, initialContainerIds,
+            out var baseline, out _)).IsTrue();
+        await Assert.That(baseline!.Count).IsEqualTo(2);
+        await Assert.That(baseline.All(resource => resource.Running)).IsTrue();
+        string ExpectedIdentities(bool additional) => new string('c', 64) + "|" + image + "|keycloak|True\n" +
+            new string('d', 64) + "|" + image + "|cerbos|True" +
+            (additional ? "\n" + new string('e', 64) + "|" + image + "|cerbos|True" : string.Empty);
+        string ActualIdentities(IReadOnlyList<SecurityExecutionEvidence.ObservedOwnedResource> resources) =>
+            string.Join('\n', resources.OrderBy(resource => resource.ContainerId, StringComparer.Ordinal)
+                .Select(resource => resource.ContainerId + "|" + resource.ImageId + "|" + resource.Resource + "|" + resource.Running));
+        await Assert.That(ActualIdentities(baseline)).IsEqualTo(ExpectedIdentities(false));
+
+        switch (variant)
+        {
+            case "additional-owned-instance": snapshot.Add(Resource('e', "cerbos")); break;
+            case "foreign-malformed-identity":
+                JsonObject foreign = Resource('e', "cerbos");
+                foreign["Id"] = "foreign-short";
+                foreign["Labels"]!["islamu.assurance.owner"] = new string('f', 32);
+                snapshot.Add(foreign);
+                break;
+            case "short-id": snapshot[0]!["Id"] = "short"; break;
+            case "uppercase-id": snapshot[0]!["Id"] = new string('C', 64); break;
+            case "duplicate-id": snapshot[1]!["Id"] = new string('c', 64); break;
+            case "unknown-resource": snapshot[0]!["Labels"]!["islamu.assurance.resource"] = "other"; break;
+            case "unadmitted-image": snapshot[0]!["ImageID"] = "sha256:" + new string('e', 64); break;
+            case "retargeted-image": snapshot[0]!["Image"] = "unadmitted:test"; break;
+            case "missing-owner": snapshot[0]!["Labels"]!.AsObject().Remove("islamu.assurance.owner"); break;
+            case "missing-image-id": snapshot[0]!.AsObject().Remove("ImageID"); break;
+            case "unknown-state": snapshot[0]!["State"] = "unknown"; break;
+            case "preexisting-id": initialContainerIds.Add(new string('c', 64)); break;
+        }
+        byte[] bytes = variant == "duplicate-json-property"
+            ? Encoding.UTF8.GetBytes(snapshot.ToJsonString().Replace("\"Id\":", "\"Id\":\"duplicate\",\"Id\":", StringComparison.Ordinal))
+            : Bytes();
+        bool accepted = SecurityExecutionEvidence.TryReadOwnedResourceSnapshot(bytes, owner, admitted, initialContainerIds,
+            out var observed, out string diagnostic);
+        bool valid = variant is "valid" or "additional-owned-instance" or "foreign-malformed-identity";
+        await Assert.That(accepted).IsEqualTo(valid);
+        if (valid)
+        {
+            await Assert.That(observed!.Count).IsEqualTo(variant == "additional-owned-instance" ? 3 : 2);
+            await Assert.That(ActualIdentities(observed)).IsEqualTo(ExpectedIdentities(variant == "additional-owned-instance"));
+            await Assert.That(diagnostic).IsEqualTo(string.Empty);
+        }
+        else
+        {
+            await Assert.That(observed is null).IsTrue();
+            await Assert.That(diagnostic).IsEqualTo("owned_resource_snapshot_invalid");
+        }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceApiContentTests
+{
+    [Test]
+    [Arguments("valid")]
+    [Arguments("stale-realm")]
+    [Arguments("stale-policy")]
+    [Arguments("missing-realm")]
+    [Arguments("missing-policy")]
+    [Arguments("extra-policy")]
+    [Arguments("linked-policy")]
+    public async Task CopiedPrerequisitesMustEqualTheExactCandidateContent(string variant)
+    {
+        using var source = new SecurityExecutionEvidenceCandidateTests.SourceFixture();
+        string realm = Path.Combine(source.Root, "docker", "keycloak", "ISLAMU-realm.test.json");
+        string policy = Path.Combine(source.Root, "cerbos", "policies", "policy.yaml");
+        Directory.CreateDirectory(Path.GetDirectoryName(realm)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(policy)!);
+        File.WriteAllBytes(realm, RandomNumberGenerator.GetBytes(32));
+        File.WriteAllBytes(policy, RandomNumberGenerator.GetBytes(32));
+        source.Git("add", "--", "docker", "cerbos");
+        source.Git("-c", "user.name=Native Control", "-c", "user.email=native-control@invalid.example",
+            "commit", "--quiet", "-m", "Native copied input control");
+        string candidate = source.Git("rev-parse", "HEAD").Trim();
+        File.AppendAllText(Path.Combine(source.Root, ".git", "info", "exclude"), "\n/output/\n");
+        string output = Path.Combine(source.Root, "output");
+        string copiedRealm = Path.Combine(output, "TestAssets", "ISLAMU-realm.test.json");
+        string copiedPolicy = Path.Combine(output, "TestAssets", "cerbos", "policies", "policy.yaml");
+        Directory.CreateDirectory(Path.GetDirectoryName(copiedPolicy)!);
+        File.Copy(realm, copiedRealm);
+        File.Copy(policy, copiedPolicy);
+
+        await Assert.That(SecurityExecutionEvidence.TryCaptureApiPrerequisiteInputs(source.Root, candidate, output,
+            out var baseline, out _)).IsTrue();
+        await Assert.That(baseline!.FileCount).IsEqualTo(2);
+        await Assert.That(baseline.PrivateManifestSha256)
+            .IsEqualTo(Convert.ToHexStringLower(SHA256.HashData(baseline.PrivateManifest)));
+        JsonArray files = JsonNode.Parse(baseline.PrivateManifest)!["files"]!.AsArray();
+        await Assert.That(files.Count).IsEqualTo(2);
+        foreach (var expected in new[]
+        {
+            (Source: "docker/keycloak/ISLAMU-realm.test.json", Output: "TestAssets/ISLAMU-realm.test.json"),
+            (Source: "cerbos/policies/policy.yaml", Output: "TestAssets/cerbos/policies/policy.yaml")
+        })
+        {
+            JsonNode file = files.Single(item => item!["sourcePath"]!.GetValue<string>() == expected.Source)!;
+            await Assert.That(file["outputPath"]!.GetValue<string>()).IsEqualTo(expected.Output);
+            await Assert.That(file["gitBlobOid"]!.GetValue<string>())
+                .IsEqualTo(source.Git("rev-parse", candidate + ":" + expected.Source).Trim());
+            await Assert.That(file["sha256"]!.GetValue<string>()).IsEqualTo(Convert.ToHexStringLower(
+                SHA256.HashData(File.ReadAllBytes(Path.Combine(output, expected.Output)))));
+            await Assert.That(file["bytes"]!.GetValue<long>()).IsEqualTo(32L);
+        }
+
+        switch (variant)
+        {
+            case "stale-realm":
+            case "stale-policy":
+                string changed = variant == "stale-realm" ? copiedRealm : copiedPolicy;
+                DateTime timestamp = File.GetLastWriteTimeUtc(changed);
+                byte[] bytes = File.ReadAllBytes(changed);
+                bytes[0] ^= 1;
+                File.WriteAllBytes(changed, bytes);
+                File.SetLastWriteTimeUtc(changed, timestamp);
+                break;
+            case "missing-realm": File.Delete(copiedRealm); break;
+            case "missing-policy": File.Delete(copiedPolicy); break;
+            case "extra-policy":
+                File.WriteAllBytes(Path.Combine(Path.GetDirectoryName(copiedPolicy)!, "extra.yaml"), RandomNumberGenerator.GetBytes(32));
+                break;
+            case "linked-policy":
+                File.Delete(copiedPolicy);
+                File.CreateSymbolicLink(copiedPolicy, policy);
+                break;
+        }
+        bool accepted = SecurityExecutionEvidence.TryCaptureApiPrerequisiteInputs(source.Root, candidate, output,
+            out var captured, out string diagnostic);
+        await Assert.That(accepted).IsEqualTo(variant == "valid");
+        if (variant == "valid")
+        {
+            await Assert.That(captured!.PrivateManifestSha256).IsEqualTo(baseline.PrivateManifestSha256);
+            await Assert.That(diagnostic).IsEqualTo(string.Empty);
+        }
+        else
+        {
+            await Assert.That(captured is null).IsTrue();
+            await Assert.That(diagnostic).IsEqualTo("api_prerequisite_inputs_invalid");
+        }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceExecutionTests
+{
+    [Test]
+    public async Task NativeOpaqueUidJoinsByExactTupleWithoutBecomingTheTrxGuid()
+    {
+        using var fixture = new NativeFixture();
+        byte[] discovery = Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString());
+        byte[] report = fixture.ReportBytes();
+
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeProof(discovery, report,
+            fixture.RequiredTests, exactSelection: true, out byte[]? proof, out string diagnostic);
+
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+        JsonNode retained = JsonNode.Parse(proof!)!;
+        await Assert.That(retained["nodes"]!.AsArray().Count).IsEqualTo(2);
+        await Assert.That(retained["privateDiscoverySha256"]!.GetValue<string>()).IsEqualTo(Digest(discovery));
+        await Assert.That(retained["privateTrxSha256"]!.GetValue<string>()).IsEqualTo(Digest(report));
+        await Assert.That(Encoding.UTF8.GetString(proof!)).DoesNotContain("opaque native uid");
+    }
+
+    [Test]
+    [Arguments("uid")]
+    [Arguments("location")]
+    [Arguments("traits")]
+    [Arguments("properties")]
+    public async Task PrivateDiscoveryDataNeverBecomesPublicIdentity(string field)
+    {
+        using var fixture = new NativeFixture();
+        string canary = "private-identity-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        JsonNode test = fixture.Discovery["tests"]![0]!;
+        switch (field)
+        {
+            case "uid": test["uid"] = canary; break;
+            case "location": test["location"] = new JsonObject { ["file"] = canary }; break;
+            default: test[field] = new JsonObject { ["private-value"] = canary }; break;
+        }
+
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeProof(
+            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), fixture.ReportBytes(),
+            fixture.RequiredTests, exactSelection: true, out byte[]? proof, out _);
+
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(Encoding.UTF8.GetString(proof!)).DoesNotContain(canary);
+    }
+
+    [Test]
+    public async Task ExtraApiIdentityIsPrivateWhileRegisteredWitnessReferencesRemainComplete()
+    {
+        using var fixture = new NativeFixture();
+        string canary = "private-identity-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        fixture.AppendTest(new(canary + ".Class", canary + "Method", canary + "(argument)"), canary);
+
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeProof(
+            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), fixture.ReportBytes(),
+            fixture.RequiredTests, exactSelection: false, out byte[]? proof, out _);
+
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(Encoding.UTF8.GetString(proof!)).DoesNotContain(canary);
+        var nodes = JsonNode.Parse(proof!)!["nodes"]!.AsArray();
+        await Assert.That(nodes.Count).IsEqualTo(3);
+        await Assert.That(nodes.Count(node => node!["requiredTest"] is null)).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task PublicProofValidatesClosedReferencesWithoutPretendingToReparsePrivateInputs()
+    {
+        using var fixture = new NativeFixture();
+        bool produced = SecurityExecutionEvidence.TryCreateNativeProof(
+            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), fixture.ReportBytes(),
+            fixture.RequiredTests, exactSelection: true, out byte[]? proof, out _);
+        await Assert.That(produced).IsTrue();
+        bool accepted = SecurityExecutionEvidence.TryValidateNativeProof(proof!, fixture.RequiredTests,
+            exactSelection: true, out string diagnostic);
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    [Arguments("raw-uid")]
+    [Arguments("raw-type")]
+    [Arguments("raw-method")]
+    [Arguments("raw-display")]
+    [Arguments("duplicate-node")]
+    [Arguments("missing-node")]
+    [Arguments("unknown-required-reference")]
+    [Arguments("reused-required-reference")]
+    [Arguments("missing-required-reference")]
+    [Arguments("raw-execution-identity")]
+    [Arguments("failed-node")]
+    [Arguments("skipped-count")]
+    [Arguments("wrong-count")]
+    [Arguments("invalid-private-digest")]
+    [Arguments("unknown-field")]
+    public async Task PublicProjectionRejectsDataBearingFieldsAndIncompleteReferenceGraphs(string variant)
+    {
+        using var fixture = new NativeFixture();
+        bool produced = SecurityExecutionEvidence.TryCreateNativeProof(
+            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), fixture.ReportBytes(),
+            fixture.RequiredTests, exactSelection: true, out byte[]? proof, out _);
+        await Assert.That(produced).IsTrue();
+        var projection = JsonNode.Parse(proof!)!.AsObject();
+        var nodes = projection["nodes"]!.AsArray();
+        string canary = "private-identity-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        switch (variant)
+        {
+            case "raw-uid": nodes[0]!["uid"] = canary; break;
+            case "raw-type": nodes[0]!["className"] = canary; break;
+            case "raw-method": nodes[0]!["methodName"] = canary; break;
+            case "raw-display": nodes[0]!["displayName"] = canary; break;
+            case "duplicate-node": nodes[1]!["node"] = nodes[0]!["node"]!.GetValue<int>(); break;
+            case "missing-node": nodes.RemoveAt(1); break;
+            case "unknown-required-reference": nodes[0]!["requiredTest"] = 999; break;
+            case "reused-required-reference": nodes[1]!["requiredTest"] = nodes[0]!["requiredTest"]!.GetValue<int>(); break;
+            case "missing-required-reference": nodes[0]!["requiredTest"] = null; break;
+            case "raw-execution-identity": nodes[0]!["executionId"] = canary; break;
+            case "failed-node": nodes[0]!["outcome"] = "failed"; break;
+            case "skipped-count": projection["counts"]!["skipped"] = 1; break;
+            case "wrong-count": projection["counts"]!["selected"] = 3; break;
+            case "invalid-private-digest": projection["privateDiscoverySha256"] = canary; break;
+            case "unknown-field": projection["unknown"] = canary; break;
+        }
+
+        bool accepted = SecurityExecutionEvidence.TryValidateNativeProof(
+            Encoding.UTF8.GetBytes(projection.ToJsonString()), fixture.RequiredTests, exactSelection: true,
+            out string diagnostic);
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
+        await Assert.That(diagnostic).DoesNotContain(canary);
+    }
+
+    [Test]
+    [Arguments("duplicate-json-key")]
+    [Arguments("malformed-json")]
+    [Arguments("malformed-trx")]
+    [Arguments("empty-requirements")]
+    public async Task MalformedPrivateInputsCannotProduceAnyPublicProof(string variant)
+    {
+        using var fixture = new NativeFixture();
+        byte[] discovery = Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString());
+        byte[] report = fixture.ReportBytes();
+        IReadOnlyList<SecurityControlRegister.RequiredTest> requirements = fixture.RequiredTests;
+        switch (variant)
+        {
+            case "duplicate-json-key": discovery = Encoding.UTF8.GetBytes("{\"schemaVersion\":1,\"schemaVersion\":1,\"tests\":[]}"); break;
+            case "malformed-json": discovery = Encoding.UTF8.GetBytes("{"); break;
+            case "malformed-trx": report = Encoding.UTF8.GetBytes("<"); break;
+            case "empty-requirements": requirements = []; break;
+        }
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeProof(discovery, report, requirements,
+            exactSelection: true, out byte[]? proof, out string diagnostic);
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(proof is null).IsTrue();
+        await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
+    }
+
+    [Test]
+    [Arguments("missing-type")]
+    [Arguments("missing-uid")]
+    [Arguments("empty-uid")]
+    [Arguments("duplicate-uid")]
+    [Arguments("duplicate-tuple")]
+    [Arguments("missing-result")]
+    [Arguments("extra-result")]
+    [Arguments("case-changed-type")]
+    [Arguments("case-changed-method")]
+    [Arguments("case-changed-display")]
+    [Arguments("whitespace-changed-display")]
+    [Arguments("different-argument")]
+    [Arguments("wrong-schema")]
+    [Arguments("empty-discovery")]
+    [Arguments("failed-result")]
+    [Arguments("skipped-result")]
+    [Arguments("missing-required-variant")]
+    [Arguments("owned-extra-variant")]
+    [Arguments("canary-type")]
+    [Arguments("canary-method")]
+    [Arguments("canary-display")]
+    public async Task DiscoveryAndExecutionMustHaveOneOrdinalUnambiguousIdentityJoin(string variant)
+    {
+        using var fixture = new NativeFixture();
+        JsonArray tests = fixture.Discovery["tests"]!.AsArray();
+        JsonNode first = tests[0]!;
+        string canary = "private-identity-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        switch (variant)
+        {
+            case "missing-type": first.AsObject().Remove("type"); break;
+            case "missing-uid": first.AsObject().Remove("uid"); break;
+            case "empty-uid": first["uid"] = ""; break;
+            case "duplicate-uid": tests[1]!["uid"] = first["uid"]!.GetValue<string>(); break;
+            case "duplicate-tuple":
+                tests[1]!["type"] = first["type"]!.DeepClone();
+                tests[1]!["displayName"] = first["displayName"]!.GetValue<string>();
+                break;
+            case "missing-result": tests.RemoveAt(1); break;
+            case "extra-result":
+                fixture.AppendTest(new("Synthetic.Extra", "Extra", "Extra"), "another opaque uid");
+                tests.RemoveAt(tests.Count - 1);
+                break;
+            case "case-changed-type": first["type"]!["typeName"] = "ownedprofile"; break;
+            case "case-changed-method": first["type"]!["methodName"] = "syntheticwitness"; break;
+            case "case-changed-display": first["displayName"] = first["displayName"]!.GetValue<string>().ToUpperInvariant(); break;
+            case "whitespace-changed-display": first["displayName"] = first["displayName"]!.GetValue<string>() + " "; break;
+            case "different-argument": first["displayName"] = "SyntheticWitness(another argument)"; break;
+            case "wrong-schema": fixture.Discovery["schemaVersion"] = 999; break;
+            case "empty-discovery": fixture.Discovery["tests"] = new JsonArray(); break;
+            case "failed-result": fixture.Results[0].SetAttributeValue("outcome", "Failed"); break;
+            case "skipped-result": fixture.Results[0].SetAttributeValue("outcome", "NotExecuted"); break;
+            case "missing-required-variant":
+                fixture.RemoveLastTest();
+                break;
+            case "owned-extra-variant": fixture.AppendTest(new("Synthetic.Extra", "Extra", "Extra"), "another opaque uid"); break;
+            case "canary-type": first["type"]!["typeName"] = canary; break;
+            case "canary-method": first["type"]!["methodName"] = canary; break;
+            case "canary-display": first["displayName"] = canary; break;
+        }
+
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeProof(
+            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), fixture.ReportBytes(),
+            fixture.RequiredTests, exactSelection: true, out byte[]? proof, out string diagnostic);
+
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(proof is null).IsTrue();
+        await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
+        await Assert.That(diagnostic).DoesNotContain(canary);
+    }
+
+    private static string Digest(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+    internal sealed class NativeFixture : IDisposable
+    {
+        private static readonly XNamespace Ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
+        private readonly string root = Path.Combine(Path.GetTempPath(), "native-proof-" + Guid.NewGuid().ToString("N"));
+        internal XDocument Report { get; }
+        internal JsonObject Discovery { get; }
+        internal SecurityControlRegister.RequiredTest[] RequiredTests { get; }
+        internal string RegisterPath => Path.Combine(root, "register.json");
+        internal XElement[] Results => Report.Root!.Element(Ns + "Results")!.Elements().ToArray();
+
+        internal NativeFixture(string laneId = "owned-runtime", [CallerFilePath] string sourcePath = "")
+        {
+            Directory.CreateDirectory(root);
+            string shipped = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourcePath)!, "..", "..", "..",
+                "security", "security-control-register.json"));
+            string registerPath = RegisterPath;
+            File.WriteAllText(registerPath, SecurityExecutionEvidenceFixture.OwnedRegister(shipped).ToJsonString());
+            var registration = SecurityControlRegister.ReadExecutionRequirements(registerPath);
+            SecurityExecutionEvidenceFixture.Write(root, new string('a', 40), registerPath: registerPath);
+            Report = XDocument.Load(Path.Combine(root, "security-execution-reports", laneId + ".trx"));
+            RequiredTests = registration[laneId].Tests.ToArray();
+            Discovery = new JsonObject { ["schemaVersion"] = 1, ["tests"] = new JsonArray() };
+            int index = 0;
+            foreach (var definition in Report.Root!.Element(Ns + "TestDefinitions")!.Elements())
+            {
+                var method = definition.Element(Ns + "TestMethod")!;
+                AddDiscovery(new((string)method.Attribute("className")!, (string)method.Attribute("name")!,
+                    (string)definition.Attribute("name")!), "opaque native uid " + index++);
+            }
+        }
+
+        internal void AppendTest(SecurityControlRegister.RequiredTest identity, string uid)
+        {
+            string testId = Guid.NewGuid().ToString("D");
+            string executionId = Guid.NewGuid().ToString("D");
+            Report.Root!.Element(Ns + "Results")!.Add(new XElement(Ns + "UnitTestResult",
+                new XAttribute("testId", testId), new XAttribute("executionId", executionId),
+                new XAttribute("testName", identity.TestName), new XAttribute("outcome", "Passed")));
+            Report.Root.Element(Ns + "TestDefinitions")!.Add(new XElement(Ns + "UnitTest",
+                new XAttribute("id", testId), new XAttribute("name", identity.TestName),
+                new XElement(Ns + "Execution", new XAttribute("id", executionId)),
+                new XElement(Ns + "TestMethod", new XAttribute("className", identity.ClassName),
+                    new XAttribute("name", identity.MethodName))));
+            AddDiscovery(identity, uid);
+            UpdateCounts();
+        }
+
+        internal void RemoveLastTest()
+        {
+            Report.Root!.Element(Ns + "Results")!.Elements().Last().Remove();
+            Report.Root.Element(Ns + "TestDefinitions")!.Elements().Last().Remove();
+            Discovery["tests"]!.AsArray().RemoveAt(Discovery["tests"]!.AsArray().Count - 1);
+            UpdateCounts();
+        }
+
+        private void UpdateCounts()
+        {
+            var counters = Report.Root!.Element(Ns + "ResultSummary")!.Element(Ns + "Counters")!;
+            foreach (string field in new[] { "total", "executed", "passed" }) counters.SetAttributeValue(field, Results.Length);
+        }
+
+        private void AddDiscovery(SecurityControlRegister.RequiredTest identity, string uid)
+        {
+            int split = identity.ClassName.LastIndexOf('.');
+            Discovery["tests"]!.AsArray().Add(new JsonObject
+            {
+                ["uid"] = uid, ["displayName"] = identity.TestName,
+                ["type"] = new JsonObject
+                {
+                    ["namespace"] = identity.ClassName[..split], ["typeName"] = identity.ClassName[(split + 1)..],
+                    ["methodName"] = identity.MethodName
+                }
+            });
+        }
+
+        internal byte[] ReportBytes()
+        {
+            using var stream = new MemoryStream();
+            Report.Save(stream);
+            return stream.ToArray();
+        }
+
+        public void Dispose() => Directory.Delete(root, recursive: true);
+    }
+}
+
+public sealed class SecurityExecutionEvidenceInvocationProofTests
+{
+    private const string LoadLane = "owned-load-correctness";
+    private static readonly XNamespace Ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
+
+    [Test]
+    [Arguments("owned-load-control")]
+    [Arguments("owned-load-correctness")]
+    public async Task SeparateLoadUidsKeepGlobalRegisteredReferencesAndPrivateWholeArtifactDigests(string laneId)
+    {
+        using var fixture = new SecurityExecutionEvidenceExecutionTests.NativeFixture(laneId);
+        byte[] discovery = Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString());
+        var invocations = SingleUidInputs(fixture);
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeLaneProofs(discovery, invocations,
+            laneId, fixture.RegisterPath, out var proofs, out string diagnostic);
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+        await Assert.That(proofs!.Count).IsEqualTo(2);
+        var references = new HashSet<int>();
+        for (int index = 0; index < proofs.Count; index++)
+        {
+            JsonNode proof = JsonNode.Parse(proofs[index])!;
+            await Assert.That(proof["nodes"]!.AsArray().Count).IsEqualTo(1);
+            await Assert.That(proof["nodes"]![0]!["node"]!.GetValue<int>()).IsEqualTo(0);
+            await Assert.That(references.Add(proof["nodes"]![0]!["requiredTest"]!.GetValue<int>())).IsTrue();
+            await Assert.That(proof["privateDiscoverySha256"]!.GetValue<string>()).IsEqualTo(Digest(discovery));
+            await Assert.That(proof["privateTrxSha256"]!.GetValue<string>()).IsEqualTo(Digest(invocations[index].ReportBytes));
+            foreach (string uid in Uids(fixture)) await Assert.That(Encoding.UTF8.GetString(proofs[index])).DoesNotContain(uid);
+        }
+        await Assert.That(references.SetEquals([0, 1])).IsTrue();
+    }
+
+    [Test]
+    public async Task NonLoadProfileKeepsOneCompleteBatchedNativeInvocation()
+    {
+        using var fixture = new SecurityExecutionEvidenceExecutionTests.NativeFixture();
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeLaneProofs(
+            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()),
+            [new SecurityExecutionEvidence.NativeInvocationInput(Uids(fixture), fixture.ReportBytes())],
+            "owned-runtime", fixture.RegisterPath, out var proofs, out _);
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(proofs!.Count).IsEqualTo(1);
+        await Assert.That(JsonNode.Parse(proofs[0])!["nodes"]!.AsArray().Count).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task PublicLoadProofsCloseOneCompleteDisjointRegisteredUnion()
+    {
+        using var fixture = new SecurityExecutionEvidenceExecutionTests.NativeFixture(LoadLane);
+        bool accepted = SecurityExecutionEvidence.TryValidateNativeLaneProofs(PublicProofs(fixture),
+            LoadLane, fixture.RegisterPath, out string diagnostic);
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    [Arguments("missing-invocation")]
+    [Arguments("reused-selected-uid")]
+    [Arguments("unknown-selected-uid")]
+    [Arguments("combined-load-selection")]
+    [Arguments("wrong-selected-result")]
+    [Arguments("reused-native-run")]
+    [Arguments("reused-native-execution")]
+    [Arguments("failed-result")]
+    [Arguments("unregistered-discovery")]
+    [Arguments("invalid-full-register")]
+    public async Task IncompleteOrReusedPrivateInvocationsCannotCoverTheRegisteredLane(string variant)
+    {
+        using var fixture = new SecurityExecutionEvidenceExecutionTests.NativeFixture(LoadLane);
+        List<SecurityExecutionEvidence.NativeInvocationInput> inputs = SingleUidInputs(fixture).ToList();
+        string[] uids = Uids(fixture);
+        switch (variant)
+        {
+            case "missing-invocation": inputs.RemoveAt(1); break;
+            case "reused-selected-uid": inputs[1] = new([uids[0]], OneReport(fixture, 0)); break;
+            case "unknown-selected-uid": inputs[1] = new(["unobserved opaque uid"], inputs[1].ReportBytes); break;
+            case "combined-load-selection": inputs = [new(uids, fixture.ReportBytes())]; break;
+            case "wrong-selected-result": inputs[1] = new([uids[1]], OneReport(fixture, 0)); break;
+            case "reused-native-run":
+            case "reused-native-execution":
+            case "failed-result":
+                XDocument first = ReadXml(inputs[0].ReportBytes);
+                XDocument second = ReadXml(inputs[1].ReportBytes);
+                if (variant == "reused-native-run") second.Root!.SetAttributeValue("id", first.Root!.Attribute("id")!.Value);
+                else if (variant == "failed-result")
+                    second.Root!.Element(Ns + "Results")!.Elements().Single().SetAttributeValue("outcome", "Failed");
+                else
+                {
+                    string reused = first.Root!.Element(Ns + "Results")!.Elements().Single().Attribute("executionId")!.Value;
+                    second.Root!.Element(Ns + "Results")!.Elements().Single().SetAttributeValue("executionId", reused);
+                    second.Root.Element(Ns + "TestDefinitions")!.Elements().Single().Element(Ns + "Execution")!.SetAttributeValue("id", reused);
+                }
+                inputs[1] = new([uids[1]], XmlBytes(second));
+                break;
+            case "unregistered-discovery": fixture.AppendTest(new("Synthetic.Unregistered", "Witness", "Witness"), "extra opaque uid"); break;
+            case "invalid-full-register":
+                JsonNode register = JsonNode.Parse(File.ReadAllBytes(fixture.RegisterPath))!;
+                register["executionRequirements"]!.AsArray().RemoveAt(2);
+                File.WriteAllText(fixture.RegisterPath, register.ToJsonString());
+                break;
+        }
+        bool accepted = SecurityExecutionEvidence.TryCreateNativeLaneProofs(
+            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()), inputs, LoadLane, fixture.RegisterPath,
+            out var proofs, out string diagnostic);
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(proofs is null).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo("native_lane_projection_invalid");
+    }
+
+    [Test]
+    [Arguments("missing-proof")]
+    [Arguments("duplicate-proof")]
+    [Arguments("reused-required-reference")]
+    [Arguments("outside-required-reference")]
+    [Arguments("public-uid-canary")]
+    [Arguments("nonpassing-outcome")]
+    [Arguments("wrong-counts")]
+    [Arguments("reused-trx-digest")]
+    [Arguments("different-discovery-digest")]
+    [Arguments("merged-load-proof")]
+    public async Task PublicInvocationReferencesCannotHideMissingReusedOrPrivateResults(string variant)
+    {
+        using var fixture = new SecurityExecutionEvidenceExecutionTests.NativeFixture(LoadLane);
+        List<byte[]> proofs = PublicProofs(fixture).ToList();
+        JsonNode second = JsonNode.Parse(proofs[1])!;
+        string canary = "private-invocation-uid-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        switch (variant)
+        {
+            case "missing-proof": proofs.RemoveAt(1); break;
+            case "duplicate-proof": proofs[1] = proofs[0].ToArray(); break;
+            case "reused-required-reference": second["nodes"]![0]!["requiredTest"] = 0; break;
+            case "outside-required-reference": second["nodes"]![0]!["requiredTest"] = 2; break;
+            case "public-uid-canary": second["nodes"]![0]!["uid"] = canary; break;
+            case "nonpassing-outcome": second["nodes"]![0]!["outcome"] = "skipped"; break;
+            case "wrong-counts": second["counts"]!["selected"] = 2; break;
+            case "reused-trx-digest": second["privateTrxSha256"] = JsonNode.Parse(proofs[0])!["privateTrxSha256"]!.GetValue<string>(); break;
+            case "different-discovery-digest": second["privateDiscoverySha256"] = new string('b', 64); break;
+            case "merged-load-proof":
+                if (!SecurityExecutionEvidence.TryCreateNativeProof(Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()),
+                        fixture.ReportBytes(), fixture.RequiredTests, true, out byte[]? merged, out _))
+                    throw new InvalidDataException("native_invocation_fixture_invalid");
+                proofs = [merged!];
+                break;
+        }
+        if (variant is not ("missing-proof" or "duplicate-proof" or "merged-load-proof")) proofs[1] = Encoding.UTF8.GetBytes(second.ToJsonString());
+        bool accepted = SecurityExecutionEvidence.TryValidateNativeLaneProofs(proofs, LoadLane,
+            fixture.RegisterPath, out string diagnostic);
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(diagnostic).IsEqualTo("native_lane_proof_invalid");
+        await Assert.That(diagnostic.Contains(canary, StringComparison.Ordinal)).IsFalse();
+    }
+
+    private static SecurityExecutionEvidence.NativeInvocationInput[] SingleUidInputs(
+        SecurityExecutionEvidenceExecutionTests.NativeFixture fixture) =>
+        Uids(fixture).Select((uid, index) => new SecurityExecutionEvidence.NativeInvocationInput([uid], OneReport(fixture, index))).ToArray();
+
+    private static string[] Uids(SecurityExecutionEvidenceExecutionTests.NativeFixture fixture) =>
+        fixture.Discovery["tests"]!.AsArray().Select(test => test!["uid"]!.GetValue<string>()).ToArray();
+
+    private static byte[] OneReport(SecurityExecutionEvidenceExecutionTests.NativeFixture fixture, int index)
+    {
+        var report = new XDocument(fixture.Report);
+        report.Root!.SetAttributeValue("id", Guid.NewGuid().ToString("D"));
+        report.Root.Element(Ns + "Results")!.Elements().Where((_, ordinal) => ordinal != index).Remove();
+        report.Root.Element(Ns + "TestDefinitions")!.Elements().Where((_, ordinal) => ordinal != index).Remove();
+        XElement counters = report.Root.Element(Ns + "ResultSummary")!.Element(Ns + "Counters")!;
+        foreach (XAttribute counter in counters.Attributes()) counter.Value = counter.Name.LocalName is "total" or "executed" or "passed" ? "1" : "0";
+        return XmlBytes(report);
+    }
+
+    private static byte[] XmlBytes(XDocument report)
+    {
+        using var stream = new MemoryStream();
+        report.Save(stream);
+        return stream.ToArray();
+    }
+
+    private static XDocument ReadXml(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes, writable: false);
+        return XDocument.Load(stream);
+    }
+
+    private static byte[][] PublicProofs(SecurityExecutionEvidenceExecutionTests.NativeFixture fixture)
+    {
+        if (!SecurityExecutionEvidence.TryCreateNativeProof(Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()),
+                fixture.ReportBytes(), fixture.RequiredTests, true, out byte[]? complete, out _))
+            throw new InvalidDataException("native_invocation_fixture_invalid");
+        JsonNode full = JsonNode.Parse(complete!)!;
+        return Enumerable.Range(0, 2).Select(index =>
+        {
+            JsonNode proof = full.DeepClone();
+            JsonNode node = proof["nodes"]![index]!.DeepClone();
+            node["node"] = 0;
+            proof["nodes"] = new JsonArray(node);
+            proof["counts"] = new JsonObject { ["selected"] = 1, ["executed"] = 1, ["passed"] = 1, ["failed"] = 0, ["skipped"] = 0 };
+            proof["privateTrxSha256"] = Digest(OneReport(fixture, index));
+            return Encoding.UTF8.GetBytes(proof.ToJsonString());
+        }).ToArray();
+    }
+
+    private static string Digest(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+}
+
+public sealed class SecurityExecutionEvidenceTransportTests
+{
+    [Test]
+    [Arguments("opaque uid 'quoted' = value")]
+    [Arguments("opaque --report-trx-filename /foreign.trx")]
+    public async Task OpaqueUidIsOneLiteralArgumentAndCannotReplaceFixedResultsPaths(string uid)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "native-transport-" + Guid.NewGuid().ToString("N"));
+        string results = Path.Combine(root, "results");
+        string? originalTemporaryDirectory = Environment.GetEnvironmentVariable("TMPDIR");
+        ProcessStartInfo command = SecurityExecutionEvidence.NativeTestStartInfo(
+            typeof(SecurityExecutionEvidenceTransportTests).Assembly.Location, [uid, "second opaque uid"],
+            results, root, "security-integration-tests.trx", 60);
+
+        await Assert.That(command.UseShellExecute).IsFalse();
+        await Assert.That(command.FileName).IsEqualTo(ReleaseToolPaths.Dotnet);
+        await Assert.That(command.ArgumentList.Count(argument => argument == "--filter-uid")).IsEqualTo(1);
+        await Assert.That(command.ArgumentList.Contains("--treenode-filter")).IsFalse();
+        await Assert.That(command.ArgumentList.Count(argument => argument == uid)).IsEqualTo(1);
+        await Assert.That(command.ArgumentList.Count(argument => argument == "--report-trx-filename")).IsEqualTo(1);
+        int filename = command.ArgumentList.IndexOf("--report-trx-filename");
+        await Assert.That(command.ArgumentList[filename + 1]).IsEqualTo("security-integration-tests.trx");
+        int directory = command.ArgumentList.IndexOf("--results-directory");
+        await Assert.That(command.ArgumentList[directory + 1]).IsEqualTo(results);
+        await Assert.That(command.Environment["TMPDIR"]).IsEqualTo(root);
+        await Assert.That(Environment.GetEnvironmentVariable("TMPDIR")).IsEqualTo(originalTemporaryDirectory);
+    }
+
+    [Test]
+    [Arguments("--report-trx-filename")]
+    [Arguments("-x")]
+    [Arguments("@response-file")]
+    [Arguments("--")]
+    [Arguments("-")]
+    [Arguments("empty")]
+    [Arguments("spaces")]
+    [Arguments("leading-space")]
+    [Arguments("trailing-space")]
+    [Arguments("newline")]
+    [Arguments("return")]
+    [Arguments("tab")]
+    [Arguments("nul")]
+    [Arguments("delete")]
+    [Arguments("oversized")]
+    public async Task CliControlFormsAreRejectedWithoutNormalizingTheNativeIdentity(string variant)
+    {
+        string uid = variant switch
+        {
+            "empty" => "", "spaces" => "   ", "leading-space" => " native",
+            "trailing-space" => "native ", "newline" => "native\nuid", "return" => "native\ruid",
+            "tab" => "native\tuid", "nul" => "native\0uid", "delete" => "native\u007fuid",
+            "oversized" => new string('x', 4097), _ => variant
+        };
+        string root = Path.Combine(Path.GetTempPath(), "native-transport-" + Guid.NewGuid().ToString("N"));
+        bool rejected = false;
+        try
+        {
+            _ = SecurityExecutionEvidence.NativeTestStartInfo(typeof(SecurityExecutionEvidenceTransportTests).Assembly.Location,
+                [uid], Path.Combine(root, "results"), root, "security-integration-tests.trx", 60);
+        }
+        catch (InvalidDataException) { rejected = true; }
+        await Assert.That(rejected).IsTrue();
+    }
+
+    [Test]
+    [Arguments("outside-results")]
+    [Arguments("absolute-filename")]
+    [Arguments("relative-filename")]
+    [Arguments("empty-selection")]
+    [Arguments("duplicate-selection")]
+    [Arguments("argument-budget")]
+    [Arguments("infinite-deadline")]
+    public async Task NativeSelectionCannotEscapeTheOwnedOutputOrRemoveItsFiniteBound(string variant)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "native-transport-" + Guid.NewGuid().ToString("N"));
+        string results = Path.Combine(root, "results");
+        string filename = "security-integration-tests.trx";
+        int timeout = 60;
+        IReadOnlyList<string> uids = ["opaque native uid"];
+        switch (variant)
+        {
+            case "outside-results": results = Path.Combine(Path.GetTempPath(), "outside-results"); break;
+            case "absolute-filename": filename = Path.Combine(Path.GetTempPath(), "outside.trx"); break;
+            case "relative-filename": filename = "../outside.trx"; break;
+            case "empty-selection": uids = []; break;
+            case "duplicate-selection": uids = ["opaque native uid", "opaque native uid"]; break;
+            case "argument-budget": uids = Enumerable.Range(0, 600).Select(index => new string('x', 2000) + index).ToArray(); break;
+            case "infinite-deadline": timeout = 0; break;
+        }
+        bool rejected = false;
+        try
+        {
+            _ = SecurityExecutionEvidence.NativeTestStartInfo(typeof(SecurityExecutionEvidenceTransportTests).Assembly.Location,
+                uids, results, root, filename, timeout);
+        }
+        catch (InvalidDataException) { rejected = true; }
+        await Assert.That(rejected).IsTrue();
+    }
+
+    [Test]
+    public async Task OldPassingReportsCannotBeReassignedToANewProducerInvocation()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "native-stale-reports-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            string old = Path.Combine(root, "old");
+            SecurityExecutionEvidenceFixture.Write(old, new string('a', 40));
+            foreach (var (id, requirement) in SecurityControlRegister.ExecutionRequirements)
+            {
+                string directory = Path.Combine(root, Path.GetDirectoryName(requirement.Project)!, "TestResults");
+                Directory.CreateDirectory(directory);
+                File.Copy(Path.Combine(old, "security-execution-reports", id + ".trx"),
+                    Path.Combine(directory, requirement.ReportFileName));
+            }
+            string outputDirectory = Path.Combine(root, "new-output");
+            using var output = new StringWriter();
+            int code = SecurityExecutionEvidence.Run(
+                ["produce-security-execution", outputDirectory, new string('b', 40), "99", "2", "push"], output, root);
+            await Assert.That(code).IsEqualTo(Program.ToolchainRejected);
+            await Assert.That(File.Exists(Path.Combine(outputDirectory, SecurityExecutionEvidence.PacketFileName))).IsFalse();
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceProcessTests
+{
+    [Test]
+    public async Task CleanCompiledChildDrainsBothPrivateStreamsAndCompletes()
+    {
+        using var fixture = new ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("clean");
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command, TimeSpan.FromSeconds(10), CancellationToken.None);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(Encoding.UTF8.GetString(result.StandardOutput)).Contains(fixture.Canary);
+        await Assert.That(Encoding.UTF8.GetString(result.StandardError)).Contains(fixture.Canary);
+    }
+
+    [Test]
+    public async Task ParentExitZeroWithOwnedChildHoldingPipesIsFailureEvenAfterCleanup()
+    {
+        using var fixture = new ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("leak");
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command, TimeSpan.FromSeconds(10), CancellationToken.None);
+        await Assert.That(result.ExitCode).IsEqualTo(0);
+        await Assert.That(result.ResidualOwnedChildren).IsTrue();
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.CleanupSucceeded).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+    }
+
+    [Test]
+    public async Task FiniteDeadlineKillsAndJoinsOnlyItsOwnedCompiledChild()
+    {
+        using var fixture = new ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("hold");
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command, TimeSpan.FromSeconds(1), CancellationToken.None);
+        await Assert.That(result.TimedOut).IsTrue();
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.CleanupSucceeded).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+    }
+
+    [Test]
+    public async Task BoundedOutputCannotTurnAFloodingChildIntoAnAdmittedPass()
+    {
+        using var fixture = new ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("flood");
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command, TimeSpan.FromSeconds(10), CancellationToken.None);
+        await Assert.That(result.OutputLimitExceeded).IsTrue();
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.CleanupSucceeded).IsTrue();
+        await Assert.That(result.StandardOutput.Length <= 16_777_216).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+    }
+
+    [Test]
+    public async Task OwnedNativeChild()
+    {
+        string? mode = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_NATIVE_CHILD_CONTROL");
+        if (mode is null) return;
+        string root = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_NATIVE_CHILD_ROOT")!;
+        string canary = Environment.GetEnvironmentVariable("ISLAMU_RELEASE_NATIVE_CHILD_CANARY")!;
+        RecordOwnedPid(root, Environment.ProcessId);
+        if (mode == "clean")
+        {
+            using Stream standardOutput = Console.OpenStandardOutput();
+            using Stream standardError = Console.OpenStandardError();
+            await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(canary));
+            await standardError.WriteAsync(Encoding.UTF8.GetBytes(canary));
+            Environment.Exit(0);
+        }
+        if (mode == "leak")
+        {
+            ProcessStartInfo descendant = SecurityExecutionEvidence.NativeTestStartInfo(
+                typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
+                [TestContext.Current!.Metadata.TestDetails.Identity.TestId], Path.Combine(root, "descendant-results"), root,
+                "descendant.trx", 60);
+            descendant.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CONTROL"] = "hold";
+            descendant.RedirectStandardOutput = false;
+            descendant.RedirectStandardError = false;
+            using Process child = Process.Start(descendant)!;
+            RecordOwnedPid(root, child.Id);
+            Environment.Exit(0);
+        }
+        if (mode == "flood")
+        {
+            byte[] bytes = new byte[1024 * 1024];
+            using Stream stream = Console.OpenStandardOutput();
+            for (int index = 0; index < 20; index++) await stream.WriteAsync(bytes);
+            Environment.Exit(0);
+        }
+        if (mode == "fifo-input")
+        {
+            using var input = new SecurityExecutionEvidenceCompiledInputTests.CompiledFixture();
+            input.CreateFifo();
+            bool accepted = SecurityExecutionEvidence.TryCaptureCompiledInputs(input.Root, input.Candidate,
+                ["entry.dll"], out _, out _);
+            Environment.Exit(accepted ? 1 : 0);
+        }
+        if (mode == "hold") await Task.Delay(Timeout.InfiniteTimeSpan);
+        throw new InvalidDataException("unknown_native_child_control");
+    }
+
+    private static void RecordOwnedPid(string root, int pid)
+    {
+        string stat = File.ReadAllText("/proc/" + pid + "/stat");
+        string[] fields = stat[(stat.LastIndexOf(')') + 2)..].Split(' ');
+        File.WriteAllText(Path.Combine(root, "pid-" + pid),
+            pid.ToString(System.Globalization.CultureInfo.InvariantCulture) + " " + fields[19]);
+    }
+
+    internal sealed class ProcessFixture : IDisposable
+    {
+        private readonly string root = Path.Combine(Path.GetTempPath(), "native-owned-process-" + Guid.NewGuid().ToString("N"));
+        internal string Canary { get; } = "private-stream-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+
+        internal ProcessFixture() => Directory.CreateDirectory(root);
+
+        internal async Task<ProcessStartInfo> CommandAsync(string mode)
+        {
+            var discovery = new ProcessStartInfo(ReleaseToolPaths.Dotnet)
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
+                WorkingDirectory = root, CreateNoWindow = true
+            };
+            foreach (string argument in new[] { typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
+                "--list-tests", "json", "--treenode-filter", "/*/*/SecurityExecutionEvidenceProcessTests/OwnedNativeChild", "--no-ansi" })
+                discovery.ArgumentList.Add(argument);
+            using var process = new Process { StartInfo = discovery };
+            process.Start();
+            Task<string> output = process.StandardOutput.ReadToEndAsync();
+            Task<string> error = process.StandardError.ReadToEndAsync();
+            try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5)); }
+            finally
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            if (process.ExitCode != 0 || (await error).Length != 0) throw new InvalidDataException("native_child_discovery_failed");
+            using JsonDocument document = JsonDocument.Parse(await output);
+            JsonElement tests = document.RootElement.GetProperty("tests");
+            if (document.RootElement.GetProperty("schemaVersion").GetInt32() != 1 || tests.GetArrayLength() != 1)
+                throw new InvalidDataException("native_child_discovery_failed");
+            string uid = tests[0].GetProperty("uid").GetString()!;
+            var command = SecurityExecutionEvidence.NativeTestStartInfo(typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
+                [uid], Path.Combine(root, "results"), root, "owned-child.trx", 60);
+            command.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CONTROL"] = mode;
+            command.Environment["ISLAMU_RELEASE_NATIVE_CHILD_ROOT"] = root;
+            command.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CANARY"] = Canary;
+            return command;
+        }
+
+        internal bool OwnedChildrenRemain()
+        {
+            foreach (string receipt in Directory.EnumerateFiles(root, "pid-*"))
+            {
+                string[] identity = File.ReadAllText(receipt).Split(' ');
+                int pid = int.Parse(identity[0], System.Globalization.CultureInfo.InvariantCulture);
+                string stat = "/proc/" + pid + "/stat";
+                if (File.Exists(stat))
+                {
+                    string value = File.ReadAllText(stat);
+                    string[] fields = value[(value.LastIndexOf(')') + 2)..].Split(' ');
+                    if (fields[19] == identity[1] && fields[0] != "Z") return true;
+                }
+            }
+            return false;
+        }
+
+        public void Dispose()
+        {
+            foreach (string receipt in Directory.EnumerateFiles(root, "pid-*"))
+            {
+                string[] identity = File.ReadAllText(receipt).Split(' ');
+                int pid = int.Parse(identity[0], System.Globalization.CultureInfo.InvariantCulture);
+                try
+                {
+                    string value = File.ReadAllText("/proc/" + pid + "/stat");
+                    string[] fields = value[(value.LastIndexOf(')') + 2)..].Split(' ');
+                    if (fields[19] != identity[1] || fields[0] == "Z") continue;
+                    using Process process = Process.GetProcessById(pid);
+                    process.Kill(entireProcessTree: true);
+                    if (!process.WaitForExit(5000)) throw new InvalidDataException("owned_child_cleanup_failed");
+                }
+                catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException or ArgumentException)
+                {
+                    // A disappeared or replaced PID is not an owned cleanup target.
+                }
+            }
+            Directory.Delete(root, recursive: true);
+        }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceCandidateTests
+{
+    [Test]
+    public async Task ActualCleanDetachedCheckoutSuppliesItsCommitAndTree()
+    {
+        using var fixture = new SourceFixture();
+        bool accepted = SecurityExecutionEvidence.TryReadCandidateSource(fixture.Root, fixture.Candidate,
+            out var identity, out string diagnostic);
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(identity!.CandidateOid).IsEqualTo(fixture.Candidate);
+        await Assert.That(identity.TreeOid).IsEqualTo(fixture.Tree);
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    [Arguments("wrong-candidate")]
+    [Arguments("dirty-worktree")]
+    [Arguments("dirty-index")]
+    [Arguments("untracked-input")]
+    [Arguments("assume-unchanged-input")]
+    [Arguments("skip-worktree-input")]
+    [Arguments("missing-repository")]
+    [Arguments("invalid-candidate")]
+    public async Task ClaimedCandidateCannotReplaceTheActualCleanSourceInputs(string variant)
+    {
+        using var fixture = new SourceFixture();
+        string repository = fixture.Root;
+        string expected = fixture.Candidate;
+        switch (variant)
+        {
+            case "wrong-candidate": expected = new string('a', 40); break;
+            case "dirty-worktree": File.AppendAllText(Path.Combine(repository, "input.txt"), "changed"); break;
+            case "dirty-index":
+                File.AppendAllText(Path.Combine(repository, "input.txt"), "changed");
+                fixture.Git("add", "input.txt");
+                break;
+            case "untracked-input": File.WriteAllText(Path.Combine(repository, "untracked-input.txt"), "unowned"); break;
+            case "assume-unchanged-input":
+                fixture.Git("update-index", "--assume-unchanged", "input.txt");
+                File.AppendAllText(Path.Combine(repository, "input.txt"), "hidden change");
+                break;
+            case "skip-worktree-input":
+                fixture.Git("update-index", "--skip-worktree", "input.txt");
+                File.AppendAllText(Path.Combine(repository, "input.txt"), "hidden change");
+                break;
+            case "missing-repository": repository = Path.Combine(repository, "missing"); break;
+            case "invalid-candidate": expected = "--output=/outside"; break;
+        }
+        bool accepted = SecurityExecutionEvidence.TryReadCandidateSource(repository, expected,
+            out var identity, out string diagnostic);
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(identity is null).IsTrue();
+        await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
+    }
+
+    internal sealed class SourceFixture : IDisposable
+    {
+        internal string Root { get; } = Path.Combine(Path.GetTempPath(), "native-source-" + Guid.NewGuid().ToString("N"));
+        internal string Candidate { get; }
+        internal string Tree { get; }
+
+        internal SourceFixture()
+        {
+            Directory.CreateDirectory(Root);
+            Git("init", "--quiet");
+            File.WriteAllText(Path.Combine(Root, "input.txt"), "native candidate input");
+            Git("add", "input.txt");
+            Git("-c", "user.name=Native Control", "-c", "user.email=native-control@invalid.example",
+                "commit", "--quiet", "-m", "Native input control");
+            Candidate = Git("rev-parse", "HEAD").Trim();
+            Tree = Git("rev-parse", "HEAD^{tree}").Trim();
+            Git("checkout", "--quiet", "--detach", Candidate);
+        }
+
+        internal string Git(params string[] arguments)
+        {
+            var info = new ProcessStartInfo(ReleaseToolPaths.Git)
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
+                WorkingDirectory = Root, CreateNoWindow = true
+            };
+            info.Environment.Clear();
+            info.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
+            info.Environment["GIT_CONFIG_GLOBAL"] = "/dev/null";
+            foreach (string argument in arguments) info.ArgumentList.Add(argument);
+            using var process = new Process { StartInfo = info };
+            process.Start();
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderr = process.StandardError.ReadToEndAsync();
+            bool finished = false;
+            bool joined = false;
+            try
+            {
+                finished = process.WaitForExit(5000);
+            }
+            finally
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                joined = process.WaitForExit(5000);
+            }
+            if (!joined) throw new InvalidDataException("native_source_fixture_cleanup_failed");
+            if (!finished) throw new InvalidDataException("native_source_fixture_timeout");
+            if (process.ExitCode != 0) throw new InvalidDataException("native_source_fixture_failed");
+            _ = stderr.WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+            return stdout.WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+        }
+
+        public void Dispose() => Directory.Delete(Root, recursive: true);
+    }
+}
+
+public sealed class SecurityExecutionEvidenceServedAssetTests
+{
+    [Test]
+    public async Task ReferencedTrackedGeneratedAndExactLockedPackageBytesFormOnePrivateInputClosure()
+    {
+        using var fixture = new ServedAssetFixture();
+        bool accepted = fixture.Capture(out var snapshot, out string diagnostic);
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+        await Assert.That(snapshot!.FileCount).IsEqualTo(5);
+        await Assert.That(snapshot.PrivateManifestSha256)
+            .IsEqualTo(Convert.ToHexString(SHA256.HashData(snapshot.PrivateManifest)).ToLowerInvariant());
+        JsonNode manifest = JsonNode.Parse(snapshot.PrivateManifest)!;
+        JsonArray files = manifest["files"]!.AsArray();
+        await Assert.That(files.Count).IsEqualTo(5);
+        foreach (var expected in new[]
+        {
+            (Root: 0, Path: fixture.TrackedAsset), (Root: 0, Path: fixture.GeneratedAsset),
+            (Root: 0, Path: fixture.RuntimePath), (Root: 0, Path: fixture.EndpointsPath),
+            (Root: 1, Path: fixture.PackageAsset)
+        })
+        {
+            string relative = Path.GetRelativePath(expected.Root == 0 ? fixture.CandidateRoot : fixture.PackageRoot, expected.Path);
+            JsonNode file = files.Single(item => item!["root"]!.GetValue<int>() == expected.Root &&
+                item["path"]!.GetValue<string>() == relative)!;
+            string path = expected.Path;
+            byte[] bytes = File.ReadAllBytes(path);
+            await Assert.That(file["sha256"]!.GetValue<string>())
+                .IsEqualTo(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+            await Assert.That(file["bytes"]!.GetValue<long>()).IsEqualTo(bytes.LongLength);
+        }
+        JsonNode tracked = files.Single(file => file!["path"]!.GetValue<string>() == "src/Fixture/wwwroot/tracked.bin")!;
+        await Assert.That(tracked["gitBlobOid"]!.GetValue<string>())
+            .IsEqualTo(fixture.Source.Git("rev-parse", fixture.Candidate + ":src/Fixture/wwwroot/tracked.bin").Trim());
+    }
+
+    [Test]
+    [Arguments("generated")]
+    [Arguments("locked-package")]
+    public async Task IgnoredLocalServedBytesCannotHideBehindTheirOriginalSizeAndTimestamp(string kind)
+    {
+        using var fixture = new ServedAssetFixture();
+        bool first = fixture.Capture(out var before, out _);
+        await Assert.That(first).IsTrue();
+        string path = kind == "generated" ? fixture.GeneratedAsset : fixture.PackageAsset;
+        DateTime timestamp = File.GetLastWriteTimeUtc(path);
+        File.WriteAllBytes(path, RandomNumberGenerator.GetBytes(32));
+        File.SetLastWriteTimeUtc(path, timestamp);
+        bool second = fixture.Capture(out var after, out _);
+        await Assert.That(second).IsTrue();
+        await Assert.That(after!.PrivateManifestSha256).IsNotEqualTo(before!.PrivateManifestSha256);
+    }
+
+    [Test]
+    [Arguments("missing-paired-manifest")]
+    [Arguments("malformed-runtime-manifest")]
+    [Arguments("duplicate-runtime-key")]
+    [Arguments("unknown-runtime-field")]
+    [Arguments("invalid-content-index")]
+    [Arguments("outside-subpath")]
+    [Arguments("outside-content-root")]
+    [Arguments("linked-asset")]
+    [Arguments("untracked-source-asset")]
+    [Arguments("tracked-source-byte-drift")]
+    [Arguments("unsupported-pattern")]
+    [Arguments("unsupported-endpoints-version")]
+    [Arguments("unrepresented-endpoint-asset")]
+    [Arguments("missing-generated-asset")]
+    public async Task UnresolvedOrUnownedServedInputsCannotAcquireCandidateIdentity(string variant)
+    {
+        using var fixture = new ServedAssetFixture();
+        bool saveRuntime = true;
+        bool saveEndpoints = true;
+        switch (variant)
+        {
+            case "missing-paired-manifest": File.Delete(fixture.EndpointsPath); saveEndpoints = false; break;
+            case "malformed-runtime-manifest": File.WriteAllText(fixture.RuntimePath, "{"); saveRuntime = false; break;
+            case "duplicate-runtime-key":
+                File.WriteAllText(fixture.RuntimePath, "{\"ContentRoots\":[]," + fixture.Runtime.ToJsonString()[1..]);
+                saveRuntime = false;
+                break;
+            case "unknown-runtime-field": fixture.Runtime["unregistered-private-field"] = "private-value-must-not-be-admitted"; break;
+            case "invalid-content-index": fixture.Runtime["Root"]!["Children"]!["tracked.bin"]!["Asset"]!["ContentRootIndex"] = 3; break;
+            case "outside-subpath": fixture.Runtime["Root"]!["Children"]!["tracked.bin"]!["Asset"]!["SubPath"] = "../unowned.bin"; break;
+            case "outside-content-root": fixture.Runtime["ContentRoots"]![2] = Path.GetDirectoryName(fixture.PackageRoot); break;
+            case "linked-asset":
+                File.Delete(fixture.GeneratedAsset);
+                File.CreateSymbolicLink(fixture.GeneratedAsset, fixture.PackageAsset);
+                break;
+            case "untracked-source-asset":
+                File.WriteAllText(Path.Combine(fixture.CandidateRoot, ".git", "info", "exclude"), "/src/Fixture/wwwroot/ignored.bin\n");
+                File.WriteAllBytes(Path.Combine(fixture.CandidateRoot, "src/Fixture/wwwroot/ignored.bin"), RandomNumberGenerator.GetBytes(32));
+                break;
+            case "tracked-source-byte-drift":
+                DateTime timestamp = File.GetLastWriteTimeUtc(fixture.TrackedAsset);
+                File.WriteAllBytes(fixture.TrackedAsset, RandomNumberGenerator.GetBytes(32));
+                File.SetLastWriteTimeUtc(fixture.TrackedAsset, timestamp);
+                break;
+            case "unsupported-pattern": fixture.Runtime["Root"]!["Patterns"]![0]!["Pattern"] = "unsupported-[pattern"; break;
+            case "unsupported-endpoints-version": fixture.EndpointManifest["Version"] = 2; break;
+            case "unrepresented-endpoint-asset": fixture.EndpointManifest["Endpoints"]![0]!["AssetFile"] = "unrepresented.bin"; break;
+            case "missing-generated-asset": File.Delete(fixture.GeneratedAsset); break;
+        }
+        if (saveRuntime) fixture.SaveRuntime();
+        if (saveEndpoints) fixture.SaveEndpoints();
+        bool accepted = fixture.Capture(out var snapshot, out string diagnostic);
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(snapshot is null).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo("local_served_assets_invalid");
+    }
+
+    private sealed class ServedAssetFixture : IDisposable
+    {
+        internal SecurityExecutionEvidenceCandidateTests.SourceFixture Source { get; } = new();
+        internal string CandidateRoot => Source.Root;
+        internal string Candidate { get; }
+        internal string PackageRoot { get; } = Path.Combine(Path.GetTempPath(), "native-asset-package-" + Guid.NewGuid().ToString("N"), "1.0.0", "staticwebassets");
+        internal string GeneratedRoot => Path.Combine(CandidateRoot, "src/Fixture/obj/Release/net10.0/served");
+        internal string OutputRoot => Path.Combine(CandidateRoot, "src/Fixture/bin/Release/net10.0");
+        internal string TrackedAsset => Path.Combine(CandidateRoot, "src/Fixture/wwwroot/tracked.bin");
+        internal string GeneratedAsset => Path.Combine(GeneratedRoot, "generated.bin");
+        internal string PackageAsset => Path.Combine(PackageRoot, "locked.bin");
+        internal string RuntimePath => Path.Combine(OutputRoot, "Fixture.staticwebassets.runtime.json");
+        internal string EndpointsPath => Path.Combine(OutputRoot, "Fixture.staticwebassets.endpoints.json");
+        internal JsonObject Runtime { get; }
+        internal JsonObject EndpointManifest { get; }
+
+        internal ServedAssetFixture()
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(TrackedAsset)!);
+            File.WriteAllBytes(TrackedAsset, RandomNumberGenerator.GetBytes(32));
+            File.WriteAllText(Path.Combine(CandidateRoot, ".gitignore"), "**/obj/\n**/bin/\n");
+            Source.Git("add", ".gitignore", "src/Fixture/wwwroot/tracked.bin");
+            Source.Git("-c", "user.name=Native Control", "-c", "user.email=native-control@invalid.example",
+                "commit", "--quiet", "-m", "Native served input control");
+            Candidate = Source.Git("rev-parse", "HEAD").Trim();
+            Directory.CreateDirectory(GeneratedRoot);
+            Directory.CreateDirectory(OutputRoot);
+            Directory.CreateDirectory(PackageRoot);
+            File.WriteAllBytes(GeneratedAsset, RandomNumberGenerator.GetBytes(32));
+            File.WriteAllBytes(PackageAsset, RandomNumberGenerator.GetBytes(32));
+            Runtime = new JsonObject
+            {
+                ["ContentRoots"] = new JsonArray(Path.GetDirectoryName(TrackedAsset)!, GeneratedRoot, PackageRoot),
+                ["Root"] = new JsonObject
+                {
+                    ["Asset"] = null,
+                    ["Children"] = new JsonObject
+                    {
+                        ["tracked.bin"] = Asset(0, "tracked.bin"),
+                        ["generated.bin"] = Asset(1, "generated.bin"),
+                        ["_content"] = new JsonObject
+                        {
+                            ["Asset"] = null, ["Patterns"] = null,
+                            ["Children"] = new JsonObject { ["locked.bin"] = Asset(2, "locked.bin") }
+                        }
+                    },
+                    ["Patterns"] = new JsonArray(new JsonObject
+                    {
+                        ["ContentRootIndex"] = 0, ["Pattern"] = "**", ["Depth"] = 0
+                    })
+                }
+            };
+            EndpointManifest = new JsonObject
+            {
+                ["Version"] = 1, ["ManifestType"] = "Build",
+                ["Endpoints"] = new JsonArray(Endpoint("tracked.bin"), Endpoint("generated.bin"), Endpoint("_content/locked.bin"))
+            };
+            SaveRuntime();
+            SaveEndpoints();
+        }
+
+        private static JsonObject Asset(int root, string path) => new()
+        {
+            ["Asset"] = new JsonObject { ["ContentRootIndex"] = root, ["SubPath"] = path },
+            ["Children"] = null, ["Patterns"] = null
+        };
+
+        private static JsonObject Endpoint(string file) => new()
+        {
+            ["AssetFile"] = file, ["Route"] = file, ["EndpointProperties"] = new JsonArray(),
+            ["ResponseHeaders"] = new JsonArray(), ["Selectors"] = new JsonArray()
+        };
+
+        internal bool Capture(out SecurityExecutionEvidence.LocalServedAssetSnapshot? snapshot, out string diagnostic) =>
+            SecurityExecutionEvidence.TryCaptureLocalServedAssets(CandidateRoot, Candidate, [RuntimePath],
+                [GeneratedRoot, OutputRoot], [PackageRoot], out snapshot, out diagnostic);
+        internal void SaveRuntime() => File.WriteAllText(RuntimePath, Runtime.ToJsonString());
+        internal void SaveEndpoints() => File.WriteAllText(EndpointsPath, EndpointManifest.ToJsonString());
+
+        public void Dispose()
+        {
+            Source.Dispose();
+            Directory.Delete(Path.GetDirectoryName(Path.GetDirectoryName(PackageRoot)!)!, recursive: true);
+        }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceProjectClosureTests
+{
+    [Test]
+    public async Task ActualGeneratedDepsBindsBothOwnedManagedRevisionsAndItsCompleteBytes()
+    {
+        using var fixture = new ProjectClosureFixture();
+        bool accepted = SecurityExecutionEvidence.TryCaptureProjectManagedInputs(fixture.Root, fixture.Candidate,
+            [fixture.EntryName], out var snapshot, out string diagnostic);
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+        await AssertClosureAsync(snapshot!, fixture);
+    }
+
+    [Test]
+    public async Task CompileOnlyFrameworkReferencesRemainDistinctFromManagedProjectRuntimeInputs()
+    {
+        using var fixture = new ProjectClosureFixture();
+        fixture.Libraries["System.Runtime.Reference/10.0.0.0"] = new JsonObject
+        {
+            ["type"] = "referenceassembly", ["serviceable"] = false, ["sha512"] = string.Empty
+        };
+        fixture.Target["System.Runtime.Reference/10.0.0.0"] = new JsonObject
+        {
+            ["compile"] = new JsonObject { ["System.Runtime.Reference.dll"] = new JsonObject() },
+            ["compileOnly"] = true
+        };
+        fixture.SaveDeps();
+        bool accepted = SecurityExecutionEvidence.TryCaptureProjectManagedInputs(fixture.Root, fixture.Candidate,
+            [fixture.EntryName], out var snapshot, out _);
+        await Assert.That(accepted).IsTrue();
+        await AssertClosureAsync(snapshot!, fixture);
+    }
+
+    private static async Task AssertClosureAsync(SecurityExecutionEvidence.CompiledInputSnapshot snapshot,
+        ProjectClosureFixture fixture)
+    {
+        JsonNode manifest = JsonNode.Parse(snapshot.PrivateManifest)!;
+        JsonArray managed = manifest["managedEntries"]!.AsArray();
+        await Assert.That(managed.Count).IsEqualTo(2);
+        foreach (string name in new[] { fixture.EntryName, fixture.DependencyName })
+        {
+            JsonNode entry = managed.Single(node => node!["path"]!.GetValue<string>() == name)!;
+            await Assert.That(entry["informationalVersion"]!.GetValue<string>()
+                .EndsWith("+" + fixture.Candidate, StringComparison.Ordinal)).IsTrue();
+        }
+        JsonArray files = manifest["files"]!.AsArray();
+        await Assert.That(files.Count).IsEqualTo(4);
+        foreach (string name in new[] { fixture.EntryName, fixture.DependencyName, Path.GetFileName(fixture.DepsPath), "payload.bin" })
+        {
+            JsonNode file = files.Single(item => item!["path"]!.GetValue<string>() == name)!;
+            byte[] bytes = File.ReadAllBytes(Path.Combine(fixture.Root, name));
+            await Assert.That(file["sha256"]!.GetValue<string>())
+                .IsEqualTo(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+            await Assert.That(file["bytes"]!.GetValue<long>()).IsEqualTo(bytes.LongLength);
+        }
+    }
+
+    [Test]
+    [Arguments("missing-deps")]
+    [Arguments("malformed-deps")]
+    [Arguments("duplicate-root-key")]
+    [Arguments("missing-selected-target")]
+    [Arguments("missing-library")]
+    [Arguments("missing-project-target")]
+    [Arguments("unknown-library-kind")]
+    [Arguments("missing-project-runtime")]
+    [Arguments("outside-project-runtime")]
+    [Arguments("missing-project-dll")]
+    [Arguments("linked-project-dll")]
+    [Arguments("wrong-transitive-revision")]
+    [Arguments("ambiguous-project-owner")]
+    [Arguments("selected-entry-not-project")]
+    public async Task UnprovedTransitiveProjectClosureCannotAcquireCandidateIdentity(string variant)
+    {
+        using var fixture = new ProjectClosureFixture();
+        bool save = true;
+        switch (variant)
+        {
+            case "missing-deps": File.Delete(fixture.DepsPath); save = false; break;
+            case "malformed-deps": File.WriteAllText(fixture.DepsPath, "{"); save = false; break;
+            case "duplicate-root-key":
+                File.WriteAllText(fixture.DepsPath, "{\"libraries\":{}," + fixture.Deps.ToJsonString()[1..]);
+                save = false;
+                break;
+            case "missing-selected-target": fixture.Deps["runtimeTarget"]!["name"] = "unselected-target"; break;
+            case "missing-library": fixture.Libraries.Remove(fixture.DependencyLibrary); break;
+            case "missing-project-target": fixture.Target.Remove(fixture.DependencyLibrary); break;
+            case "unknown-library-kind": fixture.Libraries[fixture.DependencyLibrary]!["type"] = "unproved-library-kind"; break;
+            case "missing-project-runtime": fixture.Target[fixture.DependencyLibrary]!.AsObject().Remove("runtime"); break;
+            case "outside-project-runtime":
+                fixture.Target[fixture.DependencyLibrary]!["runtime"] = new JsonObject
+                {
+                    ["../" + fixture.DependencyName] = new JsonObject()
+                };
+                break;
+            case "missing-project-dll": File.Delete(Path.Combine(fixture.Root, fixture.DependencyName)); break;
+            case "linked-project-dll":
+                File.Delete(Path.Combine(fixture.Root, fixture.DependencyName));
+                File.CreateSymbolicLink(Path.Combine(fixture.Root, fixture.DependencyName),
+                    typeof(SecurityExecutionEvidence).Assembly.Location);
+                break;
+            case "wrong-transitive-revision":
+                File.Copy(typeof(object).Assembly.Location, Path.Combine(fixture.Root, fixture.DependencyName), overwrite: true);
+                break;
+            case "ambiguous-project-owner":
+                fixture.Libraries["Ambiguous.Owned.Project/1.0.0"] = new JsonObject
+                {
+                    ["type"] = "project", ["serviceable"] = false, ["sha512"] = string.Empty
+                };
+                fixture.Target["Ambiguous.Owned.Project/1.0.0"] = new JsonObject
+                {
+                    ["runtime"] = new JsonObject { [fixture.DependencyName] = new JsonObject() }
+                };
+                break;
+            case "selected-entry-not-project": fixture.Libraries[fixture.EntryLibrary]!["type"] = "package"; break;
+        }
+        if (save) fixture.SaveDeps();
+        bool accepted = SecurityExecutionEvidence.TryCaptureProjectManagedInputs(fixture.Root, fixture.Candidate,
+            [fixture.EntryName], out var snapshot, out string diagnostic);
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(snapshot is null).IsTrue();
+        await Assert.That(diagnostic).IsEqualTo("managed_project_closure_invalid");
+    }
+
+    private sealed class ProjectClosureFixture : IDisposable
+    {
+        internal string Root { get; } = Path.Combine(Path.GetTempPath(), "native-project-closure-" + Guid.NewGuid().ToString("N"));
+        internal string EntryName { get; } = Path.GetFileName(typeof(SecurityExecutionEvidenceProjectClosureTests).Assembly.Location);
+        internal string DependencyName { get; } = Path.GetFileName(typeof(SecurityExecutionEvidence).Assembly.Location);
+        internal string Candidate { get; }
+        internal string DepsPath => Path.Combine(Root, Path.ChangeExtension(EntryName, ".deps.json"));
+        internal JsonObject Deps { get; }
+        internal JsonObject Libraries => Deps["libraries"]!.AsObject();
+        internal JsonObject Target => Deps["targets"]![Deps["runtimeTarget"]!["name"]!.GetValue<string>()]!.AsObject();
+        internal string EntryLibrary { get; }
+        internal string DependencyLibrary { get; }
+
+        internal ProjectClosureFixture()
+        {
+            string entryPath = typeof(SecurityExecutionEvidenceProjectClosureTests).Assembly.Location;
+            string dependencyPath = typeof(SecurityExecutionEvidence).Assembly.Location;
+            string version = typeof(SecurityExecutionEvidence).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? throw new InvalidDataException("owned_project_revision_missing");
+            int marker = version.LastIndexOf('+');
+            Candidate = marker < 0 ? string.Empty : version[(marker + 1)..];
+            if (Candidate.Length is not (40 or 64) || Candidate.Any(character =>
+                    character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+                throw new InvalidDataException("owned_project_revision_missing");
+            Deps = JsonNode.Parse(File.ReadAllBytes(Path.ChangeExtension(entryPath, ".deps.json")))!.AsObject();
+            EntryLibrary = ProjectLibraryFor(EntryName);
+            DependencyLibrary = ProjectLibraryFor(DependencyName);
+            Directory.CreateDirectory(Root);
+            File.Copy(entryPath, Path.Combine(Root, EntryName));
+            File.Copy(dependencyPath, Path.Combine(Root, DependencyName));
+            File.WriteAllBytes(Path.Combine(Root, "payload.bin"), RandomNumberGenerator.GetBytes(32));
+            SaveDeps();
+        }
+
+        private string ProjectLibraryFor(string assembly) => Libraries.Single(library =>
+            library.Value!["type"]!.GetValue<string>() == "project" &&
+            Target[library.Key]?["runtime"] is JsonObject runtime && runtime.ContainsKey(assembly)).Key;
+
+        internal void SaveDeps() => File.WriteAllText(DepsPath, Deps.ToJsonString());
+        public void Dispose() => Directory.Delete(Root, recursive: true);
+    }
+}
+
+public sealed class SecurityExecutionEvidenceCompiledInputTests
+{
+    [Test]
+    public async Task FifoIsRejectedWithoutBlockingAnOwnedChildRead()
+    {
+        using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
+        ProcessStartInfo command = await fixture.CommandAsync("fifo-input");
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command, TimeSpan.FromSeconds(3), CancellationToken.None);
+        await Assert.That(result.TimedOut).IsFalse();
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(result.CleanupSucceeded).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+    }
+
+    [Test]
+    public async Task ActualManagedRevisionAndEveryRegularInputByteEnterThePrivateManifest()
+    {
+        using var fixture = new CompiledFixture();
+        bool accepted = SecurityExecutionEvidence.TryCaptureCompiledInputs(fixture.Root, fixture.Candidate,
+            ["entry.dll"], out var snapshot, out string diagnostic);
+        await Assert.That(accepted).IsTrue();
+        await Assert.That(snapshot!.FileCount).IsEqualTo(2);
+        await Assert.That(snapshot.PrivateManifestSha256).IsEqualTo(
+            Convert.ToHexString(SHA256.HashData(snapshot.PrivateManifest)).ToLowerInvariant());
+        await AssertManifestBytesAsync(snapshot, fixture);
+        await Assert.That(diagnostic).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    public async Task SameSizeAndTimestampCannotHideChangedCandidateInputBytes()
+    {
+        using var fixture = new CompiledFixture();
+        bool first = SecurityExecutionEvidence.TryCaptureCompiledInputs(fixture.Root, fixture.Candidate,
+            ["entry.dll"], out var before, out _);
+        await Assert.That(first).IsTrue();
+        await AssertManifestBytesAsync(before!, fixture);
+        string payload = Path.Combine(fixture.Root, "payload.bin");
+        DateTime timestamp = File.GetLastWriteTimeUtc(payload);
+        File.WriteAllBytes(payload, Enumerable.Repeat((byte)2, 32).ToArray());
+        File.SetLastWriteTimeUtc(payload, timestamp);
+        bool second = SecurityExecutionEvidence.TryCaptureCompiledInputs(fixture.Root, fixture.Candidate,
+            ["entry.dll"], out var after, out _);
+        await Assert.That(second).IsTrue();
+        await AssertManifestBytesAsync(after!, fixture);
+        await Assert.That(after!.PrivateManifestSha256).IsNotEqualTo(before!.PrivateManifestSha256);
+    }
+
+    private static async Task AssertManifestBytesAsync(SecurityExecutionEvidence.CompiledInputSnapshot snapshot, CompiledFixture fixture)
+    {
+        JsonArray files = JsonNode.Parse(snapshot.PrivateManifest)!["files"]!.AsArray();
+        await Assert.That(files.Count).IsEqualTo(2);
+        foreach (string name in new[] { "entry.dll", "payload.bin" })
+        {
+            JsonNode file = files.Single(entry => entry!["path"]!.GetValue<string>() == name)!;
+            byte[] actual = File.ReadAllBytes(Path.Combine(fixture.Root, name));
+            await Assert.That(file["sha256"]!.GetValue<string>()).IsEqualTo(Convert.ToHexString(SHA256.HashData(actual)).ToLowerInvariant());
+            await Assert.That(file["bytes"]!.GetValue<long>()).IsEqualTo(actual.LongLength);
+        }
+    }
+
+    [Test]
+    [Arguments("wrong-revision")]
+    [Arguments("missing-entry")]
+    [Arguments("bad-managed-image")]
+    [Arguments("truncated-managed-image")]
+    [Arguments("linked-file")]
+    [Arguments("linked-directory")]
+    [Arguments("root-link")]
+    [Arguments("duplicate-entry")]
+    [Arguments("outside-entry")]
+    [Arguments("empty-entries")]
+    public async Task UnprovedManagedInputsCannotAcquireACandidateIdentity(string variant)
+    {
+        using var fixture = new CompiledFixture();
+        string root = fixture.Root;
+        string expected = fixture.Candidate;
+        IReadOnlyList<string> entries = ["entry.dll"];
+        switch (variant)
+        {
+            case "wrong-revision": expected = new string('a', 40); break;
+            case "missing-entry": File.Delete(Path.Combine(root, "entry.dll")); break;
+            case "bad-managed-image": File.WriteAllText(Path.Combine(root, "entry.dll"), "not a managed image"); break;
+            case "truncated-managed-image":
+                using (var stream = File.OpenWrite(Path.Combine(root, "entry.dll"))) stream.SetLength(8);
+                break;
+            case "linked-file": File.CreateSymbolicLink(Path.Combine(root, "link.bin"), Path.Combine(fixture.ExternalRoot, "payload.bin")); break;
+            case "linked-directory": Directory.CreateSymbolicLink(Path.Combine(root, "linked-directory"), fixture.ExternalRoot); break;
+            case "root-link":
+                string link = Path.Combine(root, "alias");
+                Directory.CreateSymbolicLink(link, root);
+                root = link;
+                break;
+            case "duplicate-entry": entries = ["entry.dll", "entry.dll"]; break;
+            case "outside-entry": entries = ["../entry.dll"]; break;
+            case "empty-entries": entries = []; break;
+        }
+        bool accepted = SecurityExecutionEvidence.TryCaptureCompiledInputs(root, expected, entries,
+            out var snapshot, out string diagnostic);
+        await Assert.That(accepted).IsFalse();
+        await Assert.That(snapshot is null).IsTrue();
+        await Assert.That(diagnostic).IsNotEqualTo(string.Empty);
+    }
+
+    internal sealed class CompiledFixture : IDisposable
+    {
+        internal string Root { get; } = Path.Combine(Path.GetTempPath(), "native-compiled-input-" + Guid.NewGuid().ToString("N"));
+        internal string ExternalRoot { get; } = Path.Combine(Path.GetTempPath(), "native-compiled-external-" + Guid.NewGuid().ToString("N"));
+        internal string Candidate { get; }
+
+        internal CompiledFixture()
+        {
+            string version = typeof(SecurityExecutionEvidence).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? throw new InvalidDataException("owned_compiled_revision_missing");
+            int marker = version.LastIndexOf('+');
+            Candidate = marker < 0 ? string.Empty : version[(marker + 1)..];
+            if (Candidate.Length is not (40 or 64) || Candidate.Any(character =>
+                    character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+                throw new InvalidDataException("owned_compiled_revision_missing");
+            Directory.CreateDirectory(Root);
+            Directory.CreateDirectory(ExternalRoot);
+            File.Copy(typeof(SecurityExecutionEvidence).Assembly.Location, Path.Combine(Root, "entry.dll"));
+            File.WriteAllBytes(Path.Combine(Root, "payload.bin"), Enumerable.Repeat((byte)1, 32).ToArray());
+            File.WriteAllBytes(Path.Combine(ExternalRoot, "payload.bin"), Enumerable.Repeat((byte)3, 32).ToArray());
+        }
+
+        internal void CreateFifo()
+        {
+            var info = new ProcessStartInfo("/usr/bin/mkfifo")
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
+            };
+            info.ArgumentList.Add("--");
+            info.ArgumentList.Add(Path.Combine(Root, "input.pipe"));
+            using var process = new Process { StartInfo = info };
+            process.Start();
+            Task<string> output = process.StandardOutput.ReadToEndAsync();
+            Task<string> error = process.StandardError.ReadToEndAsync();
+            bool finished = false;
+            bool joined = false;
+            try { finished = process.WaitForExit(5000); }
+            finally
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                joined = process.WaitForExit(5000);
+            }
+            if (!finished || !joined || process.ExitCode != 0) throw new InvalidDataException("native_fifo_fixture_failed");
+            _ = output.WaitAsync(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+            _ = error.WaitAsync(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+        }
+
+        public void Dispose()
+        {
+            Directory.Delete(Root, recursive: true);
+            Directory.Delete(ExternalRoot, recursive: true);
+        }
+    }
+}

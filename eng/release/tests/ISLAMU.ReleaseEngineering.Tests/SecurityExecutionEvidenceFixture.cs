@@ -52,7 +52,8 @@ internal static class SecurityExecutionEvidenceFixture
         {
             File.AppendAllText(Path.Combine(repositoryPath, ".git", "info", "exclude"),
                 "\n/docs/internal/releases/*/security-execution.v1.json\n" +
-                "/docs/internal/releases/*/security-execution-reports/\n");
+                "/docs/internal/releases/*/security-execution-reports/\n" +
+                "/docs/internal/releases/*/proofs/\n");
         }
 
         string reportDirectory = Path.Combine(releaseDirectory, "security-execution-reports");
@@ -100,12 +101,81 @@ internal static class SecurityExecutionEvidenceFixture
                         new XAttribute("notExecuted", 0)))));
             report.Save(reportPath);
 
+            var registered = requirement.Tests.OrderBy(test => test.ClassName, StringComparer.Ordinal)
+                .ThenBy(test => test.MethodName, StringComparer.Ordinal).ThenBy(test => test.TestName, StringComparer.Ordinal).ToArray();
+            byte[] discoveryBytes = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                schemaVersion = 1,
+                tests = registered.Select((test, ordinal) => new
+                {
+                    uid = "synthetic private uid " + ordinal,
+                    displayName = test.TestName,
+                    type = new
+                    {
+                        @namespace = test.ClassName[..test.ClassName.LastIndexOf('.')],
+                        typeName = test.ClassName[(test.ClassName.LastIndexOf('.') + 1)..], methodName = test.MethodName
+                    }
+                })
+            });
+            File.WriteAllBytes(Path.Combine(reportDirectory, id + ".discovery.json"), discoveryBytes);
+            var artifacts = new List<object>();
+            bool separate = id is "owned-load-control" or "owned-load-correctness";
+            int invocations = separate ? registered.Length : 1;
+            for (int invocation = 0; invocation < invocations; invocation++)
+            {
+                var privateReport = new XDocument(report);
+                if (separate)
+                {
+                    privateReport.Root!.SetAttributeValue("id", Guid.NewGuid().ToString("D"));
+                    string name = registered[invocation].TestName;
+                    privateReport.Root.Element(TrxNamespace + "Results")!.Elements()
+                        .Where(result => (string?)result.Attribute("testName") != name).Remove();
+                    privateReport.Root.Element(TrxNamespace + "TestDefinitions")!.Elements()
+                        .Where(definition => (string?)definition.Attribute("name") != name).Remove();
+                    XElement counters = privateReport.Descendants(TrxNamespace + "Counters").Single();
+                    foreach (string field in new[] { "total", "executed", "passed" }) counters.SetAttributeValue(field, count == 0 ? 0 : 1);
+                }
+                using var reportStream = new MemoryStream();
+                privateReport.Save(reportStream);
+                File.WriteAllBytes(Path.Combine(reportDirectory, id + "." + invocation + ".trx"), reportStream.ToArray());
+                int selected = separate ? Math.Min(count, 1) : count;
+                string discoveryDigest = Convert.ToHexString(SHA256.HashData(discoveryBytes)).ToLowerInvariant();
+                string reportDigest = Convert.ToHexString(SHA256.HashData(reportStream.ToArray())).ToLowerInvariant();
+                byte[] proof = JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    schemaVersion = 1,
+                    privateDiscoverySha256 = discoveryDigest,
+                    privateTrxSha256 = reportDigest,
+                    counts = new { selected, executed = selected, passed = selected, failed = 0, skipped = 0 },
+                    nodes = Enumerable.Range(0, selected).Select(ordinal => new
+                    {
+                        node = ordinal, requiredTest = separate ? invocation : ordinal, outcome = "passed"
+                    })
+                });
+                string relative = "proofs/" + id + "/" + invocation + ".json";
+                string destination = Path.Combine(releaseDirectory, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.WriteAllBytes(destination, proof);
+                byte[] invocationRecord = JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    schemaVersion = 1, synthetic = true, candidateOid, runId = "42", runAttempt = 1,
+                    lane = id, invocation, privateDiscoverySha256 = discoveryDigest, privateTrxSha256 = reportDigest
+                });
+                File.WriteAllBytes(Path.Combine(reportDirectory, id + "." + invocation + ".invocation.json"), invocationRecord);
+                artifacts.Add(new
+                {
+                    kind = "native-proof", invocation, path = relative,
+                    sha256 = Convert.ToHexString(SHA256.HashData(proof)).ToLowerInvariant(),
+                    privateInvocationSha256 = Convert.ToHexString(SHA256.HashData(invocationRecord)).ToLowerInvariant()
+                });
+            }
+
             lanes.Add(new
             {
                 id,
                 project = requirement.Project,
                 selector = requirement.Selector,
-                command = SecurityExecutionEvidence.Command(id, requirement),
+                command = SecurityExecutionEvidence.ExecutionCommandName,
                 runId = "42",
                 runAttempt = 1,
                 outcome = "passed",
@@ -118,17 +188,10 @@ internal static class SecurityExecutionEvidenceFixture
                     hostProfile = requirement.HostProfile,
                     databaseProvider = "not-attested",
                     databaseRole = "not-attested",
-                    authenticationScheme = "not-attested"
+                    authenticationScheme = "not-attested",
+                    authenticationAuthority = "not-attested"
                 },
-                artifacts = new[]
-                {
-                    new
-                    {
-                        kind = "trx",
-                        path = "security-execution-reports/" + id + ".trx",
-                        sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(reportPath))).ToLowerInvariant()
-                    }
-                }
+                artifacts
             });
         }
 

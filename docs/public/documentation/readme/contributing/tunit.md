@@ -109,6 +109,33 @@ same compiled candidate. Harness checks and isolated browser-module tests have
 their own scope and cannot replace healthy-host journeys. Provider, database
 role and authentication remain outside the packet's attested claims.
 
+The `execute-security-execution` producer has compiler and helper verification;
+workflow activation is held. Native API proof remains pending; final execution of
+all seven profiles must bind one clean committed candidate. Rebuild for the exact
+commit after all source, registration and workflow changes are committed. A
+later change requires new evidence; earlier commit results cannot cover it.
+
+Owning execution uses fresh private temporary directories and discovers the
+actual compiled test identities before executing their opaque UIDs. Native TRX,
+test names, paths, process output, configuration and credentials stay private.
+Upload only its admitted public proof directory containing registered references,
+counts, outcomes and whole-artifact digests. Copying an old passing report into a
+new directory cannot produce owning evidence; the former harvesting command
+rejects such inputs.
+
+Instrumented API runs require an explicit Unix `DOCKER_HOST`, cached prerequisite
+images and caller-selected `TESTCONTAINERS_RYUK_DISABLED=true`. Keep the parent
+endpoint fixed when child temporary directories change. The producer
+checks actual image/container identities and cleanup of known selected resources;
+missing observations or cleanup failures reject admission. These are bounded
+snapshots, not authenticated creation or continuous daemon-lifecycle proof.
+Ordinary tests without ownership context keep their existing fixture behavior.
+
+Release tooling structurally validates the supplied packet and retained artifact
+digests under the existing trusted operator boundary. A workflow name, run ID or
+URL does not authenticate its CI origin. Maintainers separately check required
+GitHub results for the exact final commit before release.
+
 Follow the [browser guide](browser-testing.md) and
 [owned load guide](load-testing.md) for their separate runtime prerequisites and
 artifact restrictions. Keep browser state, credentials, raw page content and

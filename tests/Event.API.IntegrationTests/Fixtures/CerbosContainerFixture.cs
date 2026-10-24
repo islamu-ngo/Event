@@ -39,7 +39,8 @@ public sealed class CerbosContainerFixture : IAsyncInitializer, IAsyncDisposable
                 "Ensure cerbos/policies/** is included as Content with CopyToOutputDirectory=PreserveNewest.");
         }
 
-        _container = new ContainerBuilder()
+        var builder = await SecurityInfrastructureFixture.WithAssuranceOwnershipAsync(new ContainerBuilder(), "cerbos");
+        _container = builder
             .WithImage(CerbosImage)
             .WithPortBinding(3592, true) // HTTP
             .WithPortBinding(3593, true) // gRPC

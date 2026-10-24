@@ -464,10 +464,12 @@ public class SafeModeLatchTests : IAsyncDisposable
 
             private static string Describe(Exception exception)
             {
-                var methods = new StackTrace(exception).GetFrames().Take(8)
-                    .Select(frame => frame.GetMethod())
-                    .Where(method => method is not null)
-                    .Select(method => method!.DeclaringType?.FullName + "." + method.Name);
+                var methods = new StackTrace(exception, fNeedFileInfo: true).GetFrames()
+                    .Where(frame => frame.GetMethod()?.DeclaringType?.FullName?
+                        .StartsWith("Explore.", StringComparison.Ordinal) == true)
+                    .Take(8)
+                    .Select(frame => frame.GetMethod()!.DeclaringType?.FullName + "."
+                        + frame.GetMethod()!.Name + ":" + frame.GetFileLineNumber());
                 return exception.GetType().FullName + ": " + string.Join(" -> ", methods);
             }
         }

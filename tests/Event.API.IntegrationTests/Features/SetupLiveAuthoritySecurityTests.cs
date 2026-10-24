@@ -1405,7 +1405,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         string body = await response.Content.ReadAsStringAsync();
 
         await Assert.That(response.StatusCode).IsEqualTo(expected)
-            .Because($"final route returned: {body}");
+            .Because(fixture.Capture.FailureMetadata);
         await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
         await Assert.That(response.Headers.CacheControl?.Private).IsTrue();
         await Assert.That(response.Content.Headers.ContentType?.MediaType)

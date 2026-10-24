@@ -75,9 +75,9 @@ public sealed class SecurityPrerequisiteOwnershipTests
     [Test]
     public async Task OrdinaryContextDoesNotSelectAnInstrumentedDaemon()
     {
-        await Assert.That(await SecurityInfrastructureFixture.ValidateAssuranceContextAsync(
+        await Assert.That(await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceContextAsync(
             null, null, Path.GetTempPath(), null)).IsNull();
-        await Assert.That(await SecurityInfrastructureFixture.ValidateAssuranceContextAsync(
+        await Assert.That(await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceContextAsync(
             null, null, Path.GetTempPath(), "tcp://unselected.invalid:2375")).IsNull();
     }
 
@@ -89,25 +89,26 @@ public sealed class SecurityPrerequisiteOwnershipTests
     {
         using var files = new OwnershipFiles();
         string host = "unix://" + Path.Combine(files.TemporaryRoot, "daemon.sock");
-        await Assert.That(await SecurityInfrastructureFixture.ValidateAssuranceOwnershipAsync(
+        await Assert.That(await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceOwnershipAsync(
             files.RunId, files.Root, files.TemporaryRoot)).IsEqualTo(files.RunId);
-        SecurityInfrastructureFixture.AssuranceOwnershipContext? baseline = null;
+        Event.Testing.AssuranceOwnershipContext? baseline = null;
         try
         {
-            baseline = await SecurityInfrastructureFixture.ValidateAssuranceContextAsync(
+            baseline = await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceContextAsync(
                 files.RunId, files.Root, files.TemporaryRoot, host);
         }
         catch (InvalidOperationException exception) when (exception.Message == "test_resource_ownership_invalid") { }
         await Assert.That(baseline).IsNotNull();
         await Assert.That(baseline!.Owner).IsEqualTo(files.RunId);
         await Assert.That(baseline.DockerEndpoint.OriginalString).IsEqualTo(host);
+        await Assert.That(baseline.Root).IsEqualTo(files.Root);
 
         string? selected = variant switch { "missing" => null, "wrong-scheme" => "tcp://localhost:2375", _ => host };
-        SecurityInfrastructureFixture.AssuranceOwnershipContext? context = null;
+        Event.Testing.AssuranceOwnershipContext? context = null;
         bool rejected = false;
         try
         {
-            context = await SecurityInfrastructureFixture.ValidateAssuranceContextAsync(
+            context = await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceContextAsync(
                 files.RunId, files.Root, files.TemporaryRoot, selected);
         }
         catch (InvalidOperationException exception) when (exception.Message == "test_resource_ownership_invalid")
@@ -126,7 +127,7 @@ public sealed class SecurityPrerequisiteOwnershipTests
     [Test]
     public async Task AbsentOwnershipContextPreservesOrdinaryFixtureAdmission()
     {
-        string? owner = await SecurityInfrastructureFixture.ValidateAssuranceOwnershipAsync(null, null, Path.GetTempPath());
+        string? owner = await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceOwnershipAsync(null, null, Path.GetTempPath());
         await Assert.That(owner).IsNull();
     }
 
@@ -134,7 +135,7 @@ public sealed class SecurityPrerequisiteOwnershipTests
     public async Task ExistingPrivateRootAndExactMarkerAdmitTheirOwner()
     {
         using var files = new OwnershipFiles();
-        string? owner = await SecurityInfrastructureFixture.ValidateAssuranceOwnershipAsync(files.RunId, files.Root, files.TemporaryRoot);
+        string? owner = await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceOwnershipAsync(files.RunId, files.Root, files.TemporaryRoot);
         await Assert.That(owner).IsEqualTo(files.RunId);
     }
 
@@ -201,7 +202,7 @@ public sealed class SecurityPrerequisiteOwnershipTests
             case "fifo-marker": File.Delete(files.Marker); await RunFileToolAsync("/usr/bin/mkfifo", files.Marker); break;
         }
         Exception? failure = null;
-        try { _ = await SecurityInfrastructureFixture.ValidateAssuranceOwnershipAsync(run, root, files.TemporaryRoot); }
+        try { _ = await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceOwnershipAsync(run, root, files.TemporaryRoot); }
         catch (InvalidOperationException exception) { failure = exception; }
         await Assert.That(failure).IsNotNull();
     }

@@ -23,6 +23,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using FixtureStage = Event.Persistence.IntegrationTests.Fixtures.PostgreSqlContainerFixture.AssuranceStage;
 
 namespace Event.Persistence.IntegrationTests.Privacy;
 
@@ -37,6 +38,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
     [Arguments(true)]
     public async Task RetainedSubjectSettlesBothTenantsWithoutPrivateTableAuthority(bool injectFailure)
     {
+        fixture.RecordStage(FixtureStage.SettlementEntered, injectFailure);
         GlobalLocationPrivacyErasureTests.ErasureGraph graph;
         StorageGraph storage;
         Guid tenantA;
@@ -82,6 +84,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
             await seed.SaveChangesAsync();
             storage = await SeedStorageAsync(seed, graph, tenantA);
         }
+        fixture.RecordStage(FixtureStage.SharedSeedReturned, injectFailure);
 
         await using (var migrations = new CoLocatedPrivacyErasureAuthorityDbContext(
             AuthorityOptions(PrimaryDatabaseRole.Migrator)))
@@ -100,8 +103,10 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                 fact.RecordedAtUtc.AddHours(1), fact.RecordedAtUtc));
             await mirror.SaveChangesAsync();
         }
+        fixture.RecordStage(FixtureStage.RetainedMirrorReturned, injectFailure);
 
         await using var logins = await OrdinaryLogins.CreateAsync(fixture);
+        fixture.RecordStage(FixtureStage.PurposeEnrollmentReturned, injectFailure);
         var runtimeFactory = new TenantExploreDbContextFactory(logins.RuntimeOptions);
         await using (var request = await runtimeFactory.CreateDbContextAsync(tenantA))
         {
@@ -116,6 +121,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         await AssertOrdinaryAsync(application, logins.GlobalOptions.Username!);
         await Assert.That(application.TenantFilterTenantId).IsNull();
         await AssertPrivateReadDeniedAsync(application);
+        fixture.RecordStage(FixtureStage.OrdinaryBoundariesReturned, injectFailure);
         if (injectFailure)
         {
             await using var administration = fixture.CreateDbContext();
@@ -126,6 +132,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         try
         {
             await using var workflow = CreateRuntime(application, retained, locatorProtector);
+            fixture.RecordStage(FixtureStage.ReplayEntered, injectFailure);
             if (injectFailure)
             {
                 var failure = await Assert.ThrowsAsync<Exception>(() =>
@@ -133,12 +140,15 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                 await Assert.That(failure).IsTypeOf<DbUpdateException>()
                     .Because(failure!.GetBaseException().Message);
                 await Assert.That(((PostgresException)failure!.InnerException!).SqlState).IsEqualTo("P0001");
+                fixture.RecordStage(FixtureStage.ExpectedFaultAsserted, injectFailure);
             }
             else
             {
                 await workflow.Service.ReplayPendingAsync(CancellationToken.None);
-                await workflow.Service.ReplayPendingAsync(CancellationToken.None);
                 settled = true;
+                fixture.RecordStage(FixtureStage.ReplayReturned, injectFailure);
+                await workflow.Service.ReplayPendingAsync(CancellationToken.None);
+                fixture.RecordStage(FixtureStage.ReplayRepeatReturned, injectFailure);
             }
         }
         finally
@@ -151,6 +161,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
             await AssertRetainedAndApplicationAsync(retained, fact, graph, !settled, locatorProtector);
             await AssertStorageAsync(storage, graph, !settled);
         }
+        fixture.RecordStage(FixtureStage.CommittedStateAsserted, injectFailure);
         await Assert.That(application.TenantFilterTenantId).IsNull();
         await AssertPrivateReadDeniedAsync(application);
         await using var receiptObserver = fixture.CreateDbContext();
@@ -183,6 +194,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
             await Assert.That(result.Lookup.Outcome).IsEqualTo(Explore.Application.Contracts.Persistence.IdempotencyLookupOutcome.RequestMismatch);
             await Assert.That(result.Record).IsNull();
         }
+        fixture.RecordStage(FixtureStage.SettlementAssertionsReturned, injectFailure);
     }
 
     [Test]
@@ -192,6 +204,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
     [Arguments("policy")]
     public async Task ForgedPreparationAndMismatchedNativeTupleCannotErase(string changed)
     {
+        fixture.RecordStage(FixtureStage.ForgedTupleEntered);
         GlobalLocationPrivacyErasureTests.ErasureGraph graph;
         await using (var seed = fixture.CreateDbContext())
         {
@@ -243,6 +256,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
                 return await command.ExecuteScalarAsync(token);
             }, CancellationToken.None));
         await Assert.That(nativeRejected!.SqlState).IsEqualTo("42501");
+        fixture.RecordStage(FixtureStage.ForgedTupleRefusalAsserted);
         await using var persisted = fixture.CreateDbContext();
         await Assert.That(await persisted.UserPii.CountAsync(row => row.UserId == graph.OwnerUserId || row.UserId == graph.UnrelatedUserId)).IsEqualTo(2);
         await Assert.That(await persisted.Locations.IgnoreQueryFilters()
@@ -250,11 +264,13 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         await Assert.That(await persisted.PrivacyErasureProviderWork.CountAsync()).IsEqualTo(0);
         await Assert.That(await persisted.PrivacyErasureReplayCheckpoints.CountAsync()).IsEqualTo(0);
         await AssertPrivateReadDeniedAsync(application);
+        fixture.RecordStage(FixtureStage.ForgedTupleStateAsserted);
     }
 
     [Test]
     public async Task DisposalCannotPrecedeProtectedProviderWork()
     {
+        fixture.RecordStage(FixtureStage.ProtectedWorkEntered);
         GlobalLocationPrivacyErasureTests.ErasureGraph graph;
         await using (var seed = fixture.CreateDbContext())
         {
@@ -293,6 +309,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         var rejected = (PostgresException)cause;
         await Assert.That(rejected!.SqlState).IsEqualTo("55000");
         await Assert.That(rejected.MessageText).IsEqualTo("subject_erasure_protected_work_required");
+        fixture.RecordStage(FixtureStage.ProtectedWorkRefusalAsserted);
         await using var persisted = fixture.CreateDbContext();
         await Assert.That(await persisted.UserExternalLogins.IgnoreQueryFilters()
             .CountAsync(row => row.UserId == graph.OwnerUserId)).IsEqualTo(2);
@@ -302,6 +319,7 @@ public sealed class PostgresSubjectPrivacyErasureAuthorityTests(PostgreSqlContai
         await Assert.That(await persisted.OutboxMessages.CountAsync(row =>
             row.EventType == "LocationPiiErased" || row.EventType == "LocationPrivacyCorrectionRequested"
                 || row.EventType == "PrivacyErasureCacheInvalidationRequested")).IsEqualTo(0);
+        fixture.RecordStage(FixtureStage.ProtectedWorkStateAsserted);
     }
 
     private DbContextOptions<CoLocatedPrivacyErasureAuthorityDbContext> AuthorityOptions(PrimaryDatabaseRole role)

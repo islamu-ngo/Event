@@ -16,6 +16,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Event.Benchmarks.Api;
 
@@ -97,7 +98,7 @@ internal sealed class ApiBenchmarkHostFactory : WebApplicationFactory<global::Pr
             var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             if (!dbContext.Database.IsInMemory())
                 throw new InvalidOperationException("benchmark_inmemory_request_provider_required");
-            await DatabaseSeeder.SeedAsync(dbContext, environment, cancellationToken: cancellationToken);
+            await DatabaseSeeder.SeedAsync(dbContext, environment, NullLogger.Instance, cancellationToken: cancellationToken);
             await BenchmarkApiSeedData.SeedAsync(dbContext, cancellationToken);
             if (await dbContext.Events.CountAsync(evt => evt.Slug != null && evt.Slug.StartsWith("benchmark-api-event-"), cancellationToken) != 24)
                 throw new InvalidOperationException("benchmark_inmemory_dataset_invalid");

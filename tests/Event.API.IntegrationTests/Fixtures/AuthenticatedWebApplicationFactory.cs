@@ -18,6 +18,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
 namespace Event.Api.IntegrationTests.Fixtures;
@@ -287,7 +288,7 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
             await using var db = nativeDatabase is null
                 ? scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
                 : nativeDatabase.CreateDbContext();
-            await DatabaseSeeder.SeedAsync(db, environment, cancellationToken: cancellationToken);
+            await DatabaseSeeder.SeedAsync(db, environment, NullLogger.Instance, cancellationToken: cancellationToken);
             if (seedActiveDefaultTenant && await db.Tenants.FindAsync([PlatformDefaults.DefaultTenantId], cancellationToken) is null)
             {
                 db.Tenants.Add(new Event.Api.IntegrationTests.Builders.TenantBuilder()

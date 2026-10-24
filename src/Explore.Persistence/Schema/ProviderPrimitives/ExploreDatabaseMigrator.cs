@@ -117,6 +117,7 @@ public static class ExploreDatabaseMigrator
             await DatabaseSeeder.SeedAsync(
                 executionDatabase,
                 environment,
+                logger,
                 seedDevelopmentData,
                 configuration: configuration,
                 cancellationToken: cancellationToken);

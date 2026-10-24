@@ -41,6 +41,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using TUnit.Core;
 using TUnit.Core.Interfaces;
 
@@ -1984,7 +1985,7 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
         await _databaseReset.ResetAsync();
         IHostEnvironment environment =
             scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
-        await DatabaseSeeder.SeedAsync(db, environment);
+        await DatabaseSeeder.SeedAsync(db, environment, NullLogger.Instance);
         ILookupDataCache? cache =
             scope.ServiceProvider.GetService<ILookupDataCache>();
         if (cache is not null)

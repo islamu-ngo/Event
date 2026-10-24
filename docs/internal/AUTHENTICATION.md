@@ -634,6 +634,19 @@ postimage. The writer epoch protects absent rows, uniqueness and page ranges;
 completion erases sensitive retained state but keeps a transaction/backend
 tombstone. Deferred settlement checks only that completion seal.
 
+Its complete mapped inventory now recognizes 93 scalars while its operational
+inventory remains the same 90 scalars. For `UserPii`, the three private birth-date
+fields participate in exact model and physical-catalog checks but not column
+grants, row projections or INSERT payloads. The physical revision column must
+retain the source-owner migration's literal zero default; a changed default or
+an added private-field SELECT/UPDATE grant fails readiness and reinstall checks.
+The PII read CTE explicitly selects the four operational columns, rather than
+using `SELECT *`, so observing name/email data requires no birth-date permission.
+New Local rows therefore retain null birth date, null collection receipt and
+revision zero without collecting or disclosing those fields. These changes add
+no permission, schema migration or runtime repair. The new model, default and
+privilege-drift regressions are authored but remain locally unbuilt and unrun.
+
 The migrator installs this contract after S/P/route/H for co-located Identity;
 the PostgreSQL fixture preserves its epoch through reset. These are source
 hooks, not executed installation. Sixty native cases are authored and unrun:

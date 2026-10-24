@@ -52,6 +52,36 @@ public sealed class UserPiiWriterManifestTests
     }
 
     [Test]
+    public async Task Local_administration_declares_the_full_pii_model_without_new_column_authority()
+    {
+        using var context = ExploreDbContextModelProviderTests.CreateContext("SqlServer");
+        var source = PostgresLocalAdministrationContract.Inventory.Single(item => item.Type == typeof(UserPii));
+        PostgresLocalAdministrationContract.RequireModel(context, source);
+        var properties = context.Model.FindEntityType(typeof(UserPii))!.GetProperties()
+            .Select(property => property.Name).Order(StringComparer.Ordinal).ToArray();
+
+        await Assert.That(source.MappedProperties.Order(StringComparer.Ordinal).SequenceEqual(properties)).IsTrue();
+        await Assert.That(source.Properties.Order(StringComparer.Ordinal)
+            .SequenceEqual(new[] { "Email", "FirstName", "LastName", "UserId" })).IsTrue();
+    }
+
+    [Test]
+    public async Task Missing_private_field_declaration_still_rejects_the_local_administration_model()
+    {
+        using var context = ExploreDbContextModelProviderTests.CreateContext("SqlServer");
+        var source = PostgresLocalAdministrationContract.Inventory.Single(item => item.Type == typeof(UserPii));
+        var incomplete = source with
+        {
+            MappedProperties = source.MappedProperties.Where(property => property != "_birthDateRevision").ToArray()
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            PostgresLocalAdministrationContract.RequireModel(context, incomplete));
+
+        await Assert.That(exception.Message).IsEqualTo("local_administration_explicit_inventory_drift");
+    }
+
+    [Test]
     public async Task Missing_private_field_declaration_still_rejects_the_local_writer_model()
     {
         using var context = ExploreDbContextModelProviderTests.CreateContext("SqlServer");

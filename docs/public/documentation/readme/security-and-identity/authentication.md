@@ -266,6 +266,13 @@ Human managed-provider provisioning also recognizes the complete PII model
 without expanding its existing user-ID/name/email storage permissions. The
 private birth-date fields remain defaulted rather than collected by that flow.
 
+Local account administration likewise validates the complete PII storage shape
+without acquiring birth-date read or write permissions. Newly linked rows retain
+the private defaults, and a changed revision default or unexpected private-field
+grant is rejected rather than silently repaired. This correction needs no new
+setting or database migration; source and product checks alone do not certify
+provider runtime behavior.
+
 Instance administrators can use the administrative API to create Local accounts,
 issue supervised reset credentials and inspect or reconcile interrupted operations.
 The Local accounts section provides the same server-authorized operations.

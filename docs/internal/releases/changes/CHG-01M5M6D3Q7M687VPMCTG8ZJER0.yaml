@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M6D3Q7M687VPMCTG8ZJER0
+Title: "Requalify quarantined material across reads and release"
+Type: feat
+Scope: storage
+Summary: "Prevent quarantined material disclosure through audience, management, audit, export and upload paths while qualifying inspection and release; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Quarantined audience, management and metadata-export responses may omit previously required title/kind/requirements/draft/time/availability/audience fields. Handle status-only redacted results and exact MaterialVersionId, and update consumers to the final nullable generated contracts."
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Exact material-generation quarantine/review/inspection/release custody also gates audience, management, audit, export and upload projections, closing alternate disclosure paths. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned resource quarantine/release/review-duty and material-generation models plus generated schema history; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Resource-safety endpoint source and nullable/redacted audience/management/export DTO sources ship here; cumulative schema/client artifacts ship once in final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Coordinate native resource-upload boundary, quarantine custody, schema and consumer updates; complete paired storage review/release guidance and provider assurance before deployment."

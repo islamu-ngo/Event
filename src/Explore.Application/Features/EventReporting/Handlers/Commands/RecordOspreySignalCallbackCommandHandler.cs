@@ -1,4 +1,5 @@
-using System.Text;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -7,6 +8,7 @@ using Explore.Application.Features.EventReporting.Models;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Validators;
 using Explore.Application.Responses;
+using Explore.Application.Serialization;
 using Explore.Domain;
 using Explore.Domain.Enums;
 
@@ -25,7 +27,7 @@ public sealed class RecordOspreySignalCallbackCommandHandler(
         if (!validationResult.IsValid)
         {
             return Failure(
-                request.Request.ReportId,
+                request.Request?.ReportId ?? Guid.Empty,
                 "Osprey signal callback is invalid.",
                 validationResult.Errors.Select(error => error.ErrorMessage),
                 EventReportFailureCodes.ValidationFailed);
@@ -45,7 +47,7 @@ public sealed class RecordOspreySignalCallbackCommandHandler(
                 EventReportFailureCodes.TenantUnresolved);
         }
 
-        return await unitOfWork.ExecuteInTransactionAsync(async token =>
+        return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
             var report = await eventReportRepository.GetByIdForUpdateAsync(
                 request.Request.TenantId,
@@ -61,7 +63,7 @@ public sealed class RecordOspreySignalCallbackCommandHandler(
                     EventReportFailureCodes.ReportNotFound);
             }
 
-            if (report.EventId != request.Request.EventId)
+            if (report.TenantId != tenantContext.TenantId || report.EventId != request.Request.EventId)
             {
                 return Failure(
                     request.Request.ReportId,
@@ -70,7 +72,7 @@ public sealed class RecordOspreySignalCallbackCommandHandler(
                     EventReportFailureCodes.EventMismatch);
             }
 
-            var reportCase = ResolveCase(report, request.Request.CaseId);
+            var reportCase = report.Cases.SingleOrDefault(candidate => candidate.Id == request.Request.CaseId);
             if (reportCase is null)
             {
                 return Failure(
@@ -81,35 +83,65 @@ public sealed class RecordOspreySignalCallbackCommandHandler(
             }
 
             var now = DateTime.UtcNow;
-            var providerTarget = ResolveProviderTarget(
-                request.Request.TenantId,
-                request.Request.ProviderTargetScope,
-                request.Request.ProviderTargetId);
-            var targetValidation = ValidateProviderTarget(report, request.Request, providerTarget.Scope, providerTarget.TargetId);
-            if (!targetValidation.IsSuccess)
+            var providerSignalId = NormalizeOptional(request.Request.ProviderSignalId);
+            var correlationId = NormalizeOptional(request.Request.CorrelationId);
+            var scope = NormalizeOptional(request.Request.ProviderTargetScope);
+            var targetId = NormalizeOptional(request.Request.ProviderTargetId);
+            var links = report.ExternalLinks.Where(link =>
+                link.Provider == EventReportExternalProvider.Osprey &&
+                link.TenantId == report.TenantId && link.ReportId == report.Id && link.CaseId == reportCase.Id &&
+                (providerSignalId is not null || correlationId is not null) &&
+                (providerSignalId is null || link.ProviderSignalId == providerSignalId) &&
+                (correlationId is null || link.CorrelationId == correlationId) &&
+                (scope is null || string.Equals(link.ProviderTargetScope.ToString(), scope, StringComparison.OrdinalIgnoreCase)) &&
+                (targetId is null || link.ProviderTargetId == targetId)).ToArray();
+            if (links.Length != 1)
             {
-                return targetValidation;
+                return Failure(report.Id, "Osprey advice requires one exact existing native provider binding.",
+                    ["The callback cannot create or widen a provider dispatch binding."], EventReportFailureCodes.ValidationFailed);
             }
 
-            var changed = false;
+            var link = links[0];
+            var identity = providerSignalId ?? correlationId!;
+            var materialHash = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(
+                JsonSerializer.SerializeToUtf8Bytes(request.Request, ExploreJsonContext.Default.OspreySignalCallbackRequestDto)));
+            var existing = await eventReportRepository.GetProviderAdviceAsync(
+                report.TenantId, EventReportSignalProvider.Osprey, identity, token);
+            if (existing.Count != 0)
+            {
+                return existing.Count == request.Request.Signals.Count &&
+                    existing.Select((signal, index) => signal.AdvisoryOrdinal == index &&
+                        signal.MatchesAdvisorySource(report.Id, reportCase.Id, link.Id, materialHash, null,
+                            link.ProviderTargetScope, link.ProviderTargetId, link.CaseConcurrencyStamp)).All(matches => matches)
+                    ? Success(report.Id, "Osprey advice was already recorded.")
+                    : Failure(report.Id, "The Osprey identity was reused with different source, target or material.",
+                        ["Previously retained provider advice cannot be replaced."], EventReportFailureCodes.DecisionInvalid);
+            }
+
+            if (link.SyncState != EventReportSyncState.Synced)
+            {
+                return Failure(report.Id, "The native provider dispatch is not active for new advice.",
+                    ["New advice requires a synced native provider dispatch."], EventReportFailureCodes.ValidationFailed);
+            }
+
+            if (link.CaseConcurrencyStamp != reportCase.ConcurrencyStamp)
+            {
+                return Failure(report.Id, "The advisory dispatch does not match the current native case version.",
+                    ["New advice requires its original current native dispatch generation."],
+                    EventReportFailureCodes.CaseConcurrencyConflict);
+            }
+
+            var advice = new List<EventReportSignal>(request.Request.Signals.Count);
             var urgentRecommendationReceived = false;
 
             for (var index = 0; index < request.Request.Signals.Count; index++)
             {
                 var callbackSignal = request.Request.Signals[index];
-                var normalized = NormalizeSignal(request.Request, callbackSignal, index, now, providerTarget.Scope, providerTarget.TargetId);
+                var normalized = NormalizeSignal(request.Request, callbackSignal, index, now, link.ProviderTargetScope, link.ProviderTargetId);
                 urgentRecommendationReceived |= IsUrgentRecommendation(normalized.Verdict, normalized.RecommendedAction);
 
-                if (HasSignal(report, normalized))
-                {
-                    continue;
-                }
-
-                report.Signals.Add(EventReportSignal.Create(
-                    report.TenantId,
-                    report.Id,
-                    report.EventId,
-                    EventReportSignalProvider.Osprey,
+                advice.Add(EventReportSignal.CreateProviderAdvice(
+                    report, reportCase, link, identity, index, materialHash,
                     normalized.SignalType,
                     normalized.PolicyCode,
                     normalized.Score,
@@ -118,57 +150,17 @@ public sealed class RecordOspreySignalCallbackCommandHandler(
                     normalized.SafeSummary,
                     normalized.ExternalSignalId,
                     normalized.CorrelationId,
-                    normalized.CreatedAtUtc,
-                    normalized.ProviderTargetScope,
-                    normalized.ProviderTargetId));
-                changed = true;
+                    normalized.CreatedAtUtc));
             }
 
-            if (urgentRecommendationReceived && PromoteForHumanReview(report, reportCase, now))
+            if (urgentRecommendationReceived)
             {
-                changed = true;
+                PromoteForHumanReview(report, reportCase, now);
             }
 
-            var linkCorrelationId = ResolveCallbackCorrelationId(request.Request);
-            var link = GetOrCreateLink(report, reportCase.Id, linkCorrelationId, now, providerTarget.Scope, providerTarget.TargetId);
-            var providerSignalId = NormalizeOptional(request.Request.ProviderSignalId);
-            if (link.SyncState != EventReportSyncState.Synced)
-            {
-                link.MarkSynced(
-                    providerCaseId: null,
-                    providerSignalId: providerSignalId,
-                    providerUrl: null,
-                    now);
-                changed = true;
-            }
-            else if (!string.IsNullOrWhiteSpace(providerSignalId) && string.IsNullOrWhiteSpace(link.ProviderSignalId))
-            {
-                link.MarkSynced(link.ProviderCaseId, providerSignalId, link.ProviderUrl, now);
-                changed = true;
-            }
-
-            if (changed)
-            {
-                await eventReportRepository.Update(report);
-            }
-
-            return Success(report.Id, changed
-                ? "Osprey signal callback processed successfully."
-                : "Osprey signal callback was already recorded.");
+            await eventReportRepository.PersistProviderAdviceAsync(advice, token);
+            return Success(report.Id, "Osprey advice recorded for local human review.");
         }, cancellationToken);
-    }
-
-    private static EventReportCase? ResolveCase(EventReport report, Guid? caseId)
-    {
-        if (caseId.HasValue)
-        {
-            return report.Cases.FirstOrDefault(candidate => candidate.Id == caseId.Value);
-        }
-
-        return report.Cases
-            .OrderBy(candidate => candidate.Status == EventReportCaseStatus.Closed)
-            .ThenBy(candidate => candidate.CreatedAt)
-            .FirstOrDefault();
     }
 
     private static NormalizedOspreySignal NormalizeSignal(
@@ -198,79 +190,6 @@ public sealed class RecordOspreySignalCallbackCommandHandler(
             providerTargetScope,
             providerTargetId,
             signal.CreatedAtUtc?.ToUniversalTime() ?? utcNow);
-    }
-
-    private static BaseCommandResponse<Guid> ValidateProviderTarget(
-        EventReport report,
-        OspreySignalCallbackRequestDto request,
-        EventReportProviderTargetScope providerTargetScope,
-        string providerTargetId)
-    {
-        var providerSignalId = NormalizeOptional(request.ProviderSignalId);
-        var correlationId = ResolveCallbackCorrelationId(request);
-        var conflictingLink = report.ExternalLinks.FirstOrDefault(link =>
-            link.Provider == EventReportExternalProvider.Osprey &&
-            (MatchesOptional(link.ProviderSignalId, providerSignalId) || MatchesOptional(link.CorrelationId, correlationId)) &&
-            !IsSameTarget(link.ProviderTargetScope, link.ProviderTargetId, providerTargetScope, providerTargetId));
-        if (conflictingLink is not null)
-        {
-            return Failure(
-                request.ReportId,
-                "Osprey callback target does not match the existing provider link.",
-                ["Osprey callback target does not match the existing provider link."],
-                EventReportFailureCodes.ValidationFailed);
-        }
-
-        return Success(request.ReportId, "Osprey callback target is valid.");
-    }
-
-    private static bool HasSignal(EventReport report, NormalizedOspreySignal signal)
-    {
-        if (!string.IsNullOrWhiteSpace(signal.ExternalSignalId))
-        {
-            return report.Signals.Any(existing =>
-                existing.Provider == EventReportSignalProvider.Osprey &&
-                IsSameTarget(existing.ProviderTargetScope, existing.ProviderTargetId, signal.ProviderTargetScope, signal.ProviderTargetId) &&
-                string.Equals(existing.ExternalSignalId, signal.ExternalSignalId, StringComparison.Ordinal));
-        }
-
-        return report.Signals.Any(existing =>
-            existing.Provider == EventReportSignalProvider.Osprey &&
-            IsSameTarget(existing.ProviderTargetScope, existing.ProviderTargetId, signal.ProviderTargetScope, signal.ProviderTargetId) &&
-            string.Equals(existing.SignalType, signal.SignalType, StringComparison.Ordinal) &&
-            string.Equals(existing.PolicyCode, signal.PolicyCode, StringComparison.Ordinal) &&
-            string.Equals(existing.CorrelationId, signal.CorrelationId, StringComparison.Ordinal));
-    }
-
-    private static EventReportExternalLink GetOrCreateLink(
-        EventReport report,
-        Guid caseId,
-        string correlationId,
-        DateTime utcNow,
-        EventReportProviderTargetScope providerTargetScope,
-        string providerTargetId)
-    {
-        var existing = report.ExternalLinks.FirstOrDefault(link =>
-            link.Provider == EventReportExternalProvider.Osprey &&
-            IsSameTarget(link.ProviderTargetScope, link.ProviderTargetId, providerTargetScope, providerTargetId) &&
-            string.Equals(link.CorrelationId, correlationId, StringComparison.Ordinal));
-
-        if (existing is not null)
-        {
-            return existing;
-        }
-
-        var link = EventReportExternalLink.CreatePending(
-            report.TenantId,
-            report.Id,
-            caseId,
-            EventReportExternalProvider.Osprey,
-            correlationId,
-            utcNow,
-            providerTargetScope,
-            providerTargetId);
-        report.ExternalLinks.Add(link);
-        return link;
     }
 
     private static bool PromoteForHumanReview(EventReport report, EventReportCase reportCase, DateTime utcNow)
@@ -325,37 +244,6 @@ public sealed class RecordOspreySignalCallbackCommandHandler(
             _ => null
         };
     }
-
-    private static string ResolveCallbackCorrelationId(OspreySignalCallbackRequestDto request)
-    {
-        return NormalizeCorrelationId(
-            NormalizeOptional(request.CorrelationId)
-            ?? NormalizeOptional(request.ProviderSignalId)
-            ?? $"osprey-callback:{request.ReportId:N}");
-    }
-
-    private static (EventReportProviderTargetScope Scope, string TargetId) ResolveProviderTarget(
-        Guid tenantId,
-        string? rawScope,
-        string? rawTargetId)
-    {
-        var scope = string.Equals(rawScope, "tenant", StringComparison.OrdinalIgnoreCase)
-            ? EventReportProviderTargetScope.Tenant
-            : EventReportProviderTargetScope.Instance;
-        var targetId = NormalizeOptional(rawTargetId)
-            ?? (scope == EventReportProviderTargetScope.Tenant ? tenantId.ToString("N") : "instance");
-        return (scope, targetId.Length <= 200 ? targetId : targetId[..200]);
-    }
-
-    private static bool IsSameTarget(
-        EventReportProviderTargetScope leftScope,
-        string leftTargetId,
-        EventReportProviderTargetScope rightScope,
-        string rightTargetId) =>
-        leftScope == rightScope && string.Equals(leftTargetId, rightTargetId, StringComparison.Ordinal);
-
-    private static bool MatchesOptional(string? left, string? right) =>
-        !string.IsNullOrWhiteSpace(left) && !string.IsNullOrWhiteSpace(right) && string.Equals(left, right, StringComparison.Ordinal);
 
     private static string NormalizeCorrelationId(string value)
     {

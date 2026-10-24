@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZNYXFYSPA88YQ05S7XPD73
+Title: "Model independently accepted generation-pinned pre-finding custody"
+Type: feat
+Scope: access
+Summary: "Pin finite private notice and response custody to exact supplied subject, source generation and evidence with separate privacy-owner acceptance, recipient-only interactions and irreversible local payload purge without findings or native permission."
+Group: moderation-pre-finding-custody-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

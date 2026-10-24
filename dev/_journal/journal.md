@@ -2858,6 +2858,62 @@ Do not infer wire presence from DTO nullability or an isolated serializer test.
 
 ---
 
+[2026-10-13 Europe/Brussels] — Native enum registration can silently lose SDK wire names
+
+**Context**: During approved cross-solution moderation implementation, native protected investigator capture and exact Human attribution added public responsibility/custody coordinates. Product API and generated Client compilation passed before artifact inspection.
+
+**Symptom / Observation**: The actual `ModerationResponsibilityBasis` component in `schemas/openapi_islamu-event.json` was `{"type":"integer"}` without named values. The first generated Client build was green but did not provide the intended named responsibility contract. Participant incident target kind and separately adopted investigation purpose required the same explicit enum registration.
+
+**Root Cause**: Native and Swagger enum schema adapters share an explicit catalogue in `src/Explore.API/OpenApi/OpenApiStringEnumSchemas.cs`. Runtime JSON string-enum handling and a successful NSwag compilation do not populate this catalogue. An omitted public enum can therefore remain an unconstrained integer in documentation and generated request types.
+
+**Resolution**: Registered `ModerationResponsibilityBasis`, `ModerationCaseTargetKind` and `ModerationCaseNarrativePurpose` at the source owner, forced native OpenAPI export and regenerated the Client through its normal build target. The actual emitted schema now includes all five responsibility names and both custody purpose names; the generated SDK includes `ParticipantInvestigation`. No generated artifact was hand-edited. Two owning `ContractApiFixture` native/Swagger enum cases were authored, not executed under the programme's implementation-first override.
+
+**Guardrail / Follow-up**: For new or expanded public enums, inspect the actual native component and generated request type rather than treating compilation as wire parity. SDK CLR ordinals are independent of backend values: the generated fifth basis is ordinal 4 while the Domain value is 5. Its configured named serialization is the contract; do not cast its ordinal into a native request. Keep hosted native/Swagger coverage for all actual enum names.
+
+**Confidence**: Confirmed source/artifact and compilation evidence. Hosted Swagger/HTTP and provider/runtime behavior remain unverified until final programme assurance.
+
+**References**:
+- `src/Explore.API/OpenApi/OpenApiStringEnumSchemas.cs`
+- `src/Explore.Blazor.Client/Clients/EventApiClients.cs:121`
+- `tests/Event.API.IntegrationTests/Features/ModerationPolicyAdministrationOpenApiTests.cs`
+- `schemas/openapi_islamu-event.json`
+- `dev/active/cross-solution-moderation/cross-solution-moderation-tasks.md` (11.2 exact export/build receipts)
+
+**Promotion Consideration**:
+- [x] Stays in journal only; shared schema adapters and hosted enum cases own the behavior.
+
+---
+
+[2026-10-20 Europe/Brussels] — Publication hashes need an immutable foreign-key principal
+
+**Context**: While joining delegated registration-provider publication to the native moderation boundary, source review found a persistence blocker shared with managed publication. The maintainer approved an immutable publication identity, generated provider migrations and unchanged evidence transfer; no database application or test execution was authorized.
+
+**Symptom / Observation**: A saved Draft binding changes `PublishedMappingRevisionHashKey` from empty to its final hash during publication, but that property was part of an EF alternate key used by exact registration-attempt foreign keys. The native publisher therefore attempted to mutate an EF key. Successful source compilation did not establish that publishing a persisted Draft could save.
+
+**Root Cause**: Mutable lifecycle state and immutable evidence identity occupied the same principal key. Removing the hash from attempt references would avoid the key mutation only by weakening tenant/binding/hash provenance. Moving the FK also introduced provider DDL dependencies: source-hash collation changes retain computed-column/index/CHECK dependencies, and SQLite copies dependent attempts before its deferred parent rebuild restores the old key on downgrade.
+
+**Resolution**: Added a binding-owned `RegistrationProviderBindingPublication` born with its final tenant, binding ID, ordinal hash and UTC time. The optional binding-to-publication FK uses nullable publication time to keep Draft insertion acyclic; strict shape checks reject partial provenance. Attempts still reference exact tenant/binding/hash, now on the immutable principal. Native save guards require the actual publishing Draft owner and reject replacement, deletion and mismatched attempts; they are not direct-SQL append-only or orphan-prevention guarantees. Generated four provider migration families without hand edits. Generator-owned preflight transfers every valid Published binding, including soft-deleted history, without changing its ID/hash/time, and rejects inconsistent evidence. Native computed dependencies are staged around collation changes; SQLite downgrade temporarily restores the legacy parent key before copying attempts, then removes publication only after owner rebuilds.
+
+Verification executed in the task worktree: `dotnet build src/Explore.Domain/Explore.Domain.csproj --configuration Release --no-restore --verbosity quiet --nologo -tl:off -m:1 -nodeReuse:false -p:UseSharedCompilation=false -p:BuildProjectReferences=false` passed with 146 warnings / 0 errors; final `dotnet build src/Explore.Persistence/Explore.Persistence.csproj --configuration Release --no-restore --verbosity quiet --nologo -tl:off -m:1 -nodeReuse:false -p:UseSharedCompilation=false -p:BuildProjectReferences=false` passed with 62 warnings / 0 errors. Native bounded SQL generation used `DOTNET_ENVIRONMENT=Development dotnet run eng/tools/ScaffoldPrimaryMigration.cs --configuration Release --no-build --no-restore -- <provider> ImmutableRegistrationProviderBindingPublication --script-from <previousMigration>` for PostgreSql, Sqlite, SqlServer and MySql after explicit product builds. All exited 0 without connecting to or applying a database. The 65 authored root regressions remain UNRUN/unbuilt. SQLite generation warnings and the separately known SQL Server case-evidence downgrade discrepancy remain open assurance/release considerations, not passing provider evidence.
+
+**Why This Matters for Future Work**: A foreign-key principal must already possess its final immutable identity when inserted; preserving exact provenance requires changing the principal, not relaxing the dependent reference. Review actual Up and Down SQL against historical models: EF-native operation ordering alone does not resolve computed/check dependencies or deferred parent-key availability. Compilation and SQL emission are distinct from model and provider execution.
+
+**References**:
+- `src/Explore.Domain/RegistrationProviderBinding.cs:134`
+- `src/Explore.Domain/RegistrationProviderBindingPublication.cs:5`
+- `src/Explore.Persistence/Configurations/Entities/RegistrationProviderConfiguration.cs:73`
+- `src/Explore.Persistence/Configurations/Entities/RegistrationAttemptConfiguration.cs:97`
+- `src/Explore.Persistence/ExploreDbContext.ProviderPublications.cs:9`
+- `src/Explore.Persistence/Schema/ProviderPrimitives/RegistrationProviderPublicationTransfer.cs:25`
+- `tests/Event.Persistence.IntegrationTests/RegistrationProviderFoundationPersistenceTests.Publication.cs`
+- `tests/Event.Persistence.IntegrationTests/RegistrationProviderPublicationTransferTests.cs`
+- `docs/internal/MODERATION.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; native ownership guards, exact model keys and provider-generation regressions own this correction.
+
+---
+
 [2026-10-08 Europe/Brussels] - Policy integrity hashes must not depend on search path
 
 **Context**: PostgreSQL ordinary-role admission was being verified during the tenant-lease security remediation.

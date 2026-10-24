@@ -105,6 +105,22 @@
             },
 
             // User authenticated routes
+            new RouteConfig
+            {
+                Path = "/moderation/policies",
+                Component = typeof(Explore.Blazor.Client.Pages.Moderation.PolicyAdministration),
+                Transition = RouteTransition.None,
+                EnableCache = false,
+                Guards = RequireAuthenticated()
+            },
+            new RouteConfig
+            {
+                Path = "/moderation/pre-finding/notices/:noticeId",
+                Component = typeof(Explore.Blazor.Client.Pages.Moderation.PreFindingNotice),
+                Transition = RouteTransition.None,
+                EnableCache = false,
+                Guards = RequireAuthenticated()
+            },
             new RouteConfig { Path = "/tickets", Component = typeof(Tickets), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/tickets/:ticketId", Component = typeof(TicketDetail), Transition = RouteTransition.Fade, EnableCache = false, Guards = RequireAuthenticated() },
             new RouteConfig { Path = "/my/profile", Component = typeof(UserProfile), Transition = RouteTransition.Fade, Guards = RequireAuthenticated() },

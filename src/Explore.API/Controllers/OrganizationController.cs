@@ -293,8 +293,7 @@ public class OrganizationController : EventControllerBase
 
         var command = new CreateOrganizationCommand
         {
-            OrganizationDto = organization,
-            CreatorUserId = userId.Value
+            OrganizationDto = organization
         };
 
         var response = await _createOrganization.ExecuteAsync(command, cancellationToken);

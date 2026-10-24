@@ -18,4 +18,3 @@ public interface IPreparedHumanManagedProviderProvisioning
     Task<IHumanManagedProviderProvisioningData> AcquireAsync(EnsureManagedProviderClientProvisionedCommand originalRequest,
         CancellationToken cancellationToken = default);
 }
-

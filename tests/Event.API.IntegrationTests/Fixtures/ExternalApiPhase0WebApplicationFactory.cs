@@ -179,6 +179,7 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
             using var scope = services.BuildServiceProvider().CreateScope();
             var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ExploreDbContext>>();
             using var dbContext = factory.CreateDbContext();
+            dbContext.BindTenantLease();
             dbContext.Database.EnsureCreated();
             SqliteDatabaseInitializer.InitializeAsync(dbContext, CancellationToken.None).GetAwaiter().GetResult();
             LookupTableSeeder.SeedAsync(dbContext).GetAwaiter().GetResult();

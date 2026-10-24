@@ -1,6 +1,7 @@
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSessions.Requests.Commands;
@@ -17,7 +18,7 @@ public sealed class PublishEventSessionCommandHandler(
     IEventRepository eventRepository,
     IEventLifecyclePolicyProvider policyProvider,
     IEventLifecycleReadinessEvaluator readinessEvaluator,
-    IUnitOfWork unitOfWork,
+    IEventPublicationMutationBoundary publicationBoundary,
     HybridCache cache,
     TimeProvider timeProvider) : ICommandHandler<PublishEventSessionCommand, BaseCommandResponse<Guid>>
 {
@@ -39,65 +40,53 @@ public sealed class PublishEventSessionCommandHandler(
             return Failure(command.Id, "Event session was not found.", ["Event session was not found."]);
         }
 
-        if (session.EventSessionStatusId == (int)EventSessionStatusEnum.Published)
-        {
-            return Success(session.Id, "Event session is already published.");
-        }
-
-        if (session.ConcurrencyStamp != command.Request.ExpectedConcurrencyStamp)
-        {
-            return Failure(command.Id, "Event session was modified by another request.", ["Refresh the event session and try publishing again."], ConcurrencyConflictCode);
-        }
-
-        var parentEvent = await eventRepository.GetById(session.EventId);
-        if (parentEvent is null || parentEvent.TenantId != session.TenantId)
-        {
-            return Failure(command.Id, "Parent event was not found in the current tenant.", ["Parent event was not found in the current tenant."]);
-        }
-
-        EventLifecyclePolicy policy = await policyProvider.GetEffectivePolicyAsync(session.TenantId, ValidationProfile.SessionPublish, cancellationToken);
-        LifecycleReadinessResult readiness = readinessEvaluator.Evaluate(session, parentEvent, ValidationProfile.SessionPublish, policy);
-        if (!readiness.IsReady)
-        {
-            return Failure(command.Id, "Event session is not ready to publish.", readiness.Errors.Select(error => error.Message), ReadinessFailedCode);
-        }
-
+        Guid originalEventId = session.EventId;
+        Guid originalTenantId = session.TenantId;
         DateTime occurredAt = timeProvider.GetUtcNow().UtcDateTime;
         bool mutationAttempted = false;
-        (BaseCommandResponse<Guid> Response, Guid? ParentEventId, Guid? TenantId) result;
+        Guid? cacheParentEventId = null;
+        Guid? cacheTenantId = null;
+        BaseCommandResponse<Guid> result;
         try
         {
-            result = await unitOfWork.ExecuteInTransactionAsync(async token =>
+            result = await publicationBoundary.ExecuteAsync(originalEventId, async token =>
             {
-                EventSession? currentSession = await eventSessionRepository.GetByIdForEventAsync(
+                cacheParentEventId = null;
+                cacheTenantId = null;
+                EventSession? currentSession = await eventSessionRepository.GetByIdForEventForUpdateAsync(
                     command.Id,
-                    session.EventId,
-                    session.TenantId,
+                    originalEventId,
+                    originalTenantId,
                     token);
                 if (currentSession is null)
                 {
-                    return NoCache(Failure(command.Id, "Event session was not found.", ["Event session was not found."]));
+                    return Failure(command.Id, "Event session was not found.", ["Event session was not found."]);
                 }
 
-                Event? currentParentEvent = await eventRepository.GetById(currentSession.EventId);
-                if (currentParentEvent is null || currentParentEvent.TenantId != currentSession.TenantId)
+                Event? currentParentEvent = await eventRepository.GetById(originalEventId);
+                if (currentParentEvent is null || currentParentEvent.TenantId != originalTenantId)
                 {
-                    return NoCache(Failure(command.Id, "Parent event was not found in the current tenant.", ["Parent event was not found in the current tenant."]));
+                    return Failure(command.Id, "Parent event was not found in the current tenant.", ["Parent event was not found in the current tenant."]);
                 }
 
                 bool alreadyPublished = currentSession.EventSessionStatusId == (int)EventSessionStatusEnum.Published;
-                if (mutationAttempted && alreadyPublished)
+                if (alreadyPublished)
                 {
-                    return WithCacheIdentity(Success(currentSession.Id, "Event session published successfully."), currentParentEvent);
+                    if (mutationAttempted)
+                    {
+                        cacheParentEventId = originalEventId;
+                        cacheTenantId = originalTenantId;
+                    }
+                    return Success(currentSession.Id, "Event session is already published.");
                 }
 
                 if (currentSession.ConcurrencyStamp != command.Request.ExpectedConcurrencyStamp)
                 {
-                    return NoCache(Failure(
+                    return Failure(
                         command.Id,
                         "Event session was modified by another request.",
                         ["Refresh the event session and try publishing again."],
-                        ConcurrencyConflictCode));
+                        ConcurrencyConflictCode);
                 }
 
                 EventLifecyclePolicy currentPolicy = await policyProvider.GetEffectivePolicyAsync(
@@ -111,11 +100,11 @@ public sealed class PublishEventSessionCommandHandler(
                     currentPolicy);
                 if (!currentReadiness.IsReady)
                 {
-                    return NoCache(Failure(
+                    return Failure(
                         command.Id,
                         "Event session is not ready to publish.",
                         currentReadiness.Errors.Select(error => error.Message),
-                        ReadinessFailedCode));
+                        ReadinessFailedCode);
                 }
 
                 currentSession.Publish((EventStatusEnum)currentParentEvent.EventStatusId, occurredAt);
@@ -123,7 +112,9 @@ public sealed class PublishEventSessionCommandHandler(
                 await eventSessionRepository.Update(currentSession);
                 await RefreshParentScheduleSummaryAsync(currentParentEvent.Id, token);
 
-                return WithCacheIdentity(Success(currentSession.Id, "Event session published successfully."), currentParentEvent);
+                cacheParentEventId = originalEventId;
+                cacheTenantId = originalTenantId;
+                return Success(currentSession.Id, "Event session published successfully.");
             }, cancellationToken);
         }
         catch (ConcurrencyConflictException)
@@ -135,16 +126,20 @@ public sealed class PublishEventSessionCommandHandler(
                 ConcurrencyConflictCode);
         }
 
-        if (!result.Response.IsSuccess
-            || result.ParentEventId is not { } parentEventId
-            || result.TenantId is not { } tenantId)
+        if (result.FailureCode is "event_publish_restricted" or "event_publish_authority_unavailable")
         {
-            return result.Response;
+            return BaseCommandResponse.Failure(
+                result.FailureCode == "event_publish_restricted"
+                    ? "event_session_publish_restricted" : "event_session_publish_authority_unavailable",
+                result.Message, result.Errors, command.Id);
         }
 
-        await cache.RemoveByTagAsync(CacheTags.Event(parentEventId), cancellationToken);
-        await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);
-        return result.Response;
+        if (result.IsSuccess && cacheParentEventId is { } parentEventId && cacheTenantId is { } tenantId)
+        {
+            await cache.RemoveByTagAsync(CacheTags.Event(parentEventId), cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);
+        }
+        return result;
     }
 
     private static BaseCommandResponse<Guid> Success(Guid id, string message) =>
@@ -154,13 +149,6 @@ public sealed class PublishEventSessionCommandHandler(
         failureCode is null
             ? BaseCommandResponse.Validation(errors, message, id)
             : BaseCommandResponse.Failure(failureCode, message, errors, id);
-
-    private static (BaseCommandResponse<Guid> Response, Guid? ParentEventId, Guid? TenantId) NoCache(
-        BaseCommandResponse<Guid> response) => (response, null, null);
-
-    private static (BaseCommandResponse<Guid> Response, Guid? ParentEventId, Guid? TenantId) WithCacheIdentity(
-        BaseCommandResponse<Guid> response,
-        Event parentEvent) => (response, parentEvent.Id, parentEvent.TenantId);
 
     private async Task RefreshParentScheduleSummaryAsync(Guid eventId, CancellationToken cancellationToken)
     {

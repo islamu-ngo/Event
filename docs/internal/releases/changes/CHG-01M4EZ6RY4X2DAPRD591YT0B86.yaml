@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4EZ6RY4X2DAPRD591YT0B86
+Title: "Keep management, audit and export metadata private until final delivery"
+Type: fix
+Scope: access
+Summary: "Prevent prepared management pages, audit entries and metadata exports from surviving revocation before serialization. Native management reads return private single-use projections with current row and attachment qualification. Audit disclosure binds retention and earliest entry expiry; exports recheck download decisions before releasing derived links. Native consumers must use Projection.DiscloseAsync instead of Value. HTTP routes and response shapes remain unchanged; moderation activation remains incomplete."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

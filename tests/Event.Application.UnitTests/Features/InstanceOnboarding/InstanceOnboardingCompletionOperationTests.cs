@@ -327,7 +327,9 @@ internal sealed class OnboardingCompletionScenario
             new Explore.Application.Services.IdentityEmailSynchronizationOperation(emails),
             SystemSettings, [new RejectionSource(this)], secret, audit, DeploymentModeProvider, jwt,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork, GenerationReader, HostConfiguration,
-            new Explore.Application.Services.PrivacyIdentityFenceOperation(new Services.FenceTestAuthority()), unitOfWork,
+            new Explore.Application.Services.PrivacyIdentityFenceOperation(new Services.FenceTestAuthority(),
+                new Services.EmptyRecognitionInventory(), TimeProvider.System, logins,
+                () => throw new InvalidOperationException("Instance onboarding does not settle human enrollment.")), unitOfWork,
             new UnexpectedLocalReceiptSource());
     }
 
@@ -409,8 +411,17 @@ internal sealed class OnboardingCompletionScenario
                 : null);
     }
 
-    private sealed class ReadOnlyUnitOfWork : IUnitOfWork, IEventDiscoveryEnrollmentGate
+    private sealed class ReadOnlyUnitOfWork : IUnitOfWork, IEventDiscoveryEnrollmentGate, IPrivacyIdentityEnrollmentTransaction
     {
+        public Task<T> ExecuteRecognitionEnrollmentAsync<T>(Func<CancellationToken, Task<T>> operation,
+            Func<CancellationToken, Task> beforeCommit, CancellationToken ct = default) =>
+            ExecuteSerializableAsync(async token =>
+            {
+                T result = await operation(token);
+                await beforeCommit(token);
+                return result;
+            }, ct);
+
         public bool InTransaction { get; private set; }
         private bool enrollmentHeld;
 

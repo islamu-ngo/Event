@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
@@ -11,8 +12,10 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Persistence;
 using Explore.ServiceDefaults.DataProtection;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -51,7 +54,7 @@ public class SafeModeLatchTests : IAsyncDisposable
 {
     private readonly KeycloakOnlyFixture _keycloak;
 
-    private readonly WebApplicationFactory<Program> _instanceAdminFactory;
+    private readonly SafeModeWebApplicationFactory _instanceAdminFactory;
     private readonly HttpClient _instanceAdminClient;
 
     private readonly WebApplicationFactory<Program> _regularUserFactory;
@@ -128,7 +131,8 @@ public class SafeModeLatchTests : IAsyncDisposable
 
         var response = await _instanceAdminClient.SendAsync(request);
 
-        await Assert.That([HttpStatusCode.OK, HttpStatusCode.BadRequest]).Contains(response.StatusCode).Because("instance admin can still manage tenant resources during safe-mode");
+        await Assert.That([HttpStatusCode.OK, HttpStatusCode.BadRequest]).Contains(response.StatusCode).Because(
+            "instance admin can still manage tenant resources during safe-mode; " + _instanceAdminFactory.RequestFailure);
     }
 
     #endregion
@@ -329,6 +333,9 @@ public class SafeModeLatchTests : IAsyncDisposable
         private readonly IAdminContext _adminContext;
         private readonly ITenantContext _tenantContext;
         private readonly ICerbosConfigResolver _cerbosConfigResolver;
+        private readonly RequestFailureMetadata _requestFailures = new();
+
+        internal string RequestFailure => _requestFailures.Metadata;
 
         public SafeModeWebApplicationFactory(
             string keycloakAuthority,
@@ -399,6 +406,7 @@ public class SafeModeLatchTests : IAsyncDisposable
 
             builder.ConfigureTestServices(services =>
             {
+                services.Insert(0, ServiceDescriptor.Singleton<IExceptionHandler>(_requestFailures));
                 services.RemoveAll<IExternalDataProtectionSource>();
                 services.AddSingleton<IExternalDataProtectionSource>(_dataProtectionAuthority);
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
@@ -436,6 +444,32 @@ public class SafeModeLatchTests : IAsyncDisposable
                     };
                 });
             });
+        }
+
+        private sealed class RequestFailureMetadata : IExceptionHandler
+        {
+            private string metadata = "No request exception metadata was observed.";
+
+            internal string Metadata => Volatile.Read(ref metadata);
+
+            public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception,
+                CancellationToken cancellationToken)
+            {
+                Exception root = exception.GetBaseException();
+                string description = Describe(exception);
+                if (!ReferenceEquals(root, exception)) description += "; root=" + Describe(root);
+                Volatile.Write(ref metadata, description);
+                return ValueTask.FromResult(false);
+            }
+
+            private static string Describe(Exception exception)
+            {
+                var methods = new StackTrace(exception).GetFrames().Take(8)
+                    .Select(frame => frame.GetMethod())
+                    .Where(method => method is not null)
+                    .Select(method => method!.DeclaringType?.FullName + "." + method.Name);
+                return exception.GetType().FullName + ": " + string.Join(" -> ", methods);
+            }
         }
     }
 

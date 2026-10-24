@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M7ZHW6J4X7V2YDHXQXSY04
+Title: "preserve publication failures for forms and provider imports"
+Type: fix
+Scope: registration
+Summary: "Map current publication restrictions and unavailable authority distinctly for native forms, external imports and provider bindings without changing other validation paths. Runtime and provider verification are not claimed."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Native form, external-import and binding publication failures retain current restriction versus authority-unavailable semantics while other management validation is unchanged. Tests and provider verification were not run by this preparer."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Registration publication actions declare HTTP 503 and map denied or unavailable authority to HTTP 403 or 503 ProblemDetails with distinct form, import and binding codes. Matched generated output remains in the final cumulative checkpoint."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Coordinate these endpoint adapters with the native publication owners and final contract. Main owns registration persistence tests and paired guides; no tests, provider conformance or deployment readiness are claimed here."

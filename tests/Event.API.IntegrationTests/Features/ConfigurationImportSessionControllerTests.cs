@@ -268,7 +268,8 @@ public sealed class ConfigurationImportSessionControllerTests
                     ImmutableArray<ConfigurationImportOperationResult>>>(),
                 Substitute.For<IQueryHandler<GetInstanceConfigurationImportReceiptQuery,
                     ConfigurationImportOperationResult>>(),
-                Substitute.For<IAuthorizationProvider>())
+                Substitute.For<IAuthorizationProvider>(),
+                Microsoft.Extensions.Options.Options.Create(new JsonOptions()))
             {
                 ControllerContext = new ControllerContext
                 {

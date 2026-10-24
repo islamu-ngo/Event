@@ -2,6 +2,7 @@
 using System.Data.Common;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
 using Explore.Persistence;
@@ -637,7 +638,8 @@ public sealed class LocalIdentityTokenPurposeTests
 
     private static LocalIdentityLifecycleStore Store(Fixture fixture, AsyncServiceScope scope) => new(
         fixture.Identity(scope), scope.ServiceProvider.GetRequiredService<ExploreDbContext>(),
-        scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Clock, fixture.StateStore(scope));
+        scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Clock, fixture.StateStore(scope),
+        NativeIdentityRecognitionBoundary.For(scope.ServiceProvider.GetRequiredService<ExploreDbContext>(), fixture.Clock));
 
     private static string NewPassword() => $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}";
 

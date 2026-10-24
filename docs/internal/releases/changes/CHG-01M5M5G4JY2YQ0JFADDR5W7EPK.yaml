@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M5G4JY2YQ0JFADDR5W7EPK
+Title: "Read assignable event roles from current permission rows"
+Type: fix
+Scope: access
+Summary: "Use current active permission entities for the event-role ceiling and replace obsolete mocked ceiling tests with native boundary coverage."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: "Assignable role ceilings read current active permission entities. Native regression source replaces obsolete mocked ceiling coverage; tests are unrun and unbuilt."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

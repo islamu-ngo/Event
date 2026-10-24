@@ -1,0 +1,74 @@
+@using Explore.Blazor.Client.Clients
+
+@if (Profile is { } profile)
+{
+    <section class="moderation-reference-preview">
+        <header>
+            <h2>Reference profile @profile.Code</h2>
+            <p>Reference definitions do not adopt policy, authorize an action or prove current native support.</p>
+        </header>
+        <dl class="moderation-reference-preview__facts">
+            <dt>Ground</dt><dd>@Label(profile.Ground)</dd>
+            <dt>Required basis</dt><dd>@Label(profile.Basis)</dd>
+            <dt>Base recipe</dt><dd>@Label(profile.Bundle)</dd>
+            <dt>Recognition</dt><dd>@Label(profile.Recognition)</dd>
+            @if (profile.ProtectionPurpose is { } purpose)
+            {
+                <dt>Protection purpose</dt><dd>@Label(purpose)</dd>
+            }
+        </dl>
+        <section>
+            <h3>Native effects</h3>
+            <ul>
+                @foreach (var effect in profile.Effects ?? [])
+                {
+                    <li>@Label(effect.Kind): @Label(effect.Mode), @Label(effect.Target), @Label(effect.Execution)</li>
+                }
+            </ul>
+        </section>
+        <section>
+            <h3>Required prerequisites</h3>
+            <ul>
+                @foreach (var prerequisite in profile.Prerequisites ?? [])
+                {
+                    <li>@Label(prerequisite)</li>
+                }
+            </ul>
+        </section>
+        <section>
+            <h3>Responses and review</h3>
+            <ul>
+                @foreach (var response in profile.Responses ?? [])
+                {
+                    <li>@response.Grade: @Label(response.Timing.Kind), duration @response.Timing.Duration,
+                        approvals @response.RequiredApprovals, independent follow-up @response.IndependentFollowUpRequired.</li>
+                }
+            </ul>
+        </section>
+        @if (ShowAdvanced)
+        {
+            <section>
+                <h3>Reference coordinates</h3>
+                <dl class="moderation-reference-preview__facts">
+                    <dt>Reference revision</dt><dd>@profile.Revision</dd>
+                    <dt>Scope kinds</dt><dd>@string.Join(", ", (profile.ScopeKinds ?? []).Select(value => Label(value)))</dd>
+                    <dt>Subject kinds</dt><dd>@string.Join(", ", (profile.SubjectKinds ?? []).Select(value => Label(value)))</dd>
+                    <dt>Recognition prerequisites</dt><dd>@string.Join(", ", (profile.RecognitionPrerequisites ?? []).Select(value => Label(value)))</dd>
+                    <dt>Minimum audience age</dt><dd>@profile.MinimumAudienceAge</dd>
+                    <dt>Qualifying finding ordinal</dt><dd>@profile.QualifyingFindingOrdinal</dd>
+                    <dt>Recurrence window</dt><dd>@profile.RecurrenceWindow</dd>
+                    <dt>Persistent evasion may replace ordinal</dt><dd>@profile.PersistentEvasionFindingMayReplaceOrdinal</dd>
+                </dl>
+            </section>
+        }
+        <section class="moderation-reference-preview__plans">
+            <h3>Complete consequence plans</h3>
+            @{ var planIndex = 0; }
+            @foreach (var plan in profile.ConsequencePlans ?? [])
+            {
+                <ModerationConsequencePlanPreview Plan="@plan" PlanIndex="@planIndex" />
+                planIndex++;
+            }
+        </section>
+    </section>
+}

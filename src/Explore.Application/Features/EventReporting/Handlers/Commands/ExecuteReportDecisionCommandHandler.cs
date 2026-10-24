@@ -862,6 +862,15 @@ public sealed class ExecuteReportDecisionCommandHandler(
             return TargetValidation.Invalid(Failure(request.DecisionId, "Event report decision does not belong to the requested report case.", ["Event report decision does not belong to the requested report case."], EventReportFailureCodes.DecisionInvalid));
         }
 
+        if (decision.DecisionSource != EventReportDecisionSource.LocalModerator)
+        {
+            return TargetValidation.Invalid(Failure(
+                request.DecisionId,
+                "Provider recommendations cannot execute local moderation decisions.",
+                ["Only a local moderator decision can enter the general execution path."],
+                EventReportFailureCodes.DecisionInvalid));
+        }
+
         if (decision.Execution is null
             || decision.Execution.TenantId != report.TenantId
             || decision.Execution.ReportId != report.Id

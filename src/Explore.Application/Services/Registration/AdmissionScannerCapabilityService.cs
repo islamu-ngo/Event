@@ -67,25 +67,25 @@ public sealed class AdmissionScannerCapabilityService(
             request.ExpiresAtUtc.UtcDateTime,
             actorId.Value,
             issuedAtUtc);
-        AdmissionScannerCapabilityStoreResult persisted = await repository.StoreAsync(capability, token);
-        if (persisted.Rejected)
-        {
+            AdmissionScannerCapabilityStoreResult persisted = await repository.StoreAsync(capability, token);
+            if (persisted.Rejected)
+            {
+                return new AdmissionScannerCapabilityIssuedResult(
+                    AdmissionScannerCapabilityIssueOutcome.Rejected,
+                    Guid.Empty,
+                    null,
+                    null);
+            }
+
+            AdmissionScannerCapabilityDescriptor descriptor = ToDescriptor(persisted.Capability);
+
             return new AdmissionScannerCapabilityIssuedResult(
-                AdmissionScannerCapabilityIssueOutcome.Rejected,
-                Guid.Empty,
-                null,
-                null);
-        }
-
-        AdmissionScannerCapabilityDescriptor descriptor = ToDescriptor(persisted.Capability);
-
-        return new AdmissionScannerCapabilityIssuedResult(
-            persisted.Created
-                ? AdmissionScannerCapabilityIssueOutcome.Issued
-                : AdmissionScannerCapabilityIssueOutcome.AlreadyIssued,
-            persisted.Capability.Id,
-            persisted.Created ? material.PlaintextCapability : null,
-                descriptor);
+                persisted.Created
+                    ? AdmissionScannerCapabilityIssueOutcome.Issued
+                    : AdmissionScannerCapabilityIssueOutcome.AlreadyIssued,
+                persisted.Capability.Id,
+                persisted.Created ? material.PlaintextCapability : null,
+                    descriptor);
         }, cancellationToken);
     }
 

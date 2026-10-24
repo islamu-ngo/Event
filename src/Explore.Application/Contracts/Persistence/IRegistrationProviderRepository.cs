@@ -10,6 +10,10 @@ public interface IRegistrationProviderRepository
 
     Task<RegistrationProviderBinding?> GetBindingAsync(Guid tenantId, Guid bindingId, CancellationToken cancellationToken);
 
+    /// <summary>Holds the original publication source rows through the caller's native serializable settlement.</summary>
+    Task<RegistrationProviderBinding?> GetBindingForPublicationAsync(Guid tenantId, Guid bindingId,
+        Guid connectionId, Guid formId, Guid formVersionId, CancellationToken cancellationToken);
+
     Task<RegistrationProviderBinding?> GetBindingObservationAsync(Guid tenantId, Guid bindingId, CancellationToken cancellationToken);
 
     Task<RegistrationProviderConnection?> GetConnectionObservationAsync(Guid tenantId, Guid connectionId, CancellationToken cancellationToken);

@@ -177,7 +177,11 @@ public sealed class IncomingWebhookEffectProcessingService(
         try
         {
             var response = await processCoopDecisionHandler.ExecuteAsync(
-                new ProcessCoopDecisionCallbackCommand { Request = request },
+                new ProcessCoopDecisionCallbackCommand
+                {
+                    Request = request,
+                    IncomingWebhookMessageId = message.Id
+                },
                 cancellationToken);
             if (response.IsSuccess)
             {

@@ -235,8 +235,10 @@ public sealed class ProviderTransportDeferredCheckpointTests
             if (operation == "publish")
             {
                 var response = await new PublishRegistrationProviderBindingCommandHandler(
-                    request.Services.GetRequiredService<IRegistrationProviderRepository>())
-                    .ExecuteAsync(new(Tenant, seed.Binding.Id, RegistrationProviderSchemaDriftClass.NoDrift,
+                    request.Services.GetRequiredService<IRegistrationProviderRepository>(),
+                    request.Services.GetRequiredService<IRegistrationProviderRegistry>(),
+                    request.Services.GetRequiredService<IEventPublicationMutationBoundary>())
+                    .ExecuteAsync(new(Tenant, seed.EventId, seed.Binding.Id, RegistrationProviderSchemaDriftClass.NoDrift,
                         fixture.Clock.GetUtcNow().UtcDateTime), ct);
                 await Assert.That(response.IsSuccess).IsTrue();
             }

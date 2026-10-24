@@ -13,7 +13,6 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.DTOs.Geocoding;
-using Explore.Application.DTOs.Location;
 using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.DTOs.OrganizationTenantEvidence;
 using Explore.Application.DTOs.Settings;
@@ -23,12 +22,15 @@ using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Application.Features.InstanceOnboarding.Requests;
+using Explore.Application.Features.Moderation.Policy;
+using Explore.Application.Services.Moderation;
 using Explore.Application.Models;
 using Explore.Application.Models.PublicExperience;
-using Explore.Application.Onboarding;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Enums.Analytics;
+using ISLAMU.Moderation.Domain;
+using ISLAMU.Moderation.Domain.Policies;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -40,8 +42,54 @@ namespace Explore.API.OpenApi;
 /// </summary>
 internal static class OpenApiStringEnumSchemaCatalog
 {
+    private static IReadOnlyCollection<Type> ModerationEnumTypes { get; } =
+    [
+        typeof(ModerationScopeKind),
+        typeof(ModerationSubjectKind),
+        typeof(ModerationAgeEvidenceKind),
+        typeof(ModerationDeclaredAgeOutcome),
+        typeof(ModerationOperationalAction),
+        typeof(ModerationResponsibilityBasis),
+        typeof(ModerationCaseTargetKind),
+        typeof(ModerationCaseNarrativePurpose),
+        typeof(ModerationCapability),
+        typeof(ModerationNativeMode),
+        typeof(ModerationPolicyRequestedState),
+        typeof(ModerationReferenceProfileId),
+        typeof(ModerationReferenceGrade),
+        typeof(ModerationReferenceBasis),
+        typeof(ModerationReferenceGround),
+        typeof(ModerationReferenceRecognition),
+        typeof(ModerationReferenceExecution),
+        typeof(ModerationReferenceEffectMode),
+        typeof(ModerationReferenceTarget),
+        typeof(ModerationReferenceEffectKind),
+        typeof(ModerationReferencePrerequisite),
+        typeof(ModerationReferenceTimingKind),
+        typeof(ModerationConsequenceBundleKind),
+        typeof(ModerationProtectionPurpose),
+        typeof(ModerationAdditiveStrategyKind),
+        typeof(ModerationContentMode),
+        typeof(ModerationManagementMode),
+        typeof(ModerationResourceReadMode),
+        typeof(ModerationNewAdmissionMode),
+        typeof(ModerationExistingAdmissionMode),
+        typeof(ModerationPrivateDisclosureMode),
+        typeof(ModerationSettlementMode),
+        typeof(ModerationCapacityMode),
+        typeof(ModerationCredentialMode),
+        typeof(ModerationNotificationMode),
+        typeof(ModerationRecognitionMode),
+        typeof(ModerationPendingWorkMode),
+        typeof(ModerationRestorationMode),
+        typeof(ModerationOperationComposition),
+        typeof(ModerationResourceComposition),
+        typeof(ModerationParticipantComposition)
+    ];
+
     private static IReadOnlyCollection<Type> EagerNestedEnumTypes { get; } =
     [
+        .. ModerationEnumTypes,
         typeof(AiModelDiscoveryScope),
         typeof(AiCredentialScope),
         typeof(Explore.Domain.Secrets.AuthenticationCredentialCutover.CredentialConsumer),
@@ -80,6 +128,7 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     public static IReadOnlyCollection<Type> EnumTypes { get; } =
     [
+        .. ModerationEnumTypes,
         typeof(AiModelDiscoveryScope),
         typeof(AiCredentialScope),
         typeof(Explore.Domain.Secrets.AuthenticationCredentialCutover.CredentialConsumer),

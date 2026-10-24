@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M6D40RKA893GZ7D70976AP
+Title: "Coordinate retained identity fences with enrollment and recovery"
+Type: feat
+Scope: privacy
+Summary: "Coordinate enrollment callbacks and retained identity fence providers with authority-owned committed replay and recovery coordinates; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Before-commit enrollment callbacks and embedded/colocated retained-identity providers acquire authority-owned replay/recovery coordinates so identity creation cannot commit outside the fence. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned retained-erasure counter/recovery coordinate models and generated schema histories; no migration, restore, concurrency or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete paired enrollment, retained-identity replay, backup/restore and reconciliation guidance; coordinate recognition recovery and final schema/composition. Coordinate equality is not completed restoration proof."

@@ -56,4 +56,3 @@ public sealed record WebhookProviderPortalAccessResult(
         string? safeDetail = null) =>
         new(false, null, null, null, null, null, isRetryable, failureCategory, safeDetail);
 }
-

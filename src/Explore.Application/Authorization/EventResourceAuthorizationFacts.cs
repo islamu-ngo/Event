@@ -17,44 +17,66 @@ public sealed class EventResourceAuthorizationFacts
     public Guid? StorageObjectId { get; }
     public string AttachmentGeneration { get; }
     public EventResourceParentModerationFacts? ParentModeration { get; }
+    public EventResourceMachinePrincipal? MachinePrincipal { get; }
+    public EventResourceModerationFacts Moderation { get; init; } = EventResourceModerationFacts.NotAdopted;
+    public bool HasModerationQuarantine { get; }
 
     public EventResourceAuthorizationFacts(EventResource resource, EventResourceAccessFacts access,
         EventResourceManagementFacts management, string attachmentGeneration,
-        EventResourceParentModerationFacts? parentModeration = null)
+        EventResourceParentModerationFacts? parentModeration = null,
+        EventResourceMachinePrincipal? machinePrincipal = null)
     {
         Policy = EventResourcePolicySnapshot.Capture(resource);
+        HasModerationQuarantine = resource.HasModerationQuarantine;
         Access = access;
         Management = management;
         ResourceVersion = resource.ConcurrencyStamp;
         StorageObjectId = resource.StorageObjectId;
         AttachmentGeneration = attachmentGeneration;
         ParentModeration = parentModeration;
+        MachinePrincipal = machinePrincipal;
     }
 
     /// <summary>Parent-event operations resolve the existing Event, never a fabricated persisted resource.</summary>
     public EventResourceAuthorizationFacts(EventResourceParentFacts parent, Guid parentVersion,
         Guid? subjectUserId, bool isMachineCaller, EventResourceManagementFacts management,
-        EventResourceGovernancePolicy? governancePolicy)
+        EventResourceGovernancePolicy? governancePolicy,
+        EventResourceMachinePrincipal? machinePrincipal = null)
     {
         Access = new(parent.TenantId, subjectUserId, isMachineCaller, parent, [], false, governancePolicy);
         Management = management;
         ResourceVersion = parentVersion;
         AttachmentGeneration = "parent";
+        MachinePrincipal = machinePrincipal;
     }
 
     internal EventResourceEvaluation Evaluate(EventResourceAuthorityRequest request,
-        EventResourceProviderSnapshot? route, DateTimeOffset now)
+        EventResourceProviderSnapshot? route, DateTimeOffset now) => Evaluate(request, route, now, applyModeration: true);
+
+    // The mutation orchestrator separately qualifies moderation after ordinary native and provider authority.
+    internal EventResourceEvaluation EvaluatePublicationAuthority(EventResourceAuthorityRequest request,
+        EventResourceProviderSnapshot? route, DateTimeOffset now) => request.Action == "publish"
+            ? Evaluate(request, route, now, applyModeration: false)
+            : throw new InvalidOperationException("Publication authority requires a publish request.");
+
+    private EventResourceEvaluation Evaluate(EventResourceAuthorityRequest request,
+        EventResourceProviderSnapshot? route, DateTimeOffset now, bool applyModeration)
     {
         bool parentTarget = Policy is null;
         bool creating = request.Action == "create";
-        if (parentTarget != request.TargetsParentEvent
+        if (applyModeration && !Moderation.PermitsNativeEvaluationAt(now)
+            || request.RequiresUnquarantinedMaterial && HasModerationQuarantine
+             || !request.HasConsistentPrincipal || !request.HasConsistentUploadPurpose || parentTarget != request.TargetsParentEvent
             || request.IsEventCollection && request.Action is not ("view" or "view-management" or "export")
             || request.ExpectedResourceVersion is { } expectedVersion && ResourceVersion != expectedVersion
             || request.ExpectedAttachmentGeneration is { } expectedGeneration && AttachmentGeneration != expectedGeneration
+            || request.ExpectedAuditRetentionDays is { } expectedRetention
+                && (request.Action != "view-audit" || Access.GovernancePolicy?.AuditRetentionDays != expectedRetention)
             || request.ResourceId != ResourceId
             || request.TenantId != (Policy?.TenantId ?? Access.Parent.TenantId)
             || Access.TenantId != request.TenantId || Access.SubjectUserId != request.SubjectUserId
-            || Access.IsMachineCaller != request.IsMachineCaller || string.IsNullOrWhiteSpace(AttachmentGeneration))
+            || Access.IsMachineCaller != request.IsMachineCaller
+            || MachinePrincipal != request.MachinePrincipal || string.IsNullOrWhiteSpace(AttachmentGeneration))
             return new(false, new(false, false, false), null);
         bool publicOnly = request.IsMachineCaller || request.SubjectUserId is null;
         var access = publicOnly

@@ -248,6 +248,8 @@ public sealed class LocalCredentialLifecycleTests
     {
         private readonly SqliteConnection _applicationConnection = new(
             new SqliteConnectionStringBuilder { DataSource = ":memory:" }.ToString());
+        private readonly SqliteConnection _recognitionConnection = new(
+            new SqliteConnectionStringBuilder { DataSource = ":memory:" }.ToString());
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
         private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private Guid _operationId = Guid.CreateVersion7();
@@ -351,6 +353,8 @@ public sealed class LocalCredentialLifecycleTests
             IServiceProvider scoped = _scope.Value.ServiceProvider;
             var application = scoped.GetRequiredService<ExploreDbContext>();
             Application = application;
+            await NativeIdentityRecognitionBoundary.InitializeExternalMemoryAsync(application,
+                _recognitionConnection, TimeProvider.System, CancellationToken);
             Identity = topology == IdentityDatabaseTopology.External
                 ? scoped.GetRequiredService<ExternalIdentityDbContext>() : application;
             if (topology == IdentityDatabaseTopology.External)
@@ -396,7 +400,8 @@ public sealed class LocalCredentialLifecycleTests
             _authentication = new LocalIdentityAuthService(userManager: _manager, tokenGenerator: signer,
                 credentialStates: new LocalIdentityCredentialStateStore(
                     identityDbContext: Identity, applicationDbContext: Application,
-                    userManager: _manager, timeProvider: TimeProvider.System));
+                    userManager: _manager, timeProvider: TimeProvider.System,
+                    identityFence: NativeIdentityRecognitionBoundary.For(Application, TimeProvider.System)));
         }
 
         private async Task ProvisionReadyAsync(string email, string password)
@@ -413,7 +418,8 @@ public sealed class LocalCredentialLifecycleTests
             await Application.SaveChangesAsync(CancellationToken);
             var credentials = new LocalIdentityCredentialStateStore(
                 identityDbContext: Identity, applicationDbContext: Application,
-                userManager: _manager, timeProvider: TimeProvider.System);
+                userManager: _manager, timeProvider: TimeProvider.System,
+                identityFence: NativeIdentityRecognitionBoundary.For(Application, TimeProvider.System));
             LocalCredentialCreateResult created = await credentials.CreatePendingAsync(new LocalCredentialCreateRequest(
                 operationId: Guid.CreateVersion7(), initiatingApplicationUserId: initiator.Id,
                 email: email, firstName: "Local", lastName: "Lifecycle"), CancellationToken);
@@ -479,6 +485,7 @@ public sealed class LocalCredentialLifecycleTests
             {
                 if (_externalConnection is not null) await _externalConnection.DisposeAsync();
                 await _applicationConnection.DisposeAsync();
+                await _recognitionConnection.DisposeAsync();
                 _metadataCache.Dispose();
                 _timeout.Dispose();
             }

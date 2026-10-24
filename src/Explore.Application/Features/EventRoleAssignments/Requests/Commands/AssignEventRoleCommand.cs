@@ -13,7 +13,6 @@ public sealed record AssignEventRoleCommand : ICommand<BaseCommandResponse<Guid>
     public Guid EventId { get; init; }
     public Guid TargetUserId { get; init; }
     public int RoleId { get; init; }
-    public Guid ActorUserId { get; init; }
     public EventRoleAssignmentStatus Status { get; init; } = EventRoleAssignmentStatus.Active;
     public DateTime StartsAtUtc { get; init; } = DateTime.UtcNow;
     public DateTime? ExpiresAtUtc { get; init; }

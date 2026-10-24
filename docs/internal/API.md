@@ -1203,6 +1203,217 @@ Three-reader non-URL versioning — clients may use any of the following; all th
 
 ## Controller Conventions
 
+Profile collection now has two additional authenticated POST boundaries:
+`/api/moderation/profile-collection-subject-observations` accepts only explicit
+`profileId` and native `mode`; it cannot bind a subject ID, observation time,
+claimed authority or sensitive input. Manual Application validation precedes the
+original native subject owner, which resolves the actual authenticated Human and
+returns only the observation ID. This is not an applicability assessment or
+collection permission.
+
+`/api/moderation/profile-collection-assessments/adoptions/{adoptionId}/withdraw`
+accepts exact retained original jurisdiction/subject/policy/publication/profile/
+mode/source/adoption coordinates and generations. The route replaces the body's
+adoption ID before manual validation. Withdrawal is historical correction, not
+fresh parent qualification or renewal. Unavailable native results use the same
+non-disclosing 404 mapping.
+
+Both reject top-level unknown members, enforce a 64 KiB JSON limit and write
+limiting, disable response/output caching and suppress idempotency response
+storage. Their integrated API product compilation passed exit 0 in 8m00.27s;
+the later four-boundary native export/generated Client receipt below also covers
+these two operations.
+
+The same assessment controller now has authenticated `sources` and `adoptions`
+POSTs. Strict nested `original` intent requires every observation, jurisdiction,
+policy/publication/profile/mode and original procedure revision/generation
+coordinate. It does not accept a subject ID, observation timestamp or claimed
+principal. Recording requires an explicit complete `required` set (including
+positive empty); acceptance names the exact source revision/generation and
+assessment-slot CAS. The copied set is bounded to the three known prerequisites.
+Manual validation precedes native nominated-owner/reviewer qualification. Both
+return only the committed entity ID, not a prerequisite, consent or collection
+receipt. Unknown members are rejected at both outer and original-object levels.
+
+Seventy API and seventeen related Application cases are authored UNRUN/unbuilt.
+All new transport diagnostics are clean. Combined record/adopt product
+compilation passed exit 0 in 7m18.68s. Current native export passed in 6.79s;
+private generated Client compilation passed in 44.50s. Emitted schema has all
+four named paths, complete required original coordinates and closed outer/
+nested objects. Seven exact published/API/Release/Debug byte comparisons and
+complete JSON syntax/schema semantic checks passed. The export
+host repeated pre-existing `LocalLifecycleDeliveryScanFailed`; durable operation
+state was retained and this unrelated worker was not changed.
+
+Actual-self consent now has authenticated POSTs at
+`/api/moderation/profile-subject-consents` and
+`/api/moderation/profile-subject-consents/{consentId}/withdraw`.
+Grant requires strict nested `assessment` and `original` nominations: all original
+observation/policy/procedure coordinates plus exact assessment source/adoption
+revisions and generations. It accepts only a new consent ID, the separate
+consent-slot CAS and requested finite end alongside these nominations. Subject,
+provider, grant time, required set, DOB, relationship and receipt cannot bind.
+Unknown fields fail at all three levels. The native owner authenticates canonical
+original self and independently accepted applicability; it denies gratuitous
+consent when `SubjectConsent` is not demanded.
+
+Withdrawal overwrites the body consent ID with the route before real manual
+validation. Historical consent generation and current consent-slot CAS remain
+distinct. Live policy/assessment/parent availability is not required for terminal
+original-self correction. Both operations retain private 404, 64 KiB JSON,
+write limiting, response/output no-store and suppressed replay-response storage.
+Scoped DI binds the real private owner; handlers return committed consent IDs
+only. Eighty-six native, seven Application and forty-two HTTP cases are authored
+UNRUN/unbuilt. Fresh new-source/test diagnostics are clean; existing registration
+using warnings remain. Integrated product compilation passed in 7m06.04s, native
+export in 6.94s and regenerated Client compilation in 46.11s. Both new operations
+and their closed 4/4/7-field schemas were inspected, along with actual generated
+methods and exact Release schema capture. Debug capture refreshed; final seven
+byte comparisons and complete six-operation/schema/JSON checks passed. Earlier passing
+four-path artifacts do not alone cover these additions. Account/guardian prerequisites
+and authenticated collection receipt/before-body enforcement remain unfinished.
+
+Profile collection procedure administration has three authenticated POSTs beneath
+`/api/moderation/profile-collection-procedures`: `sources`, `adoptions` and
+`adoptions/{adoptionId}/withdraw`. Typed intent names the exact child-age
+source/adoption revisions and writer generations, explicit preliminary/normal
+field vocabulary and finite proposal validity. These bodies contain policy
+criteria, never individual DOB, consent evidence or a claimed requester.
+Top-level unknown members are rejected by the CQS records. Manual validation
+and native qualification remain separate; the actual accepted parent nominates
+the recording owner and independent reviewer. Withdrawal overwrites the body
+adoption coordinate with the route coordinate before validation.
+
+The controller follows existing RFC 7807 mapping, 64 KiB JSON limits, write
+limiting, response/output no-store and suppressed idempotency response storage.
+Native request-bound receipts, not middleware replay, own mutation recovery.
+Twenty-five HTTP and fifteen Application contract witnesses are authored
+UNRUN/unbuilt. CQS source integration is complete, with automatic scoped handler
+discovery. Targeted API compilation/native export and generated Client compilation
+passed after the full dependency sweep timed out. The later distinct
+`GuardianConsentReference` vocabulary and five-field preliminary limit are
+compiled/exported with current Client compilation and exact capture parity passed; relationship references
+never substitute for guardian consent. Two further native/Swagger
+schema witnesses are authored UNRUN; their diagnostic freshness request timed out.
+Procedure adoption supplies no individual applicability assessment, consent,
+guardian proof or permission to accept sensitive inputs. Guided administration
+and the before-body individual collection owner remain unfinished.
+
+Material classification intent now also uses an API-owned converter rather than
+serializing the Domain record's computed `Parent`. The wire has only `eventId`,
+`eventStamp`, nullable `sessionId`/`sessionStamp` and nullable `resourceId`/
+`resourceStamp`. Event coordinates are mandatory; each child identity/stamp pair
+must be coherent. Unknown or duplicate members, null material and empty GUIDs
+are rejected. Native stamps remain GUIDs, not long revisions or forced UUIDv7.
+The registered converter and shared native/Swagger transformer describe the same
+six writable fields. Twenty wire cases and two new hosted schema-parity cases
+are authored UNRUN/unbuilt; generated contracts and actual HTTP execution remain
+programme-exit obligations.
+
+The material inventory read uses a bounded authenticated POST because the
+candidate mandate carries review grounds that do not belong in a query URL.
+Its closed body contains Event generation, taxonomy, profile, mode and mandate,
+never caller-owned completeness or server tenant/human identity. The Application
+handler captures those server coordinates; the native owner qualifies them.
+One terminal projection acquires the original complete native observation,
+maps category meaning/version/floor and payload-free material/component
+coordinates privately, then revalidates the original lease before actual body
+delivery. Disposal retains no reusable observation. The HAL source-record link
+requires the mapped `NativeOwnerQualified` marker, not roles/claims, and cannot
+grant independent acceptance. The native implementation borrows the actual
+tenant-authoring transaction and qualified evidence session, retaining the
+selected policy, original epoch, nominated humans, owner assignment, finite
+prerequisites and all complete material/component versions through final output.
+Final revalidation compares those originals and the unfiltered latest Event
+writer generation; it cannot acquire a replacement observation to make delivery
+pass. Disposal closes the owned read transaction and restores the original
+tenant/trust frame. It adds no mutation, reservation, epoch advance or commit;
+existing native no-op DML fences remain. App/API source compilation passed.
+Native source compilation passed. Actual HTTP/serialization/provider/race
+execution remains pending; thirteen Application/twelve API/thirty native cases
+remain UNRUN.
+
+The nominated-reviewer source GET is separate from the owner's inventory POST.
+`GetModerationClassificationMaterialReviewQueryHandler` captures server identity;
+the source ID cannot claim reviewer/controller status. The native source read
+retains the actual authoring transaction and evidence session, authenticates
+the proposal's original record receipt, requires the actual nominated reviewer,
+and rejects any retained acceptance. It reuses complete original inventory
+checks, adding exact source ID/revision/writer, mandate, validity and ordered
+material/category selections. Newer proposals and changed prerequisite/content/
+assignment/controller facts invalidate output rather than replacing originals.
+`ModerationClassificationMaterialReviewHttpResult` assembles HAL/JSON privately,
+then revalidates the original source lease before the actual write. The internal
+`NativeReviewerQualified` marker gates only the acceptance affordance; the POST
+still performs independent native qualification. No raw resource contents, DOB
+or accepted classification are emitted. Thirty-one additional native/eight
+Application/three API cases remain UNRUN/unbuilt; actual body/provider/race
+execution and generated-contract interoperability remain programme-exit obligations.
+
+The current moderation OpenAPI surface has now been exported through the
+existing API build target and consumed by the native per-tag Client generation
+pipeline. NSwag writes private candidates; repository-owned record/byte
+normalization and exact capture publication precede Client compilation.
+The export and Client product build passed. These source/generation receipts do
+not replace hosted native/Swagger shape parity or actual generated-client HTTP
+execution; those remain UNRUN. No generated schema/client was hand-edited.
+
+The material Client service now authors owner-source and nominated-review
+operations from detached displayed HAL metadata, freezes the exact serialized
+body and prospective identities for explicit uncertain replay, and validates
+the action's origin, path and POST method before sending. It does not refresh
+the displayed writer generations or infer permission from claims. The parent
+review found the native HAL catalogue omitted the material, component and
+selection leaf types, leaving inventory items as `object`; those authoritative
+catalogue entries have been regenerated rather than retained behind a JSON
+conversion adapter. Native export and current service integration compilation passed.
+Thirty-six actual HTTP fixture cases and two native typed-HAL schema cases are
+authored UNRUN; a documentation/schema build is not HTTP runtime assurance.
+
+Moderation scope and subject intent use API-owned JSON converters rather than
+public serialization constructors in the shared Domain. A scope has exactly
+`kind`, `id` and optional `parent`; a subject has exactly `kind`, `id` and `origin`.
+The converters call `AuthorityScope` ancestry factories and `SubjectReference.Create`,
+reject unknown/duplicate members, empty or malformed IDs, unknown kinds, invalid
+parentage and null required values with `JsonException`. Derived trust/coordinate
+fields and claimed permissions are not accepted. MVC registers both converters;
+persisted snapshot/digest serializers are unchanged. This is intent binding,
+not native permission, provenance qualification or a new lifecycle endpoint.
+The 33 authored wire-contract cases remain UNRUN/unbuilt; generated OpenAPI/client
+and hosted HTTP assurance are programme-exit obligations.
+
+Decision-proposal binding also reconstructs immutable rule and proposal intent.
+Rule JSON is `ownerId`, `code`, `revision`; proposal JSON is `caseId`, `rule`,
+`capabilities`, `startsAt`, optional `endsAt`/`reviewAt` and `requiredApprovals`.
+API-owned converters invoke the existing factory/defensive constructor, preserving
+capability snapshots, protected remedies, interval coherence and quorum. Every
+member is unique, including nullable interval terms. These values do not qualify
+the proposer or adopted policy. `POST /api/moderation/decisions/{decisionId}/proposal`
+uses the route decision ID and expected open-case revision; all later decision
+actions use expected decision revision. Twenty-five proposal/rule wire cases and
+six real-handler/service boundary cases are authored UNRUN/unbuilt.
+
+`ModerationIntentSchemaTransformer` now describes the converter-owned
+`AuthorityScope`, `SubjectReference`, `ModerationRuleReference` and
+`ModerationProposal` shapes on native OpenAPI and the existing Swagger baseline.
+The shared mutation describes known writable wire fields only; computed ancestry
+IDs and defensive CLR collection implementations are not request members.
+Native reference IDs are explicit for these four types; Swagger keeps its existing
+qualified schema IDs. Parent ancestry, subject origin and original rule references
+resolve to their own components instead of opaque objects. Nullable optional
+interval terms remain optional; capability items exclude protected remedies and
+quorum is 1 or 2. Factories/handlers still own complete ancestry, coherent intervals
+and actual authority, not the schema. Twelve hosted contract cases are authored
+UNRUN/unbuilt; no generated-client or hosted-parity pass is claimed.
+The forced native export was compiled and inspected: all four named components
+contain their wire fields and the actual proposal-command component references
+the restored subject/target/proposal definitions. Native traversal first retains
+opaque markers; the final document phase replaces those component entries with
+wire definitions. Adding recursive references during CLR-property traversal
+caused an exporter stack overflow and was removed. Generation success alone was
+insufficient: adding rather than replacing an existing component left an opaque
+marker, which direct artifact inspection caught before the final replacement.
+
 1. Controllers are thin: receive request → invoke native CQS command/query handler → assemble HATEOAS response → return HTTP result.
 2. Business logic belongs in handlers/services, never controllers.
 3. Every endpoint has named routes (via `RouteNames` constants) for HATEOAS link generation.

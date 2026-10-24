@@ -382,12 +382,12 @@ public class NotificationIntentRepositoryTests(PostgreSqlContainerFixture fixtur
     {
         var unitOfWork = new EfCoreUnitOfWork(context);
         var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
-        return new(ownershipResolver, new NotificationIntentRepository(context, mutationLock),
+        return new(ownershipResolver, new NotificationIntentRepository(context, mutationLock, TimeProvider.System),
             new PrivacyErasureStateRepository(context), unitOfWork, mutationLock);
     }
 
     private static NotificationIntentRepository CreateRepository(ExploreDbContext context) =>
-        new(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+        new(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)), TimeProvider.System);
 
     private static NotificationIntentDraft CreateDraft(Guid tenantId, Guid recipientUserId, string deduplicationKey) =>
         new(

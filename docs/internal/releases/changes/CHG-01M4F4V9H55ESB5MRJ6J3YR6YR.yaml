@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4F4V9H55ESB5MRJ6J3YR6YR
+Title: "Bind resource observers to exact machine key and owner coordinates"
+Type: fix
+Scope: access
+Summary: "Prevent machine audience continuations and prepared metadata from transferring between different key IDs, authority tenants or owner coordinates. Resource requests, fresh snapshots and batch qualification retain immutable value-equal machine identity without inheriting the owner's human subject. Native HAL, management, delivery and upload request construction carries those same coordinates. Audience cursor purpose and query version 2 require a first-page refresh. Current machine-source qualification and complete moderation consumer conformance remain open; no moderation profile is activated."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

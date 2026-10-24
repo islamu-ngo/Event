@@ -468,7 +468,8 @@ public class AiConversationRepository : GenericRepository<AiConversation, Guid>,
     public async Task<AiProposedAction?> GetProposedActionAsync(Guid proposedActionId, CancellationToken cancellationToken)
     {
         return await _dbContext.AiProposedActions
-            .AsNoTracking()
+            // Proposal decisions belong to UpdateProposedActionAsync, not a nested tool's SaveChanges.
+            .AsNoTrackingWithIdentityResolution()
             .Include(action => action.Conversation)
                 .ThenInclude(conversation => conversation!.Messages)
             .Include(action => action.Message)

@@ -7,6 +7,10 @@ namespace Explore.Application.Models;
 /// </summary>
 public class EmailMessage
 {
+    /// <summary>Original-notice work requires native qualification at the actual SMTP send boundary.</summary>
+    public Explore.Application.Contracts.Notifications.ModerationNoticeEmailRequest? ModerationNotice { get; init; }
+    public Explore.Application.Contracts.Notifications.ModerationNoticeEmailWindow? ModerationNoticeWindow { get; init; }
+
     /// <summary>Operational contact deadline; null leaves ordinary email delivery unchanged.</summary>
     public DateTime? DisclosureUntilUtc { get; init; }
 

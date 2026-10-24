@@ -251,7 +251,8 @@ public sealed class LocalCredentialBindingTests
             ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : Application(scope);
         internal LocalIdentityCredentialStateStore StateStore(AsyncServiceScope scope) => new(
             identityDbContext: Identity(scope), applicationDbContext: Application(scope),
-            userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), timeProvider: TimeProvider.System);
+            userManager: scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), timeProvider: TimeProvider.System,
+            identityFence: NativeIdentityRecognitionBoundary.For(Application(scope), TimeProvider.System));
 
         internal async Task<LocalIdentityUser> ReadIdentityUserAsync()
         {

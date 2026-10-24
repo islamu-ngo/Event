@@ -3,6 +3,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.Features.OrganizationMembers.Requests.Commands;
 using Explore.Application.Responses;
@@ -18,38 +20,50 @@ public class AddOrganizationMemberCommandHandler : ICommandHandler<AddOrganizati
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IOrganizationTenantRepository _organizationTenantRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IUserContext _userContext;
+    private readonly IOrganizationMemberMutationBoundary _mutation;
     private readonly IHumanAccountAdministrativeActionPreparation _preparation;
-    private readonly ISerializableAttemptOwner _owner;
 
     public AddOrganizationMemberCommandHandler(
         IOrganizationMemberRepository organizationMemberRepository,
         IOrganizationRepository organizationRepository,
         IOrganizationTenantRepository organizationTenantRepository,
         IUserRepository userRepository,
-        IHumanAccountAdministrativeActionPreparation preparation,
-        ISerializableAttemptOwner owner)
+        IUserContext userContext,
+        IOrganizationMemberMutationBoundary mutation,
+        IHumanAccountAdministrativeActionPreparation preparation)
     {
         _organizationMemberRepository = organizationMemberRepository;
         _organizationRepository = organizationRepository;
         _organizationTenantRepository = organizationTenantRepository;
         _userRepository = userRepository;
+        _userContext = userContext;
+        _mutation = mutation;
         _preparation = preparation;
-        _owner = owner;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddOrganizationMemberCommand request, CancellationToken cancellationToken)
     {
-        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
-        return await _owner.ExecuteAsync(async token =>
+        if (!_userContext.IsAuthenticated || _userContext.UserId is not Guid requesterGuid || requesterGuid == Guid.Empty)
         {
-            await prepared.AcquireAsync(request, token);
-            var result = await ExecuteBodyAsync(request, token);
-            if (result.IsSuccess) prepared.Complete(result.Id);
-            return result;
-        }, cancellationToken);
+            return BaseCommandResponse.Validation<Guid>(["Invalid requester User ID."], "Invalid requester User ID.");
+        }
+
+        var prepared = await _preparation.PrepareAsync(request, cancellationToken);
+        var memberId = Guid.CreateVersion7();
+        var dto = request.AddOrganizationMemberDto;
+        return await _mutation.ExecuteAddAsync(request.TenantId, dto.OrganizationId, memberId, dto.Email, (int)dto.Role,
+            async (actor, target, token) =>
+            {
+                await prepared.AcquireAsync(request, token);
+                var result = await AddAsync(request, actor, target, memberId, token);
+                if (result.IsSuccess) prepared.Complete(result.Id);
+                return result;
+            }, cancellationToken);
     }
 
-    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(AddOrganizationMemberCommand request, CancellationToken cancellationToken)
+    private async Task<BaseCommandResponse<Guid>> AddAsync(AddOrganizationMemberCommand request, Guid requesterGuid,
+        Guid targetUserId, Guid memberId, CancellationToken cancellationToken)
     {
         var dto = request.AddOrganizationMemberDto;
 
@@ -76,27 +90,17 @@ public class AddOrganizationMemberCommandHandler : ICommandHandler<AddOrganizati
         // 2. Check permissions (Requester must be an Admin member)
         var members = await _organizationMemberRepository.GetMembersByOrganizationId(dto.OrganizationId);
 
-        if (Guid.TryParse(request.RequesterUserId, out Guid requesterGuid))
-        {
-            var requesterMember = members.FirstOrDefault(m => m.UserId == requesterGuid);
-            // Only OrgAdmin role can invite members
-            if (requesterMember == null || requesterMember.RoleId != (int)RoleEnum.OrgAdmin)
-            {
-                return BaseCommandResponse.Validation<Guid>(
-                    ["You do not have permission to invite members."],
-                    "You do not have permission to invite members.");
-            }
-        }
-        else
+        var requesterMember = members.FirstOrDefault(m => m.UserId == requesterGuid);
+        if (requesterMember == null || requesterMember.RoleId != (int)RoleEnum.OrgAdmin)
         {
             return BaseCommandResponse.Validation<Guid>(
-                ["Invalid requester User ID."],
-                "Invalid requester User ID.");
+                ["You do not have permission to invite members."],
+                "You do not have permission to invite members.");
         }
 
         // 3. Find user by email
         var userToAdd = await _userRepository.GetUserByEmail(dto.Email);
-        if (userToAdd == null)
+        if (userToAdd == null || userToAdd.Id != targetUserId)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["User with this email not found."],
@@ -114,6 +118,7 @@ public class AddOrganizationMemberCommandHandler : ICommandHandler<AddOrganizati
         // 5. Create Member
         var organizationMember = new OrganizationMember
         {
+            Id = memberId,
             OrganizationTenantId = participation.Id,
             OrganizationTenant = participation,
             UserId = userToAdd.Id,

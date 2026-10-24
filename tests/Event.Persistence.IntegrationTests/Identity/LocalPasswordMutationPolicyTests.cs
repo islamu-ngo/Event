@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -278,7 +279,8 @@ public sealed class LocalPasswordMutationPolicyTests
 
     private static LocalIdentityLifecycleStore Lifecycle(Fixture fixture, AsyncServiceScope scope) => new(
         fixture.Identity(scope), scope.ServiceProvider.GetRequiredService<ExploreDbContext>(),
-        scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Clock, fixture.StateStore(scope));
+        scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), fixture.Clock, fixture.StateStore(scope),
+        NativeIdentityRecognitionBoundary.For(scope.ServiceProvider.GetRequiredService<ExploreDbContext>(), fixture.Clock));
 
     private static async Task<LocalIdentityLifecycleTransport> Recovery(Fixture fixture)
     {

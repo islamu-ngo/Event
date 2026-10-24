@@ -1,5 +1,6 @@
 using Explore.Application.Caching;
 using Explore.Application.Configuration;
+using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.PrivacyErasure;
@@ -28,6 +29,7 @@ public sealed class PrivacyErasureApplier(
     TimeProvider timeProvider,
     ILogger<PrivacyErasureApplier> logger,
     IOptions<PrivacyErasureOptions> options,
+    IModerationRecognitionErasure recognition,
     ILocalIdentityEligibilityRevocation localEligibility)
 {
     private readonly PrivacyErasureOptions _options = options.Value;
@@ -62,6 +64,9 @@ public sealed class PrivacyErasureApplier(
         IPrivacyErasureAuthority authority,
         CancellationToken cancellationToken)
     {
+        // Verify the independently committed complete capture before any irreversible local
+        // operation. Its native authority takes all subject/source anchors in writer order.
+        await recognition.VerifyPurgeAsync(intent, cancellationToken);
         await localEligibility.InvalidateInCurrentTransactionAsync(intent, cancellationToken);
         ISubjectPrivacyErasureSettlement? native = erasureRepository.NativeSettlement;
         IReadOnlyList<PrivacyErasureProviderCandidate>? nativeCandidates = null;
@@ -100,6 +105,7 @@ public sealed class PrivacyErasureApplier(
                     prepared.CheckpointId),
             _ => null
         };
+        await privacyErasureRepository.EraseModerationCaseNarrativesAsync(intent, cancellationToken);
         if (native is not null)
         {
             int count = await ProtectProviderWorkAsync(intent, prepared, nativeCandidates!, cancellationToken);

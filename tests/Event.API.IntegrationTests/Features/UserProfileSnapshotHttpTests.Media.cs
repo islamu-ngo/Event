@@ -207,12 +207,23 @@ public sealed partial class UserProfileSnapshotHttpTests
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(owner.TenantId);
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var user = await db.Users.SingleAsync(value => value.Id == owner.UserId);
-        return await ActivatorUtilities.CreateInstance<UpdateUserCommandHandler>(scope.ServiceProvider)
-            .ExecuteAsync(new UpdateUserCommand
+        var http = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+        var previous = http.HttpContext;
+        http.HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+        {
+            User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+                [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, owner.UserId.ToString())], "ProfileMedia"))
+        };
+        try
+        {
+            return await ActivatorUtilities.CreateInstance<UpdateUserProfileImageCommandHandler>(scope.ServiceProvider)
+            .ExecuteAsync(new UpdateUserProfileImageCommand
             {
                 UserId = owner.UserId,
                 ExpectedConcurrencyStamp = user.ConcurrencyStamp,
-                UpdateUserDto = new UpdateUserDto { ProfileImage = image }
+                ProfileImage = image
             });
+        }
+        finally { http.HttpContext = previous; }
     }
 }

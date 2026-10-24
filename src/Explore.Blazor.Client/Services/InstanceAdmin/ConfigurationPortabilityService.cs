@@ -36,7 +36,10 @@ internal sealed record ConfigurationImportPreviewLine(
 internal sealed record ConfigurationImportPreviewView(
     bool IsApplyReady,
     bool CanApply,
-    IReadOnlyList<ConfigurationImportPreviewLine> Items);
+    IReadOnlyList<ConfigurationImportPreviewLine> Items)
+{
+    public IReadOnlyList<ConfigurationImportModerationTargetPreview> Moderation { get; init; } = [];
+}
 
 internal sealed record ConfigurationImportOperationView(
     Guid OperationId,
@@ -263,7 +266,10 @@ internal sealed class ConfigurationPortabilityService(
                 (ConfigurationImportPreviewCategory)item.Category,
                 item.ReasonCode,
                 item.SourceMappingIdentity,
-                item.TargetMappingIdentity))]);
+                item.TargetMappingIdentity))])
+        {
+            Moderation = preview.Moderation?.ToArray() ?? []
+        };
     }
 
     public async Task<ConfigurationImportOperationView> ApplyAsync(

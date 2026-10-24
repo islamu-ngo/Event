@@ -69,7 +69,12 @@ public sealed record HumanPrincipalOwnerMembershipFact(
     bool IsDeleted, bool PlacementIsDeleted, bool OwnerIsDeleted, int ApprovalStatusId);
 public sealed record HumanPrincipalPermissionFact(
     int RoleId, int PermissionId, string MasterCode, bool IsActive,
-    bool MatchesEventCreateCode, bool MatchesEventFinanceCode);
+    bool MatchesEventCreateCode, bool MatchesEventFinanceCode)
+{
+    public bool MatchesGroupMemberCreateCode { get; init; }
+    public bool MatchesGroupMemberUpdateCode { get; init; }
+    public bool MatchesGroupMemberDeleteCode { get; init; }
+}
 
 /// <summary>
 /// Current co-located Local revocation inputs. Stamp comparison and password presence are facts,

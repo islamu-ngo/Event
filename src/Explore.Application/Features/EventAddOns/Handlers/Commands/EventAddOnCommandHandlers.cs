@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -6,6 +7,7 @@ using Explore.Application.DTOs.EventAddOns;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.EventAddOns.Requests.Commands;
 using Explore.Application.Services.Registration;
+using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
@@ -111,53 +113,67 @@ public sealed class PublishEventAddOnCatalogCommandHandler(
     IEventRepository events,
     IEventAddOnRepository addOns,
     IUnitOfWork unitOfWork,
+    IEventPublicationMutationBoundary publicationBoundary,
+    IMachinePrincipalAccessor machine,
     ITenantContext tenant,
     ICurrentUserService currentUser) :
-    ICommandHandler<PublishEventAddOnCatalogCommand, EventAddOnCatalogDto?>
+    ICommandHandler<PublishEventAddOnCatalogCommand, EventAddOnPublicationResponse>
 {
-    public async Task<EventAddOnCatalogDto?> ExecuteAsync(
+    public async Task<EventAddOnPublicationResponse> ExecuteAsync(
         PublishEventAddOnCatalogCommand request,
         CancellationToken cancellationToken)
     {
+        Guid tenantId = tenant.TenantId;
         DomainEvent? eventTarget =
             await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
-        if (!EventAddOnAccess.CanManagePlatformEvent(eventTarget, tenant.TenantId, currentUser))
+        if (!EventAddOnAccess.CanManagePlatformEvent(eventTarget, tenantId, currentUser))
         {
-            return null;
+            return Missing();
         }
 
-        EventAddOnCatalogVersion? published = await unitOfWork.ExecuteSerializableAsync(
-            async token =>
+        async Task<BaseCommandResponse<Guid>> PublishAsync(CancellationToken token)
+        {
+            DomainEvent? currentEvent = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
+            if (tenant.TenantId != tenantId ||
+                !EventAddOnAccess.CanManagePlatformEvent(currentEvent, tenantId, currentUser))
             {
-                EventAddOnCatalogVersion? draft =
-                    await addOns.GetDraftCatalogForUpdateAsync(
-                        tenant.TenantId,
-                        request.EventId,
-                        token);
-                if (draft is null)
-                {
-                    return null;
-                }
+                return Missing();
+            }
 
-                EventAddOnCatalogVersion? current =
-                    await addOns.GetPublishedCatalogForUpdateAsync(
-                        tenant.TenantId,
-                        request.EventId,
-                        token);
-                current?.Retire(request.PublishedAtUtc);
-                draft.Publish(request.PublishedAtUtc);
-                await addOns.SaveChangesAsync(token);
-                return draft;
-            },
-            cancellationToken);
-        return published is null
-            ? null
-            : EventAddOnMapper.Catalog(
-                published,
-                published.Items.ToDictionary(
+            EventAddOnCatalogVersion? draft =
+                await addOns.GetDraftCatalogForUpdateAsync(tenantId, request.EventId, token);
+            if (draft is null) return Missing();
+
+            EventAddOnCatalogVersion? current =
+                await addOns.GetPublishedCatalogForUpdateAsync(tenantId, request.EventId, token);
+            current?.Retire(request.PublishedAtUtc);
+            draft.Publish(request.PublishedAtUtc);
+            await addOns.SaveChangesAsync(token);
+            return EventAddOnPublicationResponse.Success(EventAddOnMapper.Catalog(
+                draft,
+                draft.Items.ToDictionary(
                     item => item.Id,
                     item => item.InventoryCapacity),
-                canManage: true);
+                canManage: true));
+        }
+
+        BaseCommandResponse<Guid> response = machine.Current is not null
+            ? await unitOfWork.ExecuteSerializableAsync(PublishAsync, cancellationToken)
+            : await publicationBoundary.ExecuteAsync(request.EventId, PublishAsync, cancellationToken);
+        if (response is EventAddOnPublicationResponse published) return published;
+
+        return EventAddOnPublicationResponse.Failure(response.FailureCode switch
+        {
+            "event_publish_restricted" => BaseCommandResponse.Failure<Guid>(
+                "event_add_on_publish_restricted", response.Message, response.Errors, request.EventId),
+            "event_publish_authority_unavailable" => BaseCommandResponse.Failure<Guid>(
+                "event_add_on_publish_authority_unavailable", response.Message, response.Errors, request.EventId),
+            _ => response
+        });
+
+        EventAddOnPublicationResponse Missing() => EventAddOnPublicationResponse.Failure(
+            BaseCommandResponse.Failure<Guid>("event_add_on_management_unavailable",
+                "The add-on configuration was not found or is unavailable.", id: request.EventId));
     }
 }
 

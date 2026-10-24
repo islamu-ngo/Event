@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Group.Validators;
 using Explore.Application.Features.Groups.Requests.Commands;
 using Explore.Application.Responses;
@@ -23,6 +24,7 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
     private readonly ITenantContext _tenantContext;
     private readonly HybridCache _cache;
     private readonly BusinessMetrics _metrics;
+    private readonly IGroupCreationMutationBoundary _creation;
 
     public CreateGroupCommandHandler(
         IGroupRepository groupRepository,
@@ -33,7 +35,8 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
         IStorageObjectRepository storageObjectRepository,
         ITenantContext tenantContext,
         HybridCache cache,
-        BusinessMetrics metrics)
+        BusinessMetrics metrics,
+        IGroupCreationMutationBoundary creation)
     {
         _groupRepository = groupRepository;
         _groupTenantRepository = groupTenantRepository;
@@ -44,9 +47,24 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
         _tenantContext = tenantContext;
         _cache = cache;
         _metrics = metrics;
+        _creation = creation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateGroupCommand request, CancellationToken cancellationToken)
+    {
+        var ids = new GroupCreationIds(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7());
+        var result = await _creation.ExecuteCreationAsync(_tenantContext.TenantId, ids,
+            (creator, token) => CreateAsync(request, ids, creator, token), cancellationToken);
+        if (result.IsSuccess)
+        {
+            _metrics.RecordOrganizationCreated(_tenantContext.TenantId.ToString());
+            await _cache.RemoveAsync($"group:detail:{result.Id}", cancellationToken);
+        }
+        return result;
+    }
+
+    private async Task<BaseCommandResponse<Guid>> CreateAsync(CreateGroupCommand request, GroupCreationIds ids,
+        Guid currentUserId, CancellationToken cancellationToken)
     {
         var validator = new CreateGroupDtoValidator();
         var validationResult = await validator.ValidateAsync(request.GroupDto, cancellationToken);
@@ -77,10 +95,9 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
                     return BaseCommandResponse.Validation<Guid>(hierarchyErrors, "Validation failed.");
                 }
 
-                var currentUserId = request.CreatorUserId;
-
                 var group = new Group
                 {
+                    Id = ids.GroupId,
                     FullName = request.GroupDto.FullName,
                     Description = request.GroupDto.Description
                 };
@@ -91,6 +108,7 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
 
                 var groupActor = new Actor
                 {
+                    Id = ids.ActorId,
                     ActorTypeId = (int)ActorTypeEnum.Group,
                     ActorType = null!,
                     Pii = new ActorPii { DisplayName = group.FullName },
@@ -116,6 +134,7 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
 
                 var participation = new GroupTenant
                 {
+                    Id = ids.ParticipationId,
                     TenantId = _tenantContext.TenantId,
                     Tenant = null!,
                     GroupId = group.Id,
@@ -132,6 +151,7 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
 
                 var groupMember = new GroupMember
                 {
+                    Id = ids.MemberId,
                     GroupTenantId = participation.Id,
                     GroupTenant = participation,
                     UserId = currentUserId,
@@ -143,10 +163,6 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
                 };
 
                 await _groupMemberRepository.Create(groupMember);
-
-                _metrics.RecordOrganizationCreated(_tenantContext.TenantId.ToString());
-
-                await _cache.RemoveAsync($"group:detail:{group.Id}", lockedCancellationToken);
 
                 return BaseCommandResponse.Success(
                     group.Id,

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Notifications;
 using Explore.Application.Models;
 using MailKit.Net.Smtp;
 using MailKit.Security;
@@ -27,15 +28,18 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
     private readonly ISmtpConfigResolver _configResolver;
     private readonly ILogger<SmtpEmailService> _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly IModerationNoticeEmailAuthority? _moderationNotices;
 
     public SmtpEmailService(
         ISmtpConfigResolver configResolver,
         ILogger<SmtpEmailService> logger,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IModerationNoticeEmailAuthority? moderationNotices = null)
     {
         _configResolver = configResolver;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _moderationNotices = moderationNotices;
     }
 
     public async Task<EmailResult> SendAsync(
@@ -43,7 +47,9 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
         CancellationToken cancellationToken = default)
     {
         if (ContactExpired(message)) return RetentionExpired();
-        var config = await _configResolver.ResolveAsync(cancellationToken);
+        var config = message.ModerationNotice is { } original
+            ? await _configResolver.ResolveAsync(original.TenantId, cancellationToken)
+            : await _configResolver.ResolveAsync(cancellationToken);
         if (ContactExpired(message)) return RetentionExpired();
         if (config is null)
         {
@@ -131,7 +137,7 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
 
         try
         {
-            using var mimeMessage = BuildMimeMessage(message, config);
+            using var mimeMessage = message.ModerationNotice is null ? BuildMimeMessage(message, config) : null;
 
             using var client = new SmtpClient();
             ConfigureClient(client, config);
@@ -151,9 +157,44 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
             }
 
             if (ContactExpired(message)) return RetentionExpired();
-            sendInitiated = true;
-            await client.SendAsync(mimeMessage, cancellationToken);
-            accepted = true;
+            if (message.ModerationNotice is { } original)
+            {
+                if (_moderationNotices is null)
+                    return EmailResult.Fail("moderation_notice_authority_unavailable",
+                        outcome: SmtpDeliveryOutcome.AuthorityRejected);
+                var result = await _moderationNotices.SendAsync(original, async (content, token) =>
+                {
+                    // The native owner supplies a fresh address and pointer-only template.
+                    // Connect/authentication happened first; no queued content can bypass it.
+                    _configResolver.InvalidateCache();
+                    var currentConfig = await _configResolver.ResolveAsync(original.TenantId, token);
+                    if (currentConfig is null || currentConfig.Host != config.Host || currentConfig.Port != config.Port
+                        || currentConfig.Username != config.Username || currentConfig.Password != config.Password
+                        || currentConfig.Security != config.Security || currentConfig.FromAddress != config.FromAddress
+                        || currentConfig.FromName != config.FromName || currentConfig.TimeoutSeconds != config.TimeoutSeconds
+                        || currentConfig.SkipCertificateValidation != config.SkipCertificateValidation)
+                        return EmailResult.Fail("moderation_notice_authority_unavailable",
+                            outcome: SmtpDeliveryOutcome.AuthorityRejected);
+                    content.CustomHeaders["Message-ID"] =
+                        $"<moderation-{original.OutboxId:N}-{original.AttemptNumber}@notice.invalid>";
+                    using var nativeMessage = BuildMimeMessage(content, config);
+                    token.ThrowIfCancellationRequested();
+                    if (ContactExpired(content) || content.ModerationNoticeWindow?.Allows(_timeProvider.GetUtcNow()) != true)
+                        return EmailResult.Fail("moderation_notice_authority_unavailable",
+                            outcome: SmtpDeliveryOutcome.AuthorityRejected);
+                    sendInitiated = true;
+                    await client.SendAsync(nativeMessage, token);
+                    accepted = true;
+                    return EmailResult.Ok();
+                }, cancellationToken);
+                if (!result.Success) return result;
+            }
+            else
+            {
+                sendInitiated = true;
+                await client.SendAsync(mimeMessage!, cancellationToken);
+                accepted = true;
+            }
             await client.DisconnectAsync(quit: true, cancellationToken);
         }
         catch (Exception) when (accepted)

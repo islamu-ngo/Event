@@ -104,7 +104,9 @@ public static class PrivacyErasureAuthorityDatabaseContract
         ON CONFLICT (singleton) DO UPDATE
         SET last_sequence = GREATEST(
             {SchemaName}.authority_counter.last_sequence,
-            EXCLUDED.last_sequence);
+            EXCLUDED.last_sequence),
+            revision = {SchemaName}.authority_counter.revision
+                + CASE WHEN EXCLUDED.last_sequence > {SchemaName}.authority_counter.last_sequence THEN 1 ELSE 0 END;
 
         CREATE OR REPLACE FUNCTION {SchemaName}.reject_erasure_intent_mutation()
         RETURNS trigger
@@ -236,7 +238,7 @@ public static class PrivacyErasureAuthorityDatabaseContract
 
             v_next_sequence := v_last_sequence + 1;
             UPDATE {SchemaName}.authority_counter AS counter
-            SET last_sequence = v_next_sequence
+            SET last_sequence = v_next_sequence, revision = counter.revision + 1
             WHERE counter.singleton;
 
             RETURN QUERY
@@ -430,7 +432,7 @@ public static class PrivacyErasureAuthorityDatabaseContract
 
             v_next_sequence := v_last_sequence + 1;
             UPDATE {SchemaName}.authority_counter AS counter
-            SET last_sequence = v_next_sequence
+            SET last_sequence = v_next_sequence, revision = counter.revision + 1
             WHERE counter.singleton;
 
             RETURN QUERY
@@ -784,7 +786,8 @@ public static class PrivacyErasureAuthorityDatabaseContract
             END IF;
 
             UPDATE {SchemaName}.authority_counter AS counter
-            SET retained_floor_sequence = v_new_floor
+            SET retained_floor_sequence = v_new_floor,
+                revision = counter.revision + CASE WHEN deleted_count > 0 OR pseudonymized_count > 0 THEN 1 ELSE 0 END
             WHERE counter.singleton;
             retained_floor_sequence := v_new_floor;
             RETURN NEXT;

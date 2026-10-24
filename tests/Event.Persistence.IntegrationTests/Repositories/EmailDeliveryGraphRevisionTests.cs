@@ -742,7 +742,7 @@ public sealed class EmailDeliveryGraphRevisionTests
     {
         var unitOfWork = new EfCoreUnitOfWork(context);
         var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
-        var repository = new NotificationIntentRepository(context, mutationLock);
+        var repository = new NotificationIntentRepository(context, mutationLock, TimeProvider.System);
         var materializer = new RecipientNotificationMaterializer(notificationGraphRepository: repository,
             unitOfWork: unitOfWork, mutationLock: mutationLock, privacyErasureStateRepository: new PrivacyErasureStateRepository(context));
         return new(Repository: repository, UnitOfWork: unitOfWork, MutationLock: mutationLock, Materializer: materializer);

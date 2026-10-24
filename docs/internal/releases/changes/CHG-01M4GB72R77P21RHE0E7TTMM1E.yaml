@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4GB72R77P21RHE0E7TTMM1E
+Title: "Keep resource upload responses behind current read authority"
+Type: fix
+Scope: access
+Summary: "Separate upload mutation authority from disclosure of stored reservation, finalization, cancellation and replay fields. Native resource successes carry a disposable single-use read projection; HTTP resource and generic-storage aliases recheck current resource and canonical moderation facts before serialization. Ordinary uploads retain their response envelope. Regression tests are authored and deferred until the full approved implementation is complete; this source increment does not certify consumer activation."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

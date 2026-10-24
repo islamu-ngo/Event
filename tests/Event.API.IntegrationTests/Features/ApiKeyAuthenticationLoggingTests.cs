@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Encodings.Web;
 using Explore.API.Authentication;
+using Explore.Application.Authentication;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Persistence;
@@ -67,6 +68,30 @@ public sealed class ApiKeyAuthenticationLoggingTests
         CapturedLog serilogLog = await serilogSignal.WaitAsync(TimeSpan.FromSeconds(5));
 
         await Assert.That(result.Succeeded).IsEqualTo(expectedStatus == HttpStatusCode.OK);
+        var origin = test.Context.Features.Get<ConfiguredApiKeyAuthenticationOrigin>();
+        if (scenario == "configured_success")
+        {
+            await Assert.That(origin).IsNotNull();
+            await Assert.That(origin!.Principal.KeyId).IsEqualTo(result.Principal!.GetApiKeyId());
+            await Assert.That(origin.Principal.CredentialSource).IsEqualTo(ApiKeyCredentialSource.Configured);
+            await Assert.That(origin.Principal.Scopes).Contains("events:read");
+            test.Context.User = result.Principal!;
+            var currentHttp = Substitute.For<IHttpContextAccessor>();
+            currentHttp.HttpContext.Returns(test.Context);
+            var reader = new ConfiguredApiKeyResourceAuthorityReader(test.Options, TimeProvider.System, currentHttp);
+            await using var held = await reader.AcquireAuthenticatedAsync(origin.Principal.KeyId, default);
+            await Assert.That(held).IsNotNull();
+            await Assert.That(await held!.RevalidateAsync(default)).IsTrue();
+            await Assert.That(await reader.AcquireAuthenticatedAsync(Guid.CreateVersion7().ToString(), default)).IsNull();
+            test.Context.Features.Set<ConfiguredApiKeyAuthenticationOrigin>(null);
+            await Assert.That(await reader.AcquireAuthenticatedAsync(origin.Principal.KeyId, default)).IsNull();
+            test.Context.Features.Set(origin);
+            test.OptionsCache.TryRemove(ApiAuthenticationSchemeNames.ApiKey);
+            await Assert.That(await reader.AcquireAuthenticatedAsync(origin.Principal.KeyId, default)).IsNull();
+            await Assert.That(await held.RevalidateAsync(default)).IsFalse();
+            await Assert.That(held.ValidityCancellation.IsCancellationRequested).IsTrue();
+        }
+        else await Assert.That(origin).IsNull();
         foreach (CapturedLog log in new[] { microsoftLog, serilogLog })
         {
             await Assert.That(log.Properties["Outcome"]).IsEqualTo(expectedOutcome);
@@ -152,8 +177,14 @@ public sealed class ApiKeyAuthenticationLoggingTests
             presentedCredential = "private-unmatched-api-key";
         }
 
-        var options = Substitute.For<IOptionsMonitor<ApiKeyAuthenticationOptions>>();
-        options.Get(ApiAuthenticationSchemeNames.ApiKey).Returns(optionsValue);
+        var optionsCache = new OptionsCache<ApiKeyAuthenticationOptions>();
+        var options = new OptionsMonitor<ApiKeyAuthenticationOptions>(
+            new OptionsFactory<ApiKeyAuthenticationOptions>(
+                [new ConfigureNamedOptions<ApiKeyAuthenticationOptions>(ApiAuthenticationSchemeNames.ApiKey, target =>
+                {
+                    target.HeaderName = optionsValue.HeaderName;
+                    target.Clients = optionsValue.Clients;
+                })], []), [], optionsCache);
         var loggerFactory = LoggerFactory.Create(logging =>
         {
             logging.SetMinimumLevel(LogLevel.Trace);
@@ -185,7 +216,7 @@ public sealed class ApiKeyAuthenticationLoggingTests
                 typeof(ApiKeyAuthenticationHandler)),
             context);
 
-        return new TestScenario(handler, services, metrics, loggerFactory,
+        return new TestScenario(handler, context, options, optionsCache, services, metrics, loggerFactory,
             [
                 keyId,
                 secret,
@@ -289,6 +320,9 @@ public sealed class ApiKeyAuthenticationLoggingTests
 
     private sealed record TestScenario(
         ApiKeyAuthenticationHandler Handler,
+        HttpContext Context,
+        OptionsMonitor<ApiKeyAuthenticationOptions> Options,
+        OptionsCache<ApiKeyAuthenticationOptions> OptionsCache,
         ServiceProvider Services,
         BusinessMetrics Metrics,
         ILoggerFactory LoggerFactory,
@@ -296,6 +330,7 @@ public sealed class ApiKeyAuthenticationLoggingTests
     {
         public void Dispose()
         {
+            Options.Dispose();
             Metrics.Dispose();
             LoggerFactory.Dispose();
             Services.Dispose();

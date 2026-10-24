@@ -3,6 +3,7 @@ using Explore.Application.Authentication;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 using Explore.Application.Features.EventRoleAssignments.Handlers.Queries;
 using Explore.Domain;
@@ -35,17 +36,13 @@ public sealed partial class HumanEventTeamCustodyTests
             .ObserveAsync(request.Context.User, default))!;
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), _ =>
+        request.Admission.AfterAllSources = async token =>
         {
-            request.Services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async token =>
-            {
-                entered.TrySetResult();
-                await release.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
-                await context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.Id == target.Assignment, token);
-                fixture.Clock.Advance(lifetime.ExpiresAt.Add(lifetime.ClockSkew).AddTicks(1) - fixture.Clock.GetUtcNow());
-            }, _ => { });
-            return Task.CompletedTask;
-        });
+            entered.TrySetResult();
+            await release.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+            await context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.Id == target.Assignment, token);
+            fixture.Clock.Advance(lifetime.ExpiresAt.Add(lifetime.ClockSkew).AddTicks(1) - fixture.Clock.GetUtcNow());
+        };
         Task operation = Invoke();
         await ReleaseAfterEntry(operation, entered, release);
         await Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await operation);
@@ -61,37 +58,35 @@ public sealed partial class HumanEventTeamCustodyTests
             switch (operationKind)
             {
                 case "assign":
-                    await Assert.That((await ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services, owner)
+                    await Assert.That((await ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services)
                         .ExecuteAsync(Assignment(fixture, target.Event))).IsSuccess).IsTrue();
                     break;
                 case "email":
-                    await Assert.That((await ActivatorUtilities.CreateInstance<AssignEventRoleByEmailCommandHandler>(request.Services, owner)
+                    await Assert.That((await ActivatorUtilities.CreateInstance<AssignEventRoleByEmailCommandHandler>(request.Services)
                         .ExecuteAsync(new()
                         {
                             TenantId = PlatformDefaults.DefaultTenantId,
                             EventId = target.Event,
                             TargetUserEmail = fixture.Login.Identifier,
-                            ActorUserId = fixture.Binding.LocalSubjectId,
                             RoleId = (int)RoleEnum.CheckInStaff,
                             StartsAtUtc = fixture.Clock.GetUtcNow().AddMinutes(-1).UtcDateTime
                         })).IsSuccess).IsTrue();
                     break;
                 case "revoke":
-                    await Assert.That((await ActivatorUtilities.CreateInstance<RevokeEventRoleAssignmentCommandHandler>(request.Services, owner)
+                    await Assert.That((await ActivatorUtilities.CreateInstance<RevokeEventRoleAssignmentCommandHandler>(request.Services)
                         .ExecuteAsync(new()
                         {
                             TenantId = PlatformDefaults.DefaultTenantId,
                             EventId = target.Event,
-                            AssignmentId = target.Assignment,
-                            ActorUserId = fixture.Binding.LocalSubjectId
+                            AssignmentId = target.Assignment
                         })).IsSuccess).IsTrue();
                     break;
                 case "team":
-                    await ActivatorUtilities.CreateInstance<GetEventTeamListRequestHandler>(request.Services, owner)
+                    await ActivatorUtilities.CreateInstance<GetEventTeamListRequestHandler>(request.Services)
                         .QueryAsync(new() { TenantId = PlatformDefaults.DefaultTenantId, EventId = target.Event });
                     break;
                 case "presets":
-                    await ActivatorUtilities.CreateInstance<GetAssignableEventRolePresetsRequestHandler>(request.Services, owner)
+                    await ActivatorUtilities.CreateInstance<GetAssignableEventRolePresetsRequestHandler>(request.Services)
                         .QueryAsync(new()
                         {
                             TenantId = PlatformDefaults.DefaultTenantId,
@@ -144,20 +139,20 @@ public sealed partial class HumanEventTeamCustodyTests
         var context = request.Services.GetRequiredService<ExploreDbContext>();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), async token =>
+        request.Admission.AfterNativeSources = async token =>
         {
             if (state == "extended")
                 await context.SupportAccessSessions.Where(row => row.Id == sessionId)
                     .ExecuteUpdateAsync(update => update.SetProperty(row => row.ExpiresAtUtc, expiry.AddMinutes(5)), token);
-            request.Services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async finalToken =>
-            {
-                entered.TrySetResult();
-                await release.Task.WaitAsync(TimeSpan.FromSeconds(30), finalToken);
-                await context.SupportAccessSessions.AsNoTracking().SingleAsync(row => row.Id == sessionId, finalToken);
-                if (state != "live") fixture.Clock.Advance(expiry.AddTicks(1) - fixture.Clock.GetUtcNow());
-            }, _ => { });
-        });
-        var operation = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services, owner)
+        };
+        request.Admission.AfterAllSources = async token =>
+        {
+            entered.TrySetResult();
+            await release.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+            await context.SupportAccessSessions.AsNoTracking().SingleAsync(row => row.Id == sessionId, token);
+            if (state != "live") fixture.Clock.Advance(expiry.AddTicks(1) - fixture.Clock.GetUtcNow());
+        };
+        var operation = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services)
             .ExecuteAsync(Assignment(fixture, target.Event));
         await ReleaseAfterEntry(operation, entered, release);
         if (state == "live") await Assert.That((await operation).IsSuccess).IsTrue();
@@ -183,21 +178,17 @@ public sealed partial class HumanEventTeamCustodyTests
         var context = request.Services.GetRequiredService<ExploreDbContext>();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), _ =>
+        request.Admission.AfterAllSources = async token =>
         {
-            request.Services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async token =>
-            {
-                entered.TrySetResult();
-                await release.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
-                await context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.Id == target.Assignment, token);
-                fixture.Clock.Advance(new DateTimeOffset(expiry).AddTicks(1) - fixture.Clock.GetUtcNow());
-            }, _ => { });
-            return Task.CompletedTask;
-        });
-        var operation = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services, owner)
+            entered.TrySetResult();
+            await release.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+            await context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.Id == target.Assignment, token);
+            fixture.Clock.Advance(new DateTimeOffset(expiry).AddTicks(1) - fixture.Clock.GetUtcNow());
+        };
+        var operation = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services)
             .ExecuteAsync(Assignment(fixture, target.Event));
         await ReleaseAfterEntry(operation, entered, release);
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await operation);
+        await Assert.ThrowsAsync<AuthorizationException>(async () => await operation);
         await using var observer = fixture.Native.CreateDatabase();
         await Assert.That(await observer.EventRoleAssignments.AsNoTracking().CountAsync(row => row.EventId == target.Event)).IsEqualTo(1);
     }
@@ -220,20 +211,16 @@ public sealed partial class HumanEventTeamCustodyTests
         var context = request.Services.GetRequiredService<ExploreDbContext>();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), _ =>
+        request.Admission.AfterAllSources = async token =>
         {
-            request.Services.GetRequiredService<IHumanActionCommitFinalizer>().Register(async token =>
-            {
-                entered.TrySetResult();
-                await release.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
-                await context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.Id == target.Assignment, token);
-                fixture.Clock.Advance(lifetime.ExpiresAt.Add(lifetime.ClockSkew).AddTicks(1) - fixture.Clock.GetUtcNow());
-                await Assert.That(renewedLifetime.IsValidAt(fixture.Clock.GetUtcNow())).IsTrue();
-                request.Context.User = renewed.Context.User;
-            }, _ => { });
-            return Task.CompletedTask;
-        });
-        var operation = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services, owner)
+            entered.TrySetResult();
+            await release.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+            await context.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.Id == target.Assignment, token);
+            fixture.Clock.Advance(lifetime.ExpiresAt.Add(lifetime.ClockSkew).AddTicks(1) - fixture.Clock.GetUtcNow());
+            await Assert.That(renewedLifetime.IsValidAt(fixture.Clock.GetUtcNow())).IsTrue();
+            request.Context.User = renewed.Context.User;
+        };
+        var operation = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services)
             .ExecuteAsync(Assignment(fixture, target.Event));
         await ReleaseAfterEntry(operation, entered, release);
         await Assert.ThrowsAsync<UnauthorizedAccessException>(async () => await operation);

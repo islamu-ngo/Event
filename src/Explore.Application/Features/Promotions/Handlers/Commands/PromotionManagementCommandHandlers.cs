@@ -1,6 +1,8 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Features.Promotions.Requests.Commands;
 using Explore.Application.Features.Promotions.Validators;
@@ -133,22 +135,30 @@ public sealed class PublishPromotionCommandHandler(
     IPromotionCodeDigestService digests,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    IUnitOfWork unitOfWork) : ICommandHandler<PublishPromotionCommand, PromotionManagementCommandResponseDto>
+    IUnitOfWork unitOfWork,
+    IEventPublicationMutationBoundary publicationBoundary,
+    IMachinePrincipalAccessor machine) : ICommandHandler<PublishPromotionCommand, PromotionManagementCommandResponseDto>
 {
     public async Task<PromotionManagementCommandResponseDto> ExecuteAsync(PublishPromotionCommand command, CancellationToken cancellationToken)
     {
         await new PublishPromotionCommandValidator().ValidateAndThrowAsync(command, cancellationToken);
         DateTime publishedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
+        Guid tenantId = tenant.TenantId;
+        Event? originalEvent = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
+        if (!PromotionManagementHandlerSupport.IsPlatformManaged(originalEvent, tenantId))
+            return PromotionManagementHandlerSupport.NotFound();
+        Exception? publicationFailure = null;
 
-        return await unitOfWork.ExecuteSerializableAsync(async token =>
+        async Task<PromotionManagementCommandResponseDto> PublishAsync(CancellationToken token)
         {
+            publicationFailure = null;
             Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, token);
-            if (!PromotionManagementHandlerSupport.IsPlatformManaged(eventTarget, tenant.TenantId))
+            if (tenant.TenantId != tenantId || !PromotionManagementHandlerSupport.IsPlatformManaged(eventTarget, tenantId))
             {
                 return PromotionManagementHandlerSupport.NotFound();
             }
 
-            PromotionDefinition? definition = await promotions.GetDefinitionForUpdateAsync(tenant.TenantId, command.EventId, command.PromotionDefinitionId, token);
+            PromotionDefinition? definition = await promotions.GetDefinitionForUpdateAsync(tenantId, command.EventId, command.PromotionDefinitionId, token);
             if (definition is null)
             {
                 return PromotionManagementHandlerSupport.NotFound();
@@ -157,21 +167,39 @@ public sealed class PublishPromotionCommandHandler(
             try
             {
                 definition.Publish(publishedAtUtc);
-                PromotionCodeDigest digest = await digests.ComputeActiveAsync(tenant.TenantId, command.EventId, command.Code, token);
+                PromotionCodeDigest digest = await digests.ComputeActiveAsync(tenantId, command.EventId, command.Code, token);
                 PromotionCode code = PromotionCode.Create(definition, PromotionManagementHandlerSupport.MaskSuffix(digests.NormalizeCode(command.Code)), definition.ScopeMetadata);
                 await promotions.AddPublishedCodeAsync(code, digest, token);
                 await promotions.SaveChangesAsync(token);
                 return PromotionManagementHandlerSupport.Success(definition.Id, "Promotion published.", PromotionManagementMapper.Map(definition, code, eventTarget!));
             }
-            catch (ArgumentException exception)
+            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
             {
-                return PromotionManagementHandlerSupport.ValidationFailed(exception.Message);
+                // The owning transaction must roll back Publish before a validation response is returned.
+                publicationFailure = exception;
+                throw;
             }
-            catch (InvalidOperationException exception)
+        }
+
+        try
+        {
+            BaseCommandResponse<Guid> result = machine.Current is not null
+                ? await unitOfWork.ExecuteSerializableAsync<BaseCommandResponse<Guid>>(async token => await PublishAsync(token), cancellationToken)
+                : await publicationBoundary.ExecuteAsync(command.EventId, async token => await PublishAsync(token), cancellationToken);
+            if (result is PromotionManagementCommandResponseDto response) return response;
+            return PromotionManagementCommandResponseDto.Failure(result.FailureCode switch
             {
-                return PromotionManagementHandlerSupport.ValidationFailed(exception.Message);
-            }
-        }, cancellationToken);
+                "event_publish_restricted" => BaseCommandResponse.Failure<Guid>("promotion_publish_restricted",
+                    result.Message, result.Errors, id: command.EventId),
+                "event_publish_authority_unavailable" => BaseCommandResponse.Failure<Guid>("promotion_publish_authority_unavailable",
+                    result.Message, result.Errors, id: command.EventId),
+                _ => result
+            });
+        }
+        catch (Exception exception) when (ReferenceEquals(exception, publicationFailure))
+        {
+            return PromotionManagementHandlerSupport.ValidationFailed(exception.Message);
+        }
     }
 }
 

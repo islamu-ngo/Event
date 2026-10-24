@@ -66,6 +66,7 @@ public static class SecretDefinitionRegistry
                 or Keys.Admissions.CredentialLookupHmacKey
                 or Keys.Admissions.RecoveryCapabilityHmacKey
                 or Keys.Admissions.ScannerCapabilityHmacKey
+                or Keys.ModerationRecognitionKeyRing
                 or Keys.Atproto.OAuthClientPrivateJwks
                 or Keys.Atproto.SessionEncryptionKeyRing
                 or Keys.Atproto.SessionJwtPrivateJwks => SecretRotationMode.OverlapRollout,
@@ -113,6 +114,10 @@ public static class SecretDefinitionRegistry
     {
         public const string SetupSecret = "api.setup_secret";
         public const string PrivacyIdentityFenceKey = "privacy.identity_fence_key";
+        public const string ModerationReconciliationApiKey = "moderation.reconciliation_api_key";
+        public const string ModerationRecognitionKeyRing = "moderation.recognition_keyring";
+        public const string ModerationMeasurementSigningPrivateKeyPem = "moderation.measurement_signing_private_key_pem";
+        public const string ModerationMeasurementTestDatabasePassword = "moderation.measurement_test_database.password";
         public const string SetupSecretBindingCommitmentHmacKey =
             "setup.secret_binding_commitment_hmac_key";
         public const string SetupSigning = "setup.signing";
@@ -368,6 +373,50 @@ public static class SecretDefinitionRegistry
                 Description = "Dedicated cache credential for the isolated development agent profile.",
             },
 
+            new()
+            {
+                Key = Keys.ModerationRecognitionKeyRing,
+                AllowedScopes = instanceOnly,
+                AllowedSources = [SecretSourceType.Infisical, SecretSourceType.EnvironmentVariable],
+                DefaultInfisicalPath = "/api",
+                DefaultInfisicalKey = "MODERATION_RECOGNITION_KEYRING",
+                DefaultEnvironmentVariableName = "MODERATION_RECOGNITION_KEYRING",
+                IsBootstrapSecret = false,
+                Description = "Server-only purpose-bound recognition key ring; native replica and backup retention floors remain required before retirement or activation.",
+            },
+            new()
+            {
+                Key = Keys.ModerationMeasurementSigningPrivateKeyPem,
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = "/moderation",
+                DefaultInfisicalKey = "MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM",
+                DefaultEnvironmentVariableName = "MODERATION_MEASUREMENT_SIGNING_PRIVATE_KEY_PEM",
+                IsBootstrapSecret = true,
+                Description = "Launcher-only P-256 measurement signer; public key requires independent native enrollment and private material never reaches test children.",
+            },
+            new()
+            {
+                Key = Keys.ModerationMeasurementTestDatabasePassword,
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = "/moderation",
+                DefaultInfisicalKey = "MODERATION_MEASUREMENT_TEST_DATABASE__PASSWORD",
+                DefaultEnvironmentVariableName = "MODERATION__MEASUREMENTTESTDATABASE__PASSWORD",
+                IsBootstrapSecret = true,
+                Description = "Launcher-only separate test-database credential; never selects or discloses the primary authority database.",
+            },
+            new()
+            {
+                Key = Keys.ModerationReconciliationApiKey,
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = "/api",
+                DefaultInfisicalKey = "MODERATION__RECONCILIATION__APIKEY",
+                DefaultEnvironmentVariableName = "MODERATION__RECONCILIATION__APIKEY",
+                IsBootstrapSecret = true,
+                Description = "Opt-in moderation maintenance credential; requires its actual persisted service binding and current native authority.",
+            },
             new()
             {
                 Key = Keys.PrivacyIdentityFenceKey,

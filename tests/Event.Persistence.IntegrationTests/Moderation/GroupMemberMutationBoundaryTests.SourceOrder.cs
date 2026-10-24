@@ -1,0 +1,98 @@
+using System.Data.Common;
+using Explore.Application.Features.GroupMembers.Handlers.Commands;
+using Explore.Domain;
+using Explore.Domain.Enums;
+using Explore.Infrastructure.Identity;
+using Explore.Persistence;
+using Explore.Persistence.Repositories;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
+using SourceDatabase = Event.Persistence.IntegrationTests.Moderation.ModerationQualificationWriterTests.SourceDatabase;
+
+namespace Event.Persistence.IntegrationTests.Moderation;
+
+public sealed partial class GroupMemberMutationBoundaryTests
+{
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Membership_changes_hold_the_group_and_its_actor_before_tenant(bool colocated)
+    {
+        await using var database = await SourceDatabase.CreateAsync();
+        var (_, target, groupId) = await SeedAsync(database);
+        var actorId = Guid.CreateVersion7();
+        await using (var seed = database.Context())
+        {
+            seed.Actors.Add(new Actor
+            {
+                Id = actorId,
+                GroupId = groupId,
+                ActorTypeId = (int)ActorTypeEnum.Group,
+                ActorType = null!,
+                Pii = new ActorPii { ActorId = actorId, DisplayName = "Native group" }
+            });
+            await seed.SaveChangesAsync();
+        }
+        var order = new GroupSourcesBeforeTenant(groupId, actorId);
+        await using var context = database.Context(order);
+        await using var shared = colocated ? await ModerationNoticePrivacyFixture.CreateColocatedAsync(context) : null;
+        await using var session = CreateBoundary(context, (shared ?? database.Privacy).Authority(context, TimeProvider.System), database.AdministratorId);
+        await session.InitializeAsync();
+        order.Armed = true;
+        var handler = new UpdateGroupMemberRoleCommandHandler(new GroupMemberRepository(context),
+            new UserContext(session.Http), database, session.Boundary, session.Preparation);
+        var revision = await RevisionAsync(context);
+        var result = await handler.ExecuteAsync(new()
+        {
+            UpdateGroupMemberRoleDto = new()
+            { Id = target, Role = RoleEnum.GroupAdmin }
+        }, default);
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(order.ObservedTenant).IsTrue();
+        await Assert.That(order.GroupWasHeld).IsTrue();
+        await Assert.That(order.ActorWasHeld).IsTrue();
+        await Assert.That(order.PrivacyOwned).IsEqualTo(colocated);
+        await Assert.That(await context.GroupMembers.Where(row => row.Id == target).Select(row => row.RoleId).SingleAsync())
+            .IsEqualTo((int)RoleEnum.GroupAdmin);
+        await Assert.That(await RevisionAsync(context)).IsEqualTo(revision + 1);
+        await Assert.That(context.Database.CurrentTransaction).IsNull();
+    }
+
+    private sealed class GroupSourcesBeforeTenant(Guid groupId, Guid actorId) : DbCommandInterceptor
+    {
+        private bool _group;
+        private bool _actor;
+        public bool Armed { get; set; }
+        public bool ObservedTenant { get; private set; }
+        public bool GroupWasHeld { get; private set; }
+        public bool ActorWasHeld { get; private set; }
+        public bool PrivacyOwned { get; private set; }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (!Armed || eventData.Context is not ExploreDbContext context || ObservedTenant) return ValueTask.FromResult(result);
+            var sql = context.GetService<ISqlGenerationHelper>();
+            bool Updates<TEntity>()
+            {
+                var entity = context.Model.FindEntityType(typeof(TEntity))!;
+                return command.CommandText.StartsWith($"UPDATE {sql.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema())} ",
+                    StringComparison.Ordinal);
+            }
+            bool Contains(Guid id) => command.Parameters.Cast<DbParameter>().Any(parameter => parameter.Value is Guid value && value == id);
+            if (Updates<Group>() && Contains(groupId)) _group = true;
+            if (Updates<Actor>() && Contains(actorId)) _actor = true;
+            if (Updates<Tenant>())
+            {
+                ObservedTenant = true;
+                GroupWasHeld = _group;
+                ActorWasHeld = _actor;
+                PrivacyOwned = context.IdentityFenceOwnsTransaction;
+            }
+            return ValueTask.FromResult(result);
+        }
+    }
+}

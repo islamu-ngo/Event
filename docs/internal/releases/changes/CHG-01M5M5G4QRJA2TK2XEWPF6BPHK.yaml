@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M5G4QRJA2TK2XEWPF6BPHK
+Title: "Keep event creation and team changes under native authority"
+Type: fix
+Scope: events
+Summary: "Hold original creator, publisher, team and image sources through native commits and reconcile the complete supported creation graph before replay."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: "Native authority is retained through event-team writes and complete supported initial-event creation. Source tests are unrun; unknown commit outcomes remain fail-closed rather than inferring success from an owner row."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

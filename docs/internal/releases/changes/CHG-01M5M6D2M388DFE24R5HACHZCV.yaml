@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M6D2M388DFE24R5HACHZCV
+Title: "Bind selected moderation effects to exact event generations"
+Type: feat
+Scope: access
+Summary: "Retain contribution selection and adopted event-target proof against exact native generations without authorizing event-content publication; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Contribution selection, native event generations and adopted target proofs retain the exact effect target rather than accepting an unqualified event identity. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned contribution/event-generation/adoption models and the generated schema checkpoint; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Coordinate native selection and target-generation owners with final authority composition; this evidence workflow does not authorize event-content publication. Provider assurance and paired guidance remain pending."

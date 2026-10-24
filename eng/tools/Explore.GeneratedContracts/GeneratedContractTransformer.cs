@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -135,6 +136,29 @@ public static class GeneratedContractTransformer
                 .OfType<PropertyDeclarationSyntax>()
                 .Where(property => property.AccessorList is not null))
             {
+                // Number-or-string schemas can make NSwag quote an integer's default.
+                // Repair the native initializer without changing the published wire schema.
+                TypeSyntax propertyType = property.Type is NullableTypeSyntax nullable
+                    ? nullable.ElementType : property.Type;
+                if (propertyType is PredefinedTypeSyntax integerType
+                    && (integerType.Keyword.IsKind(SyntaxKind.IntKeyword)
+                        || integerType.Keyword.IsKind(SyntaxKind.LongKeyword))
+                    && property.Initializer?.Value is LiteralExpressionSyntax literal
+                    && literal.IsKind(SyntaxKind.StringLiteralExpression))
+                {
+                    bool isInt = integerType.Keyword.IsKind(SyntaxKind.IntKeyword);
+                    if (!long.TryParse(literal.Token.ValueText, NumberStyles.AllowLeadingSign,
+                            CultureInfo.InvariantCulture, out long value)
+                        || (isInt && (value < int.MinValue || value > int.MaxValue)))
+                    {
+                        throw new InvalidOperationException(
+                            $"Invalid generated integer default for {declaration.Identifier.ValueText}.{property.Identifier.ValueText}.");
+                    }
+
+                    edits.Add(new TextEdit(literal.Span,
+                        value.ToString(CultureInfo.InvariantCulture) + (isInt ? string.Empty : "L")));
+                }
+
                 bool extensionData = property.AttributeLists
                     .SelectMany(list => list.Attributes)
                     .Any(attribute => attribute.Name.ToString()

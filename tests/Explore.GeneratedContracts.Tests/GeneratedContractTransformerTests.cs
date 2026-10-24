@@ -5,6 +5,43 @@ namespace Explore.GeneratedContracts.Tests;
 public sealed class GeneratedContractTransformerTests
 {
     [Test]
+    [Arguments("int", "1", "1")]
+    [Arguments("int?", "-2147483648", "-2147483648")]
+    [Arguments("long", "9223372036854775807", "9223372036854775807L")]
+    [Arguments("long?", "-9223372036854775808", "-9223372036854775808L")]
+    public async Task TransformPreservesIntegerDefaultsFromNumberOrStringWireSchemas(
+        string type, string value, string expected)
+    {
+        string input = GeneratedSource.Replace(
+            "public string? Value { get; set; }",
+            $"public {type} Value {{ get; set; }} = \"{value}\";",
+            StringComparison.Ordinal);
+        var output = GeneratedContractTransformer.Transform(input,
+            new HashSet<string>(StringComparer.Ordinal) { "MutableViewModel" });
+        var repeated = GeneratedContractTransformer.Transform(output.Text,
+            new HashSet<string>(StringComparer.Ordinal) { "MutableViewModel" });
+
+        await Assert.That(ExtractType(output.Text, "ResponseDto"))
+            .Contains($"public {type} Value {{ get; init; }} = {expected};");
+        await Assert.That(repeated.Text).IsEqualTo(output.Text);
+    }
+
+    [Test]
+    [Arguments("int?", "2147483648")]
+    [Arguments("long", "9223372036854775808")]
+    [Arguments("int", "1.5")]
+    public async Task TransformRejectsInvalidIntegerDefaults(string type, string value)
+    {
+        string input = GeneratedSource.Replace(
+            "public string? Value { get; set; }",
+            $"public {type} Value {{ get; set; }} = \"{value}\";",
+            StringComparison.Ordinal);
+        await Assert.That(() => GeneratedContractTransformer.Transform(input,
+                new HashSet<string>(StringComparer.Ordinal) { "MutableViewModel" }))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task TransformConvertsOnlyExactEligibleTypes()
     {
         GeneratedContractTransformer.TransformOutput output =

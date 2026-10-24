@@ -115,7 +115,7 @@ public class OrganizationMemberRepository : GenericRepository<OrganizationMember
             .AnyAsync(m => m.OrganizationTenant.OrganizationId == organizationId && m.UserId == userId);
     }
 
-    public async Task<List<OrganizationMember>> GetInvitesByEmail(string email)
+    public async Task<List<OrganizationMember>> GetInvitesByUserId(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.OrganizationMembers
             .AsNoTracking()
@@ -124,8 +124,8 @@ public class OrganizationMemberRepository : GenericRepository<OrganizationMember
                     .ThenInclude(o => o.Pii)
             .Include(m => m.User)
                 .ThenInclude(u => u!.Pii)
-            .Where(m => m.User.Pii != null && m.User.Pii.Email == email)
-            .ToListAsync();
+            .Where(m => m.UserId == userId)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<OrganizationMember?> GetByOrganizationAndUser(Guid organizationId, Guid userId)

@@ -22,8 +22,11 @@ public sealed class RecordOspreySignalCallbackCommandValidator : AbstractValidat
         RuleFor(command => command.Request.ReportId).NotEmpty();
         RuleFor(command => command.Request.EventId).NotEmpty();
         RuleFor(command => command.Request.CaseId)
-            .Must(value => value is null || value.Value != Guid.Empty)
-            .WithMessage("CaseId cannot be empty.");
+            .Must(value => value.HasValue && value.Value != Guid.Empty)
+            .WithMessage("The exact native CaseId is required.");
+        RuleFor(command => command.Request)
+            .Must(callback => !string.IsNullOrWhiteSpace(callback.ProviderSignalId) || !string.IsNullOrWhiteSpace(callback.CorrelationId))
+            .WithMessage("A bound provider signal or correlation identity is required.");
         RuleFor(command => command.Request.ProviderSignalId)
             .MaximumLength(MaxExternalSignalIdLength)
             .When(command => !string.IsNullOrWhiteSpace(command.Request.ProviderSignalId));

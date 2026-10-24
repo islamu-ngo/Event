@@ -255,6 +255,24 @@ reuse of a Local-owned account requires that link to remain present when the
 claim transaction checks it. A link removed before that transaction starts is
 not accepted from an earlier lookup.
 
+Creating a managed-tenant or Local account does not collect a birth date. Its new
+private PII row starts without a birth date or collection receipt, at revision
+zero. The account-creation storage permissions include the existing mapped fields
+needed to insert that row, but do not grant birth-date reads or updates. This
+manifest correction adds no configuration setting or database migration; provider
+runtime acceptance still requires the separately tracked verification gates.
+
+Human managed-provider provisioning also recognizes the complete PII model
+without expanding its existing user-ID/name/email storage permissions. The
+private birth-date fields remain defaulted rather than collected by that flow.
+
+Local account administration likewise validates the complete PII storage shape
+without acquiring birth-date read or write permissions. Newly linked rows retain
+the private defaults, and a changed revision default or unexpected private-field
+grant is rejected rather than silently repaired. This correction needs no new
+setting or database migration; source and product checks alone do not certify
+provider runtime behavior.
+
 Instance administrators can use the administrative API to create Local accounts,
 issue supervised reset credentials and inspect or reconcile interrupted operations.
 The Local accounts section provides the same server-authorized operations.

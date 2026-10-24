@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZV8MK9DDH7SVBBV764GKNZ
+Title: "Model exact native Resource observations and independent target adoption"
+Type: feat
+Scope: access
+Summary: "Retain exact Resource material, publisher and storage lineage separately from observation sequences, reject substituted retained target scopes, and preserve independently approved finite adoption and accountable terminal revocation without creating a sanction."
+Group: moderation-resource-generation-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

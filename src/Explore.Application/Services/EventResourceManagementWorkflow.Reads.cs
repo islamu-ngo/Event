@@ -18,7 +18,8 @@ public sealed partial class EventResourceManagementWorkflow
             if (resource is null) return null;
             var storage = resource.StorageObjectId is { } storageId
                 ? await resources.GetStorageObjectAsync(resource.TenantId, storageId, ct) : null;
-            return Map(resource) with { File = EventResourceFileSafety.Describe(resource, storage) };
+            return Map(resource) with
+            { File = resource.HasModerationQuarantine ? null : EventResourceFileSafety.Describe(resource, storage) };
         }, cancellationToken);
 
     public async Task<EventResourceManagementReadResult<EventResourceManagementPageDto>> ListAsync(
@@ -41,12 +42,14 @@ public sealed partial class EventResourceManagementWorkflow
                 .ToDictionary(item => item.Id);
             return new EventResourceManagementPageDto(rows.Select(row => Map(row) with
             {
-                File = EventResourceFileSafety.Describe(row, storage.GetValueOrDefault(row.StorageObjectId ?? Guid.Empty))
+                File = row.HasModerationQuarantine ? null
+                    : EventResourceFileSafety.Describe(row, storage.GetValueOrDefault(row.StorageObjectId ?? Guid.Empty))
             }).ToImmutableArray(), page, pageSize);
         }, cancellationToken);
         var denial = await AuthorizeDisclosureAsync(eventId, prepared.Items, cancellationToken);
         return denial == EventResourceAuthorityOutcome.Allowed
-            ? EventResourceManagementReadResult.Success(prepared)
+            ? EventResourceManagementReadResult.Success(prepared,
+                token => AuthorizeDisclosureAsync(eventId, prepared.Items, token), cancellationToken)
             : EventResourceManagementReadResult.Denied<EventResourceManagementPageDto>(denial);
     }
 
@@ -73,29 +76,50 @@ public sealed partial class EventResourceManagementWorkflow
     {
         if (limit is < 1 or > 200) throw new BadRequestException("Invalid audit page bounds.");
         int retention = 0;
-        var result = await ReadAsync(Request(resourceId, "view-audit"), async (facts, ct) =>
+        return await ReadAsync(Request(resourceId, "view-audit"), async (facts, ct) =>
         {
             retention = facts.Access.GovernancePolicy?.AuditRetentionDays ?? 0;
+            var resource = await resources.GetByIdAsync(facts.Access.TenantId, facts.Access.Parent.EventId, resourceId, ct);
+            if (resource is null) return null;
+            if (resource.HasModerationQuarantine)
+                return new EventResourceAuditPageDto([])
+                { Status = "quarantined", MaterialVersionId = resource.MaterialVersionId };
             if (retention == 0) return new EventResourceAuditPageDto([]);
             var rows = await resources.GetUnexpiredAuditEntriesAsync(facts.Access.TenantId, resourceId,
                 clock.GetUtcNow().UtcDateTime.AddDays(-retention), limit, ct);
             return new EventResourceAuditPageDto(rows.Select(row => new EventResourceAuditDto(row.Id,
                 row.Action, row.Outcome, row.Reason, row.Timestamp, row.ResponsibleManagerUserId)).ToImmutableArray());
-        }, cancellationToken);
-        if (result.Value is not { } value) return result;
-        // Expiry is a read boundary, not merely a promise that the sweeper will eventually run.
-        var cutoff = clock.GetUtcNow().UtcDateTime.AddDays(-retention);
-        return EventResourceManagementReadResult.Success(new EventResourceAuditPageDto(
-            value.Items.Where(row => retention > 0 && row.Timestamp > cutoff).ToImmutableArray()));
+        }, cancellationToken, (page, request) =>
+        {
+            // Refuse the entire prepared page at its earliest row expiry; a retry can project current rows.
+            // This ceiling also catches expiry during the final provider check, not only during loading.
+            DateTimeOffset? expiry = page.Items.IsEmpty ? null : page.Items
+                .Min(row => new DateTimeOffset(DateTime.SpecifyKind(row.Timestamp, DateTimeKind.Utc)).AddDays(retention));
+            return request with
+            {
+                ExpectedAuditRetentionDays = retention,
+                DeadlineUtc = expiry is { } end && (request.DeadlineUtc is null || end < request.DeadlineUtc)
+                    ? end : request.DeadlineUtc
+            };
+        });
     }
 
     private async Task<EventResourceManagementReadResult<T>> ReadAsync<T>(EventResourceAuthorityRequest request,
-        Func<EventResourceAuthorizationFacts, CancellationToken, Task<T?>> load, CancellationToken cancellationToken)
+        Func<EventResourceAuthorizationFacts, CancellationToken, Task<T?>> load, CancellationToken cancellationToken,
+        Func<T, EventResourceAuthorityRequest, EventResourceAuthorityRequest>? bind = null)
         where T : class
     {
+        EventResourceAuthorityRequest? projectionBinding = null;
         await using var authorized = await authority.AuthorizeAsync(request, async (facts, ct) =>
         {
             var value = await unitOfWork.ExecuteSerializableAsync(token => load(facts, token), ct);
+            projectionBinding = request with
+            {
+                ExpectedResourceVersion = facts.ResourceVersion,
+                ExpectedAttachmentGeneration = facts.AttachmentGeneration
+            };
+            if (value is not null && bind is not null)
+                projectionBinding = bind(value, projectionBinding);
             return new ManagementPreparation<T?>(facts.AttachmentGeneration, value);
         }, cancellationToken);
         if (authorized.Lease is not { } lease)
@@ -111,11 +135,16 @@ public sealed partial class EventResourceManagementWorkflow
         }
         await using var preparation = (ManagementPreparation<T?>)gate.Preparation!;
         return preparation.Value is { } value
-            ? EventResourceManagementReadResult.Success(value)
+            ? EventResourceManagementReadResult.Success(value, async token =>
+                (await authority.AuthorizeCapabilitiesAsync([projectionBinding!], token))[0], cancellationToken)
             : EventResourceManagementReadResult.Denied<T>(EventResourceAuthorityOutcome.NotFound);
     }
 
-    private static EventResourceManagementDto Map(EventResource resource) => new(resource.Id, resource.EventId,
+    private static EventResourceManagementDto Map(EventResource resource) => resource.HasModerationQuarantine
+        ? new(resource.Id, resource.EventId, resource.ConcurrencyStamp,
+            (EventResourcePublicationStateEnum)resource.PublicationStateId, null, null, null)
+        { Status = "quarantined", MaterialVersionId = resource.MaterialVersionId }
+        : new(resource.Id, resource.EventId,
         resource.ConcurrencyStamp, (EventResourcePublicationStateEnum)resource.PublicationStateId, new()
         {
             Title = resource.Title,

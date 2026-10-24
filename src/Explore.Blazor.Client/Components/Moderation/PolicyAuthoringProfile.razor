@@ -1,0 +1,108 @@
+@using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Models.Moderation
+
+<section class="policy-authoring-profile" aria-labelledby="profile-heading">
+    <h3 id="profile-heading">@(Original is null ? "Add a complete profile" : $"Revise {Original.Rule.Code}")</h3>
+    <p id="profile-help">Every saved change appends a new definition and keeps the original. Recipes supply the complete
+        effects, protective purpose and all additive strategies; partial recipes are not native policy choices.</p>
+    <p id="profile-error" role="alert">@error</p>
+    <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="policy-authoring-profile__fields">
+            <div>
+                <label for="profile-code">Rule code</label>
+                <input id="profile-code" @bind="edit.Rule.Code" readonly="@(Original is not null)" required maxlength="100"
+                       pattern="[A-Za-z0-9._\x2D]+" aria-describedby="profile-help profile-error" />
+            </div>
+            <div>
+                <label for="profile-template">Recipe, protective purpose and additive strategy set</label>
+                <select id="profile-template" value="@(template?.Id?.ToString() ?? "")" @onchange="ChangeTemplate"
+                        disabled="@(Original is not null)" required aria-describedby="profile-help profile-error">
+                    <option value="">Choose a reference recipe</option>
+                    @foreach (var reference in Catalogue.Profiles)
+                    {
+                        <option value="@reference.Id">@reference.Code - @reference.Bundle - @reference.ProtectionPurpose - @string.Join(", ", reference.Strategies ?? [])</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="profile-reason">Reason definition</label>
+                <select id="profile-reason" @bind="reason" required aria-describedby="profile-help profile-error">
+                    <option value="">Choose compatible reason</option>
+                    @foreach (var item in CompatibleReasons)
+                    {
+                        <option value="@PolicyAuthoringState.Key(item.Reference)">@item.Reference.Code revision @item.Reference.Revision - @item.Meaning</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="profile-grade">Response grade</label>
+                <select id="profile-grade" value="@grade" @onchange="ChangeGrade" required aria-describedby="profile-help profile-error">
+                    <option value="">Choose response deliberately</option>
+                    @foreach (var response in template?.Responses ?? [])
+                    {
+                        <option value="@response.Grade">@response.Grade - @response.Timing.Kind, up to @response.Timing.Duration, @response.RequiredApprovals approvals</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="profile-duration">Duration or review delay (days.hours:minutes:seconds)</label>
+                <input id="profile-duration" @bind="duration" readonly="@NoDuration" required aria-describedby="profile-help profile-error" />
+            </div>
+            <div>
+                <label for="profile-approvals">Required approvals</label>
+                <input id="profile-approvals" type="number" @bind="approvals" min="0" max="2" required aria-describedby="profile-help profile-error" />
+            </div>
+            <div>
+                <label for="profile-months">Contestation window in calendar months</label>
+                <input id="profile-months" type="number" @bind="months" min="0" max="120" required aria-describedby="profile-help profile-error" />
+            </div>
+            <div>
+                <label for="profile-recognition">Recognition declaration</label>
+                <select id="profile-recognition" @bind="edit.Recognition" aria-describedby="profile-help profile-error">
+                    <option value="@ModerationReferenceRecognition.Never">Never</option>
+                    @if (template?.Recognition is { } recognition && recognition != ModerationReferenceRecognition.Never)
+                    {
+                        <option value="@recognition">@recognition</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <fieldset>
+            <legend>Scope coverage</legend>
+            @foreach (var kind in template?.ScopeKinds ?? [])
+            {
+                var id = $"profile-scope-{kind}";
+                <div><input id="@id" type="checkbox" checked="@edit.ScopeKinds.Contains(kind)"
+                    @onchange="args => Toggle(edit.ScopeKinds, kind, args)" aria-describedby="profile-help profile-error" />
+                    <label for="@id">@kind</label></div>
+            }
+        </fieldset>
+        <fieldset>
+            <legend>Subject coverage</legend>
+            @foreach (var kind in template?.SubjectKinds ?? [])
+            {
+                var id = $"profile-subject-{kind}";
+                <div><input id="@id" type="checkbox" checked="@edit.SubjectKinds.Contains(kind)"
+                    @onchange="args => Toggle(edit.SubjectKinds, kind, args)" aria-describedby="profile-help profile-error" />
+                    <label for="@id">@kind</label></div>
+            }
+        </fieldset>
+        <div>
+            <input id="profile-select" type="checkbox" @bind="selected" aria-describedby="profile-help profile-error" />
+            <label for="profile-select">Also declare the new revision selected (does not activate it)</label>
+        </div>
+        @if (template is null && Original is not null)
+        {
+            <p>The retained reference revision is not in the installed catalogue. Its complete definition stays retained;
+                it cannot be silently migrated. Add a new rule family from an installed recipe instead.</p>
+        }
+        <div class="policy-authoring-profile__actions">
+            <button id="save-profile" type="submit" disabled="@(template is null)">Save new profile revision</button>
+            <button type="button" @onclick="() => Cancelled.InvokeAsync()">Cancel profile edit</button>
+        </div>
+    </form>
+    @if (template is not null)
+    {
+        <ModerationReferenceProfilePreview Profile="@template" ShowAdvanced="@ShowAdvanced" />
+    }
+</section>

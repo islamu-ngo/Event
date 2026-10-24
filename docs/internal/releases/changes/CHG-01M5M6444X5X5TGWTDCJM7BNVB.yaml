@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M6444X5X5TGWTDCJM7BNVB
+Title: "Retain writer-owned erasure recovery coordinates"
+Type: feat
+Scope: privacy
+Summary: "Checkpoint retained store identity, monotonic revision and recovery generation as metadata rather than backup, restoration or reconciliation evidence."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Store identity and monotonic writer revision/generation distinguish retained authority coordinates; equality grants neither recovery completion nor replay permission. Native retained writer ownership is separate and tests are unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Embedded and authority counter mappings add store/revision/generation columns. Complete model/migration integration and provider verification before deployment; none was executed here."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Coordinates are not backup, restore or reconciliation evidence. Retained authority upgrade and recovery procedures require the host repository integration and independent verification."

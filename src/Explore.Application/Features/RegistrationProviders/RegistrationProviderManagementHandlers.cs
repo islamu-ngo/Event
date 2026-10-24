@@ -2,8 +2,10 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
@@ -717,6 +719,8 @@ public sealed class DeleteRegistrationProviderBindingCommandHandler(
 
 public sealed class PublishEventRegistrationProviderBindingCommandHandler(
     IRegistrationProviderRepository providerRepository,
+    IRegistrationProviderRegistry providerRegistry,
+    IEventPublicationMutationBoundary publicationBoundary,
     IRegistrationProviderManagedPublishPreflight managedPublishPreflight,
     IRegistrationProviderSubscriptionStateRepository subscriptionStates,
     IHumanEventProviderMutationPreparation preparation,
@@ -767,8 +771,9 @@ public sealed class PublishEventRegistrationProviderBindingCommandHandler(
                 return new PublishOutcome(BaseCommandResponse.Failure<Guid>(
                     code, code, proposal.Result.Errors, request.BindingId));
             }
-            return new PublishOutcome(await new PublishRegistrationProviderBindingCommandHandler(providerRepository).ExecuteAsync(
-                new PublishRegistrationProviderBindingCommand(request.TenantId, request.BindingId,
+            return new PublishOutcome(await new PublishRegistrationProviderBindingCommandHandler(
+                providerRepository, providerRegistry, publicationBoundary).ExecuteAsync(
+                new PublishRegistrationProviderBindingCommand(request.TenantId, request.EventId, request.BindingId,
                     ToSchemaDriftClass((RegistrationProviderDriftClassEnum)current.DriftClassId), publishedAt), token));
         }, cancellationToken);
         return outcome.Response;
@@ -806,6 +811,7 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
     IRegistrationProviderRegistry providerRegistry,
     SchemaDriftClassifier driftClassifier,
     FormSchemaArtifactPublicationService publicationService,
+    IEventPublicationMutationBoundary publicationBoundary,
     IHumanEventProviderMutationPreparation preparation,
     IRegistrationProviderDeferredCheckpointJournal checkpoints,
     TimeProvider timeProvider)
@@ -854,8 +860,17 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
         }
 
         ImportOutcome outcome = await checkpoints.ExecuteAsync(request, prepared, observation,
-            async (remoteSchema, token) => new ImportOutcome(await ImportAsync(remoteSchema, token)), cancellationToken);
-        return outcome.Response;
+            async (remoteSchema, token) => new ImportOutcome(await publicationBoundary.ExecuteInCurrentTransactionAsync(
+                request.EventId, inner => ImportAsync(remoteSchema, inner), token)), cancellationToken);
+        var result = outcome.Response;
+        return result.FailureCode switch
+        {
+            "event_publish_restricted" => BaseCommandResponse.Failure<Guid>(
+                "registration_provider_external_import_publish_restricted", result.Message, result.Errors, request.EventId),
+            "event_publish_authority_unavailable" => BaseCommandResponse.Failure<Guid>(
+                "registration_provider_external_import_publish_authority_unavailable", result.Message, result.Errors, request.EventId),
+            _ => result
+        };
 
         async Task<BaseCommandResponse<Guid>> ImportAsync(RegistrationProviderSchemaReadResult remoteSchema,
             CancellationToken cancellationToken)

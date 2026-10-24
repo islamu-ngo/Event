@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M4AACD10E2F2TZPYX7JC7W
+Title: "Raise vulnerable cryptography and web package security floors"
+Type: fix
+Scope: dependencies
+Summary: "Patch the existing cryptography, Blazor, Redis Data Protection, SignalR and MessagePack dependency families without changing the framework or disabling audits."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/legal/dependencies/dotnet-october-2026-security-patches.md
+    Disposition: mitigated
+    Details: "Raise existing package-family security floors and retain audited generated lockfile resolutions; no new restore or test execution is claimed by this commit."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

@@ -117,6 +117,8 @@ public sealed record ConfigurationManifestSpecV1Alpha2
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ConfigurationManifestInstanceV1Alpha2
 {
+    public ConfigurationModerationDocumentV1? Moderation { get; init; }
+
     private IReadOnlyDictionary<string, JsonElement> _settings = Snapshot.Dictionary<string, JsonElement>(null);
     private IReadOnlyDictionary<string, ConfigurationManifestDocumentV1Alpha2> _documents = Snapshot.Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(null);
     private IReadOnlyDictionary<string, ConfigurationManifestLegalDocumentV1Alpha2> _legalDocuments = Snapshot.Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>(null);
@@ -158,6 +160,8 @@ public sealed record ConfigurationManifestTenantMetadataV1Alpha2
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ConfigurationManifestTenantSpecV1Alpha2
 {
+    public ConfigurationModerationDocumentV1? Moderation { get; init; }
+
     private IReadOnlyDictionary<string, JsonElement> _settings = Snapshot.Dictionary<string, JsonElement>(null);
     private IReadOnlyDictionary<string, ConfigurationManifestDocumentV1Alpha2> _documents = Snapshot.Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(null);
     private IReadOnlyDictionary<string, ConfigurationManifestLegalDocumentV1Alpha2> _legalDocuments = Snapshot.Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>(null);
@@ -303,6 +307,8 @@ public sealed record TenantConfigurationPackageSourceV1Alpha2
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record TenantConfigurationPackageSpecV1Alpha2
 {
+    public ConfigurationModerationDocumentV1? Moderation { get; init; }
+
     private IReadOnlyDictionary<string, JsonElement> _settings = Snapshot.Dictionary<string, JsonElement>(null);
     private IReadOnlyDictionary<string, ConfigurationManifestDocumentV1Alpha2> _documents = Snapshot.Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(null);
     private IReadOnlyDictionary<string, ConfigurationManifestLegalDocumentV1Alpha2> _legalDocuments = Snapshot.Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>(null);

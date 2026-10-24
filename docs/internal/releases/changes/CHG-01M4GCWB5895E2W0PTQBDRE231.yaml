@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4GCWB5895E2W0PTQBDRE231
+Title: "Recheck audience action decisions before HAL disclosure"
+Type: fix
+Scope: access
+Summary: "Retain bounded native download, access and management decisions with audience detail and collection proofs. Invalidate a privately prepared representation when an action outcome changes, even if metadata remains readable; a fresh request can omit the denied affordance. Keep server-derived authority fields out of HTTP JSON and preserve routes and cursors. Ten regression cases are authored and unrun under the implementation-first programme override; complete consumer activation remains open."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

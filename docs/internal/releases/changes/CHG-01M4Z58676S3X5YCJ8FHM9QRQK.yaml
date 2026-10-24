@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4Z58676S3X5YCJ8FHM9QRQK
+Title: Define independently accepted Human action budgets
+Type: feat
+Scope: access
+Summary: Model finite Human action limits, exact source-generation acceptance by a distinct named operator and one-way withdrawal. These model primitives do not authenticate operators or enable native action admission.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

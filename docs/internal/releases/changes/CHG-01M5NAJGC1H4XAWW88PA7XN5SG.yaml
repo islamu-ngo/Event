@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5NAJGC1H4XAWW88PA7XN5SG
+Title: "Recognize private PII fields without widening provisioning access"
+Type: fix
+Scope: access
+Summary: "Keep human provisioning model validation complete while retaining its original four operational PII columns and existing private-field permission boundaries."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: mitigated
+    Detail: "Human provisioning validates all existing mapped PII fields without adding private-field read, insert or update permissions. Regression source retains incomplete-model rejection and the four-column operational boundary; local test compilation and execution remain intentionally unperformed."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: planned
+    Detail: "This source correction addresses remote startup model drift without changing schema or configuration. Native permissions and provisioning behavior require fresh remote CI evidence; no database operation was executed locally."

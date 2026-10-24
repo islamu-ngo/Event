@@ -35,6 +35,28 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class EventPromotionsControllerTests
 {
     [Test]
+    [Arguments("promotion_publish_restricted", StatusCodes.Status403Forbidden)]
+    [Arguments("promotion_publish_authority_unavailable", StatusCodes.Status503ServiceUnavailable)]
+    [Arguments("promotion_management_validation_failed", StatusCodes.Status400BadRequest)]
+    public async Task Publication_failure_distinguishes_denial_from_retryable_authority_and_validation(
+        string failureCode, int expectedStatus)
+    {
+        var handler = Substitute.For<ICommandHandler<PublishPromotionCommand, PromotionManagementCommandResponseDto>>();
+        var eventId = Guid.CreateVersion7();
+        handler.ExecuteAsync(Arg.Any<PublishPromotionCommand>(), Arg.Any<CancellationToken>())
+            .Returns(PromotionManagementCommandResponseDto.Failure(
+                Explore.Application.Responses.BaseCommandResponse.Failure<Guid>(failureCode,
+                    "Publication could not proceed.", id: eventId)));
+        var controller = CreateController(publishHandler: handler);
+        var response = await controller.Publish(eventId, Guid.CreateVersion7(),
+            new PromotionCodeRequest("SAVE10"), Guid.CreateVersion7().ToString("N"));
+        var result = response.Result as ObjectResult;
+        await Assert.That(result).IsNotNull();
+        await Assert.That(result!.StatusCode).IsEqualTo(expectedStatus);
+        await Assert.That(result.Value is ProblemDetails).IsTrue();
+    }
+
+    [Test]
     public async Task PromotionManagementRoutes_ArePrivateAndTransactionalWhereMutating()
     {
         await AssertRoute<HttpGetAttribute>(nameof(EventPromotionsController.List), string.Empty, RouteNames.GetEventPromotions, false);

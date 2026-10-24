@@ -40,7 +40,8 @@ public sealed class InstanceConfigurationImportSessionsController(
         ImmutableArray<ConfigurationImportOperationResult>> listHistory,
     IQueryHandler<GetInstanceConfigurationImportReceiptQuery,
         ConfigurationImportOperationResult> getReceipt,
-    IAuthorizationProvider authorization)
+    IAuthorizationProvider authorization,
+    Microsoft.Extensions.Options.IOptions<JsonOptions> json)
     : ConfigurationImportSessionsControllerBase
 {
     [HttpPost("", Name = RouteNames.CreateInstanceConfigurationImportSession)]
@@ -285,6 +286,9 @@ public sealed class InstanceConfigurationImportSessionsController(
                 accessToken,
                 request),
             cancellationToken);
+        if (preview.Disclosure is { } disclosure)
+            return new ConfigurationImportPreviewHttpResult(disclosure,
+                view => WithSessionLinks(view, sessionId, tenantId: null), json);
         return Ok(WithSessionLinks(
             preview,
             sessionId,

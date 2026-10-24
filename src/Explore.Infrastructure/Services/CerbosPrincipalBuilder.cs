@@ -3,7 +3,6 @@ using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 
 namespace Explore.Infrastructure.Services;
@@ -93,7 +92,19 @@ public class CerbosPrincipalBuilder
             .Select(member => member.OwnerId).Distinct();
         return BuildHumanPrincipal(facts.PrincipalId, instanceAdmin, tenants, organizations, groups,
             facts.EventCreateOrganizations, facts.EventCreateGroups,
-            facts.EventFinanceOrganizations, facts.EventFinanceGroups);
+            facts.EventFinanceOrganizations, facts.EventFinanceGroups)
+            .WithAttribute("groupMemberCreateScopes", AttributeValue.ListValue(MembershipScopes(mapping => mapping.MatchesGroupMemberCreateCode)))
+            .WithAttribute("groupMemberUpdateScopes", AttributeValue.ListValue(MembershipScopes(mapping => mapping.MatchesGroupMemberUpdateCode)))
+            .WithAttribute("groupMemberDeleteScopes", AttributeValue.ListValue(MembershipScopes(mapping => mapping.MatchesGroupMemberDeleteCode)));
+
+        AttributeValue[] MembershipScopes(Func<HumanPrincipalPermissionFact, bool> matchesPermission) => facts.Groups
+            .Where(member => member.TenantId == facts.SelectedTenantId
+                && !member.IsDeleted && !member.PlacementIsDeleted && !member.OwnerIsDeleted
+                && (member.RoleId == (int)RoleEnum.GroupAdmin || facts.Permissions.Any(mapping =>
+                    mapping.RoleId == member.RoleId && mapping.IsActive && matchesPermission(mapping))))
+            .Select(member => $"{member.TenantId:D}/{member.OwnerId:D}")
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)
+            .Select(AttributeValue.StringValue).ToArray();
     }
 
     private static Principal BuildHumanPrincipal(Guid userId, bool isInstanceAdmin,
@@ -145,12 +156,29 @@ public class CerbosPrincipalBuilder
             .Select(AttributeValue.StringValue)
             .ToArray();
 
+        var membershipScopes = Array.Empty<AttributeValue>();
+        if (machineContext.TenantId is { } membershipTenant)
+        {
+            var groups = machineContext.OwnerType switch
+            {
+                ExternalApiKeyOwnerType.Group => new[] { machineContext.OwnerId },
+                ExternalApiKeyOwnerType.User => (await _adminContext.GetAdminGroupIdsAsync(
+                    machineContext.OwnerId, membershipTenant, cancellationToken)).ToArray(),
+                _ => Array.Empty<Guid>()
+            };
+            membershipScopes = groups.Distinct().Order()
+                .Select(group => AttributeValue.StringValue($"{membershipTenant:D}/{group:D}")).ToArray();
+        }
+
         var principal = Principal
             .NewInstance($"api_key:{machineContext.KeyId}", "islamuevent_authenticated_user")
             .WithAttribute("isInstanceAdmin", AttributeValue.BoolValue(isInstanceAdmin))
             .WithAttribute("tenantMemberships", AttributeValue.MapValue(tenantMemberships))
             .WithAttribute("orgMemberships", AttributeValue.MapValue(orgMemberships))
             .WithAttribute("groupMemberships", AttributeValue.MapValue(groupMemberships))
+            .WithAttribute("groupMemberCreateScopes", AttributeValue.ListValue(membershipScopes))
+            .WithAttribute("groupMemberUpdateScopes", AttributeValue.ListValue(membershipScopes))
+            .WithAttribute("groupMemberDeleteScopes", AttributeValue.ListValue(membershipScopes))
             .WithAttribute("eventCreateOrganizations", AttributeValue.ListValue([]))
             .WithAttribute("eventCreateGroups", AttributeValue.ListValue([]))
             .WithAttribute("eventFinanceOrganizations", AttributeValue.ListValue([]))

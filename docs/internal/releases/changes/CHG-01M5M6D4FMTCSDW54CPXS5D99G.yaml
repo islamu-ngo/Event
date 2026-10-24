@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5M6D4FMTCSDW54CPXS5D99G
+Title: "Render public calendars from current qualified publication proof"
+Type: feat
+Scope: discovery
+Summary: "Qualify public calendar terminal disclosure and export affordances against current native publication proof; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Current publication provenance is requalified at calendar terminal disclosure and guest export affordance generation, preventing stale or unqualified event exposure. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned publication/event target qualification models and cumulative generated schema history; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Calendar endpoint source and export affordance/result changes ship here; cumulative API snapshots ship once in final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Coordinate parent-owned event publication boundary and native target/recognition owners; complete paired discovery/export guidance and provider assurance before deployment."

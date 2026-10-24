@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M6D2AK4JCYQ50B9ET76SZM
+Title: "Align group membership authorization across native policy engines"
+Type: fix
+Scope: access
+Summary: "Align Cerbos principal scopes and fallback single and batch group-membership permission checks; included parity tests are unrun and runtime assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Cerbos principal tenant/group permission scopes and fallback single/batch evaluation require the same current create/update/delete membership authority. Included parity tests are UNRUN; runtime assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: planned
+    Detail: "Deploy the updated Cerbos group-member policy and principal schema together with its matching principal builder; policy-engine parity has not been executed."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Coordinate policy and application deployment and finish paired authorization guidance; parent-owned controller identity aliases are separate prerequisites."

@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZVTWGXA3SGM6XQWJGVXMTH
+Title: "Retain exact classified material proposals and independent finite review"
+Type: feat
+Scope: access
+Summary: "Snapshot complete native Event material and component versions against adopted taxonomy provenance, require the nominated independent reviewer, and project exact reviewed parent-child classifications without inferring content meaning from Event format or granting audience permission."
+Group: moderation-classification-material-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

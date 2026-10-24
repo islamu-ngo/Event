@@ -198,6 +198,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresRegistrationPrivateReadContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresPublicEventResponseClockContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresLookupCatalogueReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresCategoryReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresAtprotoFederationSettingPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await migratorContext.Database.ExecuteSqlRawAsync(
                 $"""

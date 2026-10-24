@@ -666,6 +666,38 @@ dotnet test --project <ProjectPath> --configuration Release -- --report-trx --re
 
 ## Persistence Hardening Verification
 
+### Fresh PostgreSQL settings contract bootstrap
+
+Fresh composition installs `PostgresCategoryReadPermissions` after the fixed
+lookup catalogue profile. The declared migration identity provisions schema
+access and direct, non-grantable Runtime SELECT on exactly the six mapped
+Category columns: `Id`, `ConcurrencyStamp`, `MasterCode`, `FullName`, `ParentId`
+and `TenantId`. The profile checks model shape, the tenant-qualified parent
+relationship and forced tenant RLS. It adds no table-wide read or write, Global
+permission or role membership. Shared event-read guards recognize this exact
+direct read purpose only when Category belongs to the owner's fixed source
+inventory.
+
+Installation retains the originally captured transaction and savepoint. A
+failure while the savepoint remains available restores that savepoint and
+preserves earlier caller work. After release or uncertain selective restoration,
+cleanup aborts the captured physical transaction; it closes the captured
+connection if abort fails. Original denial/cancellation and cleanup failures
+remain observable together. Unknown commit outcomes and post-commit cleanup
+failures do not prove that committed effects were rolled back.
+
+The native evidence consists of separate cohorts: the original class ran 33
+cases with 32 passes and one fresh-reader prerequisite failure; the corrected
+fresh-reader case later passed alone; the repaired public Runtime detail control
+passed separately; and the private-management API control later passed after
+its existing fixture bound setup leases and installed the canonical Local
+identity writer profile before host construction. The private control reached
+private draft graph, disabled action, session/parent and raw Runtime denial
+assertions. These receipts do not form a fresh full current 33-case Green run.
+A final coherent full Category class and required provider matrix remain
+outstanding, and these results do not establish Global storage readiness or a
+full current suite pass.
+
 Run provider classes separately. Combining long-lived container classes in one
 tree filter can bypass the intended TUnit isolation and obscure which engine
 failed.

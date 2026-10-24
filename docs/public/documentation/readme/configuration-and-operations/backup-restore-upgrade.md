@@ -302,6 +302,18 @@ and security failures still fail closed.
 
 ## 4. Upgrade Runbook (Pre-1.0 Releases)
 
+### PostgreSQL settings contract development bootstrap
+
+Fresh development bootstrap also provisions the Runtime access needed for
+category browsing. Reads stay limited to the selected tenant and six modelled
+Category fields under forced row security, including parent category reads.
+Migration authority installs this fixed read profile; it grants no table-wide
+read, write permission, Global access or owner-role switching. Unexpected
+privilege, membership or tenant-policy changes fail validation. The updated
+event-reader definitions recognize this fixed Category purpose while retaining
+their other privilege boundaries. These changed reader bodies target a fresh,
+disposable development bootstrap; older installed bodies remain rejected.
+
 ### Application-owned storage development migrations
 
 The current development migration set uses `ApplicationOwnedProgrammeModel`

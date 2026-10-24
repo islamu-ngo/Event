@@ -1,3 +1,4 @@
+using Explore.Domain;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -39,6 +40,9 @@ internal static class EventReadProjectionSql
                 WHERE acl.grantee = 0 AND acl.privilege_type = 'SELECT')
             """;
         referenceRead = $"({referenceRead}) OR ({PostgresTenantApiKeyStoragePermissions.RuntimeParentReadPredicate(context, enrollment, "r.oid", "t.oid", "a.attname", "'SELECT'")})";
+        if (sources.Contains(typeof(Category)))
+            referenceRead = $"({referenceRead}) OR ({PostgresCategoryReadPermissions.RuntimeReadPredicate(context,
+                typeof(Category), enrollment.RuntimeLogin, "r.oid", "t.oid", "a.attname", "'SELECT'")})";
         return $"""
             IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r
                 WHERE pg_catalog.pg_has_role({runtime},r.oid,'MEMBER')

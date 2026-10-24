@@ -163,6 +163,7 @@ public static class ExploreDatabaseMigrator
             await PostgresRegistrationPrivateReadContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresPublicEventResponseClockContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresLookupCatalogueReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresCategoryReadPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresAtprotoFederationSettingPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
             await PostgresIdempotencyReceiptContract.ApplyAsync(
                 executionDatabase, queueEnrollment, cancellationToken);

@@ -142,6 +142,16 @@ documents, establish accountable identity or certify legal validity.
 
 ## Configuration import sessions on a live instance
 
+PostgreSQL setup enrollment and operation receipts require their fixed Runtime
+storage permissions, installed through Event's normal migrator. The setup
+descriptor is separate from API-key storage permissions. It retains tenant row
+isolation, immutable issuance claims and operation identity, and grants no DELETE
+access. Partial or widened grants are rejected, not repaired automatically.
+Do not switch request handling to Migrator/Global credentials or bypass these
+checks to resolve an enrollment error. This correction adds no configuration
+setting or schema migration and does not enable live control in Configurator.
+Its native permission regressions remain subject to remote CI acceptance.
+
 Live configuration import remains a server-controlled workflow, separate from
 offline Configurator:
 

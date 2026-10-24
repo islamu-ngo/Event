@@ -432,6 +432,25 @@ coordinates, which never enter Setup contracts, logs, metrics, or responses.
 Recovery is to revoke the enrollment and clear the adapter's in-memory state;
 there is no credential-persistence recovery path.
 
+PostgreSQL setup storage uses a separate fixed Runtime permission descriptor
+installed by `PostgresTenantApiKeyStoragePermissions.ApplySetupLiveAsync` in the
+normal migrator sequence. It covers enrollments, immutable issuance claims and
+binding-operation receipts, without changing the existing API-key descriptor.
+Runtime can SELECT and INSERT their mapped scalars; UPDATE is limited to the
+enrollment capability/lifecycle and operation settlement fields, plus audit and
+concurrency metadata. Claims, tenant/actor identity and operation commitments
+cannot be updated, and no DELETE permission is granted. Stored commitments are
+digests, not plaintext capabilities or secret values.
+
+The existing migrator-identity, physical-connection/transaction, complete-column
+ACL and forced tenant-RLS checks remain mandatory. Installation accepts a fresh
+descriptor or the exact complete descriptor; partial or widened grants are
+rejected rather than repaired. C# continues to authorize the caller, validate
+capability generation and expiry, and settle operations. This change adds no
+database migration, setting or alternate credential authority. Native lifecycle,
+cross-tenant and grant-drift regressions were authored but not locally compiled
+or executed; remote CI remains the runtime acceptance gate.
+
 Configurator's own release-capability metadata governs its offline surfaces.
 The old bundled capability generator is removed. Retained Event backend
 authority and the relocated client adapter do not activate live control in

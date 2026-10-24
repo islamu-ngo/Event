@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5QEKVDVS9PTT89ZHQKAFPGP
+Title: "Permit native setup storage without widening tenant authority"
+Type: fix
+Scope: access
+Summary: "Install a separate fixed Runtime column-permission descriptor for setup enrollments, immutable issuance claims and binding operations while retaining tenant RLS and C# workflow authority."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: mitigated
+    Detail: "Separate setup column permissions retain tenant RLS, immutable issuance claims and operation identity, no DELETE access, exact catalog attestation and C# workflow authority. Native tests are authored but locally unbuilt and unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: "The normal PostgreSQL migrator installs the separately attested setup-storage descriptor. No new configuration setting, schema migration or Global request credential is needed; widened or partial grants remain fail-closed. Fresh remote CI must establish runtime acceptance."

@@ -377,6 +377,16 @@ described in [Environment variables](environment-variables.md#independent-databa
 Do not add them to the BFF's runtime credential roots. Missing native capability
 admission blocks the advertised profile; API startup does not install grants.
 
+Migration enrollment also needs the existing read, write and report login
+usernames to identify those accounts. In Aspire's Environment authority mode,
+the three username declarations reach the migration process as well as API and
+Combined hosts. Their structured `Database:<role>:Username` declarations take
+precedence over the corresponding flat aliases, including an explicitly empty
+structured value: supplying a flat value does not repair that empty declaration.
+An explicit Aspire target value is retained when no structured operator value
+is declared. This enrollment projection adds no purpose-password forwarding or
+BFF access; Infisical consumers keep using their own selected identity.
+
 Global is limited to explicitly granted cross-tenant capabilities, not universal
 `BYPASSRLS` access. On PostgreSQL it must remain `NOSUPERUSER NOBYPASSRLS`.
 Persisted machine footer link/group PATCH uses the already selected Runtime

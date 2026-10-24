@@ -629,6 +629,16 @@ projection masks unselected aliases, and Compose forwards these pairs only to
 the API database environment anchor. Infisical uses the exact `/database` root;
 BFF consumers receive none of these credentials.
 
+Migration enrollment identifies the `InstanceKeyRead`, `InstanceKeyWrite` and
+`PlatformKeyReport` accounts by their existing username declarations. The
+Environment authority projects these three usernames to API, Combined and
+Migration consumers without adding purpose-password forwarding. A declared
+`Database:<role>:Username` takes precedence over its flat environment alias;
+an explicit empty canonical value masks the alias and keeps enrollment
+unavailable. An explicit Aspire target value survives when no canonical
+operator value is declared. BFF remains excluded, and Infisical consumers
+continue acquiring configuration through their own selected authority.
+
 `InstanceApiKeyDbContextFactories` checks the common database/namespace/TLS
 target and distinct server logins/passwords before creating four independent
 pools. Startup admission opens every purpose and verifies ordinary-role RLS

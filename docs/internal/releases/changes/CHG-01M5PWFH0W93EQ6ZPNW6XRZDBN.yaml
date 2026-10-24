@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5PWFH0W93EQ6ZPNW6XRZDBN
+Title: "Preserve migration enrollment usernames"
+Type: fix
+Scope: self-hosting
+Summary: "Restore the three existing migration enrollment usernames while enforcing declared canonical precedence and preserving consumer isolation."
+Group: migration-enrollment
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: public
+    Detail: The added Environment enrollment projection carries existing read, write and report usernames without adding purpose-password forwarding, BFF access or provider permissions. Declared canonical values, including empty values, mask flat aliases.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: The three existing InstanceKeyRead, InstanceKeyWrite and PlatformKeyReport username declarations reach Environment-backed API, Combined and Migration consumers. Canonical Database role usernames take precedence over flat aliases; explicit Aspire target values survive when no canonical operator value is declared. No configuration key is added.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/infisical.md
+    Disposition: documented
+    Detail: Supply the existing read, write and report login usernames through the selected authority for migration enrollment. An explicitly empty structured declaration remains unavailable even when its flat alias has a value. No database creation, schema change, grant or reset is introduced, and this projection correction does not establish successful application startup.

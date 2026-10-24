@@ -58,6 +58,20 @@ provider, database role, authentication scheme or distributed hosting profile;
 their receipt records these dimensions as `not-attested`. Real provider, browser
 and load profiles retain their own results and resource ownership.
 
+### Host-free AppHost composition
+
+Use the `AppHostCompositionContractTests` class in
+`Event.Distributed.IntegrationTests` for focused composition changes. It inspects
+the real resource registration with explicit inputs and completes without
+starting application resources. The fixture keeps its inspection profile private
+to that path; its normal creation and startup entry points reject it.
+
+Check the required named cases and their outcomes. Passing model checks proves
+registration and the project-owned container customization projection. Image
+publication, running services, database authority and browser journeys need their
+separate execution lanes. Retain the parsed project, solution, YAML and Compose
+checks alongside the model cases.
+
 ---
 
 ## 2. Invariant-Breaker Testing Strategy

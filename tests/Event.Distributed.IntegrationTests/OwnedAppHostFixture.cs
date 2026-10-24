@@ -44,7 +44,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         this.topology = topology;
         this.profile = profile;
         RunId = Guid.NewGuid().ToString("N");
-        EnvironmentAuthority = CreateEnvironmentAuthority(RunId);
+        EnvironmentAuthority = CreateEnvironmentAuthority(RunId, profile);
         Root = Path.Combine(Path.GetTempPath(), "islamu-assurance", RunId);
         Directory.CreateDirectory(Root);
         if (!OperatingSystem.IsWindows())
@@ -77,9 +77,48 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     {
         if (!Enum.IsDefined(profile) || !Enum.IsDefined(peerProtection)
             || profile == OwnedAppHostProfile.ExternalIdentitySharedBff && topology != "Split"
-            || profile == OwnedAppHostProfile.Standard && peerProtection != OwnedBffPeerProtection.Shared)
+            || profile != OwnedAppHostProfile.ExternalIdentitySharedBff && peerProtection != OwnedBffPeerProtection.Shared)
             throw new InvalidOperationException("test_resource_profile_invalid");
-        var owner = new OwnedAppHostFixture(topology, profile);
+        var owner = new OwnedAppHostFixture(topology ?? string.Empty, profile);
+    {
+        if (profile == OwnedAppHostProfile.ClosedCompositionModel)
+            throw new InvalidOperationException("test_resource_profile_invalid");
+        return await CreateCoreAsync(topology, configuredAdministrator, deploymentMode, untrustedInputs,
+            configureBuilder, profile, peerProtection, "local-default", "EmbeddedSqlite", null, "Local", cancellationToken);
+    }
+
+    internal static async Task InspectCompositionAsync(string? topology, string runMode,
+        string privacyErasureTopology, string? eventLocationPrivacyMigrationStage, string webhookProvider,
+        Func<IDistributedApplicationTestingBuilder, Task> inspect, CancellationToken cancellationToken)
+    {
+        var completed = new CompositionInspectionCompleted();
+        try
+        {
+            var unexpectedOwner = await CreateCoreAsync(topology, false, "SingleTenant", null, async builder =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await inspect(builder);
+                cancellationToken.ThrowIfCancellationRequested();
+                throw completed;
+            }, OwnedAppHostProfile.ClosedCompositionModel, OwnedBffPeerProtection.Shared,
+                runMode, privacyErasureTopology, eventLocationPrivacyMigrationStage, webhookProvider, cancellationToken);
+            var failure = new InvalidOperationException("test_resource_inspection_incomplete");
+            try { await unexpectedOwner.DisposeAsync(); }
+            catch (Exception cleanupFailure) { throw new AggregateException(failure, cleanupFailure); }
+            throw failure;
+        }
+        catch (CompositionInspectionCompleted exception) when (ReferenceEquals(exception, completed)) { }
+    }
+
+    private sealed class CompositionInspectionCompleted : Exception { }
+
+    private static async Task<OwnedAppHostFixture> CreateCoreAsync(string? topology,
+        bool configuredAdministrator, string deploymentMode,
+        IReadOnlyDictionary<string, string?>? untrustedInputs,
+        Func<IDistributedApplicationTestingBuilder, Task>? configureBuilder,
+        OwnedAppHostProfile profile, OwnedBffPeerProtection peerProtection,
+        string runMode, string privacyErasureTopology,
+        string? eventLocationPrivacyMigrationStage, string webhookProvider, CancellationToken cancellationToken)
         IDistributedApplicationTestingBuilder? builder = null;
         try
         {
@@ -89,7 +128,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     $"ISLAMU_TEST_PROFILE={profile}",
                     $"Aspire:Store:Path={Path.Combine(owner.Root, "aspire")}",
                     "DOTNET_ENVIRONMENT=Assurance", "ASPNETCORE_ENVIRONMENT=Assurance",
-                    "ISLAMU_ASPIRE_MODE=local-default", $"Hosting:Topology={topology}",
+                    $"ISLAMU_ASPIRE_MODE={runMode}", $"Hosting:Topology={topology}",
                     "SECRET_PROVIDER=Environment", "SecretProvider:Provider=Environment",
                     "DATABASE_PROVIDER=PostgreSql", "DATABASE_NAME=islamu_assurance",
                     "DATABASE_SCHEMA=assurance", "DATABASE_HOST=localhost",
@@ -97,11 +136,12 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                     .. (profile == OwnedAppHostProfile.ExternalIdentitySharedBff
                         ? new[] { "IDENTITY_DATABASE_PROVIDER=Sqlite", $"IDENTITY_DATABASE_NAME={Path.Combine(owner.Root, "identity.sqlite")}" }
                         : []),
-                    "PrivacyErasure:Authority:Topology=EmbeddedSqlite", "ERASURE_DATABASE_TOPOLOGY=EmbeddedSqlite",
+                    $"PrivacyErasure:Authority:Topology={privacyErasureTopology}", $"ERASURE_DATABASE_TOPOLOGY={privacyErasureTopology}",
+                    $"Database:Migrations:EventLocationPrivacyStage={eventLocationPrivacyMigrationStage}",
                     "AUTHENTICATION_PROVIDER=Local", "AUTHORIZATION_PROVIDER=Local",
                     $"DEPLOYMENT_MODE={deploymentMode}",
                     "GEOCODING_PROVIDER=None", "CONFIGURATION_MANIFEST_MODE=Off",
-                    "AGENT_BROWSER_SEED_ENABLED=false", "WEBHOOKS_PROVIDER=Local",
+                    "AGENT_BROWSER_SEED_ENABLED=false", $"WEBHOOKS_PROVIDER={webhookProvider}",
                     $"INSTANCE_BOOTSTRAP_MODE={(configuredAdministrator ? "ConfiguredAdministrator" : "Interactive")}",
                     $"INSTANCE_BOOTSTRAP_ADMIN_PROVIDER={(configuredAdministrator ? "local" : string.Empty)}",
                     $"INSTANCE_BOOTSTRAP_ADMIN_SUBJECT={(configuredAdministrator ? Guid.CreateVersion7().ToString("D") : string.Empty)}",
@@ -124,6 +164,11 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 var peer = builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "explore-blazor-peer");
                 var input = owner.CreatePeerProtection(peerProtection);
                 builder.CreateResourceBuilder(peer)
+            if (profile == OwnedAppHostProfile.ClosedCompositionModel)
+            {
+                await configureBuilder!(builder);
+                throw new InvalidOperationException("test_resource_inspection_incomplete");
+            }
                     .WithEnvironment("EVENT_DP_BFF_RING", input.Ring)
                     .WithEnvironment("EVENT_DP_BFF_ADMISSION", input.Admission)
                     .WithEnvironment("EVENT_DP_BFF_ADMISSION_SHA256", input.AdmissionSha256)
@@ -172,18 +217,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         }
         catch (Exception creationFailure)
         {
-            var failures = new List<Exception> { creationFailure };
-            if (builder is not null)
-            {
-                try { await builder.DisposeAsync(); }
-                catch (Exception exception) { failures.Add(exception); }
-            }
-            if (failures.Count > 1)
-                throw new AggregateException(failures);
-            try { await owner.DisposeAsync(); }
-            catch (Exception exception) { failures.Add(exception); }
-            if (failures.Count > 1)
-                throw new AggregateException(failures);
+            await DisposeFailedCreationAsync(creationFailure, builder, owner);
             throw;
         }
     }
@@ -198,8 +232,22 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
     }
 
     internal async Task<Guid> AuthenticateBootstrapAsync(HttpClient api, CancellationToken cancellationToken)
+    internal static async Task DisposeFailedCreationAsync(Exception creationFailure,
+        IAsyncDisposable? builder, IAsyncDisposable owner)
+    {
+        if (builder is not null)
+        {
+            try { await builder.DisposeAsync(); }
+            catch (Exception exception) { throw new AggregateException(creationFailure, exception); }
+        }
+        try { await owner.DisposeAsync(); }
+        catch (Exception exception) { throw new AggregateException(creationFailure, exception); }
+    }
+
     {
         using var initial = await api.PostAsJsonAsync("/api/auth/local/login", new
+        if (profile == OwnedAppHostProfile.ClosedCompositionModel)
+            throw new InvalidOperationException("test_resource_profile_invalid");
         {
             identifier = BootstrapIdentifier, password = BootstrapPassword
         }, cancellationToken);
@@ -464,7 +512,7 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         };
     }
 
-    private static FrozenDictionary<string, string?> CreateEnvironmentAuthority(string runId)
+    private static FrozenDictionary<string, string?> CreateEnvironmentAuthority(string runId, OwnedAppHostProfile profile)
     {
         var values = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
@@ -496,3 +544,17 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         return values.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }
+        if (profile == OwnedAppHostProfile.ClosedCompositionModel)
+        {
+            foreach (string key in new[] { "FORMBRICKS_NEXTAUTH_SECRET", "FORMBRICKS_ENCRYPTION_KEY",
+                "FORMBRICKS_CRON_SECRET", "FORMBRICKS_HUB_API_KEY", "FORMBRICKS_CUBEJS_API_SECRET",
+                "FORMBRICKS_DATABASE_PASSWORD" })
+                values[key] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) + ":/?#[]@!$&'()*+,;=%";
+            values["ERASURE_DATABASE_HOST"] = "localhost";
+            values["ERASURE_DATABASE_NAME"] = "islamu_assurance_erasure";
+            foreach (string purpose in new[] { "MIGRATOR", "RUNTIME" })
+            {
+                values[$"ERASURE_DATABASE_{purpose}_USERNAME"] = "assurance_erasure_" + purpose.ToLowerInvariant();
+                values[$"ERASURE_DATABASE_{purpose}_PASSWORD"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            }
+        }

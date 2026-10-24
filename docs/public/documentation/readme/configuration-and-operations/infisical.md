@@ -725,6 +725,19 @@ Deployments running optional Compose profiles (`--profile formbricks`, `--profil
 | `FORMBRICKS_CUBEJS_API_SECRET` | CubeJS analytics API secret. |
 | `FORMBRICKS_WEBAPP_URL` | Public web application URL for Formbricks app. |
 
+For Aspire's `local-full` profile, supply all six secret values before starting:
+`FORMBRICKS_NEXTAUTH_SECRET`, `FORMBRICKS_ENCRYPTION_KEY`,
+`FORMBRICKS_CRON_SECRET`, `FORMBRICKS_HUB_API_KEY`,
+`FORMBRICKS_CUBEJS_API_SECRET`, and `FORMBRICKS_DATABASE_PASSWORD`.
+Aspire reads them from the explicitly selected secret authority and fails
+configuration when a required value is absent. It does not generate substitute
+values. Keep the selected authority and its values stable across restarts.
+
+The Formbricks database, Cube and application database URLs share the selected
+database password. Generated URLs escape reserved characters; the database
+receives the original value. Store the password as its original value in the
+selected authority rather than pre-encoding it.
+
 #### Weblate (`--profile localization`)
 
 | Key | Purpose |

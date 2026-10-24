@@ -166,6 +166,22 @@ from actual host execution and measurement. The integrated project owns all
 four categories; neither discovery nor a passing host-free selection admits
 an unexecuted browser, enabled worker, load or recovery profile.
 
+`AppHostCompositionContractTests` uses
+`OwnedAppHostFixture.InspectCompositionAsync` to inspect the real AppHost resource
+registration without starting the graph. Its internal
+`ISLAMU_TEST_PROFILE=ClosedCompositionModel` profile accepts explicit topology,
+run mode, privacy-erasure topology, optional migration stage and webhook-provider
+inputs. Public fixture creation and startup reject that inspection-only profile.
+The owned callback and cancellation token control completion; an arbitrary
+callback exception or cancellation cannot become successful model evidence.
+Builder disposal and owned-root cleanup remain part of that completion boundary.
+
+These checks establish resource registration and the project-owned Docker
+customization callback's environment/volume projection. They do not execute the
+SDK publisher, build an image, start containers or establish service readiness.
+Keep parsed solution, project, YAML and Compose contracts, and use the real
+runtime lanes for authority, role, database, browser and load evidence.
+
 The seven bundled Event setup test roots are removed. Portable engine and
 packaging coverage belongs to Configurator. Event retains client adapter tests under
 `Explore.Blazor.Client.Tests/SetupLive/`, wire/generated-contract guards,

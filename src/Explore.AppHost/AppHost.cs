@@ -341,7 +341,7 @@ if (runMode is AspireRunMode.FullLocal or AspireRunMode.DefaultLocal)
 
 if (runMode == AspireRunMode.FullLocal)
 {
-    AddLocalFormbricks(builder);
+    AddLocalFormbricks(builder, operatorInputs);
 }
 
 var migrations = WithProfileSecretMode(
@@ -910,6 +910,8 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
 
 testingIsolation?.Apply(builder);
 var application = builder.Build();
+if (testingIsolation is not null)
+    await testingIsolation.DenyInspectionRunAsync(application);
 var testingExecution = testingIsolation is null
     ? null : application.Services.GetService<TestingApplicationExecution>();
 Task execution = application.RunAsync();
@@ -1321,7 +1323,7 @@ static IResourceBuilder<ContainerResource> AddMailpit(
         : mailpit.WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit);
 }
 
-static void AddLocalFormbricks(IDistributedApplicationBuilder builder)
+static void AddLocalFormbricks(IDistributedApplicationBuilder builder, IConfiguration operatorInputs)
 {
     const string formbricksImage = "ghcr.io/formbricks/formbricks";
     const string formbricksTag = "5.2.2@sha256:d6f635714a9c29620203ba29762f4746f5def86c346d6ad95fefa66adc21fd5e";
@@ -1329,17 +1331,18 @@ static void AddLocalFormbricks(IDistributedApplicationBuilder builder)
     const string hubTag = "latest@sha256:4dc0c4f26cf999b3bf4a26d7b09634fc65ae23cbb30c9ad82042da019d231458";
 
     IResourceBuilder<ParameterResource> Secret(string name, string key) =>
-        builder.AddParameter(name, () => builder.Configuration[key] ?? string.Empty, publishValueAsDefault: false, secret: true);
+        builder.AddParameter(name, () => RequiredConfiguredValue(operatorInputs, key), publishValueAsDefault: false, secret: true);
 
     var nextAuthSecret = Secret("formbricks-nextauth-secret", "FORMBRICKS_NEXTAUTH_SECRET");
     var encryptionKey = Secret("formbricks-encryption-key", "FORMBRICKS_ENCRYPTION_KEY");
     var cronSecret = Secret("formbricks-cron-secret", "FORMBRICKS_CRON_SECRET");
     var hubApiKey = Secret("formbricks-hub-api-key", "FORMBRICKS_HUB_API_KEY");
     var cubeApiSecret = Secret("formbricks-cube-api-secret", "FORMBRICKS_CUBEJS_API_SECRET");
+    var databasePassword = Secret("formbricks-database-password", "FORMBRICKS_DATABASE_PASSWORD");
 
     var postgres = builder.AddContainer("formbricks-postgres", "pgvector/pgvector", "pg18")
         .WithEnvironment("POSTGRES_USER", "postgres")
-        .WithEnvironment("POSTGRES_PASSWORD", builder.Configuration["FORMBRICKS_DATABASE_PASSWORD"] ?? string.Empty)
+        .WithEnvironment("POSTGRES_PASSWORD", databasePassword)
         .WithEnvironment("POSTGRES_DB", "formbricks")
         .WithVolume("islamu-event-formbricks-postgres-data", "/var/lib/postgresql");
 
@@ -1349,21 +1352,10 @@ static void AddLocalFormbricks(IDistributedApplicationBuilder builder)
         .WithArgs("valkey-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction")
         .WithVolume("islamu-event-formbricks-redis-data", "/data");
 
-    var databaseUrl = BuildPostgresUrl(
-        "postgres",
-        "postgres",
-        "formbricks-postgres",
-        5432,
-        "formbricks",
-        "schema=public");
-
-    var hubDatabaseUrl = BuildPostgresUrl(
-        "postgres",
-        "postgres",
-        "formbricks-postgres",
-        5432,
-        "formbricks",
-        "sslmode=disable");
+    var databaseUrl = ReferenceExpression.Create(
+        $"postgresql://postgres:{databasePassword:uri}@formbricks-postgres:5432/formbricks?schema=public");
+    var hubDatabaseUrl = ReferenceExpression.Create(
+        $"postgresql://postgres:{databasePassword:uri}@formbricks-postgres:5432/formbricks?sslmode=disable");
 
     IResourceBuilder<ContainerResource> Environment(IResourceBuilder<ContainerResource> resource) => resource
         .WithEnvironment("WEBAPP_URL", builder.Configuration["FORMBRICKS_WEBAPP_URL"] ?? BuildHttpUri("localhost", 3005))
@@ -1404,7 +1396,7 @@ static void AddLocalFormbricks(IDistributedApplicationBuilder builder)
         .WithEnvironment("CUBEJS_DB_HOST", "formbricks-postgres")
         .WithEnvironment("CUBEJS_DB_NAME", "formbricks")
         .WithEnvironment("CUBEJS_DB_USER", "postgres")
-        .WithEnvironment("CUBEJS_DB_PASS", "postgres")
+        .WithEnvironment("CUBEJS_DB_PASS", databasePassword)
         .WithEnvironment("CUBEJS_DB_PORT", "5432")
         .WithEnvironment("CUBEJS_API_SECRET", cubeApiSecret)
         .WithEnvironment("CUBEJS_JWT_ISSUER", "formbricks-web")
@@ -1900,16 +1892,12 @@ static IResourceBuilder<ProjectResource> WithEmbeddedPrivacyErasureAuthority(
     string busyTimeoutSeconds,
     string? volumeName = null)
 {
-    const string containerPath = "/app/data/privacy_erasure_authority.db";
-
     return project
         .WithReplicas(1)
         .WithEnvironment("PrivacyErasureAuthorityEmbedded__Path", localPath)
         .WithEnvironment("PrivacyErasureAuthorityEmbedded__WriterReplicaCount", "1")
         .WithEnvironment("PrivacyErasureAuthorityEmbedded__BusyTimeoutSeconds", busyTimeoutSeconds)
-        .PublishAsDockerFile(container => container
-            .WithEnvironment("PrivacyErasureAuthorityEmbedded__Path", containerPath)
-            .WithVolume(volumeName ?? "islamu-event-privacy-erasure-authority-data", "/app/data"));
+        .PublishAsDockerFile(EmbeddedPrivacyErasureDeployment.Configure(volumeName));
 }
 
 static PrivacyErasureAuthorityTopology ParsePrivacyErasureTopology(string value)

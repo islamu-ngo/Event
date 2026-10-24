@@ -647,7 +647,9 @@ The optional Formbricks stack is deployment-owned infrastructure. Docker Compose
 | `FORMBRICKS_HUB_API_KEY` | Yes | Shared app-to-Hub API key. |
 | `FORMBRICKS_CUBEJS_API_SECRET` | Yes | Cube JWT/API authentication secret. |
 
-Leave required secrets blank in the checked-in example; the Compose migration validates and fails closed. Aspire `FullLocal` generates persistent secret parameters when values are absent. Provider API tokens and webhook secrets remain tenant-scoped ISLAMU secret bindings and are not any of the container-bootstrap values above.
+Leave required secrets blank in the checked-in example; the Compose migration validates and fails closed. Aspire `FullLocal` requires `FORMBRICKS_NEXTAUTH_SECRET`, `FORMBRICKS_ENCRYPTION_KEY`, `FORMBRICKS_CRON_SECRET`, `FORMBRICKS_HUB_API_KEY`, `FORMBRICKS_CUBEJS_API_SECRET`, and `FORMBRICKS_DATABASE_PASSWORD` from the explicitly selected operator secret authority. Required values are resolved lazily when the graph's secret parameters are evaluated; an absent value fails configuration instead of generating a replacement.
+
+AppHost wraps the selected database password in one secret parameter shared by the Formbricks PostgreSQL resource, Cube and the generated database URLs. URL expressions apply the `:uri` formatter so reserved characters are escaped while PostgreSQL receives the original password. Provider API tokens and webhook secrets remain tenant-scoped ISLAMU secret bindings, separate from these container-bootstrap values.
 
 AppHost assigns standalone HTTP dynamically through `WithHttpEndpoint(name: "http")`; HTTPS remains explicitly `https://localhost:7180` for the combined endpoint. Direct `Event.Standalone` launch profiles reserve `http://localhost:5180`.
 

@@ -66,21 +66,29 @@ public sealed record TestingResourceIsolation(string RunId, string Root,
         {
             null or "" or "Standard" => OwnedAppHostProfile.Standard,
             "ExternalIdentitySharedBff" => OwnedAppHostProfile.ExternalIdentitySharedBff,
+            "ClosedCompositionModel" => OwnedAppHostProfile.ClosedCompositionModel,
             _ => throw new InvalidOperationException("test_resource_profile_invalid")
         };
         if (configuration["DOTNET_ENVIRONMENT"] != "Assurance"
             || configuration["ASPNETCORE_ENVIRONMENT"] is not (null or "Assurance")
-            || configuration["ISLAMU_ASPIRE_MODE"] != "local-default"
-            || configuration["Hosting:Topology"] is not ("Split" or "Standalone")
+            || (profile == OwnedAppHostProfile.ClosedCompositionModel
+                ? configuration["ISLAMU_ASPIRE_MODE"] is not ("local-lite" or "local-core" or "local-default" or "local-full")
+                : configuration["ISLAMU_ASPIRE_MODE"] != "local-default"
+                    || configuration["Hosting:Topology"] is not ("Split" or "Standalone"))
             || configuration["SECRET_PROVIDER"] != "Environment"
             || configuration["SecretProvider:Provider"] is not (null or "Environment")
             || configuration["AGENT_BROWSER_SEED_ENABLED"] is not (null or "false")
             || configuration["CONFIGURATION_MANIFEST_MODE"] is not (null or "Off")
-            || configuration["PrivacyErasure:Authority:Topology"] is not (null or "EmbeddedSqlite")
-            || configuration["ERASURE_DATABASE_TOPOLOGY"] is not (null or "EmbeddedSqlite")
-            || profile == OwnedAppHostProfile.Standard
+            || (profile == OwnedAppHostProfile.ClosedCompositionModel
+                ? configuration["PrivacyErasure:Authority:Topology"] is not ("EmbeddedSqlite" or "ExternalDatabase")
+                    || configuration["ERASURE_DATABASE_TOPOLOGY"] != configuration["PrivacyErasure:Authority:Topology"]
+                : configuration["PrivacyErasure:Authority:Topology"] is not (null or "EmbeddedSqlite")
+                    || configuration["ERASURE_DATABASE_TOPOLOGY"] is not (null or "EmbeddedSqlite"))
+            || profile != OwnedAppHostProfile.ExternalIdentitySharedBff
                 && configuration["IDENTITY_DATABASE_TOPOLOGY"] is not (null or "CoLocated")
-            || configuration["WEBHOOKS_PROVIDER"] is not (null or "Local"))
+            || (profile == OwnedAppHostProfile.ClosedCompositionModel
+                ? configuration["WEBHOOKS_PROVIDER"] is not ("Local" or "Svix")
+                : configuration["WEBHOOKS_PROVIDER"] is not (null or "Local")))
             throw new InvalidOperationException("test_resource_profile_invalid");
         if (profile == OwnedAppHostProfile.ExternalIdentitySharedBff)
             ValidateExternalIdentity(configuration);
@@ -125,6 +133,8 @@ public sealed record TestingResourceIsolation(string RunId, string Root,
 
     public void Apply(IDistributedApplicationBuilder builder)
     {
+        if (Profile == OwnedAppHostProfile.ClosedCompositionModel)
+            return;
         foreach (var resource in builder.Resources)
         {
             foreach (var endpoint in resource.Annotations.OfType<EndpointAnnotation>())
@@ -161,6 +171,16 @@ public sealed record TestingResourceIsolation(string RunId, string Root,
                 }
             }
         }
+    }
+
+    public async ValueTask DenyInspectionRunAsync(IAsyncDisposable application)
+    {
+        if (Profile != OwnedAppHostProfile.ClosedCompositionModel)
+            return;
+        var failure = new InvalidOperationException("test_resource_inspection_cannot_run");
+        try { await application.DisposeAsync(); }
+        catch (Exception cleanupFailure) { throw new AggregateException(failure, cleanupFailure); }
+        throw failure;
     }
 
     private static void EnsureNoLinks(string path)

@@ -9,6 +9,93 @@ using System.Reflection;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
 
+public sealed class SecurityExecutionEvidenceIntegrationTests
+{
+    [Test]
+    [Arguments("security-integration", "600s", 615)]
+    [Arguments("owned-load-correctness", "1500s", 1515)]
+    public async Task TypedUidLaunchBudgetPreservesOrdinaryAndTwentyMinuteLoadRegimes(
+        string lane, string expectedTimeout, int expectedDeadlineSeconds)
+    {
+        var requirement = SecurityControlRegister.ExecutionRequirements[lane];
+        var launch = SecurityExecutionEvidence.NativeExecutionStartInfo("/owned/tests.dll", ["opaque uid"],
+            "/owned/tmp/results", "/owned/tmp", "execution.trx", requirement.HostProfile, lane);
+        string[] arguments = launch.Command.ArgumentList.ToArray();
+        await Assert.That(arguments[1]).IsEqualTo("--filter-uid");
+        await Assert.That(arguments[2]).IsEqualTo("opaque uid");
+        int timeout = Array.IndexOf(arguments, "--timeout");
+        await Assert.That(timeout >= 0).IsTrue();
+        await Assert.That(arguments[timeout + 1]).IsEqualTo(expectedTimeout);
+        await Assert.That(launch.Deadline.TotalSeconds).IsEqualTo((double)expectedDeadlineSeconds);
+    }
+
+    [Test]
+    [Arguments("owned-runtime", 2, "1440s", 1455)]
+    [Arguments("owned-browser-journeys", 2, "2400s", 2415)]
+    [Arguments("owned-browser-security", 2, "1500s", 1515)]
+    [Arguments("owned-browser-journeys", 1, "1200s", 1215)]
+    [Arguments("owned-runtime", 33, "19800s", 19815)]
+    public async Task SerialOwnedBatchBudgetIncludesEverySelectedCaseAndItsLifecycleAllowance(
+        string lane, int count, string expectedTimeout, int expectedDeadlineSeconds)
+    {
+        var requirement = SecurityControlRegister.ExecutionRequirements[lane];
+        string[] uids = Enumerable.Range(0, count).Select(index => "opaque selected uid " + index).ToArray();
+        var launch = SecurityExecutionEvidence.NativeExecutionStartInfo("/owned/tests.dll", uids,
+            "/owned/tmp/results", "/owned/tmp", "execution.trx", requirement.HostProfile, lane);
+        string[] arguments = launch.Command.ArgumentList.ToArray();
+        await Assert.That(arguments[1]).IsEqualTo("--filter-uid");
+        await Assert.That(arguments.Skip(2).Take(count).SequenceEqual(uids)).IsTrue();
+        int timeout = Array.IndexOf(arguments, "--timeout");
+        await Assert.That(timeout).IsEqualTo(2 + count);
+        await Assert.That(arguments[timeout + 1]).IsEqualTo(expectedTimeout);
+        await Assert.That(launch.Deadline.TotalSeconds).IsEqualTo((double)expectedDeadlineSeconds);
+    }
+
+    [Test]
+    [Arguments(0)]
+    [Arguments(1025)]
+    public async Task NativeBatchRejectsEmptyOrUnboundedSelectionBeforeLaunching(int count)
+    {
+        string[] uids = Enumerable.Range(0, count).Select(index => "bounded uid " + index).ToArray();
+        bool rejected = false;
+        try
+        {
+            _ = SecurityExecutionEvidence.NativeExecutionStartInfo("/owned/tests.dll", uids,
+                "/owned/tmp/results", "/owned/tmp", "execution.trx", "owned-apphost-assurance", "owned-runtime");
+        }
+        catch (InvalidDataException) { rejected = true; }
+        await Assert.That(rejected).IsTrue();
+    }
+
+    [Test]
+    public async Task ExplicitSyntheticRegistrationNormalizesAnAlreadyCompleteSourceRegister()
+    {
+        string shipped = RegisterPath();
+        await Assert.That(SecurityControlRegister.TryValidate(shipped, out _)).IsTrue();
+        await Assert.That(SecurityControlRegister.ReadExecutionRequirements(shipped).Count).IsEqualTo(7);
+        string directory = Path.Combine(Path.GetTempPath(), "islamu-synthetic-normalization-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string normalized = Path.Combine(directory, "register.json");
+            File.WriteAllText(normalized, SecurityExecutionEvidenceFixture.OwnedRegister(shipped).ToJsonString());
+            await Assert.That(SecurityControlRegister.TryValidate(normalized, out _)).IsTrue();
+            var requirements = SecurityControlRegister.ReadExecutionRequirements(normalized);
+            await Assert.That(requirements.Count).IsEqualTo(7);
+            foreach (var requirement in requirements.Where(item => item.Key.StartsWith("owned-", StringComparison.Ordinal)))
+            {
+                await Assert.That(requirement.Value.Tests.Count).IsEqualTo(2);
+                await Assert.That(requirement.Value.Tests.All(test => test.ClassName == "Synthetic.OwnedProfile")).IsTrue();
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    private static string RegisterPath([CallerFilePath] string sourcePath = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourcePath) ?? throw new InvalidDataException(),
+            "..", "..", "..", "security", "security-control-register.json"));
+}
+
 public sealed class SecurityExecutionEvidenceNativeUidChildTests
 {
     [Test]

@@ -49,22 +49,50 @@ category report. Owned lanes require equality between registered and observed
 named variants, so adding an unregistered passing case also rejects admission
 until the registration is refreshed against its compiled candidate.
 
-The shipped registration currently requires the two dedicated API test-host
-lanes. The parser also supports a complete closed owned group for runtime,
-browser journeys, browser security vectors, native load control and load
-correctness. Partial or contradictory registration fails. Supporting that
-contract does not register or certify those profiles: their final names and
-counts require compiled same-candidate discovery and successful physical TRX
-before the register and workflow activate together. Synthetic parser fixtures
-and isolated browser-module controls never certify a healthy owned host.
+The local integration registration declares the two dedicated API test-host
+lanes and the existing owned runtime, browser journeys, browser security vectors,
+native load control and load correctness lanes. Owned named variants are source
+expectations until the final compiled candidate's discovery independently
+confirms their exact names, uniqueness and counts. Partial or contradictory
+registration fails; missing, skipped, extra or stale owned results cannot be
+substituted. Synthetic parser fixtures and isolated browser-module controls
+never certify a healthy owned host.
 
-The owning producer has bounded compiler and helper verification, with workflow
-activation held. Clean committed-candidate API execution, its fresh successor
-against copied old reports, and final seven-profile source/evidence admission
-remain pending. The source phase retains the two shipped lanes while those
-runtime gates remain open. Rebuilding
-must bind the actual committed candidate revision; any later candidate source,
+The owning producer has bounded compiler and helper verification, with remote
+workflow activation held. Clean committed-candidate API execution, its fresh
+successor against copied old reports, live managed-entry/served-input witnesses
+and final seven-profile source/evidence admission remain pending. The earlier
+owning-executor source commit retained two lanes; the local workflow/register
+integration does not turn authored scenarios into passing runtime evidence.
+Rebuilding must bind the actual committed candidate revision; any later candidate source,
 input, registration or workflow change invalidates the final execution proof.
+
+The always-present required security job uses the existing conservative native
+change router and accepts only its exact true/false result. Unknown routing
+output fails. Selected runs build the registered API and distributed hosts with
+the exact candidate SourceRevisionId, provision external prerequisites, and call
+the existing owning verb once for all registered lanes. It uploads only the
+newly admitted public directory after successful execution; raw reports, private
+run roots and provisioning diagnostics are excluded, including on failure.
+The workflow has no separate Bash test/harvesting path. Missing managed launch
+evidence still rejects execution; the local integration does not bypass it.
+
+The native runner's timeout covers its entire serial batch. API batches retain
+600 seconds; each isolated load UID retains 1500 seconds for its twenty-minute
+regime and lifecycle allowance. For N actual selected UIDs, runtime uses `720*N`
+seconds, journeys `1200*N`, and browser security `240*N+1020`. Each owned batch is
+capped at 19800 seconds (330 minutes), with the parent process deadline fifteen
+seconds later. The existing closed lane and matching registered host profile
+select this policy; opaque UID contents do not. Empty, more than 1024 identities,
+unknown lane/profile pairs and multi-UID load invocations reject before launch.
+These are finite operating hang allowances, including startup/cleanup margin,
+not guaranteed completion bounds for multiple owners or reserved case runtimes.
+The hosted job has a 360-minute cumulative cap, including builds and setup;
+several slow batches can exhaust it before their individual caps. Cancellation,
+missing results or unfinished cleanup cannot yield admitted evidence. A final
+same-candidate all-seven run must establish normal operating fit. The workflow
+canonicalizes its explicitly selected Unix socket once, verifies it is a socket,
+and exports that endpoint without fallback before child execution.
 
 The producer owns a fresh private run root, same-DLL discovery, typed opaque UID
 execution and fresh named TRX joins. It captures clean Git HEAD/tree, managed

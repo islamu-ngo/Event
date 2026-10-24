@@ -101,19 +101,41 @@ For Markdown or GitBook documentation changes (such as edits in `docs/public/`),
 
 Security execution evidence binds the exact tested commit to registered test
 lanes, named passing TRX cases and hashes of retained artifacts. A missing,
-skipped, renamed or reused required result fails admission. The current shipped
-registration covers the two API security lanes; parser support for owned
-runtime, browser and load profiles does not certify those profiles or activate
-their CI execution. Registration requires successful physical results from the
-same compiled candidate. Harness checks and isolated browser-module tests have
+skipped, renamed or reused required result fails admission. The local integration
+register lists the two API lanes and five existing owned runtime, browser and
+load lanes. These names are source expectations, awaiting exact compiled
+discovery and successful physical results from the same final candidate;
+authoring the registration does not certify the profiles or activate remote CI.
+Harness checks and isolated browser-module tests have
 their own scope and cannot replace healthy-host journeys. Provider, database
 role and authentication remain outside the packet's attested claims.
 
 The `execute-security-execution` producer has compiler and helper verification;
-workflow activation is held. Native API proof remains pending; final execution of
-all seven profiles must bind one clean committed candidate. Rebuild for the exact
+remote workflow activation is held. Native API proof, the copied-report fresh
+successor and live managed launch/input evidence remain pending; final execution
+of all seven profiles must bind one clean committed candidate. Rebuild for the exact
 commit after all source, registration and workflow changes are committed. A
 later change requires new evidence; earlier commit results cannot cover it.
+
+The required security job stays present for every supported trigger. Its native
+change router can deliberately select a no-op; malformed routing output fails.
+Selected runs build both registered test hosts for the exact candidate, then use
+the owning producer instead of detached test commands. Only a successful admitted
+public directory is uploaded. Failed runs publish no raw TRX, logs or private
+temporary directories. External Chromium and the separately admitted k6 binary
+remain runner prerequisites and are not redistributed in the evidence artifact.
+
+The hosted security job stops after 360 minutes in total, including build and
+setup. Native timeouts cover whole serial batches, with a 330-minute batch cap
+and fifteen additional seconds for the parent deadline. API batches keep ten
+minutes; each separately executed load case keeps twenty-five minutes for its
+twenty-minute regime and lifecycle allowance. Runtime and browser budgets grow
+with the actual selected case count, subject to the cap. These are hang limits,
+not time reserved for every case: several slow batches can exhaust the overall
+job budget. Canceled, missing or incompletely cleaned runs fail admission. The
+final all-seven execution must establish that normal operation fits. The job
+resolves its explicitly selected Unix socket once and verifies the socket before
+exporting it; an unavailable endpoint fails instead of selecting another daemon.
 
 Owning execution uses fresh private temporary directories and discovers the
 actual compiled test identities before executing their opaque UIDs. Native TRX,

@@ -146,7 +146,7 @@ public static partial class SecurityExecutionEvidence
                     cancellationToken.ThrowIfCancellationRequested();
                     lane.Outcome = "failed";
                     OwnedEntry entry = entries[lane.Requirement.Project];
-                    lane.Discovery = await InvokeOwnedChildAsync(request, entry, lane.Requirement, daemon,
+                    lane.Discovery = await InvokeOwnedChildAsync(request, entry, lane.Id, lane.Requirement, daemon,
                         null, cancellationToken).ConfigureAwait(false);
                     if (!lane.Discovery.Succeeded || lane.Discovery.Process.StandardError.Length != 0 ||
                         !TryReadNativeDiscovery(lane.Discovery.Process.StandardOutput, out var discovered))
@@ -160,7 +160,7 @@ public static partial class SecurityExecutionEvidence
                         : [discovered.Select(node => node.Uid).ToArray()];
                     foreach (string[] selected in selections)
                     {
-                        OwnedChild child = await InvokeOwnedChildAsync(request, entry, lane.Requirement, daemon,
+                        OwnedChild child = await InvokeOwnedChildAsync(request, entry, lane.Id, lane.Requirement, daemon,
                             selected, cancellationToken).ConfigureAwait(false);
                         lane.Invocations.Add((selected, child));
                         if (!child.Succeeded || child.Report.Length == 0)
@@ -292,7 +292,31 @@ public static partial class SecurityExecutionEvidence
         resourceEvidence = JsonSerializer.Deserialize<JsonElement>(child.ResourceEvidence)
     };
 
-    private static async Task<OwnedChild> InvokeOwnedChildAsync(OwnedExecutionRequest request, OwnedEntry entry,
+    internal static (ProcessStartInfo Command, TimeSpan Deadline) NativeExecutionStartInfo(
+        string assemblyPath, IReadOnlyList<string> selectedUids, string resultsDirectory,
+        string temporaryDirectory, string reportFileName, string hostProfile, string laneId)
+    {
+        if (string.IsNullOrEmpty(laneId) ||
+            !SecurityControlRegister.ExecutionRequirements.TryGetValue(laneId, out var requirement) ||
+            requirement.HostProfile != hostProfile || selectedUids.Count is < 1 or > 1024 ||
+            (hostProfile == "owned-apphost-load-assurance" && selectedUids.Count != 1))
+            throw new InvalidDataException("native_batch_invalid");
+
+        // Native --timeout covers the serial batch. These are hang allowances, not reserved case runtimes.
+        int timeoutSeconds = laneId switch
+        {
+            "security-integration" or "cerbos-policy-contract" => 600,
+            "owned-runtime" => Math.Min(checked(720 * selectedUids.Count), 19_800),
+            "owned-browser-journeys" => Math.Min(checked(1200 * selectedUids.Count), 19_800),
+            "owned-browser-security" => Math.Min(checked(240 * selectedUids.Count + 1020), 19_800),
+            "owned-load-control" or "owned-load-correctness" => 1500,
+            _ => throw new InvalidDataException("native_batch_invalid")
+        };
+        return (NativeTestStartInfo(assemblyPath, selectedUids, resultsDirectory, temporaryDirectory,
+            reportFileName, timeoutSeconds), TimeSpan.FromSeconds(timeoutSeconds + 15));
+    }
+
+    private static async Task<OwnedChild> InvokeOwnedChildAsync(OwnedExecutionRequest request, OwnedEntry entry, string laneId,
         SecurityControlRegister.ExecutionRequirement requirement, SelectedDaemon daemon, string[]? uids,
         CancellationToken cancellationToken)
     {
@@ -309,6 +333,7 @@ public static partial class SecurityExecutionEvidence
             WritePrivateBytes(Path.Combine(context, ".islamu-test-owner"), Encoding.ASCII.GetBytes(owner));
             string results = PrivateChildDirectory(temporary, "results");
             ProcessStartInfo command;
+            TimeSpan deadline = TimeSpan.FromSeconds(60);
             if (uids is null)
             {
                 command = new ProcessStartInfo(ReleaseToolPaths.Dotnet)
@@ -319,7 +344,8 @@ public static partial class SecurityExecutionEvidence
                 foreach (string argument in new[] { entry.Assembly, "--list-tests", "json", "--treenode-filter", requirement.Selector, "--no-ansi" })
                     command.ArgumentList.Add(argument);
             }
-            else command = NativeTestStartInfo(entry.Assembly, uids, results, temporary, "execution.trx", 600);
+            else (command, deadline) = NativeExecutionStartInfo(entry.Assembly, uids, results, temporary,
+                "execution.trx", requirement.HostProfile, laneId);
             command.Environment["TMPDIR"] = temporary;
             command.Environment["ISLAMU_TEST_RUN_ID"] = owner;
             command.Environment["ISLAMU_TEST_ROOT"] = context;
@@ -328,7 +354,7 @@ public static partial class SecurityExecutionEvidence
             command.Environment["DOTNET_ENVIRONMENT"] = requirement.Environment;
             command.Environment["ASPNETCORE_ENVIRONMENT"] = requirement.Environment;
             var observed = await daemon.RunAsync(owner, command, uids is not null,
-                TimeSpan.FromSeconds(uids is null ? 60 : 615), cancellationToken).ConfigureAwait(false);
+                deadline, cancellationToken).ConfigureAwait(false);
             process = observed.Process;
             admitted = observed.Admitted;
             evidence = observed.Evidence;

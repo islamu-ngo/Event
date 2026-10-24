@@ -32,6 +32,125 @@
           "testName": "TenantAdmin_ShouldBeDenied_ModifyInstanceSettings"
         }
       ]
+    },
+    {
+      "laneId": "owned-runtime",
+      "project": "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj",
+      "hostProfile": "owned-apphost-assurance",
+      "requiredTests": [
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "TemporaryResourcePropertyShapesRejectForeignObjectsAndNeverDiscloseValues", "testName": "TemporaryResourcePropertyShapesRejectForeignObjectsAndNeverDiscloseValues" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "TemporaryResourcePropertyShapesRemainBoundedAndUnknown", "testName": "TemporaryResourcePropertyShapesRemainBoundedAndUnknown" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "TemporaryResourcePropertyEvidenceUsesExclusivePrivateFiles", "testName": "TemporaryResourcePropertyEvidenceUsesExclusivePrivateFiles" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "TemporaryResourcePropertyEvidenceRefusesLinkedDestinationsAndHonoursCancellation", "testName": "TemporaryResourcePropertyEvidenceRefusesLinkedDestinationsAndHonoursCancellation" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "TemporaryResourcePropertyEvidenceRetainsOriginalFailureAndOwnedCleanup", "testName": "TemporaryResourcePropertyEvidenceRetainsOriginalFailureAndOwnedCleanup" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "CancelledDockerWaitReapsItsChildAndPreservesTheContainer", "testName": "CancelledDockerWaitReapsItsChildAndPreservesTheContainer" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "BuilderFailureRetainsTheCauseAndRemovesItsOwnedRoot", "testName": "BuilderFailureRetainsTheCauseAndRemovesItsOwnedRoot" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ForeignVolumeConsumerSurvivesOwnerCleanup", "testName": "ForeignVolumeConsumerSurvivesOwnerCleanup" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "RealTopologyCompletesMigrationAndBecomesHealthy", "testName": "RealTopologyCompletesMigrationAndBecomesHealthy(Split)" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "RealTopologyCompletesMigrationAndBecomesHealthy", "testName": "RealTopologyCompletesMigrationAndBecomesHealthy(Standalone)" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "CancelledStartupDisposesOnlyItsOwnedRoot", "testName": "CancelledStartupDisposesOnlyItsOwnedRoot(False)" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "CancelledStartupDisposesOnlyItsOwnedRoot", "testName": "CancelledStartupDisposesOnlyItsOwnedRoot(True)" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ConcurrentOwnersRemainHealthyWhenTheirNeighbourStops", "testName": "ConcurrentOwnersRemainHealthyWhenTheirNeighbourStops" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "BuiltApplicationDisposalSettlesExecutionBeforeRemovingRoot", "testName": "BuiltApplicationDisposalSettlesExecutionBeforeRemovingRoot" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "MissingExecutionObservationRetainsBuiltOwnerRoot", "testName": "MissingExecutionObservationRetainsBuiltOwnerRoot" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "DuplicateExecutionObservationRetainsRootWhileStartupIsHeld", "testName": "DuplicateExecutionObservationRetainsRootWhileStartupIsHeld" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "FailedResourceJoinsDelayedStartupAndRetainsDisposalFailure", "testName": "FailedResourceJoinsDelayedStartupAndRetainsDisposalFailure" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "HealthyApplicationRetainsHostedStopFailure", "testName": "HealthyApplicationRetainsHostedStopFailure" },
+        { "className": "Event.Distributed.IntegrationTests.ExternalDataProtectionRuntimeTests", "methodName": "SelectedExternalAuthorityControlsPeerSessionsAcrossBffRestart", "testName": "SelectedExternalAuthorityControlsPeerSessionsAcrossBffRestart(Shared)" },
+        { "className": "Event.Distributed.IntegrationTests.ExternalDataProtectionRuntimeTests", "methodName": "SelectedExternalAuthorityControlsPeerSessionsAcrossBffRestart", "testName": "SelectedExternalAuthorityControlsPeerSessionsAcrossBffRestart(IndependentValidAuthority)" },
+        { "className": "Event.Distributed.IntegrationTests.ExternalDataProtectionRuntimeTests", "methodName": "PeerWithUnadmittedProtectionAuthorityFailsDuringActualHostStartup", "testName": "PeerWithUnadmittedProtectionAuthorityFailsDuringActualHostStartup(WrongPartition)" },
+        { "className": "Event.Distributed.IntegrationTests.ExternalDataProtectionRuntimeTests", "methodName": "PeerWithUnadmittedProtectionAuthorityFailsDuringActualHostStartup", "testName": "PeerWithUnadmittedProtectionAuthorityFailsDuringActualHostStartup(GenerationBelowFloor)" },
+        { "className": "Event.Distributed.IntegrationTests.ExternalDataProtectionRuntimeTests", "methodName": "PeerWithUnadmittedProtectionAuthorityFailsDuringActualHostStartup", "testName": "PeerWithUnadmittedProtectionAuthorityFailsDuringActualHostStartup(ExpiredAdmission)" },
+        { "className": "Event.Distributed.IntegrationTests.ExternalDataProtectionRuntimeTests", "methodName": "PeerWithUnadmittedProtectionAuthorityFailsDuringActualHostStartup", "testName": "PeerWithUnadmittedProtectionAuthorityFailsDuringActualHostStartup(RevokedActiveKey)" },
+        { "className": "Event.Distributed.IntegrationTests.EnabledWorkerRuntimeTests", "methodName": "EnabledWorkerDeliversPendingWorkAndRecoversTheOriginalPreHandoffClaimAfterRestart", "testName": "EnabledWorkerDeliversPendingWorkAndRecoversTheOriginalPreHandoffClaimAfterRestart" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ManagedResourcePidRequiresExactResourceInstanceAndTypedProperty", "testName": "ManagedResourcePidRequiresExactResourceInstanceAndTypedProperty" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ManagedEntryUsesOnlyClosedObservedArgumentSlots", "testName": "ManagedEntryUsesOnlyClosedObservedArgumentSlots" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ManagedProcessJoinCalibratesLiveParentAndRejectsIdentityReplacement", "testName": "ManagedProcessJoinCalibratesLiveParentAndRejectsIdentityReplacement" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ManagedFileBracketRejectsSameBytesWithChangedModificationStamp", "testName": "ManagedFileBracketRejectsSameBytesWithChangedModificationStamp" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ManagedObserverArmsBeforeSynchronousStartFailureAndJoinsShutdown", "testName": "ManagedObserverArmsBeforeSynchronousStartFailureAndJoinsShutdown" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ManagedObserverRetainsPrimaryIndependentFaultAndCancellationCallbackFailure", "testName": "ManagedObserverRetainsPrimaryIndependentFaultAndCancellationCallbackFailure" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ManagedObserverStopsAfterIndependentFinalizationFailures", "testName": "ManagedObserverStopsAfterIndependentFinalizationFailures" },
+        { "className": "Event.Distributed.IntegrationTests.AppHostRuntimeTests", "methodName": "ManagedLaunchHintsRemainPrivateExclusiveAndUnattested", "testName": "ManagedLaunchHintsRemainPrivateExclusiveAndUnattested" }
+      ]
+    },
+    {
+      "laneId": "owned-browser-journeys",
+      "project": "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj",
+      "hostProfile": "owned-browser-assurance",
+      "requiredTests": [
+        { "className": "Event.Distributed.IntegrationTests.BrowserJourneyTests", "methodName": "LoginAndLogoutRemoveAccessToProtectedPages", "testName": "LoginAndLogoutRemoveAccessToProtectedPages" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserJourneyTests", "methodName": "ExpiredBrowserCookieRequiresFreshCredentials", "testName": "ExpiredBrowserCookieRequiresFreshCredentials" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserJourneyTests", "methodName": "ServerTokenExpiryRejectsPreviouslyAuthorizedApiAndBrowserSession", "testName": "ServerTokenExpiryRejectsPreviouslyAuthorizedApiAndBrowserSession" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserJourneyTests", "methodName": "KeyboardLoginAndLanguageSwitchPreserveFocusAndDirection", "testName": "KeyboardLoginAndLanguageSwitchPreserveFocusAndDirection" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserJourneyTests", "methodName": "TenantPathWinsOverForgedBrowserTenantHeader", "testName": "TenantPathWinsOverForgedBrowserTenantHeader" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserJourneyTests", "methodName": "FreeRegistrationConfirmsAndRemovesFinalizeAffordance", "testName": "FreeRegistrationConfirmsAndRemovesFinalizeAffordance" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserJourneyTests", "methodName": "WorkspaceKeyboardValidationAndRtlLayoutUseRealFocusAndGeometry", "testName": "WorkspaceKeyboardValidationAndRtlLayoutUseRealFocusAndGeometry" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserJourneyTests", "methodName": "SeparatelyProvisionedLocalUserCannotExposeResourceManagementAffordances", "testName": "SeparatelyProvisionedLocalUserCannotExposeResourceManagementAffordances" }
+      ]
+    },
+    {
+      "laneId": "owned-browser-security",
+      "project": "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj",
+      "hostProfile": "owned-browser-assurance",
+      "requiredTests": [
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "RecoveryPointerIsDecodedOnceScrubbedAndConsumedWithoutRetry", "testName": "RecoveryPointerIsDecodedOnceScrubbedAndConsumedWithoutRetry" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "InvalidRecoveryPointersAreErasedAndDenied", "testName": "InvalidRecoveryPointersAreErasedAndDenied(missing)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "InvalidRecoveryPointersAreErasedAndDenied", "testName": "InvalidRecoveryPointersAreErasedAndDenied(duplicate)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "InvalidRecoveryPointersAreErasedAndDenied", "testName": "InvalidRecoveryPointersAreErasedAndDenied(malformed)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "InvalidRecoveryPointersAreErasedAndDenied", "testName": "InvalidRecoveryPointersAreErasedAndDenied(purpose)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "InvalidRecoveryPointersAreErasedAndDenied", "testName": "InvalidRecoveryPointersAreErasedAndDenied(empty-token)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "InvalidRecoveryPointersAreErasedAndDenied", "testName": "InvalidRecoveryPointersAreErasedAndDenied(query)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "InvalidRecoveryPointersAreErasedAndDenied", "testName": "InvalidRecoveryPointersAreErasedAndDenied(query-and-fragment)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "RecoveryMutationRejectsPrivateFragmentsAndForeignEndpoints", "testName": "RecoveryMutationRejectsPrivateFragmentsAndForeignEndpoints" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "DedicatedWorkerProofPassesIndependentSha256Oracle", "testName": "DedicatedWorkerProofPassesIndependentSha256Oracle(16)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "DedicatedWorkerProofPassesIndependentSha256Oracle", "testName": "DedicatedWorkerProofPassesIndependentSha256Oracle(17)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerBusyCancellationAndReuseHaveIndependentLifetimes", "testName": "WorkerBusyCancellationAndReuseHaveIndependentLifetimes" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerRefusesInvalidOrExpiredChallenges", "testName": "WorkerRefusesInvalidOrExpiredChallenges(version)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerRefusesInvalidOrExpiredChallenges", "testName": "WorkerRefusesInvalidOrExpiredChallenges(difficulty-low)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerRefusesInvalidOrExpiredChallenges", "testName": "WorkerRefusesInvalidOrExpiredChallenges(difficulty-high)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerRefusesInvalidOrExpiredChallenges", "testName": "WorkerRefusesInvalidOrExpiredChallenges(difficulty-fraction)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerRefusesInvalidOrExpiredChallenges", "testName": "WorkerRefusesInvalidOrExpiredChallenges(envelope-long)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerRefusesInvalidOrExpiredChallenges", "testName": "WorkerRefusesInvalidOrExpiredChallenges(envelope-newline)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerRefusesInvalidOrExpiredChallenges", "testName": "WorkerRefusesInvalidOrExpiredChallenges(expired)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerRefusesInvalidOrExpiredChallenges", "testName": "WorkerRefusesInvalidOrExpiredChallenges(expiry-invalid)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "WorkerRefusesInvalidOrExpiredChallenges", "testName": "WorkerRefusesInvalidOrExpiredChallenges(expiry-future)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestAuthorityIsExactRouteMemoryOnlyAndOneShot", "testName": "GuestAuthorityIsExactRouteMemoryOnlyAndOneShot()" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestAuthorityIsExactRouteMemoryOnlyAndOneShot", "testName": "GuestAuthorityIsExactRouteMemoryOnlyAndOneShot(/community/nested)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestRouteMismatchConsumesAndDeniesAuthority", "testName": "GuestRouteMismatchConsumesAndDeniesAuthority(foreign-order)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestRouteMismatchConsumesAndDeniesAuthority", "testName": "GuestRouteMismatchConsumesAndDeniesAuthority(changed-path)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestMalformedPrivateInputIsErasedAndDenied", "testName": "GuestMalformedPrivateInputIsErasedAndDenied(malformed)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestMalformedPrivateInputIsErasedAndDenied", "testName": "GuestMalformedPrivateInputIsErasedAndDenied(duplicate)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestMalformedPrivateInputIsErasedAndDenied", "testName": "GuestMalformedPrivateInputIsErasedAndDenied(extra)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestMalformedPrivateInputIsErasedAndDenied", "testName": "GuestMalformedPrivateInputIsErasedAndDenied(unknown)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestMalformedPrivateInputIsErasedAndDenied", "testName": "GuestMalformedPrivateInputIsErasedAndDenied(encoded)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestMalformedPrivateInputIsErasedAndDenied", "testName": "GuestMalformedPrivateInputIsErasedAndDenied(padded)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestMalformedPrivateInputIsErasedAndDenied", "testName": "GuestMalformedPrivateInputIsErasedAndDenied(query)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestMalformedPrivateInputIsErasedAndDenied", "testName": "GuestMalformedPrivateInputIsErasedAndDenied(mixed)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestExplicitExportsUsePrivatePathBaseUrlAndRevokeDownload", "testName": "GuestExplicitExportsUsePrivatePathBaseUrlAndRevokeDownload" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestClipboardFailureDoesNotCreateFallbackArtifact", "testName": "GuestClipboardFailureDoesNotCreateFallbackArtifact(denied)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "GuestClipboardFailureDoesNotCreateFallbackArtifact", "testName": "GuestClipboardFailureDoesNotCreateFallbackArtifact(unavailable)" },
+        { "className": "Event.Distributed.IntegrationTests.BrowserSecurityVectorTests", "methodName": "ActualHostFirstNonceScriptScrubsPrivateInputBeforeSubsequentNetwork", "testName": "ActualHostFirstNonceScriptScrubsPrivateInputBeforeSubsequentNetwork" }
+      ]
+    },
+    {
+      "laneId": "owned-load-control",
+      "project": "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj",
+      "hostProfile": "owned-apphost-load-assurance",
+      "requiredTests": [
+        { "className": "Event.Distributed.IntegrationTests.K6NativeControlTests", "methodName": "OwnedPublicEventSearchAndGuardedWritesHaveIndependentSettledState", "testName": "OwnedPublicEventSearchAndGuardedWritesHaveIndependentSettledState(Split)" },
+        { "className": "Event.Distributed.IntegrationTests.K6NativeControlTests", "methodName": "OwnedPublicEventSearchAndGuardedWritesHaveIndependentSettledState", "testName": "OwnedPublicEventSearchAndGuardedWritesHaveIndependentSettledState(Standalone)" }
+      ]
+    },
+    {
+      "laneId": "owned-load-correctness",
+      "project": "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj",
+      "hostProfile": "owned-apphost-load-assurance",
+      "requiredTests": [
+        { "className": "Event.Distributed.IntegrationTests.K6LoadTests", "methodName": "OwnedPublicLookupRemainsCorrectUnderClosedAndOpenLoad", "testName": "OwnedPublicLookupRemainsCorrectUnderClosedAndOpenLoad(Split)" },
+        { "className": "Event.Distributed.IntegrationTests.K6LoadTests", "methodName": "OwnedPublicLookupRemainsCorrectUnderClosedAndOpenLoad", "testName": "OwnedPublicLookupRemainsCorrectUnderClosedAndOpenLoad(Standalone)" },
+        { "className": "Event.Distributed.IntegrationTests.K6EventProgrammeTests", "methodName": "OwnedEventWorkloadsPreserveSettledStateAcrossLoadAndRecovery", "testName": "OwnedEventWorkloadsPreserveSettledStateAcrossLoadAndRecovery(Split)" },
+        { "className": "Event.Distributed.IntegrationTests.K6EventProgrammeTests", "methodName": "OwnedEventWorkloadsPreserveSettledStateAcrossLoadAndRecovery", "testName": "OwnedEventWorkloadsPreserveSettledStateAcrossLoadAndRecovery(Standalone)" }
+      ]
     }
   ],
   "executionOwnerInventory": [

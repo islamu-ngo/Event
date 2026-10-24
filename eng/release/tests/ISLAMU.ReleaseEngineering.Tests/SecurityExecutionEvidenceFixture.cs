@@ -25,6 +25,9 @@ internal static class SecurityExecutionEvidenceFixture
             ("owned-load-correctness", "owned-apphost-load-assurance")
         })
         {
+            foreach (JsonNode? previous in requirements.Where(requirement =>
+                requirement?["laneId"]?.GetValue<string>() == id).ToArray())
+                requirements.Remove(previous);
             requirements.Add(new JsonObject
             {
                 ["laneId"] = id,

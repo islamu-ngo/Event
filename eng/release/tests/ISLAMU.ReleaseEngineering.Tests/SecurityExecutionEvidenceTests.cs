@@ -183,11 +183,17 @@ public sealed class SecurityExecutionEvidenceTests
     }
 
     [Test]
-    public async Task OwnedProfilesCannotBeAdmittedByTheShippedTwoLaneRegistration()
+    public async Task OwnedProfilesCannotBeAdmittedByAnExplicitTwoLaneRegistration()
     {
         using var fixture = new EvidenceFixture(owned: true);
+        JsonObject register = JsonNode.Parse(File.ReadAllBytes(fixture.RegisterPath!))!.AsObject();
+        JsonArray requirements = register["executionRequirements"]!.AsArray();
+        while (requirements.Count > 2) requirements.RemoveAt(requirements.Count - 1);
+        File.WriteAllText(fixture.RegisterPath!, register.ToJsonString());
+        await Assert.That(SecurityControlRegister.TryValidate(fixture.RegisterPath!, out _)).IsTrue();
+        await Assert.That(SecurityControlRegister.ReadExecutionRequirements(fixture.RegisterPath!).Count).IsEqualTo(2);
         await Assert.That(SecurityExecutionEvidence.TryValidate(fixture.DirectoryPath, fixture.CandidateOid,
-            out _, out _)).IsFalse();
+            fixture.RegisterPath!, out _, out _)).IsFalse();
     }
 
     [Test]

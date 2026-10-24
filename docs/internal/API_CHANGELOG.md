@@ -5,6 +5,15 @@ Source: API routes and generated OpenAPI contracts.
 
 ## 2026-10-24
 
+- Safety-review and recognition-recovery enums now use their existing named JSON
+  values in the explicit OpenAPI enum catalog and generated client, rather than
+  integer schemas. Nullable enum values remain nullable and may be omitted, as
+  required by the server's null-omitting serializer. Both schema adapters share
+  the catalog; runtime serializers, routes, permissions and disclosure are
+  unchanged. The native contract inventory is regenerated alongside the schema
+  and client. New wire-parity regressions are authored but locally unbuilt/unrun;
+  remote CI must verify the complete contract.
+
 - The explicit HAL schema catalog now describes the existing pre-finding notice,
   resource-quarantine review/header and recognition-recovery detail responses,
   with typed content-response, correction-proof and recovery-escalation collection

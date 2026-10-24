@@ -77,7 +77,10 @@ public sealed class ModerationPolicyAdministrationOpenApiTests(ContractApiFixtur
         foreach (var type in new[]
         {
             typeof(ModerationResponsibilityBasis), typeof(ModerationCaseTargetKind),
-            typeof(ModerationCaseNarrativePurpose)
+            typeof(ModerationCaseNarrativePurpose), typeof(ResourceSafetyReviewStep),
+            typeof(ResourceSafetyAttestation), typeof(ModerationRecognitionDispositionGrounds),
+            typeof(ModerationRecognitionPendingState), typeof(ModerationRecognitionPendingFailure),
+            typeof(ModerationRecognitionEscalationStage)
         })
         {
             var schema = schemas.GetProperty(swagger ? type.FullName! : type.Name);

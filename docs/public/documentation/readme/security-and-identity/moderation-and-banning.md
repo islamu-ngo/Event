@@ -18,6 +18,12 @@ endpoint, expand disclosure, change grant permissions or make a HAL link an
 authorization substitute. Existing case-read grant/revoke operation names and
 URLs are unchanged.
 
+Generated clients describe safety-review and recognition-recovery enum values
+as the named strings already returned by the API, not integers. Optional
+attestations and recovery grounds may be absent when unavailable; that absence
+does not imply a default decision or grant an action. Regenerate clients from
+the corrected contract; endpoint permissions and runtime disclosure are unchanged.
+
 **SQLite upgrade caution:** the combined develop/moderation histories include
 resource-table rebuilds. The migration generator rejects an unexpected physical
 column layout instead of silently discarding material or quarantine evidence.

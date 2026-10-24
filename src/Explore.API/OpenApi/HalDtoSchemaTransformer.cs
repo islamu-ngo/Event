@@ -332,6 +332,9 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
                 ]
             }
             : new OpenApiSchemaReference(targetSchemaName, document);
+
+        if (isNullable)
+            schema.Required?.Remove(propertyName);
     }
 
     private static Type UnwrapNullableType(Type type)

@@ -152034,7 +152034,6 @@
           "id",
           "eventId",
           "title",
-          "kind",
           "isTeaser",
           "availability",
           "requirements"
@@ -152586,7 +152585,6 @@
           "eventId",
           "version",
           "publicationState",
-          "draft",
           "createdAt",
           "updatedAt"
         ],
@@ -158252,7 +158250,6 @@
       },
       "GuestRegistrationOrderLifecycleResponseDto": {
         "required": [
-          "order",
           "id",
           "success",
           "message",
@@ -168541,7 +168538,6 @@
           "id",
           "eventId",
           "title",
-          "kind",
           "isTeaser",
           "availability",
           "requirements"
@@ -168654,7 +168650,6 @@
           "eventId",
           "version",
           "publicationState",
-          "draft",
           "createdAt",
           "updatedAt"
         ],
@@ -172390,7 +172385,6 @@
       },
       "HalResourceOfGuestRegistrationOrderLifecycleResponseDto": {
         "required": [
-          "order",
           "id",
           "success",
           "message",
@@ -174300,9 +174294,7 @@
           "verifiedByApplicationUserId",
           "verifiedAt",
           "updatedAt",
-          "isCurrent",
-          "credentialState",
-          "resetAudit"
+          "isCurrent"
         ],
         "type": "object",
         "properties": {
@@ -174374,7 +174366,6 @@
           "firstName",
           "lastName",
           "emailVerified",
-          "credentialState",
           "currentOperationId",
           "currentOperationConcurrencyStamp"
         ],
@@ -175150,8 +175141,7 @@
           "installedCatalogueRevision",
           "installedInventoryRevision",
           "installedInventoryFingerprint",
-          "authoringBounds",
-          "authoring"
+          "authoringBounds"
         ],
         "type": "object",
         "properties": {
@@ -180563,7 +180553,7 @@
             "format": "int64"
           },
           "grounds": {
-            "type": "integer"
+            "$ref": "#/components/schemas/ModerationRecognitionDispositionGrounds"
           },
           "protectedAt": {
             "type": "string",
@@ -180611,10 +180601,8 @@
           "adoptionRevision",
           "adoptionGeneration",
           "maximumValidUntil",
-          "availableGrounds",
           "dispositionId",
           "dispositionRevision",
-          "assessedGrounds",
           "assessedAt",
           "assessmentValidUntil",
           "authorizedAt"
@@ -180638,10 +180626,10 @@
             "format": "int64"
           },
           "state": {
-            "type": "integer"
+            "$ref": "#/components/schemas/ModerationRecognitionPendingState"
           },
           "failure": {
-            "type": "integer"
+            "$ref": "#/components/schemas/ModerationRecognitionPendingFailure"
           },
           "receivedAt": {
             "type": "string",
@@ -180708,7 +180696,14 @@
             "format": "date-time"
           },
           "availableGrounds": {
-            "type": "integer"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ModerationRecognitionDispositionGrounds"
+              }
+            ]
           },
           "dispositionId": {
             "type": [
@@ -180727,7 +180722,14 @@
             "format": "int64"
           },
           "assessedGrounds": {
-            "type": "integer"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ModerationRecognitionDispositionGrounds"
+              }
+            ]
           },
           "assessedAt": {
             "type": [
@@ -180809,7 +180811,7 @@
             "format": "int64"
           },
           "stage": {
-            "type": "integer"
+            "$ref": "#/components/schemas/ModerationRecognitionEscalationStage"
           },
           "requiredAt": {
             "type": "string",
@@ -189690,9 +189692,7 @@
           "verifiedByApplicationUserId",
           "verifiedAt",
           "updatedAt",
-          "isCurrent",
-          "credentialState",
-          "resetAudit"
+          "isCurrent"
         ],
         "type": "object",
         "properties": {
@@ -189863,7 +189863,6 @@
           "firstName",
           "lastName",
           "emailVerified",
-          "credentialState",
           "currentOperationId",
           "currentOperationConcurrencyStamp"
         ],
@@ -193292,8 +193291,7 @@
           "installedCatalogueRevision",
           "installedInventoryRevision",
           "installedInventoryFingerprint",
-          "authoringBounds",
-          "authoring"
+          "authoringBounds"
         ],
         "type": "object",
         "properties": {
@@ -193533,8 +193531,6 @@
       },
       "ModerationNoticeConsequence": {
         "required": [
-          "strategy",
-          "protectionPurpose",
           "target",
           "interval",
           "plan"
@@ -194354,7 +194350,6 @@
           "subjectKinds",
           "effects",
           "bundle",
-          "protectionPurpose",
           "strategies",
           "timing",
           "requiredApprovals",
@@ -195523,12 +195518,46 @@
         }
       },
       "ModerationRecognitionDispositionGrounds": {
-        "type": "integer"
+        "enum": [
+          "OriginalKeyRecoveryUnavailable",
+          "OriginalStoreRecoveryUnavailable",
+          "CompleteOriginalMaterialUnavailable"
+        ],
+        "type": "string"
+      },
+      "ModerationRecognitionEscalationStage": {
+        "enum": [
+          "OwnerActionRequired",
+          "LawfulDeadlineReached"
+        ],
+        "type": "string"
       },
       "ModerationRecognitionMode": {
         "enum": [
           "SeparatelyQualifiedFinalSanctionOnly",
           "NoCaptureFromThisControl"
+        ],
+        "type": "string"
+      },
+      "ModerationRecognitionPendingFailure": {
+        "enum": [
+          "None",
+          "KeyUnavailable",
+          "StoreUnavailable",
+          "SourceUnavailable",
+          "IncompleteMaterial",
+          "OriginalMaterialChanged"
+        ],
+        "type": "string"
+      },
+      "ModerationRecognitionPendingState": {
+        "enum": [
+          "Received",
+          "Computed",
+          "AuthorityBound",
+          "EscalationRequired",
+          "LawfulDispositionRequired",
+          "NoLongerRequired"
         ],
         "type": "string"
       },
@@ -195572,7 +195601,6 @@
           "kind",
           "mode",
           "target",
-          "capability",
           "execution"
         ],
         "type": "object",
@@ -197202,7 +197230,6 @@
           "purposeId",
           "predecessorId",
           "step",
-          "attestation",
           "requiredApprovals",
           "maximumEvidenceLifetimeTicks",
           "recordedAt",
@@ -197226,10 +197253,17 @@
             "format": "uuid"
           },
           "step": {
-            "type": "integer"
+            "$ref": "#/components/schemas/ResourceSafetyReviewStep"
           },
           "attestation": {
-            "type": "integer"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResourceSafetyAttestation"
+              }
+            ]
           },
           "requiredApprovals": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -205236,7 +205270,7 @@
             "format": "int64"
           },
           "grounds": {
-            "type": "integer"
+            "$ref": "#/components/schemas/ModerationRecognitionDispositionGrounds"
           },
           "protectedAt": {
             "type": "string",
@@ -205270,10 +205304,8 @@
           "adoptionRevision",
           "adoptionGeneration",
           "maximumValidUntil",
-          "availableGrounds",
           "dispositionId",
           "dispositionRevision",
-          "assessedGrounds",
           "assessedAt",
           "assessmentValidUntil",
           "authorizedAt"
@@ -205297,10 +205329,10 @@
             "format": "int64"
           },
           "state": {
-            "type": "integer"
+            "$ref": "#/components/schemas/ModerationRecognitionPendingState"
           },
           "failure": {
-            "type": "integer"
+            "$ref": "#/components/schemas/ModerationRecognitionPendingFailure"
           },
           "receivedAt": {
             "type": "string",
@@ -205367,7 +205399,14 @@
             "format": "date-time"
           },
           "availableGrounds": {
-            "type": "integer"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ModerationRecognitionDispositionGrounds"
+              }
+            ]
           },
           "dispositionId": {
             "type": [
@@ -205386,7 +205425,14 @@
             "format": "int64"
           },
           "assessedGrounds": {
-            "type": "integer"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ModerationRecognitionDispositionGrounds"
+              }
+            ]
           },
           "assessedAt": {
             "type": [
@@ -205454,7 +205500,7 @@
             "format": "int64"
           },
           "stage": {
-            "type": "integer"
+            "$ref": "#/components/schemas/ModerationRecognitionEscalationStage"
           },
           "requiredAt": {
             "type": "string",
@@ -211262,10 +211308,22 @@
         }
       },
       "ResourceSafetyAttestation": {
-        "type": "integer"
+        "enum": [
+          "IndependentlyInspectedSafeForCurrentAudience",
+          "IndependentlyInspectedUnsafeForCurrentAudience"
+        ],
+        "type": "string"
       },
       "ResourceSafetyReviewStep": {
-        "type": "integer"
+        "enum": [
+          "ProposePurpose",
+          "AdoptPurpose",
+          "AttestMaterialSafety",
+          "ApproveSafety",
+          "WithdrawPurpose",
+          "ApproveContinuedQuarantine"
+        ],
+        "type": "string"
       },
       "ResumeWebhookEndpointRequestDto": {
         "type": "object",

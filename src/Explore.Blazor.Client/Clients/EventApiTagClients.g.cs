@@ -179512,7 +179512,9 @@ namespace Explore.Blazor.Client.Clients
         public long ExpectedAdoptionGeneration { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("grounds")]
-        public int Grounds { get; set; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionDispositionGrounds>))]
+        public ModerationRecognitionDispositionGrounds Grounds { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("validUntil")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -208451,7 +208453,9 @@ namespace Explore.Blazor.Client.Clients
         public long PendingRevision { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("grounds")]
-        public int Grounds { get; set; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionDispositionGrounds>))]
+        public ModerationRecognitionDispositionGrounds Grounds { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("protectedAt")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -208506,10 +208510,14 @@ namespace Explore.Blazor.Client.Clients
         public long PendingRevision { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("state")]
-        public int State { get; set; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionPendingState>))]
+        public ModerationRecognitionPendingState State { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("failure")]
-        public int Failure { get; set; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionPendingFailure>))]
+        public ModerationRecognitionPendingFailure Failure { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("receivedAt")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -208561,7 +208569,8 @@ namespace Explore.Blazor.Client.Clients
         public System.DateTimeOffset MaximumValidUntil { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("availableGrounds")]
-        public int AvailableGrounds { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionDispositionGrounds>))]
+        public ModerationRecognitionDispositionGrounds? AvailableGrounds { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("dispositionId")]
         public System.Guid? DispositionId { get; set; } = default!;
@@ -208571,7 +208580,8 @@ namespace Explore.Blazor.Client.Clients
         public long? DispositionRevision { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("assessedGrounds")]
-        public int AssessedGrounds { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionDispositionGrounds>))]
+        public ModerationRecognitionDispositionGrounds? AssessedGrounds { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("assessedAt")]
         public System.DateTimeOffset? AssessedAt { get; set; } = default!;
@@ -208630,7 +208640,9 @@ namespace Explore.Blazor.Client.Clients
         public long CapturedPendingRevision { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("stage")]
-        public int Stage { get; set; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionEscalationStage>))]
+        public ModerationRecognitionEscalationStage Stage { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("requiredAt")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -221041,6 +221053,33 @@ namespace Explore.Blazor.Client.Clients
 }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ModerationRecognitionDispositionGrounds
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"OriginalKeyRecoveryUnavailable")]
+        OriginalKeyRecoveryUnavailable = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"OriginalStoreRecoveryUnavailable")]
+        OriginalStoreRecoveryUnavailable = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"CompleteOriginalMaterialUnavailable")]
+        CompleteOriginalMaterialUnavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ModerationRecognitionEscalationStage
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"OwnerActionRequired")]
+        OwnerActionRequired = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"LawfulDeadlineReached")]
+        LawfulDeadlineReached = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum ModerationRecognitionMode
     {
 
@@ -221049,6 +221088,54 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Runtime.Serialization.EnumMember(Value = @"NoCaptureFromThisControl")]
         NoCaptureFromThisControl = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ModerationRecognitionPendingFailure
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"None")]
+        None = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"KeyUnavailable")]
+        KeyUnavailable = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"StoreUnavailable")]
+        StoreUnavailable = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"SourceUnavailable")]
+        SourceUnavailable = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"IncompleteMaterial")]
+        IncompleteMaterial = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"OriginalMaterialChanged")]
+        OriginalMaterialChanged = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ModerationRecognitionPendingState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Received")]
+        Received = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Computed")]
+        Computed = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"AuthorityBound")]
+        AuthorityBound = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"EscalationRequired")]
+        EscalationRequired = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"LawfulDispositionRequired")]
+        LawfulDispositionRequired = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"NoLongerRequired")]
+        NoLongerRequired = 5,
 
     }
 
@@ -222313,10 +222400,13 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? PredecessorId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("step")]
-        public int Step { get; init; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ResourceSafetyReviewStep>))]
+        public ResourceSafetyReviewStep Step { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("attestation")]
-        public int Attestation { get; init; } = default!;
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ResourceSafetyAttestation>))]
+        public ResourceSafetyAttestation? Attestation { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("requiredApprovals")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -222544,7 +222634,9 @@ namespace Explore.Blazor.Client.Clients
         public long ExpectedReviewerRevision { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("step")]
-        public int Step { get; set; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ResourceSafetyReviewStep>))]
+        public ResourceSafetyReviewStep Step { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("predecessorId")]
         public System.Guid? PredecessorId { get; set; } = default!;
@@ -222562,7 +222654,8 @@ namespace Explore.Blazor.Client.Clients
         public string? MaximumEvidenceLifetime { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("attestation")]
-        public int? Attestation { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ResourceSafetyAttestation>))]
+        public ResourceSafetyAttestation? Attestation { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -229391,7 +229484,9 @@ namespace Explore.Blazor.Client.Clients
         public long PendingRevision { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("grounds")]
-        public int Grounds { get; init; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionDispositionGrounds>))]
+        public ModerationRecognitionDispositionGrounds Grounds { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("protectedAt")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -229439,10 +229534,14 @@ namespace Explore.Blazor.Client.Clients
         public long PendingRevision { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("state")]
-        public int State { get; init; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionPendingState>))]
+        public ModerationRecognitionPendingState State { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("failure")]
-        public int Failure { get; init; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionPendingFailure>))]
+        public ModerationRecognitionPendingFailure Failure { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("receivedAt")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -229494,7 +229593,8 @@ namespace Explore.Blazor.Client.Clients
         public System.DateTimeOffset MaximumValidUntil { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("availableGrounds")]
-        public int AvailableGrounds { get; init; } = default!;
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionDispositionGrounds>))]
+        public ModerationRecognitionDispositionGrounds? AvailableGrounds { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("dispositionId")]
         public System.Guid? DispositionId { get; init; } = default!;
@@ -229504,7 +229604,8 @@ namespace Explore.Blazor.Client.Clients
         public long? DispositionRevision { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("assessedGrounds")]
-        public int AssessedGrounds { get; init; } = default!;
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionDispositionGrounds>))]
+        public ModerationRecognitionDispositionGrounds? AssessedGrounds { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("assessedAt")]
         public System.DateTimeOffset? AssessedAt { get; init; } = default!;
@@ -229556,7 +229657,9 @@ namespace Explore.Blazor.Client.Clients
         public long CapturedPendingRevision { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("stage")]
-        public int Stage { get; init; } = default!;
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<ModerationRecognitionEscalationStage>))]
+        public ModerationRecognitionEscalationStage Stage { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("requiredAt")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -234231,6 +234334,42 @@ namespace Explore.Blazor.Client.Clients
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
         }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ResourceSafetyAttestation
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"IndependentlyInspectedSafeForCurrentAudience")]
+        IndependentlyInspectedSafeForCurrentAudience = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"IndependentlyInspectedUnsafeForCurrentAudience")]
+        IndependentlyInspectedUnsafeForCurrentAudience = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ResourceSafetyReviewStep
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ProposePurpose")]
+        ProposePurpose = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"AdoptPurpose")]
+        AdoptPurpose = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"AttestMaterialSafety")]
+        AttestMaterialSafety = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ApproveSafety")]
+        ApproveSafety = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"WithdrawPurpose")]
+        WithdrawPurpose = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ApproveContinuedQuarantine")]
+        ApproveContinuedQuarantine = 5,
 
     }
 

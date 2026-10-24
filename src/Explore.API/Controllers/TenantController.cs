@@ -4,7 +4,9 @@ using System.Threading.Tasks;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
+using Explore.API.Extensions;
 using Explore.API.Hateoas;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Tenant;
@@ -15,6 +17,7 @@ using Explore.Application.Features.Tenants.Requests.Commands.DeleteTenantNavLink
 using Explore.Application.Features.Tenants.Requests.Commands.ReorderTenantNavLinks;
 using Explore.Application.Features.Tenants.Requests.Commands.UpdateTenantNavLink;
 using Explore.Application.Features.Tenants.Requests.Queries;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -73,6 +76,7 @@ public class TenantController : EventControllerBase
     private readonly ICommandHandler<DeleteTenantNavLinkCommand, BaseCommandResponse<bool>> _deleteTenantNavLink;
     private readonly ICommandHandler<ReorderTenantNavLinksCommand, BaseCommandResponse<bool>> _reorderTenantNavLinks;
     private readonly ITenantContext _tenantContext;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
 
     public TenantController(
         IQueryHandler<GetTenantListRequest, List<TenantListDto>> getTenantList,
@@ -86,7 +90,8 @@ public class TenantController : EventControllerBase
         ICommandHandler<UpdateTenantNavLinkCommand, BaseCommandResponse<bool>> updateTenantNavLink,
         ICommandHandler<DeleteTenantNavLinkCommand, BaseCommandResponse<bool>> deleteTenantNavLink,
         ICommandHandler<ReorderTenantNavLinksCommand, BaseCommandResponse<bool>> reorderTenantNavLinks,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery)
     {
         _getTenantList = getTenantList;
         _getActiveTenantCount = getActiveTenantCount;
@@ -100,6 +105,7 @@ public class TenantController : EventControllerBase
         _deleteTenantNavLink = deleteTenantNavLink;
         _reorderTenantNavLinks = reorderTenantNavLinks;
         _tenantContext = tenantContext;
+        _identityQuery = identityQuery;
     }
 
     // GET: api/tenant
@@ -155,10 +161,14 @@ public class TenantController : EventControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateTenantDto dto, CancellationToken cancellationToken = default)
     {
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
+        if (!userId.HasValue)
+            return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
+
         var command = new CreateTenantCommand
         {
             TenantDto = dto,
-            RequestingUserId = CurrentUserId
+            RequestingUserId = userId.Value
         };
         var response = await _createTenant.ExecuteAsync(command, cancellationToken);
 

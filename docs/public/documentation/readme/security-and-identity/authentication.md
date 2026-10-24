@@ -255,6 +255,12 @@ reuse of a Local-owned account requires that link to remain present when the
 claim transaction checks it. A link removed before that transaction starts is
 not accepted from an earlier lookup.
 
+Tenant creation also uses the platform user linked to the authenticated provider
+account, not the provider's token subject GUID. Creator attribution and optional
+administrator membership use that linked identity. An unlinked provider account
+cannot substitute a matching-looking GUID or email address. This correction adds
+no permissions, account links, configuration settings or database migration.
+
 Creating a managed-tenant or Local account does not collect a birth date. Its new
 private PII row starts without a birth date or collection receipt, at revision
 zero. The account-creation storage permissions include the existing mapped fields

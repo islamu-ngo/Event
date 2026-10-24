@@ -5,6 +5,15 @@ Source: API routes and generated OpenAPI contracts.
 
 ## 2026-10-24
 
+- Tenant creation resolves the authenticated provider account's persisted platform
+  user binding before passing the creator ID to the native command. A GUID token
+  subject is not assumed to be that platform user ID. An unlinked provider account
+  is rejected without a GUID or email fallback. Creator audit fields and optional
+  administrator membership retain the linked platform identity; the native
+  original-credential and authorization checks remain unchanged. Routes, request
+  shapes and permissions are unchanged. A real provider-binding regression is
+  authored but locally unbuilt/unrun; remote CI must verify it.
+
 - Safety-review and recognition-recovery enums now use their existing named JSON
   values in the explicit OpenAPI enum catalog and generated client, rather than
   integer schemas. Nullable enum values remain nullable and may be omitted, as

@@ -12,6 +12,7 @@ using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
 using Event.Testing.DataProtection;
@@ -20,6 +21,8 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.SetupLive;
+using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Domain.SetupLive;
@@ -48,7 +51,7 @@ using TUnit.Core.Interfaces;
 [Category(TestCategories.Security)]
 [ClassDataSource<SetupLiveAuthorityRedFixture>(Shared = SharedType.PerClass)]
 [NotInParallel]
-public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture fixture)
+public sealed partial class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture fixture)
 {
     private const string ControllerTypeName =
         "Explore.API.Controllers.SetupTargetEnrollmentsController";
@@ -2006,9 +2009,59 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
         if (cache is not null)
             await cache.RefreshAsync();
         WriteProgress(testName, "lookup-cache-ready", started);
-        Primary = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(db);
-        WriteProgress(testName, "primary-scenario-ready", started);
-        Secondary = await TenantScenarioSeed.SeedActiveTenantWithUserAsync(db);
+
+        Tenant? tenant = await db.Tenants.FindAsync(PlatformDefaults.DefaultTenantId);
+        if (tenant is null)
+        {
+            tenant = new TenantBuilder()
+                .WithId(PlatformDefaults.DefaultTenantId)
+                .WithFullName("Default Test Tenant")
+                .WithSlug("default-test")
+                .Build();
+            db.Tenants.Add(tenant);
+        }
+
+        User[] users =
+        [
+            new UserBuilder().WithId(Guid.CreateVersion7()).Build(),
+            new UserBuilder().WithId(Guid.CreateVersion7()).Build()
+        ];
+        Actor[] actors = users.Select(user => new ActorBuilder()
+            .WithId(Guid.CreateVersion7()).WithUserId(user.Id).Build()).ToArray();
+        db.Users.AddRange(users);
+        db.Actors.AddRange(actors);
+        await db.SaveChangesAsync();
+
+        // Keep membership commits separate: a shared transaction coalesces the disclosure epoch.
+        for (int index = 0; index < users.Length; index++)
+        {
+            User user = users[index];
+            Actor actor = actors[index];
+            db.TenantUsers.Add(new TenantUser
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                UserId = user.Id,
+                User = user,
+                ActorId = actor.Id,
+                Actor = actor,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            var scenario = new TenantScenarioSeed.TenantScenarioResult(tenant.Id, user.Id, actor.Id);
+            if (index == 0)
+            {
+                Primary = scenario;
+                WriteProgress(testName, "primary-scenario-ready", started);
+            }
+            else
+            {
+                Secondary = scenario;
+            }
+        }
         WriteProgress(testName, "fixture-ready", started);
     }
 

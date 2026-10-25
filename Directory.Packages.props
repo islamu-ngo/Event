@@ -81,13 +81,13 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Http.Polly" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.3" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.8.3" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
-    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.8.0" />
     <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.22.0" />
     <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.22.0" />
@@ -124,8 +124,13 @@
     <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.19.1" />
     <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.19.1" />
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />
-    <PackageVersion Include="Refit.HttpClientFactory" Version="14.0.1" />
+    <PackageVersion Include="Refit" Version="16.3.0" />
+    <PackageVersion Include="Refit.HttpClientFactory" Version="16.3.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
+    <PackageVersion Include="SecretKit.Core" Version="[0.1.0-local.20261024.1]" />
+    <PackageVersion Include="SecretKit.Infisical" Version="[0.1.0-local.20261024.1]" />
+    <PackageVersion Include="SecretKit.Extensions.Configuration" Version="[0.1.0-local.20261024.1]" />
+    <PackageVersion Include="SecretKit.Extensions.Hosting" Version="[0.1.0-local.20261024.1]" />
     <PackageVersion Include="Riok.Mapperly" Version="4.3.1" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.16.17" />
     <!-- SSH.NET pinned to patched 2026.0.0 for GHSA-q939-rpr3-3284 (transitive via Testcontainers) -->

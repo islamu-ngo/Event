@@ -3333,3 +3333,26 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only; concrete adversarial-fixture restoration lesson. No dependency or production authority change.
 
 ---
+
+[2026-10-25 Europe/Brussels] — Reserve secret preparation before caller enumeration
+
+**Context**: During `secrets-authority` foundation adoption, the native client drained its own reads, but Event also owned preparation work that could run before the first SDK call. The shared module must keep accepted preparations alive through cancellation and retirement.
+
+**Symptom / Observation**: A barrier-controlled entry enumerable entered `SecretAuthorityAcquisition.PrepareGroupAsync`, then blocked before yielding. `DisposeAsync` completed and disposed the lifetime cancellation source. Releasing enumeration produced `ObjectDisposedException` instead of retirement cancellation. Independent review also found that protected underscore namespaces admitted their colon-delimited configuration destinations.
+
+**Root Cause**: A disposed check before caller-controlled enumeration is not an operation reservation. Native IO drainage does not cover Event's enumeration, publication, or cleanup. Configuration admission also must cover the hierarchical spelling consumed by .NET, not only environment-variable prefixes.
+
+**Resolution**: Reserve the preparation and capture its lifetime token under the admission gate before enumeration. Retirement closes admission, cancels, awaits outstanding preparations, then disposes native resources outside the gate. Publication rechecks the gate; reservation release signals outside it. Reject `APPHOST:`, `DATA_PROTECTION:`, and `EVENT_DP:` alongside their underscore forms. The expanded 25-case authority slice first failed on these four exploit cases, then passed all 25 in 635 ms. Command: `dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet --no-build --no-restore -- --treenode-filter "/*/*/*SecretKitAuthorityAcquisitionTests/*" --minimum-expected-tests 1`.
+
+**Why This Matters for Future Work**: Put the linearization point before callbacks or enumeration, not merely before awaited network work. Keep native resource ownership distinct from application preparation ownership. Use event barriers to prove the race; no sleeps, internal call-count mirrors, or compatibility paths are needed.
+
+**References**:
+- `src/Explore.ServiceDefaults/Secrets/SecretAuthorityAcquisition.cs`
+- `src/Explore.ServiceDefaults/Secrets/SecretAcquisitionPolicy.cs`
+- `tests/Explore.Infrastructure.Tests/Secrets/SecretKitAuthorityAcquisitionTests.cs`
+- `docs/internal/adr/ADR-secretkit-event-ownership.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; concrete admission/retirement integration lesson. The ownership decision lives in the ADR.
+
+---

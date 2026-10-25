@@ -11,7 +11,7 @@ Last Updated: 2026-10-25
 - Report status: current
 - Disposition: plan-aligned
 - Evidence cutoff: 2026-10-25
-- Reviewed input: completed secretkit-adoption plan/tasks/context revision P1, dated 2026-10-25; Event working tree based on `fefcea5f16e3bd723e22076d505a65c696c4e40b`; SecretKit candidate `0.1.0-local.20261024.1`; evidence packet E1.
+- Reviewed input: secretkit-adoption foundation plan/tasks/context revision P2/E2, dated 2026-10-25, and the dependency-ordered successor brief; execution base `e8aa58ae8f7122949153b6c49d1a5a605e3e0b9e`; unchanged SecretKit candidate `0.1.0-local.20261024.1`. P1/E1 remains historical evidence.
 - Supersedes: none. The paused February secret-management workstream is historical, not this assessment.
 
 ## Executive Summary
@@ -20,7 +20,23 @@ Adopting a shared provider library can remove duplicated credential transport wi
 
 The principal recommendation is to remove the old Secrets projects, not rename them or reproduce their provider facade. Preserve the three explicitly selected authorities, isolate optional capabilities, and replace broad configuration reload assumptions with truthful acquisition and activation evidence. A successful provider read, local configuration publication, and deployment-wide rotation are separate facts.
 
-This current report is plan-aligned with triad P1 and supports design reasoning and source traceability only. Package checksums passed during planning; no Event integration, product test, provider permission challenge, image build, or operational recovery was performed. The user explicitly approved SecretKit Hosting's narrow per-process authentication-maintenance exception on 2026-10-25. That choice and every material finding/mitigation are mapped into the completed plan/tasks; implementation approval remains separate.
+This report is revalidated and plan-aligned with triad P2/E2 for the unused foundation only. All five findings remain accepted implementation obligations, not resolved controls. The split does not remove tenant, Data Protection, writer settlement or fleet obligations: their owners are the successor deliveries. Package distribution is now committed on the execution base; no Event integration, provider permission challenge, image build or operational recovery is established by that fact. The current user explicitly requested implementation on 2026-10-25; implementation approval is now recorded separately from this design assessment.
+
+### P2 scope revalidation
+
+The active foundation changes no serving-host authority, tenant binding, storage schema, authentication-maintenance registration or browser surface. Its responsibility is to admit a selected process authority and publish only a complete local generation with explicit ownership and deliberate managed-string export. The catastrophic authority-substitution and partial-publication scenarios now require observed failing tests before implementation. This strengthens IVSD-M001/M003/M004 without claiming their downstream controls are delivered.
+
+The scope split preserves affected stakeholders and five stable finding/mitigation IDs. Deferred controls remain mandatory: persisted Keycloak approvals need qualified revision evidence; cross-request cache invalidation must share cache lifetime; SetupLive must preserve post-dispatch effects; Data Protection must prepare before constructor resolution and retain its actual 24-hour ceiling. These are successor activation gates, not permissions to weaken behavior or silently broaden the foundation.
+
+| Finding / mitigation | Active foundation ownership | Successor ownership and evidence limit |
+|---|---|---|
+| IVSD-F001 / IVSD-M001 | S01/S02; tasks 1.2-1.4: immutable authority, consumer admission, no partial publication | S04/S09; original tasks 2.1-4.3: tenant/cache, retained references and DP admission remain unimplemented here. |
+| IVSD-F002 / IVSD-M002 | S05/S10; tasks 1.2-1.4: login-bound lifetime and cancellation/ownership | S08 and original 4.1/4.4/4.5: write settlement, host maintenance and operator recovery are not foundation changes. |
+| IVSD-F003 / IVSD-M003 | S06/S10; tasks 1.2-1.4/1.6: export, disposal and output capture | Original 2.1-4.4: serving-host/runtime output and client ownership coverage follows in successors. |
+| IVSD-F004 / IVSD-M004 | S03; tasks 1.2-1.4: separate required/optional groups | S07/S11 and original 4.2-4.5: durable approval evidence, activation and fleet convergence remain separate gates. |
+| IVSD-F005 / IVSD-M005 | S12; tasks 1.1/1.5/1.6: exact package, restore, terms and qualified claims | Original 5.1-5.4: project retirement and actual supported images are successor release gates. |
+
+No new moral principle, scholarly question, authority fallback, material-retention policy or licensing exception is introduced. Revalidation permits the approved foundation to proceed; it does not approve successor implementation or certify runtime behavior. The observed Red/Green and package evidence still must be produced.
 
 ## Scope
 
@@ -156,13 +172,14 @@ Per-process credentials cannot be renewed by a cluster-wide singleton job on ano
 |---|---|---|---|---|
 | 2026-10-25 | none | draft | Shared evidence packet established; maintenance decision remains open. | E1 / E01-E06 |
 | 2026-10-25 | draft | current / plan-aligned | User selected narrow maintenance exception; completed triad reviewed and material mappings reconciled. | P1 / E1 / E07 |
+| 2026-10-25 | current for P1; stale for P2 | current / plan-aligned for P2 foundation | Re-evaluated all five findings against narrowed active tasks, explicit successor owners, observed-Red gates and unchanged authority boundaries. User requested implementation; no runtime assurance inferred. | P2/E2; base e8aa58ae8f; P2 scope revalidation above |
 
 ## Planning Handoff
 
 - Workstream: secretkit-adoption
 - Status: current
-- Reviewed input: completed triad P1 and evidence packet E1.
+- Reviewed input: foundation triad P2/E2 and successor brief; implementation base e8aa58ae8f.
 - Findings and mitigations: IVSD-F001 -> IVSD-M001; IVSD-F002 -> IVSD-M002; IVSD-F003 -> IVSD-M003; IVSD-F004 -> IVSD-M004; IVSD-F005 -> IVSD-M005.
 - Required plan mappings: IVSD-F001/M001 -> S01/S02/S04/S09, tasks 1.1-1.3/2.1-2.3/3.1-3.3/4.1-4.3; F002/M002 -> S05/S08/S10, tasks 1.2/4.1/4.4/4.5; F003/M003 -> S06/S10, tasks 1.1-1.3/2.1-2.3/4.1-4.4; F004/M004 -> S03/S07/S11, tasks 1.2-1.3/4.2-4.5; F005/M005 -> S12, tasks 1.1/1.4/5.1-5.4. All are design-accepted implementation obligations, not resolved implementation findings.
-- Escalations required before: user approval before implementation; attributable test failures before implementation completion; native/platform qualification before corresponding release claims.
+- Escalations required before: user implementation approval and P2 mapping revalidation are satisfied for the foundation; attributable test failures still block implementation completion; native/platform qualification is required before corresponding release claims. Successor approval and persisted-approval evidence remain separate gates.
 - Refresh triggers: changed authority/fallback policy, identity scope, maintenance/recovery, export/retention, activation, telemetry, dependency bytes/terms, or material task mappings.

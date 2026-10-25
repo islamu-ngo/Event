@@ -1,0 +1,162 @@
+# SecretKit Event Ownership And Preparation Boundary
+
+> **Audience:** Contributors | Architects | Maintainers
+> **Status:** Planned
+> **Owner:** Security
+> **Last Verified:** 2026-10-25
+> **Source Anchors:** `dev/active/secretkit-adoption/secretkit-adoption-plan.md` Sections 5.1-5.3, `dev/active/secretkit-adoption/secretkit-adoption-tasks.md` task 1.5, `docs/internal/SECRETKIT_LOCAL_PACKAGES.md`
+
+## Decision status
+
+The foundation architecture is approved for implementation. This ADR remains
+proposed pending implementation qualification and acceptance; approval of the
+design is not evidence of a completed serving-host cutover. Foundation checks
+are pending in this documentation task.
+
+## Context and alternatives
+
+API, BFF and tooling need a shared acquisition boundary without importing
+backend business layers into the BFF. Use the existing
+`Explore.ServiceDefaults/Secrets/` boundary instead of creating a replacement
+project, retaining a slim provider-mirroring project, or duplicating acquisition
+in each host. This selects the eventual ownership model without asserting that
+`Explore.Secrets` or its tests have already been removed.
+
+## Responsibility and dependency direction
+
+ServiceDefaults owns process role, immutable authority selection, exact
+process-root admission, explicitly injected bootstrap identity, SDK resource
+lifetime and configuration export. It stays independent of Domain,
+Application, EF and database drivers. Capture role, environment, selector and
+authority identity once before authentication; provider content cannot replace
+them.
+
+Domain retains registry/binding scope and canonical-reference policy.
+Infrastructure must apply that policy before tenant cache/provider access in
+the successor adapter. Do not move the current Domain-dependent mixed
+acquisition policy wholesale into shared hosting.
+
+SecretKit belongs only at outer implementation boundaries, never in Domain,
+Application, wire DTOs or WASM. The BFF reaches shared acquisition through
+ServiceDefaults, not a backend project link. Infrastructure's future typed
+read/write adapter may directly reference Core/Infisical when implemented.
+Persistence may later reference ServiceDefaults only for design-time bootstrap:
+the ASP.NET-capable assembly dependency is acknowledged, but ordinary queries
+must not depend on HTTP hosting. Database construction and provider semantics
+remain Persistence responsibilities.
+
+## Async required-group preparation
+
+The approved composition contract awaits complete preparation before host
+`Build`, EF pools, OIDC clients, workers or traffic. No temporary DI container,
+remote work in a DI factory, or network I/O in synchronous
+`IConfigurationProvider.Load` is permitted. Build-time API generation and
+model-only tooling retain explicit no-I/O lanes; controlled tests use an
+admitted fake authority, not production credentials.
+
+Use `SecretSnapshotLoader` for explicit selections. Every member of one loader
+is required: missing, denied, invalid or unavailable required material prevents
+publication. Optional capabilities use separate groups included only when
+enabled, with bounded non-success outcomes rather than fabricated absence.
+Validate returned coordinates and case-insensitive mapped-key collisions before
+publishing any group.
+
+Environment, Infisical and Development/Testing-only UserSecrets are explicitly
+selected authorities, not a fallback chain. Selection or provider failure does
+not authorize another principal, hidden login, retry-based recovery or a lower
+source. AppHost projects approved inputs; it does not become the secret reader.
+API, BFF, Combined, migration and specialized Data Protection inputs remain
+distinct profiles. Combined prepares its admitted union once, not two logins.
+
+Publication is atomic **locally**: an accepted generation is complete for its
+local candidate. Sequential or concurrent remote reads do not thereby acquire
+provider-wide snapshot isolation. Any cross-secret remote consistency guarantee
+needs independent provider/version evidence.
+
+## Ownership, export and retirement
+
+The preparing owner holds the session, generation and owned transport until
+successful composition transfers ownership exactly once to the host.
+Preparation failure, cancellation or host construction failure disposes the
+lease exactly once; caller-owned dependencies remain caller-owned. Held reads
+are independently disposable. Drain accepted work before asynchronous
+retirement outside locks; do not leave orphan sessions or double-dispose them.
+
+`SecretConfigurationExport.CreateAcknowledgingManagedStrings` is a deliberate
+boundary for legacy configuration/Options consumers, not a claim of zero-copy
+or erasable managed strings. Disposing protected SDK material does not erase
+exported strings or downstream client copies. Bound retention and export only
+what the consumer needs. Controlled keys use an authority-only configuration
+view that later JSON/environment/command-line providers cannot override;
+non-secret configuration retains normal host precedence. Synchronous Build/Load
+reads prepared memory only.
+
+Finite/periodic policy must agree with evidence bound to the actual login.
+Zero maximum TTL alone proves neither periodic nor unlimited lifetime.
+Reject expired or uncertain preparation; no persisted token, automatic relogin
+or renewal replay. One caller's cancellation must not cancel another owner's
+accepted shared work.
+
+## Foundation versus successor execution
+
+All four immutable packages at `[0.1.0-local.20261024.1]` support this foundation;
+the Refit family aligns at 16.3.0. Their availability is not runtime activation.
+The Hosting helper may expose explicit lifecycle/cancellation seams, but this
+foundation registers no serving host, maintenance service or scheduler rule.
+Short-lived migration/design-time operations do not start background
+maintenance merely because Hosting is transitively available.
+
+The successor must qualify and wire real host entrypoints, tenant adapters,
+Data Protection, Persistence tooling and client activation/retirement. It must
+close the preparation-to-host-start token-maintenance gap under its approved
+contract, then remove old projects only after consumers migrate. Foundation
+tests cannot establish fleet convergence, remote atomicity, native actor/ACL
+enforcement, image readiness or trimming/Native AOT support.
+
+## Evidence and distribution
+
+The [dependency admission](../legal/dependencies/secretkit.md) records retained
+MIT notices, provenance and outbound-license obligations.
+The [package guide](../SECRETKIT_LOCAL_PACKAGES.md) separates historical transfer
+receipts, verified foundation checks, quarantined baseline failures and
+unexecuted successor qualification. This ADR does not infer image or
+live-provider assurance from offline checks.
+
+## Admission and retirement verification
+
+Preparation reserves the owner before enumerating caller-supplied selections.
+Retirement closes admission, cancels, drains reservations, and disposes native
+resources outside the ownership gate. Publication checks the same gate.
+Protected configuration destinations reject both underscore and hierarchical
+namespace spellings. Native login binding preserves original timing and finite
+ceilings; Event does not manufacture another absolute lifetime from a response.
+
+Independent security and ownership reviews produced two concrete exploit
+schedules. Both were reproduced before correction and are covered by the
+25-case passing authority slice. The review record contains no reviewer
+identities:
+
+```json
+{
+  "review": "independent asymmetric boundary review",
+  "aggregation": {"primary": 0.6, "secondary": 0.4},
+  "findings": [
+    {
+      "id": "authority-hierarchical-destination",
+      "severity": "medium",
+      "disposition": "fixed",
+      "reproducer": "HierarchicalProtectedDestinationsCannotBeExported",
+      "red": "three hierarchical destination cases admitted unexpectedly",
+      "green": "all three rejected before provider IO"
+    },
+    {
+      "id": "authority-enumeration-retirement",
+      "severity": "medium",
+      "disposition": "fixed",
+      "reproducer": "RetirementReservesPreparationBeforeCallerEnumeration",
+      "red": "retirement completed while accepted enumeration was blocked",
+      "green": "retirement drains the reserved operation without disposed-source access"
+    }
+  ]
+}
+```

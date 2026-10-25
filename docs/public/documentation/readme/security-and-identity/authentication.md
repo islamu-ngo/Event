@@ -255,8 +255,9 @@ reuse of a Local-owned account requires that link to remain present when the
 claim transaction checks it. A link removed before that transaction starts is
 not accepted from an earlier lookup.
 
-Tenant creation also uses the platform user linked to the authenticated provider
-account, not the provider's token subject GUID. Creator attribution and optional
+Tenant creation through both `/api/tenant` and the multi-tenant instance-admin
+route `/api/admin/instance/tenants` uses the platform user linked to the authenticated
+provider account, not the provider's token subject GUID. Creator attribution and optional
 administrator membership use that linked identity. An unlinked provider account
 cannot substitute a matching-looking GUID or email address. This correction adds
 no permissions, account links, configuration settings or database migration.

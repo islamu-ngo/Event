@@ -140,12 +140,21 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
     }
 
     [Test]
-    public async Task TenantCreationUsesThePersistedProviderBindingRatherThanTheGuidTokenSubject()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task TenantCreationUsesThePersistedProviderBindingRatherThanTheGuidTokenSubject(bool instanceAdministration)
     {
+        await using var administrationFactory = instanceAdministration
+            ? new LocalRbacWebApplicationFactory(_keycloak.Authority, _keycloak.MetadataAddress,
+                _keycloak.TokenClient, _tenantContext, _cerbosConfigResolver, deploymentMode: "MultiTenant")
+            : null;
+        using var administrationClient = administrationFactory?.CreateClient();
+        var factory = administrationFactory ?? _instanceAdminFactory;
+        var client = administrationClient ?? _instanceAdminClient;
         var token = await _keycloak.TokenClient.GetAdminTokenAsync();
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
         var accountKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(jwt.Issuer, jwt.Subject);
-        await using var observer = await _instanceAdminFactory.Services
+        await using var observer = await factory.Services
             .GetRequiredService<IGlobalExploreDbContextFactory>().CreateDbContextAsync();
         var login = await observer.UserExternalLogins.AsNoTracking()
             .SingleAsync(value => value.ProviderKey == accountKey.Value);
@@ -159,11 +168,12 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
             IsActive = false,
             AssignCurrentUserAsTenantAdmin = true
         };
-        using var message = CreateAuthorizedRequest(HttpMethod.Post, "/api/tenant", token);
+        using var message = CreateAuthorizedRequest(HttpMethod.Post,
+            instanceAdministration ? "/api/admin/instance/tenants" : "/api/tenant", token);
         message.Content = JsonContent.Create(request);
-        using var response = await _instanceAdminClient.SendAsync(message);
+        using var response = await client.SendAsync(message);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK)
-            .Because(_instanceAdminFactory.RequestFailureSummary);
+            .Because(factory.RequestFailureSummary);
         var result = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
         await Assert.That(result).IsNotNull();
         await Assert.That(result!.IsSuccess).IsTrue();
@@ -385,6 +395,7 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
         private readonly string _keycloakMetadataAddress;
         private readonly ITenantContext _tenantContext;
         private readonly ICerbosConfigResolver _cerbosConfigResolver;
+        private readonly string _deploymentMode;
 
         internal string RequestFailureSummary => _requestFailures.Summary;
 
@@ -393,13 +404,15 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
             string keycloakMetadataAddress,
             KeycloakTokenClient keycloakTokens,
             ITenantContext tenantContext,
-            ICerbosConfigResolver cerbosConfigResolver)
+            ICerbosConfigResolver cerbosConfigResolver,
+            string deploymentMode = "SingleTenant")
         {
             _keycloakTokens = keycloakTokens;
             _keycloakAuthority = keycloakAuthority;
             _keycloakMetadataAddress = keycloakMetadataAddress;
             _tenantContext = tenantContext;
             _cerbosConfigResolver = cerbosConfigResolver;
+            _deploymentMode = deploymentMode;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -424,7 +437,7 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
                     ["S3Settings:Region"] = "us-east-1",
                     ["S3Settings:BucketName"] = "test-bucket",
                     ["S3Settings:Endpoint"] = "https://s3.example.com",
-                    ["Deployment:Mode"] = "SingleTenant",
+                    ["Deployment:Mode"] = _deploymentMode,
                     ["Deployment:DefaultTenantId"] = DefaultTenantId.ToString(),
                     ["Testing:HostProfile"] = TestHostProfile.Security,
                     ["Cerbos:GrpcEndpoint"] = "http://localhost:19999",

@@ -3,6 +3,17 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-10-25
+
+- Instance administration's existing `POST /api/admin/instance/tenants` route
+  resolves the persisted provider-linked platform user before invoking the native
+  tenant creator, matching `POST /api/tenant`. Neither route assumes a GUID token
+  subject is an application user ID or falls back to an email address. The
+  multi-tenant requirement, native authorization, original-credential checks and
+  creator/membership attribution remain intact. No route, request schema or
+  permission changes. The provider-binding regression covers both routes;
+  it remains locally unbuilt/unrun and requires remote verification.
+
 ## 2026-10-24
 
 - Tenant creation resolves the authenticated provider account's persisted platform

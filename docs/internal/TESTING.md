@@ -668,6 +668,22 @@ dotnet test --project <ProjectPath> --configuration Release -- --report-trx --re
 
 ### Fresh PostgreSQL settings contract bootstrap
 
+Native privilege checks evaluate `MAINTAIN` and its grant option only on
+PostgreSQL 17 and later, where that capability exists. PostgreSQL 16 still checks
+every existing privilege without passing the unsupported name to PostgreSQL.
+Constraint attestation reads `conenforced` through the existing JSON metadata
+fallback when older catalogues lack that field; validation state, constraint
+shape and enforcement-trigger checks remain independent. An absent field does
+not prove that existing rows were validated. These capability corrections add
+no application permission, grant or tenant-policy exception.
+
+The declared-capability controls passed on PostgreSQL 16 and 18, and the three
+existing unexpected-MAINTAIN denial controls passed on PostgreSQL 18 in the
+integrated candidate. The complete PostgreSQL 16 public migration/idempotency
+case ended at the FreshEF process wait with cancellation and did not produce a
+whole-case pass. The final supported-engine matrix remains pending. This
+HEAD-only capability commit projection has not been compiled independently.
+
 Fresh composition installs `PostgresCategoryReadPermissions` after the fixed
 lookup catalogue profile. The declared migration identity provisions schema
 access and direct, non-grantable Runtime SELECT on exactly the six mapped

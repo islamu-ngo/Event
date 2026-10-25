@@ -219,8 +219,9 @@ public static partial class PostgresIdempotencyReceiptContract
             """));
         string services = string.Join("\n", new[] { enrollment.RuntimeLogin, enrollment.GlobalLogin }
             .SelectMany(login => new[] { sql.Table(typeof(IdempotencyRecord)), sql.Name(OwnershipTable) }.Select(table => $"""
-                IF pg_catalog.has_table_privilege({Text(login)},pg_catalog.to_regclass({Text(table)}),
-                        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                IF (pg_catalog.has_table_privilege({Text(login)},pg_catalog.to_regclass({Text(table)}),
+                        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                    OR {PostgresPrivilegeGuard.MaintainPrivilegeSql(Text(login), $"pg_catalog.to_regclass({Text(table)})", false)})
                     OR pg_catalog.has_any_column_privilege({Text(login)},pg_catalog.to_regclass({Text(table)}),'SELECT,INSERT,UPDATE,REFERENCES')
                 THEN RAISE EXCEPTION 'idempotency_receipt_ambient_service_access' USING ERRCODE = '55000'; END IF;
                 """)));
@@ -240,7 +241,8 @@ public static partial class PostgresIdempotencyReceiptContract
                     CROSS JOIN pg_catalog.pg_roles r WHERE r.rolname IN ({roles})
                         AND n.nspname <> {Text(sql.Schema)} AND n.nspname NOT IN ('pg_catalog','information_schema')
                         AND n.nspname NOT LIKE 'pg_toast%' AND t.relkind IN ('r','p','v','m','f')
-                        AND (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                        AND ((pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                            OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                             OR pg_catalog.has_any_column_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,REFERENCES')))
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
                     WHERE r.rolname IN ({roles}) AND t.relkind = 'S' AND pg_catalog.has_sequence_privilege(r.oid,t.oid,'USAGE,SELECT,UPDATE'))

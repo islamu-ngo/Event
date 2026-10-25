@@ -217,7 +217,8 @@ public static class PostgresTenantApiKeyStoragePermissions
                         OR EXISTS (SELECT 1 FROM unnest({tables}) target(relation)
                             JOIN pg_catalog.pg_class c ON c.oid=pg_catalog.to_regclass(target.relation)
                             WHERE c.relowner=r.oid OR pg_catalog.has_schema_privilege(r.oid,c.relnamespace,'CREATE')
-                                OR pg_catalog.has_table_privilege(r.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                                OR (pg_catalog.has_table_privilege(r.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                    OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "c.oid", false)})
                                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                     CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                     WHERE a.attrelid=c.oid AND a.attnum<>0 AND NOT a.attisdropped

@@ -304,6 +304,18 @@ and security failures still fail closed.
 
 ### PostgreSQL settings contract development bootstrap
 
+The native guards keep PostgreSQL 16's existing privilege checks and evaluate
+the newer `MAINTAIN` capability only on PostgreSQL 17 and later. Older constraint
+catalogues use the existing enforcement-metadata fallback while retaining
+separate validation and trigger checks. Purpose permissions and tenant isolation
+remain unchanged. The changed native definitions retain the fresh-development
+bootstrap boundary below; this is not an in-place upgrade of older bodies.
+
+The declared-capability controls passed on PostgreSQL 16 and 18, and the
+existing unexpected-MAINTAIN refusal controls passed on PostgreSQL 18.
+End-to-end PostgreSQL 16 migration/idempotency and the final supported-engine
+matrix still require their own verification before release.
+
 Fresh development bootstrap also provisions the Runtime access needed for
 category browsing. Reads stay limited to the selected tenant and six modelled
 Category fields under forced row security, including parent category reads.

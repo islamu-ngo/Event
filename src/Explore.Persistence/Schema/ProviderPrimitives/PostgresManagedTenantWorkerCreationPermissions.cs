@@ -206,7 +206,9 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                     JOIN pg_catalog.pg_class t ON t.oid=pg_catalog.to_regclass(source.relation) CROSS JOIN members r
                     WHERE r.oid=t.relowner
                         OR EXISTS (SELECT 1 FROM (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) permission(privilege)
-                            WHERE pg_catalog.has_table_privilege(r.oid,t.oid,permission.privilege)
+                            WHERE (CASE WHEN permission.privilege='MAINTAIN'
+                                THEN {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)}
+                                ELSE pg_catalog.has_table_privilege(r.oid,t.oid,permission.privilege) END)
                                 AND NOT (source.relation={federation} AND r.rolname={login} AND permission.privilege='DELETE'
                                     AND NOT pg_catalog.has_table_privilege(r.oid,t.oid,'DELETE WITH GRANT OPTION')
                                     AND EXISTS (SELECT 1 FROM pg_catalog.aclexplode(t.relacl) acl WHERE acl.grantee=r.oid AND acl.grantor=t.relowner AND acl.privilege_type='DELETE' AND NOT acl.is_grantable)
@@ -234,7 +236,8 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                 NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
                     WHERE t.oid=pg_catalog.to_regclass({Text(source.Table)})
                         AND pg_catalog.pg_has_role({Text(enrollment.GlobalLogin)},r.oid,'MEMBER')
-                        AND (r.oid=t.relowner OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                        AND (r.oid=t.relowner OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER')
+                            OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                             OR (pg_catalog.has_table_privilege(r.oid,t.oid,'DELETE') AND NOT (
                                 {(source.Type == typeof(AtprotoFederationTenantSetting) ? "true" : "false")}
                                 AND r.rolname={Text(enrollment.GlobalLogin)}
@@ -418,7 +421,8 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                     ? $"AND EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t WHERE {emailCapture})" : "")}
                 AND ({PostgresTenantCreationPermissions.DeclaredForeignKeysPredicate(context, source.Type, source.Table)})
                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint f
-                    WHERE f.conrelid=pg_catalog.to_regclass({Text(source.Table)}) AND f.contype='f' AND NOT f.conenforced)
+                    WHERE f.conrelid=pg_catalog.to_regclass({Text(source.Table)}) AND f.contype='f'
+                        AND NOT COALESCE((pg_catalog.to_jsonb(f)->>'conenforced')::boolean,true))
                 AND ({InsertSurfacePredicate(context, source)})
                 """);
         }).ToArray();
@@ -466,7 +470,8 @@ public static class PostgresManagedTenantWorkerCreationPermissions
                 WHERE conrelid=pg_catalog.to_regclass({Text(source.Table)}) AND contype='c')
             {string.Concat(checks.Select(check => $"""
                 AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c WHERE c.conrelid=pg_catalog.to_regclass({Text(source.Table)})
-                    AND c.contype='c' AND c.conname={Text(check.Name)} AND c.conenforced AND c.convalidated AND c.conislocal
+                    AND c.contype='c' AND c.conname={Text(check.Name)}
+                    AND COALESCE((pg_catalog.to_jsonb(c)->>'conenforced')::boolean,true) AND c.convalidated AND c.conislocal
                     AND c.coninhcount=0 AND NOT c.connoinherit AND NOT c.condeferrable AND NOT c.condeferred
                     AND pg_catalog.pg_get_expr(c.conbin,c.conrelid)=({check.CatalogueSql})
                     AND ({BuiltinDependencies("pg_constraint", "c.oid")}))

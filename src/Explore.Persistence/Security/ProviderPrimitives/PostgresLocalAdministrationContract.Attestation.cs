@@ -186,7 +186,8 @@ public static partial class PostgresLocalAdministrationContract
                 WHERE t.oid={Text(sql.Table(source.Type))}::regclass
                     AND pg_catalog.pg_has_role((SELECT oid FROM pg_catalog.pg_roles WHERE rolname={Text(enrollment.RuntimeLogin)}),r.oid,'MEMBER')
                     AND (r.oid=t.relowner OR r.rolsuper OR r.rolbypassrls OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication
-                        OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                        OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                            OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                         OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                             CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                             WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped

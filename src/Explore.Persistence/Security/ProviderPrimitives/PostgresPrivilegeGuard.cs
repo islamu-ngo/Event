@@ -73,6 +73,13 @@ public static class PostgresPrivilegeGuard
         ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER", "MAINTAIN"];
     private static readonly string[] ColumnPrivileges = ["SELECT", "INSERT", "UPDATE", "REFERENCES"];
 
+    /// <summary>Checks the PostgreSQL17 table capability without passing its name to older engines.</summary>
+    internal static string MaintainPrivilegeSql(string role, string relation, bool withGrantOption) => $"""
+        CASE WHEN pg_catalog.current_setting('server_version_num')::integer >= 170000
+            THEN pg_catalog.has_table_privilege({role}, {relation}, 'MAINTAIN{(withGrantOption ? " WITH GRANT OPTION" : "")}')
+            ELSE false END
+        """;
+
     /// <param name="GuardedRoles">Dedicated NOLOGIN, NOINHERIT owner, executor and migrator roles.</param>
     /// <param name="Memberships">
     /// Complete allowed incoming and outgoing edges touching guarded roles, including trusted deployment
@@ -267,9 +274,13 @@ public static class PostgresPrivilegeGuard
                     CROSS JOIN (VALUES {string.Join(", ", TablePrivileges.Select(privilege => $"({Text(privilege)})"))}) permission(privilege)
                     LEFT JOIN guard_table_grants allowed ON allowed.name = relation.relname
                         AND allowed.role_name = role.rolname AND allowed.privilege = permission.privilege
-                    WHERE pg_catalog.has_table_privilege(role.oid, relation.oid, permission.privilege)
+                    WHERE (CASE WHEN permission.privilege = 'MAINTAIN'
+                            THEN {MaintainPrivilegeSql("role.oid", "relation.oid", false)}
+                            ELSE pg_catalog.has_table_privilege(role.oid, relation.oid, permission.privilege) END)
                         IS DISTINCT FROM (allowed.name IS NOT NULL)
-                        OR pg_catalog.has_table_privilege(role.oid, relation.oid, permission.privilege || ' WITH GRANT OPTION'))
+                        OR (CASE WHEN permission.privilege = 'MAINTAIN'
+                            THEN {MaintainPrivilegeSql("role.oid", "relation.oid", true)}
+                            ELSE pg_catalog.has_table_privilege(role.oid, relation.oid, permission.privilege || ' WITH GRANT OPTION') END))
                 AND NOT EXISTS (SELECT 1 FROM guard_column_authority actual_column
                     FULL JOIN guard_column_grants allowed_column
                         ON actual_column.name = allowed_column.name

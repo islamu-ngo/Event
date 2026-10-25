@@ -51,7 +51,8 @@ internal static class EventReadProjectionSql
                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
                     WHERE t.oid IN ({relations}) AND pg_catalog.pg_has_role({runtime},r.oid,'MEMBER')
                         AND (r.oid = t.relowner
-                            OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                            OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                             OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                 WHERE a.attrelid = t.oid AND a.attnum <> 0 AND NOT a.attisdropped
                                     AND (pg_catalog.has_column_privilege(r.oid,t.oid,a.attnum,'INSERT,UPDATE,REFERENCES,SELECT WITH GRANT OPTION')

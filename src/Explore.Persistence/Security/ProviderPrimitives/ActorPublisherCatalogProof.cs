@@ -155,7 +155,8 @@ internal static class ActorPublisherCatalogProof
                     OR EXISTS (SELECT 1 FROM pg_catalog.pg_class t CROSS JOIN pg_catalog.pg_roles r
                         WHERE t.oid IN ({relations}) AND pg_catalog.pg_has_role({Text(login)},r.oid,'MEMBER')
                             AND (r.oid = t.relowner
-                                OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                                OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,TRUNCATE,REFERENCES,TRIGGER')
+                                    OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                                 OR (pg_catalog.has_table_privilege(r.oid,t.oid,'DELETE') AND NOT ({delete}))
                                 OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                     CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)

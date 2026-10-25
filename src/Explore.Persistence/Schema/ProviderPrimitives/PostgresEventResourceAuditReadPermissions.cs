@@ -192,7 +192,8 @@ public static class PostgresEventResourceAuditReadPermissions
                     AND (r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication
                         OR r.rolname={migrator}
                         OR pg_catalog.has_schema_privilege(r.oid,{Text(audit.Schema)},'CREATE')
-                        OR pg_catalog.has_table_privilege(r.oid,{relation},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                        OR (pg_catalog.has_table_privilege(r.oid,{relation},'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                            OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", relation, false)})
                         OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                             WHERE a.attrelid=pg_catalog.to_regclass({relation}) AND a.attnum<>0 AND NOT a.attisdropped
                                 AND (pg_catalog.has_column_privilege(r.oid,a.attrelid,a.attnum,'INSERT,UPDATE,REFERENCES')

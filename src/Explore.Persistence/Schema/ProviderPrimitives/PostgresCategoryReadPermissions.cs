@@ -265,7 +265,8 @@ public static class PostgresCategoryReadPermissions
                         AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class=t.oid)
                         AND NOT EXISTS (SELECT 1 FROM members r WHERE r.oid=t.relowner OR r.rolsuper OR r.rolbypassrls
                             OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication OR pg_catalog.has_schema_privilege(r.oid,n.oid,'CREATE')
-                            OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                            OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                             OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                                 CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                                 WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped
@@ -279,7 +280,8 @@ public static class PostgresCategoryReadPermissions
                                             AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(a.attacl) acl
                                                 WHERE acl.grantee=0 AND acl.privilege_type='SELECT'))))))
                         AND NOT EXISTS (SELECT 1 FROM global_members r
-                            WHERE pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                            WHERE (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                                OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                                 OR pg_catalog.has_any_column_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,REFERENCES'))
                         {(complete ? $"AND pg_catalog.has_schema_privilege({runtime},n.oid,'USAGE')" : "")})
                 AND ({required}))

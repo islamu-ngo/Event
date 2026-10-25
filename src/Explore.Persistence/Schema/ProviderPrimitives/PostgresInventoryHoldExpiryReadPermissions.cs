@@ -180,7 +180,8 @@ public static class PostgresInventoryHoldExpiryReadPermissions
                             WHERE pg_catalog.has_schema_privilege(r.oid,s.name,'CREATE')))
                 AND NOT EXISTS (SELECT 1 FROM unnest({tables}) source(relation)
                     JOIN pg_catalog.pg_class t ON t.oid=pg_catalog.to_regclass(source.relation) CROSS JOIN members r
-                    WHERE t.relowner=r.oid OR pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+                    WHERE t.relowner=r.oid OR (pg_catalog.has_table_privilege(r.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                        OR {PostgresPrivilegeGuard.MaintainPrivilegeSql("r.oid", "t.oid", false)})
                         OR EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                             CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('REFERENCES')) permission(privilege)
                             WHERE a.attrelid=t.oid AND a.attnum<>0 AND NOT a.attisdropped

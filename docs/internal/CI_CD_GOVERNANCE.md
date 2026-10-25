@@ -834,7 +834,7 @@ gate.
 
 | Evidence | Workflow(s) | Retention |
 |---|---|---:|
-| Fast/integration TRX, build/analyzer warning logs, and NuGet vulnerability summaries | `Build & Test (Reusable)` | 14 days |
+| Fast/integration TRX, build/analyzer warning logs, NuGet vulnerability summaries, and value-free setup-fixture progress | `Build & Test (Reusable)` | 14 days |
 | OpenAPI drift, `oasdiff`, and advisory Spectral artifacts | `OpenAPI Contract Guard` | 30 days |
 | Workflow security evidence | `Workflow Security` | 30 days |
 | OpenSSF Scorecard SARIF | `OpenSSF Scorecard` | 30 days |
@@ -846,6 +846,15 @@ gate.
 | Deployment summaries/logs | Coolify deploy workflows | 90 days minimum |
 
 Release notes must copy or link long-lived evidence that GitHub artifact retention will eventually delete.
+
+The fast-test artifact also retains `artifacts/test-progress/setup-security.log`
+when the setup security fixture reaches its progress checkpoints. Each record
+contains only a compile-time test method name, a fixed phase label and monotonic
+elapsed milliseconds; it contains no request values, credentials, identifiers or
+exception messages. The file distinguishes fixture startup/reset progress from
+test-runner output capture. Its absence does not prove where execution stopped.
+This evidence path does not change test selection, assertions, permissions or
+job time limits.
 
 For manual releases, generate the durable release evidence manifest after downloading retained CI/CD artifacts:
 

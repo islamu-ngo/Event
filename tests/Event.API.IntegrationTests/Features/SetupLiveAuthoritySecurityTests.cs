@@ -2014,12 +2014,21 @@ public sealed class SetupLiveAuthorityRedFixture : IAsyncInitializer, IAsyncDisp
 
     private static void WriteProgress(string testName, string phase, long started)
     {
-        // Write directly to the process stream so test-output capture cannot hide a stalled stage.
+        string line = FormattableString.Invariant(
+            $"[setup-security] test={testName} phase={phase} elapsed_ms={Stopwatch.GetElapsedTime(started).TotalMilliseconds:F0}");
         using var output = new StreamWriter(
             Console.OpenStandardError(), new UTF8Encoding(false), leaveOpen: true);
-        output.WriteLine(FormattableString.Invariant(
-            $"[setup-security] test={testName} phase={phase} elapsed_ms={Stopwatch.GetElapsedTime(started).TotalMilliseconds:F0}"));
+        output.WriteLine(line);
         output.Flush();
+
+        // Retain checkpoints even when the test platform captures output until a cancelled run ends.
+        if (Environment.GetEnvironmentVariable("GITHUB_WORKSPACE") is { Length: > 0 } workspace)
+        {
+            string directory = Path.Combine(workspace, "artifacts", "test-progress");
+            Directory.CreateDirectory(directory);
+            File.AppendAllText(Path.Combine(directory, "setup-security.log"), line + Environment.NewLine,
+                new UTF8Encoding(false));
+        }
     }
 
     public async Task<Guid> AddBinding(SecretBinding binding)

@@ -296,6 +296,7 @@ jobs:
             '**/TestResults/**/*.trx'
             artifacts/build/fast-build.log
             artifacts/dependencies/**
+            artifacts/test-progress/setup-security.log
           if-no-files-found: warn
           retention-days: 14
 

@@ -13,3 +13,6 @@ contact_links:
     url: https://github.com/islamu-ngo/Event/discussions/categories/improvements
     about: Suggest improvements to existing features. All feature and fix PRs should branch from and target `develop`.
 
+  - name: "🛡️ Report a security vulnerability"
+    url: https://github.com/islamu-ngo/Event/security/advisories/new
+    about: Do not open a public issue. Report it privately here. See SECURITY.md for other reporting channels.

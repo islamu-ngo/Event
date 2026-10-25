@@ -21,6 +21,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.SetupLive;
+using Explore.Application.Features.SetupLive;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -45,6 +46,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog.Core;
+using Serilog.Events;
 using TUnit.Core;
 using TUnit.Core.Interfaces;
 
@@ -2144,7 +2147,7 @@ public sealed class SetupLiveAuthorityWebApplicationFactory(
             services.AddSingleton<ISetupSecretBindingCommitmentAuthority>(commitmentAuthority);
             services.AddSingleton<ISetupSecretBindingCommitBarrier>(commitBarrier);
             services.AddSingleton<ISetupSecretBindingOperationCoordinator>(coordinator);
-            services.AddSingleton<ILoggerProvider>(capture.LoggerProvider);
+            services.AddSingleton<ILogEventSink>(capture);
             services.Insert(0, ServiceDescriptor.Singleton<Microsoft.AspNetCore.Diagnostics.IExceptionHandler>(capture));
             services.AddSingleton<IStartupFilter>(
                 new UnreadBodyStartupFilter(bodyProbe));
@@ -2462,7 +2465,7 @@ public sealed class ManualSetupTimeProvider : TimeProvider
     public void Reset() => _current = _initial;
 }
 
-public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnostics.IExceptionHandler
+public sealed class SetupLiveCapture : IDisposable, ILogEventSink, Microsoft.AspNetCore.Diagnostics.IExceptionHandler
 {
     private string failureMetadata = "No request exception metadata was observed.";
     public string FailureMetadata => Volatile.Read(ref failureMetadata);
@@ -2493,7 +2496,6 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
 
     public SetupLiveCapture()
     {
-        LoggerProvider = new SetupLiveCapturingLoggerProvider(_values, LogObserved);
         _activityListener = new ActivityListener
         {
             ShouldListenTo = _ => true,
@@ -2538,8 +2540,6 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
                 RecordMeasurement(instrument, measurement, tags));
     }
 
-    public ILoggerProvider LoggerProvider { get; }
-
     public void Start()
     {
         ActivitySource.AddActivityListener(_activityListener);
@@ -2576,18 +2576,26 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
         Reset();
         _activityListener.Dispose();
         _meterListener.Dispose();
-        LoggerProvider.Dispose();
     }
 
-    private void LogObserved(
-        EventId eventId,
-        IReadOnlyDictionary<string, object?> properties)
+    public void Emit(LogEvent logEvent)
     {
-        if (eventId.Id == 19_620
-            && string.Equals(eventId.Name, "SetupLiveMilestone", StringComparison.Ordinal))
+        _values.Enqueue(logEvent.MessageTemplate.Text);
+        _values.Enqueue(logEvent.RenderMessage(System.Globalization.CultureInfo.InvariantCulture));
+        foreach (var property in logEvent.Properties)
+            _values.Enqueue($"{property.Key}={property.Value}");
+        if (logEvent.Exception is not null)
+            _values.Enqueue(logEvent.Exception.ToString());
+
+        // Observe the native event after privacy enrichment, which intentionally removes EventId.
+        bool isSetupMilestone = string.Equals(
+            Scalar(logEvent, "SourceContext"), typeof(SetupLiveApplicationService).FullName, StringComparison.Ordinal)
+            && string.Equals(logEvent.MessageTemplate.Text,
+                "Setup live milestone {SetupOperation} {SetupMilestone}", StringComparison.Ordinal);
+        if (isSetupMilestone)
         {
-            _setupValues.Enqueue(eventId.Name);
-            foreach (KeyValuePair<string, object?> property in properties)
+            _setupValues.Enqueue(logEvent.MessageTemplate.Text);
+            foreach (var property in logEvent.Properties)
             {
                 _setupValues.Enqueue($"{property.Key}={property.Value}");
                 if (property.Key is not "SetupOperation"
@@ -2605,13 +2613,9 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
         }
         TelemetryBarrier? armed = _barrier;
         if (armed is null
-            || eventId.Id != 19_620
-            || !string.Equals(
-                eventId.Name, "SetupLiveMilestone", StringComparison.Ordinal)
-            || !properties.TryGetValue("SetupOperation", out object? operation)
-            || !properties.TryGetValue("SetupMilestone", out object? milestone)
-            || !string.Equals(operation?.ToString(), armed.Operation, StringComparison.Ordinal)
-            || !string.Equals(milestone?.ToString(), armed.Milestone, StringComparison.Ordinal))
+            || !isSetupMilestone
+            || !string.Equals(Scalar(logEvent, "SetupOperation"), armed.Operation, StringComparison.Ordinal)
+            || !string.Equals(Scalar(logEvent, "SetupMilestone"), armed.Milestone, StringComparison.Ordinal))
             return;
         TelemetryBarrier? barrier = Interlocked.CompareExchange(
             ref _barrier, null, armed) == armed ? armed : null;
@@ -2619,6 +2623,11 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
             return;
         barrier.SignalAndWait();
     }
+
+    private static string? Scalar(LogEvent logEvent, string name) =>
+        logEvent.Properties.TryGetValue(name, out var property) && property is ScalarValue { Value: string value }
+            ? value
+            : null;
 
     private void RecordMeasurement<T>(
         Instrument instrument,
@@ -2664,76 +2673,5 @@ public sealed class TelemetryBarrier(
         Release();
         _release.Dispose();
         Disposed?.Invoke();
-    }
-}
-
-public sealed class SetupLiveCapturingLoggerProvider(
-    ConcurrentQueue<string> values,
-    Action<EventId, IReadOnlyDictionary<string, object?>> observed) :
-    ILoggerProvider,
-    ISupportExternalScope
-{
-    private IExternalScopeProvider _scopeProvider = new LoggerExternalScopeProvider();
-
-    public ILogger CreateLogger(string categoryName) =>
-        new CapturingLogger(categoryName, values, observed, () => _scopeProvider);
-
-    public void SetScopeProvider(IExternalScopeProvider scopeProvider) =>
-        _scopeProvider = scopeProvider;
-
-    public void Dispose()
-    {
-    }
-
-    private sealed class CapturingLogger(
-        string category,
-        ConcurrentQueue<string> values,
-        Action<EventId, IReadOnlyDictionary<string, object?>> observed,
-        Func<IExternalScopeProvider> scopeProvider) : ILogger
-    {
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull =>
-            scopeProvider().Push(state);
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter)
-        {
-            values.Enqueue(category);
-            values.Enqueue(eventId.Name
-                ?? eventId.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            values.Enqueue(formatter(state, exception));
-            var snapshot = new Dictionary<string, object?>(StringComparer.Ordinal);
-            if (state is IEnumerable<KeyValuePair<string, object?>> properties)
-            {
-                foreach (KeyValuePair<string, object?> property in properties)
-                    snapshot[property.Key] = property.Value;
-            }
-            int scopeIndex = 0;
-            scopeProvider().ForEachScope<object?>(
-                (scope, _) =>
-                {
-                    if (scope is IEnumerable<KeyValuePair<string, object?>> pairs)
-                    {
-                        foreach (KeyValuePair<string, object?> pair in pairs)
-                            snapshot[$"Scope[{scopeIndex}].{pair.Key}"] = pair.Value;
-                    }
-                    else
-                    {
-                        snapshot[$"Scope[{scopeIndex}]"] = scope?.ToString();
-                    }
-                    scopeIndex++;
-                },
-                state: null);
-            foreach (KeyValuePair<string, object?> property in snapshot)
-                values.Enqueue($"{property.Key}={property.Value}");
-            observed(eventId, snapshot);
-            if (exception is not null)
-                values.Enqueue(exception.ToString());
-        }
     }
 }

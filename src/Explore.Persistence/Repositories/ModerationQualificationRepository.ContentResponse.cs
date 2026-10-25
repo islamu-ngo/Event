@@ -139,8 +139,9 @@ public sealed partial class ModerationQualificationRepository : IModerationConte
                 var proof = await ReadContentResponseProofAsync(tenantId, noticeId, null, token);
                 if (proof is null) return ModerationQualificationWriteOutcome.NotFound;
                 var prepared = await prepare(proof.Availability, token);
-                var current = await ReadContentResponseProofAsync(tenantId, noticeId, proof, token);
-                if (current is null || !SameResponseAuthority(proof, current)
+                var current = await ReadContentResponseProofAsync(tenantId, noticeId, proof, token)
+                    ?? throw new AbortQualification(ModerationQualificationWriteOutcome.Unavailable);
+                if (!SameResponseAuthority(proof, current)
                     || !ReferenceEquals(context.Database.CurrentTransaction, transaction)
                     || context.ChangeTracker.HasChanges() || clock.GetUtcNow() < proof.ObservedAt
                     || clock.GetUtcNow() >= current.Availability.QualifiedUntil)
@@ -170,8 +171,9 @@ public sealed partial class ModerationQualificationRepository : IModerationConte
         ContentResponseProof acquired, ModerationContentResponse expected,
         IDbContextTransaction transaction, CancellationToken token)
     {
-        var current = await ReadContentResponseProofAsync(request.TenantId, request.NoticeId, acquired, token);
-        if (current is null || !SameResponseAuthority(acquired, current)
+        var current = await ReadContentResponseProofAsync(request.TenantId, request.NoticeId, acquired, token)
+            ?? throw new AbortQualification(ModerationQualificationWriteOutcome.Unavailable);
+        if (!SameResponseAuthority(acquired, current)
             || !ReferenceEquals(context.Database.CurrentTransaction, transaction)
             || context.ChangeTracker.HasChanges() || clock.GetUtcNow() < acquired.ObservedAt
             || clock.GetUtcNow() < expected.SubmittedAt || clock.GetUtcNow() >= current.Availability.QualifiedUntil)

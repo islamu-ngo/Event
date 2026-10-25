@@ -43,7 +43,8 @@ public sealed partial class ModerationQualificationRepository
                     if (plaintext.Length is < 1 or > ModerationContentResponse.MaximumStatementBytes)
                         return ModerationQualificationWriteOutcome.Unavailable;
                     var current = await ReadContentResponseReviewProofAsync(tenantId, responseId, token);
-                    if (current?.Response is not { } currentRow || current.Authority.UserId != proof.Authority.UserId
+                    if (current is null) return ModerationQualificationWriteOutcome.Unavailable;
+                    if (current.Response is not { } currentRow || current.Authority.UserId != proof.Authority.UserId
                         || current.Authority.Binding.Id != proof.Authority.Binding.Id
                         || current.QualificationRevision != proof.QualificationRevision
                         || current.Reviewer.Id != proof.Reviewer.Id || current.Reviewer.Revision != proof.Reviewer.Revision

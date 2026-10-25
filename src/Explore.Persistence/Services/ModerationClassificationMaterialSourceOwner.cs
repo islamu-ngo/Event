@@ -41,8 +41,8 @@ public sealed class ModerationClassificationMaterialSourceOwner(
     {
         mandate.Validate();
         if ((!pendingWrite && context.ChangeTracker.HasChanges()) || pendingWrite && HasForeignChanges()
-            || session is null
-            || await session.AcquireNativeAsync(transactionId, observedAt, token) is not { } native
+            || session is null) return null;
+        if (await session.AcquireNativeAsync(transactionId, observedAt, token) is not { } native
             || !ReferenceEquals(native.Context, context) || native.OriginalRecipe is not null) return null;
         if (!await context.ModerationQualificationEpochs.AsNoTracking().AnyAsync(row => row.Id == native.Authority.Epoch.Id
             && row.HostBindingId == native.Authority.Binding.Id && row.TenantId == native.Authority.Tenant.Id
@@ -91,8 +91,8 @@ public sealed class ModerationClassificationMaterialSourceOwner(
         ModerationSourceReadSession? session, Guid transactionId, Guid eventId,
         Guid profileId, ModerationNativeMode mode, DateTimeOffset observedAt, CancellationToken token)
     {
-        if (context.ChangeTracker.HasChanges() || session is null
-            || await session.AcquireNativeAsync(transactionId, observedAt, token) is not { } native
+        if (context.ChangeTracker.HasChanges() || session is null) return null;
+        if (await session.AcquireNativeAsync(transactionId, observedAt, token) is not { } native
             || !ReferenceEquals(native.Context, context)) return null;
         var source = await AcquireSourceAsync(session, transactionId, eventId, profileId, mode, observedAt, token);
         if (source is null) return null;

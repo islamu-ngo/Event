@@ -7,6 +7,10 @@ using Explore.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using DotNet.Testcontainers.Containers;
+using DotNet.Testcontainers.Images;
+using NSubstitute;
+using NSubstitute.Extensions;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -242,6 +246,152 @@ public sealed class SecurityPrerequisiteOwnershipTests
         }
         else if (primaryFails || cleanupFails) await Assert.That(ReferenceEquals(observed, primary ?? cleanup)).IsTrue();
         else await Assert.That(observed).IsNull();
+    }
+
+    [Test]
+    public async Task CreationRecordsKeepDistinctFinalImagesAndIdsPrivateUntilIndependentDisposal()
+    {
+        if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("test_creation_observation_requires_linux");
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var files = new OwnershipFiles();
+        var context = await Event.Testing.AssuranceOwnershipContext.ValidateAssuranceContextAsync(
+            files.RunId, files.Root, files.TemporaryRoot, "unix://" + Path.Combine(files.TemporaryRoot, "daemon.sock"))
+            ?? throw new InvalidOperationException("test_creation_context_missing");
+        string firstImage = "registry.example.invalid/first:control";
+        string secondImage = "registry.example.invalid/final:control";
+        string firstId = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        string secondId = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        var firstImageValue = Substitute.For<IImage>();
+        firstImageValue.FullName.Returns(firstImage);
+        var secondImageValue = Substitute.For<IImage>();
+        secondImageValue.FullName.Returns(secondImage);
+        await using var firstContainer = Substitute.For<IContainer>();
+        firstContainer.Image.Returns(firstImageValue);
+        firstContainer.Id.Returns(firstId);
+        await using var secondContainer = Substitute.For<IContainer>();
+        secondContainer.Image.Returns(secondImageValue);
+        secondContainer.Id.Returns(secondId);
+        await using var ordinary = await SecurityInfrastructureFixture.BeginCreationObservationAsync(
+            null, "keycloak", firstContainer, deadline.Token);
+        await Assert.That(ordinary).IsNull();
+        await using var first = await SecurityInfrastructureFixture.BeginCreationObservationAsync(
+            context, "keycloak", firstContainer, deadline.Token)
+            ?? throw new InvalidOperationException("test_creation_observation_missing");
+        await using var second = await SecurityInfrastructureFixture.BeginCreationObservationAsync(
+            context, "keycloak", secondContainer, deadline.Token)
+            ?? throw new InvalidOperationException("test_creation_observation_missing");
+        await Assert.That(first.CreationId != second.CreationId && first.CreationId.Length == 32
+            && second.CreationId.Length == 32 && first.CreationId[12] == '7' && second.CreationId[12] == '7').IsTrue();
+        await Assert.That(await first.RecordCreatedAsync(null, deadline.Token)).IsFalse();
+        firstContainer.StartAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        await SecurityInfrastructureFixture.StartObservedContainerAsync(firstContainer, first, deadline.Token);
+        var partialStartup = new InvalidOperationException("test_creation_partial_start");
+        secondContainer.StartAsync(Arg.Any<CancellationToken>()).Returns(Task.FromException(partialStartup));
+        var partialFailure = await Assert.That(async () => await SecurityInfrastructureFixture.StartObservedContainerAsync(
+            secondContainer, second, deadline.Token)).Throws<InvalidOperationException>();
+        await Assert.That(ReferenceEquals(partialFailure, partialStartup)).IsTrue();
+        foreach (var expected in new[] { (first, firstImage, firstId), (second, secondImage, secondId) })
+        {
+            string prefix = Path.Combine(files.Root, $"api-container-keycloak-{expected.Item1.CreationId}");
+            byte[] declaration = await File.ReadAllBytesAsync(prefix + "-declaration.json", deadline.Token);
+            using var declared = JsonDocument.Parse(declaration);
+            using var created = JsonDocument.Parse(await File.ReadAllBytesAsync(prefix + "-created-" + expected.Item3 + ".json", deadline.Token));
+            var selected = declared.RootElement;
+            var observed = created.RootElement;
+            string digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(declaration)).ToLowerInvariant();
+            await Assert.That(selected.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal)
+                .SequenceEqual(new[] { "CreationId", "CreatorPid", "ImageReference", "Resource", "RunId", "Schema" })
+                && observed.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal)
+                .SequenceEqual(new[] { "ContainerId", "CreationId", "CreatorPid", "DeclarationSha256", "ImageReference", "Resource", "RunId", "Schema" })
+                && selected.GetProperty("Schema").GetInt32() == 1 && observed.GetProperty("Schema").GetInt32() == 1
+                && selected.GetProperty("Resource").GetString() == "keycloak"
+                && observed.GetProperty("Resource").GetString() == "keycloak"
+                && selected.GetProperty("ImageReference").GetString() == expected.Item2
+                && selected.GetProperty("CreationId").GetString() == expected.Item1.CreationId
+                && selected.GetProperty("RunId").GetString() == files.RunId
+                && selected.GetProperty("CreatorPid").GetInt32() == Environment.ProcessId
+                && observed.GetProperty("ContainerId").GetString() == expected.Item3
+                && observed.GetProperty("ImageReference").GetString() == expected.Item2
+                && observed.GetProperty("CreationId").GetString() == expected.Item1.CreationId
+                && observed.GetProperty("DeclarationSha256").GetString() == digest).IsTrue();
+        }
+        var primary = new InvalidOperationException("test_creation_start_primary");
+        firstContainer.StartAsync(Arg.Any<CancellationToken>()).Returns(Task.FromException(primary));
+        var failure = await Assert.That(async () => await SecurityInfrastructureFixture.StartObservedContainerAsync(
+            firstContainer, first, deadline.Token)).Throws<AggregateException>();
+        await Assert.That(failure!.InnerExceptions.Any(error => ReferenceEquals(error, primary))
+            && failure.InnerExceptions.Any(error => error.Message == "test_creation_identity_duplicate")).IsTrue();
+        string[] records = Directory.GetFiles(files.Root, "api-container-*.json");
+        bool privateModes = true;
+        foreach (string path in records)
+            privateModes &= File.GetUnixFileMode(path) == (UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        await Assert.That(records.Length == 4 && privateModes && HeldRecordCount() == 4).IsTrue();
+        foreach (var owned in new (IContainer Container, IAsyncDisposable Fixture, int HeldBefore)[]
+        {
+            (firstContainer, new KeycloakContainerFixture(firstContainer, first), 4),
+            (secondContainer, new CerbosContainerFixture(secondContainer, second), 2)
+        })
+        {
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            bool heldDuringContainerDisposal = false;
+            bool containerDisposalFails = true;
+            var cleanup = new IOException("test_creation_container_cleanup");
+            owned.Container.ReturnsForAll<ValueTask>(_ => containerDisposalFails
+                ? new ValueTask(FailAfterReleaseAsync()) : ValueTask.CompletedTask);
+            Task? firstDisposal = null;
+            Task? secondDisposal = null;
+            Exception?[] outcomes = [];
+            try
+            {
+                firstDisposal = owned.Fixture.DisposeAsync().AsTask();
+                await entered.Task.WaitAsync(deadline.Token);
+                secondDisposal = owned.Fixture.DisposeAsync().AsTask();
+                await Assert.That(!firstDisposal.IsCompleted && !secondDisposal.IsCompleted
+                    && heldDuringContainerDisposal && HeldRecordCount() == owned.HeldBefore).IsTrue();
+            }
+            finally
+            {
+                containerDisposalFails = false;
+                release.TrySetResult();
+                outcomes = await Task.WhenAll(CaptureFailureAsync(firstDisposal), CaptureFailureAsync(secondDisposal));
+            }
+            await Assert.That(outcomes.All(error => ReferenceEquals(error, cleanup))
+                && HeldRecordCount() == owned.HeldBefore - 2).IsTrue();
+
+            async Task FailAfterReleaseAsync()
+            {
+                heldDuringContainerDisposal = HeldRecordCount() == owned.HeldBefore;
+                entered.TrySetResult();
+                await release.Task.WaitAsync(deadline.Token);
+                throw cleanup;
+            }
+
+            static async Task<Exception?> CaptureFailureAsync(Task? disposal)
+            {
+                if (disposal is null) return null;
+                try { await disposal; return null; }
+                catch (Exception exception) { return exception; }
+            }
+        }
+        await Assert.That(HeldRecordCount() == 0 && records.All(File.Exists)).IsTrue();
+
+        int HeldRecordCount()
+        {
+            string[] descriptors = Directory.EnumerateFileSystemEntries("/proc/self/fd").Take(4097).ToArray();
+            if (descriptors.Length > 4096) throw new InvalidOperationException("test_creation_descriptor_limit");
+            int count = 0;
+            foreach (string descriptor in descriptors)
+            {
+                try
+                {
+                    string? target = File.ResolveLinkTarget(descriptor, returnFinalTarget: true)?.FullName;
+                    if (target is not null && records.Contains(target, StringComparer.Ordinal)) count++;
+                }
+                catch (IOException) { /* Unrelated descriptors may close during the bounded self-only scan. */ }
+            }
+            return count;
+        }
     }
 
     private sealed class FailureAfterFileDisposal(string path, Exception? failure) : IAsyncDisposable, IDisposable

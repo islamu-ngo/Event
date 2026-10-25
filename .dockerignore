@@ -45,3 +45,7 @@ README.md
 !.git/config
 !.git/packed-refs
 !.git/refs/heads/**
+
+# Keep the verified local feed, metadata and notices in every Docker build context.
+!vendor/secretkit/
+!vendor/secretkit/**

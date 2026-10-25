@@ -8,6 +8,10 @@ description: Select, bind, rotate, and recover secrets through fail-closed autho
 
 Secrets are external authority bindings, not application configuration values to copy between repositories or plaintext files.
 
+The [local SecretKit package bundle](secretkit-local-packages.md) is available
+for the upcoming secrets refactor. Vendoring the packages does not change the
+authorities or runtime behavior described here.
+
 ---
 
 ## Approved Secret Authorities

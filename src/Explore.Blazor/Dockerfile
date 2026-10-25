@@ -14,6 +14,8 @@ WORKDIR /src
 
 # Copy restore inputs and project graph first for deterministic locked restore caching
 COPY ["global.json", "Directory.Build.props", "Directory.Packages.props", "dotnet-tools.json", "./"]
+COPY ["NuGet.Config", "./"]
+COPY ["vendor/secretkit/", "vendor/secretkit/"]
 COPY ["eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets", "eng/tools/Explore.GeneratedContracts/"]
 COPY ["src/Explore.Blazor/Explore.Blazor.csproj", "src/Explore.Blazor/packages.lock.json", "src/Explore.Blazor/"]
 COPY ["src/Explore.Blazor.Client/Explore.Blazor.Client.csproj", "src/Explore.Blazor.Client/packages.lock.json", "src/Explore.Blazor.Client/"]
@@ -43,6 +45,7 @@ WORKDIR /app
 
 # Copy published application
 COPY --from=publish /app/publish .
+COPY --from=build /src/vendor/secretkit /app/vendor/secretkit
 
 # Secret management is handled by the application via AddSecretManagement()
 # Configure via environment variables:

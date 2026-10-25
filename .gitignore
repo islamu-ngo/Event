@@ -109,6 +109,8 @@ dlldata.c
 *.snupkg
 # Whitelist local test feed package dependencies
 !eng/release/dependencies/terminal-gui/feed/*.nupkg
+# Verified repository-owned SecretKit runtime bundle
+!vendor/secretkit/feed/*.nupkg
 
 # NuGet package restore folder
 **/[Pp]ackages/*

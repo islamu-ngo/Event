@@ -856,6 +856,18 @@ test-runner output capture. Its absence does not prove where execution stopped.
 This evidence path does not change test selection, assertions, permissions or
 job time limits.
 
+### Native security job execution budgets
+
+`Build & Test` and `Security Integration Tests` have a maintainer-approved
+120-minute job limit. Retained setup-fixture checkpoints showed repeated native
+reset and seed work taking 138–141 seconds per case, so the previous 45-minute
+limit cancelled execution before the complete security cohort could finish.
+The larger budget changes neither test selection nor minimum counts, assertions,
+required-check names, permissions or native database guards. A timeout still fails
+the check; a longer limit is not evidence that tests passed. Use the retained
+progress file and completed test results to evaluate fixture improvements rather
+than treating cancellation as a successful security run.
+
 For manual releases, generate the durable release evidence manifest after downloading retained CI/CD artifacts:
 
 ```bash

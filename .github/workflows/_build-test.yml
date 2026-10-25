@@ -58,7 +58,7 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     outputs:
       coverage-ready: ${{ steps.coverage_reports.outputs.ready }}
     env:

@@ -734,6 +734,7 @@ public static class InfrastructureServicesRegistration
             () => provider.GetRequiredService<IHumanActionCommitFinalizer>(),
             () => provider.GetRequiredService<Explore.Application.Authorization.AuthorizationResourceContextResolver>(),
             () => provider.GetRequiredService<Explore.Application.Contracts.Persistence.ISerializableAttemptOwner>(),
+            () => provider.GetRequiredService<IHumanSecuritySourceGate>(),
             () => provider.GetRequiredService<IEventDiscoveryEnrollmentGate>(),
             () => provider.GetRequiredService<ISettingMutationLock>(),
             () => provider.GetRequiredService<IHumanTenantCreationGraphWriter>()));

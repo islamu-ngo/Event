@@ -261,6 +261,13 @@ administrator membership use that linked identity. An unlinked provider account
 cannot substitute a matching-looking GUID or email address. This correction adds
 no permissions, account links, configuration settings or database migration.
 
+Tenant creation retains the original caller's security-source protection before
+discovery enrollment and through transaction completion. Failed enrollment
+acquisition releases that protection without creating a tenant. This fixes
+missing-custody failures; it does not bypass authorization or require a new
+permission, configuration setting or database migration. Remote verification is
+still required before treating the correction as deployment-ready.
+
 Creating a managed-tenant or Local account does not collect a birth date. Its new
 private PII row starts without a birth date or collection receipt, at revision
 zero. The account-creation storage permissions include the existing mapped fields

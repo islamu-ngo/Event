@@ -11,7 +11,9 @@ using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
+using Explore.Persistence.Seed;
 using Explore.Persistence.Services;
+using Explore.Secrets.Database;
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +26,399 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 public sealed class EventDiscoveryDisclosureMutationTests
 {
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(15);
+
+    [Test]
+    public async Task Privacy_observation_erases_exact_two_tenant_homes_including_deleted_room()
+    {
+        await using var store = await Store.CreateAsync();
+        PrivacySeed data = await store.SeedPrivacyAsync();
+        using var deadline = new CancellationTokenSource(Deadline);
+        var token = deadline.Token;
+        long firstEpoch;
+        long secondEpoch;
+        await using (var before = store.Open())
+        {
+            firstEpoch = await EpochAsync(before, store.TenantId);
+            secondEpoch = await EpochAsync(before, store.OtherTenantId);
+            await AssertPrivacyIntactAsync(before, data, token);
+        }
+        await using (var writer = await store.OpenGlobalAsync())
+        await using (var humanGate = new HumanSecuritySourceGate(writer))
+        await using (var human = await humanGate.AcquireAsync(token))
+        await using (var discoveryGate = new EventDiscoveryEnrollmentGate(writer))
+        await using (var discovery = await discoveryGate.AcquireAsync(token))
+        {
+            var repository = new UserLocationPrivacyErasureRepository(writer);
+            await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>
+            {
+                await repository.FenceSubjectAsync(data.Subject, ct);
+                var homes = await repository.GetOwnedPrivateHomesAsync(data.Subject, ct);
+                await Assert.That(homes.Select(home => home.Id)).IsEquivalentTo([data.FirstHome, data.SecondHome]);
+                foreach (Location home in homes)
+                    home.EraseOwnedPii(DateTime.UtcNow, LocationPrivacyErasureReasonEnum.AccountDeletion);
+                await repository.SaveChangesAsync([], ct);
+                return true;
+            }, token);
+            humanGate.RequireCurrent();
+            discoveryGate.RequireCurrent();
+            await Assert.That(writer.TenantFilterTenantId).IsNull();
+            await Assert.That(writer.IsTenantFilterBypassed).IsFalse();
+        }
+        await using var after = store.Open();
+        Location[] homesAfter = await after.Locations.IgnoreQueryFilters().AsNoTracking().Include(home => home.Pii)
+            .Where(home => home.Id == data.FirstHome || home.Id == data.SecondHome).ToArrayAsync(token);
+        await Assert.That(homesAfter.Length == 2 && homesAfter.All(home => home.OwnerUserId is null && home.Pii is null
+            && home.LocationPrivacyStateId == (int)LocationPrivacyStateEnum.Erased)).IsTrue();
+        var deletedRoom = await after.LocationRooms.IgnoreQueryFilters().AsNoTracking().SingleAsync(room => room.Id == data.DeletedRoom, token);
+        await Assert.That(deletedRoom.IsDeleted && deletedRoom.Description is null
+            && deletedRoom.Name == $"privacy-erased-{deletedRoom.Id:N}").IsTrue();
+        await AssertUnrelatedHomeAsync(after, data, token);
+        await Assert.That(await EpochAsync(after, store.TenantId)).IsEqualTo(firstEpoch + 1);
+        await Assert.That(await EpochAsync(after, store.OtherTenantId)).IsEqualTo(secondEpoch + 1);
+    }
+
+    [Test]
+    [Arguments("tenant")]
+    [Arguments("unproved")]
+    [Arguments("foreign")]
+    [Arguments("public")]
+    [Arguments("missing")]
+    [Arguments("no_discovery")]
+    public async Task Privacy_observation_refuses_unproved_or_foreign_parent(string attack)
+    {
+        await using var store = await Store.CreateAsync();
+        PrivacySeed data = await store.SeedPrivacyAsync();
+        using var deadline = new CancellationTokenSource(Deadline);
+        var token = deadline.Token;
+        await using var writer = attack == "tenant" ? store.Open() : await store.OpenGlobalAsync();
+        await using var humanGate = new HumanSecuritySourceGate(writer);
+        await using var human = await humanGate.AcquireAsync(token);
+        await using var discoveryGate = new EventDiscoveryEnrollmentGate(writer);
+        await using IAsyncDisposable? discovery = attack == "no_discovery" ? null : await discoveryGate.AcquireAsync(token);
+        bool attempted = false;
+        var repository = new UserLocationPrivacyErasureRepository(writer);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>
+            {
+                if (attack is "public" or "missing" or "no_discovery")
+                {
+                    if (attack != "no_discovery")
+                        await repository.FenceSubjectAsync(data.Subject, ct);
+                    attempted = true;
+                    _ = await writer.DisclosureMutations.CreatePrivateHomeErasureObservationAsync(data.Subject,
+                        [attack == "missing" ? Guid.CreateVersion7() : attack == "public" ? data.PublicLocation : data.FirstHome], ct);
+                }
+                else
+                {
+                    if (attack == "foreign")
+                    {
+                        await repository.FenceSubjectAsync(data.Subject, ct);
+                        _ = await repository.GetOwnedPrivateHomesAsync(data.Subject, ct);
+                    }
+                    Guid target = attack == "foreign" ? data.UnrelatedHome : data.SecondHome;
+                    Location home = await writer.Locations.IgnoreQueryFilters().Include(value => value.Pii)
+                        .SingleAsync(value => value.Id == target, ct);
+                    home.EraseOwnedPii(DateTime.UtcNow, LocationPrivacyErasureReasonEnum.AccountDeletion);
+                    attempted = true;
+                    await repository.SaveChangesAsync([], ct);
+                }
+                return true;
+            }, token));
+        await Assert.That(attempted).IsTrue();
+        await Assert.That(failure!.Message).IsEqualTo(attack switch
+        {
+            "tenant" => "tracked_tenant_authority_mismatch",
+            "no_discovery" => "discovery_enrollment_gate_missing",
+            _ => "discovery_disclosure_owner_unavailable"
+        });
+        await using var observer = store.Open();
+        await AssertPrivacyIntactAsync(observer, data, token);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Privacy_observation_cannot_cross_transaction_or_reset(bool reset)
+    {
+        await using var store = await Store.CreateAsync();
+        PrivacySeed data = await store.SeedPrivacyAsync();
+        using var deadline = new CancellationTokenSource(Deadline);
+        var token = deadline.Token;
+        await using var writer = await store.OpenGlobalAsync();
+        await using var humanGate = new HumanSecuritySourceGate(writer);
+        await using var human = await humanGate.AcquireAsync(token);
+        await using var discoveryGate = new EventDiscoveryEnrollmentGate(writer);
+        await using var discovery = await discoveryGate.AcquireAsync(token);
+        var repository = new UserLocationPrivacyErasureRepository(writer);
+        bool attempted = false;
+        if (!reset)
+            await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>
+            {
+                await repository.FenceSubjectAsync(data.Subject, ct);
+                _ = await repository.GetOwnedPrivateHomesAsync(data.Subject, ct);
+                return true;
+            }, token);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>
+            {
+                if (reset)
+                {
+                    await repository.FenceSubjectAsync(data.Subject, ct);
+                    _ = await repository.GetOwnedPrivateHomesAsync(data.Subject, ct);
+                    writer.ResetDisclosureMutations();
+                }
+                attempted = true;
+                await repository.SaveChangesAsync([], ct);
+                return true;
+            }, token));
+        await Assert.That(attempted).IsTrue();
+        await Assert.That(failure!.Message).IsEqualTo("privacy_erasure_disclosure_owner_invalid");
+        await using var observer = store.Open();
+        await AssertPrivacyIntactAsync(observer, data, token);
+    }
+
+    [Test]
+    public async Task Failed_privacy_save_consumes_observation_before_next_ordinary_save()
+    {
+        await using var store = await Store.CreateAsync();
+        PrivacySeed data = await store.SeedPrivacyAsync();
+        using var deadline = new CancellationTokenSource(Deadline);
+        var token = deadline.Token;
+        await using var writer = await store.OpenGlobalAsync();
+        await using var humanGate = new HumanSecuritySourceGate(writer);
+        await using var human = await humanGate.AcquireAsync(token);
+        await using var discoveryGate = new EventDiscoveryEnrollmentGate(writer);
+        await using var discovery = await discoveryGate.AcquireAsync(token);
+        var repository = new UserLocationPrivacyErasureRepository(writer);
+        foreach (bool acquireObservation in new[] { true, false })
+        {
+            bool attempted = false;
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>
+                {
+                    if (acquireObservation)
+                    {
+                        await repository.FenceSubjectAsync(data.Subject, ct);
+                        _ = await repository.GetOwnedPrivateHomesAsync(data.Subject, ct);
+                    }
+                    Guid target = acquireObservation ? data.UnrelatedHome : data.FirstHome;
+                    Location home = await writer.Locations.IgnoreQueryFilters().Include(value => value.Pii)
+                        .SingleAsync(value => value.Id == target, ct);
+                    home.EraseOwnedPii(DateTime.UtcNow, LocationPrivacyErasureReasonEnum.AccountDeletion);
+                    attempted = true;
+                    await repository.SaveChangesAsync([], ct);
+                    return true;
+                }, token));
+            await Assert.That(attempted).IsTrue();
+            await Assert.That(failure!.Message).IsEqualTo("discovery_disclosure_owner_unavailable");
+            await using var observer = store.Open();
+            await AssertPrivacyIntactAsync(observer, data, token);
+        }
+    }
+
+    [Test]
+    public async Task Issued_privacy_observation_refuses_lost_discovery_custody()
+    {
+        await using var store = await Store.CreateAsync();
+        PrivacySeed data = await store.SeedPrivacyAsync();
+        using var deadline = new CancellationTokenSource(Deadline);
+        var token = deadline.Token;
+        await using var writer = await store.OpenGlobalAsync();
+        await using var humanGate = new HumanSecuritySourceGate(writer);
+        await using var human = await humanGate.AcquireAsync(token);
+        await using var discoveryGate = new EventDiscoveryEnrollmentGate(writer);
+        await using var discovery = await discoveryGate.AcquireAsync(token);
+        var repository = new UserLocationPrivacyErasureRepository(writer);
+        bool issued = false;
+        bool released = false;
+        bool attempted = false;
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>
+            {
+                await repository.FenceSubjectAsync(data.Subject, ct);
+                var homes = await repository.GetOwnedPrivateHomesAsync(data.Subject, ct);
+                await Assert.That(homes.Count).IsEqualTo(2);
+                IDbContextTransaction transaction = writer.Database.CurrentTransaction!;
+                issued = true;
+                foreach (Location home in homes)
+                    home.EraseOwnedPii(DateTime.UtcNow, LocationPrivacyErasureReasonEnum.AccountDeletion);
+                await discovery.DisposeAsync();
+                released = true;
+                await Assert.That(ReferenceEquals(transaction, writer.Database.CurrentTransaction)
+                    && writer.Database.GetDbConnection().State == System.Data.ConnectionState.Open).IsTrue();
+                attempted = true;
+                await repository.SaveChangesAsync([], ct);
+                return true;
+            }, token));
+        await Assert.That(issued && released && attempted).IsTrue();
+        await Assert.That(failure!.Message).IsEqualTo("discovery_enrollment_gate_missing");
+        await using var observer = store.Open();
+        await AssertPrivacyIntactAsync(observer, data, token);
+    }
+
+    [Test]
+    public async Task Issued_privacy_observation_cannot_be_used_by_another_native_context()
+    {
+        await using var originalStore = await Store.CreateAsync();
+        await using var otherStore = await Store.CreateAsync();
+        PrivacySeed originalData = await originalStore.SeedPrivacyAsync();
+        PrivacySeed otherData = await otherStore.SeedPrivacyAsync();
+        using var deadline = new CancellationTokenSource(Deadline);
+        var token = deadline.Token;
+        await using var original = await originalStore.OpenGlobalAsync();
+        await using var originalHumanGate = new HumanSecuritySourceGate(original);
+        await using var originalHuman = await originalHumanGate.AcquireAsync(token);
+        await using var originalDiscoveryGate = new EventDiscoveryEnrollmentGate(original);
+        await using var originalDiscovery = await originalDiscoveryGate.AcquireAsync(token);
+        await using var other = await otherStore.OpenGlobalAsync();
+        bool issued = false;
+        bool attempted = false;
+        await new EfCoreUnitOfWork(original).ExecuteSerializableAsync(async ct =>
+        {
+            await new UserLocationPrivacyErasureRepository(original).FenceSubjectAsync(originalData.Subject, ct);
+            var observation = await original.DisclosureMutations.CreatePrivateHomeErasureObservationAsync(
+                originalData.Subject, [originalData.FirstHome, originalData.SecondHome], ct);
+            observation.RequireCurrent();
+            issued = true;
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            {
+                attempted = true;
+                using var purpose = other.DisclosureMutations.BeginPrivateHomeErasureObservation(observation);
+                return Task.CompletedTask;
+            });
+            await Assert.That(failure!.Message).IsEqualTo("privacy_erasure_disclosure_observation_conflict");
+            observation.RequireCurrent();
+            using var retainedPurpose = original.DisclosureMutations.BeginPrivateHomeErasureObservation(observation);
+            return true;
+        }, token);
+        await Assert.That(issued && attempted).IsTrue();
+        await using var originalObserver = originalStore.Open();
+        await using var otherObserver = otherStore.Open();
+        await AssertPrivacyIntactAsync(originalObserver, originalData, token);
+        await AssertPrivacyIntactAsync(otherObserver, otherData, token);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Privacy_profile_hard_delete_reuses_tracking_and_rolls_back_before_retry(bool deletedUser)
+    {
+        await using var store = await Store.CreateAsync();
+        PrivacySeed data = await store.SeedPrivacyAsync();
+        using var deadline = new CancellationTokenSource(Deadline);
+        var token = deadline.Token;
+        await using var writer = await store.OpenGlobalAsync();
+        await using var humanGate = new HumanSecuritySourceGate(writer);
+        await using var human = await humanGate.AcquireAsync(token);
+        await using var discoveryGate = new EventDiscoveryEnrollmentGate(writer);
+        await using var discovery = await discoveryGate.AcquireAsync(token);
+        if (deletedUser)
+            await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>
+            {
+                User subject = await writer.Users.IncludeDeleted().Include(user => user.Pii)
+                    .SingleAsync(user => user.Id == data.Subject, ct);
+                subject.IsDeleted = true;
+                subject.DeletedAt = DateTime.UtcNow;
+                await writer.SaveChangesAsync(ct);
+                return true;
+            }, token);
+
+        async Task<UserPii[]> ReadProfilesAsync()
+        {
+            await using var observer = store.Open();
+            return await observer.UserPii.IncludeDeleted().AsNoTracking()
+                .Where(profile => profile.UserId == data.Subject || profile.UserId == data.Unrelated)
+                .ToArrayAsync(token);
+        }
+
+        UserPii[] before = await ReadProfilesAsync();
+        await Assert.That(before.Length == 2 && before.All(profile => !string.IsNullOrWhiteSpace(profile.Email)
+            && !string.IsNullOrWhiteSpace(profile.FirstName) && !string.IsNullOrWhiteSpace(profile.LastName))).IsTrue();
+        await Assert.That(await writer.LocalIdentityUsers.AnyAsync(token)).IsFalse();
+        User originalPrincipal;
+        await using (var observer = store.Open())
+            originalPrincipal = await observer.Users.IncludeDeleted().IgnoreAutoIncludes().AsNoTracking()
+                .SingleAsync(user => user.Id == data.Subject, token);
+        var repository = new UserLocationPrivacyErasureRepository(writer);
+        bool reachedAfterSave = false;
+        const string faultCode = "privacy_profile_saved_fault";
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync<bool>(async ct =>
+            {
+                User tracked = await writer.Users.IncludeDeleted().AsTracking().Include(user => user.Pii)
+                    .SingleAsync(user => user.Id == data.Subject, ct);
+                await Assert.That(tracked.Pii is not null && tracked.Pii.UserId == data.Subject).IsTrue();
+                await repository.FenceSubjectAsync(data.Subject, ct);
+                IDbContextTransaction transaction = writer.Database.CurrentTransaction!;
+                await repository.EraseUserPiiAsync(data.Subject, ct);
+                await Assert.That(ReferenceEquals(transaction, writer.Database.CurrentTransaction)).IsTrue();
+                await Assert.That(await writer.UserPii.IncludeDeleted()
+                    .AnyAsync(profile => profile.UserId == data.Subject, ct)).IsFalse();
+                User? visible = await new UserRepository(writer).GetLocalIdentityBindingAsync(data.Subject, ct);
+                await Assert.That((visible is null) == deletedUser).IsTrue();
+                reachedAfterSave = true;
+                throw new InvalidOperationException(faultCode);
+            }, token));
+        await Assert.That(reachedAfterSave).IsTrue();
+        await Assert.That(failure!.Message).IsEqualTo(faultCode);
+        UserPii[] rolledBack = await ReadProfilesAsync();
+        await Assert.That(rolledBack.Length == before.Length && before.All(original => rolledBack.Any(profile =>
+            profile.UserId == original.UserId && profile.Email == original.Email
+            && profile.FirstName == original.FirstName && profile.LastName == original.LastName))).IsTrue();
+        await using (var observer = store.Open())
+        {
+            User restored = await observer.Users.IncludeDeleted().IgnoreAutoIncludes().AsNoTracking()
+                .SingleAsync(user => user.Id == data.Subject, token);
+            await Assert.That(restored.IsDeleted == originalPrincipal.IsDeleted
+                && restored.DeletedAt == originalPrincipal.DeletedAt && restored.DeletedBy == originalPrincipal.DeletedBy).IsTrue();
+        }
+
+        await new EfCoreUnitOfWork(writer).ExecuteSerializableAsync(async ct =>
+        {
+            User tracked = await writer.Users.IncludeDeleted().AsTracking().Include(user => user.Pii)
+                .SingleAsync(user => user.Id == data.Subject, ct);
+            await Assert.That(tracked.Pii is not null && tracked.Pii.UserId == data.Subject).IsTrue();
+            await repository.FenceSubjectAsync(data.Subject, ct);
+            await repository.EraseUserPiiAsync(data.Subject, ct);
+            User? visible = await new UserRepository(writer).GetLocalIdentityBindingAsync(data.Subject, ct);
+            await Assert.That((visible is null) == deletedUser).IsTrue();
+            return true;
+        }, token);
+        UserPii[] erased = await ReadProfilesAsync();
+        UserPii unrelated = before.Single(profile => profile.UserId == data.Unrelated);
+        await Assert.That(erased.Length == 1 && erased[0].UserId == unrelated.UserId
+            && erased[0].Email == unrelated.Email && erased[0].FirstName == unrelated.FirstName
+            && erased[0].LastName == unrelated.LastName).IsTrue();
+        await using var after = store.Open();
+        User principalAfter = await after.Users.IncludeDeleted().IgnoreAutoIncludes().AsNoTracking()
+            .SingleAsync(user => user.Id == data.Subject, token);
+        await Assert.That(principalAfter.IsDeleted == originalPrincipal.IsDeleted
+            && principalAfter.DeletedAt == originalPrincipal.DeletedAt && principalAfter.DeletedBy == originalPrincipal.DeletedBy).IsTrue();
+        await Assert.That((await after.Users.IgnoreAutoIncludes().AsNoTracking()
+            .SingleAsync(user => user.Id == data.Unrelated, token)).IsDeleted).IsFalse();
+    }
+
+    private sealed record PrivacySeed(Guid Subject, Guid Unrelated, Guid FirstHome, Guid SecondHome,
+        Guid UnrelatedHome, Guid PublicLocation, Guid DeletedRoom);
+
+    private static async Task AssertPrivacyIntactAsync(ExploreDbContext observer, PrivacySeed data, CancellationToken token)
+    {
+        var homes = await observer.Locations.IgnoreQueryFilters().AsNoTracking().Include(home => home.Pii)
+            .Where(home => home.Id == data.FirstHome || home.Id == data.SecondHome).ToArrayAsync(token);
+        await Assert.That(homes.Length == 2 && homes.All(home => home.OwnerUserId == data.Subject && home.Pii is not null
+            && home.LocationPrivacyStateId == (int)LocationPrivacyStateEnum.Active)).IsTrue();
+        var room = await observer.LocationRooms.IgnoreQueryFilters().AsNoTracking().SingleAsync(value => value.Id == data.DeletedRoom, token);
+        await Assert.That(room.IsDeleted && room.Name == "Owned deleted room" && room.Description is not null).IsTrue();
+        await AssertUnrelatedHomeAsync(observer, data, token);
+    }
+
+    private static async Task AssertUnrelatedHomeAsync(ExploreDbContext observer, PrivacySeed data, CancellationToken token)
+    {
+        var home = await observer.Locations.IgnoreQueryFilters().AsNoTracking().Include(value => value.Pii)
+            .SingleAsync(value => value.Id == data.UnrelatedHome, token);
+        await Assert.That(home.OwnerUserId == data.Unrelated && home.Pii is not null
+            && home.LocationPrivacyStateId == (int)LocationPrivacyStateEnum.Active).IsTrue();
+    }
 
     [Test]
     public async Task Missing_canonical_revision_is_unavailable_and_never_recreated_by_acquire_current()
@@ -782,6 +1177,47 @@ public sealed class EventDiscoveryDisclosureMutationTests
         private DbContextOptions<ExploreDbContext> _options = null!;
         public Guid TenantId { get; } = Guid.CreateVersion7();
         public Guid OtherTenantId { get; } = Guid.CreateVersion7();
+
+        public Task<ExploreDbContext> OpenGlobalAsync() => new GlobalExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Global, Provider = PrimaryDatabaseProvider.Sqlite, Database = _path
+        }).CreateDbContextAsync();
+
+        public async Task<PrivacySeed> SeedPrivacyAsync()
+        {
+            await using var seed = await OpenGlobalAsync();
+            await using var humanGate = new HumanSecuritySourceGate(seed);
+            await using var human = await humanGate.AcquireAsync();
+            await using var discoveryGate = new EventDiscoveryEnrollmentGate(seed);
+            await using var discovery = await discoveryGate.AcquireAsync();
+            await LookupTableSeeder.SeedLocationPrivacyLookupsAsync(seed, CancellationToken.None);
+            await LookupTableSeeder.SeedLocationAddressGovernanceLookupsAsync(seed, CancellationToken.None);
+            var subject = new User { Id = Guid.CreateVersion7(), CreatedAt = DateTime.UtcNow,
+                Pii = new UserPii { Email = $"subject-{Guid.CreateVersion7():N}@example.test", FirstName = "Synthetic", LastName = "Subject" } };
+            var unrelated = new User { Id = Guid.CreateVersion7(), CreatedAt = DateTime.UtcNow,
+                Pii = new UserPii { Email = $"unrelated-{Guid.CreateVersion7():N}@example.test", FirstName = "Synthetic", LastName = "Unrelated" } };
+            seed.AddRange(subject, unrelated);
+            await seed.SaveChangesAsync();
+            Location Home(Guid tenant, Guid owner)
+            {
+                var home = new Location { Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!,
+                    FullName = "Synthetic private home", Country = "BE", City = "Brussels", ConcurrencyStamp = Guid.CreateVersion7() };
+                home.ClassifyAsPrivateHome(owner);
+                home.SetManualAddress("Synthetic address", "1000");
+                return home;
+            }
+            var first = Home(TenantId, subject.Id);
+            var second = Home(OtherTenantId, subject.Id);
+            var other = Home(TenantId, unrelated.Id);
+            var venue = new Location { Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!,
+                FullName = "Synthetic public venue", Country = "BE", City = "Brussels" };
+            venue.ClassifyAs(LocationKindEnum.CommercialVenue);
+            var deletedRoom = new LocationRoom { Id = Guid.CreateVersion7(), TenantId = OtherTenantId, Tenant = null!,
+                Location = second, LocationId = second.Id, Name = "Owned deleted room", Description = "Synthetic private description", IsDeleted = true };
+            seed.AddRange(first, second, other, venue, deletedRoom);
+            await seed.SaveChangesAsync();
+            return new(subject.Id, unrelated.Id, first.Id, second.Id, other.Id, venue.Id, deletedRoom.Id);
+        }
 
         public ExploreDbContext Open(params IInterceptor[] interceptors)
         {

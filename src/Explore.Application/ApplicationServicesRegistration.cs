@@ -329,7 +329,8 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IEventLocationReviewQueueMonitor, EventLocationReviewQueueMonitor>();
         services.AddScoped<IFanoutAttendeeLocationAuthorizationService, FanoutAttendeeLocationAuthorizationService>();
         services.AddScoped<PrivacyErasureApplier>();
-        services.AddScoped<IPrivacyErasureService, RetainedAuthorityPrivacyErasureWorkflow>();
+        services.AddScoped<RetainedAuthorityPrivacyErasureWorkflow>();
+        services.AddScoped<IPrivacyErasureService, PrivacyErasureService>();
         services.AddSingleton<EventLocationDisclosureEvaluator>();
         services.AddScoped<PublicEventLocationDisclosureEvaluator>();
         services.AddScoped<AtprotoEventPublicationSnapshotFactory>();

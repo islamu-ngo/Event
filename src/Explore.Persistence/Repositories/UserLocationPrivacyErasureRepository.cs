@@ -3,6 +3,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -10,11 +11,36 @@ namespace Explore.Persistence.Repositories;
 public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbContext)
     : IUserLocationPrivacyErasureRepository, IUserPrivacyErasureRepository
 {
+    private EventDiscoveryDisclosureMutationScope.PrivateHomeErasureObservation? _homeObservation;
+
     public ISubjectPrivacyErasureSettlement? NativeSettlement { get; } =
         SubjectPrivacyErasureSettlementSelection.Create(dbContext);
 
     public Task FenceSubjectAsync(Guid subjectId, CancellationToken cancellationToken) =>
         dbContext.DisclosureMutations.EnlistUserAsync(subjectId, cancellationToken);
+
+    public async Task EraseUserPiiAsync(Guid subjectId, CancellationToken cancellationToken)
+    {
+        RequireId(subjectId, nameof(subjectId));
+        dbContext.DisclosureMutations.RequireOriginalPrivacyErasureTransaction(subjectId);
+        UserPii? profile = await dbContext.UserPii.IncludeDeleted().AsTracking()
+            .SingleOrDefaultAsync(value => value.UserId == subjectId, cancellationToken);
+        dbContext.DisclosureMutations.RequireOriginalPrivacyErasureTransaction(subjectId);
+        if (profile is null)
+            return;
+        dbContext.UserPii.Remove(profile);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.DisclosureMutations.RequireOriginalPrivacyErasureTransaction(subjectId);
+    }
+
+    public async Task EraseAuthenticationTokensAsync(Guid subjectId, CancellationToken cancellationToken)
+    {
+        RequireId(subjectId, nameof(subjectId));
+        dbContext.DisclosureMutations.RequireOriginalPrivacyErasureTransaction(subjectId);
+        await dbContext.UserAuthenticationTokens.IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
+            .Where(token => token.UserId == subjectId).ExecuteDeleteAsync(cancellationToken);
+        dbContext.DisclosureMutations.RequireOriginalPrivacyErasureTransaction(subjectId);
+    }
 
     public async Task RetainCorrectionReceiptsAsync(
         IReadOnlyCollection<LocationPrivacyCorrectionReceipt> receipts, CancellationToken cancellationToken)
@@ -777,33 +803,45 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
         CancellationToken cancellationToken)
     {
         RequireId(ownerUserId, nameof(ownerUserId));
-        List<Location> homes = await dbContext.Locations
-            .IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
-            .Where(location => location.OwnerUserId == ownerUserId
-                && location.LocationKindId == (int)LocationKindEnum.PrivateHome)
-            .OrderBy(location => location.TenantId)
-            .ThenBy(location => location.Id)
-            .ToListAsync(cancellationToken);
-        if (homes.Count == 0)
+        _homeObservation?.Invalidate();
+        _homeObservation = null;
+        try
         {
+            List<Location> homes = await dbContext.Locations
+                .IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
+                .Where(location => location.OwnerUserId == ownerUserId
+                    && location.LocationKindId == (int)LocationKindEnum.PrivateHome)
+                .OrderBy(location => location.TenantId)
+                .ThenBy(location => location.Id)
+                .ToListAsync(cancellationToken);
+            if (NativeSettlement is null && dbContext.Database.CurrentTransaction is not null
+                && dbContext.TenantFilterTenantId is null && !dbContext.IsTenantFilterBypassed)
+                _homeObservation = await dbContext.DisclosureMutations.CreatePrivateHomeErasureObservationAsync(
+                    ownerUserId, homes.Select(home => home.Id).ToArray(), cancellationToken);
+            if (homes.Count == 0)
+                return homes;
+
+            Guid[] locationIds = homes.Select(home => home.Id).ToArray();
+            List<LocationRoom> rooms = await dbContext.LocationRooms
+                .IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
+                .IncludeDeleted()
+                .Where(room => locationIds.Contains(room.LocationId))
+                .OrderBy(room => room.LocationId)
+                .ThenBy(room => room.Id)
+                .ToListAsync(cancellationToken);
+            ILookup<Guid, LocationRoom> roomsByLocation = rooms.ToLookup(room => room.LocationId);
+            foreach (Location home in homes)
+                home.Rooms = roomsByLocation[home.Id].ToList();
+
+            _homeObservation?.RequireCurrent();
             return homes;
         }
-
-        Guid[] locationIds = homes.Select(home => home.Id).ToArray();
-        List<LocationRoom> rooms = await dbContext.LocationRooms
-            .IgnoreTenantFilter(TenantFilterBypassReasons.UserPrivacyErasure)
-            .IncludeDeleted()
-            .Where(room => locationIds.Contains(room.LocationId))
-            .OrderBy(room => room.LocationId)
-            .ThenBy(room => room.Id)
-            .ToListAsync(cancellationToken);
-        ILookup<Guid, LocationRoom> roomsByLocation = rooms.ToLookup(room => room.LocationId);
-        foreach (Location home in homes)
+        catch
         {
-            home.Rooms = roomsByLocation[home.Id].ToList();
+            _homeObservation?.Invalidate();
+            _homeObservation = null;
+            throw;
         }
-
-        return homes;
     }
 
     public async Task<IReadOnlyList<EventLocation>> GetEventLocationsAsync(
@@ -850,12 +888,23 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
         IReadOnlyCollection<EventLocationDisclosureAudit> audits,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(audits);
-        await dbContext.ExecuteDisclosureMutationAsync(async token =>
+        var observation = _homeObservation;
+        _homeObservation = null;
+        try
         {
-            dbContext.EventLocationDisclosureAudits.AddRange(audits);
-            await dbContext.SavePrivacyErasureChangesAsync(token);
-        }, cancellationToken);
+            ArgumentNullException.ThrowIfNull(audits);
+            using var purpose = observation is null ? null
+                : dbContext.DisclosureMutations.BeginPrivateHomeErasureObservation(observation);
+            await dbContext.ExecuteDisclosureMutationAsync(async token =>
+            {
+                dbContext.EventLocationDisclosureAudits.AddRange(audits);
+                await dbContext.SavePrivacyErasureChangesAsync(token);
+            }, cancellationToken);
+        }
+        finally
+        {
+            observation?.Invalidate();
+        }
     }
 
     private static void RequireId(Guid id, string parameterName)

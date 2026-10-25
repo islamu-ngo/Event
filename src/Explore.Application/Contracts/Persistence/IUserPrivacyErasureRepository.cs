@@ -16,6 +16,10 @@ public interface IUserPrivacyErasureRepository
         Guid subjectId,
         CancellationToken cancellationToken);
 
+    Task EraseUserPiiAsync(Guid subjectId, CancellationToken cancellationToken);
+
+    Task EraseAuthenticationTokensAsync(Guid subjectId, CancellationToken cancellationToken);
+
     Task EraseMembershipsAndPreferencesAsync(
         Guid subjectId,
         CancellationToken cancellationToken);

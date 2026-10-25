@@ -528,6 +528,23 @@ public sealed class SecurityExecutionEvidenceParentModelTests
         await Assert.That(result.CleanupSucceeded).IsTrue();
         await Assert.That(result.ObserverSettled).IsTrue();
         await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+        string cleanupRoot = Path.Combine(temporary, "api-cleanup-custody");
+        Directory.CreateDirectory(cleanupRoot);
+        string retainedDiagnostic = Path.Combine(cleanupRoot, "observation.json");
+        File.WriteAllText(retainedDiagnostic, "retained-observation");
+        byte[] originalDaemonIdentity = Encoding.UTF8.GetBytes("original-daemon");
+        bool resourceCleanupComplete = true;
+        try
+        {
+            SecurityExecutionEvidence.RequireSameApiDaemonIdentity(originalDaemonIdentity, Encoding.UTF8.GetBytes("replacement-daemon"));
+        }
+        catch (Exception)
+        { resourceCleanupComplete = false; }
+        await Assert.That(SecurityExecutionEvidence.TryRemoveOwnedChildTemporary(cleanupRoot, result, resourceCleanupComplete)).IsFalse();
+        await Assert.That(File.ReadAllText(retainedDiagnostic)).IsEqualTo("retained-observation");
+        SecurityExecutionEvidence.RequireSameApiDaemonIdentity(originalDaemonIdentity, originalDaemonIdentity.ToArray());
+        await Assert.That(SecurityExecutionEvidence.TryRemoveOwnedChildTemporary(cleanupRoot, result, true)).IsTrue();
+        await Assert.That(Directory.Exists(cleanupRoot)).IsFalse();
         await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(identity!,
             temporary, root, hint!, entry, candidate, CancellationToken.None)) is null).IsTrue();
 

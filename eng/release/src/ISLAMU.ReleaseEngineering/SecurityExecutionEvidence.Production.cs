@@ -366,18 +366,28 @@ public static partial class SecurityExecutionEvidence
         }
         finally
         {
-            try
-            {
-                if (process is { CleanupSucceeded: true, ObserverSettled: true } && resourceCleanupComplete && NoInputLinks(temporary))
-                {
-                    Directory.Delete(temporary, recursive: true);
-                    removed = !Directory.Exists(temporary);
-                }
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
-            { removed = false; }
+            removed = TryRemoveOwnedChildTemporary(temporary, process, resourceCleanupComplete);
         }
         return new(process ?? throw new OwnedExecutionFailure("native_process_missing"), report, evidence, owner, admitted, removed);
+    }
+
+    internal static bool TryRemoveOwnedChildTemporary(string temporary, OwnedNativeProcessResult? process,
+        bool resourceCleanupComplete)
+    {
+        try
+        {
+            if (process is not { CleanupSucceeded: true, ObserverSettled: true } || !resourceCleanupComplete || !NoInputLinks(temporary))
+                return false;
+            Directory.Delete(temporary, recursive: true);
+            return !Directory.Exists(temporary);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+        { return false; }
+    }
+
+    internal static void RequireSameApiDaemonIdentity(byte[] before, byte[] after)
+    {
+        if (!before.AsSpan().SequenceEqual(after)) throw new OwnedExecutionFailure("api_daemon_identity_changed");
     }
 
     internal static bool TryReadOwnedChildReport(string results, string filename, out byte[] report)
@@ -916,6 +926,7 @@ public static partial class SecurityExecutionEvidence
                 HashSet<string> finalIds = ReadAllContainerIds(final.RootElement, owner, requireOwnerAbsent: true);
                 cleanup = failures.Count == 0 && !finalIds.Overlaps(known.Keys) && !finalIds.Overlaps(seenOwnedIds);
                 after = await IdentityAsync(cleanupDeadline.Token).ConfigureAwait(false);
+                RequireSameApiDaemonIdentity(before, after);
                 HashSet<string> finalImages = await CachedImageIdsAsync(cleanupDeadline.Token).ConfigureAwait(false);
                 foreach (var image in images)
                     if (!finalImages.Contains(image.Value)

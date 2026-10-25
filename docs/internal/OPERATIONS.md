@@ -1052,6 +1052,8 @@ Do not treat a green lifecycle worker as live Google proof. Operators must still
 
 ## Local Startup Topology (Aspire)
 
+The Blazor and Standalone entry points own host cleanup explicitly: StartAsync and WaitForShutdownAsync run inside the primary failure collector, followed by independent application and selected-asset-lease disposal attempts. The asset lease stays live through application disposal. Private assurance records bind typed project and owning-build metadata to the actual host environment and explicitly selected runtime/endpoint manifest pair; these records do not establish live-process or served-input authority without the parent checks.
+
 ### Isolated Local-Agent Browser Authentication
 
 For the Development-only local-agent browser-authentication profile, use the

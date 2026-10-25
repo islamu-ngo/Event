@@ -51,4 +51,23 @@
     </ItemGroup>
   </Target>
 
+  <Target Name="DeclareAssuranceOwningBuild" BeforeTargets="GetAssemblyAttributes">
+    <PropertyGroup>
+      <_AssuranceSourceRoot>$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildProjectDirectory)', 'Directory.Packages.props'))</_AssuranceSourceRoot>
+      <_AssuranceProjectPath>$([MSBuild]::MakeRelative('$(_AssuranceSourceRoot)', '$(MSBuildProjectFullPath)').Replace('\', '/'))</_AssuranceProjectPath>
+      <_AssuranceTargetPath>$([MSBuild]::MakeRelative('$(_AssuranceSourceRoot)', '$(TargetPath)').Replace('\', '/'))</_AssuranceTargetPath>
+    </PropertyGroup>
+    <Error Condition="'$(_AssuranceSourceRoot)' == '' Or '$(_AssuranceProjectPath)' == '' Or '$(_AssuranceTargetPath)' == '' Or '$(TargetName)' == ''"
+           Text="The owning build must resolve its repository-relative project and target." />
+    <Error Condition="$([System.IO.Path]::IsPathRooted('$(_AssuranceProjectPath)')) Or $([System.IO.Path]::IsPathRooted('$(_AssuranceTargetPath)')) Or $(_AssuranceProjectPath.StartsWith('../')) Or $(_AssuranceTargetPath.StartsWith('../'))"
+           Text="The owning build must remain inside its discovered source root." />
+    <ItemGroup>
+      <AssemblyMetadata Include="ISLAMU.Assurance.ProjectPath" Value="$(_AssuranceProjectPath)" />
+      <AssemblyMetadata Include="ISLAMU.Assurance.TargetPath" Value="$(_AssuranceTargetPath)" />
+      <AssemblyMetadata Include="ISLAMU.Assurance.TargetName" Value="$(TargetName)" />
+      <AssemblyMetadata Include="ISLAMU.Assurance.RuntimeManifestFileName" Value="$(TargetName).staticwebassets.runtime.json" />
+      <AssemblyMetadata Include="ISLAMU.Assurance.EndpointManifestFileName" Value="$(TargetName).staticwebassets.endpoints.json" />
+    </ItemGroup>
+  </Target>
+
 </Project>

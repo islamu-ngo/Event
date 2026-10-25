@@ -49,7 +49,14 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         Directory.CreateDirectory(Root);
         if (!OperatingSystem.IsWindows())
             File.SetUnixFileMode(Root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        File.WriteAllText(Path.Combine(Root, TestingResourceIsolation.MarkerName), RunId);
+        var markerOptions = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None
+        };
+        if (!OperatingSystem.IsWindows())
+            markerOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        using var marker = new FileStream(Path.Combine(Root, TestingResourceIsolation.MarkerName), markerOptions);
+        marker.Write(System.Text.Encoding.UTF8.GetBytes(RunId));
     }
 
     public string RunId { get; }
@@ -74,12 +81,6 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         Func<IDistributedApplicationTestingBuilder, Task>? configureBuilder, CancellationToken cancellationToken,
         OwnedAppHostProfile profile = OwnedAppHostProfile.Standard,
         OwnedBffPeerProtection peerProtection = OwnedBffPeerProtection.Shared)
-    {
-        if (!Enum.IsDefined(profile) || !Enum.IsDefined(peerProtection)
-            || profile == OwnedAppHostProfile.ExternalIdentitySharedBff && topology != "Split"
-            || profile != OwnedAppHostProfile.ExternalIdentitySharedBff && peerProtection != OwnedBffPeerProtection.Shared)
-            throw new InvalidOperationException("test_resource_profile_invalid");
-        var owner = new OwnedAppHostFixture(topology ?? string.Empty, profile);
     {
         if (profile == OwnedAppHostProfile.ClosedCompositionModel)
             throw new InvalidOperationException("test_resource_profile_invalid");
@@ -119,6 +120,12 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         OwnedAppHostProfile profile, OwnedBffPeerProtection peerProtection,
         string runMode, string privacyErasureTopology,
         string? eventLocationPrivacyMigrationStage, string webhookProvider, CancellationToken cancellationToken)
+    {
+        if (!Enum.IsDefined(profile) || !Enum.IsDefined(peerProtection)
+            || profile == OwnedAppHostProfile.ExternalIdentitySharedBff && topology != "Split"
+            || profile != OwnedAppHostProfile.ExternalIdentitySharedBff && peerProtection != OwnedBffPeerProtection.Shared)
+            throw new InvalidOperationException("test_resource_profile_invalid");
+        var owner = new OwnedAppHostFixture(topology ?? string.Empty, profile);
         IDistributedApplicationTestingBuilder? builder = null;
         try
         {
@@ -158,17 +165,17 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                         .Append(new("TestingEnvironment:ISLAMU_TEST_RUN_ID", owner.RunId)));
                 }, cancellationToken);
 
+            if (profile == OwnedAppHostProfile.ClosedCompositionModel)
+            {
+                await configureBuilder!(builder);
+                throw new InvalidOperationException("test_resource_inspection_incomplete");
+            }
             builder.Services.AddSingleton(owner.execution);
             if (profile == OwnedAppHostProfile.ExternalIdentitySharedBff)
             {
                 var peer = builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "explore-blazor-peer");
                 var input = owner.CreatePeerProtection(peerProtection);
                 builder.CreateResourceBuilder(peer)
-            if (profile == OwnedAppHostProfile.ClosedCompositionModel)
-            {
-                await configureBuilder!(builder);
-                throw new InvalidOperationException("test_resource_inspection_incomplete");
-            }
                     .WithEnvironment("EVENT_DP_BFF_RING", input.Ring)
                     .WithEnvironment("EVENT_DP_BFF_ADMISSION", input.Admission)
                     .WithEnvironment("EVENT_DP_BFF_ADMISSION_SHA256", input.AdmissionSha256)
@@ -203,6 +210,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 postgresBuilder.WithEnvironment($"DATABASE_{purpose}_PASSWORD", owner.EnvironmentAuthority[$"DATABASE_{purpose}_PASSWORD"]);
             if (configureBuilder is not null)
                 await configureBuilder(builder);
+            await new TestingResourceIsolation(owner.RunId, owner.Root, profile)
+                .PublishConfiguredContainerModelAsync(builder, cancellationToken);
             owner.volumes = builder.Resources.OfType<ContainerResource>()
                 .SelectMany(resource => resource.Annotations.OfType<ContainerMountAnnotation>())
                 .Where(mount => mount.Type == ContainerMountType.Volume)
@@ -224,6 +233,8 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        if (profile == OwnedAppHostProfile.ClosedCompositionModel)
+            throw new InvalidOperationException("test_resource_profile_invalid");
         lock (disposalLock)
         {
             ObjectDisposedException.ThrowIf(disposal is not null, this);
@@ -231,7 +242,6 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         }
     }
 
-    internal async Task<Guid> AuthenticateBootstrapAsync(HttpClient api, CancellationToken cancellationToken)
     internal static async Task DisposeFailedCreationAsync(Exception creationFailure,
         IAsyncDisposable? builder, IAsyncDisposable owner)
     {
@@ -244,10 +254,9 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
         catch (Exception exception) { throw new AggregateException(creationFailure, exception); }
     }
 
+    internal async Task<Guid> AuthenticateBootstrapAsync(HttpClient api, CancellationToken cancellationToken)
     {
         using var initial = await api.PostAsJsonAsync("/api/auth/local/login", new
-        if (profile == OwnedAppHostProfile.ClosedCompositionModel)
-            throw new InvalidOperationException("test_resource_profile_invalid");
         {
             identifier = BootstrapIdentifier, password = BootstrapPassword
         }, cancellationToken);
@@ -541,9 +550,6 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
             values[prefix + "ADMISSION_SHA256"] = input.AdmissionSha256;
             values[prefix + "MINIMUM_GENERATION"] = "1";
         }
-        return values.ToFrozenDictionary(StringComparer.Ordinal);
-    }
-}
         if (profile == OwnedAppHostProfile.ClosedCompositionModel)
         {
             foreach (string key in new[] { "FORMBRICKS_NEXTAUTH_SECRET", "FORMBRICKS_ENCRYPTION_KEY",
@@ -558,3 +564,6 @@ public sealed class OwnedAppHostFixture : IAsyncDisposable
                 values[$"ERASURE_DATABASE_{purpose}_PASSWORD"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             }
         }
+        return values.ToFrozenDictionary(StringComparer.Ordinal);
+    }
+}

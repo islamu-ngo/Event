@@ -196,7 +196,7 @@ public static class BlazorHostApplicationExtensions
         BffAuthEndpoints.MapAuthEndpoints(app);
         BffEndpointExtensions.MapBffEndpoints(app);
         app.MapBffAuthenticationCredentialReceiptEndpoints();
-        app.MapStaticAssets();
+        app.MapSelectedStaticAssets();
 
         if (profile == BlazorHostProfile.Split)
         {

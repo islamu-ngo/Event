@@ -11,11 +11,23 @@ using Explore.Application.Features.ConfigurationManifest.Application;
 using Event.Standalone.Hosting;
 using Event.Standalone.Middleware;
 using System.Runtime.Loader;
+using HostDefaults = Microsoft.Extensions.Hosting.Extensions;
 
 const BlazorHostProfile hostProfile = BlazorHostProfile.Combined;
 var shutdownState = new GracefulShutdownState();
 using var shutdownCts = shutdownState.CancellationTokenSource;
 var builder = WebApplication.CreateBuilder(args);
+HostDefaults.AssuranceStaticAssetSelection? assetSelection = null;
+WebApplication? app = null;
+var failures = new List<Exception>();
+try
+{
+if (builder.Environment.IsEnvironment("Assurance")
+    && (builder.Configuration["ISLAMU_TEST_ROOT"] is not null || builder.Configuration["ISLAMU_TEST_RUN_ID"] is not null))
+{
+    var paths = HostDefaults.ReadAssuranceManifestPaths(typeof(StandaloneHostMarker).Assembly);
+    assetSelection = await builder.SelectAssuranceStaticAssetsAsync(paths.RuntimeManifestPath, paths.EndpointManifestPath);
+}
 ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(builder.Configuration, builder.Environment, isStandaloneHost: true);
 if (!builder.Environment.IsEnvironment("Testing"))
 {
@@ -48,7 +60,7 @@ builder.Host.ConfigureContainer<IServiceCollection>((context, _) =>
     }
 });
 
-await using var app = builder.Build();
+app = builder.Build();
 
 await ExternalIdentityDatabaseMigrator.MigrateIfExternalAsync(
     app.Configuration,
@@ -92,6 +104,15 @@ await app.InitializeBlazorHostAsync(hostProfile);
 app.UseStandaloneHostMiddleware(apiHost, hostProfile, shutdownState);
 app.MapStandaloneHostEndpoints(apiHost, hostProfile);
 app.BindStandaloneInternalApiTransport();
-app.Run();
+await app.StartAsync();
+await app.WaitForShutdownAsync();
+}
+catch (Exception failure) { failures.Add(failure); }
+try { if (app is not null) await app.DisposeAsync(); }
+catch (Exception failure) { failures.Add(failure); }
+try { assetSelection?.Dispose(); }
+catch (Exception failure) { failures.Add(failure); }
+if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+if (failures.Count > 1) throw new AggregateException(failures);
 
 partial class Program;

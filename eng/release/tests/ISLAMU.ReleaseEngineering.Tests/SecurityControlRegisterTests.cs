@@ -59,6 +59,48 @@ public sealed class SecurityControlRegisterTests
             await File.WriteAllTextAsync(path, register.ToJsonString());
             bool accepted = SecurityControlRegister.TryValidate(path, out _);
             await Assert.That(accepted).IsEqualTo(expected);
+            if (variant == "complete")
+            {
+                var parsed = SecurityControlRegister.ReadExecutionRequirements(path);
+                var runtimeRequirement = parsed["owned-runtime"];
+                await Assert.That(runtimeRequirement.Lifecycles.Keys.ToHashSet().SetEquals(runtimeRequirement.Tests)).IsTrue();
+                foreach (var lifecycle in runtimeRequirement.Lifecycles.Values)
+                {
+                    await Assert.That(lifecycle.Stage).IsEqualTo(SecurityControlRegister.RuntimeStage.None);
+                    await Assert.That(lifecycle.Completion).IsEqualTo(SecurityControlRegister.RuntimeCompletion.Success);
+                    await Assert.That(lifecycle.DirectContainers).IsFalse();
+                    await Assert.That(lifecycle.Resource is null).IsTrue();
+                    await Assert.That(lifecycle.Signals.Count).IsEqualTo(0);
+                    await Assert.That(lifecycle.RootDisposition).IsEqualTo(SecurityControlRegister.RuntimeRootDisposition.NotApplicable);
+                }
+                await Assert.That(parsed.Where(lane => lane.Key != "owned-runtime")
+                    .All(lane => lane.Value.Lifecycles.Count == 0)).IsTrue();
+                foreach (string invalid in new[] { "missing", "null", "unknown-field", "unknown-stage",
+                    "unknown-completion", "contradictory-stage", "direct-without-resource-operation",
+                    "unexpected-resource", "duplicate-signal", "unknown-root-disposition", "other-lane" })
+                {
+                    JsonObject malformed = register.DeepClone().AsObject();
+                    JsonArray lanes = malformed["executionRequirements"]!.AsArray();
+                    JsonObject test = lanes[2]!["requiredTests"]![0]!.AsObject();
+                    JsonObject lifecycle = test["lifecycle"]!.AsObject();
+                    switch (invalid)
+                    {
+                        case "missing": test.Remove("lifecycle"); break;
+                        case "null": test["lifecycle"] = null; break;
+                        case "unknown-field": lifecycle["allowMissingHost"] = true; break;
+                        case "unknown-stage": lifecycle["stage"] = "future-stage"; break;
+                        case "unknown-completion": lifecycle["completion"] = "future-outcome"; break;
+                        case "contradictory-stage": lifecycle["completion"] = "refused"; break;
+                        case "direct-without-resource-operation": lifecycle["directContainers"] = true; break;
+                        case "unexpected-resource": lifecycle["resource"] = "unreviewed-resource"; break;
+                        case "duplicate-signal": lifecycle["signals"] = new JsonArray("caller-cancelled", "caller-cancelled"); break;
+                        case "unknown-root-disposition": lifecycle["rootDisposition"] = "ignore-root"; break;
+                        case "other-lane": lanes[0]!["requiredTests"]![0]!["lifecycle"] = lifecycle.DeepClone(); break;
+                    }
+                    await File.WriteAllTextAsync(path, malformed.ToJsonString());
+                    await Assert.That(SecurityControlRegister.TryValidate(path, out _)).IsFalse();
+                }
+            }
         }
         finally { Directory.Delete(directory, recursive: true); }
     }

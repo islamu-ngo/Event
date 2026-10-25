@@ -116,6 +116,14 @@ public static class PostgresIntegrationSyncReadPermissions
         if (!ready) throw new UnauthorizedAccessException("integration_sync_read_permissions_not_ready");
     }
 
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        var source = Map(context);
+        return $"({NoRetiredAuthority(source)}) AND ({Catalogue(source, enrollment, complete: true)})";
+    }
+
+    internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) => [Map(context).Table];
+
     private static string Catalogue(Source source, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         string global = Text(enrollment.GlobalLogin), runtime = Text(enrollment.RuntimeLogin);

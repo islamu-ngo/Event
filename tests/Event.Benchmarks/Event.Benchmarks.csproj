@@ -9,8 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\AssuranceOwnershipContext.cs" Link="Fixtures\AssuranceOwnershipContext.cs" />
     <Compile Include="../Shared/ExternalDataProtectionTestAuthority.cs" Link="ExternalDataProtectionTestAuthority.cs" />
     <Compile Include="../Shared/ProviderContextOwners.cs" Link="ProviderContextOwners.cs" />
+    <Compile Include="../Shared/PostgresTestRoleBootstrap.cs" Link="PostgresTestRoleBootstrap.cs" />
     <PackageReference Include="BenchmarkDotNet" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />

@@ -152,6 +152,15 @@ public static class PostgresEmailRetentionReadPermissions
         finally { connection.StateChange -= Changed; }
     }
 
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        var sources = Sources(context);
+        return $"({NoObsoleteInstallation(sources)}) AND ({Manifest(sources, enrollment, complete: true)})";
+    }
+
+    internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) =>
+        Sources(context).Select(source => source.Table).ToArray();
+
     private static string Manifest(Source[] sources, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         string global = Text(enrollment.GlobalLogin), runtime = Text(enrollment.RuntimeLogin);

@@ -12,8 +12,986 @@ namespace ISLAMU.ReleaseEngineering;
 
 public static partial class SecurityExecutionEvidence
 {
+    internal sealed record ConfiguredContainerDeclaration(string Name, string Image,
+        IReadOnlyList<ConfiguredMountDeclaration> Mounts);
+    internal sealed record ConfiguredMountDeclaration(string Type, string Source, string Target, bool ReadOnly);
+    internal sealed record ConfiguredProjectDeclaration(string Name, string ProjectPath);
+
+    internal static bool TryReadConfiguredContainerDeclarations(byte[] bytes, string runId,
+        out IReadOnlyList<ConfiguredContainerDeclaration>? declarations) =>
+        TryReadConfiguredContainerDeclarations(bytes, runId, out declarations, out _);
+
+    internal static bool TryReadConfiguredContainerDeclarations(byte[] bytes, string runId,
+        out IReadOnlyList<ConfiguredContainerDeclaration>? declarations,
+        out IReadOnlyList<ConfiguredProjectDeclaration>? projects)
+    {
+        declarations = null;
+        projects = null;
+        try
+        {
+            if (bytes.Length is < 1 or > 262144 || runId.Length != 32 || !LowerHex(runId)) return false;
+            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+            JsonElement root = document.RootElement;
+            if (!UniqueProperties(root) || !ExactFields(root, "Schema", "RunId", "Containers", "Projects")
+                || root.GetProperty("Schema").GetInt32() != 1 || Text(root, "RunId") != runId) return false;
+            JsonElement items = root.GetProperty("Containers");
+            if (items.ValueKind != JsonValueKind.Array || items.GetArrayLength() > 64) return false;
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            var resources = new List<ConfiguredContainerDeclaration>();
+            foreach (JsonElement item in items.EnumerateArray())
+            {
+                if (!ExactFields(item, "Name", "Image", "PullPolicy", "Mounts")) return false;
+                string name = Text(item, "Name"), image = Text(item, "Image");
+                if (name.Length is < 1 or > 128 || !name.All(character => char.IsAsciiLetterOrDigit(character)
+                        || character is '-' or '_') || !names.Add(name)
+                    || image.Length is < 1 or > 2048 || image.Any(character => !char.IsAsciiLetterOrDigit(character)
+                        && character is not ('/' or '.' or '_' or ':' or '@' or '-'))
+                    || image.Split('/').Any(part => part is "" or "." or "..") || Text(item, "PullPolicy") != "Never") return false;
+                int at = image.IndexOf('@', StringComparison.Ordinal);
+                if (at >= 0 && (at == 0 || image.Length - at != 72
+                    || !image[(at + 1)..].StartsWith("sha256:", StringComparison.Ordinal)
+                    || !LowerHex(image[(at + 8)..]))) return false;
+                JsonElement mounts = item.GetProperty("Mounts");
+                if (mounts.ValueKind != JsonValueKind.Array || mounts.GetArrayLength() > 32) return false;
+                var targets = new HashSet<string>(StringComparer.Ordinal);
+                var projected = new List<ConfiguredMountDeclaration>();
+                foreach (JsonElement mount in mounts.EnumerateArray())
+                {
+                    if (!ExactFields(mount, "Type", "Source", "Target", "ReadOnly")) return false;
+                    string type = Text(mount, "Type"), source = Text(mount, "Source"), target = Text(mount, "Target");
+                    if (!HintAbsolutePath(target) || target.Length > 4096
+                        || target.Length > 1 && target.EndsWith(Path.DirectorySeparatorChar) || !targets.Add(target)
+                        || source.Length is < 1 or > 4096 || source.Any(char.IsControl)
+                        || mount.GetProperty("ReadOnly").ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
+                    bool readOnly = mount.GetProperty("ReadOnly").GetBoolean();
+                    if (type == "Volume")
+                    {
+                        if (!source.StartsWith("islamu-test-" + runId + "-", StringComparison.Ordinal)
+                            || source.Any(character => !char.IsAsciiLetterOrDigit(character)
+                                && character is not ('-' or '_' or '.'))) return false;
+                    }
+                    else if (type != "BindMount" || !readOnly || !HintAbsolutePath(source)) return false;
+                    projected.Add(new(type, source, target, readOnly));
+                }
+                resources.Add(new(name, image, projected.OrderBy(mount => mount.Target, StringComparer.Ordinal).ToArray()));
+            }
+            JsonElement projectItems = root.GetProperty("Projects");
+            if (projectItems.ValueKind != JsonValueKind.Array || projectItems.GetArrayLength() > 64) return false;
+            var selectedProjects = new List<ConfiguredProjectDeclaration>();
+            foreach (JsonElement item in projectItems.EnumerateArray())
+            {
+                if (!ExactFields(item, "Name", "ProjectPath")) return false;
+                string name = Text(item, "Name"), path = Text(item, "ProjectPath");
+                if (name.Length is < 1 or > 128 || !name.All(character => char.IsAsciiLetterOrDigit(character)
+                        || character is '-' or '_') || !names.Add(name)
+                    || path.Length is < 1 or > 4096 || !HintAbsolutePath(path)) return false;
+                selectedProjects.Add(new(name, path));
+            }
+            declarations = resources.OrderBy(resource => resource.Name, StringComparer.Ordinal).ToArray();
+            projects = selectedProjects.OrderBy(project => project.Name, StringComparer.Ordinal).ToArray();
+            return true;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or InvalidOperationException
+            or ArgumentException or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    internal sealed record NativeFixtureModelSnapshot(string RunId, string Root, byte[] Model,
+        string ModelSha256, IReadOnlyList<ConfiguredContainerDeclaration> Containers,
+        IReadOnlyList<ConfiguredProjectDeclaration> Projects);
+
+    internal sealed record NativeCreatedContainer(string RunId, string CreationId, int CreatorPid,
+        string Resource, string ImageReference, string ContainerId, string DeclarationSha256);
+    internal sealed record NativeContainerCreationSnapshot(IReadOnlyList<NativeCreatedContainer> Created,
+        IReadOnlySet<string> PendingCreationIds, byte[] PrivateManifest);
+
+    internal static async Task<NativeContainerCreationSnapshot?> CaptureLiveNativeContainerCreationsAsync(
+        OwnedNativeProcessContext invocation, string invocationTemporary, string runId, string kind,
+        CancellationToken cancellationToken, string? creationId = null)
+    {
+        try
+        {
+            if (!OperatingSystem.IsLinux() || kind is not ("api" or "direct") || runId.Length != 32 || !LowerHex(runId)
+                || invocation.Pid <= 0 || invocation.Start == 0 || invocation.Group != invocation.Pid
+                || invocation.Session != invocation.Pid) return null;
+            if (creationId is not null && (creationId.Length != 32 || !LowerHex(creationId) || creationId[12] != '7'
+                || creationId[16] is not ('8' or '9' or 'a' or 'b'))) return null;
+            string temporary = InputDirectory(invocationTemporary);
+            string root = InputDirectory(Path.Combine(temporary, "islamu-assurance", runId));
+            ManagedProcessIdentity? creator = ReadManagedProcessIdentity(invocation.Pid);
+            if (creator is null || creator.Start != invocation.Start || creator.Group != invocation.Group
+                || creator.Session != invocation.Session || creator.State is 'Z' or 'X') return null;
+            string marker = Path.Combine(root, ".islamu-test-owner");
+            LiveFileIdentity rootIdentity = await ReadLiveMetadataAsync(root, false, cancellationToken).ConfigureAwait(false);
+            LiveFileIdentity markerIdentity = await ReadLiveMetadataAsync(marker, false, cancellationToken).ConfigureAwait(false);
+            if ((rootIdentity.Bits & 0xf000) != 0x4000 || (rootIdentity.Bits & 0xfff) != 0x1c0
+                || rootIdentity.User != creator.User || !PrivateLiveFile(markerIdentity, creator.User, 32)
+                || !NoInputLinks(marker) || Encoding.ASCII.GetString(ReadBoundedFile(marker, 32)) != runId) return null;
+            string prefix = kind + "-container-";
+            string pattern = prefix + (creationId is null ? "*" : "*-" + creationId + "-*") + ".json";
+            string[] names = Directory.EnumerateFiles(root, pattern).Take(129).Order(StringComparer.Ordinal).ToArray();
+            if (names.Length > 128) return null;
+            string[] declarations = names.Where(path => path.EndsWith("-declaration.json", StringComparison.Ordinal)).ToArray();
+            if (declarations.Length > 64 || creationId is not null && declarations.Length != 1) return null;
+            var consumed = new HashSet<string>(StringComparer.Ordinal);
+            var creationIds = new HashSet<string>(StringComparer.Ordinal);
+            var containerIds = new HashSet<string>(StringComparer.Ordinal);
+            var pending = new HashSet<string>(StringComparer.Ordinal);
+            var created = new List<NativeCreatedContainer>();
+            var brackets = new List<(string Path, LiveFileIdentity Identity, byte[] Bytes)>();
+            foreach (string declaration in declarations)
+            {
+                LiveFileIdentity identity = await ReadLiveMetadataAsync(declaration, false, cancellationToken).ConfigureAwait(false);
+                if (!NoInputLinks(declaration) || !PrivateLiveFile(identity, creator.User, identity.Bytes)
+                    || identity.Bytes is < 1 or > 16384
+                    || !await ProcessHoldsLiveFileAsync(creator.Pid, declaration, identity, cancellationToken).ConfigureAwait(false)) return null;
+                byte[] bytes = ReadBoundedFile(declaration, 16384);
+                using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+                JsonElement value = document.RootElement;
+                if (!UniqueProperties(value) || !ExactFields(value, "Schema", "RunId", "CreationId", "CreatorPid", "Resource", "ImageReference")
+                    || value.GetProperty("Schema").GetInt32() != 1 || Text(value, "RunId") != runId
+                    || value.GetProperty("CreatorPid").GetInt32() != creator.Pid) return null;
+                string creation = Text(value, "CreationId"), resource = Text(value, "Resource"), imageReference = Text(value, "ImageReference");
+                if (creation.Length != 32 || !LowerHex(creation) || creation[12] != '7'
+                    || creation[16] is not ('8' or '9' or 'a' or 'b') || !creationIds.Add(creation)
+                    || creationId is not null && creation != creationId
+                    || (kind == "api" ? resource is not ("keycloak" or "cerbos")
+                        : resource is not ("docker-wait" or "foreign-volume-named" or "foreign-volume-bind"))
+                    || imageReference.Length is < 1 or > 2048 || imageReference.Any(character => !char.IsAsciiLetterOrDigit(character)
+                        && character is not ('/' or '.' or '_' or ':' or '@' or '-'))
+                    || imageReference.Split('/').Any(part => part is "" or "." or "..")) return null;
+                string stem = Path.Combine(root, prefix + resource + "-" + creation);
+                if (declaration != stem + "-declaration.json") return null;
+                consumed.Add(declaration);
+                brackets.Add((declaration, identity, bytes));
+                string digest = DigestBytes(bytes);
+                string[] receipts = names.Where(path => path.StartsWith(stem + "-created-", StringComparison.Ordinal)).ToArray();
+                if (receipts.Length == 0) { pending.Add(creation); continue; }
+                if (receipts.Length != 1) return null;
+                string receipt = receipts[0];
+                LiveFileIdentity receiptIdentity = await ReadLiveMetadataAsync(receipt, false, cancellationToken).ConfigureAwait(false);
+                if (!NoInputLinks(receipt) || !PrivateLiveFile(receiptIdentity, creator.User, receiptIdentity.Bytes)
+                    || receiptIdentity.Bytes is < 1 or > 16384
+                    || !await ProcessHoldsLiveFileAsync(creator.Pid, receipt, receiptIdentity, cancellationToken).ConfigureAwait(false)) return null;
+                byte[] receiptBytes = ReadBoundedFile(receipt, 16384);
+                using JsonDocument receiptDocument = JsonDocument.Parse(receiptBytes, DocumentOptions);
+                JsonElement actual = receiptDocument.RootElement;
+                if (!UniqueProperties(actual) || !ExactFields(actual, "Schema", "RunId", "CreationId", "CreatorPid", "Resource", "ImageReference",
+                        "ContainerId", "DeclarationSha256") || actual.GetProperty("Schema").GetInt32() != 1
+                    || Text(actual, "RunId") != runId || Text(actual, "CreationId") != creation
+                    || actual.GetProperty("CreatorPid").GetInt32() != creator.Pid || Text(actual, "Resource") != resource
+                    || Text(actual, "ImageReference") != imageReference || Text(actual, "DeclarationSha256") != digest) return null;
+                string id = Text(actual, "ContainerId");
+                if (id.Length != 64 || !LowerHex(id) || !containerIds.Add(id) || receipt != stem + "-created-" + id + ".json") return null;
+                consumed.Add(receipt);
+                brackets.Add((receipt, receiptIdentity, receiptBytes));
+                created.Add(new(runId, creation, creator.Pid, resource, imageReference, id, digest));
+            }
+            if (!consumed.SetEquals(names)) return null;
+            foreach (var bracket in brackets)
+                if (!NoInputLinks(bracket.Path)
+                    || await ReadLiveMetadataAsync(bracket.Path, false, cancellationToken).ConfigureAwait(false) != bracket.Identity
+                    || !ReadBoundedFile(bracket.Path, 16384).AsSpan().SequenceEqual(bracket.Bytes)
+                    || !await ProcessHoldsLiveFileAsync(creator.Pid, bracket.Path, bracket.Identity, cancellationToken).ConfigureAwait(false)) return null;
+            if (!NoInputLinks(root) || !NoInputLinks(marker)
+                || await ReadLiveMetadataAsync(root, false, cancellationToken).ConfigureAwait(false) != rootIdentity
+                || await ReadLiveMetadataAsync(marker, false, cancellationToken).ConfigureAwait(false) != markerIdentity
+                || Encoding.ASCII.GetString(ReadBoundedFile(marker, 32)) != runId
+                || !SameLiveProcess(ReadManagedProcessIdentity(creator.Pid), creator)
+                || !names.SequenceEqual(Directory.EnumerateFiles(root, pattern).Take(129).Order(StringComparer.Ordinal), StringComparer.Ordinal))
+                return null;
+            byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                schemaVersion = 1, runId, kind, creator, invocation, created,
+                pendingCreationIds = pending.Order(StringComparer.Ordinal),
+                records = brackets.Select(item => new { path = item.Path, sha256 = DigestBytes(item.Bytes),
+                    item.Identity.Device, item.Identity.Inode, liveDescriptorMatched = true }),
+                creatorAuthentication = "not-attested", assertionAuthority = "reviewed-native-source-and-operator"
+            });
+            return new(created, pending, manifest);
+        }
+        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException or JsonException
+            or InvalidDataException or InvalidOperationException or ArgumentException or OverflowException
+            or FormatException or KeyNotFoundException or NotSupportedException)
+        { return null; }
+    }
+
+    internal sealed record InitialNativeResources(IReadOnlySet<string> ContainerIds, IReadOnlySet<string> VolumeNames,
+        IReadOnlySet<string> ImageIds);
+    internal sealed record ConfiguredResourceInputs(string Owner, IReadOnlyList<ConfiguredContainerDeclaration> Containers,
+        IReadOnlyDictionary<string, string> Images, InitialNativeResources Initial,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> ImageVolumeTargets,
+        IReadOnlyDictionary<string, string> VolumeMountpoints);
+    internal sealed record ObservedContainerMount(string Type, string Name, string Source, string Destination, bool ReadWrite);
+    internal sealed record ConfiguredOwnedResource(ObservedOwnedResource Container, IReadOnlyList<ObservedContainerMount> Mounts);
+
+    internal static bool TryReadApiCreatedResources(byte[] bytes, string owner, NativeContainerCreationSnapshot creations,
+        IReadOnlyDictionary<string, string> imageIds, InitialNativeResources initial,
+        out IReadOnlyList<ObservedOwnedResource>? resources)
+    {
+        resources = null;
+        try
+        {
+            if (bytes.Length is < 1 or > MaximumReportBytes || owner.Length != 32 || !LowerHex(owner)
+                || creations.Created.Count > 64 || creations.PendingCreationIds.Count > 64 || imageIds.Count > 65_536
+                || initial.ContainerIds.Count > 65_536 || initial.ImageIds.Count > 65_536
+                || initial.ContainerIds.Any(id => id.Length != 64 || !LowerHex(id))
+                || initial.ImageIds.Any(id => !FullLocalImageId(id))
+                || imageIds.Any(item => !BoundedIdentity(item.Key, 2048) || !FullLocalImageId(item.Value))) return false;
+            var pairs = new Dictionary<string, NativeCreatedContainer>(StringComparer.Ordinal);
+            var creationIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (NativeCreatedContainer pair in creations.Created)
+            {
+                if (pair.RunId != owner || pair.CreatorPid <= 0 || pair.Resource is not ("keycloak" or "cerbos")
+                    || pair.CreationId.Length != 32 || !LowerHex(pair.CreationId) || pair.CreationId[12] != '7'
+                    || pair.CreationId[16] is not ('8' or '9' or 'a' or 'b') || !creationIds.Add(pair.CreationId)
+                    || pair.ContainerId.Length != 64 || !LowerHex(pair.ContainerId) || initial.ContainerIds.Contains(pair.ContainerId)
+                    || pair.DeclarationSha256.Length != 64 || !LowerHex(pair.DeclarationSha256)
+                    || !BoundedIdentity(pair.ImageReference, 2048)
+                    || !imageIds.TryGetValue(pair.ImageReference, out string? selectedImage)
+                    || !initial.ImageIds.Contains(selectedImage) || !pairs.TryAdd(pair.ContainerId, pair)) return false;
+            }
+            if (creations.PendingCreationIds.Any(id => id.Length != 32 || !LowerHex(id) || id[12] != '7'
+                    || id[16] is not ('8' or '9' or 'a' or 'b') || creationIds.Contains(id))) return false;
+            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+            JsonElement inventory = document.RootElement;
+            if (inventory.ValueKind != JsonValueKind.Array || inventory.GetArrayLength() > 65_536
+                || !UniqueProperties(inventory)) return false;
+            var allIds = new HashSet<string>(StringComparer.Ordinal);
+            var observed = new List<ObservedOwnedResource>();
+            foreach (JsonElement item in inventory.EnumerateArray())
+            {
+                string id = Text(item, "Id");
+                if (id.Length != 64 || !LowerHex(id) || !allIds.Add(id)
+                    || !item.TryGetProperty("Labels", out JsonElement labels)
+                    || labels.ValueKind is not (JsonValueKind.Object or JsonValueKind.Null)) return false;
+                bool hasPair = pairs.TryGetValue(id, out NativeCreatedContainer? pair);
+                if (labels.ValueKind == JsonValueKind.Null)
+                {
+                    if (hasPair) return false;
+                    continue;
+                }
+                if (!labels.TryGetProperty("islamu.assurance.owner", out JsonElement selectedOwner))
+                {
+                    if (hasPair || labels.TryGetProperty("islamu.assurance.resource", out _)) return false;
+                    continue;
+                }
+                if (selectedOwner.ValueKind != JsonValueKind.String) return false;
+                if (selectedOwner.GetString() != owner)
+                {
+                    if (hasPair) return false;
+                    continue;
+                }
+                if (!hasPair || pair is null || Text(labels, "islamu.assurance.resource") != pair.Resource
+                    || Text(item, "Image") != pair.ImageReference || Text(item, "ImageID") != imageIds[pair.ImageReference]
+                    || !item.TryGetProperty("Mounts", out JsonElement mounts) || mounts.ValueKind != JsonValueKind.Array
+                    || mounts.GetArrayLength() != 0) return false;
+                string state = Text(item, "State");
+                if (state is not ("created" or "restarting" or "running" or "removing" or "paused" or "exited" or "dead")) return false;
+                observed.Add(new(id, imageIds[pair.ImageReference], pair.Resource, state == "running"));
+            }
+            resources = observed.AsReadOnly();
+            return true;
+        }
+        catch (Exception failure) when (failure is JsonException or InvalidOperationException or ArgumentException
+            or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
+        { return false; }
+    }
+
+    internal static bool TryReadConfiguredOwnedResources(byte[] bytes, ConfiguredResourceInputs inputs,
+        out IReadOnlyList<ConfiguredOwnedResource>? resources)
+    {
+        resources = null;
+        try
+        {
+            if (bytes.Length is < 1 or > MaximumReportBytes || inputs.Owner.Length != 32 || !LowerHex(inputs.Owner)
+                || inputs.Containers.Count > 64 || inputs.Images.Count > 65_536
+                || inputs.Initial.ContainerIds.Count > 65_536 || inputs.Initial.VolumeNames.Count > 65_536
+                || inputs.Initial.ImageIds.Count > 65_536 || inputs.VolumeMountpoints.Count > 65_536
+                || inputs.ImageVolumeTargets.Count > 65_536
+                || inputs.Initial.ContainerIds.Any(id => id.Length != 64 || !LowerHex(id))
+                || inputs.Initial.ImageIds.Any(id => !FullLocalImageId(id))
+                || inputs.Images.Any(item => !BoundedIdentity(item.Key, 2048) || !FullLocalImageId(item.Value))
+                || inputs.VolumeMountpoints.Any(item => !RuntimeVolumeName(item.Key) || !CanonicalObservedMountPath(item.Value))
+                || inputs.Initial.VolumeNames.Any(name => !RuntimeVolumeName(name))
+                || inputs.ImageVolumeTargets.Any(item => !FullLocalImageId(item.Key) || item.Value.Count > 64
+                    || item.Value.Any(target => !CanonicalObservedMountPath(target)))) return false;
+            var declarations = inputs.Containers.ToDictionary(item => item.Name, StringComparer.Ordinal);
+            var images = inputs.Images.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            var mountpoints = inputs.VolumeMountpoints.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            var implicitTargets = inputs.ImageVolumeTargets.ToDictionary(item => item.Key,
+                item => item.Value.ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
+            var volumeNames = inputs.Containers.SelectMany(item => item.Mounts)
+                .Where(mount => mount.Type == "Volume").Select(mount => mount.Source)
+                .Concat(mountpoints.Keys).ToHashSet(StringComparer.Ordinal);
+            using JsonDocument document = JsonDocument.Parse(bytes, DocumentOptions);
+            JsonElement inventory = document.RootElement;
+            if (inventory.ValueKind != JsonValueKind.Array || inventory.GetArrayLength() > 65_536
+                || !UniqueProperties(inventory)) return false;
+            var allIds = new HashSet<string>(StringComparer.Ordinal);
+            var observed = new List<ConfiguredOwnedResource>();
+            var foreignMounts = new List<ObservedContainerMount>();
+            foreach (JsonElement item in inventory.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object) return false;
+                string id = Text(item, "Id");
+                if (id.Length != 64 || !LowerHex(id) || !allIds.Add(id)
+                    || !TryReadRuntimeMounts(item, out var mounts)) return false;
+                string owner = string.Empty;
+                if (item.TryGetProperty("Labels", out JsonElement labels) && labels.ValueKind != JsonValueKind.Null)
+                {
+                    if (labels.ValueKind != JsonValueKind.Object) return false;
+                    if (labels.TryGetProperty("islamu.assurance.owner", out JsonElement label))
+                    {
+                        if (label.ValueKind != JsonValueKind.String) return false;
+                        owner = label.GetString()!;
+                    }
+                    else if (labels.TryGetProperty("islamu.assurance.resource", out _)) return false;
+                }
+                if (owner != inputs.Owner)
+                {
+                    foreignMounts.AddRange(mounts);
+                    continue;
+                }
+                string resource = Text(labels, "islamu.assurance.resource"), reference = Text(item, "Image");
+                string image = Text(item, "ImageID"), state = Text(item, "State");
+                if (inputs.Initial.ContainerIds.Contains(id) || !declarations.TryGetValue(resource, out var declaration)
+                    || reference != declaration.Image || !FullLocalImageId(image)
+                    || !images.TryGetValue(declaration.Image, out string? selectedImage) || selectedImage != image
+                    || !inputs.Initial.ImageIds.Contains(image) || observed.Count >= 1024
+                    || state is not ("created" or "restarting" or "running" or "removing" or "paused" or "exited" or "dead"))
+                    return false;
+                var expectedMounts = declaration.Mounts.ToDictionary(mount => mount.Target, StringComparer.Ordinal);
+                var seenTargets = mounts.Select(mount => mount.Destination).ToHashSet(StringComparer.Ordinal);
+                implicitTargets.TryGetValue(image, out var imageTargets);
+                foreach (ObservedContainerMount mount in mounts)
+                {
+                    if (expectedMounts.TryGetValue(mount.Destination, out var expected))
+                    {
+                        if (mount.ReadWrite == expected.ReadOnly) return false;
+                        if (expected.Type == "Volume")
+                        {
+                            if (mount.Type != "volume" || mount.Name != expected.Source) return false;
+                        }
+                        else if (expected.Type != "BindMount" || !expected.ReadOnly || mount.Type != "bind"
+                            || mount.Name.Length != 0 || mount.Source != expected.Source) return false;
+                    }
+                    else if (mount.Type != "volume" || imageTargets is null || !imageTargets.Contains(mount.Destination))
+                        return false;
+                    if (mount.Type == "volume")
+                    {
+                        if (inputs.Initial.VolumeNames.Contains(mount.Name)
+                            || !mountpoints.TryGetValue(mount.Name, out string? mountpoint)
+                            || mount.Source != mountpoint) return false;
+                        volumeNames.Add(mount.Name);
+                    }
+                }
+                if (expectedMounts.Keys.Any(target => !seenTargets.Contains(target))
+                    || imageTargets is not null && imageTargets.Any(target => !seenTargets.Contains(target))) return false;
+                observed.Add(new(new(id, image, resource, state == "running"), mounts));
+            }
+            if (foreignMounts.Any(mount => mount.Type == "volume" && volumeNames.Contains(mount.Name)
+                || mount.Type == "bind" && mountpoints.Values.Any(path => ObservedMountPathsOverlap(mount.Source, path))))
+                return false;
+            resources = observed.AsReadOnly();
+            return true;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or InvalidOperationException
+            or ArgumentException or FormatException or OverflowException or KeyNotFoundException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool RuntimeVolumeName(string name) => name.Length is >= 1 and <= 255
+        && name.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.');
+
+    private static bool CanonicalObservedMountPath(string path) => HintAbsolutePath(path)
+        && (path.Length == 1 || !path.EndsWith('/'));
+
+    private static bool ObservedMountPathsOverlap(string left, string right) => left == right || left == "/" || right == "/"
+        || InputWithin(left, right) || InputWithin(right, left);
+
+    private static bool TryReadRuntimeMounts(JsonElement container, out IReadOnlyList<ObservedContainerMount> result)
+    {
+        result = [];
+        if (!container.TryGetProperty("Mounts", out JsonElement mounts) || mounts.ValueKind != JsonValueKind.Array
+            || mounts.GetArrayLength() > 128) return false;
+        var targets = new HashSet<string>(StringComparer.Ordinal);
+        var observed = new List<ObservedContainerMount>();
+        foreach (JsonElement mount in mounts.EnumerateArray())
+        {
+            string type = Text(mount, "Type"), source = Text(mount, "Source"), target = Text(mount, "Destination");
+            if (type is not ("volume" or "bind" or "tmpfs" or "npipe") || source.Length > 8192
+                || source.Any(char.IsControl) || !CanonicalObservedMountPath(target) || !targets.Add(target)
+                || !mount.TryGetProperty("RW", out JsonElement writable)
+                || writable.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
+            string name = mount.TryGetProperty("Name", out _) ? Text(mount, "Name") : string.Empty;
+            if (type == "volume" && (!RuntimeVolumeName(name) || !CanonicalObservedMountPath(source))
+                || type == "bind" && !CanonicalObservedMountPath(source)
+                || type != "volume" && name.Length != 0) return false;
+            observed.Add(new(type, name, source, target, writable.GetBoolean()));
+        }
+        result = observed.AsReadOnly();
+        return true;
+    }
+
+    internal static async Task<NativeFixtureModelSnapshot?> CaptureLiveFixtureModelAsync(OwnedNativeProcessContext invocation,
+        string invocationTemporary, string fixtureRoot, string runId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!OperatingSystem.IsLinux() || invocation.Pid <= 0 || invocation.Group != invocation.Pid
+                || invocation.Session != invocation.Pid || invocation.Start == 0 || runId.Length != 32 || !LowerHex(runId)) return null;
+            string temporary = InputDirectory(invocationTemporary), root = InputDirectory(fixtureRoot);
+            if (root != Path.Combine(temporary, "islamu-assurance", runId)) return null;
+            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid);
+            if (owner is null || owner.Start != invocation.Start || owner.Group != invocation.Group
+                || owner.Session != invocation.Session || owner.State is 'Z' or 'X') return null;
+            string marker = Path.Combine(root, ".islamu-test-owner"), claim = Path.Combine(root, ".apphost-claim");
+            string modelPath = Path.Combine(root, "container-model.json");
+            if (!File.Exists(marker) || !File.Exists(claim) || !File.Exists(modelPath)) return null;
+            LiveFileIdentity directory = await ReadLiveMetadataAsync(root, false, cancellationToken).ConfigureAwait(false);
+            LiveFileIdentity markerIdentity = await ReadLiveMetadataAsync(marker, false, cancellationToken).ConfigureAwait(false);
+            LiveFileIdentity claimIdentity = await ReadLiveMetadataAsync(claim, false, cancellationToken).ConfigureAwait(false);
+            LiveFileIdentity modelIdentity = await ReadLiveMetadataAsync(modelPath, false, cancellationToken).ConfigureAwait(false);
+            if ((directory.Bits & 0xf000) != 0x4000 || (directory.Bits & 0xfff) != 0x1c0 || directory.User != owner.User
+                || !PrivateLiveFile(markerIdentity, owner.User, 32) || !NoInputLinks(marker) || !NoInputLinks(claim)
+                || !NoInputLinks(modelPath) || Encoding.ASCII.GetString(ReadBoundedFile(marker, 32)) != runId
+                || (claimIdentity.Bits & 0xf000) != 0x8000 || claimIdentity.User != owner.User || claimIdentity.Links != 1
+                || claimIdentity.Bytes != 0 || !PrivateLiveFile(modelIdentity, owner.User, modelIdentity.Bytes)
+                || modelIdentity.Bytes is < 1 or > 262144
+                || !await NativeOwnerHoldsClaimAsync(invocation, owner.User, claim, claimIdentity, cancellationToken).ConfigureAwait(false)) return null;
+            byte[] model = ReadBoundedFile(modelPath, 262144);
+            if (!TryReadConfiguredContainerDeclarations(model, runId, out var containers, out var projects)) return null;
+            if (!NoInputLinks(root) || !NoInputLinks(marker) || !NoInputLinks(claim) || !NoInputLinks(modelPath)
+                || await ReadLiveMetadataAsync(root, false, cancellationToken).ConfigureAwait(false) != directory
+                || await ReadLiveMetadataAsync(marker, false, cancellationToken).ConfigureAwait(false) != markerIdentity
+                || await ReadLiveMetadataAsync(claim, false, cancellationToken).ConfigureAwait(false) != claimIdentity
+                || await ReadLiveMetadataAsync(modelPath, false, cancellationToken).ConfigureAwait(false) != modelIdentity
+                || Encoding.ASCII.GetString(ReadBoundedFile(marker, 32)) != runId
+                || !ReadBoundedFile(modelPath, 262144).AsSpan().SequenceEqual(model)
+                || !await NativeOwnerHoldsClaimAsync(invocation, owner.User, claim, claimIdentity, cancellationToken).ConfigureAwait(false)
+                || !SameLiveProcess(ReadManagedProcessIdentity(invocation.Pid), owner)) return null;
+            return new(runId, root, model, DigestBytes(model), containers!, projects!);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException
+            or ArgumentException or InvalidOperationException or FormatException or OverflowException
+            or KeyNotFoundException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    internal static async Task<CompiledInputSnapshot?> CaptureLiveManagedInputsAsync(OwnedNativeProcessContext invocation,
+        string invocationTemporary, string fixtureRoot, NativeManagedLaunchHint hint, string expectedEntry,
+        string candidate, CancellationToken cancellationToken)
+    {
+        CompiledInputSnapshot? direct = await CaptureLiveManagedHostInputsAsync(invocation, invocationTemporary,
+            fixtureRoot, hint, expectedEntry, candidate, cancellationToken).ConfigureAwait(false);
+        if (direct is not null || !OperatingSystem.IsLinux() || hint.Inputs.HasValue) return direct;
+        try
+        {
+            NativeFixtureModelSnapshot? model = await CaptureLiveFixtureModelAsync(invocation, invocationTemporary,
+                fixtureRoot, hint.RunId, cancellationToken).ConfigureAwait(false);
+            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid);
+            ManagedProcessIdentity? lead = ReadManagedProcessIdentity(hint.Pid);
+            if (model is null || owner is null || lead is null || owner.Start != invocation.Start
+                || lead.User != owner.User || lead.Start != hint.Start || lead.Start < invocation.Start
+                || lead.State is 'Z' or 'X') return null;
+            string directName = $"managed-host-root-{lead.Pid}-{lead.Start}.json";
+            if (Directory.EnumerateFileSystemEntries(model.Root, directName).Any()) return null;
+            // Five closed managed resources retain at most 64 incarnation records each.
+            string[] records = Directory.EnumerateFiles(model.Root, "managed-host-root-*.json")
+                .Take(5 * 64 + 1).ToArray();
+            if (records.Length > 5 * 64) return null;
+            NativeManagedLaunchHint? selected = null;
+            List<ManagedProcessIdentity>? selectedChain = null;
+            CompiledInputSnapshot? selectedInputs = null;
+            foreach (string record in records)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string[] parts = Path.GetFileNameWithoutExtension(record)["managed-host-root-".Length..].Split('-');
+                if (parts.Length != 2 || !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture,
+                        out int pid) || pid <= 0 || !ulong.TryParse(parts[1], NumberStyles.None,
+                        CultureInfo.InvariantCulture, out ulong start) || start == 0) return null;
+                ManagedProcessIdentity? host = ReadManagedProcessIdentity(pid);
+                if (host is null || host.Start != start || host.Start < lead.Start) continue;
+                List<ManagedProcessIdentity>? chain = ReadLiveHostAncestorChain(host, lead, cancellationToken);
+                if (chain is null) continue;
+                var hosted = hint with { Pid = pid, Start = start };
+                CompiledInputSnapshot? inputs = await CaptureLiveManagedHostInputsAsync(invocation,
+                    invocationTemporary, model.Root, hosted, expectedEntry, candidate, cancellationToken).ConfigureAwait(false);
+                if (inputs is null) continue;
+                if (selected is not null) return null;
+                selected = hosted;
+                selectedChain = chain;
+                selectedInputs = inputs;
+            }
+            if (selected is null || selectedChain is null || selectedInputs is null) return null;
+            CompiledInputSnapshot? after = await CaptureLiveManagedHostInputsAsync(invocation, invocationTemporary,
+                model.Root, selected, expectedEntry, candidate, cancellationToken).ConfigureAwait(false);
+            NativeFixtureModelSnapshot? modelAfter = await CaptureLiveFixtureModelAsync(invocation, invocationTemporary,
+                model.Root, hint.RunId, cancellationToken).ConfigureAwait(false);
+            if (after is null || after.PrivateManifestSha256 != selectedInputs.PrivateManifestSha256
+                || modelAfter is null || modelAfter.ModelSha256 != model.ModelSha256
+                || !SameLiveProcess(ReadManagedProcessIdentity(invocation.Pid), owner)
+                || !SameLiveProcess(ReadManagedProcessIdentity(hint.Pid), lead)
+                || selectedChain.Any(identity => !SameLiveProcess(ReadManagedProcessIdentity(identity.Pid), identity)))
+                return null;
+            if (Directory.EnumerateFileSystemEntries(model.Root, directName).Any()
+                || !records.ToHashSet(StringComparer.Ordinal).SetEquals(
+                    Directory.EnumerateFiles(model.Root, "managed-host-root-*.json").Take(5 * 64 + 1))) return null;
+            var manifest = System.Text.Json.Nodes.JsonNode.Parse(after.PrivateManifest)!.AsObject();
+            manifest["process"]!["resourceAssociation"] = "fixture-sdk-lead-and-live-host-ancestry";
+            manifest["sdkLead"] = JsonSerializer.SerializeToNode(new
+            {
+                pid = lead.Pid, start = lead.Start, lead.Parent, lead.User, lead.Group, lead.Session,
+                hostAncestry = selectedChain.Select(identity => new
+                    { identity.Pid, identity.Start, identity.Parent, identity.User, identity.Group, identity.Session })
+            });
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest);
+            return bytes.Length > MaximumReportBytes ? null : new(bytes, DigestBytes(bytes), after.FileCount);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException
+            or ArgumentException or InvalidOperationException or FormatException or OverflowException
+            or KeyNotFoundException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static List<ManagedProcessIdentity>? ReadLiveHostAncestorChain(ManagedProcessIdentity host,
+        ManagedProcessIdentity lead, CancellationToken cancellationToken)
+    {
+        var chain = new List<ManagedProcessIdentity>();
+        var seen = new HashSet<int>();
+        int pid = host.Pid;
+        for (int count = 0; count < 128; count++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!seen.Add(pid)) return null;
+            ManagedProcessIdentity? identity = ReadManagedProcessIdentity(pid);
+            if (identity is null || identity.User != lead.User || identity.Start < lead.Start
+                || identity.State is 'Z' or 'X' || count == 0 && !SameLiveProcess(identity, host)) return null;
+            chain.Add(identity);
+            if (identity.Pid == lead.Pid) return SameLiveProcess(identity, lead) ? chain : null;
+            pid = identity.Parent;
+            if (pid <= 0) return null;
+        }
+        return null;
+    }
+
+    private static async Task<CompiledInputSnapshot?> CaptureLiveManagedHostInputsAsync(OwnedNativeProcessContext invocation,
+        string invocationTemporary, string fixtureRoot, NativeManagedLaunchHint hint, string expectedEntry,
+        string candidate, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!OperatingSystem.IsLinux() || invocation.Pid <= 0 || invocation.Group != invocation.Pid
+                || invocation.Session != invocation.Pid || invocation.Start == 0
+                || candidate.Length is not (40 or 64) || !LowerHex(candidate)
+                || hint.RunId.Length != 32 || !LowerHex(hint.RunId) || hint.Pid <= 0 || hint.Start == 0
+                || hint.Resource is not ("event-migrationservice" or "explore-api" or "explore-blazor"
+                    or "event-standalone" or "explore-blazor-peer")
+                || hint.InstanceSha256.Length != 64 || !hint.InstanceSha256.All(char.IsAsciiHexDigit)) return null;
+            string temporary = InputDirectory(invocationTemporary);
+            string root = InputDirectory(fixtureRoot);
+            if (root != Path.Combine(temporary, "islamu-assurance", hint.RunId)
+                || !HintAbsolutePath(expectedEntry) || !NoInputLinks(expectedEntry)) return null;
+            ManagedProcessIdentity? owner = ReadManagedProcessIdentity(invocation.Pid);
+            ManagedProcessIdentity? process = ReadManagedProcessIdentity(hint.Pid);
+            if (owner is null || process is null || owner.Start != invocation.Start
+                || owner.Group != invocation.Group || owner.Session != invocation.Session
+                || owner.State is 'Z' or 'X' || process.State is 'Z' or 'X' || process.User != owner.User
+                || process.Start != hint.Start || process.Start < invocation.Start) return null;
+            LiveFileIdentity rootIdentity = await ReadLiveMetadataAsync(root, false, cancellationToken).ConfigureAwait(false);
+            string marker = Path.Combine(root, ".islamu-test-owner");
+            if (!File.Exists(marker)) return null;
+            LiveFileIdentity markerIdentity = await ReadLiveMetadataAsync(marker, false, cancellationToken).ConfigureAwait(false);
+            if ((rootIdentity.Bits & 0xf000) != 0x4000 || (rootIdentity.Bits & 0xfff) != 0x1c0
+                || rootIdentity.User != owner.User || !PrivateLiveFile(markerIdentity, owner.User, 32)
+                || !NoInputLinks(marker) || Encoding.ASCII.GetString(ReadBoundedFile(marker, 32)) != hint.RunId) return null;
+            string claim = Path.Combine(root, ".apphost-claim");
+            if (!File.Exists(claim)) return null;
+            LiveFileIdentity claimIdentity = await ReadLiveMetadataAsync(claim, false, cancellationToken).ConfigureAwait(false);
+            if ((claimIdentity.Bits & 0xf000) != 0x8000 || claimIdentity.User != owner.User
+                || claimIdentity.Links != 1 || claimIdentity.Bytes != 0 || !NoInputLinks(claim)
+                || !await NativeOwnerHoldsClaimAsync(invocation, owner.User, claim, claimIdentity, cancellationToken).ConfigureAwait(false))
+                return null;
+            string modelPath = Path.Combine(root, "container-model.json");
+            if (!File.Exists(modelPath)) return null;
+            LiveFileIdentity modelIdentity = await ReadLiveMetadataAsync(modelPath, false, cancellationToken).ConfigureAwait(false);
+            if (!PrivateLiveFile(modelIdentity, owner.User, modelIdentity.Bytes)
+                || modelIdentity.Bytes is < 1 or > 262144 || !NoInputLinks(modelPath)) return null;
+            byte[] model = ReadBoundedFile(modelPath, 262144);
+            if (!TryReadConfiguredContainerDeclarations(model, hint.RunId, out _)) return null;
+            string recordPath = Path.Combine(root, $"managed-host-root-{hint.Pid}-{process.Start}.json");
+            if (!File.Exists(recordPath)) return null;
+            LiveFileIdentity recordIdentity = await ReadLiveMetadataAsync(recordPath, false, cancellationToken).ConfigureAwait(false);
+            if (!PrivateLiveFile(recordIdentity, owner.User, recordIdentity.Bytes)
+                || recordIdentity.Bytes is < 1 or > 16384 || !NoInputLinks(recordPath)
+                || !await ProcessHoldsLiveFileAsync(hint.Pid, recordPath, recordIdentity, cancellationToken).ConfigureAwait(false)) return null;
+            byte[] record = ReadBoundedFile(recordPath, 16384);
+            using JsonDocument host = JsonDocument.Parse(record, DocumentOptions);
+            JsonElement value = host.RootElement;
+            if (!UniqueProperties(value) || !ExactFields(value, "Schema", "RunId", "Pid", "Start", "ContentRoot",
+                    "ApplicationName", "EntryAssembly", "IsWebHost", "WebRoot", "ServedAssets")
+                || value.GetProperty("Schema").GetInt32() != 1 || Text(value, "RunId") != hint.RunId
+                || value.GetProperty("Pid").GetInt32() != hint.Pid || value.GetProperty("Start").GetUInt64() != process.Start)
+                return null;
+            string contentRoot = InputDirectory(Text(value, "ContentRoot"));
+            string applicationName = Text(value, "ApplicationName"), recordedEntry = Text(value, "EntryAssembly");
+            JsonElement webRootValue = value.GetProperty("WebRoot"), servedAssets = value.GetProperty("ServedAssets");
+            if (string.IsNullOrWhiteSpace(applicationName) || applicationName.Length > 512 || applicationName.Any(char.IsControl)
+                || !HintAbsolutePath(recordedEntry) || recordedEntry.Length > 4096 || recordedEntry != expectedEntry
+                || value.GetProperty("IsWebHost").ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+                || webRootValue.ValueKind is not (JsonValueKind.Null or JsonValueKind.String)) return null;
+            bool isWebHost = value.GetProperty("IsWebHost").GetBoolean();
+            string? webRoot = webRootValue.ValueKind == JsonValueKind.Null ? null : webRootValue.GetString();
+            if (!string.IsNullOrEmpty(webRoot))
+            {
+                if (webRoot.Length > 4096 || !HintAbsolutePath(webRoot)) return null;
+                for (DirectoryInfo? component = new(webRoot); component is not null; component = component.Parent)
+                    if (component.LinkTarget is not null || component.Exists
+                        && (component.Attributes & FileAttributes.ReparsePoint) != 0) return null;
+            }
+            if (!isWebHost && (webRoot is not null || servedAssets.ValueKind != JsonValueKind.Null)) return null;
+            if (servedAssets.ValueKind != JsonValueKind.Null)
+            {
+                if (!isWebHost || !ExactFields(servedAssets, "RuntimeManifestPath", "RuntimeManifestSha256",
+                        "EndpointManifestPath", "EndpointManifestSha256")) return null;
+                string runtimePath = Text(servedAssets, "RuntimeManifestPath"), endpointPath = Text(servedAssets, "EndpointManifestPath");
+                string runtimeHash = Text(servedAssets, "RuntimeManifestSha256"), endpointHash = Text(servedAssets, "EndpointManifestSha256");
+                if (!HintAbsolutePath(runtimePath) || !HintAbsolutePath(endpointPath) || runtimePath == endpointPath
+                    || runtimePath.Length > 4096 || endpointPath.Length > 4096
+                    || runtimeHash.Length != 64 || !LowerHex(runtimeHash) || endpointHash.Length != 64 || !LowerHex(endpointHash)
+                    || !NoInputLinks(runtimePath) || !NoInputLinks(endpointPath)
+                    || !await AreRegularCandidateInputsAsync([runtimePath, endpointPath]).ConfigureAwait(false)
+                    || DigestBytes(ReadBoundedFile(runtimePath, MaximumReportBytes)) != runtimeHash
+                    || DigestBytes(ReadBoundedFile(endpointPath, MaximumReportBytes)) != endpointHash) return null;
+            }
+            string executable = new FileInfo("/proc/" + hint.Pid + "/exe").ResolveLinkTarget(true)?.FullName
+                ?? throw new InvalidDataException("managed_executable_unavailable");
+            string directory = new DirectoryInfo("/proc/" + hint.Pid + "/cwd").ResolveLinkTarget(true)?.FullName
+                ?? throw new InvalidDataException("managed_directory_unavailable");
+            if (!HintAbsolutePath(executable) || !NoInputLinks(executable) || !HintAbsolutePath(directory)
+                || !NoInputLinks(directory)) return null;
+            byte[] command = ReadLiveProcBytes("/proc/" + hint.Pid + "/cmdline", 65536);
+            if (command.Length < 2 || command[^1] != 0) return null;
+            string[] arguments = new UTF8Encoding(false, true).GetString(command).Split('\0');
+            if (arguments[^1].Length != 0 || arguments[..^1].Any(argument => argument.Length == 0)) return null;
+            string actualEntry;
+            string dotnet = new FileInfo(ReleaseToolPaths.Dotnet).ResolveLinkTarget(true)?.FullName
+                ?? Path.GetFullPath(ReleaseToolPaths.Dotnet);
+            if (executable == dotnet)
+            {
+                int slot = arguments.Length > 2 && arguments[1] == "exec" ? 2 : 1;
+                if (slot >= arguments.Length - 1 || !arguments[slot].EndsWith(".dll", StringComparison.Ordinal)) return null;
+                actualEntry = Path.GetFullPath(arguments[slot], directory);
+            }
+            else
+            {
+                actualEntry = Path.ChangeExtension(executable, ".dll");
+                if (Path.GetFileNameWithoutExtension(executable) != Path.GetFileNameWithoutExtension(expectedEntry)) return null;
+            }
+            if (actualEntry != expectedEntry) return null;
+            string[] primaryPaths = [expectedEntry, Path.ChangeExtension(expectedEntry, ".deps.json"),
+                Path.ChangeExtension(expectedEntry, ".runtimeconfig.json")];
+            var primaryIdentities = new List<LiveFileIdentity>();
+            foreach (string path in primaryPaths)
+            {
+                if (!NoInputLinks(path)) return null;
+                LiveFileIdentity identity = await ReadLiveMetadataAsync(path, false, cancellationToken).ConfigureAwait(false);
+                if ((identity.Bits & 0xf000) != 0x8000 || identity.Bytes is < 1 or > 1_073_741_824) return null;
+                primaryIdentities.Add(identity);
+            }
+            if (!TryCaptureProjectManagedInputs(Path.GetDirectoryName(expectedEntry)!, candidate,
+                [Path.GetFileName(expectedEntry)], out var managed, out _)) return null;
+            LiveFileIdentity executableIdentity = await ReadLiveMetadataAsync(executable, false, cancellationToken).ConfigureAwait(false);
+            if ((executableIdentity.Bits & 0xf000) != 0x8000 || executableIdentity.Bytes is < 1 or > 1_073_741_824) return null;
+            string executableDigest = HashLiveExecutable(executable, executableIdentity.Bytes);
+            if (hint.Inputs is JsonElement supplied)
+            {
+                if (!VerifyLiveSuppliedInputs(supplied, process, executable, directory, actualEntry, cancellationToken))
+                    return null;
+            }
+            if (!NoInputLinks(root) || !NoInputLinks(marker) || !NoInputLinks(claim)
+                || !NoInputLinks(modelPath) || !NoInputLinks(recordPath)
+                || await ReadLiveMetadataAsync(root, false, cancellationToken).ConfigureAwait(false) != rootIdentity
+                || await ReadLiveMetadataAsync(marker, false, cancellationToken).ConfigureAwait(false) != markerIdentity
+                || await ReadLiveMetadataAsync(claim, false, cancellationToken).ConfigureAwait(false) != claimIdentity
+                || await ReadLiveMetadataAsync(modelPath, false, cancellationToken).ConfigureAwait(false) != modelIdentity
+                || await ReadLiveMetadataAsync(recordPath, false, cancellationToken).ConfigureAwait(false) != recordIdentity
+                || Encoding.ASCII.GetString(ReadBoundedFile(marker, 32)) != hint.RunId
+                || !ReadBoundedFile(modelPath, 262144).AsSpan().SequenceEqual(model)
+                || !ReadBoundedFile(recordPath, 16384).AsSpan().SequenceEqual(record)
+                || HashLiveExecutable(executable, executableIdentity.Bytes) != executableDigest
+                || !TryCaptureProjectManagedInputs(Path.GetDirectoryName(expectedEntry)!, candidate,
+                    [Path.GetFileName(expectedEntry)], out var afterManaged, out _)
+                || afterManaged!.PrivateManifestSha256 != managed!.PrivateManifestSha256
+                || !await NativeOwnerHoldsClaimAsync(invocation, owner.User, claim, claimIdentity, cancellationToken).ConfigureAwait(false)
+                || !await ProcessHoldsLiveFileAsync(hint.Pid, recordPath, recordIdentity, cancellationToken).ConfigureAwait(false)) return null;
+            for (int ordinal = 0; ordinal < primaryPaths.Length; ordinal++)
+                if (!NoInputLinks(primaryPaths[ordinal])
+                    || await ReadLiveMetadataAsync(primaryPaths[ordinal], false, cancellationToken).ConfigureAwait(false)
+                        != primaryIdentities[ordinal]) return null;
+            if (await ReadLiveMetadataAsync(executable, false, cancellationToken).ConfigureAwait(false) != executableIdentity
+                || await ReadLiveMetadataAsync(root, false, cancellationToken).ConfigureAwait(false) != rootIdentity
+                || !ReadBoundedFile(modelPath, 262144).AsSpan().SequenceEqual(model)
+                || !ReadBoundedFile(recordPath, 16384).AsSpan().SequenceEqual(record)
+                || new FileInfo("/proc/" + hint.Pid + "/exe").ResolveLinkTarget(true)?.FullName != executable
+                || new DirectoryInfo("/proc/" + hint.Pid + "/cwd").ResolveLinkTarget(true)?.FullName != directory
+                || !ReadLiveProcBytes("/proc/" + hint.Pid + "/cmdline", 65536).AsSpan().SequenceEqual(command)
+                || !SameLiveProcess(ReadManagedProcessIdentity(invocation.Pid), owner)
+                || !SameLiveProcess(ReadManagedProcessIdentity(hint.Pid), process)
+                || hint.Inputs is JsonElement suppliedAfter
+                    && !VerifyLiveSuppliedInputs(suppliedAfter, process, executable, directory, actualEntry, cancellationToken)) return null;
+            byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                schemaVersion = 1, candidateOid = candidate,
+                process = new { pid = process.Pid, start = process.Start, user = process.User, group = process.Group,
+                    session = process.Session, resource = hint.Resource, instanceSha256 = hint.InstanceSha256,
+                    resourceAssociation = "fixture-sdk-lead-metadata", executable,
+                    executableSha256 = executableDigest, entry = actualEntry, workingDirectory = directory },
+                hostRoot = new { contentRoot, applicationName, entryAssembly = recordedEntry, isWebHost, webRoot,
+                    servedAssets = servedAssets.Clone(), recordSha256 = DigestBytes(record), device = recordIdentity.Device,
+                    inode = recordIdentity.Inode, liveDescriptorMatched = true,
+                    assertionAuthority = "reviewed-child-source-and-operator" },
+                invocation, fixture = new { runId = hint.RunId, root, claimIdentity.Device, claimIdentity.Inode },
+                containerDeclarationSha256 = DigestBytes(model), containerDeclarationKind = "typed-prestart-declaration",
+                managed = JsonSerializer.Deserialize<JsonElement>(managed!.PrivateManifest)
+            });
+            if (manifest.Length > MaximumReportBytes) return null;
+            return new(manifest, DigestBytes(manifest), managed.FileCount);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException
+            or ArgumentException or InvalidOperationException or FormatException or OverflowException
+            or KeyNotFoundException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private sealed record ManagedProcessIdentity(int Pid, int Parent, uint User, int Group, int Session, ulong Start, char State);
+    private sealed record LiveFileIdentity(uint Bits, uint User, ulong Links, ulong Device, ulong Inode,
+        long Bytes, string Modified, string Created);
+
+    private static bool SameLiveProcess(ManagedProcessIdentity? current, ManagedProcessIdentity expected) =>
+        current is not null && current.State is not ('Z' or 'X') && current.Pid == expected.Pid
+        && current.Parent == expected.Parent && current.User == expected.User && current.Group == expected.Group
+        && current.Session == expected.Session && current.Start == expected.Start;
+
+    private static bool VerifyLiveSuppliedInputs(JsonElement supplied, ManagedProcessIdentity process,
+        string executable, string directory, string entry, CancellationToken cancellationToken)
+    {
+        if (!ValidManagedHintInputs(supplied, process.Pid, process.Start)
+            || Text(supplied, "Entry") != entry || Text(supplied, "Executable") != executable
+            || Text(supplied, "WorkingDirectory") != directory) return false;
+        var identities = new List<ManagedProcessIdentity>();
+        foreach (JsonElement claimed in supplied.GetProperty("Ancestry").EnumerateArray())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ManagedProcessIdentity? actual = ReadManagedProcessIdentity(claimed.GetProperty("Pid").GetInt32());
+            if (actual is null || actual.State is 'Z' or 'X' || Text(claimed, "State") is "Z" or "X"
+                || actual.Start != claimed.GetProperty("Start").GetUInt64()
+                || actual.Parent != claimed.GetProperty("Parent").GetInt32()
+                || actual.User != claimed.GetProperty("User").GetUInt32() || actual.User != process.User
+                || actual.Group != claimed.GetProperty("Group").GetInt32()
+                || actual.Session != claimed.GetProperty("Session").GetInt32()) return false;
+            identities.Add(actual);
+        }
+        foreach (JsonElement claimed in supplied.GetProperty("Files").EnumerateArray())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string path = Text(claimed, "Path");
+            if (!NoInputLinks(path)) return false;
+            var file = new FileInfo(path);
+            long bytes = claimed.GetProperty("Bytes").GetInt64();
+            long modified = claimed.GetProperty("LastWriteUtcTicks").GetInt64();
+            long created = claimed.GetProperty("CreationUtcTicks").GetInt64();
+            if (!file.Exists || file.Length != bytes || file.LastWriteTimeUtc.Ticks != modified
+                || file.CreationTimeUtc.Ticks != created
+                || !string.Equals(HashLiveExecutable(path, bytes), Text(claimed, "Sha256"), StringComparison.OrdinalIgnoreCase))
+                return false;
+            file.Refresh();
+            if (!file.Exists || !NoInputLinks(path) || file.Length != bytes
+                || file.LastWriteTimeUtc.Ticks != modified || file.CreationTimeUtc.Ticks != created) return false;
+        }
+        return identities.All(identity => SameLiveProcess(ReadManagedProcessIdentity(identity.Pid), identity));
+    }
+
+    private static string HashLiveExecutable(string path, long bytes)
+    {
+        using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (input.Length != bytes) throw new InvalidDataException("managed_executable_changed");
+        string digest = Convert.ToHexStringLower(SHA256.HashData(input));
+        if (input.Length != bytes) throw new InvalidDataException("managed_executable_changed");
+        return digest;
+    }
+
+    private static ManagedProcessIdentity? ReadManagedProcessIdentity(int pid)
+    {
+        try
+        {
+            string stat = new UTF8Encoding(false, true).GetString(ReadLiveProcBytes("/proc/" + pid + "/stat", 16384));
+            int end = stat.LastIndexOf(')');
+            if (pid <= 0 || end < 2 || !stat.StartsWith(pid + " (", StringComparison.Ordinal)) return null;
+            string[] fields = stat[(end + 2)..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            string status = new UTF8Encoding(false, true).GetString(ReadLiveProcBytes("/proc/" + pid + "/status", 65536));
+            string[] user = status.Split('\n').Single(line => line.StartsWith("Uid:", StringComparison.Ordinal))
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length < 20 || fields[0].Length != 1 || user.Length != 5
+                || !uint.TryParse(user[1], NumberStyles.None, CultureInfo.InvariantCulture, out uint uid)
+                || user.Skip(2).Any(value => !uint.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out uint other) || uid != other)
+                || !int.TryParse(fields[1], NumberStyles.None, CultureInfo.InvariantCulture, out int parent)
+                || !int.TryParse(fields[2], NumberStyles.None, CultureInfo.InvariantCulture, out int group)
+                || !int.TryParse(fields[3], NumberStyles.None, CultureInfo.InvariantCulture, out int session)
+                || !ulong.TryParse(fields[19], NumberStyles.None, CultureInfo.InvariantCulture, out ulong start)
+                || parent < 0 || group <= 0 || session <= 0 || start == 0) return null;
+            return new(pid, parent, uid, group, session, start, fields[0][0]);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private static byte[] ReadLiveProcBytes(string path, int maximum)
+    {
+        using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var output = new MemoryStream();
+        byte[] buffer = new byte[Math.Min(maximum + 1, 4096)];
+        int read;
+        while ((read = input.Read(buffer, 0, Math.Min(buffer.Length, maximum + 1 - (int)output.Length))) != 0)
+        {
+            output.Write(buffer, 0, read);
+            if (output.Length > maximum) throw new InvalidDataException("managed_proc_input_too_large");
+        }
+        return output.ToArray();
+    }
+
+    private static bool PrivateLiveFile(LiveFileIdentity identity, uint user, long bytes) =>
+        (identity.Bits & 0xf000) == 0x8000 && (identity.Bits & 0xfff) == 0x180
+        && identity.User == user && identity.Links == 1 && identity.Bytes == bytes;
+
+    private static async Task<bool> NativeOwnerHoldsClaimAsync(OwnedNativeProcessContext invocation, uint user,
+        string path, LiveFileIdentity expected, CancellationToken cancellationToken)
+    {
+        ManagedProcessIdentity? leader = ReadManagedProcessIdentity(invocation.Pid);
+        if (leader is null || leader.User != user || leader.Start != invocation.Start
+            || leader.Group != invocation.Group || leader.Session != invocation.Session || leader.State is 'Z' or 'X') return false;
+        if (await ProcessHoldsLiveFileAsync(invocation.Pid, path, expected, cancellationToken).ConfigureAwait(false)
+            && SameLiveProcess(ReadManagedProcessIdentity(invocation.Pid), leader)) return true;
+        string[] processes = Directory.EnumerateDirectories("/proc").Take(65537).ToArray();
+        if (processes.Length > 65536) return false;
+        foreach (string directory in processes)
+        {
+            if (!int.TryParse(Path.GetFileName(directory), NumberStyles.None, CultureInfo.InvariantCulture, out int pid)) continue;
+            if (pid == invocation.Pid) continue;
+            ManagedProcessIdentity? identity = ReadManagedProcessIdentity(pid);
+            if (identity is null || identity.User != user || identity.Group != invocation.Group
+                || identity.Session != invocation.Session || identity.State is 'Z' or 'X') continue;
+            if (await ProcessHoldsLiveFileAsync(pid, path, expected, cancellationToken).ConfigureAwait(false)
+                && SameLiveProcess(ReadManagedProcessIdentity(pid), identity)) return true;
+        }
+        return false;
+    }
+
+    private static async Task<bool> ProcessHoldsLiveFileAsync(int pid, string path, LiveFileIdentity expected,
+        CancellationToken cancellationToken)
+    {
+        string directory = "/proc/" + pid + "/fd";
+        string[] descriptors = Directory.EnumerateFileSystemEntries(directory).Take(4097).ToArray();
+        if (descriptors.Length > 4096) return false;
+        foreach (string descriptor in descriptors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!int.TryParse(Path.GetFileName(descriptor), NumberStyles.None, CultureInfo.InvariantCulture, out int number)
+                || number < 0 || new FileInfo(descriptor).LinkTarget != path) continue;
+            LiveFileIdentity identity = await ReadLiveMetadataAsync(descriptor, true, cancellationToken).ConfigureAwait(false);
+            string text = new UTF8Encoding(false, true).GetString(ReadLiveProcBytes("/proc/" + pid + "/fdinfo/" + number, 16384));
+            string[] flags = text.Split('\n').Single(line => line.StartsWith("flags:", StringComparison.Ordinal))
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (flags.Length != 2) return false;
+            ulong access = Convert.ToUInt64(flags[1], 8) & 3;
+            if (identity == expected && access is 1 or 2) return true;
+        }
+        return false;
+    }
+
+    private static async Task<LiveFileIdentity> ReadLiveMetadataAsync(string path, bool follow, CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(5));
+        using var process = new Process { StartInfo = new ProcessStartInfo("/usr/bin/stat")
+        {
+            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
+        } };
+        process.StartInfo.Environment.Clear();
+        process.StartInfo.Environment["LC_ALL"] = "C";
+        process.StartInfo.Environment["TZ"] = "UTC";
+        if (follow) process.StartInfo.ArgumentList.Add("--dereference");
+        foreach (string argument in new[] { "--format=%f|%u|%h|%d|%i|%s|%y|%w", "--", path }) process.StartInfo.ArgumentList.Add(argument);
+        if (!process.Start()) throw new InvalidDataException("managed_metadata_unavailable");
+        Task<string> output = ReadLiveMetadataPipeAsync(process.StandardOutput, deadline.Token);
+        Task<string> error = ReadLiveMetadataPipeAsync(process.StandardError, deadline.Token);
+        var failures = new List<Exception>();
+        string? value = null;
+        try
+        {
+            await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
+            value = await output.WaitAsync(deadline.Token).ConfigureAwait(false);
+            if ((await error.WaitAsync(deadline.Token).ConfigureAwait(false)).Length != 0 || process.ExitCode != 0)
+                throw new InvalidDataException("managed_metadata_unavailable");
+        }
+        catch (Exception failure) { failures.Add(failure); }
+        try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+        catch (Exception failure) { failures.Add(failure); }
+        try { await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None).ConfigureAwait(false); }
+        catch (Exception failure) { failures.Add(failure); }
+        try { await Task.WhenAll(output, error).WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None).ConfigureAwait(false); }
+        catch (Exception failure) { failures.Add(failure); }
+        bool outputComplete = output.IsCompleted, errorComplete = error.IsCompleted;
+        foreach (Task<string> task in new[] { outputComplete ? output : null, errorComplete ? error : null }.OfType<Task<string>>())
+        {
+            try { await task.ConfigureAwait(false); }
+            catch (Exception failure)
+            {
+                if (!failures.Any(existing => ReferenceEquals(existing, failure))) failures.Add(failure);
+            }
+        }
+        if (failures.Count != 0) throw new AggregateException(failures);
+        string[] fields = value!.TrimEnd('\n').Split('|');
+        if (fields.Length != 8 || !uint.TryParse(fields[0], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out uint bits)
+            || !uint.TryParse(fields[1], NumberStyles.None, CultureInfo.InvariantCulture, out uint user)
+            || !ulong.TryParse(fields[2], NumberStyles.None, CultureInfo.InvariantCulture, out ulong links)
+            || !ulong.TryParse(fields[3], NumberStyles.None, CultureInfo.InvariantCulture, out ulong device)
+            || !ulong.TryParse(fields[4], NumberStyles.None, CultureInfo.InvariantCulture, out ulong inode)
+            || !long.TryParse(fields[5], NumberStyles.None, CultureInfo.InvariantCulture, out long bytes) || bytes < 0
+            || fields[6].Length is < 1 or > 64 || fields[7].Length is < 1 or > 64
+            || fields.Skip(6).Any(field => field.Any(char.IsControl)))
+            throw new InvalidDataException("managed_metadata_invalid");
+        return new(bits, user, links, device, inode, bytes, fields[6], fields[7]);
+    }
+
+    private static async Task<string> ReadLiveMetadataPipeAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
+        char[] buffer = new char[513];
+        int count = 0;
+        while (count < buffer.Length)
+        {
+            int read = await reader.ReadAsync(buffer.AsMemory(count), cancellationToken).ConfigureAwait(false);
+            if (read == 0) return new string(buffer, 0, count);
+            count += read;
+        }
+        throw new InvalidDataException("managed_metadata_too_large");
+    }
+
     internal sealed record NativeManagedLaunchHint(string RunId, string Resource, string InstanceSha256,
-        int Pid, string Diagnostic, JsonElement? Inputs);
+        int Pid, ulong Start, string Diagnostic, JsonElement? Inputs);
 
     internal static bool TryReadManagedLaunchHint(byte[] bytes, string fixtureRunId,
         out NativeManagedLaunchHint? hint, out string diagnostic)
@@ -29,24 +1007,25 @@ public static partial class SecurityExecutionEvidence
                 root.GetProperty("Schema").GetInt32() != 1 || Text(root, "RunId") != fixtureRunId) return false;
             JsonElement value = root.GetProperty("Hint");
             bool hasInputs = value.TryGetProperty("Inputs", out JsonElement inputs);
-            if (hasInputs ? !ExactFields(value, "Resource", "InstanceSha256", "Pid", "Diagnostic", "Inputs")
-                : !ExactFields(value, "Resource", "InstanceSha256", "Pid", "Diagnostic")) return false;
+            if (hasInputs ? !ExactFields(value, "Resource", "InstanceSha256", "Pid", "Start", "Diagnostic", "Inputs")
+                : !ExactFields(value, "Resource", "InstanceSha256", "Pid", "Start", "Diagnostic")) return false;
             string resource = Text(value, "Resource");
             string instance = Text(value, "InstanceSha256");
             int pid = value.GetProperty("Pid").GetInt32();
+            ulong start = value.GetProperty("Start").GetUInt64();
             string reason = Text(value, "Diagnostic");
             if (resource is not ("event-migrationservice" or "explore-api" or "explore-blazor" or
                     "event-standalone" or "explore-blazor-peer") ||
-                instance.Length != 64 || !instance.All(char.IsAsciiHexDigit) || pid <= 0 ||
+                instance.Length != 64 || !instance.All(char.IsAsciiHexDigit) || pid <= 0 || start == 0 ||
                 reason.Length is < 1 or > 128 || reason.Any(character =>
                     !char.IsAsciiLetterOrDigit(character) && character is not ('_' or '-' or '.' or ':'))) return false;
             JsonElement? capturedInputs = null;
             if (hasInputs && inputs.ValueKind != JsonValueKind.Null)
             {
-                if (!ValidManagedHintInputs(inputs, pid)) return false;
+                if (!ValidManagedHintInputs(inputs, pid, start)) return false;
                 capturedInputs = inputs.Clone();
             }
-            hint = new(fixtureRunId, resource, instance, pid, reason, capturedInputs);
+            hint = new(fixtureRunId, resource, instance, pid, start, reason, capturedInputs);
             diagnostic = string.Empty;
             return true;
         }
@@ -57,13 +1036,14 @@ public static partial class SecurityExecutionEvidence
         }
     }
 
-    private static bool ValidManagedHintInputs(JsonElement inputs, int pid)
+    private static bool ValidManagedHintInputs(JsonElement inputs, int pid, ulong start)
     {
         if (!ExactFields(inputs, "Ancestry", "Executable", "WorkingDirectory", "Entry", "Files")) return false;
         string executable = Text(inputs, "Executable"), directory = Text(inputs, "WorkingDirectory"), entry = Text(inputs, "Entry");
         if (!HintAbsolutePath(executable) || !HintAbsolutePath(directory) || !HintAbsolutePath(entry)) return false;
         JsonElement ancestry = inputs.GetProperty("Ancestry");
         if (ancestry.ValueKind != JsonValueKind.Array || ancestry.GetArrayLength() is < 1 or > 128) return false;
+        if (ancestry[0].GetProperty("Start").GetUInt64() != start) return false;
         var pids = new HashSet<int>();
         int expected = pid;
         foreach (JsonElement identity in ancestry.EnumerateArray())
@@ -306,12 +1286,12 @@ public static partial class SecurityExecutionEvidence
                 : SecurityControlRegister.ReadExecutionRequirements(registerPath);
             if (!requirements.TryGetValue(laneId, out var requirement) ||
                 !TryReadNativeDiscovery(discoveryBytes, out var discovered)) return false;
-            bool load = laneId is "owned-load-control" or "owned-load-correctness";
+            bool singleton = laneId is "owned-runtime" or "owned-load-control" or "owned-load-correctness";
             bool owned = laneId.StartsWith("owned-", StringComparison.Ordinal);
             var allUids = discovered.ToDictionary(node => node.Uid, StringComparer.Ordinal);
             var identities = discovered.Select(node => node.Identity).ToHashSet();
             if ((owned ? !requirement.Tests.SetEquals(identities) : !requirement.Tests.IsSubsetOf(identities)) ||
-                (load ? invocations.Count != discovered.Count : invocations.Count != 1)) return false;
+                (singleton ? invocations.Count != discovered.Count : invocations.Count != 1)) return false;
             var registered = requirement.Tests.OrderBy(test => test.ClassName, StringComparer.Ordinal)
                 .ThenBy(test => test.MethodName, StringComparer.Ordinal).ThenBy(test => test.TestName, StringComparer.Ordinal)
                 .Select((test, index) => (test, index)).ToDictionary(item => item.test, item => item.index);
@@ -323,7 +1303,7 @@ public static partial class SecurityExecutionEvidence
             long reportBytes = 0;
             foreach (NativeInvocationInput invocation in invocations)
             {
-                if (invocation.SelectedUids.Count is < 1 or > 65_536 || (load && invocation.SelectedUids.Count != 1) ||
+                if (invocation.SelectedUids.Count is < 1 or > 65_536 || (singleton && invocation.SelectedUids.Count != 1) ||
                     invocation.ReportBytes.Length is < 1 or > MaximumReportBytes ||
                     (reportBytes = checked(reportBytes + invocation.ReportBytes.LongLength)) > MaximumReportBytes ||
                     !TryReadReport(invocation.ReportBytes, out ExecutionReport report) || !runs.Add(report.RunId) ||
@@ -377,9 +1357,9 @@ public static partial class SecurityExecutionEvidence
             var requirements = registerPath is null ? SecurityControlRegister.ExecutionRequirements
                 : SecurityControlRegister.ReadExecutionRequirements(registerPath);
             if (!requirements.TryGetValue(laneId, out var requirement)) return false;
-            bool load = laneId is "owned-load-control" or "owned-load-correctness";
+            bool singleton = laneId is "owned-runtime" or "owned-load-control" or "owned-load-correctness";
             bool owned = laneId.StartsWith("owned-", StringComparison.Ordinal);
-            if ((load ? proofs.Count != requirement.Tests.Count : proofs.Count != 1) ||
+            if ((singleton ? proofs.Count != requirement.Tests.Count : proofs.Count != 1) ||
                 proofs.Sum(proof => (long)proof.Length) > MaximumReportBytes) return false;
             var references = new HashSet<int>();
             var reports = new HashSet<string>(StringComparer.Ordinal);
@@ -400,7 +1380,7 @@ public static partial class SecurityExecutionEvidence
                 JsonElement nodes = proof.GetProperty("nodes");
                 if (!ExactFields(countsElement, "selected", "executed", "passed", "failed", "skipped") ||
                     nodes.ValueKind != JsonValueKind.Array || nodes.GetArrayLength() is < 1 or > 65_536 ||
-                    (load && nodes.GetArrayLength() != 1)) return false;
+                    (singleton && nodes.GetArrayLength() != 1)) return false;
                 ExecutionCounts counts = JsonCounts(countsElement);
                 if (counts.Selected != nodes.GetArrayLength() || counts.Executed != counts.Selected || counts.Passed != counts.Selected ||
                     counts.Failed != 0 || counts.Skipped != 0) return false;

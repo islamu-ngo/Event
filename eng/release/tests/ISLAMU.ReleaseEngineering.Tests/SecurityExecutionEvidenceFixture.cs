@@ -33,11 +33,20 @@ internal static class SecurityExecutionEvidenceFixture
                 ["laneId"] = id,
                 ["project"] = "tests/Event.Distributed.IntegrationTests/Event.Distributed.IntegrationTests.csproj",
                 ["hostProfile"] = profile,
-                ["requiredTests"] = new JsonArray(new[] { "alpha", "beta" }.Select(variant => (JsonNode)new JsonObject
+                ["requiredTests"] = new JsonArray(new[] { "alpha", "beta" }.Select(variant =>
                 {
-                    ["className"] = "Synthetic.OwnedProfile",
-                    ["methodName"] = "SyntheticWitness",
-                    ["testName"] = $"SyntheticWitness({id}, {variant})"
+                    var test = new JsonObject
+                    {
+                        ["className"] = "Synthetic.OwnedProfile",
+                        ["methodName"] = "SyntheticWitness",
+                        ["testName"] = $"SyntheticWitness({id}, {variant})"
+                    };
+                    if (id == "owned-runtime") test["lifecycle"] = new JsonObject
+                    {
+                        ["stage"] = "none", ["completion"] = "success", ["directContainers"] = false,
+                        ["resource"] = null, ["signals"] = new JsonArray(), ["rootDisposition"] = "not-applicable"
+                    };
+                    return (JsonNode)test;
                 }).ToArray())
             });
         }
@@ -122,7 +131,7 @@ internal static class SecurityExecutionEvidenceFixture
             });
             File.WriteAllBytes(Path.Combine(reportDirectory, id + ".discovery.json"), discoveryBytes);
             var artifacts = new List<object>();
-            bool separate = id is "owned-load-control" or "owned-load-correctness";
+            bool separate = id is "owned-runtime" or "owned-load-control" or "owned-load-correctness";
             int invocations = separate ? registered.Length : 1;
             for (int invocation = 0; invocation < invocations; invocation++)
             {

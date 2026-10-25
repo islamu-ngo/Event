@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Seed;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.AspNetCore.Authentication;
@@ -61,12 +62,12 @@ internal sealed class ApiBenchmarkHostFactory : WebApplicationFactory<global::Pr
             services.AddTestContextOwners();
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
-            services.AddHostedService<BenchmarkSeedingHostedService>();
         });
 
         builder.ConfigureTestServices(services =>
         {
-            services.RemoveProductHostedServices();
+            services.RemoveAll<IHostedService>();
+            services.AddHostedService<BenchmarkSeedingHostedService>();
             services.RemoveAll<IExternalDataProtectionSource>();
             services.AddSingleton<IExternalDataProtectionSource>(_dataProtection);
             services.AddAuthentication(options =>
@@ -95,12 +96,15 @@ internal sealed class ApiBenchmarkHostFactory : WebApplicationFactory<global::Pr
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             using var scope = serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var global = scope.ServiceProvider.GetRequiredService<IGlobalExploreDbContextFactory>();
+            var tenants = scope.ServiceProvider.GetRequiredService<ITenantExploreDbContextFactory>();
+            await using var dbContext = await global.CreateDbContextAsync(cancellationToken);
             if (!dbContext.Database.IsInMemory())
                 throw new InvalidOperationException("benchmark_inmemory_request_provider_required");
             await DatabaseSeeder.SeedAsync(dbContext, environment, NullLogger.Instance, cancellationToken: cancellationToken);
-            await BenchmarkApiSeedData.SeedAsync(dbContext, cancellationToken);
-            if (await dbContext.Events.CountAsync(evt => evt.Slug != null && evt.Slug.StartsWith("benchmark-api-event-"), cancellationToken) != 24)
+            await BenchmarkApiSeedData.SeedAsync(dbContext, tenants, cancellationToken);
+            await using var tenant = await tenants.CreateDbContextAsync(SeedIds.DefaultTenantId, cancellationToken);
+            if (await tenant.Events.CountAsync(evt => evt.Slug != null && evt.Slug.StartsWith("benchmark-api-event-"), cancellationToken) != 24)
                 throw new InvalidOperationException("benchmark_inmemory_dataset_invalid");
             var lookupCache = scope.ServiceProvider.GetService<ILookupDataCache>();
             if (lookupCache is not null)

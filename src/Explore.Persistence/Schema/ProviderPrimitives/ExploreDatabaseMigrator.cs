@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 
 namespace Explore.Persistence.Schema;
 
@@ -79,12 +80,10 @@ public static class ExploreDatabaseMigrator
         await MigrateCoreAsync(migrationDatabase, configuration, cancellationToken);
         logger.LogInformation("Database migration operation {Operation} completed.", "Application");
 
-        await using var executionDatabase = CreateNamespaceExecutionContext(migrationDatabase);
+        await using var executionDatabase = CreateNamespaceExecutionContext(migrationDatabase, forSeeding: true);
         await SqliteDatabaseInitializer.InitializeAsync(executionDatabase, cancellationToken);
         if (executionDatabase.Database.IsNpgsql())
         {
-            await PostgresModelConstraintApplier.ApplyAsync(executionDatabase, cancellationToken);
-            await PostgresTenantRowLevelSecurityModel.ApplyAsync(executionDatabase, cancellationToken);
             if (writerEnrollment is not null)
             {
                 await PostgresLocalIdentityWriterPermissions.ApplyAsync(executionDatabase, writerEnrollment,
@@ -144,12 +143,17 @@ public static class ExploreDatabaseMigrator
         await db.Database.MigrateAsync(cancellationToken);
         var mapping = db.GetService<IDbContextOptions>().FindExtension<RelationalNamespaceOptionsExtension>();
         await using var mappedDatabase = mapping is not null && mapping.ModelSchema != mapping.TargetSchema
-            ? CreateNamespaceExecutionContext(db)
+            ? CreateNamespaceExecutionContext(db, forSeeding: false)
             : null;
         var executionDatabase = mappedDatabase ?? db;
         PostgresNativeQueueEnrollment? queueEnrollment = executionDatabase.Database.IsNpgsql()
             ? PostgresNativeQueueEnrollment.Bind(configuration)
             : null;
+        if (executionDatabase.Database.IsNpgsql())
+        {
+            await PostgresModelConstraintApplier.ApplyAsync(executionDatabase, cancellationToken);
+            await PostgresTenantRowLevelSecurityModel.ApplyAsync(executionDatabase, cancellationToken);
+        }
         await PostgresDiscoverySnapshotMaintenanceContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresTenantLookupContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresDiscoveryDisclosureContract.ApplyAsync(executionDatabase, cancellationToken);
@@ -294,7 +298,8 @@ public static class ExploreDatabaseMigrator
         await PostgresInstanceStorageAdministrationContract.ApplyAsync(executionDatabase, cancellationToken);
         if (queueEnrollment is not null)
             await PostgresStorageReconciliationContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
-        await PostgresLocalStorageQuarantineContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresLocalStorageQuarantineContract.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
         if (queueEnrollment is not null)
         {
             await PostgresDiscoveryMetadataPermissions.ApplyAsync(executionDatabase, queueEnrollment, cancellationToken);
@@ -328,7 +333,7 @@ public static class ExploreDatabaseMigrator
         return enrollment;
     }
 
-    private static ExploreDbContext CreateNamespaceExecutionContext(ExploreDbContext migrationDatabase)
+    private static ExploreDbContext CreateNamespaceExecutionContext(ExploreDbContext migrationDatabase, bool forSeeding)
     {
         var originalOptions = migrationDatabase.GetService<IDbContextOptions>();
         var options = new DbContextOptionsBuilder<ExploreDbContext>(
@@ -338,6 +343,8 @@ public static class ExploreDatabaseMigrator
             ((IDbContextOptionsBuilderInfrastructure)options).AddOrUpdateExtension(
                 new RelationalNamespaceOptionsExtension(mapping.TargetSchema, mapping.TargetSchema));
         }
+        if (forSeeding && migrationDatabase.Database.IsNpgsql())
+            new NpgsqlDbContextOptionsBuilder(options).MaxBatchSize(1);
         var context = new ExploreDbContext(options.Options);
         context.BindTenantLease();
         return context;

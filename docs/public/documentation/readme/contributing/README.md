@@ -57,6 +57,16 @@ Interested in how we leverage autonomous AI agents with deterministic rigor? Rea
 
 ---
 
+## API Benchmark Measurements
+
+The native PostgreSQL benchmark redesign retains six API read operations, including authenticated my-events and event-creation context. It uses canonical database bootstrap, separate database purpose accounts, genuine Local login with mandatory initial password replacement, and 24 published InformationOnly events created through the API. Startup, dataset creation and session refresh occur outside the measured request. ASP.NET Core TestServer, disabled output caching and disabled background workers define the comparison profile.
+
+Native invocation requires the existing supervised parent-run ownership context before setup: paired `ISLAMU_TEST_RUN_ID`/`ISLAMU_TEST_ROOT`, private child temporary storage, the existing private ownership marker and an explicit Unix `DOCKER_HOST`. Preserve the selected parent endpoint when narrowing TMPDIR. Setup rejects missing ownership, selects the cached PostgreSQL image without pulling, and flushes private creation intent before constructing the named container. These records stay outside request timing and public artifacts. The parent must independently establish actual child, daemon, image and resource ownership before cleanup; an intent record alone is insufficient. Compilation alone does not prove native execution or cleanup.
+
+Functional calibration selects all six cases with `--filter '*ApiEndpointPostgreSqlBenchmarks*' --job Dry --inProcess --stopOnFirstError`. Method-only CLI listings do not establish a single Scenario selection. The existing four-minute setup cancellation bound remains; the supervised calibration has a 30-minute outer limit followed by SIGINT and a 60-second grace period before enforced termination and owned cleanup. Stop at the first failure, retain partial results honestly, and check actual artifacts for credential canaries. This does not authorize unattended retries or relaxing setup deadlines.
+
+Execution admission is pending. The unsupported InMemory API factory will be retired only after all six native PostgreSQL cases succeed; the three database-free EF query-construction benchmarks remain. A Dry command or zero process exit code is insufficient: reviewers require completed case results, dataset correctness, secret-safe artifacts and exact owned-container cleanup. Credentials must come from the controlled benchmark child environment and must never appear in arguments, BenchmarkDotNet job metadata or reports. Timing comparisons use the existing default .NET 10 adaptive job targeting 1% relative error and three comparable quiet runs, separately from Dry. Missing required physical pressure metrics or quiet-host evidence prevents capacity inference; this harness establishes no production latency or capacity guarantee.
+
 ## Dependency Graph Checks
 
 The repository-owned Dependency Submission workflow is intended to replace

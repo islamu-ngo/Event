@@ -32,6 +32,10 @@ public static class PostgresExternalApiKeyAuthenticationContract
     public static Task RequireReadyAsync(ExploreDbContext context, PostgresNativeQueueEnrollment? enrollment,
         CancellationToken cancellationToken = default) => Profile.RequireReadyAsync(context, enrollment, cancellationToken);
     internal static string GlobalPolicyException(ExploreDbContext context, string globalLogin) => Profile.PolicyException(context, globalLogin);
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        Profile.CompleteGlobalCataloguePredicate(context, enrollment);
+    internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) =>
+        Profile.GlobalCatalogueRelations(context);
 }
 
 /// <summary>Fixed-column catalogue mechanics shared by the two authentication sources, never business queries.</summary>
@@ -152,6 +156,14 @@ internal sealed class PostgresAuthenticationSourceProfile(Type type, string role
         var source = Map(context);
         return $"n.nspname={Text(source.Schema)} AND c.relname={Text(source.Name)} AND ({string.Join(" OR ", Privileges.Select(privilege => PolicyPredicate(source, globalLogin, privilege)))})";
     }
+
+    internal string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        Validate(enrollment);
+        return Catalogue(context, Map(context), enrollment, complete: true);
+    }
+
+    internal IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) => [Map(context).Table];
 
     private string[] Privileges => updateProperties.Length == 0 ? ["SELECT"] : ["SELECT", "UPDATE"];
     private string PolicyName(string privilege) => policyPrefix + (privilege == "SELECT" ? "_read" : "_usage");

@@ -684,6 +684,34 @@ case ended at the FreshEF process wait with cancellation and did not produce a
 whole-case pass. The final supported-engine matrix remains pending. This
 HEAD-only capability commit projection has not been compiled independently.
 
+The managed-worker settings attestation composes the complete installed Storage,
+OrdinarySettings, EventResource and PolicySourceSet trigger cohorts with each
+owner's exact readiness checks. Canonical constraints and row-level security must
+exist before strict source-catalogue installers run. Recognition of a trigger
+does not replace its owner/body/ACL/stamp/target-shape validation or permit an
+unknown trigger. The existing worker's fixed column INSERT permissions remain
+distinct from forbidden table-wide writes and runtime/public grants.
+
+Storage-probe source validation accepts only the canonical Global policies with
+an absent-or-complete worker catalogue. Traversal readiness reuses the unchanged
+complete Runtime parent-read guard for `Tenant.Id`; an extra `Tenant.Slug` read
+remains forbidden. Shared read projections also compose the fixed Runtime
+reference, Actor ownership and catalogue-backed membership SELECT/UPDATE/DELETE
+permissions needed by existing application purposes. Actor/publisher catalogue
+proof and publication fanout also compose the exact fixed Global preference
+profile, retaining their source shape, row security and native-body checks.
+The closed composition also includes the fixed worker/outbox delivery INSERT
+profile, Runtime storage reconciliation/quarantine readiness, and the existing
+API-key and scanner capability catalogue profiles. The resulting nine complete
+Global profiles retain their native owner, body, policy and privilege proofs;
+composing their mapped relations does not add a grant. Remaining
+settings owners reuse the complete registered purpose-profile proofs; relations
+outside those mappings and unsupported grants remain forbidden. A matching
+relation name or an empty privilege count cannot replace the complete proof.
+Within one Mixed guard evaluation, repeated canonical proofs are factored and
+reused by its existing relation checks. This retains the same validation and
+does not cache authority across operations or bypass native enrollment checks.
+
 Fresh composition installs `PostgresCategoryReadPermissions` after the fixed
 lookup catalogue profile. The declared migration identity provisions schema
 access and direct, non-grantable Runtime SELECT on exactly the six mapped
@@ -713,6 +741,39 @@ assertions. These receipts do not form a fresh full current 33-case Green run.
 A final coherent full Category class and required provider matrix remain
 outstanding, and these results do not establish Global storage readiness or a
 full current suite pass.
+
+Fresh bootstrap also binds the existing quarantine capability role to the
+configured Global role with inheritance enabled, role switching disabled and
+membership administration disabled. The real Global positive must obtain this
+binding from the installer; a test-only `GRANT` cannot manufacture eligibility.
+Other purpose privileges remain unchanged.
+
+The outer Npgsql migration seeding context clones its existing options and uses
+supported EF statement batches of one. The Core mapped context retains its
+ordinary batching. This purpose-limited selection preserves the existing Save
+transaction, retries, command timeout and native guards; it is not the temporary
+120-second diagnostic command setting. Permanent controls must verify preserved
+options, all seeded rows after success, and no seeded rows after a later batch
+fails. Their actual native execution remains required.
+
+Permanent canaries add an unknown Global policy or grant an extra read, verify
+refusal without implicit
+cleanup, then explicitly restore the test target. These compositions do not grant
+arbitrary application privileges.
+
+These changed native body fingerprints target a **fresh development bootstrap**.
+Older installed bodies remain rejected by fail-closed validation; this change
+provides no supported in-place transition from them and performs no automatic
+reset or data deletion. See the [operator development-bootstrap boundary](../public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md#postgresql-settings-contract-development-bootstrap).
+
+`PostgresMigrationPrerequisiteTests` selects both public migration paths twice in
+an owned nondefault PostgreSQL schema. Its negative cases disable canonical
+triggers, add an unknown trigger and escalate Global INSERT rights, then verify
+refusal without implicit repair before explicit test restoration. Fresh-path
+execution and the existing Global reattestation selection remain required
+runtime gates; source review or two fresh invocations alone cannot prove an
+upgrade from older installed bodies. No user database is modified by this
+verification.
 
 Run provider classes separately. Combining long-lived container classes in one
 tree filter can bypass the intended TUnit isolation and obscure which engine

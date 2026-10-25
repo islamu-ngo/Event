@@ -704,7 +704,7 @@ public sealed class SecurityExecutionEvidenceTests
                 byte[] discovery = File.ReadAllBytes(Path.Combine(reports, id + ".discovery.json"));
                 string[] uids = JsonNode.Parse(discovery)!["tests"]!.AsArray()
                     .Select(node => node!["uid"]!.GetValue<string>()).ToArray();
-                var invocations = id is "owned-load-control" or "owned-load-correctness"
+                var invocations = id is "owned-runtime" or "owned-load-control" or "owned-load-correctness"
                     ? uids.Select((uid, ordinal) => new SecurityExecutionEvidence.NativeInvocationInput([uid],
                         File.ReadAllBytes(Path.Combine(reports, id + "." + ordinal + ".trx")))).ToArray()
                     : new[] { new SecurityExecutionEvidence.NativeInvocationInput(uids, File.ReadAllBytes(Path.Combine(reports, id + ".trx"))) };

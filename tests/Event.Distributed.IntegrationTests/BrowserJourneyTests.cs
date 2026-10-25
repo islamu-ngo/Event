@@ -18,6 +18,63 @@ public sealed class BrowserJourneyTests
         {
             await LoginAsync(host, browser.Page);
             await AssertAuthenticatedAsync(browser, true);
+            var cookies = (await browser.Context.CookiesAsync()).Where(cookie =>
+                cookie.HttpOnly && cookie.Name.StartsWith(".AspNetCore.Cookies", StringComparison.Ordinal)).ToArray();
+            await Assert.That(cookies.Length > 0).IsTrue();
+
+            using HttpClient api = await AuthenticatedApiAsync(host, cancellationToken);
+            string slug = await SelectActiveTenantAsync(host, api, cancellationToken);
+            DateTimeOffset start = DateTimeOffset.UtcNow.AddDays(7);
+            using JsonDocument created = await PostAsync(api, "/api/Event", new
+            {
+                title = "Browser session assurance event", description = "Owned peer circuit assurance.",
+                eventFormatId = 2, eventTimeZoneId = "UTC",
+                participationConfiguration = new { participationHandlingModeId = 4, advanceRegistrationObligationId = 3, identityAccessModeId = 1 },
+                sessions = new[] { new { tempKey = "session", title = "Browser session assurance", startTime = start, endTime = start.AddHours(1), endTimeType = 0 } }
+            }, cancellationToken);
+            Guid eventId = created.RootElement.GetProperty("id").GetGuid();
+            using JsonDocument details = await ReadAsync(api, $"/api/Event/{eventId:D}/management-detail", cancellationToken);
+            using JsonDocument published = await PostAsync(api, $"/api/Event/{eventId:D}/publish", new
+            {
+                expectedConcurrencyStamp = details.RootElement.GetProperty("concurrencyStamp").GetGuid()
+            }, cancellationToken);
+            using JsonDocument management = await ReadAsync(api, $"/api/event/{eventId:D}/resources/management", cancellationToken);
+            await Assert.That(management.RootElement.GetProperty("_links").TryGetProperty("export", out JsonElement export)).IsTrue();
+            string exportPath = $"/api/event/{eventId:D}/resources/export";
+            await Assert.That(string.Equals(export.GetProperty("href").GetString(), exportPath, StringComparison.Ordinal)).IsTrue();
+
+            using HttpClient peerEndpoint = host.CreateHttpClient("explore-blazor-peer");
+            await using var peer = await OwnedBrowserContext.CreateAsync(peerEndpoint.BaseAddress!);
+            await Assert.That((await peer.Context.CookiesAsync()).Count == 0).IsTrue();
+            await peer.Context.AddCookiesAsync(cookies.Select(cookie => new Microsoft.Playwright.Cookie
+            {
+                Name = cookie.Name, Value = cookie.Value, Domain = cookie.Domain, Path = cookie.Path,
+                HttpOnly = cookie.HttpOnly, Secure = cookie.Secure, SameSite = cookie.SameSite, Expires = cookie.Expires
+            }));
+            await AssertAuthenticatedAsync(peer, true);
+            IAPIResponse before = await peer.Context.APIRequest.GetAsync($"/{slug}{exportPath}");
+            try { await Assert.That(before.Status).IsEqualTo(200); }
+            finally { await before.DisposeAsync(); }
+            string resourcesPath = $"/{slug}/studio/events/{eventId:D}/resources";
+            var connected = new TaskCompletionSource<IWebSocket>(TaskCreationOptions.RunContinuationsAsynchronously);
+            peer.Page.WebSocket += (_, socket) =>
+            {
+                if (Uri.TryCreate(socket.Url, UriKind.Absolute, out Uri? address)
+                    && (address.AbsolutePath == "/_blazor" || address.AbsolutePath == $"/{slug}/_blazor"))
+                    connected.TrySetResult(socket);
+            };
+            await peer.Page.GotoAsync(resourcesPath);
+            IWebSocket connection = await connected.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            ILocator exportButton = peer.Page.GetByRole(AriaRole.Button, new() { Name = "Export metadata", Exact = true });
+            await Expect(exportButton).ToBeVisibleAsync();
+            await peer.Page.GetByRole(AriaRole.Button, new() { Name = "New resource", Exact = true }).ClickAsync();
+            await Expect(peer.Page.GetByLabel("Title", new() { Exact = true })).ToBeVisibleAsync();
+            await peer.Page.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+            await Expect(peer.Page.GetByLabel("Title", new() { Exact = true })).ToHaveCountAsync(0);
+            await Assert.That(connection.IsClosed).IsFalse();
+            await Expect(peer.Page.GetByRole(AriaRole.Region, new() { Name = "Export metadata", Exact = true })).ToHaveCountAsync(0);
+            bool peerDownloaded = false;
+            peer.Page.Download += (_, _) => peerDownloaded = true;
 
             await browser.Page.GotoAsync("/logout?returnUrl=/login");
             await Expect(browser.Page.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true }))
@@ -27,7 +84,45 @@ public sealed class BrowserJourneyTests
             await Expect(browser.Page.GetByLabel("Username or email", new() { Exact = true })).ToBeVisibleAsync();
             await Expect(browser.Page.GetByRole(AriaRole.Heading, new() { Name = "Create Event", Exact = true }))
                 .ToHaveCountAsync(0);
-        });
+
+            await exportButton.ClickAsync();
+            await Expect(peer.Page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
+            string peerPath = new Uri(peer.Page.Url).AbsolutePath;
+            await Assert.That(peerPath == resourcesPath || peerPath == "/login" || peerPath == $"/{slug}/login").IsTrue();
+            await AssertAuthenticatedAsync(peer, false);
+            await Expect(peer.Page.GetByRole(AriaRole.Region, new() { Name = "Export metadata", Exact = true })).ToHaveCountAsync(0);
+            await Expect(peer.Page.GetByText("Authorized metadata export loaded.", new() { Exact = true })).ToHaveCountAsync(0);
+            await Assert.That(peerDownloaded).IsFalse();
+
+            using HttpClient endpoint = host.CreateHttpClient("explore-blazor");
+            await using var replay = await OwnedBrowserContext.CreateAsync(endpoint.BaseAddress!);
+            await Assert.That((await replay.Context.CookiesAsync()).Count == 0).IsTrue();
+            await AssertAuthenticatedAsync(replay, false);
+            await replay.Context.AddCookiesAsync(cookies.Select(cookie => new Microsoft.Playwright.Cookie
+            {
+                Name = cookie.Name,
+                Value = cookie.Value,
+                Domain = cookie.Domain,
+                Path = cookie.Path,
+                HttpOnly = cookie.HttpOnly,
+                Secure = cookie.Secure,
+                SameSite = cookie.SameSite,
+                Expires = cookie.Expires
+            }));
+            await AssertAuthenticatedAsync(replay, false);
+            await replay.Page.GotoAsync("/events/create");
+            await Expect(replay.Page.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
+            await Expect(replay.Page.GetByRole(AriaRole.Heading, new() { Name = "Create Event", Exact = true })).ToHaveCountAsync(0);
+            using HttpClient controlEndpoint = host.CreateHttpClient("explore-blazor-peer");
+            await using var control = await OwnedBrowserContext.CreateAsync(controlEndpoint.BaseAddress!);
+            await Assert.That((await control.Context.CookiesAsync()).Count == 0).IsTrue();
+            await AssertAuthenticatedAsync(control, false);
+            await LoginAsync(host, control.Page);
+            await AssertAuthenticatedAsync(control, true);
+            IAPIResponse after = await control.Context.APIRequest.GetAsync($"/{slug}{exportPath}");
+            try { await Assert.That(after.Status).IsEqualTo(200); }
+            finally { await after.DisposeAsync(); }
+        }, deploymentMode: "MultiTenant", profile: Explore.AppHost.OwnedAppHostProfile.ExternalIdentitySharedBff);
 
     [Test]
     public Task ExpiredBrowserCookieRequiresFreshCredentials() => RunAsync(
@@ -351,7 +446,7 @@ public sealed class BrowserJourneyTests
 
     private static async Task RunAsync(BrowserJourney journey,
         Func<OwnedAppHostFixture, OwnedBrowserContext, CancellationToken, Task> scenario,
-        string deploymentMode = "SingleTenant")
+        string deploymentMode = "SingleTenant", Explore.AppHost.OwnedAppHostProfile profile = Explore.AppHost.OwnedAppHostProfile.Standard)
     {
         try
         {
@@ -360,7 +455,7 @@ public sealed class BrowserJourneyTests
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
             timeout.CancelAfter(TimeSpan.FromMinutes(15));
             await using var host = await OwnedAppHostFixture.CreateAsync("Split", timeout.Token,
-                configuredAdministrator: true, deploymentMode: deploymentMode);
+                configuredAdministrator: true, deploymentMode: deploymentMode, profile: profile);
             await host.StartAsync(timeout.Token);
             using HttpClient endpoint = host.CreateHttpClient("explore-blazor");
             await using var browser = await OwnedBrowserContext.CreateAsync(endpoint.BaseAddress!);

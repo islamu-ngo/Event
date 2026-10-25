@@ -40,7 +40,8 @@ public sealed class ApiFixtureLifecycleTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
-        await AssertLifecycleBoundaryAsync(factory, client);
+        await using var database = factory.CreateMigratorContext();
+        await AssertLifecycleBoundaryAsync(database, client);
     }
 
     [Test]
@@ -48,8 +49,7 @@ public sealed class ApiFixtureLifecycleTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory();
         using var client = factory.CreateClient();
-        using var scope = factory.Services.CreateScope();
-        var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await using var database = factory.CreateMigratorContext();
         await Assert.That(await database.Tenants.AnyAsync()).IsFalse();
         using var response = await client.GetAsync("/api/category");
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
@@ -59,6 +59,11 @@ public sealed class ApiFixtureLifecycleTests
     {
         using var scope = factory.Services.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await AssertLifecycleBoundaryAsync(database, client);
+    }
+
+    private static async Task AssertLifecycleBoundaryAsync(ExploreDbContext database, HttpClient client)
+    {
         var tenant = await database.Tenants.SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId);
         await Assert.That(tenant.TenantStatusId).IsEqualTo((int)TenantStatusEnum.Active);
         using var active = await client.GetAsync("/api/category");

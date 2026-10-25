@@ -2,6 +2,8 @@
 
 The Browser profile checks real sign-in, mandatory first password replacement, logout, browser session expiry, keyboard navigation, Arabic/English layout, tenant routing and free-ticket registration. It also checks actual mobile sidebar focus trapping and restoration, desktop dock geometry, accessible resource-form errors, and denied resource management for a separately provisioned ordinary local account. It starts a disposable local Event installation and uses generated test identities. It does not connect to an existing deployment or use your personal account.
 
+The logout journey also replays the original session cookies in a fresh browser context after logout. A passing result requires the server to reject that replay and challenge again on the protected page. It leaves an Interactive Server resources page connected on a peer BFF and verifies that its next protected export action exposes the anonymous sign-in control without producing an export or download, while a fresh independent login still succeeds. The test does not navigate or reload the peer page to obtain this result; the application may redirect it to sign-in. Cookies are held only in memory, with no storage export. These guards require an actual healthy-host run; compilation and clearing the original browser's cookies do not establish their outcomes.
+
 Use a Docker-compatible runtime and the repository's .NET SDK. The test fixture selects its Environment secret authority and owns its temporary resources. Run from the repository checkout, with temporary files on a disk-backed directory:
 
 ```bash

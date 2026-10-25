@@ -147,7 +147,7 @@ public static partial class SecurityExecutionEvidence
                 var proofs = new List<byte[]>();
                 int measuredCount = 0;
                 JsonElement artifacts = lane.GetProperty("artifacts");
-                int expectedInvocations = id is "owned-load-control" or "owned-load-correctness"
+                int expectedInvocations = id is "owned-runtime" or "owned-load-control" or "owned-load-correctness"
                     ? requirement.Tests.Count : 1;
                 if (artifacts.GetArrayLength() != expectedInvocations)
                 {

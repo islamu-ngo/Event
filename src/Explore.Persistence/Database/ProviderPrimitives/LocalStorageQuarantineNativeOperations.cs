@@ -8,14 +8,22 @@ namespace Explore.Persistence.Database.ProviderPrimitives;
 internal sealed class LocalStorageQuarantineNativeOperations
 {
     private readonly ExploreDbContext context;
+    private readonly PostgresNativeQueueEnrollment enrollment;
 
-    private LocalStorageQuarantineNativeOperations(ExploreDbContext context) => this.context = context;
+    private LocalStorageQuarantineNativeOperations(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        this.context = context;
+        this.enrollment = enrollment;
+    }
 
-    internal static LocalStorageQuarantineNativeOperations? TryBind(ExploreDbContext context) =>
-        context.Database.IsNpgsql() ? new(context) : null;
+    internal static LocalStorageQuarantineNativeOperations? TryBind(
+        ExploreDbContext context, PostgresNativeQueueEnrollment? enrollment) =>
+        context.Database.IsNpgsql()
+            ? new(context, enrollment ?? throw new InvalidOperationException("local_storage_quarantine_enrollment_required"))
+            : null;
 
     internal Task RequireReadyAsync(CancellationToken cancellationToken) =>
-        PostgresLocalStorageQuarantineContract.RequireReadyAsync(context, cancellationToken);
+        PostgresLocalStorageQuarantineContract.RequireReadyAsync(context, enrollment, cancellationToken);
 
     internal Task<bool> InspectAsync(Guid bindingId, string objectKey, CancellationToken cancellationToken) =>
         context.Database.SqlQueryRaw<bool>(

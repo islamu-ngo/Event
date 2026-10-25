@@ -1040,6 +1040,62 @@ public sealed class AppHostOwnershipTests
         public Task StopAsync(CancellationToken cancellationToken) => Task.FromException(failure);
     }
 
+    [Test]
+    public async Task ManagedLaunchPublicationRetainsDistinctIncarnationsWithoutDuplicatePollFiles()
+    {
+        if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("private_host_observation_requires_linux");
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var owner = new PrivateHostRoot();
+        var resource = new ProjectResource("managed-restart-control");
+        var observation = new OwnedAppHostFixture.ManagedResourceLaunchObservation([resource], owner.Id, owner.Root);
+        string instance = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(owner.Id)));
+        var invalid = await Assert.That(async () => await observation.PublishObservedIncarnationAsync(
+            resource, instance, 101, 0, "managed_launch_inputs_unavailable:process_not_owned", null, deadline.Token))
+            .Throws<InvalidOperationException>();
+        await Assert.That(invalid!.Message == "test_managed_launch_hint_invalid" && observation.Rows.Count == 0
+            && Directory.GetFiles(owner.Root, "managed-launch-*.json").Length == 0).IsTrue();
+        (int Pid, ulong Start)[] incarnations =
+        [
+            (101, 11), (102, 12), (102, 13)
+        ];
+        foreach (var incarnation in incarnations)
+        {
+            await observation.PublishObservedIncarnationAsync(resource, instance, incarnation.Pid, incarnation.Start,
+                "managed_launch_inputs_unavailable:process_not_owned", null, deadline.Token);
+            await observation.PublishObservedIncarnationAsync(resource, instance, incarnation.Pid, incarnation.Start,
+                "managed_launch_inputs_unavailable:process_not_owned", null, deadline.Token);
+        }
+        string[] paths = Directory.GetFiles(owner.Root, "managed-launch-*.json");
+        await Assert.That(paths.Length == incarnations.Length && observation.Rows.Count == incarnations.Length).IsTrue()
+            .Because("Each controlled incarnation requires one retained lead; identical polls require none.");
+        var observed = new HashSet<(int Pid, ulong Start)>();
+        foreach (string path in paths)
+        {
+            byte[] bytes = await File.ReadAllBytesAsync(path, deadline.Token);
+            using var document = System.Text.Json.JsonDocument.Parse(bytes);
+            var hint = document.RootElement.GetProperty("Hint");
+            bool complete = hint.GetProperty("Resource").GetString() == resource.Name
+                && hint.GetProperty("InstanceSha256").GetString() == instance
+                && hint.TryGetProperty("Start", out var start) && start.TryGetUInt64(out ulong kernelStart)
+                && kernelStart > 0 && observed.Add((hint.GetProperty("Pid").GetInt32(), kernelStart));
+            await Assert.That(complete && File.GetUnixFileMode(path) ==
+                (UnixFileMode.UserRead | UnixFileMode.UserWrite)).IsTrue();
+        }
+        await Assert.That(observed.SetEquals(incarnations)).IsTrue();
+        for (ulong start = 14; start <= 74; start++)
+            await observation.PublishObservedIncarnationAsync(resource, instance, 102, start,
+                "managed_launch_inputs_unavailable:process_not_owned", null, deadline.Token);
+        await observation.PublishObservedIncarnationAsync(resource, instance, 102, 74,
+            "managed_launch_inputs_unavailable:process_not_owned", null, deadline.Token);
+        var limit = await Assert.That(async () => await observation.PublishObservedIncarnationAsync(
+            resource, instance, 102, 75, "managed_launch_inputs_unavailable:process_not_owned", null, deadline.Token))
+            .Throws<InvalidOperationException>();
+        await Assert.That(limit!.Message == "test_managed_launch_observation_limit"
+            && Directory.GetFiles(owner.Root, "managed-launch-*.json").Length == 64
+            && observation.Rows.Count == 64 && observed.All(incarnation => observation.Rows.Any(row =>
+                row.Pid == incarnation.Pid && row.Start == incarnation.Start))).IsTrue();
+    }
+
     private sealed class PrivateHostRoot : IDisposable
     {
         internal string Id { get; } = Guid.NewGuid().ToString("N");

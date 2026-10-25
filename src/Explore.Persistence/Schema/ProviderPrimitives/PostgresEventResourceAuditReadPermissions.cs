@@ -164,6 +164,12 @@ public static class PostgresEventResourceAuditReadPermissions
         return $"COALESCE((session_user={Text(enrolledGlobalLogin)} AND current_user=session_user AND n.nspname={Text(audit.Schema)} AND c.relname={Text(audit.Name)} AND ({PolicyPredicate(audit, enrolledGlobalLogin, ReadPolicy)})),false)";
     }
 
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment) =>
+        Manifest(Audit(context), Map<Tenant>(context, nameof(Tenant.Id)), enrollment, complete: true);
+
+    internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) =>
+        [Audit(context).Table, Map<Tenant>(context, nameof(Tenant.Id)).Table];
+
     private static string Manifest(Source audit, Source tenant, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         string global = Text(enrollment.GlobalLogin), migrator = Text(enrollment.MigratorLogin);

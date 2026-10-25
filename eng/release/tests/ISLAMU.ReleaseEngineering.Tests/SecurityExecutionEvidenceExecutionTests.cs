@@ -30,11 +30,11 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
     }
 
     [Test]
-    [Arguments("owned-runtime", 2, "1440s", 1455)]
+    [Arguments("owned-runtime", 1, "720s", 735)]
     [Arguments("owned-browser-journeys", 2, "2400s", 2415)]
     [Arguments("owned-browser-security", 2, "1500s", 1515)]
     [Arguments("owned-browser-journeys", 1, "1200s", 1215)]
-    [Arguments("owned-runtime", 33, "19800s", 19815)]
+    [Arguments("owned-browser-journeys", 33, "19800s", 19815)]
     public async Task SerialOwnedBatchBudgetIncludesEverySelectedCaseAndItsLifecycleAllowance(
         string lane, int count, string expectedTimeout, int expectedDeadlineSeconds)
     {
@@ -49,6 +49,17 @@ public sealed class SecurityExecutionEvidenceIntegrationTests
         await Assert.That(timeout).IsEqualTo(2 + count);
         await Assert.That(arguments[timeout + 1]).IsEqualTo(expectedTimeout);
         await Assert.That(launch.Deadline.TotalSeconds).IsEqualTo((double)expectedDeadlineSeconds);
+        if (lane == "owned-runtime")
+        {
+            bool rejected = false;
+            try
+            {
+                _ = SecurityExecutionEvidence.NativeExecutionStartInfo("/owned/tests.dll", ["first uid", "second uid"],
+                    "/owned/tmp/results", "/owned/tmp", "execution.trx", requirement.HostProfile, lane);
+            }
+            catch (InvalidDataException) { rejected = true; }
+            await Assert.That(rejected).IsTrue();
+        }
     }
 
     [Test]
@@ -125,7 +136,7 @@ public sealed class SecurityExecutionEvidenceManagedHintTests
             ["Schema"] = 1, ["RunId"] = owner,
             ["Hint"] = new JsonObject
             {
-                ["Resource"] = "event-migrationservice", ["InstanceSha256"] = instance, ["Pid"] = 123,
+                ["Resource"] = "event-migrationservice", ["InstanceSha256"] = instance, ["Pid"] = 123, ["Start"] = 42,
                 ["Diagnostic"] = "managed_launch_os_inputs_observed",
                 ["Inputs"] = new JsonObject
                 {
@@ -152,12 +163,22 @@ public sealed class SecurityExecutionEvidenceManagedHintTests
         await Assert.That(baseline.Resource).IsEqualTo("event-migrationservice");
         await Assert.That(baseline.InstanceSha256).IsEqualTo(instance);
         await Assert.That(baseline.Pid).IsEqualTo(123);
+        await Assert.That(baseline.Start).IsEqualTo(42UL);
         await Assert.That(baseline.Inputs.HasValue).IsTrue();
         JsonElement baselineInputs = baseline.Inputs.GetValueOrDefault();
         await Assert.That(baselineInputs.GetProperty("Entry").GetString()).IsEqualTo(entry);
         await Assert.That(baselineInputs.GetProperty("Files").EnumerateArray()
             .Select(file => file.GetProperty("Path").GetString()).SequenceEqual(files)).IsTrue();
         JsonObject hint = document["Hint"]!.AsObject();
+        foreach (string invalidStart in new[] { "missing", "zero", "different-from-inputs" })
+        {
+            JsonObject malformed = document.DeepClone().AsObject();
+            JsonObject malformedHint = malformed["Hint"]!.AsObject();
+            if (invalidStart == "missing") malformedHint.Remove("Start");
+            else malformedHint["Start"] = invalidStart == "zero" ? 0 : 43;
+            await Assert.That(SecurityExecutionEvidence.TryReadManagedLaunchHint(
+                JsonSerializer.SerializeToUtf8Bytes(malformed), owner, out _, out _)).IsFalse();
+        }
         switch (variant)
         {
             case "lead-without-inputs": hint.Remove("Inputs"); hint["Diagnostic"] = "managed_launch_inputs_unavailable"; break;
@@ -166,6 +187,7 @@ public sealed class SecurityExecutionEvidenceManagedHintTests
                 hint["Resource"] = "explore-blazor-peer";
                 hint["InstanceSha256"] = new string('C', 64);
                 hint["Pid"] = 321;
+                hint["Start"] = 43;
                 hint["Inputs"]!["Ancestry"]![0]!["Pid"] = 321;
                 hint["Inputs"]!["Ancestry"]![0]!["Parent"] = 320;
                 hint["Inputs"]!["Ancestry"]![0]!["Group"] = 321;
@@ -204,6 +226,7 @@ public sealed class SecurityExecutionEvidenceManagedHintTests
             await Assert.That(result.Resource).IsEqualTo(variant == "selected-peer" ? "explore-blazor-peer" : "event-migrationservice");
             await Assert.That(result.InstanceSha256).IsEqualTo(variant == "selected-peer" ? new string('C', 64) : instance);
             await Assert.That(result.Pid).IsEqualTo(variant == "selected-peer" ? 321 : 123);
+            await Assert.That(result.Start).IsEqualTo(variant == "selected-peer" ? 43UL : 42UL);
             await Assert.That(result.Inputs.HasValue).IsEqualTo(variant is not ("lead-without-inputs" or "lead-null-inputs"));
             if (result.Inputs is JsonElement inputs)
             {
@@ -213,6 +236,857 @@ public sealed class SecurityExecutionEvidenceManagedHintTests
                     .IsEqualTo(variant == "selected-peer" ? 321 : 123);
             }
         }
+    }
+}
+
+public sealed class SecurityExecutionEvidenceParentModelTests
+{
+    [Test]
+    public async Task LiveChildPossessionCannotBeReplacedByCopiedBytesOrDifferentProcessInputs()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var fixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
+        using var caller = new CancellationTokenSource(TimeSpan.FromSeconds(50));
+        ProcessStartInfo command = await fixture.CommandAsync("managed-witness");
+        ProcessStartInfo laterCommand = await fixture.CommandAsync("managed-claim");
+        string temporary = command.WorkingDirectory;
+        command.Environment["TMPDIR"] = temporary;
+        laterCommand.ArgumentList[laterCommand.ArgumentList.IndexOf("--results-directory") + 1] =
+            Path.Combine(temporary, "later-results");
+        File.SetUnixFileMode(temporary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        string owner = Path.GetFileName(temporary)[^32..];
+        string root = Path.Combine(temporary, "islamu-assurance", owner);
+        string lead = Path.Combine(root, "managed-control-lead.json");
+        string entry = typeof(SecurityExecutionEvidenceParentModelTests).Assembly.Location;
+        string otherEntry = typeof(SecurityExecutionEvidence).Assembly.Location;
+        await Assert.That(File.Exists(entry) && File.Exists(otherEntry)).IsTrue();
+        await Assert.That(otherEntry).IsNotEqualTo(entry);
+        string version = typeof(SecurityExecutionEvidence).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+        string candidate = version[(version.LastIndexOf('+') + 1)..];
+        await Assert.That(candidate.Length is 40 or 64 && candidate.All(character =>
+            char.IsAsciiDigit(character) || character is >= 'a' and <= 'f')).IsTrue();
+        SecurityExecutionEvidence.OwnedNativeProcessContext? identity = null;
+        SecurityExecutionEvidence.NativeManagedLaunchHint? hint = null;
+        var result = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(command,
+            TimeSpan.FromSeconds(55), caller.Token, async (context, stop) =>
+            {
+                if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
+                identity = context;
+                using var ready = CancellationTokenSource.CreateLinkedTokenSource(stop);
+                ready.CancelAfter(TimeSpan.FromSeconds(10));
+                while (!File.Exists(lead)) await Task.Delay(10, ready.Token);
+                await Assert.That(SecurityExecutionEvidence.TryReadManagedLaunchHint(File.ReadAllBytes(lead), owner,
+                    out hint, out _)).IsTrue();
+                var selectedHint = hint ?? throw new InvalidDataException("native_managed_control_lead_missing");
+                await Assert.That(selectedHint.Pid).IsEqualTo(context.Pid);
+                var baseline = await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                    temporary, root, selectedHint, entry, candidate, stop);
+                await Assert.That(baseline is not null).IsTrue();
+                await Assert.That(baseline!.PrivateManifestSha256).IsEqualTo(
+                    Convert.ToHexString(SHA256.HashData(baseline.PrivateManifest)).ToLowerInvariant());
+                using JsonDocument manifest = JsonDocument.Parse(baseline.PrivateManifest);
+                JsonElement process = manifest.RootElement.GetProperty("process");
+                await Assert.That(process.GetProperty("pid").GetInt32()).IsEqualTo(context.Pid);
+                await Assert.That(process.GetProperty("start").GetUInt64()).IsEqualTo(context.Start);
+                await Assert.That(process.GetProperty("entry").GetString()).IsEqualTo(entry);
+                await Assert.That(process.GetProperty("resource").GetString()).IsEqualTo("event-migrationservice");
+                await Assert.That(process.GetProperty("instanceSha256").GetString()).IsEqualTo(new string('c', 64));
+                await Assert.That(manifest.RootElement.GetProperty("candidateOid").GetString()).IsEqualTo(candidate);
+                var declared = await SecurityExecutionEvidence.CaptureLiveFixtureModelAsync(context,
+                    temporary, root, owner, stop);
+                await Assert.That(declared is not null).IsTrue();
+                await Assert.That(declared!.Containers.Count).IsEqualTo(0);
+                await Assert.That(declared.ModelSha256).IsEqualTo(
+                    Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(root, "container-model.json")))));
+                var creations = await SecurityExecutionEvidence.CaptureLiveNativeContainerCreationsAsync(
+                    context, temporary, owner, "api", stop);
+                var observedCreations = creations
+                    ?? throw new InvalidDataException("native_container_creator_possession_not_joined");
+                await Assert.That(observedCreations.Created.Count).IsEqualTo(1);
+                await Assert.That(observedCreations.PendingCreationIds.Count).IsEqualTo(0);
+                string declarationPath = Directory.GetFiles(root, "api-container-*-declaration.json").Single();
+                byte[] declarationBytes = File.ReadAllBytes(declarationPath);
+                using JsonDocument creationDocument = JsonDocument.Parse(declarationBytes);
+                string creationId = creationDocument.RootElement.GetProperty("CreationId").GetString()!;
+                string declarationDigest = Convert.ToHexStringLower(SHA256.HashData(declarationBytes));
+                await Assert.That(observedCreations.Created.Single()).IsEqualTo(new SecurityExecutionEvidence.NativeCreatedContainer(
+                    owner, creationId, context.Pid, "keycloak", "example.invalid/creator-control:local",
+                    new string('a', 64), declarationDigest));
+                string createdPath = Directory.GetFiles(root, "api-container-*-created-*.json").Single();
+                File.Move(createdPath, createdPath + ".held-control");
+                try
+                {
+                    var pendingCreation = await SecurityExecutionEvidence.CaptureLiveNativeContainerCreationsAsync(
+                        context, temporary, owner, "api", stop);
+                    await Assert.That(pendingCreation is not null).IsTrue();
+                    await Assert.That(pendingCreation!.Created.Count).IsEqualTo(0);
+                    await Assert.That(pendingCreation.PendingCreationIds.SetEquals([creationId])).IsTrue();
+                }
+                finally { File.Move(createdPath + ".held-control", createdPath); }
+                foreach (string pairPath in new[] { declarationPath, createdPath })
+                {
+                    byte[] originalBytes = File.ReadAllBytes(pairPath);
+                    File.Move(pairPath, pairPath + ".held-control");
+                    try
+                    {
+                        using (var copied = new FileStream(pairPath, new FileStreamOptions
+                        {
+                            Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                            UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                        }))
+                        {
+                            copied.Write(originalBytes);
+                            copied.Flush(true);
+                        }
+                        await Assert.That((await SecurityExecutionEvidence.CaptureLiveNativeContainerCreationsAsync(
+                            context, temporary, owner, "api", stop)) is null).IsTrue();
+                    }
+                    finally
+                    {
+                        File.Delete(pairPath);
+                        File.Move(pairPath + ".held-control", pairPath);
+                    }
+                    await Assert.That((await SecurityExecutionEvidence.CaptureLiveNativeContainerCreationsAsync(
+                        context, temporary, owner, "api", stop)) is not null).IsTrue();
+                }
+                using (var nextCreatorSignal = new FileStream(Path.Combine(root, "managed-control-next-creation"),
+                    new FileStreamOptions
+                    {
+                        Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                        UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                    }))
+                    nextCreatorSignal.Flush(true);
+                string nextCreatorReadyPath = Path.Combine(root, "managed-control-next-creation-ready");
+                using var nextCreatorReady = CancellationTokenSource.CreateLinkedTokenSource(stop);
+                nextCreatorReady.CancelAfter(TimeSpan.FromSeconds(10));
+                while (!File.Exists(nextCreatorReadyPath)) await Task.Delay(10, nextCreatorReady.Token);
+                string nextCreatorId = File.ReadAllText(nextCreatorReadyPath, Encoding.ASCII);
+                await Assert.That(nextCreatorId.Length == 32 && nextCreatorId != creationId).IsTrue();
+                var nextCreatorCapture = await SecurityExecutionEvidence.CaptureLiveNativeContainerCreationsAsync(
+                    context, temporary, owner, "api", stop, nextCreatorId);
+                if (nextCreatorCapture is null)
+                    throw new InvalidDataException("native_api_next_live_creation_not_joined");
+                await Assert.That(nextCreatorCapture.Created.Count).IsEqualTo(1);
+                await Assert.That(nextCreatorCapture.PendingCreationIds.Count).IsEqualTo(0);
+                string nextCreatorDeclaration = Path.Combine(root, "api-container-cerbos-" + nextCreatorId + "-declaration.json");
+                await Assert.That(nextCreatorCapture.Created.Single()).IsEqualTo(new SecurityExecutionEvidence.NativeCreatedContainer(
+                    owner, nextCreatorId, context.Pid, "cerbos", "example.invalid/creator-control:next",
+                    new string('d', 64), Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(nextCreatorDeclaration)))));
+                await Assert.That((await SecurityExecutionEvidence.CaptureLiveNativeContainerCreationsAsync(
+                    context, temporary, owner, "api", stop, creationId)) is null).IsTrue();
+                await Assert.That((await SecurityExecutionEvidence.CaptureLiveNativeContainerCreationsAsync(
+                    context, temporary, owner, "api", stop)) is null).IsTrue();
+                await Assert.That((await SecurityExecutionEvidence.CaptureLiveNativeContainerCreationsAsync(
+                    context, temporary, owner, "api", stop, nextCreatorId)) is not null).IsTrue();
+                string hostedRecord = Path.Combine(root, $"managed-host-root-{context.Pid}-{context.Start}.json");
+                File.Move(hostedRecord, hostedRecord + ".not-hosted");
+                try
+                {
+                    await Assert.That((await SecurityExecutionEvidence.CaptureLiveFixtureModelAsync(context,
+                        temporary, root, owner, stop)) is not null).IsTrue();
+                    await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                        temporary, root, selectedHint, entry, candidate, stop)) is null).IsTrue();
+                }
+                finally { File.Move(hostedRecord + ".not-hosted", hostedRecord); }
+                string liveStat = File.ReadAllText("/proc/" + context.Pid + "/stat");
+                string[] liveFields = liveStat[(liveStat.LastIndexOf(')') + 2)..].Split(' ');
+                string executable = process.GetProperty("executable").GetString()!;
+                string[] inputPaths = [executable, entry, Path.ChangeExtension(entry, ".deps.json"),
+                    Path.ChangeExtension(entry, ".runtimeconfig.json")];
+                JsonObject supplied = new()
+                {
+                    ["Ancestry"] = new JsonArray(new JsonObject
+                    {
+                        ["Pid"] = context.Pid, ["Parent"] = int.Parse(liveFields[1], System.Globalization.CultureInfo.InvariantCulture),
+                        ["User"] = process.GetProperty("user").GetUInt32(), ["Group"] = context.Group,
+                        ["Session"] = context.Session, ["Start"] = context.Start, ["State"] = liveFields[0]
+                    }),
+                    ["Executable"] = executable, ["WorkingDirectory"] = process.GetProperty("workingDirectory").GetString(),
+                    ["Entry"] = entry, ["Files"] = new JsonArray(inputPaths.Select(path =>
+                    {
+                        var file = new FileInfo(path);
+                        using var bytes = File.OpenRead(path);
+                        return (JsonNode)new JsonObject
+                        {
+                            ["Path"] = path, ["Bytes"] = file.Length,
+                            ["Sha256"] = Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                            ["LastWriteUtcTicks"] = file.LastWriteTimeUtc.Ticks, ["CreationUtcTicks"] = file.CreationTimeUtc.Ticks
+                        };
+                    }).ToArray())
+                };
+                byte[] HintBytes(JsonObject inputs) => JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    Schema = 1, RunId = owner, Hint = new { selectedHint.Resource, selectedHint.InstanceSha256,
+                        selectedHint.Pid, selectedHint.Start, Diagnostic = "managed_launch_os_inputs_observed", Inputs = inputs }
+                });
+                await Assert.That(SecurityExecutionEvidence.TryReadManagedLaunchHint(HintBytes(supplied), owner,
+                    out var parsedInputs, out _)).IsTrue();
+                var withInputs = parsedInputs ?? throw new InvalidDataException("native_managed_control_inputs_missing");
+                await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                    temporary, root, withInputs, entry, candidate, stop)) is not null).IsTrue();
+                foreach (string conflict in new[] { "group", "session", "parent", "bytes", "sha256", "modified", "created" })
+                {
+                    JsonObject bad = supplied.DeepClone().AsObject();
+                    JsonObject head = bad["Ancestry"]![0]!.AsObject(), file = bad["Files"]![1]!.AsObject();
+                    switch (conflict)
+                    {
+                        case "group": head["Group"] = context.Group + 1; break;
+                        case "session": head["Session"] = context.Session + 1; break;
+                        case "parent": head["Parent"] = head["Parent"]!.GetValue<int>() + 1; break;
+                        case "bytes": file["Bytes"] = file["Bytes"]!.GetValue<long>() + 1; break;
+                        case "sha256": file["Sha256"] = new string('0', 64); break;
+                        case "modified": file["LastWriteUtcTicks"] = file["LastWriteUtcTicks"]!.GetValue<long>() + 1; break;
+                        case "created": file["CreationUtcTicks"] = file["CreationUtcTicks"]!.GetValue<long>() + 1; break;
+                    }
+                    await Assert.That(SecurityExecutionEvidence.TryReadManagedLaunchHint(HintBytes(bad), owner,
+                        out var parsedConflict, out _)).IsTrue();
+                    var conflicting = parsedConflict ?? throw new InvalidDataException("native_managed_control_conflict_missing");
+                    var rejected = await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                        temporary, root, conflicting, entry, candidate, stop);
+                    if (rejected is not null) throw new InvalidDataException("native_managed_conflict_accepted_" + conflict);
+                }
+                using (var laterCaller = CancellationTokenSource.CreateLinkedTokenSource(stop))
+                {
+                    laterCaller.CancelAfter(TimeSpan.FromSeconds(20));
+                    var laterResult = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(laterCommand,
+                        TimeSpan.FromSeconds(25), laterCaller.Token, async (later, laterStop) =>
+                        {
+                            using var laterReady = CancellationTokenSource.CreateLinkedTokenSource(laterStop);
+                            laterReady.CancelAfter(TimeSpan.FromSeconds(10));
+                            string receipt = Path.Combine(root, "managed-claim-ready-" + later.Pid);
+                            while (!File.Exists(receipt)) await Task.Delay(10, laterReady.Token);
+                            await Assert.That(File.ReadAllText(receipt)).IsEqualTo("claim-held");
+                            await Assert.That(later.Pid).IsNotEqualTo(context.Pid);
+                            await Assert.That(later.Start > context.Start).IsTrue();
+                            await Assert.That(Directory.EnumerateFileSystemEntries("/proc/" + later.Pid + "/fd")
+                                .Any(path => new FileInfo(path).LinkTarget == Path.Combine(root, ".apphost-claim"))).IsTrue();
+                            await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                                temporary, root, selectedHint, entry, candidate, laterStop)) is not null).IsTrue();
+                            var earlierTarget = await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(later,
+                                temporary, root, selectedHint, entry, candidate, laterStop);
+                            await Assert.That(earlierTarget is null).IsTrue();
+                            await laterCaller.CancelAsync();
+                        });
+                    if (laterResult.ObserverFailures.Count != 0)
+                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(laterResult.ObserverFailures[0]).Throw();
+                    await Assert.That(laterResult.Cancelled).IsTrue();
+                    await Assert.That(laterResult.Succeeded).IsFalse();
+                    await Assert.That(laterResult.CleanupSucceeded && laterResult.ObserverSettled).IsTrue();
+                    await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                        temporary, root, selectedHint, entry, candidate, stop)) is not null).IsTrue();
+                }
+                foreach (string variant in new[] { "wrong-pid", "wrong-start", "wrong-target-start", "outside-root", "wrong-entry", "wrong-candidate" })
+                {
+                    var selected = variant == "wrong-pid" ? selectedHint with { Pid = Environment.ProcessId }
+                        : variant == "wrong-target-start" ? selectedHint with { Start = selectedHint.Start + 1 } : selectedHint;
+                    var invocation = variant == "wrong-start" ? context with { Start = context.Start + 1 } : context;
+                    var rejected = await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(invocation,
+                        temporary, variant == "outside-root" ? temporary : root, selected,
+                        variant == "wrong-entry" ? otherEntry : entry,
+                        variant == "wrong-candidate" ? new string('0', candidate.Length) : candidate, stop);
+                    await Assert.That(rejected is null).IsTrue();
+                }
+                File.SetUnixFileMode(root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                    | UnixFileMode.GroupRead | UnixFileMode.GroupExecute);
+                try
+                {
+                    await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                        temporary, root, selectedHint, entry, candidate, stop)) is null).IsTrue();
+                }
+                finally
+                {
+                    File.SetUnixFileMode(root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                }
+                string record = Path.Combine(root, $"managed-host-root-{context.Pid}-{context.Start}.json");
+                string original = record + ".original";
+                File.Move(record, original);
+                try
+                {
+                    using (var replacement = new FileStream(record, new FileStreamOptions
+                    {
+                        Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                        UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                    }))
+                        await replacement.WriteAsync(File.ReadAllBytes(original), stop);
+                    await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                        temporary, root, selectedHint, entry, candidate, stop)) is null).IsTrue();
+                }
+                finally
+                {
+                    File.Delete(record);
+                    File.Move(original, record);
+                }
+                await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(context,
+                    temporary, root, selectedHint, entry, candidate, stop)) is not null).IsTrue();
+                await caller.CancelAsync();
+            });
+        if (result.ObserverFailures.Count != 0)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(result.ObserverFailures[0]).Throw();
+        await Assert.That(result.Cancelled).IsTrue();
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.CleanupSucceeded).IsTrue();
+        await Assert.That(result.ObserverSettled).IsTrue();
+        await Assert.That(fixture.OwnedChildrenRemain()).IsFalse();
+        await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(identity!,
+            temporary, root, hint!, entry, candidate, CancellationToken.None)) is null).IsTrue();
+
+        using var launcherFixture = new SecurityExecutionEvidenceProcessTests.ProcessFixture();
+        using var launcherCaller = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+        ProcessStartInfo launcherCommand = await launcherFixture.CommandAsync("managed-launcher");
+        ProcessStartInfo unrelatedCommand = await launcherFixture.CommandAsync("managed-claim");
+        string launcherTemporary = launcherCommand.WorkingDirectory;
+        File.SetUnixFileMode(launcherTemporary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        string launcherOwner = Path.GetFileName(launcherTemporary)[^32..];
+        string launcherRoot = Path.Combine(launcherTemporary, "islamu-assurance", launcherOwner);
+        unrelatedCommand.ArgumentList[unrelatedCommand.ArgumentList.IndexOf("--results-directory") + 1] =
+            Path.Combine(launcherTemporary, "unrelated-results");
+        var launcherResult = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(launcherCommand,
+            TimeSpan.FromSeconds(45), launcherCaller.Token, async (launcher, launcherStop) =>
+            {
+                if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
+                using var launcherReady = CancellationTokenSource.CreateLinkedTokenSource(launcherStop);
+                launcherReady.CancelAfter(TimeSpan.FromSeconds(10));
+                string launcherLead = Path.Combine(launcherRoot, "managed-control-lead.json");
+                while (!File.Exists(launcherLead)) await Task.Delay(10, launcherReady.Token);
+                await Assert.That(SecurityExecutionEvidence.TryReadManagedLaunchHint(File.ReadAllBytes(launcherLead),
+                    launcherOwner, out var parsedLauncher, out _)).IsTrue();
+                var launcherHint = parsedLauncher ?? throw new InvalidDataException("native_launcher_hint_missing");
+                await Assert.That(launcherHint.Pid == launcher.Pid && launcherHint.Start == launcher.Start).IsTrue();
+                using var unrelatedCaller = CancellationTokenSource.CreateLinkedTokenSource(launcherStop);
+                unrelatedCaller.CancelAfter(TimeSpan.FromSeconds(25));
+                var unrelatedResult = await SecurityExecutionEvidence.RunOwnedNativeProcessAsync(unrelatedCommand,
+                    TimeSpan.FromSeconds(30), unrelatedCaller.Token, async (unrelated, unrelatedStop) =>
+                    {
+                        if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
+                        using var hostReady = CancellationTokenSource.CreateLinkedTokenSource(unrelatedStop);
+                        hostReady.CancelAfter(TimeSpan.FromSeconds(10));
+                        string unrelatedReceipt = Path.Combine(launcherRoot, "managed-claim-ready-" + unrelated.Pid);
+                        while (!File.Exists(unrelatedReceipt)) await Task.Delay(10, hostReady.Token);
+                        await Assert.That(File.ReadAllText(unrelatedReceipt)).IsEqualTo("claim-held");
+                        await Assert.That(unrelated.Start > launcher.Start && unrelated.Pid != launcher.Pid).IsTrue();
+                        string[] siblingReceipts;
+                        do
+                        {
+                            siblingReceipts = Directory.GetFiles(launcherRoot, "managed-claim-ready-*")
+                                .Where(path => path != unrelatedReceipt).ToArray();
+                            if (siblingReceipts.Length == 0) await Task.Delay(10, hostReady.Token);
+                        } while (siblingReceipts.Length == 0);
+                        await Assert.That(siblingReceipts.Length).IsEqualTo(1);
+                        await Assert.That(File.ReadAllText(siblingReceipts[0])).IsEqualTo("claim-held");
+                        int siblingPid = int.Parse(Path.GetFileName(siblingReceipts[0])["managed-claim-ready-".Length..],
+                            System.Globalization.CultureInfo.InvariantCulture);
+                        string siblingStat = File.ReadAllText("/proc/" + siblingPid + "/stat");
+                        string[] siblingFields = siblingStat[(siblingStat.LastIndexOf(')') + 2)..].Split(' ');
+                        ulong siblingStart = ulong.Parse(siblingFields[19], System.Globalization.CultureInfo.InvariantCulture);
+                        await Assert.That(int.Parse(siblingFields[1], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(launcher.Pid);
+                        await Assert.That(int.Parse(siblingFields[2], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(launcher.Group);
+                        await Assert.That(int.Parse(siblingFields[3], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(launcher.Session);
+                        await Assert.That(siblingPid != unrelated.Pid && siblingStart >= launcher.Start).IsTrue();
+                        string launcherUser = File.ReadLines("/proc/" + launcher.Pid + "/status")
+                            .Single(line => line.StartsWith("Uid:", StringComparison.Ordinal));
+                        await Assert.That(File.ReadLines("/proc/" + siblingPid + "/status")
+                            .Single(line => line.StartsWith("Uid:", StringComparison.Ordinal))).IsEqualTo(launcherUser);
+                        await Assert.That(Directory.EnumerateFileSystemEntries("/proc/" + siblingPid + "/fd")
+                            .Any(path => new FileInfo(path).LinkTarget == Path.Combine(launcherRoot, ".apphost-claim"))).IsTrue();
+                        // This private control signal coordinates real process order; it is not an evidence carrier.
+                        using (var signal = new FileStream(Path.Combine(launcherRoot, "managed-control-start-host"),
+                            new FileStreamOptions
+                            {
+                                Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                            }))
+                            await signal.FlushAsync(unrelatedStop);
+                        string[] hostRecords;
+                        do
+                        {
+                            hostRecords = Directory.GetFiles(launcherRoot, "managed-host-root-*.json");
+                            if (hostRecords.Length == 0) await Task.Delay(10, hostReady.Token);
+                        } while (hostRecords.Length == 0);
+                        await Assert.That(hostRecords.Length).IsEqualTo(1);
+                        using JsonDocument hostRecord = JsonDocument.Parse(File.ReadAllBytes(hostRecords[0]));
+                        int hostPid = hostRecord.RootElement.GetProperty("Pid").GetInt32();
+                        ulong hostStart = hostRecord.RootElement.GetProperty("Start").GetUInt64();
+                        string hostStat = File.ReadAllText("/proc/" + hostPid + "/stat");
+                        string[] hostFields = hostStat[(hostStat.LastIndexOf(')') + 2)..].Split(' ');
+                        await Assert.That(int.Parse(hostFields[1], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(launcher.Pid);
+                        await Assert.That(ulong.Parse(hostFields[19], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(hostStart);
+                        await Assert.That(hostStart >= unrelated.Start && hostPid != launcher.Pid && hostPid != unrelated.Pid).IsTrue();
+                        await Assert.That(hostPid != siblingPid && hostStart >= siblingStart).IsTrue();
+                        await Assert.That(File.ReadLines("/proc/" + hostPid + "/status")
+                            .Single(line => line.StartsWith("Uid:", StringComparison.Ordinal))).IsEqualTo(launcherUser);
+                        await Assert.That(int.Parse(hostFields[2], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(launcher.Group);
+                        await Assert.That(int.Parse(hostFields[3], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(launcher.Session);
+                        await Assert.That(File.Exists(Path.Combine(launcherRoot,
+                            $"managed-host-root-{launcher.Pid}-{launcher.Start}.json"))).IsFalse();
+                        var hostHint = launcherHint with { Pid = hostPid, Start = hostStart };
+                        var hostedBaseline = await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(launcher,
+                            launcherTemporary, launcherRoot, hostHint, entry, candidate, unrelatedStop);
+                        await Assert.That(hostedBaseline is not null).IsTrue();
+                        var joined = await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(launcher,
+                            launcherTemporary, launcherRoot, launcherHint, entry, candidate, unrelatedStop);
+                        if (joined is null) throw new InvalidDataException("native_launcher_host_ancestry_not_joined");
+                        using JsonDocument joinedManifest = JsonDocument.Parse(joined.PrivateManifest);
+                        await Assert.That(joinedManifest.RootElement.GetProperty("process").GetProperty("pid").GetInt32())
+                            .IsEqualTo(hostPid);
+                        await Assert.That(joinedManifest.RootElement.GetProperty("process").GetProperty("start").GetUInt64())
+                            .IsEqualTo(hostStart);
+                        await Assert.That(joinedManifest.RootElement.GetProperty("process").GetProperty("entry").GetString())
+                            .IsEqualTo(entry);
+                        using JsonDocument baselineManifest = JsonDocument.Parse(hostedBaseline!.PrivateManifest);
+                        await Assert.That(joinedManifest.RootElement.GetProperty("hostRoot").GetRawText())
+                            .IsEqualTo(baselineManifest.RootElement.GetProperty("hostRoot").GetRawText());
+                        JsonElement sdkLead = joinedManifest.RootElement.GetProperty("sdkLead");
+                        await Assert.That(sdkLead.GetProperty("pid").GetInt32()).IsEqualTo(launcher.Pid);
+                        await Assert.That(sdkLead.GetProperty("start").GetUInt64()).IsEqualTo(launcher.Start);
+                        string launcherStat = File.ReadAllText("/proc/" + launcher.Pid + "/stat");
+                        string[] launcherFields = launcherStat[(launcherStat.LastIndexOf(')') + 2)..].Split(' ');
+                        int launcherParent = int.Parse(launcherFields[1], System.Globalization.CultureInfo.InvariantCulture);
+                        uint user = baselineManifest.RootElement.GetProperty("process").GetProperty("user").GetUInt32();
+                        await Assert.That(sdkLead.GetProperty("hostAncestry").EnumerateArray().Select(node =>
+                            (node.GetProperty("Pid").GetInt32(), node.GetProperty("Start").GetUInt64(),
+                                node.GetProperty("Parent").GetInt32(), node.GetProperty("User").GetUInt32(),
+                                node.GetProperty("Group").GetInt32(), node.GetProperty("Session").GetInt32()))
+                            .SequenceEqual(new[]
+                            {
+                                (hostPid, hostStart, launcher.Pid, user, launcher.Group, launcher.Session),
+                                (launcher.Pid, launcher.Start, launcherParent, user, launcher.Group, launcher.Session)
+                            })).IsTrue();
+                        foreach (var invalidLead in new[]
+                        {
+                            launcherHint with { Start = launcherHint.Start + 1 },
+                            launcherHint with { Pid = siblingPid, Start = siblingStart },
+                            launcherHint with { Pid = unrelated.Pid, Start = unrelated.Start }
+                        })
+                            await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(launcher,
+                                launcherTemporary, launcherRoot, invalidLead, entry, candidate, unrelatedStop)) is null).IsTrue();
+                        using (var signal = new FileStream(Path.Combine(launcherRoot, "managed-control-start-second-host"),
+                            new FileStreamOptions
+                            {
+                                Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                            }))
+                            await signal.FlushAsync(unrelatedStop);
+                        using var secondReady = CancellationTokenSource.CreateLinkedTokenSource(unrelatedStop);
+                        secondReady.CancelAfter(TimeSpan.FromSeconds(10));
+                        string[] secondRecords;
+                        do
+                        {
+                            secondRecords = Directory.GetFiles(launcherRoot, "managed-host-root-*.json")
+                                .Where(path => path != hostRecords[0]).ToArray();
+                            if (secondRecords.Length == 0) await Task.Delay(10, secondReady.Token);
+                        } while (secondRecords.Length == 0);
+                        await Assert.That(secondRecords.Length).IsEqualTo(1);
+                        using JsonDocument secondRecord = JsonDocument.Parse(File.ReadAllBytes(secondRecords[0]));
+                        int secondPid = secondRecord.RootElement.GetProperty("Pid").GetInt32();
+                        ulong secondStart = secondRecord.RootElement.GetProperty("Start").GetUInt64();
+                        await Assert.That(secondPid != hostPid && secondStart >= hostStart).IsTrue();
+                        string secondStat = File.ReadAllText("/proc/" + secondPid + "/stat");
+                        string[] secondFields = secondStat[(secondStat.LastIndexOf(')') + 2)..].Split(' ');
+                        await Assert.That(int.Parse(secondFields[1], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(launcher.Pid);
+                        await Assert.That(int.Parse(secondFields[2], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(launcher.Group);
+                        await Assert.That(int.Parse(secondFields[3], System.Globalization.CultureInfo.InvariantCulture))
+                            .IsEqualTo(launcher.Session);
+                        var secondHint = launcherHint with { Pid = secondPid, Start = secondStart };
+                        await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(launcher,
+                            launcherTemporary, launcherRoot, secondHint, entry, candidate, unrelatedStop)) is not null).IsTrue();
+                        await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(launcher,
+                            launcherTemporary, launcherRoot, hostHint, entry, candidate, unrelatedStop)) is not null).IsTrue();
+                        await Assert.That((await SecurityExecutionEvidence.CaptureLiveManagedInputsAsync(launcher,
+                            launcherTemporary, launcherRoot, launcherHint, entry, candidate, unrelatedStop)) is null).IsTrue();
+                        await unrelatedCaller.CancelAsync();
+                    });
+                if (unrelatedResult.ObserverFailures.Count != 0)
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(unrelatedResult.ObserverFailures[0]).Throw();
+                await Assert.That(unrelatedResult.Cancelled && !unrelatedResult.Succeeded
+                    && unrelatedResult.CleanupSucceeded && unrelatedResult.ObserverSettled).IsTrue();
+                await launcherCaller.CancelAsync();
+            });
+        if (launcherResult.ObserverFailures.Count != 0)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(launcherResult.ObserverFailures[0]).Throw();
+        await Assert.That(launcherResult.Cancelled && !launcherResult.Succeeded
+            && launcherResult.CleanupSucceeded && launcherResult.ObserverSettled).IsTrue();
+        await Assert.That(launcherFixture.OwnedChildrenRemain()).IsFalse();
+    }
+
+    [Test]
+    public async Task PrivateDeclarationRequiresExactOwnerResourceImageAndMountInventory()
+    {
+        const string owner = "4f9adeeb61e4486599a1fc15b6d31d27";
+        string source = "islamu-test-" + owner + "-data";
+        JsonObject Model() => new()
+        {
+            ["Schema"] = 1, ["RunId"] = owner,
+            ["Projects"] = new JsonArray(new JsonObject
+            {
+                ["Name"] = "event-migrationservice",
+                ["ProjectPath"] = "/candidate/src/Event.MigrationService/Event.MigrationService.csproj"
+            }),
+            ["Containers"] = new JsonArray(new JsonObject
+            {
+                ["Name"] = "native-model-control", ["Image"] = "registry.example.test/native/model:control",
+                ["PullPolicy"] = "Never", ["Mounts"] = new JsonArray(new JsonObject
+                {
+                    ["Type"] = "Volume", ["Source"] = source, ["Target"] = "/native-data", ["ReadOnly"] = false
+                })
+            })
+        };
+        bool admitted = SecurityExecutionEvidence.TryReadConfiguredContainerDeclarations(
+            JsonSerializer.SerializeToUtf8Bytes(Model()), owner, out var baseline, out var baselineProjects);
+        await Assert.That(admitted).IsTrue();
+        await Assert.That(baselineProjects!.Single()).IsEqualTo(new SecurityExecutionEvidence.ConfiguredProjectDeclaration(
+            "event-migrationservice", "/candidate/src/Event.MigrationService/Event.MigrationService.csproj"));
+        await Assert.That(baseline!.Count).IsEqualTo(1);
+        await Assert.That(baseline[0].Name).IsEqualTo("native-model-control");
+        await Assert.That(baseline[0].Image).IsEqualTo("registry.example.test/native/model:control");
+        await Assert.That(baseline[0].Mounts.Single()).IsEqualTo(
+            new SecurityExecutionEvidence.ConfiguredMountDeclaration("Volume", source, "/native-data", false));
+
+        JsonObject sharedProject = Model();
+        var peerProject = sharedProject["Projects"]![0]!.DeepClone().AsObject();
+        peerProject["Name"] = "explore-blazor-peer";
+        sharedProject["Projects"]!.AsArray().Add(peerProject);
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredContainerDeclarations(
+            JsonSerializer.SerializeToUtf8Bytes(sharedProject), owner, out _, out var peerProjects)).IsTrue();
+        await Assert.That(peerProjects!.ToHashSet().SetEquals([
+            new SecurityExecutionEvidence.ConfiguredProjectDeclaration("event-migrationservice",
+                "/candidate/src/Event.MigrationService/Event.MigrationService.csproj"),
+            new SecurityExecutionEvidence.ConfiguredProjectDeclaration("explore-blazor-peer",
+                "/candidate/src/Event.MigrationService/Event.MigrationService.csproj")])).IsTrue();
+        foreach (string invalidProject in new[] { "missing", "unknown-field", "relative-path", "duplicate-name",
+            "container-name", "too-many-projects" })
+        {
+            JsonObject malformed = Model();
+            JsonArray projects = malformed["Projects"]!.AsArray();
+            JsonObject project = projects[0]!.AsObject();
+            switch (invalidProject)
+            {
+                case "missing": malformed.Remove("Projects"); break;
+                case "unknown-field": project["TargetPath"] = "/guessed/entry.dll"; break;
+                case "relative-path": project["ProjectPath"] = "src/project.csproj"; break;
+                case "duplicate-name": projects.Add(project.DeepClone()); break;
+                case "container-name": project["Name"] = "native-model-control"; break;
+                case "too-many-projects":
+                    for (int index = 1; index <= 64; index++)
+                    {
+                        JsonObject extra = project.DeepClone().AsObject();
+                        extra["Name"] = "project-" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        projects.Add(extra);
+                    }
+                    break;
+            }
+            await Assert.That(SecurityExecutionEvidence.TryReadConfiguredContainerDeclarations(
+                JsonSerializer.SerializeToUtf8Bytes(malformed), owner, out _)).IsFalse();
+        }
+
+        foreach (string variant in new[] { "wrong-owner", "unknown-field", "pull-policy", "duplicate-resource",
+            "duplicate-target", "foreign-volume", "writable-bind", "relative-target", "build-backed",
+            "too-many-containers", "too-many-mounts" })
+        {
+            JsonObject model = Model();
+            JsonObject container = model["Containers"]![0]!.AsObject();
+            JsonObject mount = container["Mounts"]![0]!.AsObject();
+            switch (variant)
+            {
+                case "wrong-owner": model["RunId"] = new string('a', 32); break;
+                case "unknown-field": model["Succeeded"] = true; break;
+                case "pull-policy": container["PullPolicy"] = "Always"; break;
+                case "duplicate-resource": model["Containers"]!.AsArray().Add(container.DeepClone()); break;
+                case "duplicate-target": container["Mounts"]!.AsArray().Add(mount.DeepClone()); break;
+                case "foreign-volume": mount["Source"] = "foreign-volume"; break;
+                case "writable-bind": mount["Type"] = "BindMount"; mount["Source"] = "/native-source"; break;
+                case "relative-target": mount["Target"] = "native-data"; break;
+                case "build-backed": container["DockerfileBuild"] = true; break;
+                case "too-many-containers":
+                    for (int index = 1; index <= 64; index++)
+                    {
+                        var additional = container.DeepClone().AsObject();
+                        additional["Name"] = "native-control-" + index;
+                        model["Containers"]!.AsArray().Add(additional);
+                    }
+                    break;
+                case "too-many-mounts":
+                    for (int index = 1; index <= 32; index++)
+                    {
+                        var additional = mount.DeepClone().AsObject();
+                        additional["Target"] = "/native-data-" + index;
+                        container["Mounts"]!.AsArray().Add(additional);
+                    }
+                    break;
+            }
+            bool accepted = SecurityExecutionEvidence.TryReadConfiguredContainerDeclarations(
+                JsonSerializer.SerializeToUtf8Bytes(model), owner, out var rejected);
+            await Assert.That(accepted).IsFalse();
+            await Assert.That(rejected is null).IsTrue();
+        }
+        JsonObject empty = Model();
+        empty["Containers"] = new JsonArray();
+        empty["Projects"] = new JsonArray();
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredContainerDeclarations(
+            JsonSerializer.SerializeToUtf8Bytes(empty), owner, out var zero, out var zeroProjects)).IsTrue();
+        await Assert.That(zero!.Count).IsEqualTo(0);
+        await Assert.That(zeroProjects!.Count).IsEqualTo(0);
+        JsonObject bound = Model();
+        JsonObject boundMount = bound["Containers"]![0]!["Mounts"]![0]!.AsObject();
+        boundMount["Type"] = "BindMount";
+        boundMount["Source"] = "/native-readonly-source";
+        boundMount["ReadOnly"] = true;
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredContainerDeclarations(
+            JsonSerializer.SerializeToUtf8Bytes(bound), owner, out var readonlyBind)).IsTrue();
+        await Assert.That(readonlyBind![0].Mounts.Single()).IsEqualTo(
+            new SecurityExecutionEvidence.ConfiguredMountDeclaration("BindMount", "/native-readonly-source", "/native-data", true));
+        string containerId = new('3', 64), imageId = "sha256:" + new string('7', 64);
+        string mountpoint = "/native-volumes/" + source + "/data";
+        var expectedModel = baseline ?? throw new InvalidDataException("native_control_model_missing");
+        var expected = new SecurityExecutionEvidence.ConfiguredResourceInputs(owner, expectedModel,
+            new Dictionary<string, string>(StringComparer.Ordinal) { [expectedModel[0].Image] = imageId },
+            new SecurityExecutionEvidence.InitialNativeResources(new HashSet<string>(StringComparer.Ordinal),
+                new HashSet<string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal) { imageId }),
+            new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.Ordinal) { [source] = mountpoint });
+        JsonObject RuntimeContainer() => new()
+        {
+            ["Id"] = containerId, ["ImageID"] = imageId, ["Image"] = expectedModel[0].Image, ["State"] = "running",
+            ["Labels"] = new JsonObject { ["islamu.assurance.owner"] = owner, ["islamu.assurance.resource"] = "native-model-control" },
+            ["Mounts"] = new JsonArray(new JsonObject
+            {
+                ["Type"] = "volume", ["Name"] = source, ["Source"] = mountpoint,
+                ["Destination"] = "/native-data", ["RW"] = true
+            })
+        };
+        byte[] RuntimeBytes(JsonObject container) => JsonSerializer.SerializeToUtf8Bytes(new JsonArray(container));
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(RuntimeContainer()),
+            expected, out var observed)).IsTrue();
+        var exactObserved = observed ?? throw new InvalidDataException("native_control_resource_missing");
+        await Assert.That(exactObserved.Single().Container).IsEqualTo(
+            new SecurityExecutionEvidence.ObservedOwnedResource(containerId, imageId, "native-model-control", true));
+        await Assert.That(exactObserved.Single().Mounts.Single()).IsEqualTo(
+            new SecurityExecutionEvidence.ObservedContainerMount("volume", source, mountpoint, "/native-data", true));
+        foreach (string invalid in new[] { "initial-container", "initial-volume", "image-not-in-initial-cache", "unknown-resource", "wrong-image-id",
+            "wrong-image-ref", "wrong-volume-name", "wrong-source-mountpoint", "wrong-target", "missing-rw", "duplicate-target" })
+        {
+            JsonObject runtime = RuntimeContainer(), mount = runtime["Mounts"]![0]!.AsObject();
+            var selected = expected;
+            switch (invalid)
+            {
+                case "initial-container": selected = expected with { Initial = expected.Initial with { ContainerIds = new HashSet<string> { containerId } } }; break;
+                case "initial-volume": selected = expected with { Initial = expected.Initial with { VolumeNames = new HashSet<string> { source } } }; break;
+                case "image-not-in-initial-cache": selected = expected with { Initial = expected.Initial with { ImageIds = new HashSet<string>() } }; break;
+                case "unknown-resource": runtime["Labels"]!["islamu.assurance.resource"] = "unmodeled-resource"; break;
+                case "wrong-image-id": runtime["ImageID"] = "sha256:" + new string('8', 64); break;
+                case "wrong-image-ref":
+                    const string foreignReference = "registry.example.test/native/foreign:control";
+                    runtime["Image"] = foreignReference;
+                    selected = expected with { Images = new Dictionary<string, string>
+                        { [expectedModel[0].Image] = imageId, [foreignReference] = imageId } };
+                    break;
+                case "wrong-volume-name":
+                    mount["Name"] = source + "-foreign";
+                    mount["Source"] = "/foreign-volume-data";
+                    selected = expected with { VolumeMountpoints = new Dictionary<string, string>
+                        { [source] = mountpoint, [source + "-foreign"] = "/foreign-volume-data" } };
+                    break;
+                case "wrong-source-mountpoint": mount["Source"] = "/foreign-volume-data"; break;
+                case "wrong-target": mount["Destination"] = "/foreign-target"; break;
+                case "missing-rw": mount.Remove("RW"); break;
+                case "duplicate-target": runtime["Mounts"]!.AsArray().Add(mount.DeepClone()); break;
+            }
+            if (SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(runtime), selected, out _))
+                throw new InvalidDataException("native_resource_conflict_accepted_" + invalid);
+        }
+        JsonObject foreignOwner = RuntimeContainer();
+        foreignOwner["Labels"]!["islamu.assurance.owner"] = new string('a', 32);
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+            RuntimeBytes(foreignOwner.DeepClone().AsObject()), expected, out _)).IsFalse();
+        foreignOwner["Mounts"] = new JsonArray();
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(foreignOwner), expected,
+            out var unselected)).IsTrue();
+        await Assert.That(unselected!.Count).IsEqualTo(0);
+        string anonymous = new('9', 64), anonymousMountpoint = "/native-volumes/" + anonymous + "/data";
+        JsonObject withImplicit = RuntimeContainer();
+        withImplicit["Mounts"]!.AsArray().Add(new JsonObject
+        {
+            ["Type"] = "volume", ["Name"] = anonymous, ["Source"] = anonymousMountpoint,
+            ["Destination"] = "/image-declared-data", ["RW"] = true
+        });
+        var implicitExpected = expected with
+        {
+            ImageVolumeTargets = new Dictionary<string, IReadOnlySet<string>>
+                { [imageId] = new HashSet<string> { "/image-declared-data" } },
+            VolumeMountpoints = new Dictionary<string, string>
+                { [source] = mountpoint, [anonymous] = anonymousMountpoint }
+        };
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(withImplicit.DeepClone().AsObject()),
+            implicitExpected, out var implicitObserved)).IsTrue();
+        var exactImplicit = implicitObserved ?? throw new InvalidDataException("native_control_implicit_resource_missing");
+        await Assert.That(exactImplicit.Single().Mounts.Count).IsEqualTo(2);
+        await Assert.That(exactImplicit.Single().Mounts.ToHashSet().SetEquals(
+        [
+            new SecurityExecutionEvidence.ObservedContainerMount("volume", source, mountpoint, "/native-data", true),
+            new SecurityExecutionEvidence.ObservedContainerMount("volume", anonymous, anonymousMountpoint, "/image-declared-data", true)
+        ])).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(withImplicit.DeepClone().AsObject()),
+            implicitExpected with { ImageVolumeTargets = new Dictionary<string, IReadOnlySet<string>>() }, out _)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(withImplicit.DeepClone().AsObject()),
+            implicitExpected with { ImageVolumeTargets = new Dictionary<string, IReadOnlySet<string>>
+                { ["sha256:" + new string('8', 64)] = new HashSet<string> { "/image-declared-data" } } }, out _)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(withImplicit.DeepClone().AsObject()),
+            implicitExpected with { Initial = expected.Initial with { VolumeNames = new HashSet<string> { anonymous } } }, out _)).IsFalse();
+        JsonObject foreignConsumer = RuntimeContainer();
+        foreignConsumer["Id"] = new string('4', 64);
+        foreignConsumer["Labels"]!["islamu.assurance.owner"] = new string('b', 32);
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(
+            JsonSerializer.SerializeToUtf8Bytes(new JsonArray(RuntimeContainer(), foreignConsumer)), expected, out _)).IsFalse();
+        JsonObject readonlyRuntime = RuntimeContainer();
+        JsonObject readonlyRuntimeMount = readonlyRuntime["Mounts"]![0]!.AsObject();
+        readonlyRuntimeMount["Type"] = "bind";
+        readonlyRuntimeMount.Remove("Name");
+        readonlyRuntimeMount["Source"] = "/native-readonly-source";
+        readonlyRuntimeMount["RW"] = false;
+        var readonlyExpected = expected with { Containers = readonlyBind ?? throw new InvalidDataException("native_control_bind_missing"),
+            VolumeMountpoints = new Dictionary<string, string>() };
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(readonlyRuntime.DeepClone().AsObject()),
+            readonlyExpected, out var readonlyObserved)).IsTrue();
+        await Assert.That(readonlyObserved!.Single().Mounts.Single()).IsEqualTo(
+            new SecurityExecutionEvidence.ObservedContainerMount("bind", string.Empty, "/native-readonly-source", "/native-data", false));
+        readonlyRuntimeMount["RW"] = true;
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(readonlyRuntime),
+            readonlyExpected, out _)).IsFalse();
+        foreach (var binding in new[]
+        {
+            (Reason: "exact", Source: mountpoint),
+            (Reason: "descendant", Source: Path.Combine(mountpoint, "child")),
+            (Reason: "ancestor", Source: Path.GetDirectoryName(mountpoint)!),
+            (Reason: "root", Source: "/"),
+            (Reason: "relative", Source: "native-data"),
+            (Reason: "noncanonical", Source: mountpoint + "/../data"),
+            (Reason: "trailing", Source: mountpoint + "/"),
+            (Reason: "double-slash", Source: mountpoint + "//child")
+        })
+        {
+            JsonObject boundConsumer = RuntimeContainer();
+            boundConsumer["Id"] = new string('4', 64);
+            boundConsumer["Labels"]!["islamu.assurance.owner"] = new string('b', 32);
+            boundConsumer["Mounts"] = new JsonArray(new JsonObject
+            {
+                ["Type"] = "bind", ["Source"] = binding.Source, ["Destination"] = "/foreign-use", ["RW"] = true
+            });
+            if (SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(boundConsumer), expected, out _))
+                throw new InvalidDataException("native_volume_bind_consumer_accepted_" + binding.Reason);
+        }
+        JsonObject unrelatedBind = RuntimeContainer();
+        unrelatedBind["Id"] = new string('4', 64);
+        unrelatedBind["Labels"]!["islamu.assurance.owner"] = new string('b', 32);
+        unrelatedBind["Mounts"] = new JsonArray(new JsonObject
+        {
+            ["Type"] = "bind", ["Source"] = mountpoint + "-foreign", ["Destination"] = "/foreign-use", ["RW"] = true
+        });
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(unrelatedBind), expected,
+            out var unrelatedBinding)).IsTrue();
+        await Assert.That(unrelatedBinding!.Count).IsEqualTo(0);
+        JsonObject retainedImplicitConsumer = RuntimeContainer();
+        retainedImplicitConsumer["Id"] = new string('4', 64);
+        retainedImplicitConsumer["Labels"]!["islamu.assurance.owner"] = new string('b', 32);
+        retainedImplicitConsumer["Mounts"] = new JsonArray(withImplicit["Mounts"]![1]!.DeepClone());
+        if (SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(retainedImplicitConsumer), implicitExpected, out _))
+            throw new InvalidDataException("native_retained_implicit_consumer_accepted");
+        JsonObject retainedImplicitBind = RuntimeContainer();
+        retainedImplicitBind["Id"] = new string('4', 64);
+        retainedImplicitBind["Labels"]!["islamu.assurance.owner"] = new string('b', 32);
+        retainedImplicitBind["Mounts"] = new JsonArray(new JsonObject
+        {
+            ["Type"] = "bind", ["Source"] = anonymousMountpoint, ["Destination"] = "/foreign-use", ["RW"] = false
+        });
+        if (SecurityExecutionEvidence.TryReadConfiguredOwnedResources(RuntimeBytes(retainedImplicitBind), implicitExpected, out _))
+            throw new InvalidDataException("native_retained_implicit_bind_consumer_accepted");
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(Encoding.UTF8.GetBytes("[]"), expected,
+            out var pendingResources)).IsTrue();
+        await Assert.That(pendingResources!.Count).IsEqualTo(0);
+        await Assert.That(SecurityExecutionEvidence.TryReadConfiguredOwnedResources(Encoding.UTF8.GetBytes("[]"),
+            expected with { Containers = zero ?? throw new InvalidDataException("native_control_empty_missing"),
+                Images = new Dictionary<string, string>(), VolumeMountpoints = new Dictionary<string, string>() },
+            out var emptyResources)).IsTrue();
+        await Assert.That(emptyResources!.Count).IsEqualTo(0);
+
+        string apiCreatedId = new string('a', 64), apiCreatedImageId = "sha256:" + new string('b', 64);
+        const string apiCreatedReference = "registry.example.test/native/creator:control";
+        const string apiAliasReference = "registry.example.test/native/creator:alias";
+        var apiCreatedPair = new SecurityExecutionEvidence.NativeCreatedContainer(owner,
+            Guid.CreateVersion7().ToString("N"), Environment.ProcessId, "keycloak", apiCreatedReference,
+            apiCreatedId, new string('c', 64));
+        var apiCreatedSnapshot = new SecurityExecutionEvidence.NativeContainerCreationSnapshot([apiCreatedPair],
+            new HashSet<string>(StringComparer.Ordinal), []);
+        var apiCreatedImages = new Dictionary<string, string>(StringComparer.Ordinal)
+            { [apiCreatedReference] = apiCreatedImageId, [apiAliasReference] = apiCreatedImageId };
+        var apiCreatedInitial = new SecurityExecutionEvidence.InitialNativeResources(
+            new HashSet<string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal) { apiCreatedImageId, "sha256:" + new string('e', 64) });
+        JsonObject ApiCreatedRow() => new()
+        {
+            ["Id"] = apiCreatedId, ["Image"] = apiCreatedReference, ["ImageID"] = apiCreatedImageId,
+            ["State"] = "running", ["Mounts"] = new JsonArray(),
+            ["Labels"] = new JsonObject { ["islamu.assurance.owner"] = owner, ["islamu.assurance.resource"] = "keycloak" }
+        };
+        byte[] ApiCreatedBytes(JsonObject row) => JsonSerializer.SerializeToUtf8Bytes(new JsonArray(row));
+        if (!SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(ApiCreatedRow()), owner,
+            apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiCreatedObserved))
+            throw new InvalidDataException("native_api_creator_resource_join_missing");
+        await Assert.That(apiCreatedObserved!.Single()).IsEqualTo(
+            new SecurityExecutionEvidence.ObservedOwnedResource(apiCreatedId, apiCreatedImageId, "keycloak", true));
+        JsonObject apiUnrelatedRow = ApiCreatedRow();
+        apiUnrelatedRow["Id"] = new string('d', 64);
+        apiUnrelatedRow["Labels"]!["islamu.assurance.owner"] = new string('d', 32);
+        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiUnrelatedRow), owner,
+            apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiUnrelatedObserved)).IsTrue();
+        await Assert.That(apiUnrelatedObserved!.Count).IsEqualTo(0);
+        foreach (string apiConflict in new[] { "same-image-alias", "owner", "resource", "image-id", "container-id",
+            "missing-pair", "pending-pair", "pair-image", "pair-id", "initial-container", "uncached-image", "mount" })
+        {
+            JsonObject apiConflictingRow = ApiCreatedRow();
+            var apiConflictingSnapshot = apiCreatedSnapshot;
+            var apiConflictingInitial = apiCreatedInitial;
+            switch (apiConflict)
+            {
+                case "same-image-alias": apiConflictingRow["Image"] = apiAliasReference; break;
+                case "owner": apiConflictingRow["Labels"]!["islamu.assurance.owner"] = new string('d', 32); break;
+                case "resource": apiConflictingRow["Labels"]!["islamu.assurance.resource"] = "cerbos"; break;
+                case "image-id": apiConflictingRow["ImageID"] = "sha256:" + new string('e', 64); break;
+                case "container-id": apiConflictingRow["Id"] = new string('f', 64); break;
+                case "missing-pair": apiConflictingSnapshot = apiCreatedSnapshot with { Created = [] }; break;
+                case "pending-pair": apiConflictingSnapshot = apiCreatedSnapshot with
+                    { Created = [], PendingCreationIds = new HashSet<string>(StringComparer.Ordinal) { apiCreatedPair.CreationId } }; break;
+                case "pair-image": apiConflictingSnapshot = apiCreatedSnapshot with
+                    { Created = [apiCreatedPair with { ImageReference = apiAliasReference }] }; break;
+                case "pair-id": apiConflictingSnapshot = apiCreatedSnapshot with
+                    { Created = [apiCreatedPair with { ContainerId = new string('f', 64) }] }; break;
+                case "initial-container": apiConflictingInitial = apiCreatedInitial with
+                    { ContainerIds = new HashSet<string>(StringComparer.Ordinal) { apiCreatedId } }; break;
+                case "uncached-image": apiConflictingInitial = apiCreatedInitial with
+                    { ImageIds = new HashSet<string>(StringComparer.Ordinal) }; break;
+                case "mount": apiConflictingRow["Mounts"] = new JsonArray(new JsonObject
+                    { ["Type"] = "volume", ["Name"] = "unqualified-volume", ["Source"] = "/unqualified",
+                        ["Destination"] = "/data", ["RW"] = true }); break;
+            }
+            if (SecurityExecutionEvidence.TryReadApiCreatedResources(ApiCreatedBytes(apiConflictingRow), owner,
+                apiConflictingSnapshot, apiCreatedImages, apiConflictingInitial, out _))
+                throw new InvalidDataException("native_api_creator_resource_conflict_accepted_" + apiConflict);
+        }
+        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"), owner,
+            apiCreatedSnapshot, apiCreatedImages, apiCreatedInitial, out var apiCreatedGone)).IsTrue();
+        await Assert.That(apiCreatedGone!.Count).IsEqualTo(0);
+        await Assert.That(SecurityExecutionEvidence.TryReadApiCreatedResources(Encoding.UTF8.GetBytes("[]"), owner,
+            apiCreatedSnapshot with { Created = [], PendingCreationIds = new HashSet<string>(StringComparer.Ordinal)
+                { apiCreatedPair.CreationId } }, apiCreatedImages, apiCreatedInitial, out var apiCreationNotYetVisible)).IsTrue();
+        await Assert.That(apiCreationNotYetVisible!.Count).IsEqualTo(0);
     }
 }
 
@@ -859,16 +1733,61 @@ public sealed class SecurityExecutionEvidenceInvocationProofTests
     }
 
     [Test]
-    public async Task NonLoadProfileKeepsOneCompleteBatchedNativeInvocation()
+    public async Task RuntimeSingletonsKeepExactCoverageWhileOtherOrdinaryLanesRemainBatched()
     {
         using var fixture = new SecurityExecutionEvidenceExecutionTests.NativeFixture();
+        byte[] runtimeDiscovery = Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString());
+        var runtimeInvocations = SingleUidInputs(fixture);
         bool accepted = SecurityExecutionEvidence.TryCreateNativeLaneProofs(
-            Encoding.UTF8.GetBytes(fixture.Discovery.ToJsonString()),
-            [new SecurityExecutionEvidence.NativeInvocationInput(Uids(fixture), fixture.ReportBytes())],
+            runtimeDiscovery, runtimeInvocations,
             "owned-runtime", fixture.RegisterPath, out var proofs, out _);
         await Assert.That(accepted).IsTrue();
-        await Assert.That(proofs!.Count).IsEqualTo(1);
-        await Assert.That(JsonNode.Parse(proofs[0])!["nodes"]!.AsArray().Count).IsEqualTo(2);
+        var runtimeProofs = proofs ?? throw new InvalidDataException("runtime_proofs_missing");
+        await Assert.That(runtimeProofs.Count).IsEqualTo(2);
+        var references = new HashSet<int>();
+        for (int index = 0; index < runtimeProofs.Count; index++)
+        {
+            JsonNode proof = JsonNode.Parse(runtimeProofs[index])!;
+            await Assert.That(proof["nodes"]!.AsArray().Count).IsEqualTo(1);
+            await Assert.That(proof["nodes"]![0]!["node"]!.GetValue<int>()).IsEqualTo(0);
+            await Assert.That(references.Add(proof["nodes"]![0]!["requiredTest"]!.GetValue<int>())).IsTrue();
+            await Assert.That(proof["privateDiscoverySha256"]!.GetValue<string>()).IsEqualTo(Digest(runtimeDiscovery));
+            await Assert.That(proof["privateTrxSha256"]!.GetValue<string>()).IsEqualTo(Digest(runtimeInvocations[index].ReportBytes));
+            foreach (string uid in Uids(fixture))
+                await Assert.That(Encoding.UTF8.GetString(runtimeProofs[index])).DoesNotContain(uid);
+        }
+        await Assert.That(references.SetEquals([0, 1])).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryValidateNativeLaneProofs(runtimeProofs, "owned-runtime",
+            fixture.RegisterPath, out _)).IsTrue();
+        await Assert.That(SecurityExecutionEvidence.TryCreateNativeLaneProofs(runtimeDiscovery,
+            [new SecurityExecutionEvidence.NativeInvocationInput(Uids(fixture), fixture.ReportBytes())],
+            "owned-runtime", fixture.RegisterPath, out _, out _)).IsFalse();
+        await Assert.That(SecurityExecutionEvidence.TryCreateNativeProof(runtimeDiscovery, fixture.ReportBytes(),
+            fixture.RequiredTests, true, out var runtimeBatch, out _)).IsTrue();
+        byte[] completeRuntimeProof = runtimeBatch ?? throw new InvalidDataException("runtime_batch_proof_missing");
+        await Assert.That(SecurityExecutionEvidence.TryValidateNativeLaneProofs([completeRuntimeProof], "owned-runtime",
+            fixture.RegisterPath, out _)).IsFalse();
+        foreach (string lane in SecurityControlRegister.ExecutionRequirements.Keys.Where(lane =>
+            lane is not ("owned-runtime" or "owned-load-control" or "owned-load-correctness")))
+        {
+            using var batched = new SecurityExecutionEvidenceExecutionTests.NativeFixture(lane);
+            byte[] discovery = Encoding.UTF8.GetBytes(batched.Discovery.ToJsonString());
+            await Assert.That(SecurityExecutionEvidence.TryCreateNativeLaneProofs(discovery,
+                [new SecurityExecutionEvidence.NativeInvocationInput(Uids(batched), batched.ReportBytes())],
+                lane, batched.RegisterPath, out var complete, out _)).IsTrue();
+            var completeProofs = complete ?? throw new InvalidDataException("ordinary_batch_proof_missing");
+            await Assert.That(completeProofs.Count).IsEqualTo(1);
+            await Assert.That(JsonNode.Parse(completeProofs[0])!["nodes"]!.AsArray().Count).IsEqualTo(batched.RequiredTests.Length);
+            await Assert.That(SecurityExecutionEvidence.TryValidateNativeLaneProofs(completeProofs,
+                lane, batched.RegisterPath, out _)).IsTrue();
+            if (batched.RequiredTests.Length > 1)
+            {
+                await Assert.That(SecurityExecutionEvidence.TryCreateNativeLaneProofs(discovery,
+                    SingleUidInputs(batched), lane, batched.RegisterPath, out _, out _)).IsFalse();
+                await Assert.That(SecurityExecutionEvidence.TryValidateNativeLaneProofs(PublicProofs(batched),
+                    lane, batched.RegisterPath, out _)).IsFalse();
+            }
+        }
     }
 
     [Test]
@@ -1309,6 +2228,213 @@ public sealed class SecurityExecutionEvidenceProcessTests
             await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(canary));
             await standardError.WriteAsync(Encoding.UTF8.GetBytes(canary));
             Environment.Exit(0);
+        }
+        if (mode == "managed-claim")
+        {
+            if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
+            string owner = Path.GetFileName(root)[^32..];
+            string context = Path.Combine(root, "islamu-assurance", owner);
+            using var claim = new FileStream(Path.Combine(context, ".apphost-claim"),
+                FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+            string pending = Path.Combine(context, ".managed-claim-ready-" + Environment.ProcessId);
+            using (var ready = new FileStream(pending,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                    UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                }))
+            {
+                await ready.WriteAsync(Encoding.ASCII.GetBytes("claim-held"));
+                await ready.FlushAsync();
+            }
+            File.Move(pending, Path.Combine(context, "managed-claim-ready-" + Environment.ProcessId));
+            await Task.Delay(Timeout.InfiniteTimeSpan);
+            return;
+        }
+        if (mode is "managed-witness" or "managed-launcher" or "managed-host")
+        {
+            if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
+            string owner = Path.GetFileName(root)[^32..];
+            string assurance = Path.Combine(root, "islamu-assurance");
+            string context = Path.Combine(assurance, owner);
+            if (mode != "managed-host")
+            {
+                Directory.CreateDirectory(context);
+                foreach (string directory in new[] { assurance, context })
+                    File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
+            var options = new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.Read,
+                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+            };
+            if (mode != "managed-host")
+            {
+                using (var marker = new FileStream(Path.Combine(context, ".islamu-test-owner"), options))
+                    marker.Write(Encoding.ASCII.GetBytes(owner));
+                using (var model = new FileStream(Path.Combine(context, "container-model.json"), options))
+                    model.Write(JsonSerializer.SerializeToUtf8Bytes(new
+                        { Schema = 1, RunId = owner, Containers = Array.Empty<object>(), Projects = Array.Empty<object>() }));
+            }
+            using var claim = mode == "managed-host" ? null : new FileStream(Path.Combine(context, ".apphost-claim"), new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.ReadWrite,
+                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+            });
+            string stat = File.ReadAllText("/proc/" + Environment.ProcessId + "/stat");
+            string[] fields = stat[(stat.LastIndexOf(')') + 2)..].Split(' ');
+            ulong start = ulong.Parse(fields[19], System.Globalization.CultureInfo.InvariantCulture);
+            string unpublished = Path.Combine(context, ".managed-root-control");
+            using var record = mode == "managed-launcher" ? null : new FileStream(unpublished, options);
+            if (record is not null)
+            {
+                await record.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    Schema = 1, RunId = owner, Pid = Environment.ProcessId, Start = start,
+                    ContentRoot = Path.GetDirectoryName(typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location),
+                    ApplicationName = typeof(SecurityExecutionEvidenceProcessTests).Assembly.GetName().Name,
+                    EntryAssembly = typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
+                    IsWebHost = false, WebRoot = (string?)null, ServedAssets = (object?)null
+                }));
+                await record.FlushAsync();
+                File.Move(unpublished, Path.Combine(context, $"managed-host-root-{Environment.ProcessId}-{start}.json"));
+            }
+            if (mode == "managed-host")
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan);
+                return;
+            }
+            string creationId = Guid.CreateVersion7().ToString("N");
+            string creationStem = Path.Combine(context, "api-container-keycloak-" + creationId);
+            using var creationDeclaration = mode == "managed-witness"
+                ? new FileStream(creationStem + ".declaration-pending", options) : null;
+            using var creationReceipt = mode == "managed-witness"
+                ? new FileStream(creationStem + ".created-pending", options) : null;
+            if (creationDeclaration is not null && creationReceipt is not null)
+            {
+                byte[] declarationBytes = JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    Schema = 1, RunId = owner, CreationId = creationId, CreatorPid = Environment.ProcessId,
+                    Resource = "keycloak", ImageReference = "example.invalid/creator-control:local"
+                });
+                await creationDeclaration.WriteAsync(declarationBytes);
+                creationDeclaration.Flush(true);
+                File.Move(creationStem + ".declaration-pending", creationStem + "-declaration.json");
+                await creationReceipt.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    Schema = 1, RunId = owner, CreationId = creationId, CreatorPid = Environment.ProcessId,
+                    Resource = "keycloak", ImageReference = "example.invalid/creator-control:local",
+                    ContainerId = new string('a', 64),
+                    DeclarationSha256 = Convert.ToHexStringLower(SHA256.HashData(declarationBytes))
+                }));
+                creationReceipt.Flush(true);
+                File.Move(creationStem + ".created-pending", creationStem + "-created-" + new string('a', 64) + ".json");
+            }
+            using var hosted = new Process();
+            using var secondHosted = new Process();
+            using var sibling = new Process();
+            if (mode == "managed-launcher")
+            {
+                sibling.StartInfo = SecurityExecutionEvidence.NativeTestStartInfo(
+                    typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
+                    [TestContext.Current!.Metadata.TestDetails.Identity.TestId], Path.Combine(root, "sibling-results"),
+                    root, "managed-sibling.trx", 60);
+                sibling.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CONTROL"] = "managed-claim";
+                sibling.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_ROOT"] = root;
+                sibling.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CANARY"] = canary;
+                sibling.StartInfo.RedirectStandardOutput = false;
+                sibling.StartInfo.RedirectStandardError = false;
+                if (!sibling.Start()) throw new InvalidDataException("native_managed_sibling_start_failed");
+                RecordOwnedPid(root, sibling.Id);
+            }
+            string pending = Path.Combine(context, ".managed-lead-control");
+            using (var lead = new FileStream(pending, options))
+            {
+                await lead.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    Schema = 1, RunId = owner, Hint = new
+                    {
+                        Resource = "event-migrationservice", InstanceSha256 = new string('c', 64), Pid = Environment.ProcessId, Start = start,
+                        Diagnostic = "managed_launch_inputs_unavailable:process_not_owned"
+                    }
+                }));
+                await lead.FlushAsync();
+            }
+            File.Move(pending, Path.Combine(context, "managed-control-lead.json"));
+            if (mode == "managed-launcher")
+            {
+                using var startup = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                while (!File.Exists(Path.Combine(context, "managed-control-start-host")))
+                    await Task.Delay(10, startup.Token);
+                hosted.StartInfo = SecurityExecutionEvidence.NativeTestStartInfo(
+                    typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
+                    [TestContext.Current!.Metadata.TestDetails.Identity.TestId], Path.Combine(root, "host-results"),
+                    root, "managed-host.trx", 60);
+                hosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CONTROL"] = "managed-host";
+                hosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_ROOT"] = root;
+                hosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CANARY"] = canary;
+                hosted.StartInfo.RedirectStandardOutput = false;
+                hosted.StartInfo.RedirectStandardError = false;
+                if (!hosted.Start()) throw new InvalidDataException("native_managed_host_start_failed");
+                RecordOwnedPid(root, hosted.Id);
+                while (!File.Exists(Path.Combine(context, "managed-control-start-second-host")))
+                    await Task.Delay(10);
+                secondHosted.StartInfo = SecurityExecutionEvidence.NativeTestStartInfo(
+                    typeof(SecurityExecutionEvidenceProcessTests).Assembly.Location,
+                    [TestContext.Current!.Metadata.TestDetails.Identity.TestId], Path.Combine(root, "second-host-results"),
+                    root, "managed-second-host.trx", 60);
+                secondHosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CONTROL"] = "managed-host";
+                secondHosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_ROOT"] = root;
+                secondHosted.StartInfo.Environment["ISLAMU_RELEASE_NATIVE_CHILD_CANARY"] = canary;
+                secondHosted.StartInfo.RedirectStandardOutput = false;
+                secondHosted.StartInfo.RedirectStandardError = false;
+                if (!secondHosted.Start()) throw new InvalidDataException("native_managed_second_host_start_failed");
+                RecordOwnedPid(root, secondHosted.Id);
+            }
+            if (mode == "managed-witness")
+            {
+                while (!File.Exists(Path.Combine(context, "managed-control-next-creation"))) await Task.Delay(10);
+                if (creationDeclaration is null || creationReceipt is null)
+                    throw new InvalidDataException("native_api_initial_creation_not_held");
+                var creationCloseFailures = new List<Exception>();
+                try { await creationDeclaration.DisposeAsync(); }
+                catch (Exception failure) { creationCloseFailures.Add(failure); }
+                try { await creationReceipt.DisposeAsync(); }
+                catch (Exception failure) { creationCloseFailures.Add(failure); }
+                if (creationCloseFailures.Count != 0) throw new AggregateException(creationCloseFailures);
+                string nextCreationId = Guid.CreateVersion7().ToString("N");
+                string nextCreationStem = Path.Combine(context, "api-container-cerbos-" + nextCreationId);
+                using var nextDeclaration = new FileStream(nextCreationStem + ".declaration-pending", options);
+                using var nextReceipt = new FileStream(nextCreationStem + ".created-pending", options);
+                byte[] nextDeclarationBytes = JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    Schema = 1, RunId = owner, CreationId = nextCreationId, CreatorPid = Environment.ProcessId,
+                    Resource = "cerbos", ImageReference = "example.invalid/creator-control:next"
+                });
+                await nextDeclaration.WriteAsync(nextDeclarationBytes);
+                nextDeclaration.Flush(true);
+                File.Move(nextCreationStem + ".declaration-pending", nextCreationStem + "-declaration.json");
+                await nextReceipt.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new
+                {
+                    Schema = 1, RunId = owner, CreationId = nextCreationId, CreatorPid = Environment.ProcessId,
+                    Resource = "cerbos", ImageReference = "example.invalid/creator-control:next",
+                    ContainerId = new string('d', 64),
+                    DeclarationSha256 = Convert.ToHexStringLower(SHA256.HashData(nextDeclarationBytes))
+                }));
+                nextReceipt.Flush(true);
+                File.Move(nextCreationStem + ".created-pending", nextCreationStem + "-created-" + new string('d', 64) + ".json");
+                string nextReadyPending = Path.Combine(context, ".managed-control-next-creation-ready");
+                using (var nextReady = new FileStream(nextReadyPending, options))
+                {
+                    nextReady.Write(Encoding.ASCII.GetBytes(nextCreationId));
+                    nextReady.Flush(true);
+                }
+                File.Move(nextReadyPending, Path.Combine(context, "managed-control-next-creation-ready"));
+                await Task.Delay(Timeout.InfiniteTimeSpan);
+                return;
+            }
+            await Task.Delay(Timeout.InfiniteTimeSpan);
+            return;
         }
         if (mode == "leak")
         {

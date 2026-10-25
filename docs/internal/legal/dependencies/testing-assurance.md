@@ -17,6 +17,8 @@ MIT permits the intended public and alternative outbound offerings while preserv
 
 The implementation handoff contains public API signatures, observable behavior, exact package identities and repository-native requirements. Fixture ownership, startup, cancellation, cleanup, browser journeys and retained evidence are designed from Event's own contracts. Package source and external implementation examples are excluded. The two central package pins express version selection; the test project and its generated lockfile define the resolved dependency graph.
 
+On 2026-10-24, two runtime contexts independently reported incidental external implementation examples: one during a public-documentation search, the other during an installed SDK XML lookup. Both stopped before making runtime model or Formbricks changes and are permanently restricted to research and read-only work. Existing temporary observation tests were authored and verified before the second exposure; no subsequent implementation was accepted from either context. A fresh implementation owner receives only sanitized functional requirements and repository-native context, excluding installed XML and external implementation research. Foreign snippets are neither retained as implementation inputs nor forwarded. Process-snapshot PID field names remain unverified and must not be used to attribute running resources to assumed Release binaries.
+
 ## Browser And External Tool Boundary
 
 The Playwright NuGet license does not establish the license of a downloaded browser, its bundled components, or FFmpeg. Browser binaries remain separately obtained developer/CI tools in the external Playwright cache. They are not vendored or included in Event product distribution. Preserve their upstream license and notice files and inspect those component terms before admitting the actual browser execution profile; no blanket MIT claim or product-bundling approval is made here.
@@ -28,6 +30,27 @@ Playwright's separately cached FFmpeg reports `n7.0.1-playwright-build-1013`. It
 The approved installer excludes full Chrome, whose separate cache contained a proprietary Widevine CDM notice; no Widevine filename or notice was found in the selected headless-shell directory. All executable components stay outside Event's repository, linked product and release bundles. Any future browser/FFmpeg bundling or media use needs a separate component and distribution review; external-tool approval is not a legal certification of an assembled offering.
 
 The separately approved k6 executable follows its own [tooling and distribution decision](../../adr/ADR-testing-assurance-k6-tooling.md). It is not a NuGet dependency and this document does not broaden that approval.
+
+### Existing Cerbos policy compiler receipt
+
+The programme reuses Cerbos `0.53.0`, already selected by the repository's policy
+check/publication workflows and Compose declarations. This is not a new product
+dependency or a version change. The official release archive SHA-256 is
+`56427176bd2e5e676097f9a08743ed211e7c0123af1e71a48f94d497e3c9e131`;
+the admitted executable SHA-256 is
+`a9754bffb82f09dd0fef8b809048d063d4646df485fb33eb984da14535a39574`.
+The archive matched the official checksum. Only the executable and Apache-2.0
+license were extracted into the external task cache; no upstream source,
+README examples or `cerbosctl` entered implementation context. Signature
+verification was not performed because `cosign` was unavailable.
+
+The scoped `cerbos --version` command reported `0.53.0`, build
+`78d494cab93cf3e3723da18d5390bf9222593560`, with `vcs.modified=false`.
+The existing `cerbos compile --tests=cerbos/tests cerbos/policies` command
+executed 884 policy tests, all successful. These are native compiler/policy-test
+results, not live PDP, HTTP authentication or same-candidate application evidence.
+Retain the Apache license and normal tool notices; this receipt does not authorize
+copying implementation or bundling the executable in Event product images.
 
 ## Verification
 

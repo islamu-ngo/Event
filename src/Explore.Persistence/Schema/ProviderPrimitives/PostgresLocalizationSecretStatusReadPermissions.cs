@@ -159,6 +159,14 @@ public static class PostgresLocalizationSecretStatusReadPermissions
         finally { connection.StateChange -= Changed; }
     }
 
+    internal static string CompleteGlobalCataloguePredicate(ExploreDbContext context, PostgresNativeQueueEnrollment enrollment)
+    {
+        var source = Mapping(context);
+        return $"({NoObsoleteInstallation(source)}) AND ({Manifest(source, enrollment, complete: true)})";
+    }
+
+    internal static IReadOnlyList<string> GlobalCatalogueRelations(ExploreDbContext context) => [Mapping(context).Table];
+
     private static string Manifest(Source source, PostgresNativeQueueEnrollment enrollment, bool complete)
     {
         string runtime = Text(enrollment.RuntimeLogin), global = Text(enrollment.GlobalLogin);

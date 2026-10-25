@@ -267,6 +267,8 @@ public static class PostgresDiscoveryMetadataPermissions
             PostgresUserTenantMembershipReadPermissions.TryGetGlobalReadColumns(context, source.Type, out var membershipRead);
             return read.Concat(membershipRead).Distinct(StringComparer.Ordinal).Select(column => (column, Privilege: "SELECT"))
                 .Concat(insert.Select(column => (column, Privilege: "INSERT")))
+                .Concat(PostgresTenantMembershipMutationPermissions.GlobalUpdateColumns(context, source.Type)
+                    .Select(column => (column, Privilege: "UPDATE")))
                 .Select(grant => $"({Text(source.Table)},{Text(grant.column)},{Text(creatorEnrollment.GlobalLogin)},{Text(grant.Privilege)})");
         }).ToArray();
         string[] declaredRuntimeParents = context is null || creatorEnrollment is null ? [] : sources.SelectMany(source =>

@@ -155,7 +155,7 @@ public static partial class SecurityExecutionEvidence
                     bool owned = lane.Id.StartsWith("owned-", StringComparison.Ordinal);
                     if (owned ? !lane.Requirement.Tests.SetEquals(identities) : !lane.Requirement.Tests.IsSubsetOf(identities))
                         throw new OwnedExecutionFailure("native_discovery_requirements_mismatch");
-                    string[][] selections = lane.Id is "owned-load-control" or "owned-load-correctness"
+                    string[][] selections = lane.Id is "owned-runtime" or "owned-load-control" or "owned-load-correctness"
                         ? discovered.Select(node => new[] { node.Uid }).ToArray()
                         : [discovered.Select(node => node.Uid).ToArray()];
                     foreach (string[] selected in selections)
@@ -300,14 +300,14 @@ public static partial class SecurityExecutionEvidence
         if (string.IsNullOrEmpty(laneId) ||
             !SecurityControlRegister.ExecutionRequirements.TryGetValue(laneId, out var requirement) ||
             requirement.HostProfile != hostProfile || selectedUids.Count is < 1 or > 1024 ||
-            (hostProfile == "owned-apphost-load-assurance" && selectedUids.Count != 1))
+            (laneId is "owned-runtime" or "owned-load-control" or "owned-load-correctness" && selectedUids.Count != 1))
             throw new InvalidDataException("native_batch_invalid");
 
         // Native --timeout covers the serial batch. These are hang allowances, not reserved case runtimes.
         int timeoutSeconds = laneId switch
         {
             "security-integration" or "cerbos-policy-contract" => 600,
-            "owned-runtime" => Math.Min(checked(720 * selectedUids.Count), 19_800),
+            "owned-runtime" => 720,
             "owned-browser-journeys" => Math.Min(checked(1200 * selectedUids.Count), 19_800),
             "owned-browser-security" => Math.Min(checked(240 * selectedUids.Count + 1020), 19_800),
             "owned-load-control" or "owned-load-correctness" => 1500,
@@ -328,6 +328,7 @@ public static partial class SecurityExecutionEvidence
         byte[] evidence = JsonSerializer.SerializeToUtf8Bytes(new { observed = false, cleanup = false });
         bool admitted = false;
         bool removed = false;
+        bool resourceCleanupComplete = false;
         try
         {
             string context = PrivateChildDirectory(PrivateChildDirectory(temporary, "islamu-assurance"), owner);
@@ -354,19 +355,20 @@ public static partial class SecurityExecutionEvidence
             command.Environment["TESTCONTAINERS_RYUK_DISABLED"] = request.RyukDisabled;
             command.Environment["DOTNET_ENVIRONMENT"] = requirement.Environment;
             command.Environment["ASPNETCORE_ENVIRONMENT"] = requirement.Environment;
-            var observed = await daemon.RunAsync(owner, command, uids is not null,
+            var observed = await daemon.RunAsync(owner, temporary, context, command, uids is not null,
                 deadline, cancellationToken).ConfigureAwait(false);
             process = observed.Process;
             admitted = observed.Admitted;
             evidence = observed.Evidence;
-            if (uids is not null && process.CleanupSucceeded)
+            resourceCleanupComplete = observed.ResourceCleanupComplete;
+            if (uids is not null && process.CleanupSucceeded && process.ObserverSettled)
                 _ = TryReadOwnedChildReport(results, "execution.trx", out report);
         }
         finally
         {
             try
             {
-                if (NoInputLinks(temporary))
+                if (process is { CleanupSucceeded: true, ObserverSettled: true } && resourceCleanupComplete && NoInputLinks(temporary))
                 {
                     Directory.Delete(temporary, recursive: true);
                     removed = !Directory.Exists(temporary);
@@ -411,13 +413,18 @@ public static partial class SecurityExecutionEvidence
         foreach (OwnedEntry entry in entries.OrderBy(item => item.Project, StringComparer.Ordinal))
         {
             if (!TryCaptureProjectManagedInputs(entry.Directory, request.Candidate, [Path.GetFileName(entry.Assembly)],
-                    out var captured, out _) ||
-                !TryCaptureApiPrerequisiteInputs(request.Repository, request.Candidate, entry.Directory, out var content, out _))
+                    out var captured, out _))
                 throw new OwnedExecutionFailure("selected_test_inputs_invalid");
             managed.Add(new { project = entry.Project, digest = captured!.PrivateManifestSha256,
                 manifest = JsonSerializer.Deserialize<JsonElement>(captured.PrivateManifest) });
-            managed.Add(new { project = entry.Project + ":content", digest = content!.PrivateManifestSha256,
-                manifest = JsonSerializer.Deserialize<JsonElement>(content.PrivateManifest) });
+            if (SecurityControlRegister.ExecutionRequirements.Values.Any(requirement =>
+                requirement.Project == entry.Project && requirement.HostProfile == "dedicated-api-test-host"))
+            {
+                if (!TryCaptureApiPrerequisiteInputs(request.Repository, request.Candidate, entry.Directory, out var content, out _))
+                    throw new OwnedExecutionFailure("selected_test_inputs_invalid");
+                managed.Add(new { project = entry.Project + ":content", digest = content!.PrivateManifestSha256,
+                    manifest = JsonSerializer.Deserialize<JsonElement>(content.PrivateManifest) });
+            }
         }
         byte[] tools = CaptureExecutionTools();
         byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
@@ -645,120 +652,279 @@ public static partial class SecurityExecutionEvidence
             }
         }
 
-        internal async Task<(OwnedNativeProcessResult Process, bool Admitted, byte[] Evidence)> RunAsync(
-            string owner, ProcessStartInfo command, bool requireRunningPrerequisites, TimeSpan timeout,
+        private sealed record ApiCreationFile(string Path, LiveFileIdentity Identity, string Sha256);
+        private sealed record ApiCreationProof(NativeCreatedContainer Creation, byte[] PrivateManifest,
+            IReadOnlyList<ApiCreationFile> Files);
+
+        private static Dictionary<string, string[]> ReadApiCreationCandidates(string root)
+        {
+            string[] paths = Directory.EnumerateFiles(root, "api-container-*.json").Take(129).Order(StringComparer.Ordinal).ToArray();
+            if (paths.Length > 128) throw new OwnedExecutionFailure("api_creation_inventory_limit");
+            var candidates = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (string path in paths)
+            {
+                string name = Path.GetFileName(path);
+                const string declaration = "-declaration.json", created = "-created-";
+                int end = name.EndsWith(declaration, StringComparison.Ordinal)
+                    ? name.Length - declaration.Length : name.LastIndexOf(created, StringComparison.Ordinal);
+                if (end < "api-container-".Length + 34 || name[end - 33] != '-')
+                    throw new OwnedExecutionFailure("api_creation_filename_invalid");
+                string id = name.Substring(end - 32, 32);
+                if (!LowerHex(id) || id[12] != '7' || id[16] is not ('8' or '9' or 'a' or 'b'))
+                    throw new OwnedExecutionFailure("api_creation_filename_invalid");
+                if (!candidates.TryGetValue(id, out List<string>? files))
+                {
+                    if (candidates.Count >= 64) throw new OwnedExecutionFailure("api_creation_inventory_limit");
+                    files = [];
+                    candidates.Add(id, files);
+                }
+                files.Add(path);
+            }
+            return candidates.ToDictionary(item => item.Key, item => item.Value.ToArray(), StringComparer.Ordinal);
+        }
+
+        private static async Task ValidateApiRootAsync(string root, string owner, uint user, CancellationToken token)
+        {
+            string marker = Path.Combine(root, ".islamu-test-owner");
+            LiveFileIdentity directory = await ReadLiveMetadataAsync(root, false, token).ConfigureAwait(false);
+            LiveFileIdentity identity = await ReadLiveMetadataAsync(marker, false, token).ConfigureAwait(false);
+            if (!NoInputLinks(root) || !NoInputLinks(marker) || (directory.Bits & 0xf000) != 0x4000
+                || (directory.Bits & 0xfff) != 0x1c0 || directory.User != user || !PrivateLiveFile(identity, user, 32)
+                || Encoding.ASCII.GetString(ReadBoundedFile(marker, 32)) != owner)
+                throw new OwnedExecutionFailure("api_creation_root_invalid");
+        }
+
+        private static async Task<ApiCreationProof?> CaptureApiCreationAsync(OwnedNativeProcessContext context,
+            string temporary, string root, string owner, string creationId, CancellationToken token)
+        {
+            NativeContainerCreationSnapshot? capture = await CaptureLiveNativeContainerCreationsAsync(
+                context, temporary, owner, "api", token, creationId).ConfigureAwait(false);
+            if (capture is null || capture.Created.Count == 0) return null;
+            if (capture.Created.Count != 1 || capture.PendingCreationIds.Count != 0)
+                throw new OwnedExecutionFailure("api_creation_capture_invalid");
+            NativeCreatedContainer pair = capture.Created[0];
+            if (pair.RunId != owner || pair.CreatorPid != context.Pid || pair.CreationId != creationId)
+                throw new OwnedExecutionFailure("api_creation_capture_invalid");
+            using JsonDocument manifest = JsonDocument.Parse(capture.PrivateManifest, DocumentOptions);
+            uint user = manifest.RootElement.GetProperty("creator").GetProperty("User").GetUInt32();
+            JsonElement records = manifest.RootElement.GetProperty("records");
+            if (records.ValueKind != JsonValueKind.Array || records.GetArrayLength() != 2)
+                throw new OwnedExecutionFailure("api_creation_capture_invalid");
+            string stem = Path.Combine(root, "api-container-" + pair.Resource + "-" + pair.CreationId);
+            var expected = new HashSet<string>(StringComparer.Ordinal)
+                { stem + "-declaration.json", stem + "-created-" + pair.ContainerId + ".json" };
+            var files = new List<ApiCreationFile>();
+            foreach (JsonElement record in records.EnumerateArray())
+            {
+                string path = Text(record, "path"), digest = Text(record, "sha256");
+                if (!expected.Remove(path) || !NoInputLinks(path))
+                    throw new OwnedExecutionFailure("api_creation_capture_changed");
+                LiveFileIdentity identity = await ReadLiveMetadataAsync(path, false, token).ConfigureAwait(false);
+                if (!PrivateLiveFile(identity, user, identity.Bytes)
+                    || identity.Bytes is < 1 or > 16384 || digest.Length != 64 || !LowerHex(digest)
+                    || identity.Device != record.GetProperty("Device").GetUInt64()
+                    || identity.Inode != record.GetProperty("Inode").GetUInt64()
+                    || DigestBytes(ReadBoundedFile(path, 16384)) != digest)
+                    throw new OwnedExecutionFailure("api_creation_capture_changed");
+                files.Add(new(path, identity, digest));
+            }
+            if (expected.Count != 0) throw new OwnedExecutionFailure("api_creation_capture_invalid");
+            return new(pair, capture.PrivateManifest, files.AsReadOnly());
+        }
+
+        private static async Task ValidateApiCreationAsync(ApiCreationProof proof, IReadOnlyList<string> paths,
+            CancellationToken token)
+        {
+            if (!paths.ToHashSet(StringComparer.Ordinal).SetEquals(proof.Files.Select(file => file.Path)))
+                throw new OwnedExecutionFailure("api_creation_records_changed");
+            foreach (ApiCreationFile file in proof.Files)
+                if (!NoInputLinks(file.Path) || await ReadLiveMetadataAsync(file.Path, false, token).ConfigureAwait(false) != file.Identity
+                    || DigestBytes(ReadBoundedFile(file.Path, 16384)) != file.Sha256)
+                    throw new OwnedExecutionFailure("api_creation_records_changed");
+        }
+
+        internal async Task<(OwnedNativeProcessResult Process, bool Admitted, byte[] Evidence, bool ResourceCleanupComplete)> RunAsync(
+            string owner, string temporary, string root, ProcessStartInfo command, bool requireRunningPrerequisites, TimeSpan timeout,
             CancellationToken cancellationToken)
         {
             byte[] before = await IdentityAsync(CancellationToken.None).ConfigureAwait(false);
-            Dictionary<string, string> images = await CachedImagesAsync(CancellationToken.None).ConfigureAwait(false);
-            if (images.Count == 0) throw new OwnedExecutionFailure("cached_image_inputs_missing");
+            HashSet<string> cachedImageIds = await CachedImageIdsAsync(CancellationToken.None).ConfigureAwait(false);
+            if (requireRunningPrerequisites && cachedImageIds.Count == 0)
+                throw new OwnedExecutionFailure("cached_image_inputs_missing");
             HashSet<string> initial = await InitialContainersAsync(owner, CancellationToken.None).ConfigureAwait(false);
+            var initialResources = new InitialNativeResources(initial, new HashSet<string>(StringComparer.Ordinal), cachedImageIds);
+            var qualified = new Dictionary<string, ApiCreationProof>(StringComparer.Ordinal);
+            var seenCreations = new HashSet<string>(StringComparer.Ordinal);
+            var seenOwnedIds = new HashSet<string>(StringComparer.Ordinal);
+            var images = new Dictionary<string, string>(StringComparer.Ordinal);
             var known = new Dictionary<string, ObservedOwnedResource>(StringComparer.Ordinal);
             var running = new HashSet<string>(StringComparer.Ordinal);
-            var references = new HashSet<string>(StringComparer.Ordinal);
-            bool valid = true;
             bool cleanup = false;
             byte[] after = [];
-            var cleanupFailures = new List<string>();
-            using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            Task<OwnedNativeProcessResult> native = RunOwnedNativeProcessAsync(command, timeout, stop.Token);
-            OwnedNativeProcessResult? process = null;
+            var failures = new List<Exception>();
+            uint? nativeUser = null;
 
-            async Task ObserveAsync()
+            void RetainCandidates(Dictionary<string, string[]> candidates)
             {
-                using JsonDocument document = await GetAsync("/v1.40/containers/json?all=true", CancellationToken.None).ConfigureAwait(false);
-                byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(document.RootElement);
-                if (!TryReadOwnedResourceSnapshot(bytes, owner, images, initial, out var observed, out _))
-                    throw new OwnedExecutionFailure("owned_resource_observation_invalid");
-                foreach (ObservedOwnedResource item in observed!)
+                foreach (string id in candidates.Keys)
+                    if (seenCreations.Add(id) && seenCreations.Count > 64)
+                        throw new OwnedExecutionFailure("api_creation_inventory_limit");
+                foreach (ApiCreationProof proof in qualified.Values)
+                    if (!candidates.ContainsKey(proof.Creation.CreationId))
+                        throw new OwnedExecutionFailure("api_creation_records_changed");
+            }
+
+            NativeContainerCreationSnapshot QualifiedSnapshot() => new(
+                qualified.Values.Select(proof => proof.Creation).ToArray(), new HashSet<string>(StringComparer.Ordinal), []);
+
+            void RetainResources(IReadOnlyList<ObservedOwnedResource> observed)
+            {
+                foreach (ObservedOwnedResource item in observed)
                 {
-                    if (known.TryGetValue(item.ContainerId, out var previous) &&
-                        (previous.ImageId != item.ImageId || previous.Resource != item.Resource))
+                    if (known.TryGetValue(item.ContainerId, out ObservedOwnedResource? previous)
+                        && (previous.ImageId != item.ImageId || previous.Resource != item.Resource))
                         throw new OwnedExecutionFailure("owned_resource_identity_changed");
                     known[item.ContainerId] = item with { Running = item.Running || (previous?.Running ?? false) };
                     if (item.Running) running.Add(item.Resource);
                 }
-                var selected = observed.Select(item => item.ContainerId).ToHashSet(StringComparer.Ordinal);
-                foreach (JsonElement item in document.RootElement.EnumerateArray())
-                {
-                    if (!selected.Contains(Text(item, "Id"))) continue;
-                    references.Add(Text(item, "Image"));
-                    // These existing API fixtures use resource copies, not admitted persistent volumes.
-                    // Unknown mounts cannot become a claim of complete resource/input cleanup.
-                    if (!item.TryGetProperty("Mounts", out JsonElement mounts) || mounts.ValueKind != JsonValueKind.Array ||
-                        mounts.GetArrayLength() != 0)
-                        throw new OwnedExecutionFailure("container_mount_inputs_not_attested");
-                }
             }
 
+            byte[] EligibleInventory(JsonElement inventory)
+            {
+                _ = ReadAllContainerIds(inventory, owner, requireOwnerAbsent: false);
+                var eligible = new List<JsonElement>();
+                var pairedIds = qualified.Values.Select(proof => proof.Creation.ContainerId).ToHashSet(StringComparer.Ordinal);
+                foreach (JsonElement item in inventory.EnumerateArray())
+                {
+                    string id = Text(item, "Id");
+                    bool selected = item.TryGetProperty("Labels", out JsonElement labels) && labels.ValueKind == JsonValueKind.Object
+                        && labels.TryGetProperty("islamu.assurance.owner", out JsonElement selectedOwner) && selectedOwner.GetString() == owner;
+                    if (selected && seenOwnedIds.Add(id) && seenOwnedIds.Count > 65_536)
+                        throw new OwnedExecutionFailure("api_resource_inventory_limit");
+                    if (!selected || pairedIds.Contains(id)) eligible.Add(item);
+                }
+                return JsonSerializer.SerializeToUtf8Bytes(eligible);
+            }
+
+            async Task ObserveAsync(OwnedNativeProcessContext context, CancellationToken stop)
+            {
+                if (!nativeUser.HasValue) throw new OwnedExecutionFailure("api_native_creator_identity_missing");
+                await ValidateApiRootAsync(root, owner, nativeUser.Value, CancellationToken.None).ConfigureAwait(false);
+                Dictionary<string, string[]> candidates = ReadApiCreationCandidates(root);
+                RetainCandidates(candidates);
+                foreach (ApiCreationProof proof in qualified.Values)
+                {
+                    if (stop.IsCancellationRequested) return;
+                    await ValidateApiCreationAsync(proof, candidates[proof.Creation.CreationId], CancellationToken.None).ConfigureAwait(false);
+                }
+                foreach (string id in candidates.Keys)
+                {
+                    if (stop.IsCancellationRequested) return;
+                    if (qualified.ContainsKey(id)) continue;
+                    ApiCreationProof? proof = await CaptureApiCreationAsync(context, temporary, root, owner, id,
+                        CancellationToken.None).ConfigureAwait(false);
+                    if (proof is null) continue;
+                    if (qualified.Values.Any(previous => previous.Creation.ContainerId == proof.Creation.ContainerId)
+                        || qualified.Values.Sum(previous => (long)previous.PrivateManifest.Length) + proof.PrivateManifest.Length > MaximumReportBytes / 2)
+                        throw new OwnedExecutionFailure("api_creation_capture_conflict");
+                    if (stop.IsCancellationRequested) return;
+                    string image = await LocalImageIdAsync(proof.Creation.ImageReference, CancellationToken.None).ConfigureAwait(false);
+                    if (!cachedImageIds.Contains(image) || images.TryGetValue(proof.Creation.ImageReference, out string? previousImage)
+                        && previousImage != image) throw new OwnedExecutionFailure("api_image_reference_changed");
+                    images[proof.Creation.ImageReference] = image;
+                    qualified.Add(id, proof);
+                }
+                if (stop.IsCancellationRequested) return;
+                using JsonDocument document = await GetAsync("/v1.40/containers/json?all=true", CancellationToken.None).ConfigureAwait(false);
+                if (!TryReadApiCreatedResources(EligibleInventory(document.RootElement), owner, QualifiedSnapshot(), images,
+                        initialResources, out var observed)) throw new OwnedExecutionFailure("api_created_resource_observation_invalid");
+                RetainResources(observed!);
+            }
+
+            OwnedNativeProcessResult process = await RunOwnedNativeProcessAsync(command, timeout, cancellationToken, async (context, stop) =>
+            {
+                ManagedProcessIdentity? identity = ReadManagedProcessIdentity(context.Pid);
+                if (identity is null || identity.Start != context.Start || identity.Group != context.Group
+                    || identity.Session != context.Session || identity.State is 'Z' or 'X')
+                    throw new OwnedExecutionFailure("api_native_creator_identity_missing");
+                nativeUser = identity.User;
+                var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                using CancellationTokenRegistration registration = stop.Register(() => stopped.TrySetResult());
+                while (!stop.IsCancellationRequested)
+                {
+                    await ObserveAsync(context, stop).ConfigureAwait(false);
+                    if (!stop.IsCancellationRequested)
+                        _ = await Task.WhenAny(stopped.Task, Task.Delay(50, CancellationToken.None)).ConfigureAwait(false);
+                }
+            }).ConfigureAwait(false);
+            if (!process.ObserverSettled)
+            {
+                byte[] unsettled = JsonSerializer.SerializeToUtf8Bytes(new
+                    { observed = false, cleanup = false, reason = "api_observer_unsettled", creatorAuthentication = "not-attested" });
+                return (process, false, unsettled, false);
+            }
+            bool valid = process.Succeeded && nativeUser.HasValue;
+            using var cleanupDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try
             {
-                while (!native.IsCompleted)
+                if (!nativeUser.HasValue) throw new OwnedExecutionFailure("api_native_creator_identity_missing");
+                await ValidateApiRootAsync(root, owner, nativeUser.Value, cleanupDeadline.Token).ConfigureAwait(false);
+                Dictionary<string, string[]> finalCandidates = ReadApiCreationCandidates(root);
+                RetainCandidates(finalCandidates);
+                foreach (ApiCreationProof proof in qualified.Values)
+                    await ValidateApiCreationAsync(proof, finalCandidates[proof.Creation.CreationId], cleanupDeadline.Token).ConfigureAwait(false);
+                using (JsonDocument terminal = await GetAsync("/v1.40/containers/json?all=true", cleanupDeadline.Token).ConfigureAwait(false))
                 {
-                    await ObserveAsync().ConfigureAwait(false);
-                    _ = await Task.WhenAny(native, Task.Delay(50, CancellationToken.None)).ConfigureAwait(false);
+                    if (!TryReadApiCreatedResources(EligibleInventory(terminal.RootElement), owner, QualifiedSnapshot(), images,
+                            initialResources, out var terminalQualified))
+                        throw new OwnedExecutionFailure("api_resource_terminal_unqualified");
+                    RetainResources(terminalQualified!);
+                    if (!TryReadApiCreatedResources(JsonSerializer.SerializeToUtf8Bytes(terminal.RootElement), owner,
+                            QualifiedSnapshot(), images, initialResources, out _))
+                        throw new OwnedExecutionFailure("api_resource_terminal_unqualified");
                 }
-                process = await native.ConfigureAwait(false);
-                await ObserveAsync().ConfigureAwait(false);
+                var qualifiedIds = qualified.Values.Select(proof => proof.Creation.ContainerId).ToHashSet(StringComparer.Ordinal);
+                if (!seenCreations.SetEquals(qualified.Keys) || !qualifiedIds.SetEquals(known.Keys)
+                    || !seenOwnedIds.IsSubsetOf(qualifiedIds))
+                    throw new OwnedExecutionFailure("api_resource_terminal_unqualified");
             }
-            catch
+            catch (Exception failure) { failures.Add(failure); valid = false; }
+            foreach (ObservedOwnedResource item in known.Values)
             {
-                valid = false;
-                await stop.CancelAsync().ConfigureAwait(false);
-            }
-            finally
-            {
-                if (process is null)
-                {
-                    try { process = await native.ConfigureAwait(false); }
-                    catch { valid = false; }
-                }
-                using var cleanupDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                foreach (ObservedOwnedResource item in known.Values)
-                {
-                    try
-                    {
-                        if (initial.Contains(item.ContainerId))
-                        {
-                            cleanupFailures.Add("owned_container_cleanup_failed");
-                            continue;
-                        }
-                        string filter = Uri.EscapeDataString(JsonSerializer.Serialize(new Dictionary<string, string[]>
-                            { ["id"] = [item.ContainerId] }));
-                        using JsonDocument current = await GetAsync("/v1.40/containers/json?all=true&filters=" + filter,
-                            cleanupDeadline.Token).ConfigureAwait(false);
-                        JsonElement inventory = current.RootElement;
-                        if (inventory.ValueKind != JsonValueKind.Array)
-                        {
-                            cleanupFailures.Add("owned_container_cleanup_failed");
-                            continue;
-                        }
-                        if (inventory.GetArrayLength() == 0) continue;
-                        if (inventory.GetArrayLength() != 1 || Text(inventory[0], "Id") != item.ContainerId ||
-                            !TryReadOwnedResourceSnapshot(JsonSerializer.SerializeToUtf8Bytes(inventory), owner, images,
-                                initial, out var currentResources, out _) || currentResources!.Count != 1 ||
-                            currentResources[0].ImageId != item.ImageId || currentResources[0].Resource != item.Resource)
-                        {
-                            cleanupFailures.Add("owned_container_cleanup_failed");
-                            continue;
-                        }
-                        await DeleteAsync(item.ContainerId, cleanupDeadline.Token).ConfigureAwait(false);
-                    }
-                    catch { cleanupFailures.Add("owned_container_cleanup_failed"); }
-                }
                 try
                 {
-                    using JsonDocument final = await GetAsync("/v1.40/containers/json?all=true", cleanupDeadline.Token).ConfigureAwait(false);
-                    HashSet<string> finalIds = ReadAllContainerIds(final.RootElement, owner, requireOwnerAbsent: true);
-                    cleanup = cleanupFailures.Count == 0 && !finalIds.Overlaps(known.Keys);
-                    after = await IdentityAsync(cleanupDeadline.Token).ConfigureAwait(false);
-                    Dictionary<string, string> finalImages = await CachedImagesAsync(cleanupDeadline.Token).ConfigureAwait(false);
-                    if (references.Any(reference => !finalImages.TryGetValue(reference, out string? id) || id != images[reference]))
-                        valid = false;
+                    if (initial.Contains(item.ContainerId)) throw new OwnedExecutionFailure("owned_container_cleanup_failed");
+                    string filter = Uri.EscapeDataString(JsonSerializer.Serialize(new Dictionary<string, string[]>
+                        { ["id"] = [item.ContainerId] }));
+                    using JsonDocument current = await GetAsync("/v1.40/containers/json?all=true&filters=" + filter,
+                        cleanupDeadline.Token).ConfigureAwait(false);
+                    JsonElement inventory = current.RootElement;
+                    if (inventory.ValueKind != JsonValueKind.Array) throw new OwnedExecutionFailure("owned_container_cleanup_failed");
+                    if (inventory.GetArrayLength() == 0) continue;
+                    if (inventory.GetArrayLength() != 1 || Text(inventory[0], "Id") != item.ContainerId
+                        || !TryReadApiCreatedResources(JsonSerializer.SerializeToUtf8Bytes(inventory), owner, QualifiedSnapshot(), images,
+                            initialResources, out var currentResources) || currentResources!.Count != 1
+                        || currentResources[0].ImageId != item.ImageId || currentResources[0].Resource != item.Resource)
+                        throw new OwnedExecutionFailure("owned_container_cleanup_failed");
+                    await DeleteAsync(item.ContainerId, cleanupDeadline.Token).ConfigureAwait(false);
                 }
-                catch { cleanup = false; }
+                catch (Exception failure) { failures.Add(failure); valid = false; }
             }
-            bool admitted = valid && cleanup && before.AsSpan().SequenceEqual(after) &&
+            try
+            {
+                using JsonDocument final = await GetAsync("/v1.40/containers/json?all=true", cleanupDeadline.Token).ConfigureAwait(false);
+                HashSet<string> finalIds = ReadAllContainerIds(final.RootElement, owner, requireOwnerAbsent: true);
+                cleanup = failures.Count == 0 && !finalIds.Overlaps(known.Keys) && !finalIds.Overlaps(seenOwnedIds);
+                after = await IdentityAsync(cleanupDeadline.Token).ConfigureAwait(false);
+                HashSet<string> finalImages = await CachedImageIdsAsync(cleanupDeadline.Token).ConfigureAwait(false);
+                foreach (var image in images)
+                    if (!finalImages.Contains(image.Value)
+                        || await LocalImageIdAsync(image.Key, cleanupDeadline.Token).ConfigureAwait(false) != image.Value)
+                        throw new OwnedExecutionFailure("api_image_reference_changed");
+            }
+            catch (Exception failure) { failures.Add(failure); valid = false; cleanup = false; }
+            process = process with { ObserverFailures = process.ObserverFailures.Concat(failures).ToArray() };
+            bool admitted = valid && process.Succeeded && cleanup && before.AsSpan().SequenceEqual(after) &&
                 (!requireRunningPrerequisites || running.SetEquals(["keycloak", "cerbos"]));
             byte[] evidence = JsonSerializer.SerializeToUtf8Bytes(new
             {
@@ -768,12 +934,26 @@ public static partial class SecurityExecutionEvidence
                 initialContainerInventorySha256 = DigestBytes(JsonSerializer.SerializeToUtf8Bytes(initial.Order(StringComparer.Ordinal))),
                 resources = known.Values.OrderBy(item => item.ContainerId, StringComparer.Ordinal)
                     .Select(item => new { item.ContainerId, item.ImageId, item.Resource, runningObserved = item.Running }),
+                creatorObservations = qualified.Values.OrderBy(proof => proof.Creation.CreationId, StringComparer.Ordinal)
+                    .Select(proof => new { proof.Creation, witnessSha256 = DigestBytes(proof.PrivateManifest),
+                        witness = JsonSerializer.Deserialize<JsonElement>(proof.PrivateManifest) }),
+                seenCreationIds = seenCreations.Order(StringComparer.Ordinal),
+                seenOwnedContainerIds = seenOwnedIds.Order(StringComparer.Ordinal),
                 runningPrerequisites = running.Order(StringComparer.Ordinal),
-                cachedImages = references.Order(StringComparer.Ordinal).Select(reference => new { reference, imageId = images[reference] }),
+                cachedImages = images.OrderBy(image => image.Key, StringComparer.Ordinal)
+                    .Select(image => new { reference = image.Key, imageId = image.Value }),
+                initialImageCount = cachedImageIds.Count,
+                initialImageInventorySha256 = DigestBytes(JsonSerializer.SerializeToUtf8Bytes(cachedImageIds.Order(StringComparer.Ordinal))),
                 boundedObservationsAdmitted = valid, observationCoverage = "point-in-time-only",
-                knownContainerCleanupComplete = cleanup, cleanupFailures
+                knownContainerCleanupComplete = cleanup, observationFailureCount = process.ObserverFailures.Count
             });
-            return (process ?? throw new OwnedExecutionFailure("native_process_custody_missing"), admitted, evidence);
+            if (evidence.Length > MaximumReportBytes)
+            {
+                process = process with { ObserverFailures = process.ObserverFailures.Append(new OwnedExecutionFailure("api_creation_evidence_limit")).ToArray() };
+                evidence = JsonSerializer.SerializeToUtf8Bytes(new { observed = false, cleanup, reason = "api_creation_evidence_limit" });
+                admitted = false;
+            }
+            return (process, admitted, evidence, cleanup);
         }
 
         private async Task<byte[]> IdentityAsync(CancellationToken token)
@@ -794,33 +974,29 @@ public static partial class SecurityExecutionEvidence
                 reportedApiVersion = api, reportedMinimumApiVersion = minimum, os, architecture, id });
         }
 
-        private async Task<Dictionary<string, string>> CachedImagesAsync(CancellationToken token)
+        private async Task<HashSet<string>> CachedImageIdsAsync(CancellationToken token)
         {
             using JsonDocument document = await GetAsync("/v1.40/images/json?all=true", token).ConfigureAwait(false);
             JsonElement inventory = document.RootElement;
             if (inventory.ValueKind != JsonValueKind.Array || inventory.GetArrayLength() > 65_536) throw new InvalidDataException();
-            var images = new Dictionary<string, string>(StringComparer.Ordinal);
-            var ambiguous = new HashSet<string>(StringComparer.Ordinal);
+            var images = new HashSet<string>(StringComparer.Ordinal);
             foreach (JsonElement item in inventory.EnumerateArray())
             {
                 if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("Id", out var id) ||
-                    id.ValueKind != JsonValueKind.String || !FullLocalImageId(id.GetString()!) ||
-                    !item.TryGetProperty("RepoTags", out var tags) || tags.ValueKind != JsonValueKind.Array) continue;
-                foreach (JsonElement tag in tags.EnumerateArray())
-                {
-                    if (tag.ValueKind != JsonValueKind.String) continue;
-                    string reference = tag.GetString()!;
-                    if (!BoundedIdentity(reference, 1024) || ambiguous.Contains(reference)) continue;
-                    if (images.TryGetValue(reference, out string? previous) && previous != id.GetString())
-                    {
-                        images.Remove(reference);
-                        ambiguous.Add(reference);
-                    }
-                    else images[reference] = id.GetString()!;
-                    if (images.Count > 65_536) throw new InvalidDataException();
-                }
+                    id.ValueKind != JsonValueKind.String || !FullLocalImageId(id.GetString()!))
+                    throw new OwnedExecutionFailure("cached_image_inventory_invalid");
+                images.Add(id.GetString()!);
             }
             return images;
+        }
+
+        private async Task<string> LocalImageIdAsync(string reference, CancellationToken token)
+        {
+            if (!BoundedIdentity(reference, 2048)) throw new OwnedExecutionFailure("api_image_reference_invalid");
+            using JsonDocument document = await GetAsync("/v1.40/images/" + Uri.EscapeDataString(reference) + "/json", token).ConfigureAwait(false);
+            string id = Text(document.RootElement, "Id");
+            if (!FullLocalImageId(id)) throw new OwnedExecutionFailure("api_image_reference_invalid");
+            return id;
         }
 
         private async Task<HashSet<string>> InitialContainersAsync(string owner, CancellationToken token)

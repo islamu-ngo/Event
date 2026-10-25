@@ -113,6 +113,120 @@ public sealed class DiscoveryMetadataFreshEnrollmentTests
         await Assert.That(await AuthorityImageAsync(migrator)).IsEqualTo(installedImage);
     }
 
+    [Test]
+    public async Task MetadataRetryAdmitsFixedMembershipUpdatesAndRejectsPrivilegeDrift()
+    {
+        await using var fixture = new DiscoveryMetadataEnrollmentPostgresFixture(PrimaryDatabaseRole.Global);
+        await fixture.InitializeAsync();
+        await using var migrator = fixture.CreateMigrator();
+        await migrator.Database.OpenConnectionAsync();
+        var migrationConnection = (NpgsqlConnection)migrator.Database.GetDbConnection();
+        var migrationContextId = migrator.ContextId;
+        int migrationBackend = migrationConnection.ProcessID;
+        await AssertIdentityAsync(migrator, fixture.Enrollment.MigratorLogin);
+
+        await PostgresDiscoveryMetadataPermissions.ApplyAsync(migrator, fixture.Enrollment);
+        await PostgresTenantMembershipMutationPermissions.ApplyAsync(migrator, fixture.Enrollment);
+        await PostgresDiscoveryMetadataPermissions.ApplyAsync(migrator, fixture.Enrollment);
+
+        await using var global = await fixture.CreateGlobalAsync();
+        await global.Database.OpenConnectionAsync();
+        var globalConnection = (NpgsqlConnection)global.Database.GetDbConnection();
+        var globalContextId = global.ContextId;
+        int globalBackend = globalConnection.ProcessID;
+        await AssertIdentityAsync(global, fixture.Enrollment.GlobalLogin);
+        await PostgresDiscoveryMetadataPermissions.RequireCurrentAsync(global, fixture.Enrollment, true, default);
+        await AssertCustodyAsync();
+
+        var names = new HumanPrincipalSourceSql(migrator);
+        string login = names.Quote(fixture.Enrollment.GlobalLogin);
+        foreach (var change in new[]
+        {
+            (Type: typeof(Tenant), Property: nameof(Tenant.Slug), Remove: false, GrantOption: false),
+            (Type: typeof(Tenant), Property: nameof(Tenant.TenantStatusId), Remove: false, GrantOption: true),
+            (Type: typeof(EventDiscoveryRevision), Property: nameof(EventDiscoveryRevision.DisclosureEpoch), Remove: true, GrantOption: false)
+        })
+        {
+            string table = names.Table(change.Type);
+            string column = names.Column(change.Type, change.Property);
+            string permission = $"UPDATE ({column}) ON {table}";
+            string tamper = change.Remove ? $"REVOKE {permission} FROM {login}"
+                : $"GRANT {permission} TO {login}" + (change.GrantOption ? " WITH GRANT OPTION" : "");
+            string restore = change.Remove ? $"GRANT {permission} TO {login}"
+                : change.GrantOption ? $"REVOKE GRANT OPTION FOR {permission} FROM {login}"
+                : $"REVOKE {permission} FROM {login}";
+            var failures = new List<Exception>();
+            try
+            {
+                await using (var command = Command(migrator, tamper)) await command.ExecuteNonQueryAsync();
+                var installer = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                    await PostgresDiscoveryMetadataPermissions.ApplyAsync(migrator, fixture.Enrollment));
+                await Assert.That(installer!.Message == "discovery_metadata_permissions_drift").IsTrue();
+                var current = await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+                    await PostgresDiscoveryMetadataPermissions.RequireCurrentAsync(global, fixture.Enrollment, true, default));
+                await Assert.That(current!.Message == "discovery_metadata_current_owner_not_ready").IsTrue();
+                await using var retained = Command(migrator, """
+                    SELECT pg_catalog.has_column_privilege(@login,@relation::regclass,@column,@privilege) = @expected
+                        AND (NOT @grant_option OR pg_catalog.has_column_privilege(@login,@relation::regclass,@column,'UPDATE'))
+                    """);
+                retained.Parameters.Add(new NpgsqlParameter("login", NpgsqlTypes.NpgsqlDbType.Text) { Value = fixture.Enrollment.GlobalLogin });
+                retained.Parameters.Add(new NpgsqlParameter("relation", NpgsqlTypes.NpgsqlDbType.Text) { Value = table });
+                retained.Parameters.Add(new NpgsqlParameter("column", NpgsqlTypes.NpgsqlDbType.Text) { Value = names.ColumnName(change.Type, change.Property) });
+                retained.Parameters.Add(new NpgsqlParameter("privilege", NpgsqlTypes.NpgsqlDbType.Text)
+                    { Value = change.GrantOption ? "UPDATE WITH GRANT OPTION" : "UPDATE" });
+                retained.Parameters.Add(new NpgsqlParameter("expected", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = !change.Remove });
+                retained.Parameters.Add(new NpgsqlParameter("grant_option", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = change.GrantOption });
+                await Assert.That(await retained.ExecuteScalarAsync() is true).IsTrue();
+                await AssertCustodyAsync();
+            }
+            catch (Exception failure) { failures.Add(failure); }
+            finally
+            {
+                try
+                {
+                    await using var command = Command(migrator, restore);
+                    await command.ExecuteNonQueryAsync();
+                    await using var restored = Command(migrator, """
+                        SELECT pg_catalog.has_column_privilege(@login,@relation::regclass,@column,'UPDATE') = @expected
+                            AND NOT pg_catalog.has_column_privilege(@login,@relation::regclass,@column,'UPDATE WITH GRANT OPTION')
+                        """);
+                    restored.Parameters.Add(new NpgsqlParameter("login", NpgsqlTypes.NpgsqlDbType.Text) { Value = fixture.Enrollment.GlobalLogin });
+                    restored.Parameters.Add(new NpgsqlParameter("relation", NpgsqlTypes.NpgsqlDbType.Text) { Value = table });
+                    restored.Parameters.Add(new NpgsqlParameter("column", NpgsqlTypes.NpgsqlDbType.Text) { Value = names.ColumnName(change.Type, change.Property) });
+                    restored.Parameters.Add(new NpgsqlParameter("expected", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = change.Remove || change.GrantOption });
+                    await Assert.That(await restored.ExecuteScalarAsync() is true).IsTrue();
+                }
+                catch (Exception cleanup) { failures.Add(cleanup); }
+                try
+                {
+                    await PostgresDiscoveryMetadataPermissions.ApplyAsync(migrator, fixture.Enrollment);
+                    await PostgresDiscoveryMetadataPermissions.RequireCurrentAsync(global, fixture.Enrollment, true, default);
+                    await AssertCustodyAsync();
+                }
+                catch (Exception cleanup) { failures.Add(cleanup); }
+            }
+            if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count > 1) throw new AggregateException("Metadata retry invariant and cleanup failures.", failures);
+        }
+
+        async Task AssertCustodyAsync()
+        {
+            migrator.RequireBoundTenantLease();
+            global.RequireBoundTenantLease();
+            bool migrationRetained = migrator.ContextId == migrationContextId
+                && ReferenceEquals(migrator.Database.GetDbConnection(), migrationConnection)
+                && migrationConnection.State == ConnectionState.Open && migrationConnection.ProcessID == migrationBackend
+                && migrator.Database.CurrentTransaction is null && migrator.TenantFilterTenantId is null && !migrator.IsTenantFilterBypassed;
+            bool globalRetained = global.ContextId == globalContextId
+                && ReferenceEquals(global.Database.GetDbConnection(), globalConnection)
+                && globalConnection.State == ConnectionState.Open && globalConnection.ProcessID == globalBackend
+                && global.Database.CurrentTransaction is null && global.TenantFilterTenantId is null && !global.IsTenantFilterBypassed
+                && System.Transactions.Transaction.Current is null;
+            await Assert.That(migrationRetained).IsTrue();
+            await Assert.That(globalRetained).IsTrue();
+        }
+    }
+
     private static async Task AssertIdentityAsync(ExploreDbContext context, string login)
     {
         await using var command = Command(context, "SELECT session_user=@login AND current_user=session_user AND current_setting('role') IN ('none',session_user::text)");

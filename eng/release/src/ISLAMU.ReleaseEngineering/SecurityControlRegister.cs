@@ -423,21 +423,30 @@ public static class SecurityControlRegister
             if (project != expectedProject || profile != expectedProfile) throw new InvalidDataException();
 
             var tests = new HashSet<RequiredTest>();
+            var lifecycles = new Dictionary<RequiredTest, RuntimeLifecycle>();
             foreach (JsonElement test in requirement.GetProperty("requiredTests").EnumerateArray())
             {
+                string[] fields = lane == "owned-runtime"
+                    ? ["className", "methodName", "testName", "lifecycle"]
+                    : ["className", "methodName", "testName"];
+                if (!ClosedFields(test, fields)) throw new InvalidDataException();
                 string className = test.GetProperty("className").GetString() ?? string.Empty;
                 string methodName = test.GetProperty("methodName").GetString() ?? string.Empty;
                 string testName = test.GetProperty("testName").GetString() ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(className) || string.IsNullOrWhiteSpace(methodName) ||
                     string.IsNullOrWhiteSpace(testName) || !tests.Add(new RequiredTest(className, methodName, testName)))
                     throw new InvalidDataException();
+                if (lane == "owned-runtime")
+                    lifecycles.Add(new RequiredTest(className, methodName, testName),
+                        ReadRuntimeLifecycle(test.GetProperty("lifecycle")));
             }
 
             if (tests.Count is < 1 or > 1024 || !requirements.TryAdd(lane, new ExecutionRequirement(project, profile, tests)
             {
                 Environment = project == apiProject ? "Testing" : "Assurance",
                 Selector = selector,
-                ReportFileName = lane + "-tests.trx"
+                ReportFileName = lane + "-tests.trx",
+                Lifecycles = lifecycles
             }))
                 throw new InvalidDataException();
         }
@@ -452,8 +461,84 @@ public static class SecurityControlRegister
         internal string Environment { get; init; } = "Testing";
         internal string Selector { get; init; } = string.Empty;
         internal string ReportFileName { get; init; } = string.Empty;
+        internal IReadOnlyDictionary<RequiredTest, RuntimeLifecycle> Lifecycles { get; init; } =
+            new Dictionary<RequiredTest, RuntimeLifecycle>();
     }
     internal readonly record struct RequiredTest(string ClassName, string MethodName, string TestName);
+
+    internal enum RuntimeStage { None, Build, Startup, Hosted }
+    internal enum RuntimeCompletion { Success, Cancelled, BuilderFault, ExecutionFault, ControlledFault, Refused, StopFault }
+    internal enum RuntimeRootDisposition { NotApplicable, CaseCleanup, OwnedScopeCleanup }
+    internal sealed record RuntimeLifecycle(RuntimeStage Stage, RuntimeCompletion Completion, bool DirectContainers,
+        string? Resource, IReadOnlySet<string> Signals, RuntimeRootDisposition RootDisposition);
+
+    private static RuntimeLifecycle ReadRuntimeLifecycle(JsonElement value)
+    {
+        if (!ClosedFields(value, ["stage", "completion", "directContainers", "resource", "signals", "rootDisposition"]))
+            throw new InvalidDataException();
+        RuntimeStage stage = value.GetProperty("stage").GetString() switch
+        {
+            "none" => RuntimeStage.None, "build" => RuntimeStage.Build,
+            "startup" => RuntimeStage.Startup, "hosted" => RuntimeStage.Hosted,
+            _ => throw new InvalidDataException()
+        };
+        RuntimeCompletion completion = value.GetProperty("completion").GetString() switch
+        {
+            "success" => RuntimeCompletion.Success, "cancelled" => RuntimeCompletion.Cancelled,
+            "builder-fault" => RuntimeCompletion.BuilderFault, "execution-fault" => RuntimeCompletion.ExecutionFault,
+            "controlled-fault" => RuntimeCompletion.ControlledFault, "refused" => RuntimeCompletion.Refused,
+            "stop-fault" => RuntimeCompletion.StopFault, _ => throw new InvalidDataException()
+        };
+        RuntimeRootDisposition root = value.GetProperty("rootDisposition").GetString() switch
+        {
+            "not-applicable" => RuntimeRootDisposition.NotApplicable,
+            "case-cleanup" => RuntimeRootDisposition.CaseCleanup,
+            "owned-scope-cleanup" => RuntimeRootDisposition.OwnedScopeCleanup,
+            _ => throw new InvalidDataException()
+        };
+        bool direct = value.GetProperty("directContainers").GetBoolean();
+        JsonElement resourceValue = value.GetProperty("resource");
+        string? resource = resourceValue.ValueKind == JsonValueKind.Null ? null : resourceValue.GetString();
+        JsonElement signalValues = value.GetProperty("signals");
+        if (signalValues.ValueKind != JsonValueKind.Array || signalValues.GetArrayLength() > 4)
+            throw new InvalidDataException();
+        var signals = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement signal in signalValues.EnumerateArray())
+            if (signal.ValueKind != JsonValueKind.String || signal.GetString() is not { Length: > 0 and <= 128 } text
+                || !signals.Add(text)) throw new InvalidDataException();
+
+        string[][] alternatives = (stage, completion, direct, resource, root) switch
+        {
+            (RuntimeStage.None, RuntimeCompletion.Success, false, null, RuntimeRootDisposition.NotApplicable) => [[]],
+            (RuntimeStage.None, RuntimeCompletion.Cancelled, true, null, RuntimeRootDisposition.NotApplicable) =>
+                [["docker-wait-cancelled"]],
+            (RuntimeStage.Build, RuntimeCompletion.Success, false, null, RuntimeRootDisposition.CaseCleanup) => [[]],
+            (RuntimeStage.Build, RuntimeCompletion.BuilderFault, false, null, RuntimeRootDisposition.CaseCleanup) =>
+                [["assurance_builder_fault"]],
+            (RuntimeStage.Build, RuntimeCompletion.ControlledFault, true, null, RuntimeRootDisposition.CaseCleanup) =>
+                [["test_resource_foreign_container", "root-retained"]],
+            (RuntimeStage.Build, RuntimeCompletion.ExecutionFault, false, null, RuntimeRootDisposition.OwnedScopeCleanup) =>
+                [["execution-unobserved", "root-retained"]],
+            (RuntimeStage.Startup, RuntimeCompletion.Cancelled, false, "postgres", RuntimeRootDisposition.CaseCleanup) =>
+                [["caller-cancelled", "postgres-healthy"], ["caller-cancelled", "postgres-starting"]],
+            (RuntimeStage.Startup, RuntimeCompletion.ExecutionFault, false, "postgres", RuntimeRootDisposition.OwnedScopeCleanup) =>
+                [["test_resource_start_failed:postgres", "test_application_execution_already_observed", "startup-held", "root-retained"]],
+            (RuntimeStage.Startup, RuntimeCompletion.ControlledFault, false, "postgres", RuntimeRootDisposition.CaseCleanup) =>
+                [["test_resource_start_failed:postgres", "assurance_disposal_fault", "root-retained"]],
+            (RuntimeStage.Startup, RuntimeCompletion.Refused, false, "explore-blazor-peer", RuntimeRootDisposition.CaseCleanup) =>
+                [["data_protection_admission_rejected", "non-cancellation-start-failure", "nonzero-resource-exit"]],
+            (RuntimeStage.Hosted, RuntimeCompletion.Success, false, null, RuntimeRootDisposition.CaseCleanup) => [[]],
+            (RuntimeStage.Hosted, RuntimeCompletion.StopFault, false, null, RuntimeRootDisposition.CaseCleanup) =>
+                [["assurance_stop_fault", "root-retained"]],
+            _ => throw new InvalidDataException()
+        };
+        if (!alternatives.Any(signals.SetEquals)) throw new InvalidDataException();
+        return new(stage, completion, direct, resource, signals, root);
+    }
+
+    private static bool ClosedFields(JsonElement value, string[] names) => value.ValueKind == JsonValueKind.Object
+        && value.EnumerateObject().Count() == names.Length
+        && value.EnumerateObject().All(property => names.Contains(property.Name, StringComparer.Ordinal));
 
     private static HashSet<string> Identities(JsonElement entries, string prefix, int count, int digits)
     {

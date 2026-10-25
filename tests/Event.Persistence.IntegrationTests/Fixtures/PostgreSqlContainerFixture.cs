@@ -345,7 +345,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresPaidPolicyCeilingContract.ApplyAsync(migratorContext);
             await PostgresInstanceStorageAdministrationContract.ApplyAsync(migratorContext);
             await PostgresStorageReconciliationContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
-            await PostgresLocalStorageQuarantineContract.ApplyAsync(migratorContext);
+            await PostgresLocalStorageQuarantineContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresDiscoveryMetadataPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresTenantMembershipMutationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresActorOwnershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);

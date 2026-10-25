@@ -10,6 +10,7 @@ using Event.Api.IntegrationTests.Fixtures;
 using Event.Testing.DataProtection;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Models;
 using Explore.Application.Responses;
@@ -151,6 +152,9 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
         using var administrationClient = administrationFactory?.CreateClient();
         var factory = administrationFactory ?? _instanceAdminFactory;
         var client = administrationClient ?? _instanceAdminClient;
+        if (instanceAdministration)
+            await Assert.That(await factory.Services.GetRequiredService<IDeploymentModeProvider>().GetCurrentModeAsync())
+                .IsEqualTo(DeploymentMode.MultiTenant);
         var token = await _keycloak.TokenClient.GetAdminTokenAsync();
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
         var accountKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(jwt.Issuer, jwt.Subject);
@@ -572,6 +576,19 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
                 dbContext.Tenants.Add(new TenantBuilder().WithId(DefaultTenantId).Build());
             else
                 tenant.TenantStatusId = (int)TenantStatusEnum.Active;
+
+            if (scope.ServiceProvider.GetRequiredService<IConfiguration>()
+                    .GetValue<DeploymentMode>("Deployment:Mode") == DeploymentMode.MultiTenant)
+            {
+                var administratorId = await dbContext.PlatformUserRoles
+                    .Where(role => role.RoleId == (int)RoleEnum.Admin)
+                    .Select(role => role.UserId).SingleAsync(cancellationToken);
+                var completedAt = DateTime.UtcNow;
+                var bootstrap = InstanceBootstrapState.CreateInteractivePending(
+                    Guid.CreateVersion7(), DeploymentMode.MultiTenant, completedAt);
+                bootstrap.CompleteInteractive(administratorId, completedAt);
+                dbContext.InstanceBootstrapStates.Add(bootstrap);
+            }
 
             dbContext.SystemSettings.Add(new SystemSetting
             {

@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
+using Explore.Blazor.Client.Contracts.Services;
 
 namespace Explore.Blazor.Client.Services.Moderation;
 
@@ -13,7 +14,7 @@ namespace Explore.Blazor.Client.Services.Moderation;
 public sealed class ModerationPolicyAdministrationService(
     IModerationCurrentPolicyClient currentClient,
     IModerationReferenceCatalogueClient referenceClient,
-    HttpClient http)
+    HttpClient http) : IModerationPolicyAdministrationService
 {
     internal static readonly JsonSerializerOptions Json = EventApiJsonSerializerSettings.Configure(new());
 

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
+using Explore.Blazor.Client.Contracts.Services;
 
 namespace Explore.Blazor.Client.Services.Moderation;
 
@@ -28,7 +29,7 @@ public sealed record PreFindingNoticeReadResult(PreFindingNoticeView? View, PreF
 /// Uses the registered generated client and its BFF transport. No persistence, logging or retry policy.
 /// The generated notice wrapper currently carries all flattened fields in JSON extension data.
 /// </summary>
-public sealed class PreFindingNoticeService(IModerationPreFindingNoticesClient client, TimeProvider clock)
+public sealed class PreFindingNoticeService(IModerationPreFindingNoticesClient client, TimeProvider clock) : IPreFindingNoticeService
 {
     public const int MaximumResponseBytes = 65536;
 

@@ -87,12 +87,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEventSessionService, EventSessionService>();
         services.AddScoped<IEventOrganizerClaimService, EventOrganizerClaimService>();
         services.AddScoped<IEventModerationService, EventModerationService>();
-        services.AddScoped<Explore.Blazor.Client.Services.Moderation.PreFindingNoticeService>();
+        services.AddScoped<IPreFindingNoticeService, Explore.Blazor.Client.Services.Moderation.PreFindingNoticeService>();
         services.AddScoped(provider => new Explore.Blazor.Client.Services.Moderation.ModerationClassificationMaterialService(
             provider.GetRequiredService<Explore.Blazor.Client.Clients.IModerationClassificationMaterialInventoryClient>(),
             provider.GetRequiredService<Explore.Blazor.Client.Clients.IModerationClassificationMaterialReviewClient>(),
             provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(Explore.Blazor.Client.Clients.IModerationClassificationMaterialInventoryClient))));
-        services.AddScoped(provider => new Explore.Blazor.Client.Services.Moderation.ModerationPolicyAdministrationService(
+        services.AddScoped<IModerationPolicyAdministrationService>(provider => new Explore.Blazor.Client.Services.Moderation.ModerationPolicyAdministrationService(
             provider.GetRequiredService<Explore.Blazor.Client.Clients.IModerationCurrentPolicyClient>(),
             provider.GetRequiredService<Explore.Blazor.Client.Clients.IModerationReferenceCatalogueClient>(),
             provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(Explore.Blazor.Client.Clients.IModerationCurrentPolicyClient))));

@@ -234,7 +234,7 @@ public sealed class PreFindingNoticeTests
         var http = new HttpClient(transport) { BaseAddress = new Uri("https://event.example/") };
         clock ??= new FixedTimeProvider(PreFindingNoticeTransport.Now);
         context.Services.AddSingleton(clock);
-        context.Services.AddSingleton(new PreFindingNoticeService(new ModerationPreFindingNoticesClient(http), clock));
+        context.Services.AddSingleton<Explore.Blazor.Client.Contracts.Services.IPreFindingNoticeService>(new PreFindingNoticeService(new ModerationPreFindingNoticesClient(http), clock));
         return http;
     }
 

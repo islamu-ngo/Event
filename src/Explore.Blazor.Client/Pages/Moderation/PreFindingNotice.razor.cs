@@ -1,3 +1,4 @@
+using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Services.Moderation;
 using Microsoft.AspNetCore.Components;
@@ -9,7 +10,7 @@ public partial class PreFindingNotice : ComponentBase, IDisposable
     private static readonly TimeSpan MaximumTimerDelay = TimeSpan.FromMilliseconds(uint.MaxValue - 1d);
     [Parameter] public Guid NoticeId { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "reviewResponse")] public bool ReviewResponse { get; set; }
-    [Inject] private PreFindingNoticeService NoticeService { get; set; } = null!;
+    [Inject] private IPreFindingNoticeService NoticeService { get; set; } = null!;
     [Inject] private TimeProvider Clock { get; set; } = null!;
     [Inject] private IAccessibilityFocusService Focus { get; set; } = null!;
 

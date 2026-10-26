@@ -1,5 +1,6 @@
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
+using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Models.Moderation;
 using Explore.Blazor.Client.Services.Moderation;
@@ -13,7 +14,7 @@ namespace Explore.Blazor.Client.Pages.Moderation;
 /// </summary>
 public partial class PolicyAdministration : ComponentBase, IDisposable
 {
-    [Inject] private ModerationPolicyAdministrationService Administration { get; set; } = default!;
+    [Inject] private IModerationPolicyAdministrationService Administration { get; set; } = default!;
     [Inject] private IAccessibilityFocusService Focus { get; set; } = default!;
 
     private ModerationPolicyAdministrationScope scope = ModerationPolicyAdministrationScope.Tenant;

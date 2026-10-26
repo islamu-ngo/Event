@@ -396,7 +396,7 @@ public sealed class PolicyAdministrationTests
         internal Fixture()
         {
             http = new(Transport) { BaseAddress = new Uri("https://event.example/community/") };
-            Context.Services.AddSingleton(new ModerationPolicyAdministrationService(
+            Context.Services.AddSingleton<Explore.Blazor.Client.Contracts.Services.IModerationPolicyAdministrationService>(new ModerationPolicyAdministrationService(
                 new ModerationCurrentPolicyClient(http), new ModerationReferenceCatalogueClient(http), http));
         }
 

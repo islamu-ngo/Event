@@ -5,6 +5,13 @@ Source: API routes and generated OpenAPI contracts.
 
 ## 2026-10-25
 
+- Managed event-program responses copy their sessions, groups, days and agenda
+  collections during construction and `init`/`with` replacement. Mutating a
+  caller-owned list afterwards no longer changes the published response. JSON
+  arrays, property names, routes and permissions are unchanged. Constructor and
+  replacement snapshot regressions are authored; local test compilation and
+  execution remain unperformed and require remote CI verification.
+
 - Instance administration's existing `POST /api/admin/instance/tenants` route
   resolves the persisted provider-linked platform user before invoking the native
   tenant creator, matching `POST /api/tenant`. Neither route assumes a GUID token

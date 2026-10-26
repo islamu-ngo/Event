@@ -208,6 +208,7 @@ public class ModerationQualificationEvidenceInvariantTests
     [Arguments(ModerationQualificationSourceKind.Reviewer)]
     [Arguments(ModerationQualificationSourceKind.Finding)]
     [Arguments(ModerationQualificationSourceKind.Policy)]
+    [Arguments(ModerationQualificationSourceKind.QualificationPolicy)]
     public async Task ReceiptRetainsExactMutationCoordinatesWithoutPrivateText(ModerationQualificationSourceKind kind)
     {
         var source = Receipt(kind);
@@ -243,7 +244,8 @@ public class ModerationQualificationEvidenceInvariantTests
         foreach (var (property, value) in new (string, object?)[]
         {
             ("PrincipalId", Guid.Empty), ("SourceKind", (ModerationQualificationSourceKind)0),
-            ("SourceKind", (ModerationQualificationSourceKind)6), ("RequestDigest", null),
+            ("SourceKind", (ModerationQualificationSourceKind)(-1)),
+            ("SourceKind", (ModerationQualificationSourceKind)int.MaxValue), ("RequestDigest", null),
             ("RequestDigest", new string('a', 63)), ("RequestDigest", new string('a', 65)),
             ("RequestDigest", new string('g', 64)), ("ResultRevision", 0L),
             ("QualificationRevision", -1L), ("CompletedAt", DateTimeOffset.MinValue),

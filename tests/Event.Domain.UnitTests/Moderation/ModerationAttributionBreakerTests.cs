@@ -36,8 +36,15 @@ public class ModerationAttributionBreakerTests
         var allegation = ModerationCase.OpenAllegation(Guid.CreateVersion7(), scope, evidence, Now);
 
         await Assert.That(() => Finalize(allegation)).Throws<InvalidOperationException>();
-        await Assert.That(() => ModerationReviewerAssignment.Assign(Guid.CreateVersion7(),
-            allegation, 1, Guid.CreateVersion7(), Guid.CreateVersion7(), Now)).Throws<ArgumentException>();
+        var intake = ModerationReviewerAssignment.Assign(Guid.CreateVersion7(),
+            allegation, 1, Guid.CreateVersion7(), Guid.CreateVersion7(), Now);
+        intake.ValidatePersistedState();
+        await Assert.That(intake.CaseId).IsEqualTo(allegation.Id);
+        await Assert.That(intake.CaseTenantId).IsEqualTo(allegation.ScopeTenantId);
+        await Assert.That(intake.SubjectHumanId).IsNull();
+        await Assert.That(intake.ConflictState).IsEqualTo(ModerationReviewerConflictState.Unresolved);
+        await Assert.That(intake.IsQualifiedAt(Now)).IsFalse();
+        await Assert.That(() => Finalize(allegation)).Throws<InvalidOperationException>();
         allegation.ValidatePersistedState();
         await Assert.That(allegation.Subject).IsNull();
         await Assert.That(allegation.Target).IsEqualTo(evidence.Target);

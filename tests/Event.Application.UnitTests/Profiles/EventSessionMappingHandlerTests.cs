@@ -52,7 +52,8 @@ public sealed class EventSessionMappingHandlerTests
         var session = Session();
         sessions.GetSessionWithDetails(SessionId, Arg.Any<CancellationToken>()).Returns(session);
         var events = Substitute.For<IEventRepository>();
-        events.GetEventWithDetails(EventId, Arg.Any<CancellationToken>()).Returns(session.Event);
+        events.GetAuthorizationTargetByIdAsync(EventId, Arg.Any<CancellationToken>())
+            .Returns(session.Event);
         sessions.Exists(SessionId).Returns(true);
         languages.Exists(7).Returns(true);
         EventSessionLanguage? stored = null;

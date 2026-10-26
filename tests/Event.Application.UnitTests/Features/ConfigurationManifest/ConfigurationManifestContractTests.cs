@@ -53,11 +53,8 @@ public sealed class ConfigurationManifestContractTests
         await AssertClosedRequiredProperties(specType, "Instance", "Tenants");
 
         Type instanceType = RequiredProperty(specType, "Instance").PropertyType;
-        await AssertClosedRequiredProperties(
-            instanceType,
-            "Settings",
-            "Documents",
-            "LegalDocuments");
+        await AssertClosedProperties(instanceType,
+            ["Settings", "Documents", "LegalDocuments"], ["Moderation"]);
         await Assert.That(RequiredProperty(instanceType, "Settings").PropertyType)
             .IsEqualTo(typeof(IReadOnlyDictionary<string, JsonElement>));
 
@@ -70,12 +67,8 @@ public sealed class ConfigurationManifestContractTests
         await AssertClosedRequiredProperties(tenantType, "Metadata", "Spec");
 
         Type tenantSpecType = RequiredProperty(tenantType, "Spec").PropertyType;
-        await AssertClosedRequiredProperties(
-            tenantSpecType,
-            "DisplayName",
-            "Settings",
-            "Documents",
-            "LegalDocuments");
+        await AssertClosedProperties(tenantSpecType,
+            ["DisplayName", "Settings", "Documents", "LegalDocuments"], ["Moderation"]);
         await Assert.That(RequiredProperty(tenantSpecType, "Settings").PropertyType)
             .IsEqualTo(typeof(IReadOnlyDictionary<string, JsonElement>));
     }
@@ -170,6 +163,10 @@ public sealed class ConfigurationManifestContractTests
     private static async Task AssertClosedRequiredProperties(
         Type type,
         params string[] expectedNames)
+        => await AssertClosedProperties(type, expectedNames, []);
+
+    private static async Task AssertClosedProperties(
+        Type type, string[] requiredNames, string[] optionalNames)
     {
         JsonUnmappedMemberHandlingAttribute? unmapped =
             type.GetCustomAttribute<JsonUnmappedMemberHandlingAttribute>();
@@ -182,20 +179,23 @@ public sealed class ConfigurationManifestContractTests
             .Select(property => property.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        string[] orderedExpected = expectedNames
+        string[] orderedExpected = requiredNames.Concat(optionalNames)
             .Order(StringComparer.Ordinal)
             .ToArray();
         await Assert.That(actualNames.SequenceEqual(
             orderedExpected,
             StringComparer.Ordinal)).IsTrue();
 
-        foreach (string name in expectedNames)
+        foreach (string name in requiredNames.Concat(optionalNames))
         {
             PropertyInfo property = RequiredProperty(type, name);
             bool isRequired =
                 property.GetCustomAttribute<RequiredMemberAttribute>() is not null
                 || property.GetCustomAttribute<JsonRequiredAttribute>() is not null;
-            await Assert.That(isRequired).IsTrue();
+            await Assert.That(isRequired).IsEqualTo(requiredNames.Contains(name, StringComparer.Ordinal));
+            if (optionalNames.Contains(name, StringComparer.Ordinal))
+                await Assert.That(new NullabilityInfoContext().Create(property).ReadState)
+                    .IsEqualTo(NullabilityState.Nullable);
         }
     }
 

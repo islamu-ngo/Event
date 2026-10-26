@@ -77,10 +77,25 @@ public sealed class ModerationNoticeNativeMaterializerTests
         await Assert.That(persisted.Deliveries.Count).IsEqualTo(2);
         var email = persisted.Deliveries.Single(row => row.ChannelId == (int)NotificationPreferenceChannelEnum.Email);
         var inApp = persisted.Deliveries.Single(row => row.ChannelId == (int)NotificationPreferenceChannelEnum.InApp);
-        await Assert.That(email.StatusId).IsEqualTo((int)NotificationDeliveryStatusEnum.Skipped);
-        await Assert.That(email.EmailDispatchOutbox is null).IsTrue();
-        await Assert.That(email.FailureCategory).IsEqualTo(!verified ? RecipientEmailAddressResolver.RecipientEmailUnverified
-            : enabled ? "moderation_notice_dispatch_owner_missing" : "email_preference_disabled");
+        if (verified && enabled)
+        {
+            await Assert.That(email.StatusId).IsEqualTo((int)NotificationDeliveryStatusEnum.Queued);
+            await Assert.That(email.EmailDispatchOutbox).IsNotNull();
+            var dispatch = email.EmailDispatchOutbox!;
+            await Assert.That(ModerationNoticeEmailTemplate.Matches(dispatch, persisted, noticeId)).IsTrue();
+            await Assert.That(dispatch.RecipientEmail).IsEqualTo("subject@example.test");
+            await Assert.That(dispatch.TenantId).IsEqualTo(tenantId);
+            await Assert.That(dispatch.RecipientUserId).IsEqualTo(userId);
+            await Assert.That(email.FailureCategory).IsNull();
+            await Assert.That(result.Disposition).IsEqualTo(ModerationNoticeDeliveryDisposition.NativePortalEmailQueued);
+        }
+        else
+        {
+            await Assert.That(email.StatusId).IsEqualTo((int)NotificationDeliveryStatusEnum.Skipped);
+            await Assert.That(email.EmailDispatchOutbox is null).IsTrue();
+            await Assert.That(email.FailureCategory).IsEqualTo(!verified
+                ? RecipientEmailAddressResolver.RecipientEmailUnverified : "email_preference_disabled");
+        }
         await Assert.That(inApp.StatusId).IsEqualTo((int)(enabled
             ? NotificationDeliveryStatusEnum.Delivered : NotificationDeliveryStatusEnum.Skipped));
         await Assert.That(inApp.Notification?.Body is null).IsTrue();

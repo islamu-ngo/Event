@@ -66,7 +66,8 @@ public sealed class EventTeamAuthorizationBoundaryTests
         Guid tenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
         IEventRepository eventRepository = Substitute.For<IEventRepository>();
-        eventRepository.GetEventWithDetails(eventId).Returns(AuthorizationEvent(tenantId, eventId));
+        eventRepository.GetAuthorizationTargetByIdAsync(eventId, Arg.Any<CancellationToken>())
+            .Returns(AuthorizationEvent(tenantId, eventId));
         ITenantContext tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(tenantId);
         IAuthorizationProvider provider = Substitute.For<IAuthorizationProvider>();

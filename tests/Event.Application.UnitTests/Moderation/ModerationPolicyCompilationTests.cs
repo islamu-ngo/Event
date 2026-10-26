@@ -386,6 +386,7 @@ public sealed partial class ModerationPolicyCompilationTests
             ModerationScopeKind.Tenant => Tenant,
             ModerationScopeKind.Community => Community,
             ModerationScopeKind.Resource => Resource,
+            ModerationScopeKind.Event => AuthorityScope.Event(Tenant, Id(16)),
             _ => throw new InvalidOperationException()
         };
         var subject = definition.SubjectKinds.Single();

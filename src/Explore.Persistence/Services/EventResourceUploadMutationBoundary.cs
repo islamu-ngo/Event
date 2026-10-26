@@ -1,6 +1,5 @@
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Exceptions;
 using Explore.Application.Responses;
 using Explore.Domain;
@@ -14,9 +13,9 @@ public sealed class EventResourceUploadMutationBoundary(
     ExploreDbContext context, IPrivacyIdentityFenceAuthority privacy,
     IEventResourceModerationSnapshotReader moderation, TimeProvider clock) : IEventResourceUploadMutationBoundary
 {
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
+    public async Task<BaseCommandResponse<TPayload>> ExecuteAsync<TPayload>(
         EventResourceAuthorityRequest request, EventResourceModerationFacts original,
-        Func<CancellationToken, Task<BaseCommandResponse<StorageUploadSessionDto>>> operation,
+        Func<CancellationToken, Task<BaseCommandResponse<TPayload>>> operation,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -28,7 +27,7 @@ public sealed class EventResourceUploadMutationBoundary(
         return await EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(
             () => context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            BaseCommandResponse<StorageUploadSessionDto>? result = null;
+            BaseCommandResponse<TPayload>? result = null;
             async Task RecheckAsync(CancellationToken token)
             {
                 // Failure can retire staging or release quota; an upload restriction must not veto cleanup.

@@ -19,6 +19,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.SetupLive;
+using Explore.Application.Features.SetupLive;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Domain.SetupLive;
@@ -1233,7 +1234,8 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         if (completed == writeTask)
         {
             using HttpResponseMessage early = await writeTask;
-            await Assert.That(early.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+            await Assert.That(early.StatusCode).IsEqualTo(HttpStatusCode.Accepted)
+                .Because(fixture.Capture.FailureMetadata);
             throw new InvalidOperationException("missing-setup-provider-write-barrier");
         }
 
@@ -1405,7 +1407,7 @@ public sealed class SetupLiveAuthoritySecurityTests(SetupLiveAuthorityRedFixture
         string body = await response.Content.ReadAsStringAsync();
 
         await Assert.That(response.StatusCode).IsEqualTo(expected)
-            .Because($"final route returned: {body}");
+            .Because($"final route returned: {body}; {fixture.Capture.FailureMetadata}");
         await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
         await Assert.That(response.Headers.CacheControl?.Private).IsTrue();
         await Assert.That(response.Content.Headers.ContentType?.MediaType)
@@ -2489,13 +2491,18 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
     }
 
     private void LogObserved(
-        EventId eventId,
+        EventId _,
         IReadOnlyDictionary<string, object?> properties)
     {
-        if (eventId.Id == 19_620
-            && string.Equals(eventId.Name, "SetupLiveMilestone", StringComparison.Ordinal))
+        // The API redactor retains native template arguments, not EventId metadata.
+        bool isSetupMilestone = properties.TryGetValue("SourceContext", out object? source)
+            && string.Equals(source?.ToString(), typeof(SetupLiveApplicationService).FullName,
+                StringComparison.Ordinal)
+            && properties.ContainsKey("SetupOperation")
+            && properties.ContainsKey("SetupMilestone");
+        if (isSetupMilestone)
         {
-            _setupValues.Enqueue(eventId.Name);
+            _setupValues.Enqueue("SetupLiveMilestone");
             foreach (KeyValuePair<string, object?> property in properties)
             {
                 _setupValues.Enqueue($"{property.Key}={property.Value}");
@@ -2514,9 +2521,7 @@ public sealed class SetupLiveCapture : IDisposable, Microsoft.AspNetCore.Diagnos
         }
         TelemetryBarrier? armed = _barrier;
         if (armed is null
-            || eventId.Id != 19_620
-            || !string.Equals(
-                eventId.Name, "SetupLiveMilestone", StringComparison.Ordinal)
+            || !isSetupMilestone
             || !properties.TryGetValue("SetupOperation", out object? operation)
             || !properties.TryGetValue("SetupMilestone", out object? milestone)
             || !string.Equals(operation?.ToString(), armed.Operation, StringComparison.Ordinal)

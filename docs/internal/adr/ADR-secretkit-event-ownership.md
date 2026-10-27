@@ -126,6 +126,12 @@ publication tests qualify these local boundaries, not remote actor permissions
 or convergence across replicas. Native read registration alone does not activate
 a serving entrypoint.
 
+Commitment support resolves its instance key through the selected resolver and
+binds tenant, actor, enrollment, generation, operation, purpose and exact secret
+bytes with SHA-256 HMAC. It does not dispatch a provider mutation. Its immediate
+barrier is a cancellation checkpoint, not a concurrency lock; the application
+coordinator retains operation ownership through dispatch and settlement.
+
 ## Foundation versus successor execution
 
 All four immutable packages at `[0.1.0-local.20261024.1]` support this foundation;

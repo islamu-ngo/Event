@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
+using Explore.Application.Contracts.SetupLive;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -8,7 +9,7 @@ namespace Explore.Infrastructure.Secrets;
 
 public static class SecretResolutionServiceCollectionExtensions
 {
-    /// <summary>Registers native secret reads around the authority supplied by the composition root.</summary>
+    /// <summary>Registers native secret reads and commitment support around the selected authority.</summary>
     public static IServiceCollection AddNativeSecretResolution(
         this IServiceCollection services)
     {
@@ -25,6 +26,8 @@ public static class SecretResolutionServiceCollectionExtensions
         services.AddSingleton<IAuthenticationCredentialProfileReader, AuthenticationCredentialProfileReader>();
         services.AddScoped<ISecretAuthorityStatusReader, SecretAuthorityStatusReader>();
         services.AddScoped<IPrivacyIdentityFenceKeyProvider, PrivacyIdentityFenceKeyProvider>();
+        services.AddScoped<ISetupSecretBindingCommitmentAuthority, SetupSecretBindingCommitmentAuthority>();
+        services.AddSingleton<ISetupSecretBindingCommitBarrier, ImmediateSetupSecretBindingCommitBarrier>();
         return services;
     }
 }

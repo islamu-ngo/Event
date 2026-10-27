@@ -185,7 +185,19 @@ public sealed partial class ModerationNoticeReadTests
                     database.HostId, database.Scope.TrustDomainId, database.TenantId,
                     ModerationQualificationSourceKind.QualificationPolicyAdoption, adoption.Id, database.UrgencyAssessorId, 1, 3, Now));
             if (representativeNotice is not null) context.Add(representativeNotice);
-            await context.SaveChangesAsync();
+            try
+            {
+                await context.SaveChangesAsync();
+            }
+            catch (InvalidOperationException exception) when (exception.Message == "tracked_tenant_authority_mismatch")
+            {
+                using var progress = new StreamWriter(Environment.GetEnvironmentVariable("GRANT_TEST_PROGRESS_PATH") is { Length: > 0 } progressFile
+                    ? new FileStream(progressFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)
+                    : Console.OpenStandardError())
+                { AutoFlush = true };
+                progress.WriteLine($"[DEBUG-GRANT-SETTLEMENT] notice-seed-invisible-parent:{exception.Data["TrackedEntityType"]}:{exception.Data["PrincipalEntityType"]}:{exception.Data["ForeignKeyProperties"]}");
+                throw;
+            }
             return fixture;
         }
 

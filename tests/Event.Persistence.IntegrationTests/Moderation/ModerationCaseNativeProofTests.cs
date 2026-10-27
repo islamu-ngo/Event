@@ -1138,10 +1138,11 @@ public sealed partial class ModerationCaseNativeProofTests
                         "native-test", "self-hosted", "1", "1", "1", "https://example.invalid", "https://example.invalid",
                         "native-test", null, null, now);
                     database.ProviderId = provider.Id;
-                    var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes("{}")));
+                    var digest = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes("{}"));
+                    var hash = Convert.ToBase64String(digest);
                     var schema = RegistrationProviderSchemaRevision.Create(tenant.Id, provider.Id,
                         RegistrationProviderSchemaAuthorityEnum.ProviderDiscovered, RegistrationEvidenceHash.Create(hash),
-                        "native-survey", "1", "{}", hash, RegistrationProviderDriftClassEnum.NoDrift, now);
+                        "native-survey", "1", "{}", Convert.ToHexStringLower(digest), RegistrationProviderDriftClassEnum.NoDrift, now);
                     var version = RegistrationFormVersion.CreateExternalImported(form, 1, "en", provider.Id,
                         schema.Id, "native-survey", "1", hash, now);
                     database.FormId = version.Id;

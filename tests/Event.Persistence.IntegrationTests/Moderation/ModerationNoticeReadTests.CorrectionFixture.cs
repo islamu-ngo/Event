@@ -175,6 +175,7 @@ public sealed partial class ModerationNoticeReadTests
             fixture.SubjectNoticeId = representativeNotice?.Id ?? subjectNotice.Id;
             fixture.ReviewerNoticeId = reviewerNotice.Id;
             await using var context = database.Context();
+            context.ModerationTrustDomainId = database.Scope.TrustDomainId;
             context.AddRange(allegation, finding, decision, sanction, effect, fixture.Approval,
                 policy, adoption, reviewer, identity, conflict, source, subjectNotice, reviewerNotice,
                 ModerationQualificationMutationReceipt.Complete(Guid.CreateVersion7(), new string('A', 64),

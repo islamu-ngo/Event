@@ -118,7 +118,9 @@ jobs:
             ui:
               - 'src/Explore.Blazor/**'
               - 'src/Explore.Blazor.Client/**'
+              - 'src/Event.Web.BffHosting/**'
               - 'src/Explore.ServiceDefaults/**'
+              - 'src/Directory.Build.props'
               - 'Directory.Build.props'
               - 'Directory.Packages.props'
               - 'global.json'
@@ -133,6 +135,7 @@ jobs:
               - 'src/Explore.Diagnostic/**'
               - 'src/Event.MigrationService/**'
               - 'src/Explore.ServiceDefaults/**'
+              - 'src/Directory.Build.props'
               - 'Directory.Build.props'
               - 'Directory.Packages.props'
               - 'global.json'

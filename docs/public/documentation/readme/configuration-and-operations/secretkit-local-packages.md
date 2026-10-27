@@ -6,10 +6,11 @@ description: Restore Event's vendored SecretKit development packages without a p
 
 Event includes SecretKit **0.1.0-local.20261024.1** under
 `vendor/secretkit/`. These packages are in development, not ready for production,
-and may change APIs without backward compatibility. They support an approved
-shared-acquisition foundation, not a serving-host cutover. Foundation
-qualification checks remain pending; Event's existing secrets implementation is
-not declared retired or replaced.
+and may change APIs without backward compatibility. Event's server entrypoints,
+runtime resolution and native writes now use these packages through explicit
+selected owners. The obsolete Secrets projects are removed. Final integration
+assurance is still in progress; this development cutover is not production
+readiness or provider certification.
 
 ## Git and source distribution
 
@@ -34,7 +35,7 @@ The repository's `NuGet.Config` maps `SecretKit.*` exclusively to
 therefore contains the SecretKit packages, but a first restore still requires
 access to external dependencies or an existing approved dependency cache.
 
-## Approved foundation package boundary
+## Server-side package boundary
 
 Package availability is separate from foundation qualification and deployment.
 The approved foundation requires these selected entries in Event's existing
@@ -48,10 +49,11 @@ candidate changes:
 <PackageVersion Include="SecretKit.Extensions.Hosting" Version="[0.1.0-local.20261024.1]" />
 ```
 
-The shared server-side foundation uses all four packages: Core for owned
+The shared server-side boundary uses all four packages: Core for owned
 material, Infisical for provider access, Configuration for deliberate legacy
-configuration export, and Hosting for explicit lifecycle seams. Hosting being
-available does not enable a service or background maintenance. A project using
+configuration export, and Hosting for explicit lifecycle seams. Entry points
+explicitly acquire their process owner and start token-only authentication
+maintenance before dependent preparation. A project using
 central versions references packages without repeating their versions:
 
 ```xml
@@ -92,13 +94,16 @@ held by clients. Only consumers that need strings should receive them.
 Acquisition stays server-side. It adds no SDK to browser/WASM or business
 contracts and requires no BFF link to backend implementation projects.
 The shared hosting boundary does not turn normal database queries into hosted
-operations; any future database-tooling dependency is design-time bootstrap
-only.
+operations; Persistence uses the shared boundary for explicit migration and
+tooling bootstrap, not ordinary database queries.
 
-These are architectural commitments, not instructions to enable a new runtime
-path. The foundation registers no serving host or background authentication
-maintenance. Runtime activation, recovery and retirement of the existing
-implementation require the separately qualified successor.
+API, BFF, Combined and migration hosts require their documented consumer
+inputs. Combined shares one selected owner rather than opening an independent
+BFF session. Data Protection ring/admission preparation finishes before its
+synchronous consumers start. Configure the selected authority and per-consumer
+lifetime policy using the [secret-authority guide](secrets.md); recovery after
+expiry or uncertain renewal is explicit, never an automatic fallback or
+relogin.
 
 ## Docker behavior
 
@@ -114,6 +119,16 @@ feed before their first restore. Their final stages also retain the complete
 bundle, including license and notices, at `/app/vendor/secretkit`. The four
 archives occupy approximately 204 KiB in the source tree.
 
+The four build stages share the digest-pinned SDK 10.0.302 selected by
+`global.json`. Keep those versions aligned; a moving `10.0` SDK image may
+contain a different feature band and fail before restore starts.
+
+Server lockfiles include the declared Linux x64 and arm64 restore targets;
+the browser client keeps its WASM target. This declaration does not certify
+either image architecture. Container restore stays locked: update dependency
+locks through NuGet when changing the declared runtime graph, rather than
+disabling locked restore in an image build.
+
 After package references and code are integrated, normal .NET publish will
 also include the required runtime assemblies and dependencies. Merely putting
 the archives in an image does not load SecretKit into the running application.
@@ -125,18 +140,29 @@ secret authority; none are baked into these packages or images.
 The source candidate passed Linux package installation, relocation and offline
 behavior checks. Its four package hashes are retained in this repository.
 Those historical package receipts are separate from Event's foundation checks.
-The unused shared acquisition boundary now has a passing Release build,
+The shared acquisition boundary has a passing Release build,
 controlled-provider invariant tests, backend/browser Refit checks, fresh-cache
 source/hash verification and dependency-license inventory. The architecture
 suite still has four independently reproduced baseline failures; it is not
 reported as clean. Exact commands and evidence are in the technical provenance
 guide.
 
-Serving-host activation, native Infisical actor/ACL enforcement and actual
-supported image builds remain separate successor work. No old Secrets project
-deletion or runtime qualification is claimed. The selected SecretKit
-trimming/Native AOT profile is not qualified; do not assume Event's publish mode
-is supported without testing it.
+Serving-host activation and old-project retirement are implemented. Final
+suite assurance remains open, with newly exposed failures being attributed
+before they can be accepted as unrelated baseline defects. Native Infisical
+actor/ACL enforcement and fleet recovery remain unqualified. API, BFF,
+MigrationService and Standalone Linux x64 images completed actual locked
+restore and publish. The October 27, 2026 refresh covers the later routing and
+writer corrections and completed all four recipes. The three
+framework-dependent images' four native
+DLL hashes match the frozen packages, and the retired Secrets assembly
+is absent. Standalone's single-file image retains the complete package
+bundle with all four archive checksums verified. These checks do not
+certify credentialed service startup or another architecture.
+Standalone's normal container profile uses untrimmed IL;
+trimming/Native AOT support must not be inferred from that profile.
+Its single-file publish dependencies use a separately generated container
+lockfile; ordinary solution builds keep their existing lockfile.
 
 See the [technical provenance and integration boundary](../../../../internal/SECRETKIT_LOCAL_PACKAGES.md)
 and [existing secret-authority guide](secrets.md).

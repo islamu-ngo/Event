@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(StandaloneContainerPublish)' == 'true'">
+    <NuGetLockFilePath>$(MSBuildProjectDirectory)/container/packages.lock.json</NuGetLockFilePath>
     <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishTrimmed>false</PublishTrimmed>

@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 
 namespace Event.Distributed.IntegrationTests;
 
@@ -127,6 +129,189 @@ public sealed class K6LoadHarnessTests
 [Category("Harness")]
 public sealed class K6LoadProfileHarnessTests
 {
+    private const string RuntimeSample = """
+        # TYPE dotnet_process_cpu_time_seconds_total counter
+        # UNIT dotnet_process_cpu_time_seconds_total seconds
+        # TYPE dotnet_process_memory_working_set_bytes gauge
+        # UNIT dotnet_process_memory_working_set_bytes bytes
+        dotnet_process_cpu_time_seconds_total{cpu_mode="user"} 12.5
+        dotnet_process_cpu_time_seconds_total{cpu_mode="system"} 3.25
+        dotnet_process_memory_working_set_bytes 4096
+        """;
+
+    [Test]
+    public async Task NumericCandidatesNeverInventAnEmittingProcessOrResetIdentity()
+    {
+        var observation = K6LoadRunner.ParseRuntimePressure(RuntimeSample,
+            K6LoadRunner.ParseRuntimeMetricInventory(RuntimeSample));
+        await Assert.That(observation.CpuUserSeconds).IsEqualTo(12.5);
+        await Assert.That(observation.CpuSystemSeconds).IsEqualTo(3.25);
+        await Assert.That(observation.WorkingSetBytes).IsEqualTo(4096L);
+        await Assert.That(observation.Status).IsEqualTo(K6ObservationStatus.RuntimeSeriesUnpinned);
+        await Assert.That(observation.ProcessId).IsNull();
+        await Assert.That(observation.KernelStart).IsNull();
+        await Assert.That(observation.ExportContractQualified).IsFalse();
+        await Assert.That(observation.ResetIdentityQualified).IsFalse();
+        await Assert.That(observation.MetricDefinitions.Count).IsEqualTo(2);
+        await Assert.That(observation.NumericSamples.Count).IsEqualTo(3);
+        await Assert.That(observation.NumericSamples[0].CpuMode).IsEqualTo("user");
+        await Assert.That(observation.NumericSamples[0].CpuSeconds).IsEqualTo(observation.CpuUserSeconds);
+        await Assert.That(observation.NumericSamples[1].CpuMode).IsEqualTo("system");
+        await Assert.That(observation.NumericSamples[2].Bytes).IsEqualTo(observation.WorkingSetBytes);
+    }
+
+    [Test]
+    public async Task RetainedExporterFactsExcludeUnknownLabelsAndHelp()
+    {
+        string canary = Guid.NewGuid().ToString("N");
+        string sample = RuntimeSample + $"\n# HELP dotnet_process_cpu_time_seconds_total {canary}\nprivate_{canary}{{customer=\"{canary}\"}} 7";
+        var observation = K6LoadRunner.ParseRuntimePressure(sample, K6LoadRunner.ParseRuntimeMetricInventory(sample)) with
+        {
+            ScrapeEndpoint = K6LoadRunner.RuntimeScrapeEndpoint(new Uri("http://127.0.0.1:4321/")).AbsoluteUri
+        };
+        string retained = JsonSerializer.Serialize(observation);
+        await Assert.That(retained).DoesNotContain(canary);
+        await Assert.That(retained).DoesNotContain("customer");
+        await Assert.That(observation.ScrapeEndpoint).IsEqualTo("http://127.0.0.1:4321/metrics");
+        await Assert.That(observation.ExportContractQualified).IsFalse();
+        await Assert.That(observation.NumericSamples[2].CpuMode).IsNull();
+        await Assert.That(observation.NumericSamples[2].CpuSeconds).IsNull();
+        await Assert.That(observation.NumericSamples[0].Bytes).IsNull();
+    }
+
+    [Test]
+    [Arguments("http://user:private@127.0.0.1:4321/")]
+    [Arguments("http://127.0.0.1:4321/?private=value")]
+    [Arguments("http://127.0.0.1:4321/foreign")]
+    [Arguments("http://example.org:4321/")]
+    public async Task UntrustedScrapeLeadCannotRetainCredentialsOrOtherTargets(string origin)
+    {
+        await Assert.That(() => K6LoadRunner.RuntimeScrapeEndpoint(new Uri(origin))).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task IntegralMemoryBytesRetainTheirExactWireValue()
+    {
+        string sample = RuntimeSample.Replace(" 4096", " 9007199254740993", StringComparison.Ordinal);
+        var observation = K6LoadRunner.ParseRuntimePressure(sample, K6LoadRunner.ParseRuntimeMetricInventory(sample));
+        await Assert.That(observation.WorkingSetBytes).IsEqualTo(9007199254740993L);
+        await Assert.That(observation.NumericSamples[2].Bytes).IsEqualTo(9007199254740993L);
+    }
+
+    [Test]
+    public async Task FinalPressureSnapshotPreservesTheLiveObservedPrefix()
+    {
+        var directory = Directory.CreateTempSubdirectory("islamu-pressure-snapshot-");
+        try
+        {
+            string path = Path.Combine(directory.FullName, "pressure-Split.json");
+            var runtime = K6LoadRunner.ParseRuntimePressure(RuntimeSample, K6LoadRunner.ParseRuntimeMetricInventory(RuntimeSample));
+            DateTimeOffset started = DateTimeOffset.UtcNow;
+            var rows = new List<K6PressureObservation>
+            {
+                new(0, 1, started, K6ObservationStatus.Unavailable, null, K6ObservationStatus.Unavailable, null, runtime)
+            };
+            await K6LoadRunner.WritePressureSnapshotAsync(path, started, rows, final: false, completed: false,
+                TestContext.Current!.Execution.CancellationToken);
+            using var live = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+            await Assert.That(live.RootElement.GetProperty("Final").GetBoolean()).IsFalse();
+            await Assert.That(live.RootElement.GetProperty("Completed").GetBoolean()).IsFalse();
+            string first = live.RootElement.GetProperty("Observations")[0].GetRawText();
+            rows.Add(rows[0] with { StartedOffsetMilliseconds = 2, CompletedOffsetMilliseconds = 3 });
+            await K6LoadRunner.WritePressureSnapshotAsync(path, started, rows, final: true, completed: true,
+                TestContext.Current!.Execution.CancellationToken);
+            using var final = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+            await Assert.That(final.RootElement.GetProperty("Final").GetBoolean()).IsTrue();
+            await Assert.That(final.RootElement.GetProperty("Observations").GetArrayLength()).IsEqualTo(2);
+            await Assert.That(final.RootElement.GetProperty("Observations")[0].GetRawText()).IsEqualTo(first);
+            await Assert.That(final.RootElement.GetProperty("CapacityEvidenceEligible").GetBoolean()).IsFalse();
+            if (!OperatingSystem.IsWindows())
+                await Assert.That(File.GetUnixFileMode(path)).IsEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    [Test]
+    [Arguments(false, true, 1)]
+    [Arguments(true, true, 901)]
+    public async Task IncompleteOrUnboundedPressureCannotPublishACompletedSnapshot(bool final, bool completed, int count)
+    {
+        var runtime = new K6RuntimePressure(K6ObservationStatus.RuntimeSeriesUnpinned, null, null, null);
+        var row = new K6PressureObservation(0, 1, DateTimeOffset.UtcNow, K6ObservationStatus.Unavailable, null,
+            K6ObservationStatus.Unavailable, null, runtime);
+        var directory = Directory.CreateTempSubdirectory("islamu-pressure-refusal-");
+        try
+        {
+            string path = Path.Combine(directory.FullName, "pressure-Split.json");
+            await Assert.That(() => K6LoadRunner.WritePressureSnapshotAsync(path, row.ObservedAtUtc,
+                Enumerable.Repeat(row, count).ToArray(), final, completed, TestContext.Current!.Execution.CancellationToken))
+                .Throws<InvalidOperationException>();
+            await Assert.That(File.Exists(path)).IsFalse();
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    [Test]
+    [Arguments("NaN")]
+    [Arguments("+Inf")]
+    [Arguments("-1")]
+    [Arguments("1 2")]
+    public async Task InvalidNumericSamplesCannotBecomeMeasurements(string numeric)
+    {
+        string sample = RuntimeSample.Replace(" 12.5", " " + numeric, StringComparison.Ordinal);
+        await Assert.That(() => K6LoadRunner.ParseRuntimePressure(sample,
+            K6LoadRunner.ParseRuntimeMetricInventory(sample))).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments("dotnet_process_cpu_time_seconds_total{cpu_mode=\"user\"} 1")]
+    [Arguments("dotnet_process_cpu_time_seconds_total{cpu_mode=\"user\",customer=\"private\"} 1")]
+    [Arguments("dotnet_process_memory_working_set_bytes 1.5")]
+    public async Task DuplicateOrUnqualifiedSeriesCannotEnterNumericEvidence(string extra)
+    {
+        string sample = RuntimeSample + "\n" + extra;
+        await Assert.That(() => K6LoadRunner.ParseRuntimePressure(sample,
+            K6LoadRunner.ParseRuntimeMetricInventory(sample))).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task MissingSeriesRemainUnavailableRatherThanZero()
+    {
+        var observation = K6LoadRunner.ParseRuntimePressure("", []);
+        await Assert.That(observation.CpuUserSeconds).IsNull();
+        await Assert.That(observation.WorkingSetBytes).IsNull();
+    }
+
+    [Test]
+    [Arguments(200)]
+    [Arguments(401)]
+    [Arguments(403)]
+    [Arguments(404)]
+    [Arguments(502)]
+    public async Task OutageDoesNotExcuseUnexpectedStatusOrAuthorityFailure(int status)
+    {
+        await Assert.That(() => K6LoadRunner.RequireOutageOutcome(status)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public void OnlyFiniteOutageOutcomesAreAdmitted()
+    {
+        K6LoadRunner.RequireOutageOutcome(null);
+        K6LoadRunner.RequireOutageOutcome(500);
+        K6LoadRunner.RequireOutageOutcome(503);
+        K6LoadRunner.RequireDispatchOutcome(true, 1, true);
+    }
+
+    [Test]
+    [Arguments(false, 1, true)]
+    [Arguments(true, 0, true)]
+    [Arguments(true, 2, true)]
+    [Arguments(true, 1, false)]
+    public async Task SettledDispatchMustPreserveOriginalSourceAndExactlyOneAttempt(bool source, int attempts, bool deliveredAt)
+    {
+        await Assert.That(() => K6LoadRunner.RequireDispatchOutcome(source, attempts, deliveredAt)).Throws<InvalidOperationException>();
+    }
+
     [Test]
     public async Task RejectedDroppedWorkRemainsVisibleWithoutBecomingAccepted()
     {
@@ -348,6 +533,177 @@ public sealed class K6LoadProfileHarnessTests
         finally
         {
             root.Delete(recursive: true);
+        }
+    }
+}
+
+[Category("Harness")]
+public sealed class K6RecoveryFinalizationTests
+{
+    private static readonly K6NativeDataset Dataset = new(Guid.CreateVersion7(), "owned-recovery", Guid.CreateVersion7(),
+        "Owned read", Guid.CreateVersion7(), Guid.CreateVersion7(), "Owned control", Guid.CreateVersion7(),
+        DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+    private static string ReadBody => JsonSerializer.Serialize(new { id = Dataset.ReadId, title = Dataset.ReadTitle });
+    private static string SearchBody => "{\"_embedded\":{\"items\":[{\"event\":" + ReadBody + "}]}}";
+
+    [Test]
+    [Arguments(500, false)]
+    [Arguments(503, false)]
+    [Arguments(500, true)]
+    [Arguments(503, true)]
+    public async Task RecoveryRetriesAdmittedTransientReadAndSearchResponses(int status, bool duringSearch)
+    {
+        var responses = new List<(int, string)>();
+        if (duringSearch) responses.Add((200, ReadBody));
+        responses.Add((status, "{}"));
+        responses.Add((200, ReadBody));
+        responses.Add((200, SearchBody));
+        using var api = RecoveryClient(responses.ToArray());
+        await Assert.That(await K6LoadRunner.TryVerifyPublicDatasetRecoveryAsync(api, Dataset, "owned", CancellationToken.None)).IsFalse();
+        await Assert.That(await K6LoadRunner.TryVerifyPublicDatasetRecoveryAsync(api, Dataset, "owned", CancellationToken.None)).IsTrue();
+    }
+
+    [Test]
+    [Arguments(401)]
+    [Arguments(403)]
+    [Arguments(404)]
+    [Arguments(429)]
+    [Arguments(502)]
+    public async Task RecoveryNeverRetriesAuthorityOrUnadmittedStatusFailures(int status)
+    {
+        using var api = RecoveryClient((status, "{}"));
+        var failure = await Assert.That(() => K6LoadRunner.TryVerifyPublicDatasetRecoveryAsync(api, Dataset, "owned", CancellationToken.None))
+            .Throws<HttpRequestException>();
+        await Assert.That((int?)failure!.StatusCode).IsEqualTo(status);
+    }
+
+    [Test]
+    public async Task RecoveryNeverRetriesMalformedSuccessfulResponses()
+    {
+        using var api = RecoveryClient((200, "{"));
+        await Assert.That(() => K6LoadRunner.TryVerifyPublicDatasetRecoveryAsync(api, Dataset, "owned", CancellationToken.None))
+            .Throws<JsonException>();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RecoveryNeverRetriesChangedReadOrSearchDatasets(bool changedSearch)
+    {
+        string changed = ReadBody.Replace("Owned read", "Changed read", StringComparison.Ordinal);
+        using var api = RecoveryClient((200, changedSearch ? ReadBody : changed),
+            (200, changedSearch ? "{\"_embedded\":{\"items\":[]}}" : SearchBody));
+        var failure = await Assert.That(() => K6LoadRunner.TryVerifyPublicDatasetRecoveryAsync(api, Dataset, "owned", CancellationToken.None))
+            .Throws<InvalidOperationException>();
+        await Assert.That(failure!.Message).IsEqualTo("load_public_dataset_changed");
+    }
+
+    [Test]
+    public async Task RecoveryCannotHideAChangedReadBehindATransientSearchFailure()
+    {
+        using var api = RecoveryClient((200, ReadBody.Replace("Owned read", "Changed read", StringComparison.Ordinal)), (503, "{}"));
+        var failure = await Assert.That(() => K6LoadRunner.TryVerifyPublicDatasetRecoveryAsync(api, Dataset, "owned", CancellationToken.None))
+            .Throws<InvalidOperationException>();
+        await Assert.That(failure!.Message).IsEqualTo("load_public_dataset_changed");
+    }
+
+    [Test]
+    public async Task RecoveryNeverRetriesAnIncompleteSuccessfulContract()
+    {
+        using var api = RecoveryClient((200, "{}"), (503, "{}"));
+        await Assert.That(() => K6LoadRunner.TryVerifyPublicDatasetRecoveryAsync(api, Dataset, "owned", CancellationToken.None))
+            .Throws<KeyNotFoundException>();
+    }
+
+    [Test]
+    public async Task RecoveryNeverRetriesCallerCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        using var api = RecoveryClient((200, ReadBody), (200, SearchBody));
+        await Assert.That(() => K6LoadRunner.TryVerifyPublicDatasetRecoveryAsync(api, Dataset, "owned", cancellation.Token))
+            .Throws<OperationCanceledException>();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task FinalPressureCompletionRequiresSuccessfulSamplerSettlement(bool samplerFails)
+    {
+        var directory = Directory.CreateTempSubdirectory("islamu-pressure-finalization-");
+        try
+        {
+            string path = Path.Combine(directory.FullName, "pressure.json");
+            var samplerFailure = new InvalidOperationException("sampler-publication-failed");
+            Task sampler = samplerFails ? Task.FromException(samplerFailure) : Task.CompletedTask;
+            if (samplerFails)
+            {
+                var failure = await Assert.That(() => K6LoadRunner.FinalizePressureAsync(sampler, path,
+                    DateTimeOffset.UnixEpoch, [], true, null, CancellationToken.None)).Throws<InvalidOperationException>();
+                await Assert.That(ReferenceEquals(failure, samplerFailure)).IsTrue();
+            }
+            else
+                await K6LoadRunner.FinalizePressureAsync(sampler, path, DateTimeOffset.UnixEpoch, [], true, null, CancellationToken.None);
+            using var snapshot = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+            await Assert.That(snapshot.RootElement.GetProperty("Final").GetBoolean()).IsTrue();
+            await Assert.That(snapshot.RootElement.GetProperty("Completed").GetBoolean()).IsEqualTo(!samplerFails);
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    [Test]
+    public async Task FailedFinalPublicationPreservesIncompleteEvidenceAndTheOriginalFailure()
+    {
+        var directory = Directory.CreateTempSubdirectory("islamu-pressure-publication-");
+        try
+        {
+            string path = Path.Combine(directory.FullName, "pressure.json");
+            await K6LoadRunner.WritePressureSnapshotAsync(path, DateTimeOffset.UnixEpoch, [], false, false, CancellationToken.None);
+            string live = await File.ReadAllTextAsync(path);
+            var original = new InvalidOperationException("workload-failed");
+            using var cancellation = new CancellationTokenSource();
+            await cancellation.CancelAsync();
+            var failure = await Assert.That(() => K6LoadRunner.FinalizePressureAsync(Task.CompletedTask, path,
+                DateTimeOffset.UnixEpoch, [], true, original, cancellation.Token)).Throws<AggregateException>();
+            await Assert.That(failure!.Flatten().InnerExceptions.Any(error => ReferenceEquals(error, original))).IsTrue();
+            await Assert.That(failure.Flatten().InnerExceptions.OfType<OperationCanceledException>()
+                .Any(error => error.CancellationToken == cancellation.Token)).IsTrue();
+            await Assert.That(await File.ReadAllTextAsync(path)).IsEqualTo(live);
+            using var snapshot = JsonDocument.Parse(live);
+            await Assert.That(snapshot.RootElement.GetProperty("Completed").GetBoolean()).IsFalse();
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    [Test]
+    public async Task FinalPressurePublicationIoFailureRemainsAFailure()
+    {
+        var directory = Directory.CreateTempSubdirectory("islamu-pressure-publication-io-");
+        try
+        {
+            string path = Path.Combine(directory.FullName, "pressure.json");
+            Directory.CreateDirectory(path);
+            await Assert.That(() => K6LoadRunner.FinalizePressureAsync(Task.CompletedTask, path,
+                DateTimeOffset.UnixEpoch, [], true, null, CancellationToken.None)).Throws<IOException>();
+            await Assert.That(File.Exists(path)).IsFalse();
+            await Assert.That(Directory.Exists(path)).IsTrue();
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    private static HttpClient RecoveryClient(params (int Status, string Body)[] responses) =>
+        new(new RecoveryResponseHandler(responses)) { BaseAddress = new Uri("http://127.0.0.1:4321/") };
+
+    private sealed class RecoveryResponseHandler((int Status, string Body)[] responses) : HttpMessageHandler
+    {
+        private readonly Queue<(int Status, string Body)> pending = new(responses);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var response = pending.Dequeue();
+            return Task.FromResult(new HttpResponseMessage((System.Net.HttpStatusCode)response.Status)
+            { Content = new StringContent(response.Body) });
         }
     }
 }
@@ -640,7 +996,7 @@ public sealed class K6LoadTests
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current!.Execution.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromMinutes(5));
+        deadline.CancelAfter(TimeSpan.FromMinutes(15));
         await using var fixture = await OwnedAppHostFixture.CreateAsync(topology, deadline.Token);
         await fixture.StartAsync(deadline.Token);
         await K6LoadRunner.RunAsync(fixture, topology, deadline.Token);
@@ -657,7 +1013,7 @@ public sealed class K6NativeControlTests
     public async Task OwnedPublicEventSearchAndGuardedWritesHaveIndependentSettledState(string topology)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromMinutes(8));
+        deadline.CancelAfter(TimeSpan.FromMinutes(15));
         await using var fixture = await OwnedAppHostFixture.CreateAsync(topology, deadline.Token,
             configuredAdministrator: true, deploymentMode: "MultiTenant");
         await fixture.StartAsync(deadline.Token);
@@ -676,8 +1032,16 @@ public sealed class K6EventProgrammeTests
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current!.Execution.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromMinutes(20));
-        await using var fixture = await OwnedAppHostFixture.CreateAsync(topology, deadline.Token,
-            configuredAdministrator: true, deploymentMode: "MultiTenant");
+        await using var fixture = await OwnedAppHostFixture.CreateAsync(topology, true, "MultiTenant", null,
+            builder =>
+            {
+                var api = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>()
+                    .Single(resource => resource.Name == (topology == "Split" ? "explore-api" : "event-standalone")));
+                api.WithEnvironment("EmailDispatchProcessor__Enabled", "true")
+                    .WithEnvironment("EmailDispatchProcessor__Mode", "HostedService")
+                    .WithEnvironment("EmailDispatchProcessor__PollingIntervalSeconds", "1");
+                return Task.CompletedTask;
+            }, deadline.Token);
         await fixture.StartAsync(deadline.Token);
         await K6LoadRunner.RunProgrammeAsync(fixture, topology, deadline.Token);
     }

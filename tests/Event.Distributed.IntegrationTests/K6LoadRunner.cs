@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Data.Common;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -9,12 +10,18 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Notifications;
+using Explore.Domain;
+using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Repositories;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Distributed.IntegrationTests;
 
@@ -95,10 +102,11 @@ internal static class K6LoadRunner
         if (topology is not ("Split" or "Standalone"))
             throw new InvalidOperationException("load_topology_not_admitted");
         using var transport = CreateNativeTransport();
-        using var api = CreateNativeClient(fixture, topology, transport);
+        using var api = await CreateDirectNativeClientAsync(fixture, topology, transport, cancellationToken);
         using (var initial = await ReadNativeJsonAsync(api, HttpMethod.Post, "/api/auth/local/login", new
         {
-            identifier = fixture.BootstrapIdentifier, password = fixture.BootstrapPassword
+            identifier = fixture.BootstrapIdentifier,
+            password = fixture.BootstrapPassword
         }, cancellationToken))
         {
             if (initial.RootElement.GetProperty("success").GetBoolean())
@@ -112,7 +120,8 @@ internal static class K6LoadRunner
         api.DefaultRequestHeaders.Authorization = null;
         using (var login = await ReadNativeJsonAsync(api, HttpMethod.Post, "/api/auth/local/login", new
         {
-            identifier = fixture.BootstrapIdentifier, password = fixture.BootstrapReplacementPassword
+            identifier = fixture.BootstrapIdentifier,
+            password = fixture.BootstrapReplacementPassword
         }, cancellationToken))
         {
             if (!login.RootElement.GetProperty("success").GetBoolean())
@@ -126,13 +135,21 @@ internal static class K6LoadRunner
         Guid tenantId;
         using (var tenant = await ReadNativeJsonAsync(api, HttpMethod.Post, "/api/Tenant", new
         {
-            fullName = "Owned load community", slug = tenantSlug, isActive = true, assignCurrentUserAsTenantAdmin = true,
+            fullName = "Owned load community",
+            slug = tenantSlug,
+            isActive = true,
+            assignCurrentUserAsTenantAdmin = true,
             directoryOperatorIdentity = new
             {
-                publicName = "Owned load community", legalName = "Owned load community", operatorKindCode = "registered_organization",
-                jurisdictionCountryCode = "BE", registrationIdentifier = "load-" + fixture.RunId,
-                publicContactEmail = "assurance@example.invalid", legalNoticeUrl = "https://example.invalid/legal",
-                termsUrl = "https://example.invalid/terms", privacyUrl = "https://example.invalid/privacy"
+                publicName = "Owned load community",
+                legalName = "Owned load community",
+                operatorKindCode = "registered_organization",
+                jurisdictionCountryCode = "BE",
+                registrationIdentifier = "load-" + fixture.RunId,
+                publicContactEmail = "assurance@example.invalid",
+                legalNoticeUrl = "https://example.invalid/legal",
+                termsUrl = "https://example.invalid/terms",
+                privacyUrl = "https://example.invalid/privacy"
             }
         }, cancellationToken))
             tenantId = tenant.RootElement.GetProperty("id").GetGuid();
@@ -153,7 +170,7 @@ internal static class K6LoadRunner
             expectedConcurrencyStamp = read.RootElement.GetProperty("concurrencyStamp").GetGuid()
         }, cancellationToken)) { }
 
-        using var publicApi = CreateNativeClient(fixture, topology, transport);
+        using var publicApi = await CreateDirectNativeClientAsync(fixture, topology, transport, cancellationToken);
         publicApi.DefaultRequestHeaders.Add("X-Tenant-Slug", tenantSlug);
         using (var discovery = await ReadNativeJsonAsync(publicApi, HttpMethod.Get,
             "/api/Event?pageSize=20&searchTerm=" + Uri.EscapeDataString(fixture.RunId), null, cancellationToken))
@@ -194,14 +211,27 @@ internal static class K6LoadRunner
     private static async Task CaptureRuntimeMetricInventoryAsync(OwnedAppHostFixture fixture, string topology,
         CancellationToken cancellationToken)
     {
+        var observed = await ReadRuntimePressureAsync(fixture, topology, cancellationToken);
+        await WriteRuntimeMetricInventoryAsync(Path.Combine(EvidenceDirectory(fixture), $"runtime-metric-inventory-{topology}.json"),
+            observed.Status, observed.Definitions, cancellationToken, observed.Pressure);
+    }
+
+    private static async Task<(K6MetricInventoryStatus Status, K6MetricDefinition[] Definitions, K6RuntimePressure Pressure)>
+        ReadRuntimePressureAsync(OwnedAppHostFixture fixture, string topology, CancellationToken cancellationToken)
+    {
         K6MetricInventoryStatus status = K6MetricInventoryStatus.EndpointUnavailable;
         K6MetricDefinition[] definitions = [];
+        long started = Stopwatch.GetTimestamp();
+        K6RuntimePressure pressure = new(K6ObservationStatus.RuntimeSeriesUnpinned, null, null, null);
         try
         {
             using var transport = CreateNativeTransport();
             using var operations = CreateNativeClient(fixture, topology, transport, "operations");
             operations.Timeout = TimeSpan.FromSeconds(3);
-            using var response = await operations.GetAsync("/metrics", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            Uri scrapeEndpoint = RuntimeScrapeEndpoint(operations.BaseAddress
+                ?? throw new InvalidOperationException("load_owned_endpoint_missing"));
+            pressure = pressure with { ScrapeEndpoint = scrapeEndpoint.AbsoluteUri };
+            using var response = await operations.GetAsync(scrapeEndpoint, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (response.StatusCode == HttpStatusCode.OK)
             {
                 status = K6MetricInventoryStatus.UnsupportedMediaType;
@@ -219,7 +249,9 @@ internal static class K6LoadRunner
                             throw new InvalidOperationException("load_runtime_metric_inventory_limit");
                         body.Write(buffer, 0, count);
                     }
-                    definitions = ParseRuntimeMetricInventory(Encoding.UTF8.GetString(body.GetBuffer(), 0, checked((int)body.Length)));
+                    string exposition = Encoding.UTF8.GetString(body.GetBuffer(), 0, checked((int)body.Length));
+                    definitions = ParseRuntimeMetricInventory(exposition);
+                    pressure = ParseRuntimePressure(exposition, definitions) with { ScrapeEndpoint = scrapeEndpoint.AbsoluteUri };
                     status = K6MetricInventoryStatus.MetadataOnly;
                 }
             }
@@ -240,8 +272,73 @@ internal static class K6LoadRunner
         {
             status = K6MetricInventoryStatus.InvalidMetadata;
         }
-        await WriteRuntimeMetricInventoryAsync(Path.Combine(EvidenceDirectory(fixture), $"runtime-metric-inventory-{topology}.json"),
-            status, definitions, cancellationToken);
+        return (status, definitions, pressure with
+        {
+            CaptureStatus = status,
+            StartedTimestamp = started,
+            CompletedTimestamp = Stopwatch.GetTimestamp(),
+            MetricDefinitions = definitions
+        });
+    }
+
+    internal static Uri RuntimeScrapeEndpoint(Uri origin)
+    {
+        if (origin.Scheme != "http" || origin.Host != IPAddress.Loopback.ToString() || origin.IsDefaultPort
+            || origin.UserInfo.Length != 0 || origin.AbsolutePath != "/" || origin.Query.Length != 0 || origin.Fragment.Length != 0)
+            throw new InvalidOperationException("load_runtime_scrape_endpoint_not_admitted");
+        return new Uri(origin, "/metrics");
+    }
+
+    internal static K6RuntimePressure ParseRuntimePressure(string exposition, IReadOnlyList<K6MetricDefinition> definitions)
+    {
+        if (exposition.Length > 4 * 1024 * 1024)
+            throw new InvalidOperationException("load_runtime_metric_inventory_limit");
+        // These are finite candidate wire contracts, not evidence that this API/exporter emitted them.
+        // Parent qualification must bind actual export semantics AND the emitting process/reset interval.
+        bool cpuContract = definitions.Count(row => row.Name == "dotnet_process_cpu_time_seconds_total"
+            && row.Kind == "counter" && row.Unit == "seconds") == 1;
+        bool memoryContract = definitions.Count(row => row.Name == "dotnet_process_memory_working_set_bytes"
+            && row.Kind == "gauge" && row.Unit == "bytes") == 1;
+        double? user = null, system = null;
+        long? memory = null;
+        using var reader = new StringReader(exposition);
+        while (reader.ReadLine() is { } raw)
+        {
+            string line = raw.Trim();
+            if (line.StartsWith('#') || line.Length == 0) continue;
+            const string cpu = "dotnet_process_cpu_time_seconds_total";
+            const string rss = "dotnet_process_memory_working_set_bytes";
+            if (!line.StartsWith(cpu, StringComparison.Ordinal) && !line.StartsWith(rss, StringComparison.Ordinal)) continue;
+            int separator = line.LastIndexOf(' ');
+            if (separator < 1 || !double.TryParse(line.AsSpan(separator + 1), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out double numeric) || !double.IsFinite(numeric) || numeric < 0)
+                throw new InvalidOperationException("load_runtime_numeric_invalid");
+            string identity = line[..separator];
+            switch (identity)
+            {
+                case cpu + "{cpu_mode=\"user\"}" when cpuContract && user is null:
+                    user = numeric; break;
+                case cpu + "{cpu_mode=\"system\"}" when cpuContract && system is null:
+                    system = numeric; break;
+                case rss when memoryContract && memory is null && long.TryParse(line.AsSpan(separator + 1),
+                    NumberStyles.None, CultureInfo.InvariantCulture, out long exactBytes):
+                    memory = exactBytes; break;
+                default:
+                    throw new InvalidOperationException("load_runtime_numeric_contract_unqualified");
+            }
+        }
+        if (user is null || system is null || memory is null)
+            return new(K6ObservationStatus.RuntimeSeriesUnpinned, null, null, null) { MetricDefinitions = definitions.ToArray() };
+        return new(K6ObservationStatus.RuntimeSeriesUnpinned, user, system, memory)
+        {
+            MetricDefinitions = definitions.ToArray(),
+            NumericSamples =
+            [
+                new("dotnet_process_cpu_time_seconds_total", "counter", "seconds", "user", user, null),
+                new("dotnet_process_cpu_time_seconds_total", "counter", "seconds", "system", system, null),
+                new("dotnet_process_memory_working_set_bytes", "gauge", "bytes", null, null, memory)
+            ]
+        };
     }
 
     internal static K6MetricDefinition[] ParseRuntimeMetricInventory(string exposition)
@@ -282,12 +379,16 @@ internal static class K6LoadRunner
     }
 
     internal static Task WriteRuntimeMetricInventoryAsync(string path, K6MetricInventoryStatus status,
-        IReadOnlyList<K6MetricDefinition> definitions, CancellationToken cancellationToken) => File.WriteAllTextAsync(path,
+        IReadOnlyList<K6MetricDefinition> definitions, CancellationToken cancellationToken, K6RuntimePressure? observation = null) => File.WriteAllTextAsync(path,
         JsonSerializer.Serialize(new
         {
-            Schema = 1, Status = status.ToString(), Scope = "runtime metric metadata only", CapacityEvidenceEligible = false,
+            Schema = 1,
+            Status = status.ToString(),
+            Scope = "runtime candidate observations; exporter and reset identity unqualified",
+            CapacityEvidenceEligible = false,
             UnavailableMeasurements = new[] { "api_cpu_numeric", "api_working_set_numeric", "api_reset_identity", "database_pressure", "queue_backlog" },
-            MetricDefinitions = definitions
+            MetricDefinitions = definitions,
+            Runtime = observation
         }, EvidenceJsonOptions), cancellationToken);
 
     private static string EvidenceDirectory(OwnedAppHostFixture fixture)
@@ -302,6 +403,16 @@ internal static class K6LoadRunner
     private static HttpClientHandler CreateNativeTransport() =>
         new() { AllowAutoRedirect = false, UseProxy = false, UseCookies = false };
 
+    private static async Task<HttpClient> CreateDirectNativeClientAsync(OwnedAppHostFixture fixture, string topology,
+        HttpMessageHandler transport, CancellationToken cancellationToken)
+    {
+        if (topology is not ("Split" or "Standalone"))
+            throw new InvalidOperationException("load_owned_endpoint_not_admitted");
+        Uri origin = await fixture.GetDirectHttpOriginAsync(
+            topology == "Split" ? "explore-api" : "event-standalone", cancellationToken);
+        return CreateNativeClient(origin, transport);
+    }
+
     private static HttpClient CreateNativeClient(OwnedAppHostFixture fixture, string topology, HttpMessageHandler transport,
         string endpoint = "http")
     {
@@ -309,6 +420,11 @@ internal static class K6LoadRunner
             throw new InvalidOperationException("load_owned_endpoint_not_admitted");
         using var bound = fixture.CreateHttpClient(topology == "Split" ? "explore-api" : "event-standalone", endpoint);
         var origin = bound.BaseAddress ?? throw new InvalidOperationException("load_owned_endpoint_missing");
+        return CreateNativeClient(origin, transport);
+    }
+
+    private static HttpClient CreateNativeClient(Uri origin, HttpMessageHandler transport)
+    {
         if (origin.Scheme != "http" || !origin.IsLoopback || origin.IsDefaultPort || origin.UserInfo.Length != 0 ||
             origin.AbsolutePath != "/" || origin.Query.Length != 0 || origin.Fragment.Length != 0)
             throw new InvalidOperationException("load_owned_endpoint_not_admitted");
@@ -334,11 +450,15 @@ internal static class K6LoadRunner
         var authority = fixture.EnvironmentAuthority;
         return new GlobalExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Global, Provider = PrimaryDatabaseProvider.PostgreSql,
-            Host = endpoint.Host, Port = endpoint.Port, Database = authority["DATABASE_NAME"],
+            Role = PrimaryDatabaseRole.Global,
+            Provider = PrimaryDatabaseProvider.PostgreSql,
+            Host = endpoint.Host,
+            Port = endpoint.Port,
+            Database = authority["DATABASE_NAME"],
             Schema = authority["DATABASE_SCHEMA"] ?? throw new InvalidOperationException("load_owned_observer_authority_missing"),
             Username = authority["DATABASE_GLOBAL_USERNAME"],
-            Password = authority["DATABASE_GLOBAL_PASSWORD"], TlsMode = PrimaryDatabaseTlsMode.Disabled
+            Password = authority["DATABASE_GLOBAL_PASSWORD"],
+            TlsMode = PrimaryDatabaseTlsMode.Disabled
         }, poolSize: 2);
     }
 
@@ -420,7 +540,10 @@ internal static class K6LoadRunner
         DateTimeOffset start = DateTimeOffset.UtcNow.AddDays(7);
         using var created = await ReadNativeJsonAsync(api, HttpMethod.Post, "/api/Event", new
         {
-            title, description = "Owned load correctness fixture.", eventFormatId = 2, eventTimeZoneId = "UTC",
+            title,
+            description = "Owned load correctness fixture.",
+            eventFormatId = 2,
+            eventTimeZoneId = "UTC",
             participationConfiguration = new { participationHandlingModeId = 1, advanceRegistrationObligationId = 1 },
             sessions = new[] { new { tempKey = "load-session", title = "Load control session", startTime = start, endTime = start.AddHours(1), endTimeType = 0 } }
         }, cancellationToken, HttpStatusCode.Created);
@@ -449,7 +572,8 @@ internal static class K6LoadRunner
             return response;
         int actual = (int)response.StatusCode;
         response.Dispose();
-        throw new InvalidOperationException($"load_native_control_status_invalid:{method.Method}:{(int)expected}:{actual}");
+        throw new HttpRequestException($"load_native_control_status_invalid:{method.Method}:{(int)expected}:{actual}",
+            null, (HttpStatusCode)actual);
     }
 
     internal static async Task RunProgrammeAsync(OwnedAppHostFixture fixture, string topology, CancellationToken cancellationToken)
@@ -466,10 +590,10 @@ internal static class K6LoadRunner
             candidateAssemblyDigest = Convert.ToHexString(await SHA256.HashDataAsync(assembly, cancellationToken));
         var baselineKeys = new Dictionary<K6Journey, string>();
         using var transport = CreateNativeTransport();
-        using var publicApi = CreateNativeClient(fixture, topology, transport);
+        using var publicApi = await CreateDirectNativeClientAsync(fixture, topology, transport, cancellationToken);
         publicApi.DefaultRequestHeaders.Add("X-Tenant-Slug", dataset.TenantSlug);
         var ownedOrigin = new UriBuilder(publicApi.BaseAddress ?? throw new InvalidOperationException("load_owned_endpoint_missing"))
-            { Host = IPAddress.Loopback.ToString(), Path = "/" }.Uri;
+        { Host = IPAddress.Loopback.ToString(), Path = "/" }.Uri;
         var warmup = new List<double>();
         for (int index = 0; index < 3; index++)
         {
@@ -486,8 +610,10 @@ internal static class K6LoadRunner
         DateTimeOffset programmeObservedStartAtUtc = DateTimeOffset.UtcNow;
         var observations = new List<K6PressureObservation>();
         using var sampling = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        Task sampler = SamplePressureAsync(factory, fixture.EnvironmentAuthority["DATABASE_NAME"]
-            ?? throw new InvalidOperationException("load_owned_observer_authority_missing"), programmeStartedTimestamp, observations, sampling.Token);
+        string pressurePath = Path.Combine(EvidenceDirectory(fixture), $"pressure-{topology}.json");
+        Task sampler = SamplePressureAsync(fixture, topology, factory, fixture.EnvironmentAuthority["DATABASE_NAME"]
+            ?? throw new InvalidOperationException("load_owned_observer_authority_missing"), programmeStartedTimestamp,
+            programmeObservedStartAtUtc, pressurePath, observations, sampling.Token);
         bool completed = false;
         Exception? failure = null;
         try
@@ -501,7 +627,9 @@ internal static class K6LoadRunner
                 await File.WriteAllTextAsync(Path.Combine(EvidenceDirectory(fixture), $"spike-recovery-{topology}-{JourneyName(journey)}.json"),
                     JsonSerializer.Serialize(new
                     {
-                        Schema = 1, Transition = "spike_then_recovery_with_observed_gap", Journey = JourneyName(journey),
+                        Schema = 1,
+                        Transition = "spike_then_recovery_with_observed_gap",
+                        Journey = JourneyName(journey),
                         GapMilliseconds = Stopwatch.GetElapsedTime(spike.ExitedTimestamp, recovery.StartedTimestamp).TotalMilliseconds,
                         Observation = "parent-observed process exit to next process-start return; sampler remains active",
                         CapacityEvidenceEligible = false
@@ -510,7 +638,7 @@ internal static class K6LoadRunner
             }
 
             // The configured native profile intentionally has a five-minute JWT lifetime. Renew through genuine Local login.
-            using var writer = CreateNativeClient(fixture, topology, transport);
+            using var writer = await CreateDirectNativeClientAsync(fixture, topology, transport, cancellationToken);
             writer.DefaultRequestHeaders.Add("X-Tenant-Slug", dataset.TenantSlug);
             await LoginAdministratorAsync(writer, fixture, cancellationToken);
             await VerifySettledDatasetAsync(writer, publicApi, dataset, "Load settled " + fixture.RunId + "-0001",
@@ -521,6 +649,21 @@ internal static class K6LoadRunner
             await VerifySettledDatasetAsync(writer, publicApi, dataset, "Load serial " + fixture.RunId + "-0020",
                 fixture.RunId, cancellationToken);
 
+            using (var enabled = await writer.PatchAsJsonAsync("/api/instance/settings/smtp",
+                new { deliveryEnabled = true }, cancellationToken))
+                enabled.EnsureSuccessStatusCode();
+            using var currentUser = await ReadNativeJsonAsync(writer, HttpMethod.Get, "/api/user", null, cancellationToken);
+            var dispatch = await SeedDrainWitnessAsync(fixture, dataset.TenantId,
+                currentUser.RootElement.GetProperty("id").GetGuid(), cancellationToken);
+            using var mailpit = fixture.CreateHttpClient("mailpit");
+            mailpit.Timeout = TimeSpan.FromSeconds(5);
+            mailpit.MaxResponseContentBufferSize = 4 * 1024 * 1024;
+            await RequireDrainWitnessAsync(writer, mailpit, dispatch, cancellationToken);
+            await RecoverOwnedDatabaseAsync(fixture, topology, publicApi, dataset, factory,
+                programmeStartedTimestamp, cancellationToken);
+            await LoginAdministratorAsync(writer, fixture, cancellationToken);
+            await RequireDrainWitnessAsync(writer, mailpit, dispatch, cancellationToken);
+
             // Repetitions retain candidates with identical settings; this does not promote them or infer host quiescence.
             for (int repetition = 1; repetition <= 3; repetition++)
                 foreach (var journey in new[] { K6Journey.EventRead, K6Journey.EventSearch })
@@ -528,6 +671,20 @@ internal static class K6LoadRunner
             await LoginAdministratorAsync(writer, fixture, cancellationToken);
             await VerifySettledDatasetAsync(writer, publicApi, dataset, "Load serial " + fixture.RunId + "-0020",
                 fixture.RunId, cancellationToken);
+            await RequireDrainWitnessAsync(writer, mailpit, dispatch, cancellationToken);
+            await File.WriteAllTextAsync(Path.Combine(EvidenceDirectory(fixture), $"dispatch-drain-{topology}.json"),
+                JsonSerializer.Serialize(new
+                {
+                    Schema = 1,
+                    Completed = true,
+                    Scope = "one native notification dispatch after pressure; same persisted source checked before and after dependency recovery and final repetitions",
+                    ExpectedDispatches = 1,
+                    PersistedSent = 1,
+                    PersistedAttemptCount = 1,
+                    MailpitReceipts = 1,
+                    OriginalSourcePreserved = true,
+                    CapacityEvidenceEligible = false
+                }, EvidenceJsonOptions), cancellationToken);
             completed = true;
         }
         catch (Exception exception)
@@ -537,33 +694,9 @@ internal static class K6LoadRunner
         finally
         {
             sampling.Cancel();
-            try { await sampler; }
-            catch (Exception exception)
-            {
-                failure = failure is null ? exception : new AggregateException("load_pressure_finalization_failed", failure, exception);
-            }
-            try
-            {
-                await File.WriteAllTextAsync(Path.Combine(EvidenceDirectory(fixture), $"pressure-{topology}.json"),
-                JsonSerializer.Serialize(new
-                {
-                    Schema = 1, Completed = completed, CapacityEvidenceEligible = false,
-                    ProgrammeObservedStartAtUtc = programmeObservedStartAtUtc,
-                    Scope = "continuous run-owned Global statistics and native queue health; API numeric series remain unpinned",
-                    UnavailableMeasurements = new[] { "api_cpu_numeric", "api_working_set_numeric", "api_reset_identity" },
-                    CounterUnits = "transactions, PostgreSQL blocks, files, bytes, deadlocks; cumulative since StatisticsResetAtUtc",
-                    GaugeUnits = "backends and queue item counts", StaleQueueAgeMinutes = 5,
-                    Sampling = "actual monotonic offsets; up to three seconds each for DB and queue observations, then one-second delay",
-                    SamplingLimitReached = observations.Count >= 900, Observations = observations
-                }, EvidenceJsonOptions), CancellationToken.None);
-            }
-            catch (Exception exception)
-            {
-                failure = failure is null ? exception : new AggregateException("load_pressure_finalization_failed", failure, exception);
-            }
+            await FinalizePressureAsync(sampler, pressurePath, programmeObservedStartAtUtc, observations,
+                completed, failure, CancellationToken.None);
         }
-        if (failure is not null)
-            ExceptionDispatchInfo.Capture(failure).Throw();
 
         async Task<K6ProcessMeasurement> RunEventProfileAsync(K6LoadProfile profile, K6Journey journey, int repetition, string? token)
         {
@@ -605,16 +738,24 @@ internal static class K6LoadRunner
             await VerifyPublicDatasetAsync(publicApi, dataset, fixture.RunId, cancellationToken);
             var comparison = new
             {
-                CandidateAssemblyDigest = candidateAssemblyDigest, ExecutableDigest = AdmittedExecutableDigest,
-                WorkloadDigest = workloadDigest, Topology = topology, ProviderProfile = "owned PostgreSQL 18 native purpose logins",
-                Journey = JourneyName(journey), Profile = budget.Name, budget.DurationSeconds, budget.OfferedRate, budget.MaximumVirtualUsers,
+                CandidateAssemblyDigest = candidateAssemblyDigest,
+                ExecutableDigest = AdmittedExecutableDigest,
+                WorkloadDigest = workloadDigest,
+                Topology = topology,
+                ProviderProfile = "owned PostgreSQL 18 native purpose logins",
+                Journey = JourneyName(journey),
+                Profile = budget.Name,
+                budget.DurationSeconds,
+                budget.OfferedRate,
+                budget.MaximumVirtualUsers,
                 DatasetGeneration = "three InformationOnly events; sessions UTC now plus seven days; one published read, distinct draft writer and control",
                 WarmupGeneration = "three paired typed public event reads and searches, excluded from measured requests",
                 CacheProfile = "production cache policy retained",
                 Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
                 OperatingSystem = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
                 Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
-                LogicalProcessors = Environment.ProcessorCount, TotalAvailableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes
+                LogicalProcessors = Environment.ProcessorCount,
+                TotalAvailableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes
             };
             string comparisonDigest = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(comparison)));
             if (repetition > 0)
@@ -626,35 +767,381 @@ internal static class K6LoadRunner
             await File.WriteAllTextAsync(Path.Combine(EvidenceDirectory(fixture), $"event-load-{topology}-{name}.json"),
                 JsonSerializer.Serialize(new
                 {
-                    Schema = 2, Candidate = true, CapacityEvidenceEligible = false, BaselineRepetition = repetition,
+                    Schema = 2,
+                    Candidate = true,
+                    CapacityEvidenceEligible = false,
+                    BaselineRepetition = repetition,
                     StartedOffsetMilliseconds = Stopwatch.GetElapsedTime(programmeStartedTimestamp, measurement.StartedTimestamp).TotalMilliseconds,
                     ExitedOffsetMilliseconds = Stopwatch.GetElapsedTime(programmeStartedTimestamp, measurement.ExitedTimestamp).TotalMilliseconds,
-                    ComparisonDigest = comparisonDigest, Comparison = comparison,
-                    ToolVersion = version, ExecutableDigest = AdmittedExecutableDigest, WorkloadDigest = workloadDigest,
-                    WorkloadId = "owned-information-only-events-v1", Topology = topology, Provider = "PostgreSql",
-                    Journey = JourneyName(journey), Profile = budget.Name, budget.DurationSeconds, budget.OfferedRate,
-                    budget.MaximumVirtualUsers, WarmupMilliseconds = warmup,
-                    Dataset = new { Events = 3, Published = 1, InformationOnly = 3, RegistrationOrMoneyOperations = 0,
-                        dataset.SeedStartedAtUtc, dataset.SeedCompletedAtUtc },
+                    ComparisonDigest = comparisonDigest,
+                    Comparison = comparison,
+                    ToolVersion = version,
+                    ExecutableDigest = AdmittedExecutableDigest,
+                    WorkloadDigest = workloadDigest,
+                    WorkloadId = "owned-information-only-events-v1",
+                    Topology = topology,
+                    Provider = "PostgreSql",
+                    Journey = JourneyName(journey),
+                    Profile = budget.Name,
+                    budget.DurationSeconds,
+                    budget.OfferedRate,
+                    budget.MaximumVirtualUsers,
+                    WarmupMilliseconds = warmup,
+                    Dataset = new
+                    {
+                        Events = 3,
+                        Published = 1,
+                        InformationOnly = 3,
+                        RegistrationOrMoneyOperations = 0,
+                        dataset.SeedStartedAtUtc,
+                        dataset.SeedCompletedAtUtc
+                    },
                     CacheProfile = "three typed public read/search warmups; production cache policy retained",
                     LatencyScope = journey == K6Journey.EventWrite ? "all GET/PATCH/GET request durations; not end-to-end transaction duration" : "single public read or search request duration",
                     Authentication = journey == K6Journey.EventWrite ? "fresh real Local login, configured five-minute JWT lifetime" : "anonymous",
                     Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
                     OperatingSystem = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
                     Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
-                    LogicalProcessors = Environment.ProcessorCount, TotalAvailableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
+                    LogicalProcessors = Environment.ProcessorCount,
+                    TotalAvailableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
                     BuildInformationalVersion = typeof(K6LoadRunner).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
-                    measurement.Summary, measurement.WallMilliseconds, measurement.GeneratorSamples,
-                    measurement.GeneratorPeakCpuRatio, measurement.GeneratorPeakRssBytes,
-                    GeneratorCpuBudgetRatio = 0.8, GeneratorMemoryBudgetBytes = MemoryBudgetBytes,
-                    HostQuiescence = "unverified; candidates cannot establish capacity", RecordedAtUtc = DateTimeOffset.UtcNow
+                    measurement.Summary,
+                    measurement.WallMilliseconds,
+                    measurement.GeneratorSamples,
+                    measurement.GeneratorPeakCpuRatio,
+                    measurement.GeneratorPeakRssBytes,
+                    GeneratorCpuBudgetRatio = 0.8,
+                    GeneratorMemoryBudgetBytes = MemoryBudgetBytes,
+                    HostQuiescence = "unverified; candidates cannot establish capacity",
+                    RecordedAtUtc = DateTimeOffset.UtcNow
                 }, EvidenceJsonOptions), cancellationToken);
             return measurement;
         }
     }
 
-    private static async Task SamplePressureAsync(GlobalExploreDbContextFactory factory, string expectedDatabase, long programmeStartedTimestamp,
-        List<K6PressureObservation> observations, CancellationToken cancellationToken)
+    internal static async Task FinalizePressureAsync(Task sampler, string path, DateTimeOffset programmeObservedStartAtUtc,
+        IReadOnlyList<K6PressureObservation> observations, bool completed, Exception? originalFailure, CancellationToken cancellationToken)
+    {
+        Exception? failure = originalFailure;
+        try { await sampler; }
+        catch (Exception exception)
+        {
+            failure = failure is null ? exception : new AggregateException("load_pressure_finalization_failed", failure, exception);
+        }
+        try
+        {
+            await WritePressureSnapshotAsync(path, programmeObservedStartAtUtc, observations,
+                final: true, completed: completed && failure is null, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            failure = failure is null ? exception : new AggregateException("load_pressure_finalization_failed", failure, exception);
+        }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    internal static async Task WritePressureSnapshotAsync(string path, DateTimeOffset programmeObservedStartAtUtc,
+        IReadOnlyList<K6PressureObservation> observations, bool final, bool completed, CancellationToken cancellationToken)
+    {
+        if (observations.Count > 900 || completed && !final)
+            throw new InvalidOperationException("load_pressure_snapshot_not_admitted");
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            Schema = 1,
+            Final = final,
+            Completed = completed,
+            CapacityEvidenceEligible = false,
+            ProgrammeObservedStartAtUtc = programmeObservedStartAtUtc,
+            Scope = "continuous run-owned Global statistics and native queue health; API numeric series remain unpinned",
+            UnavailableMeasurements = new[] { "api_cpu_numeric", "api_working_set_numeric", "api_reset_identity" },
+            CounterUnits = "transactions, PostgreSQL blocks, files, bytes, deadlocks; cumulative since StatisticsResetAtUtc",
+            GaugeUnits = "backends and queue item counts",
+            StaleQueueAgeMinutes = 5,
+            Sampling = "actual monotonic capture brackets; bounded parallel DB, queue and runtime reads, then one-second delay",
+            SamplingLimitReached = observations.Count >= 900,
+            Observations = observations
+        }, EvidenceJsonOptions);
+        if (bytes.Length > 4 * 1024 * 1024)
+            throw new InvalidOperationException("load_pressure_snapshot_limit");
+        string temporary = path + "." + Guid.CreateVersion7().ToString("N") + ".tmp";
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+            Options = FileOptions.WriteThrough
+        };
+        if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        using (var stream = new FileStream(temporary, options))
+        {
+            await stream.WriteAsync(bytes, cancellationToken);
+            await stream.FlushAsync(cancellationToken);
+            stream.Flush(flushToDisk: true);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        File.Move(temporary, path, overwrite: true);
+    }
+
+    private static async Task RecoverOwnedDatabaseAsync(OwnedAppHostFixture fixture, string topology,
+        HttpClient publicApi, K6NativeDataset dataset, GlobalExploreDbContextFactory factory,
+        long programmeStartedTimestamp, CancellationToken cancellationToken)
+    {
+        _ = fixture.Application.Services.GetRequiredService<DistributedApplicationModel>().Resources
+            .OfType<ContainerResource>().Single(resource => resource.Name == "postgres");
+        using var faultDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        faultDeadline.CancelAfter(TimeSpan.FromSeconds(30));
+        Exception? failure = null;
+        Exception? recoveryFailure = null;
+        Exception? evidenceFailure = null;
+        bool stopRequested = false, exited = false, restored = false;
+        int? unavailableStatus = null;
+        long stopAt = Stopwatch.GetTimestamp(), exitAt = 0, startAt = 0, healthyAt = 0;
+        try
+        {
+            Task stopped = fixture.Application.ResourceNotifications.WaitForResourceAsync(
+                "postgres", KnownResourceStates.Exited, faultDeadline.Token);
+            stopRequested = true;
+            var stop = await fixture.Application.ResourceCommands.ExecuteCommandAsync(
+                "postgres", KnownResourceCommands.StopCommand, faultDeadline.Token);
+            if (!stop.Success) throw new InvalidOperationException("load_owned_dependency_stop_failed");
+            await stopped;
+            exited = true;
+            exitAt = Stopwatch.GetTimestamp();
+            HttpResponseMessage? response = null;
+            try
+            {
+                response = await publicApi.GetAsync($"/api/Event/{dataset.ReadId:D}",
+                    HttpCompletionOption.ResponseHeadersRead, faultDeadline.Token);
+            }
+            catch (HttpRequestException) { RequireOutageOutcome(null); }
+            using (response)
+            {
+                if (response is not null)
+                {
+                    unavailableStatus = (int)response.StatusCode;
+                    RequireOutageOutcome(unavailableStatus);
+                    if (response.Content.Headers.ContentType?.MediaType != "application/problem+json")
+                        throw new InvalidOperationException("load_owned_dependency_error_contract_invalid");
+                    await response.Content.LoadIntoBufferAsync(4 * 1024 * 1024, faultDeadline.Token);
+                    using var problem = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(faultDeadline.Token),
+                        cancellationToken: faultDeadline.Token);
+                    var root = problem.RootElement;
+                    if (root.GetProperty("status").GetInt32() != unavailableStatus
+                        || root.GetProperty("code").GetString() != (unavailableStatus == 500 ? "unexpected_error" : "discovery_unavailable")
+                        || unavailableStatus == 500 && (root.GetProperty("title").GetString() != "Internal server error"
+                            || root.GetProperty("detail").GetString() != "An unexpected error occurred.")
+                        || unavailableStatus == 503 && (root.GetProperty("title").GetString() != "Event discovery unavailable"
+                            || root.GetProperty("detail").GetString() != "Event discovery is temporarily unavailable."))
+                        throw new InvalidOperationException("load_owned_dependency_error_contract_invalid");
+                }
+            }
+        }
+        catch (Exception exception) { failure = exception; }
+        finally
+        {
+            // Recovery has its own finite budget even when the workload caller was cancelled.
+            if (stopRequested)
+            {
+                using var recovery = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+                try
+                {
+                    startAt = Stopwatch.GetTimestamp();
+                    Task running = fixture.Application.ResourceNotifications.WaitForResourceAsync(
+                        "postgres", KnownResourceStates.Running, recovery.Token);
+                    var start = await fixture.Application.ResourceCommands.ExecuteCommandAsync(
+                        "postgres", KnownResourceCommands.StartCommand, recovery.Token);
+                    if (!start.Success)
+                    {
+                        recoveryFailure = new InvalidOperationException("load_owned_dependency_start_failed");
+                        recovery.Cancel();
+                    }
+                    else
+                    {
+                        await running;
+                        await fixture.Application.ResourceNotifications.WaitForResourceHealthyAsync("postgres", recovery.Token);
+                        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
+                        while (true)
+                        {
+                            var database = await ReadDatabasePressureAsync(factory,
+                                fixture.EnvironmentAuthority["DATABASE_NAME"]!, recovery.Token);
+                            if (database.Status == K6ObservationStatus.Available
+                                && await TryVerifyPublicDatasetRecoveryAsync(publicApi, dataset, fixture.RunId, recovery.Token))
+                            {
+                                break;
+                            }
+                            await timer.WaitForNextTickAsync(recovery.Token);
+                        }
+                        healthyAt = Stopwatch.GetTimestamp();
+                        restored = true;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    recoveryFailure = recoveryFailure is null ? exception
+                        : new AggregateException("load_owned_dependency_recovery_failed", recoveryFailure, exception);
+                }
+            }
+            try
+            {
+                await File.WriteAllTextAsync(Path.Combine(EvidenceDirectory(fixture), $"dependency-recovery-{topology}.json"),
+                    JsonSerializer.Serialize(new
+                    {
+                        Schema = 1,
+                        Resource = "postgres",
+                        Profile = "owned_read_only_outage",
+                        StopRequested = stopRequested,
+                        ObservedExited = exited,
+                        UnavailableStatus = unavailableStatus,
+                        Restored = restored,
+                        StopOffsetMilliseconds = Stopwatch.GetElapsedTime(programmeStartedTimestamp, stopAt).TotalMilliseconds,
+                        ExitedOffsetMilliseconds = exitAt == 0 ? (double?)null : Stopwatch.GetElapsedTime(programmeStartedTimestamp, exitAt).TotalMilliseconds,
+                        StartOffsetMilliseconds = startAt == 0 ? (double?)null : Stopwatch.GetElapsedTime(programmeStartedTimestamp, startAt).TotalMilliseconds,
+                        HealthyAndTypedRecoveryOffsetMilliseconds = healthyAt == 0 ? (double?)null : Stopwatch.GetElapsedTime(programmeStartedTimestamp, healthyAt).TotalMilliseconds,
+                        CapacityEvidenceEligible = false
+                    }, EvidenceJsonOptions), CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                evidenceFailure = exception;
+            }
+        }
+        if (recoveryFailure is not null)
+            failure = failure is null ? recoveryFailure : new AggregateException("load_owned_dependency_recovery_failed", failure, recoveryFailure);
+        if (evidenceFailure is not null)
+            failure = failure is null ? evidenceFailure : new AggregateException("load_owned_dependency_evidence_failed", failure, evidenceFailure);
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    internal static void RequireOutageOutcome(int? status)
+    {
+        if (status is not (null or 500 or 503))
+            throw new InvalidOperationException("load_owned_dependency_outcome_invalid");
+    }
+
+    private static async Task<K6DispatchWitness> SeedDrainWitnessAsync(OwnedAppHostFixture fixture,
+        Guid tenantId, Guid userId, CancellationToken cancellationToken)
+    {
+        Uri endpoint = fixture.Application.GetEndpoint("postgres", "tcp");
+        var authority = fixture.EnvironmentAuthority;
+        var factory = new TenantExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.PostgreSql,
+            Host = endpoint.Host,
+            Port = endpoint.Port,
+            Database = authority["DATABASE_NAME"],
+            Schema = authority["DATABASE_SCHEMA"]!,
+            Username = authority["DATABASE_RUNTIME_USERNAME"],
+            Password = authority["DATABASE_RUNTIME_PASSWORD"],
+            TlsMode = PrimaryDatabaseTlsMode.Disabled
+        }, poolSize: 2);
+        await using var context = await factory.CreateDbContextAsync(tenantId, cancellationToken);
+        context.CurrentUserService = new K6SeedActor(userId);
+        var recipient = await context.Users.Include(user => user.IdentityEmailClaims).ThenInclude(claim => claim.Evidence)
+            .SingleAsync(user => user.Id == userId, cancellationToken);
+        var address = RecipientEmailAddressResolver.Resolve(recipient, userId);
+        if (!address.HasVerifiedEmail) throw new InvalidOperationException("load_dispatch_verified_recipient_required");
+        var membership = await context.TenantUsers.SingleAsync(row => row.TenantId == tenantId && row.UserId == userId
+            && row.StatusId == (int)TenantUserStatusEnum.Active, cancellationToken);
+        long revision = await context.EmailDispatchTenantControls.Where(row => row.TenantId == tenantId)
+            .Select(row => row.DeliveryPolicyRevision).SingleOrDefaultAsync(cancellationToken);
+        DateTime now = DateTime.UtcNow;
+        var intent = new NotificationIntent
+        {
+            TenantId = tenantId,
+            RecipientUserId = userId,
+            RecipientTenantUser = membership,
+            CategoryId = (int)NotificationCategoryEnum.RegistrationLifecycle,
+            OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
+            RecipientKindId = (int)NotificationRecipientKindEnum.User,
+            StatusId = (int)NotificationIntentStatusEnum.DispatchQueued,
+            TemplateKey = "registration.confirmed",
+            DeduplicationKey = $"load-assurance:{Guid.CreateVersion7():N}",
+            EmailDeliveryPolicyRevision = revision,
+            CreatedAt = now
+        };
+        var dispatch = new EmailDispatchOutbox
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Kind = EmailDispatchKind.RegistrationConfirmation,
+            SourceType = "notification_intent",
+            SourceId = intent.Id,
+            NotificationIntentId = intent.Id,
+            NotificationIntent = intent,
+            RecipientUserId = userId,
+            RecipientTenantUser = membership,
+            RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail,
+            RecipientEmail = address.Email!,
+            Subject = $"Load assurance {Guid.CreateVersion7():N}",
+            PlainTextBody = "Owned bounded notification delivery witness.",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        intent.Deliveries.Add(new NotificationDelivery
+        {
+            TenantId = tenantId,
+            NotificationIntentId = intent.Id,
+            NotificationIntent = intent,
+            ChannelId = (int)NotificationPreferenceChannelEnum.Email,
+            DeliveryPolicyId = (int)NotificationDeliveryPolicyEnum.RegistrationStatusOptional,
+            PolicyVersion = 1,
+            PreferenceCategoryCode = NotificationPreferenceCategoryCodes.RegistrationStatus,
+            RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail,
+            DisclosureLevel = "standard",
+            TemplateKey = intent.TemplateKey,
+            TemplateVersion = 1,
+            EmailDispatchOutboxId = dispatch.Id,
+            EmailDispatchOutbox = dispatch,
+            StatusId = (int)NotificationDeliveryStatusEnum.Queued,
+            ProviderStatus = "queued",
+            QueuedAt = now,
+            CreatedAt = now
+        });
+        context.NotificationIntents.Add(intent);
+        await context.SaveChangesAsync(cancellationToken);
+        return new(tenantId, dispatch.Id, intent.Id, dispatch.Subject, address.Email!);
+    }
+
+    private static async Task RequireDrainWitnessAsync(HttpClient api, HttpClient mailpit,
+        K6DispatchWitness witness, CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
+        while (true)
+        {
+            using var status = await ReadNativeJsonAsync(api, HttpMethod.Get,
+                $"/api/admin/email-dispatch/status?tenantId={witness.TenantId:D}", null, deadline.Token);
+            var rows = status.RootElement.GetProperty("_embedded").GetProperty("items").EnumerateArray()
+                .Where(row => row.GetProperty("outboxId").GetGuid() == witness.OutboxId).ToArray();
+            if (rows.Length > 1) throw new InvalidOperationException("load_dispatch_duplicate_state");
+            bool sent = rows.Length == 1 && rows[0].GetProperty("deliveryStatus").GetString() == "Sent";
+            if (sent)
+                RequireDispatchOutcome(rows[0].GetProperty("sourceId").GetGuid() == witness.SourceId,
+                    rows[0].GetProperty("attemptCount").GetInt32(), rows[0].GetProperty("deliveredAt").ValueKind == JsonValueKind.String);
+            using var messages = await ReadNativeJsonAsync(mailpit, HttpMethod.Get, "/api/v1/messages", null, deadline.Token);
+            int receipts = messages.RootElement.GetProperty("messages").EnumerateArray().Count(message =>
+                message.GetProperty("Subject").GetString() == witness.Subject && message.GetProperty("To").EnumerateArray()
+                    .Any(recipient => recipient.GetProperty("Address").GetString() == witness.Recipient));
+            if (receipts > 1) throw new InvalidOperationException("load_dispatch_duplicate_receipt");
+            if (sent && receipts == 1) return;
+            await timer.WaitForNextTickAsync(deadline.Token);
+        }
+    }
+
+    internal static void RequireDispatchOutcome(bool originalSource, int attemptCount, bool deliveredAtPresent)
+    {
+        if (!originalSource || attemptCount != 1 || !deliveredAtPresent)
+            throw new InvalidOperationException("load_dispatch_delivery_invalid");
+    }
+
+    private sealed record K6DispatchWitness(Guid TenantId, Guid OutboxId, Guid SourceId, string Subject, string Recipient);
+    private sealed record K6SeedActor(Guid? UserId) : ICurrentUserService { public bool IsAuthenticated => true; }
+
+    private static async Task SamplePressureAsync(OwnedAppHostFixture fixture, string topology,
+        GlobalExploreDbContextFactory factory, string expectedDatabase, long programmeStartedTimestamp,
+        DateTimeOffset programmeObservedStartAtUtc, string pressurePath, List<K6PressureObservation> observations, CancellationToken cancellationToken)
     {
         try
         {
@@ -665,11 +1152,15 @@ internal static class K6LoadRunner
                 DateTimeOffset observedAt = DateTimeOffset.UtcNow;
                 var databaseTask = ReadDatabasePressureAsync(factory, expectedDatabase, cancellationToken);
                 var queueTask = ReadQueuePressureAsync(factory, cancellationToken);
-                await Task.WhenAll(databaseTask, queueTask);
+                var runtimeTask = ReadRuntimePressureAsync(fixture, topology, cancellationToken);
+                await Task.WhenAll(databaseTask, queueTask, runtimeTask);
                 var database = await databaseTask;
                 var queue = await queueTask;
+                var runtime = await runtimeTask;
                 observations.Add(new K6PressureObservation(startedOffset, Stopwatch.GetElapsedTime(programmeStartedTimestamp).TotalMilliseconds, observedAt,
-                    database.Status, database.Value, queue.Status, queue.Value));
+                    database.Status, database.Value, queue.Status, queue.Value, runtime.Pressure));
+                await WritePressureSnapshotAsync(pressurePath, programmeObservedStartAtUtc, observations,
+                    final: false, completed: false, cancellationToken);
                 await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
             }
         }
@@ -681,7 +1172,8 @@ internal static class K6LoadRunner
         api.DefaultRequestHeaders.Authorization = null;
         using var login = await ReadNativeJsonAsync(api, HttpMethod.Post, "/api/auth/local/login", new
         {
-            identifier = fixture.BootstrapIdentifier, password = fixture.BootstrapReplacementPassword
+            identifier = fixture.BootstrapIdentifier,
+            password = fixture.BootstrapReplacementPassword
         }, cancellationToken);
         if (!login.RootElement.GetProperty("success").GetBoolean())
             throw new InvalidOperationException("load_ordinary_login_required");
@@ -689,15 +1181,32 @@ internal static class K6LoadRunner
             login.RootElement.GetProperty("token").GetString() ?? throw new InvalidOperationException("load_access_token_missing"));
     }
 
+    internal static async Task<bool> TryVerifyPublicDatasetRecoveryAsync(HttpClient publicApi, K6NativeDataset dataset,
+        string searchTerm, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await VerifyPublicDatasetAsync(publicApi, dataset, searchTerm, cancellationToken);
+            return true;
+        }
+        catch (HttpRequestException exception) when (!cancellationToken.IsCancellationRequested
+            && exception.StatusCode is null or HttpStatusCode.InternalServerError or HttpStatusCode.ServiceUnavailable)
+        {
+            return false;
+        }
+    }
+
     private static async Task VerifyPublicDatasetAsync(HttpClient publicApi, K6NativeDataset dataset, string searchTerm,
         CancellationToken cancellationToken)
     {
         using var read = await ReadNativeJsonAsync(publicApi, HttpMethod.Get, $"/api/Event/{dataset.ReadId:D}", null, cancellationToken);
+        if (read.RootElement.GetProperty("id").GetGuid() != dataset.ReadId ||
+            read.RootElement.GetProperty("title").GetString() != dataset.ReadTitle)
+            throw new InvalidOperationException("load_public_dataset_changed");
         using var search = await ReadNativeJsonAsync(publicApi, HttpMethod.Get,
             "/api/Event?pageSize=20&searchTerm=" + Uri.EscapeDataString(searchTerm), null, cancellationToken);
         var items = search.RootElement.GetProperty("_embedded").GetProperty("items");
-        if (read.RootElement.GetProperty("id").GetGuid() != dataset.ReadId ||
-            read.RootElement.GetProperty("title").GetString() != dataset.ReadTitle || items.GetArrayLength() != 1 ||
+        if (items.GetArrayLength() != 1 ||
             items[0].GetProperty("event").GetProperty("id").GetGuid() != dataset.ReadId ||
             items[0].GetProperty("event").GetProperty("title").GetString() != dataset.ReadTitle)
             throw new InvalidOperationException("load_public_dataset_changed");
@@ -743,7 +1252,7 @@ internal static class K6LoadRunner
         ValidateTarget(ownedOrigin, target);
         using var transport = CreateNativeTransport();
         using var warmupClient = new HttpClient(transport)
-            { Timeout = TimeSpan.FromSeconds(5), MaxResponseContentBufferSize = 4 * 1024 * 1024 };
+        { Timeout = TimeSpan.FromSeconds(5), MaxResponseContentBufferSize = 4 * 1024 * 1024 };
         var warmup = new List<double>();
         string? expectedDigest = null;
         for (int index = 0; index < 3; index++)
@@ -788,17 +1297,31 @@ internal static class K6LoadRunner
             string evidenceDirectory = EvidenceDirectory(fixture);
             var evidence = new
             {
-                Schema = 2, Candidate = true, CapacityEvidenceEligible = false, WorkloadId, WorkloadDigest = workloadDigest,
-                ToolVersion = version, ExecutableDigest = executableDigest, Topology = topology,
-                Provider = "PostgreSql", Profile = budget.Name, Mode = mode, budget.DurationSeconds,
+                Schema = 2,
+                Candidate = true,
+                CapacityEvidenceEligible = false,
+                WorkloadId,
+                WorkloadDigest = workloadDigest,
+                ToolVersion = version,
+                ExecutableDigest = executableDigest,
+                Topology = topology,
+                Provider = "PostgreSql",
+                Profile = budget.Name,
+                Mode = mode,
+                budget.DurationSeconds,
                 VirtualUsers = mode == "closed" ? budget.MaximumVirtualUsers : (int?)null,
                 OfferedRate = mode == "open" ? budget.OfferedRate : (int?)null,
                 budget.MaximumVirtualUsers,
-                WarmupMilliseconds = warmup, measurement.Summary,
-                measurement.WallMilliseconds, measurement.GeneratorSamples,
-                measurement.GeneratorPeakCpuRatio, measurement.GeneratorPeakRssBytes,
-                GeneratorCpuBudgetRatio = 0.8, GeneratorMemoryBudgetBytes = MemoryBudgetBytes,
-                LogicalProcessors = Environment.ProcessorCount, TotalAvailableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
+                WarmupMilliseconds = warmup,
+                measurement.Summary,
+                measurement.WallMilliseconds,
+                measurement.GeneratorSamples,
+                measurement.GeneratorPeakCpuRatio,
+                measurement.GeneratorPeakRssBytes,
+                GeneratorCpuBudgetRatio = 0.8,
+                GeneratorMemoryBudgetBytes = MemoryBudgetBytes,
+                LogicalProcessors = Environment.ProcessorCount,
+                TotalAvailableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
                 Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
                 BuildInformationalVersion = typeof(K6LoadRunner).Assembly
                     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
@@ -1010,7 +1533,11 @@ internal static class K6LoadRunner
         }
         await File.WriteAllTextAsync(evidencePath, JsonSerializer.Serialize(new
         {
-            Schema = 1, Admission = "Rejected", CapacityEvidenceEligible = false, SummaryStatus = status, Summary = summary
+            Schema = 1,
+            Admission = "Rejected",
+            CapacityEvidenceEligible = false,
+            SummaryStatus = status,
+            Summary = summary
         }, EvidenceJsonOptions), cancellationToken);
     }
 
@@ -1024,7 +1551,10 @@ internal static class K6LoadRunner
     {
         var info = new ProcessStartInfo(executable)
         {
-            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
         };
         info.Environment.Clear();
         info.Environment["K6_NO_USAGE_REPORT"] = "true";
@@ -1096,7 +1626,26 @@ internal sealed record K6DatabasePressure(int ServerVersionMajor, int ServerVers
 
 internal sealed record K6PressureObservation(double StartedOffsetMilliseconds, double CompletedOffsetMilliseconds, DateTimeOffset ObservedAtUtc,
     K6ObservationStatus DatabaseStatus, K6DatabasePressure? Database,
-    K6ObservationStatus QueueStatus, K6QueuePressure? Queue);
+    K6ObservationStatus QueueStatus, K6QueuePressure? Queue, K6RuntimePressure Runtime);
+
+internal sealed record K6RuntimePressure(K6ObservationStatus Status, double? CpuUserSeconds, double? CpuSystemSeconds, long? WorkingSetBytes)
+{
+    public string? ScrapeEndpoint { get; init; }
+    public IReadOnlyList<K6MetricDefinition> MetricDefinitions { get; init; } = [];
+    public IReadOnlyList<K6RuntimeNumericSample> NumericSamples { get; init; } = [];
+    public K6MetricInventoryStatus CaptureStatus { get; init; } = K6MetricInventoryStatus.MetadataOnly;
+    public long StartedTimestamp { get; init; }
+    public long CompletedTimestamp { get; init; }
+    public long TimestampFrequency => Stopwatch.Frequency;
+    public int? ProcessId => null;
+    public ulong? KernelStart => null;
+    public string CounterUnit => "seconds";
+    public string MemoryUnit => "bytes";
+    public bool ExportContractQualified => false;
+    public bool ResetIdentityQualified => false;
+}
+
+internal sealed record K6RuntimeNumericSample(string Name, string Kind, string Unit, string? CpuMode, double? CpuSeconds, long? Bytes);
 
 internal sealed record K6QueuePressure(int IntegrationDue, int IntegrationStale, int IntegrationAmbiguous,
     int IncomingDue, int IncomingStale, int BulkReplayQueued, int BulkReplayExecuting, int ProviderPublicationDue,

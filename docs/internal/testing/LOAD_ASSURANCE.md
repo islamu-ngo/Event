@@ -160,9 +160,12 @@ the predetermined twentieth title, the unchanged separate control title/stamp,
 and unchanged published event/search results. Setup/control requests and warmup
 are outside measured iteration counts; no order or payment flow is involved.
 
-The owned workload origin is obtained only from the fixture model, pinned to
-literal loopback and independently checked in C# and JavaScript against the
-verified event IDs and exact query. Native clients disable proxies and
+The event programme obtains its direct HTTP origin only from the selected API
+resource's configured target binding through the fixture. Missing or ambiguous
+bindings fail before workload launch; the operations listener cannot be selected.
+The origin is pinned to literal loopback and independently checked in C# and
+JavaScript against the verified event IDs and exact query. The lookup foundation
+retains its existing controlled endpoint. Native clients disable proxies and
 redirects, bound response buffering to four MiB, and use finite HTTP timeouts.
 The executable digest is checked again before each workload child starts.
 The workload rejects response strings longer than 4,194,304 UTF-16 code units
@@ -179,10 +182,70 @@ The existing private operations `/metrics` endpoint is the only API metrics
 source. Diagnostic capture reads headers first and bounds the body to four MiB
 under a separate three-second deadline. Only six finite candidate family names,
 finite metric kinds and admitted `seconds`/`bytes` units can survive projection;
-HELP, labels and samples are never retained. Unknown units remain unavailable.
+HELP and arbitrary labels are never retained. Unknown units remain unavailable.
 The candidate names are not proof that the live exporter emits them. Actual
 owned series, units and reset identity must be verified before replacing this
-temporary metadata inventory with a finite numeric reader.
+candidate projection with qualified numeric interpretation.
+
+The same bounded read now attempts one finite candidate numeric shape: cumulative
+user/system CPU seconds and integral working-set bytes. Missing components,
+nonfinite/negative values, duplicates, unexpected labels or missing TYPE/UNIT
+contracts refuse numeric admission. There is no alias fallback. Parsed candidates
+remain `RuntimeSeriesUnpinned`, with `ExportContractQualified=false`,
+`ResetIdentityQualified=false` and null process PID/kernel-start identity. Their
+own monotonic capture timestamps and frequency bracket the sample. These are
+unqualified values, not API CPU measurements or counter deltas: the owning parent
+must join the actual exporter contract and independently admitted API process
+interval before any qualification. No SDK PID lead or resource name supplies that
+authority. The existing runtime subscription is reused without another package
+or metric. `CapacityEvidenceEligible` remains false.
+
+Each runtime observation also retains the actual requested `ScrapeEndpoint` as
+an untrusted lead, observed `MetricDefinitions` rows (`Name`, `Kind`, nullable
+`Unit`) and at most three `NumericSamples` rows (`Name`, `Kind`, `Unit`, nullable
+`CpuMode`, `CpuSeconds`, `Bytes`). Only the fixed user/system dimension and the
+selected family names survive projection; no raw headers, HELP, arbitrary labels
+or response bodies are retained. Integer memory values preserve their exact wire
+value. The operations URI can be an Aspire proxy. Its listening process must not
+be equated with the API host: the parent must independently bind the existing
+operations target-port lead to the admitted API process/listening socket and
+corroborate the actual exporter while it is live. For programme measurements, the
+parent also reads the actual workload child's `LOAD_ORIGIN` as an untrusted lead
+and binds its port to the same API process, kernel start, network namespace and
+exclusive listening sockets as the operations listener. A direct loopback URI
+alone does not establish that association.
+
+The same private pressure path is atomically replaced after each completed
+sample, at most once per sampling iteration followed by the one-second delay.
+There are at most 900 observations and four MiB per serialized snapshot. A mode
+600 sibling temporary file is flushed and closed before rename; a failed or
+cancelled write never exposes a partial snapshot. Live snapshots have `Final=false`
+and `Completed=false`; after sampler cancellation and join the terminal snapshot
+has `Final=true`. The terminal observation list preserves the live prefix so the
+parent can compare rows it already qualified. Publication alone does not qualify
+any row. The path is `<child TMP>/testing-assurance-modernization/continuation/load/<fixture.RunId>/pressure-<topology>.json`;
+derive RunId from the already admitted `<child TMP>/islamu-assurance/<RunId>`
+fixture root, never from a historical-output search or the parent invocation ID.
+Failed private temporary files may remain for diagnosis; only the fixed JSON path
+is a snapshot. Exporter semantics, the process/reset interval and final lifecycle
+settlement must still be independently proven before any numeric qualification.
+
+The scheduled/manual `performance-smoke.yml` lane is a separate native
+BenchmarkDotNet functional gate. It uses the existing ReleaseEngineering
+`execute-api-benchmarks` operation with mandatory final `smoke` mode and uploads
+only that parent's admitted `benchmark-summary.json` on success. The same
+operation's `baseline` mode performs one whole-nine default-job run (native API
+six plus the existing database-free query-construction three). The coordinator
+invokes it three times sequentially with fresh private custody/output roots and
+checks the admitted per-run summaries for comparability and quiet-host evidence.
+No Dry/in-process/count overrides apply to baseline. Each smoke or baseline call
+has an explicit 30-minute cap followed by 60-second SIGINT grace, a bounded
+execution choice rather than statistical-cost evidence. Three calls do not
+extend that per-call limit or authorize retries/Dry substitution. Neither mode
+runs k6 nor promotes these load
+observations. Native command/control verification, actual six-case execution,
+credential-canary scans and independent creator cleanup remain required; the
+workflow's presence is not their proof.
 
 The event programme continuously observes its own primary database through the
 existing Global factory and original native login admission. One fixed
@@ -210,11 +273,28 @@ programme records explicitly remain ineligible for capacity inference. Actual
 statistics privileges, metric availability and repeated quiescent-host timing
 remain runtime acceptance requirements.
 
-The explicit read-only owned-PostgreSQL outage profile remains unimplemented
-until native control establishes its precise opaque unavailability contract.
-No arbitrary 5xx acceptance or guessed error status is admitted. Owned-resource
-stop/start acknowledgement, health, native database query, public recovery and
-unchanged independent settlement must all be proven before closing that gate.
+After pressure and constrained writes, the explicit read-only outage step stops
+only the model-owned `postgres` resource, requires command success and observed
+Exited, then checks an anonymous owned event read. Only connection unavailability
+or the existing opaque 500/unexpected-error and 503/discovery-unavailable problem
+contracts are candidates; unexpected status, auth refusal or malformed errors fail.
+The finally path attempts restart under a separate 90-second bound even after
+caller cancellation, then requires Running, health, the native current-database
+query and exact public dataset recovery. It preserves both the original and
+recovery failure. No writes occur during the outage. Its artifact records actual
+monotonic stop/exit/start/typed-recovery offsets; this is no timing SLA. Physical
+fault behavior and the selected opaque contract remain acceptance gates.
+
+The programme enables the existing native email hosted worker for one bounded
+post-pressure dispatch. It uses the existing Runtime tenant factory and persisted
+verified recipient/membership, not synthetic human authority. Native admin status
+must show the exact original source Sent with one attempt and a delivery timestamp;
+Mailpit must contain exactly one matching receipt. The same witness is rechecked
+after database recovery and after final load repetitions. Each drain observation
+has a 30-second bound; no subject/address/tenant/outbox identity enters its retained
+aggregate. This proves only the one controlled dispatch, not every worker or a
+claim that it was pending during the database outage. Real delivery and duplicate
+checks remain unrun until the owned native scenario succeeds.
 
 ## Tool execution
 

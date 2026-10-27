@@ -1,10 +1,9 @@
 using Event.Testing.DataProtection;
 using Explore.ServiceDefaults.DataProtection;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
+using Explore.ServiceDefaults.Secrets;
 
-namespace Explore.Secrets.UnitTests.Services;
+namespace Explore.Infrastructure.Tests.Secrets;
 
 [NotInParallel]
 public sealed class ExternalDataProtectionSourceTests
@@ -20,17 +19,22 @@ public sealed class ExternalDataProtectionSourceTests
             ["EVENT_DP_API_ADMISSION_SHA256"] = authority.Input.AdmissionSha256,
             ["EVENT_DP_API_MINIMUM_GENERATION"] = "1"
         });
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        using var configuration = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["SECRET_PROVIDER"] = "Environment",
             ["EVENT_DP_API_RING"] = authority.Input.Ring,
             ["EVENT_DP_API_ADMISSION"] = authority.Input.Admission
         }).Build();
-        var source = new ExternalDataProtectionSource(configuration, new HostEnvironment(), new("api"));
+        await using var owner = await SecretAuthorityBootstrap.OpenAsync(
+            configuration, "Production", SecretConsumerRole.Api,
+            [new("/runtime/api/authentication/keycloak", "KEYCLOAK_ENDPOINT", "KEYCLOAK_ENDPOINT")],
+            new SecretAuthorityLoginAttempt());
+        var source = new ExternalDataProtectionSource(owner, new("api"));
+        await source.PrepareAsync();
         using var provider = ExternalDataProtectionProvider.Create(source.Read(), "api", TimeProvider.System);
         await Assert.That(provider.KeyCount).IsEqualTo(1);
         Environment.SetEnvironmentVariable("EVENT_DP_API_RING", null);
-        await Assert.That(() => source.Read()).Throws<InvalidOperationException>();
+        await Assert.That(async () => await source.ReadFreshAsync()).Throws<InvalidOperationException>();
     }
 
     [Test]
@@ -44,12 +48,15 @@ public sealed class ExternalDataProtectionSourceTests
             ["EVENT_DP_API_ADMISSION_SHA256"] = authority.Input.AdmissionSha256,
             ["EVENT_DP_API_MINIMUM_GENERATION"] = "1"
         });
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        using var configuration = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["SECRET_PROVIDER"] = "UserSecrets"
         }).Build();
-        var source = new ExternalDataProtectionSource(configuration, new HostEnvironment(), new("api"));
-        await Assert.That(() => source.Read()).Throws<InvalidOperationException>();
+        await Assert.That(async () => await SecretAuthorityBootstrap.OpenAsync(
+            configuration, "Production", SecretConsumerRole.Api,
+            [new("/runtime/api/authentication/keycloak", "KEYCLOAK_ENDPOINT", "KEYCLOAK_ENDPOINT")],
+            new SecretAuthorityLoginAttempt()))
+            .Throws<InvalidOperationException>();
     }
 
     [Test]
@@ -63,13 +70,17 @@ public sealed class ExternalDataProtectionSourceTests
             ["EVENT_DP_API_ADMISSION_SHA256"] = null,
             ["EVENT_DP_API_MINIMUM_GENERATION"] = "1"
         });
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        using var configuration = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["SECRET_PROVIDER"] = "Environment",
             ["EVENT_DP_API_ADMISSION_SHA256"] = authority.Input.AdmissionSha256
         }).Build();
-        var source = new ExternalDataProtectionSource(configuration, new HostEnvironment(), new("api"));
-        await Assert.That(() => source.Read()).Throws<InvalidOperationException>();
+        await using var owner = await SecretAuthorityBootstrap.OpenAsync(
+            configuration, "Production", SecretConsumerRole.Api,
+            [new("/runtime/api/authentication/keycloak", "KEYCLOAK_ENDPOINT", "KEYCLOAK_ENDPOINT")],
+            new SecretAuthorityLoginAttempt());
+        var source = new ExternalDataProtectionSource(owner, new("api"));
+        await Assert.That(async () => await source.PrepareAsync()).Throws<InvalidOperationException>();
     }
 
     private sealed class EnvironmentScope : IDisposable
@@ -87,13 +98,5 @@ public sealed class ExternalDataProtectionSourceTests
         {
             foreach (var pair in previous) Environment.SetEnvironmentVariable(pair.Key, pair.Value);
         }
-    }
-
-    private sealed class HostEnvironment : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = Environments.Production;
-        public string ApplicationName { get; set; } = "DataProtectionSourceTests";
-        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

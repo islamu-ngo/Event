@@ -1551,6 +1551,35 @@ an environment variable cannot silently select it. The ordinary design-time
 path continues to require the explicitly selected secret authority for database
 operations. Do not invent credentials merely to construct a model.
 
+The same explicit offline branch is available in the Data Protection, external
+identity and external/co-located PostgreSQL erasure factories. Identity uses
+`IdentityDatabase:Provider` and requires an explicit valid
+`IdentityDatabase:Schema`; MySQL/MariaDB also needs
+`IdentityDatabase:ServerVersion`. Offline construction proves model availability,
+not database connectivity or a migration round-trip.
+
+Credential-bearing factories use Persistence's `MigrationDatabaseAcquisition`
+with the compiled `Migration` consumer. The EF interface is synchronous, so one
+two-minute cancellation-bounded bridge awaits acquisition at that interface;
+configuration-provider `Load` never performs this work. The migration service
+instead awaits acquisition directly before composing database services and
+retains its owner until host disposal. Neither short-lived path starts token
+maintenance.
+
+The serving-host exception is separate: one SecretKit helper may maintain each
+selected process-local Infisical session's token. It is not a Quartz job, secret
+refresh sweep or recovery login. Its health must not be interpreted as database
+readiness or fleet convergence. A failed/uncertain renewal requires explicit
+recovery, not a retry loop, another identity or replay of pending application
+mutations. Local authorities require no authentication-maintenance worker.
+
+Acquisition exports only admitted structured database fields from the selected
+authority. Absent optional fields remain absent; malformed, denied or unavailable
+fields cannot become absence. Explicit empty fields fail instead of activating
+another alias. Lower-priority application settings, command-line credentials
+and raw connection strings cannot rescue missing authority data. Provider and
+topology validation remains in the existing Persistence binders.
+
 Run these commands from the repository root. They use the current `src/`
 project paths and cover every generated catalog:
 
@@ -1569,7 +1598,8 @@ migrator role. Starting the `local-core` Aspire profile does **not** inject its
 child-process environment into a separate terminal. Launch the shell or each
 command through the repository's Infisical-backed environment first. For the
 shared local User Secrets authority, populate the complete structured database
-contract in `src/Explore.Secrets`, then export
+contract in the shared `event-shared-secrets` store using `src/Explore.API` as
+the CLI owner, then export
 `SECRET_PROVIDER=UserSecrets` and `DOTNET_ENVIRONMENT=Development` in the EF shell.
 User Secrets is rejected when that environment is absent or Production, and store
 changes require restarting the EF command. The commands below deliberately override

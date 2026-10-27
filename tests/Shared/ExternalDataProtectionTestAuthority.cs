@@ -34,6 +34,18 @@ internal sealed class ExternalDataProtectionTestAuthority : IExternalDataProtect
 
     public ExternalDataProtectionInput Read() => Input;
 
+    public ValueTask PrepareAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<ExternalDataProtectionInput> ReadFreshAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(Input);
+    }
+
     private sealed class Repository : IXmlRepository
     {
         private readonly List<XElement> documents = [];

@@ -3,44 +3,46 @@ namespace Explore.API.Extensions;
 using Explore.Application.Configuration;
 using Explore.Domain.Constants;
 using Explore.Domain.Secrets;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
 
 public static class ConfigurationExtensions
 {
-    /// <summary>
-    /// Maps the selected secret authority to authoritative keys and returns isolated runtime provider configuration.
-    /// </summary>
-    public static IConfiguration AddSecretAuthorityConfiguration(
+    /// <summary>Awaits selected startup groups before publishing authoritative API mappings.</summary>
+    public static async ValueTask AddPreparedApiConfigurationAsync(
         this IConfigurationBuilder configBuilder,
-        string environmentName,
-        SecretConsumer consumer = SecretConsumer.Api)
+        Explore.ServiceDefaults.Secrets.SecretAuthorityAcquisition owner,
+        CancellationToken cancellationToken = default)
     {
-        var bootstrapConfig = configBuilder.Build();
-        _ = PrivacyErasureDurabilityOptions.FromConfiguration(bootstrapConfig);
-        IConfiguration authority = SecretAuthorityConfiguration.Build(
-            bootstrapConfig,
-            environmentName,
-            consumer,
-            SecretAcquisitionPolicy.Roots(consumer).ToArray());
+        ArgumentNullException.ThrowIfNull(configBuilder);
+        ArgumentNullException.ThrowIfNull(owner);
+        var bootstrapConfiguration = configBuilder.Build();
+        _ = PrivacyErasureDurabilityOptions.FromConfiguration(bootstrapConfiguration);
+        var staged = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        string[] requiredRoots = Explore.ServiceDefaults.Secrets.SecretAcquisitionPolicy
+            .Roots(Explore.ServiceDefaults.Secrets.SecretConsumerRole.Api)
+            .Where(root => root is not ("/smtp" or "/analytics")).ToArray();
+        IReadOnlyList<string>[] groups = [requiredRoots, ["/smtp"], ["/analytics"]];
+        for (int index = 0; index < groups.Length; index++)
+        {
+            var prepared = await owner.PrepareConfigurationGroupAsync(groups[index], cancellationToken).ConfigureAwait(false);
+            if (!prepared.IsSuccess)
+            {
+                if (prepared.Status == SecretKit.Core.SecretStatus.Absent || index > 0)
+                    continue;
+                throw new InvalidOperationException("secret_api_configuration_unavailable");
+            }
+            foreach (var pair in prepared.Value)
+            {
+                if (!staged.TryAdd(pair.Key, pair.Value))
+                    throw new InvalidOperationException("secret_api_configuration_collision");
+            }
+        }
+        var authorityBuilder = new ConfigurationBuilder().AddInMemoryCollection(staged);
+        PrivacyErasureAuthorityDatabaseConfiguration.ProjectDiscreteConfiguration(authorityBuilder);
+        using var authority = (ConfigurationRoot)authorityBuilder.Build();
         _ = PrivacyErasureDurabilityOptions.FromConfiguration(authority);
-        var isolatedAuthority = new ConfigurationBuilder().AddConfiguration(authority);
-        PrivacyErasureAuthorityDatabaseConfiguration.ProjectDiscreteConfiguration(isolatedAuthority);
-        ApplyMapping(configBuilder, isolatedAuthority.Build(), bootstrapConfig);
-
-        // Runtime provider binding must use the authority and bootstrap source that loaded
-        // startup secrets, not lower-priority settings or a vault-supplied provider selector.
-        var runtimeProvider = bootstrapConfig.GetSection("SecretProvider:Infisical").AsEnumerable()
-            .ToDictionary(pair => pair.Key, _ => (string?)null, StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in authority.GetSection(SecretProviderOptions.SectionName).AsEnumerable())
-            runtimeProvider[pair.Key] = pair.Value;
-        configBuilder.AddInMemoryCollection(runtimeProvider);
-
-        // Null overlays hide values, not collection children. Bind the provider from a
-        // separate root so suppressed paths cannot become null members at runtime.
-        return new ConfigurationBuilder()
-            .AddInMemoryCollection(runtimeProvider.Where(pair => pair.Value is not null))
-            .Build();
+        cancellationToken.ThrowIfCancellationRequested();
+        ApplyMapping(configBuilder, authority, bootstrapConfiguration);
     }
 
     /// <summary>
@@ -287,7 +289,7 @@ public static class ConfigurationExtensions
 
         static void TrySet(IDictionary<string, string?> dict, IConfiguration root, string key, string? value)
         {
-            if (!string.IsNullOrWhiteSpace(root[key]))
+            if (root[key] is not null)
             {
                 dict[key] = root[key];
                 return;

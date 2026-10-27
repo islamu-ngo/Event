@@ -339,12 +339,56 @@ public sealed class SecretKitNativeWriterTests
     }
 
     [Test]
-    [Arguments(true)]
-    [Arguments(false)]
-    public async Task WrongConsumerCannotBorrowAnotherHostsWriteAuthority(bool setup)
+    [Arguments(SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)]
+    [Arguments(SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret)]
+    public async Task ApiCanUpdateCanonicalCredentialsWithoutFrontendReadAuthority(string key)
+    {
+        await using var fixture = await WriterFixture.OpenAsync(key, consumer: SecretConsumerRole.Api);
+        Func<Task> readFrontend = async () =>
+        {
+            var result = await fixture.Owner.PrepareGroupAsync(
+                [new(fixture.Definition.DefaultInfisicalPath, fixture.Definition.DefaultInfisicalKey, "Credential")]);
+            if (result.IsSuccess) result.Value.Dispose();
+        };
+        var deniedRead = await Assert.That(readFrontend).Throws<InvalidOperationException>();
+        await Assert.That(deniedRead!.Message).IsEqualTo("secret_consumer_scope_invalid");
+        fixture.PatchReleased.TrySetResult();
+
+        await Assert.That(await fixture.WriteAsync()).IsTrue();
+        await Assert.That(fixture.Attempt.Evidence).IsEqualTo(SecretMutationEvidence.Applied);
+        await Assert.That(fixture.Patches).IsEqualTo(1);
+        await Assert.That(fixture.MatchedTargetAndValue).IsTrue();
+        await Assert.That(fixture.UnexpectedRequests).IsEqualTo(0);
+        await Assert.That(fixture.Logins).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(SecretAuthorityKind.Environment)]
+    [Arguments(SecretAuthorityKind.UserSecrets)]
+    public async Task ApiLocalAuthorityRequiresExplicitOperatorInjection(SecretAuthorityKind provider)
+    {
+        await using var fixture = await WriterFixture.OpenAsync(
+            SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret,
+            consumer: SecretConsumerRole.Api, provider: provider);
+        var capability = await new AuthenticationRuntimeSecretWriter(
+            fixture.Bindings, fixture.Owner, fixture.Resolver).GetWriteCapabilityAsync(
+                AuthenticationRuntimeSecretTarget.GoogleClientSecret);
+
+        await Assert.That(capability.Outcome).IsEqualTo(AuthenticationRuntimeWriteOutcome.OperatorInjectionRequired);
+        await Assert.That(capability.OperatorVariable).IsEqualTo(fixture.Definition.DefaultEnvironmentVariableName);
+        await Assert.That(fixture.Patches).IsEqualTo(0);
+        await Assert.That(fixture.Logins).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(true, SecretConsumerRole.Bff)]
+    [Arguments(true, SecretConsumerRole.Migration)]
+    [Arguments(false, SecretConsumerRole.Bff)]
+    [Arguments(false, SecretConsumerRole.Migration)]
+    public async Task WrongConsumerCannotBorrowAnotherHostsWriteAuthority(bool setup, SecretConsumerRole consumer)
     {
         await using var fixture = await WriterFixture.OpenAsync(Key(setup),
-            consumer: setup ? SecretConsumerRole.Bff : SecretConsumerRole.Api);
+            consumer: consumer);
 
         await Assert.That(await fixture.WriteAsync()).IsFalse();
         await Assert.That(fixture.Attempt.Evidence).IsEqualTo(SecretMutationEvidence.NotDispatched);

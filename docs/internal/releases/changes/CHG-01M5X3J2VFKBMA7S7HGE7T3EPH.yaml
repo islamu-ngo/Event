@@ -1,0 +1,32 @@
+Change-Id: CHG-01M5X3J2VFKBMA7S7HGE7T3EPH
+Title: "Activate native serving secret owners and prepared Data Protection"
+Type: feat
+Scope: self-hosting
+Summary: "Prepare API, BFF and Combined secrets and Data Protection before serving; use explicit per-consumer token maintenance and authorized recovery instead of secret polling or implicit relogin."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: Select each host authority explicitly and supply its lifetime policy and Data Protection admission inputs; synchronous secret loading, broad refresh polling and implicit relogin are retired.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: One selected owner controls each process; Combined shares its owner, synchronous consumers use prepared memory, and Data Protection verifies independent admission pins and generation floors without authority fallback. Native comparison revisions remain owner-bound; late or compacted read observations cannot replace admitted evidence.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+    Detail: Host activation changes no persisted schema; the retained mutation-evidence migration is tracked separately.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Configure API, BFF and Combined consumer inputs, finite or periodic Infisical token policy, and independent Data Protection ring admission; startup-bound changes require coordinated restart.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Native host preparation and authentication maintenance do not add public HTTP schemas.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/secrets.md
+    Disposition: documented
+    Detail: After expiry or uncertain renewal use explicit authorized recovery; do not retry secret writes through relogin or infer fleet, actor-ACL or image qualification from local preparation.

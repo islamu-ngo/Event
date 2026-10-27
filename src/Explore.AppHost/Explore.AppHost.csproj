@@ -14,7 +14,6 @@
     <PackageReference Include="Aspire.Hosting.RabbitMQ" />
     <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="DotNetEnv" />
-    <PackageReference Include="Infisical.Sdk" />
     <PackageReference Include="MessagePack" />
     <PackageReference Include="SonarAnalyzer.CSharp">
       <PrivateAssets>all</PrivateAssets>
@@ -28,7 +27,8 @@
     <ProjectReference Include="..\Explore.API\Explore.API.csproj" />
     <ProjectReference Include="..\Explore.Blazor\Explore.Blazor.csproj" />
     <ProjectReference Include="..\Explore.Infrastructure\Explore.Infrastructure.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\Explore.Secrets\Explore.Secrets.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\Explore.Persistence\Explore.Persistence.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 
 </Project>

@@ -7,6 +7,9 @@ using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Explore.Blazor.Services;
 using Explore.ServiceDefaults.Configuration;
+using Explore.ServiceDefaults.DataProtection;
+using Explore.ServiceDefaults.Secrets;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MudBlazor.Services;
@@ -16,6 +19,50 @@ namespace Explore.Blazor.Hosting;
 
 public static class BlazorHostServiceCollectionExtensions
 {
+    private sealed record BffSecretPreparation(SecretAuthorityAcquisition Owner);
+
+    /// <summary>Prepares frontend credentials and the serving partition before host services can consume them.</summary>
+    public static async ValueTask PrepareBlazorHostSecretsAsync(
+        this WebApplicationBuilder builder,
+        BlazorHostProfile profile,
+        SecretAuthorityAcquisition? owner,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (owner is null)
+        {
+            if (builder.Environment.IsEnvironment("Testing"))
+                return;
+            throw new InvalidOperationException("bff_secret_preparation_required");
+        }
+        SecretConsumerRole expectedConsumer = profile switch
+        {
+            BlazorHostProfile.Split => SecretConsumerRole.Bff,
+            BlazorHostProfile.Combined => SecretConsumerRole.Combined,
+            _ => throw new InvalidOperationException("secret_consumer_scope_invalid")
+        };
+        if (owner.Selection.Consumer != expectedConsumer
+            || !string.Equals(owner.Selection.EnvironmentName, builder.Environment.EnvironmentName,
+                StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("secret_consumer_scope_invalid");
+        var receipts = new AuthenticationCredentialAcquisitionReceipts(
+            owner.Selection.AuthenticationProfileRevision);
+        await builder.Configuration.AddPreparedBffConfigurationAsync(owner, receipts, cancellationToken);
+        if (profile == BlazorHostProfile.Split)
+            await builder.Services.PrepareExternalDataProtectionAsync(owner, "bff", cancellationToken);
+        else if (!builder.Services.Any(descriptor =>
+            descriptor.ServiceType == typeof(SecretAuthorityAcquisition)
+            && ReferenceEquals(descriptor.ImplementationInstance, owner))
+            || !builder.Services.Any(descriptor =>
+                descriptor.ImplementationInstance is ExternalDataProtectionPartition { Name: "combined" }))
+            throw new InvalidOperationException("api_secret_preparation_required");
+        cancellationToken.ThrowIfCancellationRequested();
+        builder.Services.TryAddSingleton(owner);
+        builder.Services.AddSingleton(receipts);
+        builder.Services.AddSingleton(new BffSecretPreparation(owner));
+    }
+
     public static WebApplicationBuilder AddBlazorHostServices(
         this WebApplicationBuilder builder,
         BlazorHostProfile profile,
@@ -89,11 +136,20 @@ public static class BlazorHostServiceCollectionExtensions
                 ["SecretProvider:Provider"] = "Environment"
             });
         }
-        var acquisitionReceipts = new AuthenticationCredentialAcquisitionReceipts(
-            Guid.TryParse(Environment.GetEnvironmentVariable("AUTHENTICATION_CREDENTIAL_PROFILE_REVISION"),
-                out Guid profileRevision) && profileRevision != Guid.Empty ? profileRevision : null);
-        builder.Configuration.AddSecretAuthorityConfiguration(builder.Environment.EnvironmentName, acquisitionReceipts);
-        builder.Services.AddSingleton(acquisitionReceipts);
+        _ = SecretAuthoritySelection.Select(builder.Configuration, builder.Environment.EnvironmentName,
+            profile == BlazorHostProfile.Split ? SecretConsumerRole.Bff : SecretConsumerRole.Combined);
+        if (!builder.Environment.IsEnvironment("Testing"))
+        {
+            var preparation = builder.Services.Select(descriptor => descriptor.ImplementationInstance)
+                .OfType<BffSecretPreparation>().SingleOrDefault();
+            if (preparation is null
+                || preparation.Owner.Selection.Consumer !=
+                    (profile == BlazorHostProfile.Split ? SecretConsumerRole.Bff : SecretConsumerRole.Combined)
+                || !string.Equals(preparation.Owner.Selection.EnvironmentName,
+                    builder.Environment.EnvironmentName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("bff_secret_preparation_required");
+        }
+        builder.Services.TryAddSingleton<AuthenticationCredentialAcquisitionReceipts>();
 
         builder.Services.AddMudServices(config =>
         {

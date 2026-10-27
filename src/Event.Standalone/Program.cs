@@ -5,7 +5,7 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;
-using Explore.Secrets.Configuration;
+using Explore.ServiceDefaults.Secrets;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Event.Standalone.Hosting;
 using Event.Standalone.Middleware;
@@ -16,6 +16,14 @@ var shutdownState = new GracefulShutdownState();
 using var shutdownCts = shutdownState.CancellationTokenSource;
 var builder = WebApplication.CreateBuilder(args);
 ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(builder.Configuration, builder.Environment, isStandaloneHost: true);
+await using var secretAuthority = builder.Environment.IsEnvironment("Testing")
+    || ApiHostServiceCollectionExtensions.IsBuildTimeOpenApiGeneration ? null
+    : await SecretAuthorityBootstrap.OpenAsync(builder.Configuration, builder.Environment.EnvironmentName,
+        SecretConsumerRole.Combined,
+        [new("/runtime/bff/oidc/keycloak", "KEYCLOAK_ENDPOINT", "KEYCLOAK_ENDPOINT")],
+        new SecretAuthorityLoginAttempt(), cancellationToken: shutdownCts.Token);
+if (secretAuthority is not null)
+    await secretAuthority.StartAuthenticationMaintenanceAsync(shutdownCts.Token);
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     foreach (var migrationAssembly in Directory.EnumerateFiles(
@@ -26,11 +34,13 @@ if (!builder.Environment.IsEnvironment("Testing"))
     }
 }
 
+await builder.PrepareApiHostSecretsAsync(secretAuthority, SecretConsumerRole.Combined, shutdownCts.Token);
 var apiHost = builder.AddApiHostServices(
     () => shutdownState.IsShuttingDown,
     ownsDevelopmentMigrations: false,
-    secretConsumer: SecretConsumer.Combined,
+    secretConsumer: SecretConsumerRole.Combined,
     ownsConfigurationManifestStartup: false);
+await builder.PrepareBlazorHostSecretsAsync(hostProfile, secretAuthority, shutdownCts.Token);
 builder.AddBlazorHostServices(hostProfile, shutdownState);
 builder.Services.AddCombinedApiDataProtection();
 builder.Services.AddCombinedApiBridge();

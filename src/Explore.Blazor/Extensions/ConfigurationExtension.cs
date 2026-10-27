@@ -1,144 +1,62 @@
 using Explore.Blazor.Configuration;
 using Explore.Blazor.Services.Auth;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
+using Explore.ServiceDefaults.Secrets;
 
 namespace Explore.Blazor.Extensions;
 
 public static class ConfigurationExtensions
 {
-    public static IConfigurationBuilder AddInfisical(
-        this IConfigurationBuilder builder,
-        IConfiguration configuration,
-        Action<InfisicalConfigurationSource>? configure = null,
-        string? environmentName = null)
-    {
-        var resolvedEnv = environmentName
-            ?? configuration["DOTNET_ENVIRONMENT"]
-            ?? configuration["ASPNETCORE_ENVIRONMENT"]
-            ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
-            ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
-            ?? Environments.Production;
-
-        var projectId = ReadBootstrapValue("ProjectId", "INFISICAL_PROJECT_ID", configuration, resolvedEnv);
-        var clientId = ReadBootstrapValue("ClientId", "INFISICAL_CLIENT_ID", configuration, resolvedEnv);
-        var clientSecret = ReadBootstrapValue("ClientSecret", "INFISICAL_CLIENT_SECRET", configuration, resolvedEnv);
-        var url = ReadBootstrapValue("Url", "INFISICAL_URL", configuration, resolvedEnv);
-        var environment = ReadBootstrapValue("Environment", "INFISICAL_ENV", configuration, resolvedEnv);
-
-        if (string.IsNullOrEmpty(projectId)
-            || string.IsNullOrEmpty(clientId)
-            || string.IsNullOrEmpty(clientSecret)
-            || string.IsNullOrEmpty(url)
-            || string.IsNullOrEmpty(environment))
-        {
-            throw new InvalidOperationException(
-                "Infisical authority requires an explicit URL, environment, project, and universal-auth credentials.");
-        }
-
-        var source = new InfisicalConfigurationSource
-        {
-            Url = url,
-            ProjectId = projectId,
-            ClientId = clientId,
-            ClientSecret = clientSecret,
-            Environment = environment,
-        };
-
-        var paths = configuration.GetSection("SecretProvider:Infisical:Paths").Get<List<string>>();
-        if (paths is { Count: > 0 })
-        {
-            source.Paths.Clear();
-            source.Paths.AddRange(paths);
-        }
-
-        configure?.Invoke(source);
-        source.Url = url;
-        source.ProjectId = projectId;
-        source.ClientId = clientId;
-        source.ClientSecret = clientSecret;
-        source.Environment = environment;
-        return builder.Add(source);
-    }
-
-    /// <summary>
-    /// Adds Infisical secrets and maps them to standard .NET configuration keys for Blazor Server.
-    /// </summary>
-    public static void AddSecretAuthorityConfiguration(
+    /// <summary>Stages complete frontend groups from the admitted owner before publishing any mapping.</summary>
+    public static async ValueTask AddPreparedBffConfigurationAsync(
         this IConfigurationBuilder configBuilder,
-        string environmentName,
-        AuthenticationCredentialAcquisitionReceipts? receipts = null)
+        SecretAuthorityAcquisition owner,
+        AuthenticationCredentialAcquisitionReceipts receipts,
+        CancellationToken cancellationToken = default)
     {
-        var bootstrapConfig = configBuilder.Build();
-        string? configuredProvider = bootstrapConfig["SecretProvider:Provider"]
-            ?? bootstrapConfig["SECRET_PROVIDER"];
-
-        if (string.IsNullOrEmpty(configuredProvider) && IsDevelopmentOrTesting(environmentName))
+        ArgumentNullException.ThrowIfNull(configBuilder);
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(receipts);
+        SecretAcquisitionEntry[][] groups =
+        [
+            [new("/runtime/bff/oidc/keycloak", "KEYCLOAK_ENDPOINT", "KEYCLOAK_ENDPOINT"),
+             new("/runtime/bff/oidc/keycloak", "KEYCLOAK_REALM", "KEYCLOAK_REALM"),
+             new("/runtime/bff/oidc/keycloak", "KEYCLOAK_CLIENT_ID", "KEYCLOAK_CLIENT_ID"),
+             new("/runtime/bff/oidc/keycloak", "KEYCLOAK_BLAZOR_CLIENT_SECRET", "KEYCLOAK_BLAZOR_CLIENT_SECRET")],
+            [new("/runtime/bff/oidc/google", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID"),
+             new("/runtime/bff/oidc/google", "GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET")],
+            [new("/runtime/bff/atproto/oauth", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS", "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS")]
+        ];
+        var staged = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (SecretAcquisitionEntry[] group in groups)
         {
-            var userSecrets = new ConfigurationBuilder()
-                .AddUserSecrets("event-shared-secrets", reloadOnChange: false)
-                .Build();
-            configuredProvider = userSecrets["SecretProvider:Provider"]
-                ?? userSecrets["SECRET_PROVIDER"];
-
-            if (string.IsNullOrEmpty(configuredProvider)
-                && (!string.IsNullOrEmpty(userSecrets["Infisical:ClientId"])
-                    || !string.IsNullOrEmpty(userSecrets["SecretProvider:Infisical:ClientId"])
-                    || !string.IsNullOrEmpty(userSecrets["INFISICAL_CLIENT_ID"])
-                    || !string.IsNullOrEmpty(bootstrapConfig["Infisical:ClientId"])
-                    || !string.IsNullOrEmpty(bootstrapConfig["SecretProvider:Infisical:ClientId"])
-                    || !string.IsNullOrEmpty(bootstrapConfig["INFISICAL_CLIENT_ID"])))
+            var result = await owner.PrepareAvailableGroupAsync(group, cancellationToken).ConfigureAwait(false);
+            if (!result.IsSuccess)
             {
-                configuredProvider = "Infisical";
+                if (result.Status == SecretKit.Core.SecretStatus.Absent)
+                    continue;
+                throw new InvalidOperationException("bff_secret_authority_unavailable");
             }
+            using var lease = result.Value;
+            if (group.Any(entry => string.IsNullOrWhiteSpace(lease.Configuration[entry.ConfigurationKey])
+                || lease.Configuration[entry.ConfigurationKey]!.Contains("${", StringComparison.Ordinal)))
+                throw new InvalidOperationException("bff_secret_authority_unavailable");
+            foreach (SecretAcquisitionEntry entry in group)
+                staged.Add(entry.ConfigurationKey, lease.Configuration[entry.ConfigurationKey]);
         }
-
-        if (string.Equals(configuredProvider, "Environment", StringComparison.OrdinalIgnoreCase))
+        using var configuration = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(staged).Build();
+        cancellationToken.ThrowIfCancellationRequested();
+        var authority = owner.Provider switch
         {
-            ApplyBlazorMapping(
-                configBuilder,
-                new ConfigurationBuilder().AddEnvironmentVariables().Build(),
-                fromInfisical: false, receipts,
-                AuthenticationCredentialAcquisitionReceipts.Authority.Environment);
-            return;
-        }
-
-        if (string.Equals(configuredProvider, "UserSecrets", StringComparison.OrdinalIgnoreCase))
-        {
-            if (!IsDevelopmentOrTesting(environmentName))
-            {
-                throw new InvalidOperationException("secret_authority_user_secrets_environment_invalid");
-            }
-
-            ApplyBlazorMapping(
-                configBuilder,
-                new ConfigurationBuilder()
-                    .AddUserSecrets("event-shared-secrets", reloadOnChange: false)
-                    .Build(),
-                fromInfisical: false, receipts,
-                AuthenticationCredentialAcquisitionReceipts.Authority.UserSecrets);
-            return;
-        }
-
-        if (!string.Equals(configuredProvider, "Infisical", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                "SecretProvider:Provider must explicitly select Environment, Infisical, or UserSecrets.");
-        }
-
-        var authorityBuilder = new ConfigurationBuilder();
-        authorityBuilder.AddInfisical(bootstrapConfig, source =>
-        {
-            source.Paths.Clear();
-            source.Paths.AddRange(
-                ["/runtime/bff/oidc/keycloak", "/runtime/bff/oidc/google", "/runtime/bff/atproto/oauth"]);
-        }, environmentName);
-        ApplyBlazorMapping(configBuilder, authorityBuilder.Build(), fromInfisical: true, receipts,
-            AuthenticationCredentialAcquisitionReceipts.Authority.Infisical);
+            SecretAuthorityKind.Environment => AuthenticationCredentialAcquisitionReceipts.Authority.Environment,
+            SecretAuthorityKind.UserSecrets => AuthenticationCredentialAcquisitionReceipts.Authority.UserSecrets,
+            SecretAuthorityKind.Infisical => AuthenticationCredentialAcquisitionReceipts.Authority.Infisical,
+            _ => throw new InvalidOperationException("secret_authority_selection_invalid")
+        };
+        ApplyBlazorMapping(configBuilder, configuration, receipts, authority, configBuilder.Build());
     }
 
     /// <summary>
-    /// Maps Infisical secret names to .NET configuration keys for Blazor Server.
+    /// Maps complete native frontend groups without importing raw authority configuration.
     /// </summary>
     /// <remarks>
     /// Standard Infisical keys:
@@ -149,47 +67,21 @@ public static class ConfigurationExtensions
     private static void ApplyBlazorMapping(
         IConfigurationBuilder configBuilder,
         IConfiguration config,
-        bool fromInfisical,
-        AuthenticationCredentialAcquisitionReceipts? receipts,
-        AuthenticationCredentialAcquisitionReceipts.Authority authority)
+        AuthenticationCredentialAcquisitionReceipts receipts,
+        AuthenticationCredentialAcquisitionReceipts.Authority authority,
+        IConfiguration ordinary)
     {
-        var rawRealm = config[fromInfisical ? "Keycloak:Realm" : "KEYCLOAK_REALM"];
-        var rawKeycloakClientId = config[fromInfisical ? "Keycloak:ClientId" : "KEYCLOAK_CLIENT_ID"];
-        var rawClientSecret = config[fromInfisical ? "Keycloak:BlazorClientSecret" : "KEYCLOAK_BLAZOR_CLIENT_SECRET"];
-        var rawGoogleClientId = config[fromInfisical ? "Google:ClientId" : "GOOGLE_CLIENT_ID"];
-        var rawGoogleClientSecret = config[fromInfisical ? "Google:ClientSecret" : "GOOGLE_CLIENT_SECRET"];
-        var rawApiUrl = config[fromInfisical ? "Blazor:ApiEndpoint" : "API_ENDPOINT"];
-        var rawAuthProvider = config[fromInfisical ? "Blazor:AuthenticationProvider" : "AUTHENTICATION_PROVIDER"]
-            ?? config["AUTHENTICATION_PROVIDER"]
-            ?? config["Authentication:Provider"];
-        var rawAtprotoOAuthClientPrivateJwks = config[
-            fromInfisical ? "Atproto:OauthClientPrivateJwks" : "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS"];
+        var rawRealm = config["KEYCLOAK_REALM"];
+        var rawClientSecret = config["KEYCLOAK_BLAZOR_CLIENT_SECRET"];
+        var rawGoogleClientSecret = config["GOOGLE_CLIENT_SECRET"];
+        var rawApiUrl = ordinary["API_ENDPOINT"];
+        var rawAuthProvider = ordinary["AUTHENTICATION_PROVIDER"]
+            ?? ordinary["Authentication:Provider"];
+        var rawAtprotoOAuthClientPrivateJwks = config["ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS"];
         var hasAspireApiReference =
-            !string.IsNullOrWhiteSpace(GetAspireApiReference(config, "http"))
-            || !string.IsNullOrWhiteSpace(GetAspireApiReference(config, "https"));
-        var baseUrl = config[fromInfisical ? "Keycloak:Endpoint" : "KEYCLOAK_ENDPOINT"];
-
-        var hasKeycloakInput =
-            !string.IsNullOrWhiteSpace(baseUrl)
-            || !string.IsNullOrWhiteSpace(rawRealm)
-            || !string.IsNullOrWhiteSpace(rawKeycloakClientId)
-            || !string.IsNullOrWhiteSpace(rawClientSecret);
-
-        string? keycloakAuthority = null;
-        if (!string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(rawRealm))
-        {
-            keycloakAuthority = $"{baseUrl.TrimEnd('/')}/realms/{rawRealm}";
-        }
-
-        var keycloakClientId = rawKeycloakClientId;
-        if (string.IsNullOrWhiteSpace(keycloakClientId) && !string.IsNullOrWhiteSpace(keycloakAuthority))
-        {
-            keycloakClientId = "islamu-event-blazor";
-        }
-
-        var metadataAddress = string.IsNullOrWhiteSpace(keycloakAuthority)
-            ? null
-            : $"{keycloakAuthority}/.well-known/openid-configuration";
+            !string.IsNullOrWhiteSpace(GetAspireApiReference(ordinary, "http"))
+            || !string.IsNullOrWhiteSpace(GetAspireApiReference(ordinary, "https"));
+        var baseUrl = config["KEYCLOAK_ENDPOINT"];
 
         var mappedConfig = new Dictionary<string, string?>
         {
@@ -202,86 +94,34 @@ public static class ConfigurationExtensions
             mappedConfig[AtprotoClientKeyProvider.ConfigurationKey] = rawAtprotoOAuthClientPrivateJwks;
         }
 
-        void TrySet(IDictionary<string, string?> dict, IConfiguration root, string key, string? value)
+        if (rawClientSecret is not null)
         {
-            if (string.IsNullOrWhiteSpace(value)
-                || (!fromInfisical && !string.IsNullOrEmpty(root[key])))
-                return;
-            dict[key] = value;
+            string keycloakAuthority = $"{baseUrl!.TrimEnd('/')}/realms/{rawRealm}";
+            mappedConfig["Keycloak:Realm"] = rawRealm;
+            mappedConfig["Keycloak:Authority"] = keycloakAuthority;
+            mappedConfig["Keycloak:MetadataAddress"] = $"{keycloakAuthority}/.well-known/openid-configuration";
+            mappedConfig["Keycloak:ClientId"] = config["KEYCLOAK_CLIENT_ID"];
         }
 
-        // Keycloak
-        if (hasKeycloakInput)
+        if (rawGoogleClientSecret is not null)
+            mappedConfig["Google:ClientId"] = config["GOOGLE_CLIENT_ID"];
+
+        if (!hasAspireApiReference && !string.IsNullOrWhiteSpace(rawApiUrl)
+            && string.IsNullOrEmpty(ordinary["ExploreApi:BaseUrl"]))
         {
-            TrySet(mappedConfig, config, "Keycloak:Realm", rawRealm);
-            TrySet(mappedConfig, config, "Keycloak:Authority", keycloakAuthority);
-            TrySet(mappedConfig, config, "Keycloak:MetadataAddress", metadataAddress);
-            TrySet(mappedConfig, config, "Keycloak:ClientId", keycloakClientId);
-            TrySet(mappedConfig, config, "Keycloak:RequireHttpsMetadata", "true");
+            mappedConfig["ExploreApi:BaseUrl"] = rawApiUrl;
         }
 
-        // Google
-        TrySet(mappedConfig, config, "Google:ClientId", rawGoogleClientId);
-
-        // API
-        if (!hasAspireApiReference && !string.IsNullOrEmpty(rawApiUrl))
-        {
-            TrySet(mappedConfig, config, "ExploreApi:BaseUrl", rawApiUrl);
-        }
-
-        // Authentication Provider
-        TrySet(mappedConfig, config, "Authentication:Provider", rawAuthProvider);
+        if (!string.IsNullOrWhiteSpace(rawAuthProvider)
+            && string.IsNullOrEmpty(ordinary["Authentication:Provider"]))
+            mappedConfig["Authentication:Provider"] = rawAuthProvider;
 
         configBuilder.AddInMemoryCollection(mappedConfig);
-        if (!string.IsNullOrWhiteSpace(rawClientSecret))
-            receipts?.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, authority);
-        if (!string.IsNullOrWhiteSpace(rawGoogleClientSecret))
-            receipts?.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, authority);
+        if (rawClientSecret is not null)
+            receipts.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.KeycloakOidc, authority);
+        if (rawGoogleClientSecret is not null)
+            receipts.RecordAcquired(AuthenticationCredentialAcquisitionReceipts.Consumer.GoogleOidc, authority);
     }
-
-    private static string? ReadBootstrapValue(
-        string name,
-        string flatName,
-        IConfiguration configuration,
-        string environmentName)
-    {
-        var envVal = Environment.GetEnvironmentVariable($"SecretProvider__Infisical__{name}")
-            ?? Environment.GetEnvironmentVariable(flatName);
-        if (!string.IsNullOrWhiteSpace(envVal))
-        {
-            return envVal;
-        }
-
-        if (IsDevelopmentOrTesting(environmentName))
-        {
-            var configVal = configuration[$"SecretProvider:Infisical:{name}"]
-                ?? configuration[$"Infisical:{name}"]
-                ?? configuration[flatName]
-                ?? configuration[$"SecretProvider__Infisical__{name}"];
-            if (!string.IsNullOrWhiteSpace(configVal))
-            {
-                return configVal;
-            }
-
-            var userSecrets = new ConfigurationBuilder()
-                .AddUserSecrets("event-shared-secrets", reloadOnChange: false)
-                .Build();
-            var userSecretsVal = userSecrets[$"SecretProvider:Infisical:{name}"]
-                ?? userSecrets[$"Infisical:{name}"]
-                ?? userSecrets[flatName]
-                ?? userSecrets[$"SecretProvider__Infisical__{name}"];
-            if (!string.IsNullOrWhiteSpace(userSecretsVal))
-            {
-                return userSecretsVal;
-            }
-        }
-
-        return null;
-    }
-
-    private static bool IsDevelopmentOrTesting(string environmentName) =>
-        string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(environmentName, "Testing", StringComparison.OrdinalIgnoreCase);
 
     private static string? GetAspireApiReference(IConfiguration config, string scheme) =>
         config[$"services:explore-api:{scheme}:0"]

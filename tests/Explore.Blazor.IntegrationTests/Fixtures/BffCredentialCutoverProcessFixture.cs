@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using Event.Testing.DataProtection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -19,6 +20,7 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
 {
     private readonly WebApplication _upstream;
     private readonly string _scratch;
+    private readonly ExternalDataProtectionTestAuthority _dataProtection = new("bff");
     private readonly string _certificatePassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -79,7 +81,7 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
             RedirectStandardError = true,
             UseShellExecute = false
         };
-        start.ArgumentList.Add(Path.Combine(project, "bin", "Release", "net10.0", "Explore.Blazor.dll"));
+        start.ArgumentList.Add(typeof(Program).Assembly.Location);
         var hostVariables = new[] { "PATH", "DOTNET_ROOT", "TMPDIR", "LD_LIBRARY_PATH" }
             .ToDictionary(key => key, Environment.GetEnvironmentVariable);
         start.Environment.Clear();
@@ -88,8 +90,8 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
         string home = Path.Combine(_scratch, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(home);
         start.Environment["HOME"] = home;
-        start.Environment["DOTNET_ENVIRONMENT"] = "Testing";
-        start.Environment["ASPNETCORE_ENVIRONMENT"] = "Testing";
+        start.Environment["DOTNET_ENVIRONMENT"] = "Development";
+        start.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
         start.Environment["SECRET_PROVIDER"] = "Environment";
         start.Environment["AUTHENTICATION_PROVIDER"] = "keycloak";
         start.Environment["AUTHENTICATION_CREDENTIAL_PROFILE_REVISION"] = Guid.NewGuid().ToString();
@@ -97,6 +99,10 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
         start.Environment["KEYCLOAK_REALM"] = BffKeycloakFixture.RealmName;
         start.Environment["KEYCLOAK_CLIENT_ID"] = BffKeycloakFixture.TestClientId;
         start.Environment["KEYCLOAK_BLAZOR_CLIENT_SECRET"] = credential;
+        start.Environment["EVENT_DP_BFF_RING"] = _dataProtection.Input.Ring;
+        start.Environment["EVENT_DP_BFF_ADMISSION"] = _dataProtection.Input.Admission;
+        start.Environment["EVENT_DP_BFF_ADMISSION_SHA256"] = _dataProtection.Input.AdmissionSha256;
+        start.Environment["EVENT_DP_BFF_MINIMUM_GENERATION"] = "1";
         start.Environment["Keycloak__RequireHttpsMetadata"] = "false";
         start.Environment["API_ENDPOINT"] = _upstream.Services.GetRequiredService<IServer>()
             .Features.Get<IServerAddressesFeature>()!.Addresses.Single();
@@ -155,10 +161,11 @@ internal sealed class BffCredentialCutoverProcessFixture : IAsyncDisposable
                     using var document = JsonDocument.Parse(line);
                     var root = document.RootElement;
                     if (root.TryGetProperty("SourceContext", out var source)
-                        && source.GetString() == "Microsoft.Hosting.Lifetime"
-                        && root.TryGetProperty("address", out var address)
-                        && Uri.TryCreate(address.GetString(), UriKind.Absolute, out var listener))
-                        Listening.TrySetResult(listener);
+                        && source.GetString() == "Explore.Blazor.Hosting.Lifecycle"
+                        && root.TryGetProperty("Phase", out var phase)
+                        && phase.GetString() == "started"
+                        && root.TryGetProperty("ListenerPort", out var port))
+                        Listening.TrySetResult(new Uri($"https://127.0.0.1:{port.GetInt32()}"));
                     if (root.TryGetProperty("Seconds", out var seconds) && seconds.GetInt32() == 25)
                         Stopping.TrySetResult();
                 }

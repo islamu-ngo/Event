@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>event-shared-secrets</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <!-- .NET 10: Prevent NavigateTo from throwing NavigationException during SSR prerender.
          Enabled by default in new .NET 10 templates but required for upgraded projects. -->

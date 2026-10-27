@@ -157,6 +157,31 @@ receipts, verified foundation checks, quarantined baseline failures and
 unexecuted successor qualification. This ADR does not infer image or
 live-provider assurance from offline checks.
 
+## Serving composition cutover
+
+API and split BFF open one selected authority before composing services, start
+its token-only maintenance when applicable, and await their preparation methods
+before `Build`. Combined passes the same Combined owner to API preparation and
+then BFF preparation; the frontend checks the already admitted Combined key
+partition and owner identity instead of opening a second session. The outer
+program retains that owner through host shutdown and disposes it after the app.
+
+Preparation admits configuration groups and Data Protection before synchronous
+consumers can construct. The API selects `AddNativeSecretResolution`, not the
+legacy provider pipeline. Readiness reacquires the same key authority and fences
+cached protectors on rejected admission; it cannot install a new ring or clear
+the rejection without restart. Testing and build-time OpenAPI retain explicit
+no-login composition lanes. Their injected authorities are not production
+fallbacks.
+
+Aspire projects value-free consumer policy and only that consumer's machine
+identity. Compose projects API, BFF and migration policies independently. Direct
+launches use native fields; neither path borrows a shared lifetime policy.
+Token renewal is not application-secret rotation, provider write permission or
+fleet readiness. Native writer activation still does not establish durable
+setup cancellation correctness without the separate Domain/Application effect
+settlement and its generated model change.
+
 ## Admission and retirement verification
 
 Native mutation adapters retain a request-owned `SecretMutationAttempt` before

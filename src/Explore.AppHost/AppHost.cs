@@ -5,11 +5,11 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DotNetEnv;
 using Explore.Application.Configuration;
+using Explore.Domain.Secrets;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Webhooks;
-using Explore.Secrets.Abstractions;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
+using Explore.Persistence.Database;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -58,17 +58,15 @@ if (agentBrowserProfile is not null || agentBrowserSeedEnabled)
             erasureDatabaseTopology: builder.Configuration["ERASURE_DATABASE_TOPOLOGY"],
             flatWebhookProvider: builder.Configuration["WEBHOOKS_PROVIDER"]);
 }
-SecretProviderType configuredSecretProvider =
-    SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration, builder.Environment.EnvironmentName);
+SecretAuthorityKind configuredSecretProvider = SecretAuthoritySelection.Select(
+    builder.Configuration, builder.Environment.EnvironmentName, SecretConsumerRole.Api).Provider;
 // AppHost never authenticates to a runtime vault. Operators provision provider
 // infrastructure outside the application identity, then inject resource inputs.
 var operatorInputBuilder = new ConfigurationBuilder().AddEnvironmentVariables();
-if (configuredSecretProvider == SecretProviderType.UserSecrets)
+if (configuredSecretProvider == SecretAuthorityKind.UserSecrets)
 {
-    if (!SecretAuthorityConfiguration.IsDevelopmentOrTesting(builder.Environment.EnvironmentName))
-        throw new InvalidOperationException("secret_authority_user_secrets_environment_invalid");
     operatorInputBuilder.Sources.Clear();
-    operatorInputBuilder.AddUserSecrets(typeof(SecretAuthorityConfiguration).Assembly, optional: true, reloadOnChange: false);
+    operatorInputBuilder.AddUserSecrets("event-shared-secrets", reloadOnChange: false);
 }
 IConfiguration operatorInputs = operatorInputBuilder.Build();
 builder.Configuration.AddConfiguration(operatorInputs);
@@ -76,6 +74,9 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
     ["SecretProvider:Provider"] = configuredSecretProvider.ToString()
 });
+var runtimeSecretEntries = SecretDefinitionRegistry.All.Values.Select(definition =>
+    new SecretAcquisitionEntry(definition.DefaultInfisicalPath,
+        definition.DefaultInfisicalKey, definition.DefaultEnvironmentVariableName)).ToArray();
 IResourceBuilder<ParameterResource>? agentPostgresUsername = null;
 IResourceBuilder<ParameterResource>? agentPostgresPassword = null;
 IResourceBuilder<ParameterResource>? agentRedisPassword = null;
@@ -201,7 +202,7 @@ if (runMode.UsesLocalData())
         () => RequiredConfiguredValue(operatorInputs, "DATABASE_MIGRATOR_PASSWORD"),
         publishValueAsDefault: false, secret: true);
     int? localPostgresPort = null;
-    if (agentBrowserProfile is null && configuredSecretProvider == SecretProviderType.Infisical)
+    if (agentBrowserProfile is null && configuredSecretProvider == SecretAuthorityKind.Infisical)
         localPostgresPort = operatorInputs.GetValue<int?>("DATABASE_PORT")
             ?? throw new InvalidOperationException("secret_local_database_port_required");
     database = (agentBrowserProfile is null
@@ -258,7 +259,7 @@ if (runMode.UsesLocalData())
             () => RequiredConfiguredValue(operatorInputs, "ERASURE_DATABASE_MIGRATOR_PASSWORD"),
             publishValueAsDefault: false, secret: true);
         privacyErasureDatabase = builder.AddPostgres("privacy-erasure-postgres", erasureUsername, erasurePassword,
-                port: configuredSecretProvider == SecretProviderType.Infisical
+                port: configuredSecretProvider == SecretAuthorityKind.Infisical
                     ? operatorInputs.GetValue<int?>("ERASURE_DATABASE_PORT")
                         ?? throw new InvalidOperationException("secret_local_database_port_required")
                     : null)
@@ -309,7 +310,7 @@ var migrations = WithProfileSecretMode(
             "event-migrationservice",
             ExcludeProjectLaunchProfile),
         runMode,
-        builder.Configuration,
+        configuredSecretProvider,
         allowAgentRuntimeSecrets: false)
     .WithEnvironment("PrivacyErasure__Authority__Topology", privacyErasureTopology.ToString());
 if (usesEmbeddedPrivacyErasureAuthority)
@@ -367,7 +368,7 @@ if (hostingTopology == HostingTopology.Split)
                     ExcludeProjectLaunchProfile),
                 agentBrowserProfile),
             runMode,
-            builder.Configuration,
+            configuredSecretProvider,
             allowAgentRuntimeSecrets: true)
         .WithEnvironment("HttpsRedirection__Enabled", "false")
         .WithEnvironment("INSTANCE_ADMIN_PUBLIC_ORIGIN", instanceAdminPublicOrigin)
@@ -502,7 +503,7 @@ if (hostingTopology == HostingTopology.Split)
                     ExcludeProjectLaunchProfile),
                 agentBrowserProfile),
             runMode,
-            builder.Configuration,
+            configuredSecretProvider,
             allowAgentRuntimeSecrets: false)
         .WithReference(exploreAPI)
         .WaitFor(exploreAPI)
@@ -563,7 +564,7 @@ else
                 .WithHttpEndpoint(name: "http")
                 .WithHttpsEndpoint(port: 7180, name: "https"),
             runMode,
-            builder.Configuration,
+            configuredSecretProvider,
             allowAgentRuntimeSecrets: false)
         .WithEnvironment("HttpsRedirection__Enabled", "false")
         .WithEnvironment("INSTANCE_ADMIN_PUBLIC_ORIGIN", ConfiguredValue(
@@ -708,17 +709,10 @@ else
 // inheritance must not reintroduce sibling or infrastructure authority.
 foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>())
 {
-    SecretConsumer consumer = resource.Name switch
-    {
-        "explore-api" => SecretConsumer.Api,
-        "explore-blazor" => SecretConsumer.Bff,
-        "event-standalone" => SecretConsumer.Combined,
-        "event-migrationservice" => SecretConsumer.Migration,
-        _ => throw new InvalidOperationException("secret_consumer_invalid")
-    };
+    SecretConsumerRole consumer = SecretConsumerFor(resource.Name);
     builder.CreateResourceBuilder(resource).WithEnvironment(context =>
     {
-        if (consumer is SecretConsumer.Api or SecretConsumer.Combined)
+        if (consumer is SecretConsumerRole.Api or SecretConsumerRole.Combined)
         {
             // Event owns its runtime input projection. The external Configurator
             // prepares artifacts; no offline engine or definition is loaded here.
@@ -835,7 +829,7 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 context.EnvironmentVariables[$"KEYCLOAK__PERMITTEDCLIENTS__{client.Key}"] = client.Value
                     ?? throw new InvalidOperationException("keycloak_permitted_client_invalid");
         }
-        if (consumer == SecretConsumer.Migration)
+        if (consumer == SecretConsumerRole.Migration)
         {
             foreach (string key in new[]
             {
@@ -847,7 +841,7 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                 if (builder.Configuration[key] is { } value && !context.EnvironmentVariables.ContainsKey(key))
                     context.EnvironmentVariables[key] = value;
         }
-        if (consumer == SecretConsumer.Bff)
+        if (consumer == SecretConsumerRole.Bff)
         {
             foreach (string key in new[] { "AUTHENTICATION_PROVIDER", "ATPROTO_LOGIN_ENABLED",
                 "AUTHENTICATION_CREDENTIAL_PROFILE_REVISION", "API_ENDPOINT" })
@@ -855,7 +849,8 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
                     context.EnvironmentVariables[key] = value;
         }
         RuntimeSecretEnvironment.Apply(context.EnvironmentVariables, operatorInputs,
-            Environment.GetEnvironmentVariables().Keys.Cast<string>(), consumer, configuredSecretProvider);
+            Environment.GetEnvironmentVariables().Keys.Cast<string>(), consumer, configuredSecretProvider,
+            runtimeSecretEntries);
     });
 }
 
@@ -1665,7 +1660,8 @@ static IResourceBuilder<ProjectResource> WithLocalPrimaryDatabase(
     IResourceBuilder<PostgresDatabaseResource> database,
     PrimaryDatabaseRole role)
 {
-    if (SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration) == SecretProviderType.Infisical)
+    if (SecretAuthoritySelection.Select(builder.Configuration, builder.Environment.EnvironmentName,
+            SecretConsumerFor(project.Resource.Name)).Provider == SecretAuthorityKind.Infisical)
         return project;
     var credentialPrefix = $"Database__{role}__";
     var postgres = database.Resource.Parent;
@@ -1692,7 +1688,8 @@ static IResourceBuilder<ProjectResource> WithExternalPrimaryDatabase(
     IResourceBuilder<ProjectResource> project,
     PrimaryDatabaseRole role)
 {
-    if (SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration) == SecretProviderType.Infisical)
+    if (SecretAuthoritySelection.Select(builder.Configuration, builder.Environment.EnvironmentName,
+            SecretConsumerFor(project.Resource.Name)).Provider == SecretAuthorityKind.Infisical)
         return project;
     var database = PrimaryDatabaseConfiguration.Bind(builder.Configuration, role);
     if (role == PrimaryDatabaseRole.Global)
@@ -1721,7 +1718,8 @@ static IResourceBuilder<ProjectResource> WithInstanceApiKeyCapabilities(
     IDistributedApplicationBuilder builder,
     IResourceBuilder<ProjectResource> project)
 {
-    if (SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration) == SecretProviderType.Infisical)
+    if (SecretAuthoritySelection.Select(builder.Configuration, builder.Environment.EnvironmentName,
+            SecretConsumerFor(project.Resource.Name)).Provider == SecretAuthorityKind.Infisical)
         return project;
     PrimaryDatabaseRole[] roles =
     [
@@ -1790,7 +1788,8 @@ static IResourceBuilder<ProjectResource> WithExternalPrivacyErasureAuthorityData
     IResourceBuilder<ProjectResource> project,
     PrimaryDatabaseRole role)
 {
-    if (SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration) == SecretProviderType.Infisical)
+    if (SecretAuthoritySelection.Select(builder.Configuration, builder.Environment.EnvironmentName,
+            SecretConsumerFor(project.Resource.Name)).Provider == SecretAuthorityKind.Infisical)
         return project;
     var database = PrivacyErasureAuthorityDatabaseConfiguration.Bind(builder.Configuration, role);
     var credentialPrefix = $"PrivacyErasureAuthorityDatabase__{role}__";
@@ -1899,10 +1898,19 @@ static HostingTopology ParseHostingTopology(string? rawValue)
         "Hosting:Topology must be Split or Standalone.");
 }
 
+static SecretConsumerRole SecretConsumerFor(string resourceName) => resourceName switch
+{
+    "explore-api" => SecretConsumerRole.Api,
+    "explore-blazor" => SecretConsumerRole.Bff,
+    "event-standalone" => SecretConsumerRole.Combined,
+    "event-migrationservice" => SecretConsumerRole.Migration,
+    _ => throw new InvalidOperationException("secret_consumer_invalid")
+};
+
 static IResourceBuilder<ProjectResource> WithProfileSecretMode(
     IResourceBuilder<ProjectResource> project,
     AspireRunMode runMode,
-    IConfiguration configuration,
+    SecretAuthorityKind provider,
     bool allowAgentRuntimeSecrets = false)
 {
     project = project
@@ -1919,8 +1927,7 @@ static IResourceBuilder<ProjectResource> WithProfileSecretMode(
         }
     }
 
-    return project.WithEnvironment("SecretProvider__Provider",
-        SecretAuthorityConfiguration.GetRequiredProvider(configuration).ToString());
+    return project.WithEnvironment("SecretProvider__Provider", provider.ToString());
 }
 
 static IResourceBuilder<ProjectResource> WithAgentBrowserEnvironment(
@@ -1949,7 +1956,7 @@ static IResourceBuilder<ProjectResource> WithAgentBrowserEnvironment(
 static IResourceBuilder<ProjectResource> WithoutAgentRuntimeSecrets(
     IResourceBuilder<ProjectResource> project) =>
     project
-        .WithEnvironment("SecretProvider__Provider", nameof(SecretProviderType.Environment))
+        .WithEnvironment("SecretProvider__Provider", nameof(SecretAuthorityKind.Environment))
         .WithEnvironment("SecretProvider__Infisical__Url", "")
         .WithEnvironment("SecretProvider__Infisical__ProjectId", "")
         .WithEnvironment("SecretProvider__Infisical__ClientId", "")

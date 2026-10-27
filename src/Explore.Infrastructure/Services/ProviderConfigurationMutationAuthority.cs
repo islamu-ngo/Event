@@ -253,8 +253,8 @@ public sealed class ProviderConfigurationMutationAuthority(IServiceProvider serv
             }
             materials = MaterialSnapshot(results);
             var keycloak = results.Count == 0 ? KeycloakConnectionResolution.Failed(KeycloakConnectionStatus.Unconfigured)
-                : await new KeycloakConnectionResolver(new OriginalSecrets(results), Deployment,
-                    Owner._services.GetRequiredService<KeycloakCredentialBindingRevision>()).ResolveRuntimeAsync(token);
+                : await new KeycloakConnectionResolver(new OriginalSecrets(results), Deployment)
+                    .ResolveRuntimeAsync(token);
             await RequireSourcesAsync(token);
             RequireTime();
             return new(keycloak, results.GetValueOrDefault(SecretDefinitionRegistry.Keys.Authentication.GoogleClientSecret)

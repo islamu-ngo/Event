@@ -3,6 +3,23 @@ ABOUTME: Prioritizes repeat incidents and non-obvious checks over generic .NET a
 
 # Troubleshooting
 
+## Selected Secret Authority Recovery
+
+If startup reports `secret_authority_token_policy_invalid`, verify the selected
+consumer's lifetime policy, not another process's identity. Compose/Aspire use
+`INFISICAL_<CONSUMER>_TOKEN_LIFETIME` and the matching period/margin/timeout
+inputs; direct launches use `SecretProvider__Infisical__*`. Finite identities
+have no configured period; periodic identities require the exact observed
+period. Request timeout is positive and at most 60 seconds, and renewal margin
+must be shorter than the token lifetime. See [configuration](CONFIGURATION.md#secret-provider-configuration).
+
+For expiry, uncertain renewal or authority recovery-required status, drain the
+affected process, repair its selected external authority through authorized
+operator tooling, and restart with an explicitly admitted owner. Do not switch
+provider, reuse another consumer's machine identity, or enable an automatic
+login loop. Successful token renewal does not refresh application credentials
+or prove another replica's readiness.
+
 ## Onboarding Journey Readiness
 
 Use the private `GET /api/instanceonboarding/journey` resource with active setup

@@ -317,7 +317,7 @@ is required. See the [operator procedure](../public/self-hosting/operator-identi
 > **Status:** Implemented
 > **Owner:** Platform/Ops
 > **Last Verified:** 2026-08-15
-> **Source Anchors:** `src/Explore.Secrets/Database/PrimaryDatabaseConfiguration.cs`, `src/Event.MigrationService/Extensions/ConfigurationExtensions.cs`, `src/Event.Standalone/Program.cs`, `src/Event.Standalone/appsettings.json`, `src/Event.Standalone/Dockerfile`, `Explore.API/Extensions/ConfigurationExtensions.cs`, `Explore.API/Controllers/ListmonkIntegrationSettingsController.cs`, `Explore.API/Controllers/PlatformMonetizationSettingsController.cs`, `Explore.Application/Configuration/PromotionCodeLookupOptions.cs`, `Explore.Application/DTOs/Integrations/ListmonkIntegrationSettingsDto.cs`, `Explore.Application/Features/PlatformMonetization/`, `Explore.Infrastructure/Integrations/Listmonk/ListmonkSyncService.cs`, `Explore.Infrastructure/Services/Registration/PromotionCodeDigestService.cs`, `Explore.Blazor/Extensions/ConfigurationExtension.cs`, `Explore.Blazor/Extensions/YarpProxyExtensions.cs`, `Event.Web.BffHosting/Authentication/EventBffKeycloakAuthenticationOptions.cs`, `Event.Web.BffHosting/Proxy/EventApiBaseAddressResolver.cs`, `Explore.Application/Features/EventReporting/EventReportSubmissionOptions.cs`, `Explore.Application/Services/AccountAuthorityLifecycleEmailOptions.cs`, `Explore.Application/Notifications/AccountAuthorityKind.cs`, `Explore.Application/Notifications/NotificationRoutingOptions.cs`, `Explore.Infrastructure/Configuration/ModerationProviderOptions.cs`, `Explore.Infrastructure/Configuration/OspreyProviderOptions.cs`, `Explore.Infrastructure/Configuration/CoopProviderOptions.cs`, `Explore.API/Services/CoopWebhookSignatureValidator.cs`, `Explore.Infrastructure/Services/HierarchicalSettingsResolver.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakLifecycleEmailOptions.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakAccountAuthorityLifecycleEmailService.cs`, `Explore.Infrastructure/Storage/LocalFileStorageProvider.cs`, `Explore.Infrastructure/Storage/S3ConfigResolver.cs`, `Explore.Infrastructure/StorageReconciliationSettings.cs`, `Explore.Infrastructure/Mail/SmtpConfigResolver.cs`, `Explore.Infrastructure/Services/SetupSecretProvider.cs`, `Explore.Domain/Constants/GovernanceSettingKeys.cs`, `Explore.Domain/Constants/InfrastructureSecretSettingKeys.cs`, `Explore.Domain/Secrets/SecretDefinitionRegistry.cs`, `docs/SECRETS.md`
+> **Source Anchors:** `src/Explore.Persistence/Database/PrimaryDatabaseConfiguration.cs`, `src/Event.MigrationService/Extensions/ConfigurationExtensions.cs`, `src/Event.Standalone/Program.cs`, `src/Event.Standalone/appsettings.json`, `src/Event.Standalone/Dockerfile`, `Explore.API/Extensions/ConfigurationExtensions.cs`, `Explore.API/Controllers/ListmonkIntegrationSettingsController.cs`, `Explore.API/Controllers/PlatformMonetizationSettingsController.cs`, `Explore.Application/Configuration/PromotionCodeLookupOptions.cs`, `Explore.Application/DTOs/Integrations/ListmonkIntegrationSettingsDto.cs`, `Explore.Application/Features/PlatformMonetization/`, `Explore.Infrastructure/Integrations/Listmonk/ListmonkSyncService.cs`, `Explore.Infrastructure/Services/Registration/PromotionCodeDigestService.cs`, `Explore.Blazor/Extensions/ConfigurationExtension.cs`, `Explore.Blazor/Extensions/YarpProxyExtensions.cs`, `Event.Web.BffHosting/Authentication/EventBffKeycloakAuthenticationOptions.cs`, `Event.Web.BffHosting/Proxy/EventApiBaseAddressResolver.cs`, `Explore.Application/Features/EventReporting/EventReportSubmissionOptions.cs`, `Explore.Application/Services/AccountAuthorityLifecycleEmailOptions.cs`, `Explore.Application/Notifications/AccountAuthorityKind.cs`, `Explore.Application/Notifications/NotificationRoutingOptions.cs`, `Explore.Infrastructure/Configuration/ModerationProviderOptions.cs`, `Explore.Infrastructure/Configuration/OspreyProviderOptions.cs`, `Explore.Infrastructure/Configuration/CoopProviderOptions.cs`, `Explore.API/Services/CoopWebhookSignatureValidator.cs`, `Explore.Infrastructure/Services/HierarchicalSettingsResolver.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakLifecycleEmailOptions.cs`, `Explore.Infrastructure/Services/Keycloak/KeycloakAccountAuthorityLifecycleEmailService.cs`, `Explore.Infrastructure/Storage/LocalFileStorageProvider.cs`, `Explore.Infrastructure/Storage/S3ConfigResolver.cs`, `Explore.Infrastructure/StorageReconciliationSettings.cs`, `Explore.Infrastructure/Mail/SmtpConfigResolver.cs`, `Explore.Infrastructure/Services/SetupSecretProvider.cs`, `Explore.Domain/Constants/GovernanceSettingKeys.cs`, `Explore.Domain/Constants/InfrastructureSecretSettingKeys.cs`, `Explore.Domain/Secrets/SecretDefinitionRegistry.cs`, `docs/SECRETS.md`
 
 ## Environment Variables & Secrets Authority
 
@@ -682,7 +682,6 @@ Commonly consumed sections in code:
 - `StorageReconciliation:*` (dry-run-first storage drift sweep; runs as the `storage-reconciliation` Quartz job)
 - `s3.*` governance settings (non-secret S3 endpoint, bucket, region, and URL policy)
 - `SecretProvider:*`
-- `SecretRefresh:*`
 - `EmailDispatchProcessor:*` (Basic Dispatch Mode background worker)
 - `EmailDispatchRabbitMq:*` (optional RabbitMQ Dispatch Mode transport foundation)
 - `EmailDispatchRetention:*` (bounded email content redaction; `email-dispatch-retention-cleanup` Quartz job)
@@ -1822,13 +1821,28 @@ The per-tenant retention window still comes from the governance setting `ai_assi
 
 ## Secret Provider Configuration
 
-`Explore.Secrets` binds provider config from `SecretProvider`:
+ServiceDefaults `SecretAuthoritySelection` selects one authority for the
+declared host consumer before acquisition:
 
 - `SecretProvider:Provider` (required: `Environment`, `Infisical`, or `UserSecrets`; the latter is Development/Testing only)
-- `SecretProvider:FailFast`
-- `SecretProvider:Infisical:*` (project/client credentials, paths, environment)
+- `SecretProvider:Infisical:Url`, `ProjectId`, `Environment`, `ClientId`, `ClientSecret`: process-only Universal Auth inputs, not merged application values
+- `SecretProvider:Infisical:TokenLifetime`: explicit `Finite` or `Periodic`; periodic also requires `TokenPeriodSeconds` matching the observed session
+- `SecretProvider:Infisical:RenewBeforeSeconds`: default 60, shorter than returned token lifetime
+- `SecretProvider:Infisical:RequestTimeoutSeconds`: default 15, positive and at most 60
 
-Refresh behavior binds from `SecretRefresh` and runs via hosted `SecretRefreshService`.
+Compose/Aspire accept these policies under each consumer's deployment prefix:
+`INFISICAL_API_`, `INFISICAL_BFF_`, `INFISICAL_COMBINED_` or
+`INFISICAL_MIGRATION_`, followed by `TOKEN_LIFETIME`, `TOKEN_PERIOD_SECONDS`,
+`RENEW_BEFORE_SECONDS` or `REQUEST_TIMEOUT_SECONDS`. Only the selected consumer's
+fields become the native process inputs above. There is no shared deployment
+policy fallback. Set lifetime for every enabled Infisical consumer; omit/blank
+period for finite identities. A nonblank finite period is rejected. Periodic
+identities require a positive period matching the observed login lifetime.
+
+Consumer roots are fixed in code, not widened through configurable Paths.
+Native serving owners maintain only their selected authentication token; no
+secret polling, automatic relogin or mutation replay is registered. See
+[SECRETS.md](SECRETS.md#native-authentication-maintenance) for lifetime and recovery.
 
 ## Setup Secret And Managed Provisioning Bootstrap
 

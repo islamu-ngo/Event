@@ -41,6 +41,69 @@ Never store passwords, tokens, connection strings, encryption keys, or setup sec
 
 ## Fail-Closed Authority Status
 
+When directly launching a host or tool using native SecretKit bootstrap, explicitly set
+`SecretProvider__Infisical__TokenLifetime` to `Finite` or `Periodic` according to
+the machine identity's actual policy. For periodic tokens also supply
+`SecretProvider__Infisical__TokenPeriodSeconds`, matching the lifetime returned
+by Universal Auth; omit that field for finite tokens. A zero maximum TTL alone
+does not prove periodic authority. A mismatch stops startup rather than
+inventing unlimited token life.
+
+For Compose/Aspire, configure each enabled consumer separately with prefix
+`INFISICAL_API_`, `INFISICAL_BFF_`, `INFISICAL_COMBINED_` or
+`INFISICAL_MIGRATION_`. Append `TOKEN_LIFETIME` and, for periodic identities,
+`TOKEN_PERIOD_SECONDS`. Optional `RENEW_BEFORE_SECONDS` and
+`REQUEST_TIMEOUT_SECONDS` configure that consumer's bounds. For example,
+`INFISICAL_API_TOKEN_LIFETIME=Finite` selects the API policy; it does not select
+the BFF or migration policy. Set those independently to match their identities.
+Leave a finite identity's period unset or blank. Shared direct-process fields
+are not an orchestrator policy fallback.
+
+The native bootstrap defaults to a 60-second renewal margin and a 15-second
+request timeout. Override these with
+`SecretProvider__Infisical__RenewBeforeSeconds` and
+`SecretProvider__Infisical__RequestTimeoutSeconds` when needed; timeout must not
+exceed 60 seconds, and the renewal margin must be shorter than the returned
+token lifetime. Inject that process's universal-auth credentials through its
+environment, not application JSON. Environment-only deployments require none
+of these Infisical fields. Opening an authority does not itself schedule token
+renewal or reauthenticate it.
+
+Long-lived Infisical-backed hosts may maintain one session-local renewal helper.
+This renews the process's Infisical access token, not database passwords, OAuth
+secrets or application configuration. Each replica owns its own session; a
+successful renewal on one replica does not prove another replica is ready.
+Environment-only deployments and short-lived migration/tooling commands start
+no helper. Renewal failure requires controlled recovery; it does not authorize
+automatic login, identity switching or replay of an uncertain write.
+
+Environment and local User Secrets runtime credentials belong to the process
+generation admitted at startup. Replace/restart that owner to activate changed
+credentials; waiting for a cache entry to expire does not replace its generation.
+Fresh Data Protection admission checks are separate and do not silently activate
+new runtime credentials.
+
+API, split BFF and Combined hosts prepare their selected credentials and Data
+Protection keys before constructing dependent services. Combined uses one
+authority for both modules, not separate API and frontend logins. Authentication
+renewal starts before slow preparation, and startup failure retires the owner.
+Runtime status reports authentication health only; it does not certify provider
+ACLs or permission to write a particular secret.
+
+Review and apply Keycloak provisioning on the same running replica. Restarting,
+moving to another replica or losing retained comparison evidence requires a
+fresh review, even when both replicas use identical injected credentials.
+Missing comparison evidence is rejected, not replaced with an invented revision.
+Use replica affinity for this workflow or repeat the review on the replica
+handling apply. A fresh review does not authorize replay of an uncertain write;
+reconcile that operation first.
+
+An overlapping read started earlier cannot replace a different comparison
+revision already accepted by a later read. If bounded inventory compaction
+loses the required ordering evidence, the affected pending read is rejected
+rather than restoring stale approval evidence. Obtain fresh comparison
+evidence; this does not authorize replay of an uncertain write.
+
 Runtime authority is also consumer-specific. API, BFF, Combined and migration
 processes require independently scoped identities; a shared project is not a
 shared permission grant. AppHost no longer fetches all provider/runtime secrets,
@@ -115,6 +178,19 @@ the positive integer is a floor that may only advance. Protect this control from
 the administrators/jobs that can restore ring/admission or application backups.
 Restoring all four values together would defeat rollback protection. The
 application cannot certify that your external control is independently protected.
+
+Startup must finish asynchronous admission of both partition values before it
+constructs the framework key provider. Key custody is separate from ordinary
+configuration export, and subsequent synchronous encryption/decryption uses the
+admitted in-memory ring. Readiness performs a fresh bounded check against the
+same selected authority; it does not silently replace the active ring.
+
+A changed or unavailable authority, changed independent pin/floor, or expired
+admission requires controlled restart. Once rejected, cached protectors also
+reject encryption and decryption; restoring a healthy response alone cannot
+resume that process. Route traffic only to admitted replicas and enforce readiness
+and drain centrally. These process checks do not prove provider ACLs or fleet
+convergence.
 
 ### Establish complete custody before first admission
 

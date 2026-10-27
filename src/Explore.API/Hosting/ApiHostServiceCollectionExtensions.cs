@@ -33,10 +33,9 @@ using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Services;
 using Microsoft.AspNetCore.OutputCaching;
-using Explore.Secrets.Abstractions;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Database;
-using Explore.Secrets.Extensions;
+using Explore.Persistence.Database;
+using Explore.Infrastructure.Secrets;
+using Explore.ServiceDefaults.Secrets;
 using Explore.ServiceDefaults.Configuration;
 using Explore.ServiceDefaults.DataProtection;
 using Explore.ServiceDefaults.HealthChecks;
@@ -67,6 +66,37 @@ public sealed record ApiHostCompositionState(
 
 public static class ApiHostServiceCollectionExtensions
 {
+    private sealed record ApiSecretPreparation(SecretAuthorityAcquisition Owner);
+
+    public static bool IsBuildTimeOpenApiGeneration => OpenApiGenerationMode.IsBuildTimeGeneration;
+
+    /// <summary>Stages selected API groups and the serving key partition before dependent construction.</summary>
+    public static async ValueTask PrepareApiHostSecretsAsync(
+        this WebApplicationBuilder builder,
+        SecretAuthorityAcquisition? owner,
+        SecretConsumerRole consumer,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (owner is null)
+        {
+            if (IsBuildTimeOpenApiGeneration || builder.Environment.IsEnvironment("Testing"))
+                return;
+            throw new InvalidOperationException("api_secret_preparation_required");
+        }
+        if (consumer is not (SecretConsumerRole.Api or SecretConsumerRole.Combined)
+            || owner.Selection.Consumer != consumer
+            || !string.Equals(owner.Selection.EnvironmentName, builder.Environment.EnvironmentName,
+                StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("secret_consumer_scope_invalid");
+        await builder.Configuration.AddPreparedApiConfigurationAsync(owner, cancellationToken);
+        await builder.Services.PrepareExternalDataProtectionAsync(owner,
+            consumer == SecretConsumerRole.Combined ? "combined" : "api", cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        builder.Services.AddSingleton(owner);
+        builder.Services.AddSingleton(new ApiSecretPreparation(owner));
+    }
+
     /// <summary>Validates the final service collection, including later standalone and test modules.</summary>
     public static void ConfigureNativeOperationValidation(this WebApplicationBuilder builder, bool isOpenApiGeneration)
     {
@@ -97,7 +127,7 @@ public static class ApiHostServiceCollectionExtensions
         this WebApplicationBuilder builder,
         Func<bool> isShuttingDown,
         bool ownsDevelopmentMigrations = true,
-        SecretConsumer secretConsumer = SecretConsumer.Api,
+        SecretConsumerRole secretConsumer = SecretConsumerRole.Api,
         bool ownsConfigurationManifestStartup = true)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -140,21 +170,42 @@ public static class ApiHostServiceCollectionExtensions
         builder.AddDistributedCacheReadinessCheck();
         builder.AddOidcDiscoveryReadinessCheck();
         if ((isOpenApiGeneration || builder.Environment.IsEnvironment("Testing"))
-            && builder.Configuration[$"{SecretProviderOptions.SectionName}:Provider"] is null
+            && builder.Configuration["SecretProvider:Provider"] is null
             && builder.Configuration["SECRET_PROVIDER"] is null)
         {
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [$"{SecretProviderOptions.SectionName}:Provider"] = nameof(SecretProviderType.Environment)
+                ["SecretProvider:Provider"] = nameof(SecretAuthorityKind.Environment)
             });
         }
-        var secretProviderConfiguration = builder.Configuration.AddSecretAuthorityConfiguration(
-            builder.Environment.EnvironmentName, secretConsumer);
-        builder.Services.AddSecretManagement(
-            builder.Configuration,
-            secretProviderConfiguration,
-            enableAuditing: true,
-            enableRefreshService: !isOpenApiGeneration);
+        if (!isOpenApiGeneration && !builder.Environment.IsEnvironment("Testing"))
+        {
+            var preparation = builder.Services.Select(descriptor => descriptor.ImplementationInstance)
+                .OfType<ApiSecretPreparation>().SingleOrDefault();
+            if (preparation is null || preparation.Owner.Selection.Consumer != secretConsumer
+                || !string.Equals(preparation.Owner.Selection.EnvironmentName,
+                    builder.Environment.EnvironmentName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("api_secret_preparation_required");
+        }
+        // Testing obtains its explicitly injected final configuration only after
+        // WebApplicationFactory callbacks. No vault login or User Secrets file is opened.
+        builder.Services.TryAddSingleton(provider =>
+        {
+            IConfiguration configuration = provider.GetRequiredService<IConfiguration>();
+            if (isOpenApiGeneration)
+                return SecretAuthorityAcquisition.OpenLocal(
+                    new(SecretAuthorityKind.Environment, "Testing", secretConsumer), configuration);
+            if (!builder.Environment.IsEnvironment("Testing"))
+                throw new InvalidOperationException("api_secret_preparation_required");
+            var selection = SecretAuthoritySelection.Select(configuration, "Testing", secretConsumer);
+            return SecretAuthorityAcquisition.OpenLocal(selection, configuration);
+        });
+        builder.Services.AddNativeSecretResolution();
+        builder.Services.AddHealthChecks()
+            .AddCheck<Explore.Persistence.HealthChecks.SecretResolverHealthCheck>(
+                "secret-resolver",
+                failureStatus: HealthStatus.Degraded,
+                tags: ["ready", "secrets", "infrastructure"]);
         if (!isOpenApiGeneration && ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(builder.Configuration, builder.Environment))
         {
             if (builder.Configuration.GetValue<bool>("EmailDispatchRabbitMq:Enabled"))
@@ -305,7 +356,8 @@ public static class ApiHostServiceCollectionExtensions
             builder.Services.AddSingleton<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider,
                 OpenApiGenerationDataProtectionProvider>();
         else
-            builder.Services.AddExternalDataProtection("api");
+            builder.Services.AddExternalDataProtection(
+                secretConsumer == SecretConsumerRole.Combined ? "combined" : "api");
 
         builder.Services.AddScoped<ITenantResolverService, Explore.Infrastructure.Services.TenantResolverService>();
         builder.Services.AddScoped<ITenantContext, Explore.Infrastructure.Services.TenantContext>();

@@ -12,6 +12,7 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Security;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -30,8 +31,31 @@ internal static class NativeDraftGraphAuthentication
 {
     internal static IConfigurationRoot CreateConfiguration()
     {
+        // Fresh observer contexts have a synchronous construction contract. Keep the
+        // async acquisition scoped to this boundary, never to a configuration provider.
+        return CreateAsync().GetAwaiter().GetResult();
+
+        static async Task<IConfigurationRoot> CreateAsync()
+        {
+            await using var owner = await OpenSecretAuthorityAsync();
+            return await CreateConfigurationAsync(owner);
+        }
+    }
+
+    internal static ValueTask<SecretAuthorityAcquisition> OpenSecretAuthorityAsync()
+    {
+        var bootstrap = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+        return SecretAuthorityBootstrap.OpenAsync(
+            bootstrap, Environments.Production, SecretConsumerRole.Api,
+            [new("/runtime/api/authentication/keycloak", "KEYCLOAK_ENDPOINT", "KEYCLOAK_ENDPOINT")],
+            new SecretAuthorityLoginAttempt());
+    }
+
+    internal static async Task<IConfigurationRoot> CreateConfigurationAsync(
+        SecretAuthorityAcquisition owner)
+    {
         var builder = new ConfigurationBuilder().AddEnvironmentVariables();
-        builder.AddSecretAuthorityConfiguration(Environments.Production);
+        await builder.AddPreparedApiConfigurationAsync(owner);
         builder.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Authentication:Provider"] = "local",

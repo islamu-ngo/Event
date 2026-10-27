@@ -1,6 +1,7 @@
 using Explore.API.Extensions;
 using Explore.Infrastructure.Services;
 using Explore.Persistence.Database;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.Extensions.Configuration;
 using System.Reflection;
 
@@ -28,7 +29,7 @@ public sealed class ConfigurationExtensionsTests
             ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME"] = selectedUsername,
             ["IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_PASSWORD"] = selectedPassword,
         };
-        IConfiguration control = BuildConfiguration(selected, bootstrap);
+        IConfiguration control = await BuildConfiguration(selected, bootstrap);
         var accepted = Explore.Persistence.Identity.IdentityDatabaseConfiguration.BindExternal(
             control, PrimaryDatabaseRole.LocalIdentityWriter);
         var connection = new Npgsql.NpgsqlConnectionStringBuilder(accepted.ConnectionString);
@@ -36,7 +37,7 @@ public sealed class ConfigurationExtensionsTests
         await Assert.That(connection.Password == selectedPassword).IsTrue();
 
         selected.Remove("IDENTITY_DATABASE_LOCAL_IDENTITY_WRITER_USERNAME");
-        IConfiguration missingUsername = BuildConfiguration(selected, bootstrap);
+        IConfiguration missingUsername = await BuildConfiguration(selected, bootstrap);
 
         await Assert.That(() => Explore.Persistence.Identity.IdentityDatabaseConfiguration.BindExternal(
             missingUsername, PrimaryDatabaseRole.LocalIdentityWriter))
@@ -49,7 +50,7 @@ public sealed class ConfigurationExtensionsTests
     [Arguments("MariaDb", "10.11.8")]
     public async Task IsolatedAuthorityPreservesItsExplicitExternalServerVersion(string provider, string version)
     {
-        IConfiguration mapped = BuildConfiguration(new Dictionary<string, string?>
+        IConfiguration mapped = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["IDENTITY_DATABASE_TOPOLOGY"] = "external",
             ["IDENTITY_DATABASE_PROVIDER"] = provider,
@@ -72,7 +73,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task IsolatedAuthorityWithoutExternalVersionCannotBorrowLowerSourceAlias()
     {
-        IConfiguration mapped = BuildConfiguration(new Dictionary<string, string?>
+        IConfiguration mapped = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["IDENTITY_DATABASE_TOPOLOGY"] = "external",
             ["IDENTITY_DATABASE_PROVIDER"] = "MySql",
@@ -100,7 +101,7 @@ public sealed class ConfigurationExtensionsTests
     {
         string username = $"identity_{Guid.CreateVersion7():N}";
         string password = Guid.CreateVersion7().ToString("N");
-        IConfiguration mapped = BuildConfiguration(new Dictionary<string, string?>
+        IConfiguration mapped = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["IDENTITY_DATABASE_TOPOLOGY"] = "external",
             ["IDENTITY_DATABASE_PROVIDER"] = "PostgreSql",
@@ -138,7 +139,7 @@ public sealed class ConfigurationExtensionsTests
             [$"IdentityDatabase:{role}:{field}"] = " ",
             [$"IDENTITY_DATABASE_{alias}_{field.ToUpperInvariant()}"] = Guid.CreateVersion7().ToString("N"),
         };
-        IConfiguration mapped = BuildConfiguration(values);
+        IConfiguration mapped = await BuildConfiguration(values);
         var purpose = Enum.Parse<PrimaryDatabaseRole>(role);
         await Assert.That(() => Explore.Persistence.Identity.IdentityDatabaseConfiguration.BindExternal(mapped, purpose))
             .Throws<Microsoft.Extensions.Options.OptionsValidationException>();
@@ -147,7 +148,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsLocalPasswordPolicyWithoutOverwritingCanonicalInputs()
     {
-        var mapped = BuildConfiguration(new Dictionary<string, string?>
+        var mapped = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_PATH"] = "/operator/password-policy.json",
             ["AUTHENTICATION_LOCAL_PASSWORD_BLOCKLIST_SHA256"] = new string('a', 64),
@@ -164,7 +165,7 @@ public sealed class ConfigurationExtensionsTests
     {
         string username = Guid.NewGuid().ToString("N");
         string password = " " + Guid.NewGuid().ToString("N") + " ";
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["DATABASE_PROVIDER"] = "PostgreSql",
             ["DATABASE_HOST"] = "database.example.test",
@@ -187,7 +188,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MissingGlobalCredentialsCannotUseOtherRoles()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["DATABASE_PROVIDER"] = "PostgreSql",
             ["DATABASE_HOST"] = "database.example.test",
@@ -209,7 +210,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsCerbosUsePolicyScopeFromAuthoritativeKey()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["CERBOS_USE_POLICY_SCOPE"] = "false"
         });
@@ -220,7 +221,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_PreservesResourceAudienceAndSeparatePermittedClient()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["Keycloak:Audience"] = "event-resource",
             ["Keycloak:PermittedClients:0"] = "event-browser"
@@ -233,11 +234,11 @@ public sealed class ConfigurationExtensionsTests
     public async Task AddSecretAuthorityConfiguration_MapsKeycloakClientIdsForApiProviderManagement()
     {
         string bffCanary = Guid.CreateVersion7().ToString("N");
-        var configured = BuildConfiguration(new Dictionary<string, string?>
+        var configured = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["KEYCLOAK_CLIENT_ID"] = "configured-blazor"
         });
-        var composeAlias = BuildConfiguration(new Dictionary<string, string?>
+        var composeAlias = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["KEYCLOAK_BLAZOR_CLIENT_ID"] = "event-blazor",
             ["KEYCLOAK_BLAZOR_CLIENT_SECRET"] = bffCanary
@@ -251,7 +252,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_DoesNotOverrideConfiguredCerbosUsePolicyScope()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["CERBOS_USE_POLICY_SCOPE"] = "false",
             ["Cerbos:UsePolicyScope"] = "true"
@@ -263,7 +264,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsCerbosHttpEndpointToAdminApiEndpoint()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["CERBOS_HTTP_ENDPOINT"] = "cerbosapi.openislamu.org:443"
         });
@@ -277,7 +278,7 @@ public sealed class ConfigurationExtensionsTests
     {
         var username = Guid.NewGuid().ToString("N");
         var password = Guid.NewGuid().ToString("N");
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["CERBOS_USE_TLS"] = "true",
             ["CERBOS_PLAINTEXT_MODE"] = "false",
@@ -294,11 +295,11 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsAuthorizationProviderIntentWithoutOverridingConfiguredValue()
     {
-        var mapped = BuildConfiguration(new Dictionary<string, string?>
+        var mapped = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["AUTHORIZATION_PROVIDER"] = "cerbos"
         });
-        var configured = BuildConfiguration(new Dictionary<string, string?>
+        var configured = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["AUTHORIZATION_PROVIDER"] = "cerbos",
             ["Authorization:Provider"] = "local"
@@ -311,7 +312,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsTwoAxisLocalIdentityConfigurationWithoutOverridingConfiguredValues()
     {
-        var mapped = BuildConfiguration(new Dictionary<string, string?>
+        var mapped = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["AUTHENTICATION_PROVIDER"] = "local",
             ["ATPROTO_LOGIN_ENABLED"] = "true",
@@ -323,7 +324,7 @@ public sealed class ConfigurationExtensionsTests
             ["IDENTITY_DATABASE_HOST"] = "identity-db",
             ["IDENTITY_DATABASE_RUNTIME_PASSWORD"] = "runtime-secret",
         });
-        var configured = BuildConfiguration(new Dictionary<string, string?>
+        var configured = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["AUTHENTICATION_PROVIDER"] = "local",
             ["ATPROTO_LOGIN_ENABLED"] = "true",
@@ -347,7 +348,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsDatabaseFolderAgnosticKeys()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["DATABASE_PROVIDER"] = "SqlServer",
             ["DATABASE_HOST"] = "sql.example.test",
@@ -401,7 +402,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_DoesNotOverrideExplicitStructuredDatabaseContract()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["DATABASE_HOST"] = "mapped-host",
             ["DATABASE_NAME"] = "mapped_db",
@@ -427,7 +428,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsPrivacyErasureAuthorityKeys()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["ERASURE_DATABASE_TOPOLOGY"] = "ExternalDatabase",
             ["PRIVACY_ERASURE_AUTHORITY_HOST"] = "authority",
@@ -456,7 +457,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsErasureDatabaseKeys()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["ERASURE_DATABASE_TOPOLOGY"] = "ExternalDatabase",
             ["ERASURE_DATABASE_HOST"] = "erasure-authority",
@@ -495,7 +496,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_DoesNotOverrideConfiguredPrivacyErasureAuthorityKeys()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["ERASURE_DATABASE_TOPOLOGY"] = "ExternalDatabase",
             ["PRIVACY_ERASURE_AUTHORITY_HOST"] = "mapped-host",
@@ -536,7 +537,7 @@ public sealed class ConfigurationExtensionsTests
     {
         var username = Guid.NewGuid().ToString("N");
         var password = Guid.NewGuid().ToString("N");
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["MAIL_SMTP_HOST"] = "mailpit",
             ["MAIL_SMTP_PORT"] = "1025",
@@ -559,7 +560,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsApiFolderVapidKeys()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["VAPID_PUBLIC_KEY"] = "public-key",
             ["VAPID_PRIVATE_KEY"] = "private-key",
@@ -575,7 +576,7 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsDocumentedGeocodingEnvironmentContract()
     {
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        var configuration = await BuildConfiguration(new Dictionary<string, string?>
         {
             ["GEOCODING_PROVIDER"] = "Photon",
             ["GEOCODING_ENDPOINT"] = "https://photon.operator.example/",
@@ -623,49 +624,23 @@ public sealed class ConfigurationExtensionsTests
             ["SecretProvider:Provider"] = "UserSecrets",
         });
 
-        Action act = () => builder.AddSecretAuthorityConfiguration("Production");
+        Action act = () => SecretAuthoritySelection.Select(builder.Build(), "Production", SecretConsumerRole.Api);
 
         var exception = await Assert.That(act).Throws<InvalidOperationException>();
         await Assert.That(exception!.Message)
             .IsEqualTo("secret_authority_user_secrets_environment_invalid");
     }
 
-    private static IConfiguration BuildConfiguration(
+    private static async Task<IConfiguration> BuildConfiguration(
         Dictionary<string, string?> values, Dictionary<string, string?>? bootstrapValues = null)
     {
         values.TryAdd("SecretProvider:Provider", "Environment");
-        var ambientDatabaseKeys = Environment.GetEnvironmentVariables().Keys.OfType<string>()
-            .Where(key => key.StartsWith("Database__", StringComparison.OrdinalIgnoreCase)
-                || key.StartsWith("DATABASE_", StringComparison.Ordinal)
-                || key.StartsWith("IdentityDatabase__", StringComparison.OrdinalIgnoreCase)
-                || key.StartsWith("IDENTITY_DATABASE_", StringComparison.Ordinal))
-            .ToArray();
-        var previous = values.Keys.Concat(ambientDatabaseKeys).Distinct(StringComparer.Ordinal).ToDictionary(
-            key => key,
-            Environment.GetEnvironmentVariable,
-            StringComparer.Ordinal);
-
-        try
-        {
-            foreach (string key in ambientDatabaseKeys)
-                Environment.SetEnvironmentVariable(key, null);
-
-            foreach (var pair in values)
-            {
-                Environment.SetEnvironmentVariable(pair.Key, pair.Value);
-            }
-
-            var builder = new ConfigurationBuilder()
-                .AddInMemoryCollection(bootstrapValues ?? values);
-            builder.AddSecretAuthorityConfiguration("Testing");
-            return builder.Build();
-        }
-        finally
-        {
-            foreach (var pair in previous)
-            {
-                Environment.SetEnvironmentVariable(pair.Key, pair.Value);
-            }
-        }
+        using var selected = (ConfigurationRoot)new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        var builder = new ConfigurationBuilder().AddInMemoryCollection(bootstrapValues ?? values);
+        using var bootstrap = (ConfigurationRoot)builder.Build();
+        await using var owner = SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(bootstrap, "Testing", SecretConsumerRole.Api), selected);
+        await builder.AddPreparedApiConfigurationAsync(owner);
+        return builder.Build();
     }
 }

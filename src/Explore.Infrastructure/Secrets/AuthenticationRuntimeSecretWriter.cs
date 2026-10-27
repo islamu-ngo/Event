@@ -22,7 +22,7 @@ public sealed class AuthenticationRuntimeSecretWriter(
         cancellationToken.ThrowIfCancellationRequested();
         SecretDefinition? definition = Definition(target);
         if (definition is null
-            || !SecretAcquisitionPolicy.AllowsRoot(owner.Selection.Consumer, definition.DefaultInfisicalPath))
+            || owner.Selection.Consumer is not (SecretConsumerRole.Api or SecretConsumerRole.Combined))
             return new(AuthenticationRuntimeWriteOutcome.Invalid);
         if (owner.Provider is SecretAuthorityKind.Environment or SecretAuthorityKind.UserSecrets)
             return new(AuthenticationRuntimeWriteOutcome.OperatorInjectionRequired,
@@ -40,7 +40,7 @@ public sealed class AuthenticationRuntimeSecretWriter(
             || binding.Qualifier != string.Empty
             || !string.Equals(binding.SettingKey, definition.Key, StringComparison.Ordinal)
             || !SecretBindingAdmission.AllowsBinding(binding,
-                SecretAcquisitionPolicy.Roots(owner.Selection.Consumer), options.VaultEnvironment))
+                [definition.DefaultInfisicalPath], options.VaultEnvironment))
             return new(AuthenticationRuntimeWriteOutcome.Invalid);
         try
         {

@@ -11,6 +11,22 @@ ABOUTME: Grounds release operations in provider-native database tools, authority
 
 This runbook covers self-hosted deployments using the repository Docker Compose topology. Treat every upgrade as a data operation first and an image rollout second.
 
+## SecretKit Lifecycle Cutover
+
+Before upgrading from the retired Secrets implementation, remove `SecretRefresh`
+polling/rotation configuration. Provision each enabled consumer's independent
+machine identity and exact ACLs, then supply its explicit finite or periodic
+token policy through the [deployment inputs](CONFIGURATION.md#secret-provider-configuration).
+There is no shared identity/policy fallback or automatic relogin. Stage the
+external Data Protection ring, independent admission pin and minimum generation
+before starting serving hosts; preserve the approved pin/floor during restore.
+
+Drain affected replicas before replacing startup-bound credentials. Start each
+replacement with its selected owner and verify that replica's capability
+readiness before returning traffic. A renewed process token is not credential
+activation or fleet convergence. The five-minute runtime cache is not a promise
+of immediate external credential revocation.
+
 ## Native PostgreSQL login identity
 
 Bootstrap, navigation and tenant-preference native contracts serialize declared login names

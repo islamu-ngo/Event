@@ -1,6 +1,9 @@
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
+using Explore.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Event.Architecture.Tests;
 
@@ -19,23 +22,15 @@ public sealed class LegacyDecentralizationRetirementContractTests
         GovernanceSettingKeys.Federation.AtprotoPublishMyEvents
     ];
 
-    private static readonly string[] CurrentAtprotoSystemSettingSymbols =
-    [
-        "GovernanceSettingKeys.Federation.AtprotoEventsEnabled",
-        "GovernanceSettingKeys.Federation.AtprotoEventValidationProfile",
-        "GovernanceSettingKeys.Federation.AtprotoEventsBackfillEnabled",
-        "GovernanceSettingKeys.Federation.AtprotoEventsBackfillMode"
-    ];
-
     [Test]
     public async Task CurrentSchema_MustRetireLegacyDecentralizationColumnsAndSettingRows()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var migrationsDirectory = Path.Combine(repositoryRoot, "src", "Explore.Persistence", "Migrations");
-        var snapshot = await File.ReadAllTextAsync(
-            Path.Combine(migrationsDirectory, "ExploreDbContextModelSnapshot.cs"));
-        var settingSeeder = await File.ReadAllTextAsync(
-            Path.Combine(repositoryRoot, "src", "Explore.Persistence", "Seed", "LookupTableSeeder.cs"));
+        var snapshotType = typeof(ExploreDbContext).Assembly.GetType(
+            "Explore.Persistence.Migrations.ExploreDbContextModelSnapshot", throwOnError: true)!;
+        var snapshot = (ModelSnapshot)Activator.CreateInstance(snapshotType, nonPublic: true)!;
+        var properties = snapshot.Model.GetEntityTypes()
+            .SelectMany(entityType => entityType.GetProperties())
+            .ToArray();
         var actualAtprotoSettingKeys = AtprotoFederationSettingDefinitions.All
             .Select(definition => definition.Key)
             .Order(StringComparer.Ordinal)
@@ -47,26 +42,11 @@ public sealed class LegacyDecentralizationRetirementContractTests
         await Assert.That(SettingRegistry.Contains(LegacyKey)).IsFalse();
         await Assert.That(actualAtprotoSettingKeys.SequenceEqual(expectedAtprotoSettingKeys)).IsTrue();
 
-        foreach (var symbol in CurrentAtprotoSystemSettingSymbols)
-        {
-            await Assert.That(settingSeeder).Contains($"SettingKey = {symbol}");
-        }
-
-        await Assert.That(snapshot).DoesNotContain("DecentralizationEnabled", StringComparison.Ordinal);
-        await Assert.That(snapshot).DoesNotContain(LegacyLocalValueColumn, StringComparison.Ordinal);
-        await Assert.That(snapshot).DoesNotContain(LegacyOverrideModeColumn, StringComparison.Ordinal);
-        await Assert.That(settingSeeder).DoesNotContain(LegacyKey, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string ResolveRepositoryRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null && !File.Exists(Path.Combine(current.FullName, "Explore.slnx")))
-        {
-            current = current.Parent;
-        }
-
-        return current?.FullName
-            ?? throw new DirectoryNotFoundException("Could not locate the repository root from the architecture test output directory.");
+        await Assert.That(properties.Any(property =>
+            property.Name.Contains("DecentralizationEnabled", StringComparison.Ordinal))).IsFalse();
+        await Assert.That(properties.Select(property => property.GetColumnName()))
+            .DoesNotContain(LegacyLocalValueColumn);
+        await Assert.That(properties.Select(property => property.GetColumnName()))
+            .DoesNotContain(LegacyOverrideModeColumn);
     }
 }

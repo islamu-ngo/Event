@@ -149,7 +149,7 @@ public sealed class ModerationRecognitionPrivacySource
         // 31 days per month is a conservative storage ceiling check, never the actual remedy clock.
         // Actual protected eligibility is notification.AddMonths(ProtectedRemedyCalendarMonths).
         if (pending.MaximumRetentionTicks < LawfulRequestDeadlineTicks
-            || correction.MaximumRetentionTicks < TimeSpan.FromDays(31L * ProtectedRemedyCalendarMonths).Ticks
+            || correction.MaximumRetentionTicks < TimeSpan.FromDays(31d * ProtectedRemedyCalendarMonths).Ticks
             || receipts.MaximumRetentionTicks < backup
             || matching.MaximumRetentionTicks >= long.MaxValue - backup)
             throw new ArgumentException("Retention must cover finite settlement, calendar remedy floors and backup replay without overflowing key horizons.");

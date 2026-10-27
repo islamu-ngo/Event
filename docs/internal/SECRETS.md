@@ -524,17 +524,14 @@ phase; never reuse the Photon configuration surface.
 
 Copy `.env.example` to the ignored repository-root `.env`. Select exactly one
 `SECRET_PROVIDER`: `Environment`, `Infisical`, or `UserSecrets`. Environment mode
-reads the documented process variables. Infisical mode uses `INFISICAL_*` process
-environment variables or, in Development and Testing environments, can read bootstrap
-Universal Auth credentials (`Infisical:Url`, `Infisical:ProjectId`, `Infisical:ClientId`,
-`Infisical:ClientSecret`, `Infisical:Environment`) directly from the shared User Secrets store
-owned by `src/Explore.Secrets/Explore.Secrets.csproj`. In Development/Testing, if `SECRET_PROVIDER`
-is omitted from process variables or `.env`, it also falls back to `SECRET_PROVIDER` configured in
-User Secrets. User Secrets mode reads all application secrets directly from the shared store
-through your IDE or the `dotnet user-secrets --project src/Explore.Secrets` CLI.
-Both User Secrets mode and Infisical bootstrap via User Secrets are rejected unless the
-host environment is Development or Testing. In Production, Infisical bootstrap credentials
-must strictly come from process environment variables.
+reads the documented process variables. Infisical Universal Auth credentials come
+only from process environment (`INFISICAL_*` or `SecretProvider__Infisical__*`),
+including Development; application JSON, vault-returned configuration and the
+User Secrets store cannot bootstrap that identity. Testing may inject its explicit
+fake authority root. UserSecrets is a separate, explicitly selected authority
+allowed only in Development/Testing, reading `event-shared-secrets`. All four
+hosts declare that ID; use `dotnet user-secrets --project src/Explore.API` or the
+IDE against that shared store. Missing or contradictory selection fails closed.
 
 AppHost loads the repository `.env`, so Aspire profiles honor
 `SECRET_PROVIDER=UserSecrets` directly. Direct project launches do not load that

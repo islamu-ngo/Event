@@ -171,11 +171,6 @@ jobs:
                   run_infra="true"
                   run_arch="true"
                   ;;
-                src/Explore.Secrets/*)
-                  run_infra="true"
-                  run_arch="true"
-                  run_setup="true"
-                  ;;
                 src/Explore.Blazor/*|src/Explore.Blazor.Client/*|src/Event.Web.BffHosting/*|tests/Explore.Blazor.Client.Tests/*|tests/Explore.Blazor.IntegrationTests/*)
                   run_blazor="true"
                   run_arch="true"

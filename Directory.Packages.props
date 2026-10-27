@@ -39,7 +39,6 @@
     <PackageVersion Include="HarfBuzzSharp" Version="14.2.1.1" />
     <PackageVersion Include="HarfBuzzSharp.NativeAssets.Linux" Version="14.2.1.1" />
     <PackageVersion Include="Ical.Net" Version="5.2.3" />
-    <PackageVersion Include="Infisical.Sdk" Version="3.0.4" />
     <PackageVersion Include="MailKit" Version="4.17.0" />
     <!-- AppHost MessagePack security floor for GHSA-qhrr-8q5h-9q3h. -->
     <PackageVersion Include="MessagePack" Version="3.1.9" />

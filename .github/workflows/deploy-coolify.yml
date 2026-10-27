@@ -131,7 +131,6 @@ jobs:
               - 'src/Explore.Infrastructure/**'
               - 'src/Explore.Persistence*/**'
               - 'src/Explore.Diagnostic/**'
-              - 'src/Explore.Secrets/**'
               - 'src/Event.MigrationService/**'
               - 'src/Explore.ServiceDefaults/**'
               - 'Directory.Build.props'

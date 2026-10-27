@@ -17,7 +17,6 @@
     <Project Path="src/Explore.Atproto.Transport/Explore.Atproto.Transport.csproj" />
     <Project Path="src/Explore.Infrastructure/Explore.Infrastructure.csproj" />
     <Project Path="src/Explore.Persistence/Explore.Persistence.csproj" />
-    <Project Path="src/Explore.Secrets/Explore.Secrets.csproj" />
   </Folder>
   <Folder Name="/Infrastructure/Migrations/">
     <Project Path="src/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj" />

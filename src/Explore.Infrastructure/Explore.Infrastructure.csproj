@@ -37,6 +37,7 @@
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="OpenFeature" />
     <PackageReference Include="OpenTelemetry" />
@@ -53,7 +54,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Explore.Atproto.Transport\Explore.Atproto.Transport.csproj" />
     <ProjectReference Include="..\Explore.Application\Explore.Application.csproj" />
-    <ProjectReference Include="..\Explore.Secrets\Explore.Secrets.csproj" />
     <ProjectReference Include="..\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
   </ItemGroup>
 

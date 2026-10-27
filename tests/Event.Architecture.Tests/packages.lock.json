@@ -1077,7 +1077,6 @@
           "Explore.Application": "[1.0.0, )",
           "Explore.Infrastructure": "[1.0.0, )",
           "Explore.Persistence": "[1.0.0, )",
-          "Explore.Secrets": "[1.0.0, )",
           "Explore.ServiceDefaults": "[1.0.0, )",
           "HarfBuzzSharp": "[14.2.1.1, )",
           "HarfBuzzSharp.NativeAssets.Linux": "[14.2.1.1, )",
@@ -1177,7 +1176,6 @@
           "Cerbos.Sdk": "[1.10.2, )",
           "Explore.Application": "[1.0.0, )",
           "Explore.Atproto.Transport": "[1.0.0, )",
-          "Explore.Secrets": "[1.0.0, )",
           "Explore.ServiceDefaults": "[1.0.0, )",
           "Google.Protobuf": "[3.35.1, )",
           "Grpc.Net.Client": "[2.80.0, )",
@@ -1198,6 +1196,7 @@
           "Stripe.net": "[52.3.0, )",
           "Svix": "[1.99.1, )",
           "System.IdentityModel.Tokens.Jwt": "[8.22.0, )",
+          "System.Security.Cryptography.Pkcs": "[10.0.13, )",
           "WebPush": "[1.0.13, )",
           "YamlDotNet": "[18.1.0, )"
         }
@@ -1241,20 +1240,6 @@
         "dependencies": {
           "Explore.Persistence": "[1.0.0, )",
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.10, )"
-        }
-      },
-      "explore.secrets": {
-        "type": "Project",
-        "dependencies": {
-          "Explore.Application": "[1.0.0, )",
-          "Infisical.Sdk": "[3.0.4, )",
-          "Microsoft.Data.SqlClient": "[6.1.0, )",
-          "Microsoft.Data.Sqlite": "[10.0.10, )",
-          "MySqlConnector": "[2.6.1, )",
-          "Npgsql": "[10.0.3, )",
-          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
-          "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, )",
-          "System.Security.Cryptography.Pkcs": "[10.0.13, )"
         }
       },
       "explore.servicedefaults": {
@@ -1525,15 +1510,6 @@
           "NodaTime": "3.2.2"
         }
       },
-      "Infisical.Sdk": {
-        "type": "CentralTransitive",
-        "requested": "[3.0.4, )",
-        "resolved": "3.0.4",
-        "contentHash": "6D5l4cOcJdG36cw7KULyhC1YuxVAPuSizHdyjXJv2CSJz31vPxj8vplxPy2FElButJd4JFaadwSNqAb61jA4IA==",
-        "dependencies": {
-          "Polly.Extensions.Http": "3.0.0"
-        }
-      },
       "MailKit": {
         "type": "CentralTransitive",
         "requested": "[4.17.0, )",
@@ -1642,17 +1618,6 @@
           "Microsoft.SqlServer.Server": "1.0.0",
           "System.Configuration.ConfigurationManager": "9.0.4",
           "System.Security.Cryptography.Pkcs": "9.0.4"
-        }
-      },
-      "Microsoft.Data.Sqlite": {
-        "type": "CentralTransitive",
-        "requested": "[10.0.10, )",
-        "resolved": "10.0.10",
-        "contentHash": "58JwZ39lCvRXHfV5O6RQfbHEDu8ZsXI7weRoVRR4jrGRxxkS+qyeuGrN2xD+9VYEICApYr0iTSL6PuU+DdsvPg==",
-        "dependencies": {
-          "Microsoft.Data.Sqlite.Core": "10.0.10",
-          "SQLitePCLRaw.bundle_e_sqlite3": "2.1.11",
-          "SQLitePCLRaw.core": "2.1.11"
         }
       },
       "Microsoft.EntityFrameworkCore": {

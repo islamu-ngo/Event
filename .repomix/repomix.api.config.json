@@ -13,7 +13,6 @@
     "Explore.Domain/**/*",
     "Explore.Infrastructure/**/*",
     "Explore.Persistence/**/*",
-    "Explore.Secrets/**/*",
     "Explore.ServiceDefaults/**/*",
     "docs/**/*",
     ".claude/**/*",

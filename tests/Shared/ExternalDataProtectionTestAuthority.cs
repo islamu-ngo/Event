@@ -63,7 +63,8 @@ internal sealed class ExternalDataProtectionTestAuthority : IExternalDataProtect
         });
         return input with
         {
-            Ring = revokedRing, Admission = revokedAdmission,
+            Ring = revokedRing,
+            Admission = revokedAdmission,
             AdmissionSha256 = ExternalDataProtectionInput.Hash(revokedAdmission)
         };
     }

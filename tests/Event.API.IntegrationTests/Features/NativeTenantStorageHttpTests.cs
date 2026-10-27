@@ -350,8 +350,12 @@ public sealed partial class NativeTenantStorageHttpTests
             })
                 settings.TenantSettingOverrides.Add(new TenantSetting
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!,
-                    SettingKey = key, Value = JsonSerializer.Serialize(value), CreatedAt = DateTime.UtcNow,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = null!,
+                    SettingKey = key,
+                    Value = JsonSerializer.Serialize(value),
+                    CreatedAt = DateTime.UtcNow,
                     CreatedBy = admin.UserId
                 });
             await settings.SaveChangesAsync();
@@ -368,8 +372,11 @@ public sealed partial class NativeTenantStorageHttpTests
         bootstrap.Actors.Add(actor);
         bootstrap.UserExternalLogins.Add(new UserExternalLogin
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = null!,
-            AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak, AuthenticationProvider = null!,
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = null!,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
+            AuthenticationProvider = null!,
             ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(factory.Issuer, user.Id.ToString("D")).Value,
             CreatedAt = DateTime.UtcNow
         });

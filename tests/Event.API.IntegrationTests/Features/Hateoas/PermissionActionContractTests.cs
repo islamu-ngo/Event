@@ -38,7 +38,10 @@ public sealed class PermissionActionContractTests
     public Task CategoryLinksUseCanonicalActionsAndIndependentDecisions(bool update, bool delete) =>
         AssertPipeline(new CategoryDto
         {
-            Id = ResourceId, TenantId = TenantId, MasterCode = "contract", FullName = "Contract"
+            Id = ResourceId,
+            TenantId = TenantId,
+            MasterCode = "contract",
+            FullName = "Contract"
         }, new CategoryDetailLinkPolicy(), new CategoryCollectionLinkPolicy(),
             "islamuevent_category", [("edit", "update", update), ("delete", "delete", delete)]);
 
@@ -50,7 +53,10 @@ public sealed class PermissionActionContractTests
     public Task TagLinksUseCanonicalActionsAndIndependentDecisions(bool update, bool delete) =>
         AssertPipeline(new TagDto
         {
-            Id = ResourceId, TenantId = TenantId, MasterCode = "contract", FullName = "Contract"
+            Id = ResourceId,
+            TenantId = TenantId,
+            MasterCode = "contract",
+            FullName = "Contract"
         }, new TagDetailLinkPolicy(), new TagCollectionLinkPolicy(),
             "islamuevent_tag", [("edit", "update", update), ("delete", "delete", delete)]);
 
@@ -60,7 +66,10 @@ public sealed class PermissionActionContractTests
     public Task UserProfileLinkUsesCanonicalActionAndDecision(bool update) =>
         AssertPipeline(new UserDto
         {
-            Id = ResourceId, Email = "contract@example.invalid", FirstName = "Contract", LastName = "Subject"
+            Id = ResourceId,
+            Email = "contract@example.invalid",
+            FirstName = "Contract",
+            LastName = "Subject"
         }, new UserDetailLinkPolicy(), new UserCollectionLinkPolicy(),
             "islamuevent_user", [("edit", "update", update)]);
 

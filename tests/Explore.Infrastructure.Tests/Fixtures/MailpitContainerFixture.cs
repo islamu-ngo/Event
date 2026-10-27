@@ -175,16 +175,26 @@ public sealed class MailpitContainerFixture : IAsyncInitializer, IAsyncDisposabl
         int sequence = Interlocked.Increment(ref _stageSequence);
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
         {
-            schemaVersion = 1, owner = owner.Owner, fixtureNonce = _fixtureNonce,
-            writerPid = Environment.ProcessId, constructedAtUtc = _constructedAtUtc,
-            constructorReturnedAtUtc = _constructorReturnedAtUtc, recordedAtUtc = DateTime.UtcNow,
-            sequence, stage = stage.ToString(), injectFailure = (bool?)null, resource = "mailpit",
-            intendedContainerName = _intendedContainerName, imageReference = MailpitImage,
+            schemaVersion = 1,
+            owner = owner.Owner,
+            fixtureNonce = _fixtureNonce,
+            writerPid = Environment.ProcessId,
+            constructedAtUtc = _constructedAtUtc,
+            constructorReturnedAtUtc = _constructorReturnedAtUtc,
+            recordedAtUtc = DateTime.UtcNow,
+            sequence,
+            stage = stage.ToString(),
+            injectFailure = (bool?)null,
+            resource = "mailpit",
+            intendedContainerName = _intendedContainerName,
+            imageReference = MailpitImage,
             imagePullPolicy = "never",
             dockerEndpointSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(owner.DockerEndpoint.OriginalString))),
             intendedLabels = new Dictionary<string, string>
             {
-                [OwnerLabel] = owner.Owner, [ResourceLabel] = "mailpit", [FixtureLabel] = _fixtureNonce
+                [OwnerLabel] = owner.Owner,
+                [ResourceLabel] = "mailpit",
+                [FixtureLabel] = _fixtureNonce
             }
         });
         Exception? operationFailure = null;
@@ -193,8 +203,11 @@ public sealed class MailpitContainerFixture : IAsyncInitializer, IAsyncDisposabl
             using var stream = new FileStream(Path.Combine(owner.Root, $"mailpit-{_fixtureNonce}-{sequence:D3}-{stage}.json"),
                 new FileStreamOptions
                 {
-                    Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None,
-                    UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite, Options = FileOptions.WriteThrough
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.Write,
+                    Share = FileShare.None,
+                    UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                    Options = FileOptions.WriteThrough
                 });
             try
             {

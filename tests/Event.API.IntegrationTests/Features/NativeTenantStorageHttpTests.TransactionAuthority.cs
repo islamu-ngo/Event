@@ -181,8 +181,11 @@ public sealed partial class NativeTenantStorageHttpTests
         if (row is null)
             global.SystemSettings.Add(new SystemSetting
             {
-                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.SupportAccess.AllowWriteMode,
-                Value = "false", ValueType = SettingValueType.Boolean, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.SupportAccess.AllowWriteMode,
+                Value = "false",
+                ValueType = SettingValueType.Boolean,
+                CreatedAt = DateTime.UtcNow
             });
         else row.Value = "false";
         await global.SaveChangesAsync();

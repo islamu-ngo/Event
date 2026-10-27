@@ -61,7 +61,9 @@ public sealed class BffSessionAuthorityMiddlewareTests(RedisBffTicketStoreTests.
         }));
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false,
+            HandleCookies = false
         });
         await Assert.That(factory.Services.GetRequiredService<IOptions<AuthenticationOptions>>()
             .Value.RequireAuthenticatedSignIn).IsTrue();
@@ -97,7 +99,9 @@ public sealed class BffSessionAuthorityMiddlewareTests(RedisBffTicketStoreTests.
 
             using var anonymous = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
-                BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false
+                BaseAddress = new Uri("https://localhost"),
+                AllowAutoRedirect = false,
+                HandleCookies = false
             });
             using var publicResponse = await anonymous.GetAsync("/test/session-authority/public");
             await Assert.That(publicResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -115,7 +119,9 @@ public sealed class BffSessionAuthorityMiddlewareTests(RedisBffTicketStoreTests.
         await Assert.That(replay.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         using var missing = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false,
+            HandleCookies = false
         });
         using var withoutCookie = await missing.GetAsync("/test/session-authority/protected");
         await Assert.That(withoutCookie.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);

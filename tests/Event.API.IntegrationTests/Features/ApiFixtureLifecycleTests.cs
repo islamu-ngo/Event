@@ -447,7 +447,9 @@ public sealed class SecurityPrerequisiteOwnershipTests
             Directory.CreateDirectory(Root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             using var marker = new FileStream(Marker, new FileStreamOptions
             {
-                Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None,
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
                 UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
             });
             marker.Write(System.Text.Encoding.UTF8.GetBytes(RunId));

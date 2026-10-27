@@ -349,8 +349,10 @@ public sealed class PrivacyErasureStartupRecoveryTests
     {
         using HttpResponseMessage created = await administrator.PostAsJsonAsync("/api/instance/local-identities", new
         {
-            operationId = Guid.CreateVersion7(), email = $"privacy-{Guid.CreateVersion7():N}@example.test",
-            firstName = "Synthetic", lastName = "Ordinary"
+            operationId = Guid.CreateVersion7(),
+            email = $"privacy-{Guid.CreateVersion7():N}@example.test",
+            firstName = "Synthetic",
+            lastName = "Ordinary"
         }, cancellationToken);
         await Assert.That(created.StatusCode).IsEqualTo(HttpStatusCode.Created);
         JsonElement issue = await ReadJsonAsync(created, cancellationToken);
@@ -399,7 +401,8 @@ public sealed class PrivacyErasureStartupRecoveryTests
     {
         using HttpResponseMessage initial = await client.PostAsJsonAsync("/api/auth/local/login", new
         {
-            identifier = subject.ToString("D"), password = temporaryPassword
+            identifier = subject.ToString("D"),
+            password = temporaryPassword
         }, cancellationToken);
         await Assert.That(initial.StatusCode).IsEqualTo(HttpStatusCode.OK);
         JsonElement challenge = await ReadJsonAsync(initial, cancellationToken);
@@ -413,7 +416,8 @@ public sealed class PrivacyErasureStartupRecoveryTests
         client.DefaultRequestHeaders.Authorization = null;
         using HttpResponseMessage normal = await client.PostAsJsonAsync("/api/auth/local/login", new
         {
-            identifier = subject.ToString("D"), password
+            identifier = subject.ToString("D"),
+            password
         }, cancellationToken);
         await Assert.That(normal.StatusCode).IsEqualTo(HttpStatusCode.OK);
         JsonElement session = await ReadJsonAsync(normal, cancellationToken);
@@ -470,8 +474,11 @@ public sealed class PrivacyErasureStartupRecoveryTests
             await using IAsyncDisposable discovery = await discoveryGate.AcquireAsync(cancellationToken);
             seed.Tenants.Add(new Tenant
             {
-                Id = secondTenant, Slug = $"privacy-session-{secondTenant:N}", FullName = "Synthetic second tenant",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = secondTenant,
+                Slug = $"privacy-session-{secondTenant:N}",
+                FullName = "Synthetic second tenant",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             });
             await seed.SaveChangesAsync(cancellationToken);
         }
@@ -489,14 +496,20 @@ public sealed class PrivacyErasureStartupRecoveryTests
             using var dpop = DPoPKeyPair.Generate();
             var session = new OAuthSessionData
             {
-                DPoPKey = dpop.ExportKeyPair(), AuthMethod = "private_key_jwt",
+                DPoPKey = dpop.ExportKeyPair(),
+                AuthMethod = "private_key_jwt",
                 ClientId = "https://privacy.example.test/oauth/client-metadata.json",
-                RedirectUri = "https://privacy.example.test/signin-atproto", Scope = "atproto transition:generic",
+                RedirectUri = "https://privacy.example.test/signin-atproto",
+                Scope = "atproto transition:generic",
                 TokenSet = new TokenSet
                 {
-                    Issuer = "https://issuer.example.test/", Sub = did, Audience = "https://pds.example.invalid/",
-                    Scope = "atproto transition:generic", AccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
-                    RefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)), ExpiresAt = DateTimeOffset.UtcNow.AddHours(1)
+                    Issuer = "https://issuer.example.test/",
+                    Sub = did,
+                    Audience = "https://pds.example.invalid/",
+                    Scope = "atproto transition:generic",
+                    AccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+                    RefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+                    ExpiresAt = DateTimeOffset.UtcNow.AddHours(1)
                 }
             };
             var repository = new UserAuthenticationTokenRepository(tenant);
@@ -611,7 +624,8 @@ public sealed class PrivacyErasureStartupRecoveryTests
 
     private static WebApplicationFactoryClientOptions ClientOptions() => new()
     {
-        BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+        BaseAddress = new Uri("https://localhost"),
+        AllowAutoRedirect = false
     };
 
     private static async Task AssertStartupAndHttpAsync<TEntryPoint>(RecoveryFactory<TEntryPoint> host,
@@ -671,7 +685,9 @@ public sealed class PrivacyErasureStartupRecoveryTests
 
     private static User NewUser() => new()
     {
-        Id = Guid.CreateVersion7(), CreatedAt = DateTime.UtcNow, EmailVerified = true,
+        Id = Guid.CreateVersion7(),
+        CreatedAt = DateTime.UtcNow,
+        EmailVerified = true,
         Pii = new UserPii { Email = $"startup-{Guid.CreateVersion7():N}@example.test", FirstName = "Synthetic", LastName = "Subject" }
     };
 
@@ -679,8 +695,13 @@ public sealed class PrivacyErasureStartupRecoveryTests
     {
         var home = new Location
         {
-            Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-            FullName = "Synthetic private venue", Country = "BE", City = "Brussels", ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            FullName = "Synthetic private venue",
+            Country = "BE",
+            City = "Brussels",
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         home.ClassifyAsPrivateHome(owner);
         home.SetManualAddress("Synthetic address", "1000");
@@ -692,7 +713,9 @@ public sealed class PrivacyErasureStartupRecoveryTests
         var options = new DbContextOptionsBuilder<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = path
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = path
         });
         options.UseSnakeCaseNamingConvention();
         var database = new ExploreDbContext(options.Options);
@@ -787,11 +810,17 @@ public sealed class PrivacyErasureStartupRecoveryTests
     {
         await using var source = new SqliteConnection(new SqliteConnectionStringBuilder
         {
-            DataSource = sourcePath, Mode = SqliteOpenMode.ReadOnly, Pooling = false, DefaultTimeout = 5
+            DataSource = sourcePath,
+            Mode = SqliteOpenMode.ReadOnly,
+            Pooling = false,
+            DefaultTimeout = 5
         }.ConnectionString);
         await using var destination = new SqliteConnection(new SqliteConnectionStringBuilder
         {
-            DataSource = destinationPath, Mode = SqliteOpenMode.ReadWriteCreate, Pooling = false, DefaultTimeout = 5
+            DataSource = destinationPath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Pooling = false,
+            DefaultTimeout = 5
         }.ConnectionString);
         await source.OpenAsync(cancellationToken);
         await destination.OpenAsync(cancellationToken);
@@ -802,7 +831,9 @@ public sealed class PrivacyErasureStartupRecoveryTests
     {
         using var connection = new SqliteConnection(PrimaryDatabaseConfiguration.BuildConnectionString(new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = path
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = path
         }).ConnectionString);
         SqliteConnection.ClearPool(connection);
     }

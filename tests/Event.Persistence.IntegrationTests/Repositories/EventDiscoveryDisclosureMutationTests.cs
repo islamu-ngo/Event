@@ -1180,7 +1180,9 @@ public sealed class EventDiscoveryDisclosureMutationTests
 
         public Task<ExploreDbContext> OpenGlobalAsync() => new GlobalExploreDbContextFactory(new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Global, Provider = PrimaryDatabaseProvider.Sqlite, Database = _path
+            Role = PrimaryDatabaseRole.Global,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = _path
         }).CreateDbContextAsync();
 
         public async Task<PrivacySeed> SeedPrivacyAsync()
@@ -1192,16 +1194,32 @@ public sealed class EventDiscoveryDisclosureMutationTests
             await using var discovery = await discoveryGate.AcquireAsync();
             await LookupTableSeeder.SeedLocationPrivacyLookupsAsync(seed, CancellationToken.None);
             await LookupTableSeeder.SeedLocationAddressGovernanceLookupsAsync(seed, CancellationToken.None);
-            var subject = new User { Id = Guid.CreateVersion7(), CreatedAt = DateTime.UtcNow,
-                Pii = new UserPii { Email = $"subject-{Guid.CreateVersion7():N}@example.test", FirstName = "Synthetic", LastName = "Subject" } };
-            var unrelated = new User { Id = Guid.CreateVersion7(), CreatedAt = DateTime.UtcNow,
-                Pii = new UserPii { Email = $"unrelated-{Guid.CreateVersion7():N}@example.test", FirstName = "Synthetic", LastName = "Unrelated" } };
+            var subject = new User
+            {
+                Id = Guid.CreateVersion7(),
+                CreatedAt = DateTime.UtcNow,
+                Pii = new UserPii { Email = $"subject-{Guid.CreateVersion7():N}@example.test", FirstName = "Synthetic", LastName = "Subject" }
+            };
+            var unrelated = new User
+            {
+                Id = Guid.CreateVersion7(),
+                CreatedAt = DateTime.UtcNow,
+                Pii = new UserPii { Email = $"unrelated-{Guid.CreateVersion7():N}@example.test", FirstName = "Synthetic", LastName = "Unrelated" }
+            };
             seed.AddRange(subject, unrelated);
             await seed.SaveChangesAsync();
             Location Home(Guid tenant, Guid owner)
             {
-                var home = new Location { Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!,
-                    FullName = "Synthetic private home", Country = "BE", City = "Brussels", ConcurrencyStamp = Guid.CreateVersion7() };
+                var home = new Location
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant,
+                    Tenant = null!,
+                    FullName = "Synthetic private home",
+                    Country = "BE",
+                    City = "Brussels",
+                    ConcurrencyStamp = Guid.CreateVersion7()
+                };
                 home.ClassifyAsPrivateHome(owner);
                 home.SetManualAddress("Synthetic address", "1000");
                 return home;
@@ -1209,11 +1227,27 @@ public sealed class EventDiscoveryDisclosureMutationTests
             var first = Home(TenantId, subject.Id);
             var second = Home(OtherTenantId, subject.Id);
             var other = Home(TenantId, unrelated.Id);
-            var venue = new Location { Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!,
-                FullName = "Synthetic public venue", Country = "BE", City = "Brussels" };
+            var venue = new Location
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = TenantId,
+                Tenant = null!,
+                FullName = "Synthetic public venue",
+                Country = "BE",
+                City = "Brussels"
+            };
             venue.ClassifyAs(LocationKindEnum.CommercialVenue);
-            var deletedRoom = new LocationRoom { Id = Guid.CreateVersion7(), TenantId = OtherTenantId, Tenant = null!,
-                Location = second, LocationId = second.Id, Name = "Owned deleted room", Description = "Synthetic private description", IsDeleted = true };
+            var deletedRoom = new LocationRoom
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = OtherTenantId,
+                Tenant = null!,
+                Location = second,
+                LocationId = second.Id,
+                Name = "Owned deleted room",
+                Description = "Synthetic private description",
+                IsDeleted = true
+            };
             seed.AddRange(first, second, other, venue, deletedRoom);
             await seed.SaveChangesAsync();
             return new(subject.Id, unrelated.Id, first.Id, second.Id, other.Id, venue.Id, deletedRoom.Id);

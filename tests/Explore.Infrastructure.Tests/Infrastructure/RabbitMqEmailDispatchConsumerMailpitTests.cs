@@ -167,7 +167,8 @@ public sealed class RabbitMqEmailDispatchConsumerMailpitTests(
 
             broker = await new ConnectionFactory
             {
-                Uri = new Uri(rabbitMq.AmqpConnectionString), AutomaticRecoveryEnabled = false,
+                Uri = new Uri(rabbitMq.AmqpConnectionString),
+                AutomaticRecoveryEnabled = false,
                 ClientProvidedName = $"{settings.ClientProvidedName}:settlement-observer"
             }.CreateConnectionAsync(deadline.Token);
             observerChannel = await broker.CreateChannelAsync(cancellationToken: deadline.Token);

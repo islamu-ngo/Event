@@ -66,7 +66,8 @@ public sealed class ConfigurationAuthorityRegressionTests
                 string environmentPrefix = canonical.Replace(":", "__", StringComparison.Ordinal);
                 using var selectedEnvironment = new EnvironmentScope(new()
                 {
-                    ["SECRET_PROVIDER"] = "Environment", ["SecretProvider__Provider"] = "Environment",
+                    ["SECRET_PROVIDER"] = "Environment",
+                    ["SecretProvider__Provider"] = "Environment",
                     ["ERASURE_DATABASE_TOPOLOGY"] = "EmbeddedSqlite",
                     [prefix + "USERNAME"] = form == 0 ? username : Guid.CreateVersion7().ToString("N"),
                     [prefix + "PASSWORD"] = form == 0 ? password : Guid.CreateVersion7().ToString("N"),

@@ -225,172 +225,174 @@ public sealed class AppHostCompositionContractTests
     public async Task ErasureTopologySelectsManagedResourcesAndKeepsTheBffOutsideDatabaseAuthority()
     {
         foreach (string topology in new[] { "Split", "Standalone" })
-          foreach (string mode in new[] { "local-lite", "local-core", "local-default", "local-full" })
-            foreach (string erasure in new[] { "EmbeddedSqlite", "ExternalDatabase" })
-                await InspectAsync(async builder =>
-                {
-                    var worker = Project(builder, "event-migrationservice");
-                    var backend = Project(builder, topology == "Split" ? "explore-api" : "event-standalone");
-                    if (topology == "Split") _ = Project(builder, "explore-blazor");
-                    await Assert.That(HasExpectedApplicationProjects(builder, topology == "Standalone")).IsTrue();
-                    bool localAuthority = mode != "local-lite" && erasure == "ExternalDatabase";
-                    var database = builder.Resources.OfType<PostgresDatabaseResource>()
-                        .SingleOrDefault(resource => resource.Name == "privacy-erasure-authority");
-                    var server = builder.Resources.OfType<PostgresServerResource>()
-                        .SingleOrDefault(resource => resource.Name == "privacy-erasure-postgres");
-                    await Assert.That(database is not null).IsEqualTo(localAuthority);
-                    await Assert.That(server is not null).IsEqualTo(localAuthority);
-                    foreach (var resource in builder.Resources.OfType<IResourceWithEnvironment>())
-                        await Assert.That(HasNoBroadNamedErasureConnection(await EnvironmentAsync(builder, resource))).IsTrue()
-                            .Because("Every environment-capable resource must exclude active broad named erasure connections.");
-                    foreach (var project in builder.Resources.OfType<ProjectResource>())
+            foreach (string mode in new[] { "local-lite", "local-core", "local-default", "local-full" })
+                foreach (string erasure in new[] { "EmbeddedSqlite", "ExternalDatabase" })
+                    await InspectAsync(async builder =>
                     {
-                        var environment = await EnvironmentAsync(builder, project);
-                        bool bff = project.Name is "explore-blazor" or "explore-blazor-peer";
-                        await Assert.That(environment.EnvironmentVariables.Any(pair => pair.Key.StartsWith(
-                            "PrivacyErasureAuthorityDatabase__", StringComparison.Ordinal) && pair.Value is not (null or "")))
-                            .IsEqualTo(!bff && erasure == "ExternalDatabase");
-                        await Assert.That(environment.EnvironmentVariables.Any(pair =>
-                            pair.Key == "PrivacyErasureAuthorityEmbedded__Path" && pair.Value is not (null or "")))
-                            .IsEqualTo(!bff && erasure == "EmbeddedSqlite");
-                        if (bff)
+                        var worker = Project(builder, "event-migrationservice");
+                        var backend = Project(builder, topology == "Split" ? "explore-api" : "event-standalone");
+                        if (topology == "Split") _ = Project(builder, "explore-blazor");
+                        await Assert.That(HasExpectedApplicationProjects(builder, topology == "Standalone")).IsTrue();
+                        bool localAuthority = mode != "local-lite" && erasure == "ExternalDatabase";
+                        var database = builder.Resources.OfType<PostgresDatabaseResource>()
+                            .SingleOrDefault(resource => resource.Name == "privacy-erasure-authority");
+                        var server = builder.Resources.OfType<PostgresServerResource>()
+                            .SingleOrDefault(resource => resource.Name == "privacy-erasure-postgres");
+                        await Assert.That(database is not null).IsEqualTo(localAuthority);
+                        await Assert.That(server is not null).IsEqualTo(localAuthority);
+                        foreach (var resource in builder.Resources.OfType<IResourceWithEnvironment>())
+                            await Assert.That(HasNoBroadNamedErasureConnection(await EnvironmentAsync(builder, resource))).IsTrue()
+                                .Because("Every environment-capable resource must exclude active broad named erasure connections.");
+                        foreach (var project in builder.Resources.OfType<ProjectResource>())
                         {
-                            await Assert.That(BffHasNoDeclaredDatabaseAuthority(environment)).IsTrue()
-                                .Because("A BFF-only resource must have no active primary or erasure database authority.");
-                            await Assert.That(BffHasNoErasureDependency(project, environment, database, server)).IsTrue()
-                                .Because("A BFF-only resource must not directly reference or wait for the erasure database or its server.");
-                            builder.CreateResourceBuilder(project)
-                                .WithEnvironment("PrivacyErasureAuthorityDatabase__Runtime__Password", string.Empty)
-                                .WithEnvironment("PrivacyErasureAuthorityEmbedded__Path", string.Empty)
-                                .WithEnvironment("ConnectionStrings__PrivacyErasureAuthority", string.Empty);
-                            environment = await EnvironmentAsync(builder, project);
-                            await Assert.That(BffHasNoDeclaredDatabaseAuthority(environment)).IsTrue()
-                                .Because("Explicit empty authority denial placeholders grant no database authority.");
-                            await Assert.That(HasNoBroadNamedErasureConnection(environment)).IsTrue()
-                                .Because("An empty named-connection denial placeholder grants no erasure authority.");
-                        }
-                        else if (ReferenceEquals(project, backend))
-                        {
-                            await Assert.That(BffHasNoDeclaredDatabaseAuthority(environment)).IsFalse()
-                                .Because("The API role receives its selected primary database authority.");
-                            foreach (var purpose in new[]
+                            var environment = await EnvironmentAsync(builder, project);
+                            bool bff = project.Name is "explore-blazor" or "explore-blazor-peer";
+                            await Assert.That(environment.EnvironmentVariables.Any(pair => pair.Key.StartsWith(
+                                "PrivacyErasureAuthorityDatabase__", StringComparison.Ordinal) && pair.Value is not (null or "")))
+                                .IsEqualTo(!bff && erasure == "ExternalDatabase");
+                            await Assert.That(environment.EnvironmentVariables.Any(pair =>
+                                pair.Key == "PrivacyErasureAuthorityEmbedded__Path" && pair.Value is not (null or "")))
+                                .IsEqualTo(!bff && erasure == "EmbeddedSqlite");
+                            if (bff)
                             {
+                                await Assert.That(BffHasNoDeclaredDatabaseAuthority(environment)).IsTrue()
+                                    .Because("A BFF-only resource must have no active primary or erasure database authority.");
+                                await Assert.That(BffHasNoErasureDependency(project, environment, database, server)).IsTrue()
+                                    .Because("A BFF-only resource must not directly reference or wait for the erasure database or its server.");
+                                builder.CreateResourceBuilder(project)
+                                    .WithEnvironment("PrivacyErasureAuthorityDatabase__Runtime__Password", string.Empty)
+                                    .WithEnvironment("PrivacyErasureAuthorityEmbedded__Path", string.Empty)
+                                    .WithEnvironment("ConnectionStrings__PrivacyErasureAuthority", string.Empty);
+                                environment = await EnvironmentAsync(builder, project);
+                                await Assert.That(BffHasNoDeclaredDatabaseAuthority(environment)).IsTrue()
+                                    .Because("Explicit empty authority denial placeholders grant no database authority.");
+                                await Assert.That(HasNoBroadNamedErasureConnection(environment)).IsTrue()
+                                    .Because("An empty named-connection denial placeholder grants no erasure authority.");
+                            }
+                            else if (ReferenceEquals(project, backend))
+                            {
+                                await Assert.That(BffHasNoDeclaredDatabaseAuthority(environment)).IsFalse()
+                                    .Because("The API role receives its selected primary database authority.");
+                                foreach (var purpose in new[]
+                                {
                                 PrimaryDatabaseRole.EmailPolicyInstanceMutation,
                                 PrimaryDatabaseRole.EmailPolicyTenantMutation
-                            })
-                            {
-                                string prefix = $"Database__{purpose}__";
-                                bool projected = HasActiveEnvironmentEntry(environment, prefix + "Username")
-                                    && HasActiveEnvironmentEntry(environment, prefix + "Password");
-                                await Assert.That(projected).IsTrue()
-                                    .Because("API and Combined require both selected email-policy database authorities.");
-                                bool selectedBinding = false, declaredEmptyDenied = false;
-                                CancellationToken token = TestContext.Current!.Execution.CancellationToken;
-                                try
+                                })
                                 {
-                                    string? username = environment.EnvironmentVariables[prefix + "Username"] switch
-                                    {
-                                        string text => text,
-                                        IValueProvider provider => await provider.GetValueAsync(token),
-                                        _ => null
-                                    };
-                                    string? password = environment.EnvironmentVariables[prefix + "Password"] switch
-                                    {
-                                        string text => text,
-                                        IValueProvider provider => await provider.GetValueAsync(token),
-                                        _ => null
-                                    };
-                                    var shared = PrimaryDatabaseConfiguration.BindRuntime(builder.Configuration);
-                                    var selected = PrimaryDatabaseConfiguration.Bind(builder.Configuration, purpose);
-                                    string alias = purpose == PrimaryDatabaseRole.EmailPolicyInstanceMutation
-                                        ? "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_" : "DATABASE_EMAIL_POLICY_TENANT_MUTATION_";
-                                    // Use owned nonsecret coordinates; model endpoints have not been allocated.
-                                    var inputs = new Dictionary<string, string?>
-                                    {
-                                        ["Database:Provider"] = shared.Provider.ToString(),
-                                        ["Database:Host"] = shared.Host, ["Database:Database"] = shared.Database,
-                                        ["Database:Schema"] = shared.Schema, ["Database:TlsMode"] = shared.TlsMode.ToString(),
-                                        ["Database:TrustServerCertificate"] = shared.TrustServerCertificate.ToString(),
-                                        [$"Database:{purpose}:Username"] = username,
-                                        [$"Database:{purpose}:Password"] = password,
-                                        [alias + "USERNAME"] = shared.Username,
-                                        [alias + "PASSWORD"] = shared.Password
-                                    };
-                                    using var projectedConfiguration = new ConfigurationManager();
-                                    projectedConfiguration.AddInMemoryCollection(inputs);
-                                    var bound = PrimaryDatabaseConfiguration.Bind(projectedConfiguration, purpose);
-                                    selectedBinding = bound.Role == purpose && bound.Username == selected.Username
-                                        && bound.Password == selected.Password && password != shared.Password;
-                                    inputs[$"Database:{purpose}:Password"] = string.Empty;
-                                    inputs[alias + "PASSWORD"] = selected.Password;
+                                    string prefix = $"Database__{purpose}__";
+                                    bool projected = HasActiveEnvironmentEntry(environment, prefix + "Username")
+                                        && HasActiveEnvironmentEntry(environment, prefix + "Password");
+                                    await Assert.That(projected).IsTrue()
+                                        .Because("API and Combined require both selected email-policy database authorities.");
+                                    bool selectedBinding = false, declaredEmptyDenied = false;
+                                    CancellationToken token = TestContext.Current!.Execution.CancellationToken;
                                     try
                                     {
-                                        using var denied = new ConfigurationManager();
-                                        denied.AddInMemoryCollection(inputs);
-                                        _ = PrimaryDatabaseConfiguration.Bind(denied, purpose);
+                                        string? username = environment.EnvironmentVariables[prefix + "Username"] switch
+                                        {
+                                            string text => text,
+                                            IValueProvider provider => await provider.GetValueAsync(token),
+                                            _ => null
+                                        };
+                                        string? password = environment.EnvironmentVariables[prefix + "Password"] switch
+                                        {
+                                            string text => text,
+                                            IValueProvider provider => await provider.GetValueAsync(token),
+                                            _ => null
+                                        };
+                                        var shared = PrimaryDatabaseConfiguration.BindRuntime(builder.Configuration);
+                                        var selected = PrimaryDatabaseConfiguration.Bind(builder.Configuration, purpose);
+                                        string alias = purpose == PrimaryDatabaseRole.EmailPolicyInstanceMutation
+                                            ? "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_" : "DATABASE_EMAIL_POLICY_TENANT_MUTATION_";
+                                        // Use owned nonsecret coordinates; model endpoints have not been allocated.
+                                        var inputs = new Dictionary<string, string?>
+                                        {
+                                            ["Database:Provider"] = shared.Provider.ToString(),
+                                            ["Database:Host"] = shared.Host,
+                                            ["Database:Database"] = shared.Database,
+                                            ["Database:Schema"] = shared.Schema,
+                                            ["Database:TlsMode"] = shared.TlsMode.ToString(),
+                                            ["Database:TrustServerCertificate"] = shared.TrustServerCertificate.ToString(),
+                                            [$"Database:{purpose}:Username"] = username,
+                                            [$"Database:{purpose}:Password"] = password,
+                                            [alias + "USERNAME"] = shared.Username,
+                                            [alias + "PASSWORD"] = shared.Password
+                                        };
+                                        using var projectedConfiguration = new ConfigurationManager();
+                                        projectedConfiguration.AddInMemoryCollection(inputs);
+                                        var bound = PrimaryDatabaseConfiguration.Bind(projectedConfiguration, purpose);
+                                        selectedBinding = bound.Role == purpose && bound.Username == selected.Username
+                                            && bound.Password == selected.Password && password != shared.Password;
+                                        inputs[$"Database:{purpose}:Password"] = string.Empty;
+                                        inputs[alias + "PASSWORD"] = selected.Password;
+                                        try
+                                        {
+                                            using var denied = new ConfigurationManager();
+                                            denied.AddInMemoryCollection(inputs);
+                                            _ = PrimaryDatabaseConfiguration.Bind(denied, purpose);
+                                        }
+                                        catch (Microsoft.Extensions.Options.OptionsValidationException failure)
+                                        {
+                                            declaredEmptyDenied = failure.Failures.Contains("PostgreSql requires Password.", StringComparer.Ordinal);
+                                        }
                                     }
-                                    catch (Microsoft.Extensions.Options.OptionsValidationException failure)
-                                    {
-                                        declaredEmptyDenied = failure.Failures.Contains("PostgreSql requires Password.", StringComparer.Ordinal);
-                                    }
+                                    catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+                                    catch (Exception) { selectedBinding = false; }
+                                    await Assert.That(selectedBinding && declaredEmptyDenied).IsTrue()
+                                        .Because("Native email-policy role binding must preserve selected authority and declared-empty denial.");
                                 }
-                                catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-                                catch (Exception) { selectedBinding = false; }
-                                await Assert.That(selectedBinding && declaredEmptyDenied).IsTrue()
-                                    .Because("Native email-policy role binding must preserve selected authority and declared-empty denial.");
                             }
-                        }
-                        if (!ReferenceEquals(project, backend))
-                            foreach (string purpose in new[] { "EmailPolicyInstanceMutation", "EmailPolicyTenantMutation" })
-                                await Assert.That(!HasActiveEnvironmentEntry(environment, $"Database__{purpose}__Password")
-                                    && !HasActiveEnvironmentEntry(environment, purpose == "EmailPolicyInstanceMutation"
-                                        ? "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"
-                                        : "DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD")).IsTrue()
-                                    .Because("BFF-only and migration resources must not receive email-policy workflow passwords.");
-                        if (!bff && erasure == "EmbeddedSqlite")
-                        {
-                            string root = builder.Configuration["ISLAMU_TEST_ROOT"]!;
-                            await Assert.That(environment.EnvironmentVariables["PrivacyErasureAuthorityEmbedded__Path"] is string path
-                                && Path.GetFullPath(path) == Path.Combine(root, "privacy-erasure-authority-data",
-                                    "aspire-local", "privacy_erasure_authority.db")).IsTrue();
-                            await Assert.That(environment.EnvironmentVariables["PrivacyErasureAuthorityEmbedded__WriterReplicaCount"] as string)
-                                .IsEqualTo("1");
-                            await Assert.That(project.Annotations.OfType<ReplicaAnnotation>().Single().Replicas).IsEqualTo(1);
-                        }
-                        if (!bff && erasure == "ExternalDatabase")
-                        {
-                            string role = ReferenceEquals(project, worker) ? "Migrator" : "Runtime";
-                            string otherRole = role == "Migrator" ? "Runtime" : "Migrator";
-                            foreach (string family in new[] { "PrivacyErasureAuthorityDatabase", "Database__Erasure" })
+                            if (!ReferenceEquals(project, backend))
+                                foreach (string purpose in new[] { "EmailPolicyInstanceMutation", "EmailPolicyTenantMutation" })
+                                    await Assert.That(!HasActiveEnvironmentEntry(environment, $"Database__{purpose}__Password")
+                                        && !HasActiveEnvironmentEntry(environment, purpose == "EmailPolicyInstanceMutation"
+                                            ? "DATABASE_EMAIL_POLICY_INSTANCE_MUTATION_PASSWORD"
+                                            : "DATABASE_EMAIL_POLICY_TENANT_MUTATION_PASSWORD")).IsTrue()
+                                        .Because("BFF-only and migration resources must not receive email-policy workflow passwords.");
+                            if (!bff && erasure == "EmbeddedSqlite")
                             {
-                                await Assert.That(HasActiveEnvironmentEntry(environment, $"{family}__{role}__Username")
-                                    && HasActiveEnvironmentEntry(environment, $"{family}__{role}__Password")).IsTrue()
-                                    .Because("Each erasure consumer must receive active credentials for its own purpose.");
-                                await Assert.That(environment.EnvironmentVariables.Any(pair =>
-                                    NormalizeEnvironmentKey(pair.Key).StartsWith(
-                                        NormalizeEnvironmentKey($"{family}__{otherRole}__"), StringComparison.Ordinal)
-                                    && pair.Value is not (null or ""))).IsFalse()
-                                    .Because("An erasure consumer must not receive the other purpose's credentials.");
+                                string root = builder.Configuration["ISLAMU_TEST_ROOT"]!;
+                                await Assert.That(environment.EnvironmentVariables["PrivacyErasureAuthorityEmbedded__Path"] is string path
+                                    && Path.GetFullPath(path) == Path.Combine(root, "privacy-erasure-authority-data",
+                                        "aspire-local", "privacy_erasure_authority.db")).IsTrue();
+                                await Assert.That(environment.EnvironmentVariables["PrivacyErasureAuthorityEmbedded__WriterReplicaCount"] as string)
+                                    .IsEqualTo("1");
+                                await Assert.That(project.Annotations.OfType<ReplicaAnnotation>().Single().Replicas).IsEqualTo(1);
+                            }
+                            if (!bff && erasure == "ExternalDatabase")
+                            {
+                                string role = ReferenceEquals(project, worker) ? "Migrator" : "Runtime";
+                                string otherRole = role == "Migrator" ? "Runtime" : "Migrator";
+                                foreach (string family in new[] { "PrivacyErasureAuthorityDatabase", "Database__Erasure" })
+                                {
+                                    await Assert.That(HasActiveEnvironmentEntry(environment, $"{family}__{role}__Username")
+                                        && HasActiveEnvironmentEntry(environment, $"{family}__{role}__Password")).IsTrue()
+                                        .Because("Each erasure consumer must receive active credentials for its own purpose.");
+                                    await Assert.That(environment.EnvironmentVariables.Any(pair =>
+                                        NormalizeEnvironmentKey(pair.Key).StartsWith(
+                                            NormalizeEnvironmentKey($"{family}__{otherRole}__"), StringComparison.Ordinal)
+                                        && pair.Value is not (null or ""))).IsFalse()
+                                        .Because("An erasure consumer must not receive the other purpose's credentials.");
+                                }
                             }
                         }
-                    }
-                    if (mode == "local-core" && erasure == "EmbeddedSqlite")
-                    {
-                        string runId = builder.Configuration["ISLAMU_TEST_RUN_ID"]!;
-                        foreach (string? volume in new[] { null, $"islamu-test-{runId}-privacy-erasure-authority-data" })
+                        if (mode == "local-core" && erasure == "EmbeddedSqlite")
                         {
-                            var container = new ContainerResource(volume is null ? "erasure-default-deployment" : "erasure-owned-deployment");
-                            EmbeddedPrivacyErasureDeployment.Configure(volume)(builder.CreateResourceBuilder(container));
-                            var deployed = await EnvironmentAsync(builder, container);
-                            await Assert.That(deployed.EnvironmentVariables["PrivacyErasureAuthorityEmbedded__Path"] as string)
-                                .IsEqualTo("/app/data/privacy_erasure_authority.db");
-                            var mount = container.Annotations.OfType<ContainerMountAnnotation>().Single();
-                            await Assert.That(mount.Type == ContainerMountType.Volume && !mount.IsReadOnly).IsTrue();
-                            await Assert.That(mount.Target).IsEqualTo("/app/data");
-                            await Assert.That(mount.Source).IsEqualTo(volume ?? "islamu-event-privacy-erasure-authority-data");
+                            string runId = builder.Configuration["ISLAMU_TEST_RUN_ID"]!;
+                            foreach (string? volume in new[] { null, $"islamu-test-{runId}-privacy-erasure-authority-data" })
+                            {
+                                var container = new ContainerResource(volume is null ? "erasure-default-deployment" : "erasure-owned-deployment");
+                                EmbeddedPrivacyErasureDeployment.Configure(volume)(builder.CreateResourceBuilder(container));
+                                var deployed = await EnvironmentAsync(builder, container);
+                                await Assert.That(deployed.EnvironmentVariables["PrivacyErasureAuthorityEmbedded__Path"] as string)
+                                    .IsEqualTo("/app/data/privacy_erasure_authority.db");
+                                var mount = container.Annotations.OfType<ContainerMountAnnotation>().Single();
+                                await Assert.That(mount.Type == ContainerMountType.Volume && !mount.IsReadOnly).IsTrue();
+                                await Assert.That(mount.Target).IsEqualTo("/app/data");
+                                await Assert.That(mount.Source).IsEqualTo(volume ?? "islamu-event-privacy-erasure-authority-data");
+                            }
                         }
-                    }
-                }, topology: topology, runMode: mode, erasure: erasure);
+                    }, topology: topology, runMode: mode, erasure: erasure);
 
         foreach (string topology in new[] { "Split", "Standalone" })
             foreach (string? alias in new[] { null, "PrivacyErasureAuthority", "PrivacyErasureAuthorityMigrator" })
@@ -681,7 +683,8 @@ public sealed class AppHostCompositionContractTests
                 && uri.Query.Contains("search_path=cerbos", StringComparison.Ordinal);
         }
         catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken
-            && cancellationToken.IsCancellationRequested) { throw; }
+            && cancellationToken.IsCancellationRequested)
+        { throw; }
         catch (Exception) { return false; }
     }
 

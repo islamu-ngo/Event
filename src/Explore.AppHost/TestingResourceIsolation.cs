@@ -107,9 +107,12 @@ public sealed record TestingResourceIsolation(string RunId, string Root,
             throw new InvalidOperationException("test_resource_profile_invalid");
         var expected = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["IDENTITY_DATABASE_TOPOLOGY"] = "External", ["IdentityDatabase:Topology"] = "External",
-            ["IDENTITY_DATABASE_PROVIDER"] = "Sqlite", ["IdentityDatabase:Provider"] = "Sqlite",
-            ["IDENTITY_DATABASE_NAME"] = path, ["IdentityDatabase:Name"] = path
+            ["IDENTITY_DATABASE_TOPOLOGY"] = "External",
+            ["IdentityDatabase:Topology"] = "External",
+            ["IDENTITY_DATABASE_PROVIDER"] = "Sqlite",
+            ["IdentityDatabase:Provider"] = "Sqlite",
+            ["IDENTITY_DATABASE_NAME"] = path,
+            ["IdentityDatabase:Name"] = path
         };
         foreach (var pair in configuration.AsEnumerable())
         {
@@ -211,7 +214,10 @@ public sealed record TestingResourceIsolation(string RunId, string Root,
             }
             byte[] bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
             {
-                Schema = 1, RunId, Containers = rows, Projects = projectRows
+                Schema = 1,
+                RunId,
+                Containers = rows,
+                Projects = projectRows
             });
             if (bytes.Length > 262144) return false;
             snapshot = bytes;
@@ -260,7 +266,9 @@ public sealed record TestingResourceIsolation(string RunId, string Root,
             string published = Path.Combine(Root, "container-model.json");
             pending = new FileStream(temporary, new FileStreamOptions
             {
-                Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.Read,
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.ReadWrite,
+                Share = FileShare.Read,
                 UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
             });
             await pending.WriteAsync(bytes, cancellationToken);
@@ -348,7 +356,9 @@ public sealed record TestingResourceIsolation(string RunId, string Root,
         using var process = new System.Diagnostics.Process();
         process.StartInfo = new System.Diagnostics.ProcessStartInfo("/usr/bin/stat")
         {
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
         process.StartInfo.Environment["LC_ALL"] = "C";
         if (follow) process.StartInfo.ArgumentList.Add("--dereference");

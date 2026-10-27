@@ -49,7 +49,10 @@ internal sealed record AssuranceOwnershipContext
                 throw new InvalidOperationException("test_resource_ownership_invalid");
             await using var input = new FileStream(markerPath, new FileStreamOptions
             {
-                Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, Options = FileOptions.Asynchronous
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                Options = FileOptions.Asynchronous
             });
             if (input.Length != 32) throw new InvalidOperationException("test_resource_ownership_invalid");
             byte[] bytes = new byte[32];
@@ -92,7 +95,10 @@ internal sealed record AssuranceOwnershipContext
         {
             StartInfo = new ProcessStartInfo("/usr/bin/stat")
             {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
             }
         };
         process.StartInfo.Environment.Clear();

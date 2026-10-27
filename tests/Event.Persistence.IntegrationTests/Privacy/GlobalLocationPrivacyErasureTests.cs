@@ -1031,14 +1031,20 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
         using var dpop = DPoPKeyPair.Generate();
         var session = new OAuthSessionData
         {
-            DPoPKey = dpop.ExportKeyPair(), AuthMethod = "private_key_jwt",
+            DPoPKey = dpop.ExportKeyPair(),
+            AuthMethod = "private_key_jwt",
             ClientId = "https://privacy.example.test/oauth/client-metadata.json",
-            RedirectUri = "https://privacy.example.test/signin-atproto", Scope = "atproto transition:generic",
+            RedirectUri = "https://privacy.example.test/signin-atproto",
+            Scope = "atproto transition:generic",
             TokenSet = new TokenSet
             {
-                Issuer = "https://issuer.example.test/", Sub = subjectDid, Audience = "https://pds.example.invalid/",
-                Scope = "atproto transition:generic", AccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
-                RefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)), ExpiresAt = DateTimeOffset.UtcNow.AddHours(1)
+                Issuer = "https://issuer.example.test/",
+                Sub = subjectDid,
+                Audience = "https://pds.example.invalid/",
+                Scope = "atproto transition:generic",
+                AccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+                RefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(1)
             }
         };
         var store = new RepositoryBackedOAuthSessionStore(new UserAuthenticationTokenRepository(context),

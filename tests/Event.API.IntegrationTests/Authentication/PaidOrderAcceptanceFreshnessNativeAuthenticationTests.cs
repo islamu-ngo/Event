@@ -181,20 +181,30 @@ public sealed class PaidOrderAcceptanceFreshnessNativeAuthenticationTests
             ProviderRequirementsState.Satisfied, ["EUR"], now, "freshness-ready"));
         var identity = new InstanceOperatorIdentitySettings
         {
-            OperatorId = Guid.CreateVersion7(), Revision = Guid.CreateVersion7(), PublicName = "Independent Operator",
-            LegalName = "Independent Operator ASBL", OperatorKindCode = "registered_organization",
-            JurisdictionCountryCode = "BE", RegistrationIdentifier = "BE 0123.456.789",
-            PublicContactEmail = "complaints@example.test", WebsiteUrl = "https://events.example.test",
-            OfficialOrigin = "https://events.example.test", LegalNoticeUrl = "https://events.example.test/legal",
-            TermsUrl = "https://events.example.test/terms", PrivacyUrl = "https://events.example.test/privacy"
+            OperatorId = Guid.CreateVersion7(),
+            Revision = Guid.CreateVersion7(),
+            PublicName = "Independent Operator",
+            LegalName = "Independent Operator ASBL",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            RegistrationIdentifier = "BE 0123.456.789",
+            PublicContactEmail = "complaints@example.test",
+            WebsiteUrl = "https://events.example.test",
+            OfficialOrigin = "https://events.example.test",
+            LegalNoticeUrl = "https://events.example.test/legal",
+            TermsUrl = "https://events.example.test/terms",
+            PrivacyUrl = "https://events.example.test/privacy"
         };
         database.AddRange(actor, target, catalog, contribution, order, policy, directory, connection,
             PaidCheckoutSaleControl.CreateActive(tenant, null, userId, now),
             new SystemSetting
             {
-                Id = Guid.CreateVersion7(), SettingKey = InstanceOperatorIdentitySettingKeys.OperatorIdentity,
-                Value = JsonSerializer.Serialize(identity, JsonOptions), ValueType = SettingValueType.Json,
-                Category = "OperatorIdentity", CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                SettingKey = InstanceOperatorIdentitySettingKeys.OperatorIdentity,
+                Value = JsonSerializer.Serialize(identity, JsonOptions),
+                ValueType = SettingValueType.Json,
+                Category = "OperatorIdentity",
+                CreatedAt = now
             });
         await database.SaveChangesAsync();
         return order.Id;
@@ -202,8 +212,14 @@ public sealed class PaidOrderAcceptanceFreshnessNativeAuthenticationTests
 
     private static TenantDirectoryOperatorIdentitySettings DirectoryIdentity() => new()
     {
-        PublicName = "Community Events", LegalName = "Community Events ASBL", OperatorKindCode = "registered_organization",
-        JurisdictionCountryCode = "BE", RegistrationIdentifier = "BE 0987.654.321", PublicContactEmail = "contact@example.test",
-        LegalNoticeUrl = "https://example.test/legal", TermsUrl = "https://example.test/terms", PrivacyUrl = "https://example.test/privacy"
+        PublicName = "Community Events",
+        LegalName = "Community Events ASBL",
+        OperatorKindCode = "registered_organization",
+        JurisdictionCountryCode = "BE",
+        RegistrationIdentifier = "BE 0987.654.321",
+        PublicContactEmail = "contact@example.test",
+        LegalNoticeUrl = "https://example.test/legal",
+        TermsUrl = "https://example.test/terms",
+        PrivacyUrl = "https://example.test/privacy"
     };
 }

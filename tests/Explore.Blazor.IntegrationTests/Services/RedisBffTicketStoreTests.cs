@@ -163,12 +163,12 @@ public sealed class RedisBffTicketStoreTests(RedisBffTicketStoreTests.Authority 
     {
         using var store = authority.Create();
         foreach (string property in new[] { BffSessionIdentity.HandleProperty, BffSessionIdentity.RevisionProperty })
-        foreach (string? marker in new string?[] { null, "", "malformed", Convert.ToHexString(RandomNumberGenerator.GetBytes(32)) })
-        {
-            var retained = Ticket();
-            retained.Properties.Items[property] = marker;
-            await Assert.That(async () => { _ = await store.StoreAsync(retained); }).Throws<BffSessionAuthorityUnavailableException>();
-        }
+            foreach (string? marker in new string?[] { null, "", "malformed", Convert.ToHexString(RandomNumberGenerator.GetBytes(32)) })
+            {
+                var retained = Ticket();
+                retained.Properties.Items[property] = marker;
+                await Assert.That(async () => { _ = await store.StoreAsync(retained); }).Throws<BffSessionAuthorityUnavailableException>();
+            }
         var fresh = Ticket();
         ((ClaimsIdentity)fresh.Principal.Identity!).AddClaim(new Claim(BffSessionIdentity.HandleClaim, "untrusted"));
         string handle = await store.StoreAsync(fresh);

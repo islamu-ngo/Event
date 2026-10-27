@@ -74,9 +74,9 @@ public static class PostgresStorageReconciliationContract
             string signatureParameter = $"routine_signature_{index}";
             string bodyParameter = $"routine_body_{index}";
             readinessParameters[index * 2] = new NpgsqlParameter(signatureParameter, NpgsqlDbType.Text)
-                { Value = routine.Signature };
+            { Value = routine.Signature };
             readinessParameters[index * 2 + 1] = new NpgsqlParameter(bodyParameter, NpgsqlDbType.Text)
-                { Value = routine.Body };
+            { Value = routine.Body };
             return $"EXISTS (SELECT 1 FROM pg_catalog.pg_proc p WHERE p.oid = pg_catalog.to_regprocedure(@{signatureParameter})" +
                 $" AND p.prosrc = @{bodyParameter})";
         }));

@@ -141,8 +141,12 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests
         var role = await database.Set<Role>().SingleAsync(item => item.MasterCode == "platform.admin", Token);
         database.PlatformUserRoles.Add(new PlatformUserRole
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-            RoleId = role.Id, Role = role, GrantedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            RoleId = role.Id,
+            Role = role,
+            GrantedAt = DateTime.UtcNow
         });
         await database.SaveChangesAsync(Token);
     }

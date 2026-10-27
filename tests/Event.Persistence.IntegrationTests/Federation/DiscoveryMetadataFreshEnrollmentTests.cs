@@ -173,7 +173,7 @@ public sealed class DiscoveryMetadataFreshEnrollmentTests
                 retained.Parameters.Add(new NpgsqlParameter("relation", NpgsqlTypes.NpgsqlDbType.Text) { Value = table });
                 retained.Parameters.Add(new NpgsqlParameter("column", NpgsqlTypes.NpgsqlDbType.Text) { Value = names.ColumnName(change.Type, change.Property) });
                 retained.Parameters.Add(new NpgsqlParameter("privilege", NpgsqlTypes.NpgsqlDbType.Text)
-                    { Value = change.GrantOption ? "UPDATE WITH GRANT OPTION" : "UPDATE" });
+                { Value = change.GrantOption ? "UPDATE WITH GRANT OPTION" : "UPDATE" });
                 retained.Parameters.Add(new NpgsqlParameter("expected", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = !change.Remove });
                 retained.Parameters.Add(new NpgsqlParameter("grant_option", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = change.GrantOption });
                 await Assert.That(await retained.ExecuteScalarAsync() is true).IsTrue();

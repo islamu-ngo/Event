@@ -361,46 +361,46 @@ public sealed class BrowserSecurityVectorTests
             string slug = "assurance-" + host.RunId[..8];
             await BrowserJourneyTests.CreateTenantAsync(api, slug, deadline.Token);
             foreach (string prefix in new[] { string.Empty, "/" + slug })
-            foreach (bool malformed in new[] { false, true })
-            {
-                await using var browser = await OwnedBrowserContext.CreateAsync(endpoint.BaseAddress!);
-                await browser.Context.GrantPermissionsAsync(["clipboard-read", "clipboard-write"]);
-                bool cleanAtRequest = true;
-                bool privateNetwork = false;
-                int subsequentRequests = 0;
-                string token = GuestToken();
-                await browser.Context.RouteAsync("**/*", async route =>
+                foreach (bool malformed in new[] { false, true })
                 {
-                    privateNetwork |= route.Request.Url.Contains(token, StringComparison.Ordinal)
-                        || route.Request.Headers.Values.Any(value => value.Contains(token, StringComparison.Ordinal));
-                    if (!route.Request.IsNavigationRequest)
+                    await using var browser = await OwnedBrowserContext.CreateAsync(endpoint.BaseAddress!);
+                    await browser.Context.GrantPermissionsAsync(["clipboard-read", "clipboard-write"]);
+                    bool cleanAtRequest = true;
+                    bool privateNetwork = false;
+                    int subsequentRequests = 0;
+                    string token = GuestToken();
+                    await browser.Context.RouteAsync("**/*", async route =>
                     {
-                        subsequentRequests++;
-                        cleanAtRequest &= await browser.Page.EvaluateAsync<bool>("() => !location.hash && !location.search");
-                    }
-                    await route.ContinueAsync();
-                });
-                IResponse? response = await browser.Page.GotoAsync(prefix + GuestPath
-                    + (malformed ? "?capability=" + token + "#capability=%ZZ" : "#capability=" + token));
-                using JsonDocument document = JsonDocument.Parse(await browser.Page.EvaluateAsync<string>("""
+                        privateNetwork |= route.Request.Url.Contains(token, StringComparison.Ordinal)
+                            || route.Request.Headers.Values.Any(value => value.Contains(token, StringComparison.Ordinal));
+                        if (!route.Request.IsNavigationRequest)
+                        {
+                            subsequentRequests++;
+                            cleanAtRequest &= await browser.Page.EvaluateAsync<bool>("() => !location.hash && !location.search");
+                        }
+                        await route.ContinueAsync();
+                    });
+                    IResponse? response = await browser.Page.GotoAsync(prefix + GuestPath
+                        + (malformed ? "?capability=" + token + "#capability=%ZZ" : "#capability=" + token));
+                    using JsonDocument document = JsonDocument.Parse(await browser.Page.EvaluateAsync<string>("""
                     () => JSON.stringify({ firstScript: document.head.firstElementChild?.tagName === 'SCRIPT',
                         nonce: document.head.firstElementChild?.nonce,
                         frozen: Object.isFrozen(window.guestRegistrationStatus), base: document.baseURI,
                         clean: !location.hash && !location.search })
                     """));
-                JsonElement state = document.RootElement;
-                string nonce = state.GetProperty("nonce").GetString() ?? string.Empty;
-                await Assert.That(response is not null && response.Ok && nonce.Length > 0
-                    && response.Headers.TryGetValue("content-security-policy", out string? csp)
-                    && csp.Contains("'nonce-" + nonce + "'", StringComparison.Ordinal)
-                    && state.GetProperty("firstScript").GetBoolean() && state.GetProperty("frozen").GetBoolean()
-                    && state.GetProperty("clean").GetBoolean() && cleanAtRequest && !privateNetwork && subsequentRequests > 0).IsTrue();
-                await Assert.That(state.GetProperty("base").GetString()
-                    == new Uri(endpoint.BaseAddress!, prefix + "/").AbsoluteUri).IsTrue();
-                await Assert.That(await SaveGuestAsync(browser, "copy", token)).IsTrue();
-                string copied = await browser.Page.EvaluateAsync<string>("() => navigator.clipboard.readText()");
-                await Assert.That(copied == new Uri(endpoint.BaseAddress!, prefix + GuestPath).AbsoluteUri + "#capability=" + token).IsTrue();
-            }
+                    JsonElement state = document.RootElement;
+                    string nonce = state.GetProperty("nonce").GetString() ?? string.Empty;
+                    await Assert.That(response is not null && response.Ok && nonce.Length > 0
+                        && response.Headers.TryGetValue("content-security-policy", out string? csp)
+                        && csp.Contains("'nonce-" + nonce + "'", StringComparison.Ordinal)
+                        && state.GetProperty("firstScript").GetBoolean() && state.GetProperty("frozen").GetBoolean()
+                        && state.GetProperty("clean").GetBoolean() && cleanAtRequest && !privateNetwork && subsequentRequests > 0).IsTrue();
+                    await Assert.That(state.GetProperty("base").GetString()
+                        == new Uri(endpoint.BaseAddress!, prefix + "/").AbsoluteUri).IsTrue();
+                    await Assert.That(await SaveGuestAsync(browser, "copy", token)).IsTrue();
+                    string copied = await browser.Page.EvaluateAsync<string>("() => navigator.clipboard.readText()");
+                    await Assert.That(copied == new Uri(endpoint.BaseAddress!, prefix + GuestPath).AbsoluteUri + "#capability=" + token).IsTrue();
+                }
         }
         catch (Exception failure) { throw BrowserArtifactPolicy.Sanitize(BrowserJourney.HostPrivacy, failure); }
     }
@@ -433,7 +433,9 @@ public sealed class BrowserSecurityVectorTests
 
     private static Dictionary<string, object> Challenge(string envelope, int difficulty) => new()
     {
-        ["version"] = 1, ["difficulty"] = difficulty, ["protectedChallenge"] = envelope,
+        ["version"] = 1,
+        ["difficulty"] = difficulty,
+        ["protectedChallenge"] = envelope,
         ["expiresAt"] = DateTimeOffset.UtcNow.AddSeconds(110).ToString("O")
     };
 
@@ -473,8 +475,12 @@ public sealed class BrowserSecurityVectorTests
                 if (route.Request.IsNavigationRequest)
                 {
                     string prefix = uri.AbsolutePath.Contains("/community/nested/", StringComparison.Ordinal) ? "/community/nested/" : "/";
-                    await route.FulfillAsync(new() { ContentType = "text/html", Body =
-                        "<!doctype html><html><head><script src='/js/guest-registration-status.js'></script><base href='" + prefix + "'></head><body></body></html>" });
+                    await route.FulfillAsync(new()
+                    {
+                        ContentType = "text/html",
+                        Body =
+                        "<!doctype html><html><head><script src='/js/guest-registration-status.js'></script><base href='" + prefix + "'></head><body></body></html>"
+                    });
                     return;
                 }
                 await route.AbortAsync();

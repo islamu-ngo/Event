@@ -235,37 +235,70 @@ public sealed class PaidOrderAcceptanceFreshnessServiceTests
         AcceptanceTemplateText = PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateText,
         OrganizerMerchant = new()
         {
-            OrganizerActorId = OrganizerId, MerchantDisclosureText = "Example Organizer, legal merchant for this order",
-            OrganizerPaymentProviderConnectionId = ConnectionId, ConnectPlatformId = "platform-live-eu",
-            ExternalAccountId = "acct_123", MerchantCountryCode = "BE", ProviderCode = "stripe",
-            ProviderProfileCode = "OrganizerDirect", ProviderEnvironment = "test", ProviderCredentialOwner = "instance-operator",
-            ChargeType = "direct-charge", StatementDescriptor = "EXAMPLE EVENT"
+            OrganizerActorId = OrganizerId,
+            MerchantDisclosureText = "Example Organizer, legal merchant for this order",
+            OrganizerPaymentProviderConnectionId = ConnectionId,
+            ConnectPlatformId = "platform-live-eu",
+            ExternalAccountId = "acct_123",
+            MerchantCountryCode = "BE",
+            ProviderCode = "stripe",
+            ProviderProfileCode = "OrganizerDirect",
+            ProviderEnvironment = "test",
+            ProviderCredentialOwner = "instance-operator",
+            ChargeType = "direct-charge",
+            StatementDescriptor = "EXAMPLE EVENT"
         },
         TenantDirectoryOperator = new()
         {
-            DocumentId = DirectoryDocumentId, RevisionId = DirectoryRevision, PublicName = "Community Events",
-            LegalName = "Community Events ASBL", OperatorKindCode = "registered_organization", JurisdictionCountryCode = "BE",
-            RegistrationIdentifier = "BE 0123.456.789", PublicContactEmail = "contact@example.test",
-            LegalNoticeUrl = "https://example.test/legal", TermsUrl = "https://example.test/terms", PrivacyUrl = "https://example.test/privacy"
+            DocumentId = DirectoryDocumentId,
+            RevisionId = DirectoryRevision,
+            PublicName = "Community Events",
+            LegalName = "Community Events ASBL",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            RegistrationIdentifier = "BE 0123.456.789",
+            PublicContactEmail = "contact@example.test",
+            LegalNoticeUrl = "https://example.test/legal",
+            TermsUrl = "https://example.test/terms",
+            PrivacyUrl = "https://example.test/privacy"
         },
         InstanceOperator = new()
         {
-            OperatorId = OperatorId, PublicName = "Independent Operator", LegalName = "Independent Operator ASBL",
-            OperatorKindCode = "registered_organization", RegistrationIdentifier = "BE 0987.654.321",
-            IsOfficialInstance = false, OfficialOrigin = "https://events.example.test", JurisdictionCountryCode = "BE",
-            WebsiteUrl = "https://events.example.test/", LegalNoticeUrl = "https://events.example.test/legal",
-            TermsUrl = "https://events.example.test/terms", PrivacyUrl = "https://events.example.test/privacy"
+            OperatorId = OperatorId,
+            PublicName = "Independent Operator",
+            LegalName = "Independent Operator ASBL",
+            OperatorKindCode = "registered_organization",
+            RegistrationIdentifier = "BE 0987.654.321",
+            IsOfficialInstance = false,
+            OfficialOrigin = "https://events.example.test",
+            JurisdictionCountryCode = "BE",
+            WebsiteUrl = "https://events.example.test/",
+            LegalNoticeUrl = "https://events.example.test/legal",
+            TermsUrl = "https://events.example.test/terms",
+            PrivacyUrl = "https://events.example.test/privacy"
         },
         PaymentOperations = new()
         {
-            ComplaintContact = "complaints@example.test", ComplaintOwner = "Trust and Safety", RefundOwner = "Payments Operations",
-            DisputeOwner = "Dispute Operations", ReconciliationOwner = "Payment Reconciliation", ActivationStatus = "approved"
+            ComplaintContact = "complaints@example.test",
+            ComplaintOwner = "Trust and Safety",
+            RefundOwner = "Payments Operations",
+            DisputeOwner = "Dispute Operations",
+            ReconciliationOwner = "Payment Reconciliation",
+            ActivationStatus = "approved"
         },
         DeliveryStartsAtUtc = new DateTimeOffset(UtcNow.AddDays(10)),
-        DeliveryEndsAtUtc = new DateTimeOffset(UtcNow.AddDays(10).AddHours(3)), EventTimeZoneId = "Europe/Brussels",
-        CurrencyCode = "EUR", CurrencyMinorUnitDigits = 2, OrganizerAmountMinor = 1_000, PlatformFeeMinor = 75,
-        PlatformContributionMinor = 125, TotalMinor = 1_125, RefundPolicyVersion = 1, RefundPolicyText = "Refund policy",
-        RefundPolicyLanguageTag = "en-GB", SupportContact = "support@example.test",
+        DeliveryEndsAtUtc = new DateTimeOffset(UtcNow.AddDays(10).AddHours(3)),
+        EventTimeZoneId = "Europe/Brussels",
+        CurrencyCode = "EUR",
+        CurrencyMinorUnitDigits = 2,
+        OrganizerAmountMinor = 1_000,
+        PlatformFeeMinor = 75,
+        PlatformContributionMinor = 125,
+        TotalMinor = 1_125,
+        RefundPolicyVersion = 1,
+        RefundPolicyText = "Refund policy",
+        RefundPolicyLanguageTag = "en-GB",
+        SupportContact = "support@example.test",
         Lines = [new() { OrderLineId = LineId, Name = "Admission", Quantity = 1, UnitAmountMinor = 1_000, DiscountAmountMinor = 0, LineTotalMinor = 1_000 }]
     };
 }

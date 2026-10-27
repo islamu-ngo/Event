@@ -895,8 +895,10 @@ foreach (ProjectResource resource in builder.Resources.OfType<ProjectResource>()
         {
             string? partition = consumer switch
             {
-                SecretConsumer.Api => "API", SecretConsumer.Bff => "BFF",
-                SecretConsumer.Combined => "COMBINED", _ => null
+                SecretConsumer.Api => "API",
+                SecretConsumer.Bff => "BFF",
+                SecretConsumer.Combined => "COMBINED",
+                _ => null
             };
             if (partition is not null)
                 foreach (string suffix in new[] { "RING", "ADMISSION", "ADMISSION_SHA256", "MINIMUM_GENERATION" })

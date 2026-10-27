@@ -174,8 +174,13 @@ public sealed class RedisBffTicketStore : ITicketStore, IBffSessionAuthority, ID
             || uri.AbsolutePath is not ("" or "/")) throw Unavailable();
         var configuration = new ConfigurationOptions
         {
-            Password = password, Ssl = uri.Scheme == "rediss", AbortOnConnectFail = false,
-            ConnectTimeout = 1000, ConnectRetry = 0, AsyncTimeout = 1000, SyncTimeout = 1000,
+            Password = password,
+            Ssl = uri.Scheme == "rediss",
+            AbortOnConnectFail = false,
+            ConnectTimeout = 1000,
+            ConnectRetry = 0,
+            AsyncTimeout = 1000,
+            SyncTimeout = 1000,
             BacklogPolicy = BacklogPolicy.FailFast
         };
         configuration.EndPoints.Add(uri.Host, uri.Port);

@@ -158,8 +158,14 @@ internal sealed class TicketingNativeAuthenticationFixture : IAsyncDisposable
         Guid actor = await database.Actors.Where(row => row.UserId == user).Select(row => row.Id).SingleAsync();
         database.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, UserId = user, User = null!,
-            ActorId = actor, Actor = null!, StatusId = (int)TenantUserStatusEnum.Active,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant,
+            Tenant = null!,
+            UserId = user,
+            User = null!,
+            ActorId = actor,
+            Actor = null!,
+            StatusId = (int)TenantUserStatusEnum.Active,
             JoinedAt = Http.Clock.GetUtcNow().UtcDateTime
         });
         DateTime now = Http.Clock.GetUtcNow().UtcDateTime.AddHours(transfer ? -2 : 0);

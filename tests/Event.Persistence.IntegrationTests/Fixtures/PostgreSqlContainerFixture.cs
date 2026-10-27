@@ -400,7 +400,9 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             dockerEndpointSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(owner.DockerEndpoint.OriginalString))),
             intendedLabels = new Dictionary<string, string>
             {
-                [OwnerLabel] = owner.Owner, [ResourceLabel] = "postgres", [FixtureLabel] = _fixtureNonce
+                [OwnerLabel] = owner.Owner,
+                [ResourceLabel] = "postgres",
+                [FixtureLabel] = _fixtureNonce
             }
         });
         FileStream? stream = null;
@@ -409,8 +411,11 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         {
             stream = new FileStream(Path.Combine(owner.Root, file), new FileStreamOptions
             {
-                Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None,
-                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite, Options = FileOptions.WriteThrough
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                Options = FileOptions.WriteThrough
             });
             stream.Write(bytes);
             stream.Flush(flushToDisk: true);

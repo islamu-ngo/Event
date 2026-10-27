@@ -162,8 +162,12 @@ public sealed class SecurityInfrastructureFixture : IAsyncInitializer, IAsyncDis
         {
             byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                Schema = 1, RunId = context.Owner, CreatorPid = Environment.ProcessId, CreationId,
-                Resource = resource, ImageReference = imageReference
+                Schema = 1,
+                RunId = context.Owner,
+                CreatorPid = Environment.ProcessId,
+                CreationId,
+                Resource = resource,
+                ImageReference = imageReference
             });
             declarationSha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             declaration = await WriteRecordAsync($"api-container-{resource}-{CreationId}-declaration.json", bytes, token);
@@ -182,8 +186,13 @@ public sealed class SecurityInfrastructureFixture : IAsyncInitializer, IAsyncDis
                 if (created is not null) throw new InvalidOperationException("test_creation_identity_duplicate");
                 byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    Schema = 1, RunId = context.Owner, CreatorPid = Environment.ProcessId, CreationId,
-                    Resource = resource, ImageReference = imageReference, ContainerId = containerId,
+                    Schema = 1,
+                    RunId = context.Owner,
+                    CreatorPid = Environment.ProcessId,
+                    CreationId,
+                    Resource = resource,
+                    ImageReference = imageReference,
+                    ContainerId = containerId,
                     DeclarationSha256 = declarationSha256
                 });
                 created = await WriteRecordAsync($"api-container-{resource}-{CreationId}-created-{containerId}.json", bytes, deadline.Token);
@@ -204,8 +213,11 @@ public sealed class SecurityInfrastructureFixture : IAsyncInitializer, IAsyncDis
             {
                 output = new FileStream(pending, new FileStreamOptions
                 {
-                    Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.Read,
-                    Options = FileOptions.Asynchronous, UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.ReadWrite,
+                    Share = FileShare.Read,
+                    Options = FileOptions.Asynchronous,
+                    UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                 });
                 await output.WriteAsync(bytes, token);
                 await output.FlushAsync(token);

@@ -86,7 +86,9 @@ public sealed class BlazorHostCompositionTests
                 Directory.CreateDirectory(root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
                 await using (var marker = new FileStream(Path.Combine(root, ".islamu-test-owner"), new FileStreamOptions
                 {
-                    Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read,
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.Write,
+                    Share = FileShare.Read,
                     UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
                 }))
                 {
@@ -115,7 +117,8 @@ public sealed class BlazorHostCompositionTests
                             ["Patterns"] = null
                         }
                     },
-                    ["Asset"] = null, ["Patterns"] = null
+                    ["Asset"] = null,
+                    ["Patterns"] = null
                 };
                 var endpoint = endpointTemplate["Endpoints"]!.AsArray().Single(item =>
                     item!["Route"]!.GetValue<string>() == "css/" + sourceAssets[index]
@@ -133,12 +136,15 @@ public sealed class BlazorHostCompositionTests
                 {
                     var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
                     {
-                        ApplicationName = assembly.GetName().Name, EnvironmentName = "Assurance",
-                        ContentRootPath = hostRoot, WebRootPath = webRoot
+                        ApplicationName = assembly.GetName().Name,
+                        EnvironmentName = "Assurance",
+                        ContentRootPath = hostRoot,
+                        WebRootPath = webRoot
                     });
                     builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        ["ISLAMU_TEST_ROOT"] = root, ["ISLAMU_TEST_RUN_ID"] = owner
+                        ["ISLAMU_TEST_ROOT"] = root,
+                        ["ISLAMU_TEST_RUN_ID"] = owner
                     });
                     builder.WebHost.UseTestServer();
                     return builder;

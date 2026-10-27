@@ -13,12 +13,13 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings;
 using Explore.Infrastructure;
+using Explore.Infrastructure.Secrets;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Services;
 using Explore.Persistence.Security;
-using Explore.Secrets.Extensions;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
@@ -162,8 +163,10 @@ public sealed class PolicyMutationExecutionScopeSqliteFixture : IAsyncInitialize
         services.AddSingleton<BusinessMetrics>();
         services.ConfigureApplicationServices(configuration);
         services.ConfigureInfrastructureServices(configuration);
-        services.AddSecretProvider(configuration);
-        services.AddSecretResolution();
+        services.AddSingleton(_ => SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(configuration, "Testing", SecretConsumerRole.Api),
+            testingAuthority: configuration));
+        services.AddNativeSecretResolution();
         services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
         var runtimeOptions = PrimaryDatabaseConfiguration.BindRuntime(configuration);
         services.AddEmailPolicyMutationPersistence(runtimeOptions, PrimaryDatabaseConfiguration.BindGlobal(configuration),

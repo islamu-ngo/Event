@@ -25,13 +25,14 @@ using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
 using Explore.Domain.Settings.Documents;
 using Explore.Infrastructure;
+using Explore.Infrastructure.Secrets;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Entities;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
-using Explore.Secrets.Extensions;
+using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -1097,8 +1098,10 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
         services.AddApiAuthentication(configuration, environment, skipAuthorityWarmup: true);
         services.ConfigureApplicationServices(configuration);
         services.ConfigureInfrastructureServices(configuration);
-        services.AddSecretProvider(configuration);
-        services.AddSecretResolution();
+        services.AddSingleton(_ => SecretAuthorityAcquisition.OpenLocal(
+            SecretAuthoritySelection.Select(configuration, "Testing", SecretConsumerRole.Api),
+            testingAuthority: configuration));
+        services.AddNativeSecretResolution();
         services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
         if (failAfterEffect is not null)
             services.AddScoped<IConfigurationImportEffectOutboxRepository>(scope =>

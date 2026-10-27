@@ -36,7 +36,7 @@ public sealed class SetupAssistantArchitectureTests
 
     private static readonly string[] BindingProperties =
     [
-        "ApplyMode", "ArtifactDigest", "ExpiresAt", "MappingDigest",
+        "ApplyMode", "ArtifactDigest", "ExpiresAt", "MappingDigest", "ModerationReservationDigest",
         "RequiredApprovalDigest", "SelectedSectionsDigest", "Target",
         "TargetRevisionDigest"
     ];

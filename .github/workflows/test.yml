@@ -28,7 +28,6 @@ jobs:
       run-setup-tests: ${{ steps.changes.outputs.run-setup-tests }}
       run-infrastructure-tests: ${{ steps.changes.outputs.run-infrastructure-tests }}
       run-blazor-tests: ${{ steps.changes.outputs.run-blazor-tests }}
-      run-secrets-tests: ${{ steps.changes.outputs.run-secrets-tests }}
 
     steps:
       - name: Checkout
@@ -87,7 +86,6 @@ jobs:
               echo "run-setup-tests=true"
               echo "run-infrastructure-tests=true"
               echo "run-blazor-tests=true"
-              echo "run-secrets-tests=true"
             } >> "$GITHUB_OUTPUT"
             {
               echo "## Build & Test Change Detection"
@@ -115,7 +113,6 @@ jobs:
               echo "run-setup-tests=false"
               echo "run-infrastructure-tests=false"
               echo "run-blazor-tests=false"
-              echo "run-secrets-tests=false"
             } >> "$GITHUB_OUTPUT"
             {
               echo "## Build & Test Change Detection"
@@ -133,7 +130,6 @@ jobs:
           run_setup="false"
           run_infra="false"
           run_blazor="false"
-          run_secrets="false"
 
           all_subsystems="false"
           while IFS= read -r file; do
@@ -151,7 +147,6 @@ jobs:
             run_setup="true"
             run_infra="true"
             run_blazor="true"
-            run_secrets="true"
           else
             while IFS= read -r file; do
               [ -z "$file" ] && continue
@@ -176,10 +171,10 @@ jobs:
                   run_infra="true"
                   run_arch="true"
                   ;;
-                src/Explore.Secrets/*|tests/Explore.Secrets.UnitTests/*)
-                  run_secrets="true"
+                src/Explore.Secrets/*)
                   run_infra="true"
                   run_arch="true"
+                  run_setup="true"
                   ;;
                 src/Explore.Blazor/*|src/Explore.Blazor.Client/*|src/Event.Web.BffHosting/*|tests/Explore.Blazor.Client.Tests/*|tests/Explore.Blazor.IntegrationTests/*)
                   run_blazor="true"
@@ -213,15 +208,40 @@ jobs:
                   run_setup="true"
                   run_infra="true"
                   run_blazor="true"
-                  run_secrets="true"
                   ;;
               esac
               case "$file" in
+                # Shared authority and host preparation are exercised by native
+                # Domain, Infrastructure, API SetupLive, BFF and Combined owners.
+                src/Explore.ServiceDefaults/Secrets/*|src/Explore.ServiceDefaults/DataProtection/*|src/Explore.Infrastructure/Secrets/*|src/Explore.Persistence/Database/*|src/Explore.API/Hosting/*|src/Explore.API/Configuration/*|src/Explore.API/Program.cs|src/Explore.Blazor/Hosting/*|src/Explore.Blazor/Extensions/ConfigurationExtension.cs|src/Explore.Blazor/Program.cs|src/Event.Web.BffHosting/*|src/Event.Standalone/*|eng/security/*|eng/tools/EmergencyAdminProvisioner.cs)
+                  run_app="true"
+                  run_domain="true"
+                  run_arch="true"
+                  run_setup="true"
+                  run_infra="true"
+                  run_blazor="true"
+                  ;;
+                src/Explore.Domain/Secrets/*|src/Explore.Application/Contracts/Secrets/*|tests/Event.Domain.UnitTests/Secrets/*|tests/Explore.Infrastructure.Tests/Secrets/*|tests/Event.API.IntegrationTests/Hosting/*|tests/Event.API.IntegrationTests/*Secret*|tests/Event.API.IntegrationTests/*Security*|tests/Explore.Blazor.IntegrationTests/Configuration/*|tests/Explore.Blazor.IntegrationTests/Hosting/*|tests/Explore.Blazor.IntegrationTests/*Security*|tests/Event.Standalone.IntegrationTests/*)
+                  run_arch="true"
+                  run_setup="true"
+                  run_infra="true"
+                  ;;
+                tests/Shared/*)
+                  run_arch="true"
+                  run_setup="true"
+                  run_infra="true"
+                  run_blazor="true"
+                  ;;
                 src/Explore.Blazor.Client/Services/SetupLive/*|tests/Explore.Blazor.Client.Tests/SetupLive/*)
                   run_arch="true"
                   run_setup="true"
                   ;;
-                src/Event.Wire.Contracts/SetupLive/*|src/Explore.Domain/SetupLive/*|src/Explore.Application/ApplicationServicesRegistration.cs|src/Explore.Application/Contracts/SetupLive/*|src/Explore.Application/Contracts/Persistence/ISetupLiveRepository.cs|src/Explore.Application/Contracts/Infrastructure/ISetupSecretBindingReadinessReader.cs|src/Explore.Application/Contracts/Secrets/ISetupSecretBindingWriter.cs|src/Explore.Application/Contracts/Secrets/ISetupSecretBindingCommitBarrier.cs|src/Explore.Application/Features/SetupLive/*|src/Explore.Application/Telemetry/SetupLiveTelemetry.cs|src/Explore.Persistence/PersistenceServicesRegistration.cs|src/Explore.Persistence/ExploreDbContext.DbSets.cs|src/Explore.Persistence/ExploreDbContext.QueryFilters.cs|src/Explore.Persistence/Configurations/Entities/SetupLiveConfigurations.cs|src/Explore.Persistence/Repositories/SetupLiveRepository.cs|src/Explore.Persistence/RelationalSetupSecretBindingOperationCoordinator.cs|src/Explore.Persistence/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.MySql/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.SqlServer/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.SqlServer/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.Sqlite/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Secrets/Services/SetupSecretBindingAuthority.cs|src/Explore.Secrets/Extensions/SecretResolutionServiceCollectionExtensions.cs|src/Explore.Infrastructure/InfrastructureServicesRegistration.cs|src/Explore.Infrastructure/Services/SetupSecretProvider.cs|src/Explore.API/Controllers/SetupTargetEnrollmentsController.cs|src/Explore.API/OpenApi/SetupLiveRequestBodyTransformer.cs|src/Explore.Blazor.Client/Clients/EventApiClients.cs|src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs|tests/Event.Wire.Contracts.UnitTests/SetupLive/*|tests/Event.Domain.UnitTests/SetupLive/*|tests/Event.Application.UnitTests/Features/SetupLive/*|tests/Event.Persistence.IntegrationTests/SetupLive/*|tests/Explore.Secrets.UnitTests/SetupLive/*|tests/Event.API.IntegrationTests/Features/SetupLive*|tests/Explore.GeneratedContracts.Tests/SetupLive*)
+                src/Explore.Infrastructure/Services/SetupSecretProvider.cs)
+                  run_arch="true"
+                  run_setup="true"
+                  run_infra="true"
+                  ;;
+                src/Event.Wire.Contracts/SetupLive/*|src/Explore.Domain/SetupLive/*|src/Explore.Application/ApplicationServicesRegistration.cs|src/Explore.Application/Contracts/SetupLive/*|src/Explore.Application/Contracts/Persistence/ISetupLiveRepository.cs|src/Explore.Application/Contracts/Infrastructure/ISetupSecretBindingReadinessReader.cs|src/Explore.Application/Contracts/Secrets/ISetupSecretBindingWriter.cs|src/Explore.Application/Contracts/Secrets/ISetupSecretBindingCommitBarrier.cs|src/Explore.Application/Features/SetupLive/*|src/Explore.Application/Telemetry/SetupLiveTelemetry.cs|src/Explore.Persistence/PersistenceServicesRegistration.cs|src/Explore.Persistence/ExploreDbContext.DbSets.cs|src/Explore.Persistence/ExploreDbContext.QueryFilters.cs|src/Explore.Persistence/Configurations/Entities/SetupLiveConfigurations.cs|src/Explore.Persistence/Repositories/SetupLiveRepository.cs|src/Explore.Persistence/RelationalSetupSecretBindingOperationCoordinator.cs|src/Explore.Persistence/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.MySql/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.MySql/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.SqlServer/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.SqlServer/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Persistence.Migrations.Sqlite/Migrations/*AddSetupLivePersistence*|src/Explore.Persistence.Migrations.Sqlite/Migrations/ExploreDbContextModelSnapshot.cs|src/Explore.Infrastructure/InfrastructureServicesRegistration.cs|src/Explore.API/Controllers/SetupTargetEnrollmentsController.cs|src/Explore.API/OpenApi/SetupLiveRequestBodyTransformer.cs|src/Explore.Blazor.Client/Clients/EventApiClients.cs|src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs|tests/Event.Wire.Contracts.UnitTests/SetupLive/*|tests/Event.Domain.UnitTests/SetupLive/*|tests/Event.Application.UnitTests/Features/SetupLive/*|tests/Event.Persistence.IntegrationTests/SetupLive/*|tests/Event.API.IntegrationTests/Features/SetupLive*|tests/Explore.GeneratedContracts.Tests/SetupLive*)
                   run_arch="true"
                   run_setup="true"
                   ;;
@@ -236,7 +256,6 @@ jobs:
             echo "run-setup-tests=$run_setup"
             echo "run-infrastructure-tests=$run_infra"
             echo "run-blazor-tests=$run_blazor"
-            echo "run-secrets-tests=$run_secrets"
           } >> "$GITHUB_OUTPUT"
 
           {
@@ -250,7 +269,6 @@ jobs:
             echo "| Setup Project Gates | $run_setup |"
             echo "| Infrastructure Tests | $run_infra |"
             echo "| Blazor UI Tests | $run_blazor |"
-            echo "| Secrets Tests | $run_secrets |"
             echo
             echo "### Changed Relevant Files"
             echo '```text'
@@ -272,6 +290,5 @@ jobs:
       run-setup-tests: ${{ needs.detect-build-test-changes.outputs.run-setup-tests == 'true' }}
       run-infrastructure-tests: ${{ needs.detect-build-test-changes.outputs.run-infrastructure-tests == 'true' }}
       run-blazor-tests: ${{ needs.detect-build-test-changes.outputs.run-blazor-tests == 'true' }}
-      run-secrets-tests: ${{ needs.detect-build-test-changes.outputs.run-secrets-tests == 'true' }}
       run-integration-tests: false
       configuration: Release

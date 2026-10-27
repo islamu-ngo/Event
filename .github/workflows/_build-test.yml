@@ -45,10 +45,6 @@ on:
         required: false
         type: boolean
         default: true
-      run-secrets-tests:
-        required: false
-        type: boolean
-        default: true
       configuration:
         required: false
         type: string
@@ -177,16 +173,6 @@ jobs:
         id: test_architecture
         run: dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.Architecture.Tests.trx
 
-      - name: Unit Tests — Secrets
-        if: ${{ inputs.run-fast-tests && inputs.run-secrets-tests }}
-        id: test_secrets
-        run: |
-          coverage_args=()
-          if [[ "$COLLECT_COVERAGE" == true ]]; then
-            coverage_args=(--coverage --coverage-settings eng/coverage/product.config --coverage-output "$GITHUB_WORKSPACE/artifacts/coverage/fast-Explore.Secrets.UnitTests.cobertura.xml" --coverage-output-format cobertura)
-          fi
-          dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Secrets.UnitTests.trx "${coverage_args[@]}"
-
       - name: Unit Tests — Infrastructure
         if: ${{ inputs.run-fast-tests && inputs.run-infrastructure-tests }}
         id: test_infrastructure
@@ -259,7 +245,6 @@ jobs:
             (steps.test_setup.outputs.started == 'true' ||
              contains(fromJSON('["success","failure"]'), steps.test_application.outcome) ||
              contains(fromJSON('["success","failure"]'), steps.test_domain.outcome) ||
-             contains(fromJSON('["success","failure"]'), steps.test_secrets.outcome) ||
              contains(fromJSON('["success","failure"]'), steps.test_infrastructure.outcome) ||
              contains(fromJSON('["success","failure"]'), steps.test_blazor_client.outcome) ||
              contains(fromJSON('["success","failure"]'), steps.test_blazor_integration.outcome) ||
@@ -305,7 +290,6 @@ jobs:
           APPLICATION_OUTCOME: ${{ steps.test_application.outcome }}
           DOMAIN_OUTCOME: ${{ steps.test_domain.outcome }}
           ARCHITECTURE_OUTCOME: ${{ steps.test_architecture.outcome }}
-          SECRETS_OUTCOME: ${{ steps.test_secrets.outcome }}
           INFRASTRUCTURE_OUTCOME: ${{ steps.test_infrastructure.outcome }}
           BLAZOR_CLIENT_OUTCOME: ${{ steps.test_blazor_client.outcome }}
           BLAZOR_INTEGRATION_OUTCOME: ${{ steps.test_blazor_integration.outcome }}
@@ -325,7 +309,6 @@ jobs:
             echo "| Event.Application.UnitTests | ${APPLICATION_OUTCOME:-not-run} |"
             echo "| Event.Domain.UnitTests | ${DOMAIN_OUTCOME:-not-run} |"
             echo "| Event.Architecture.Tests | ${ARCHITECTURE_OUTCOME:-not-run} |"
-            echo "| Explore.Secrets.UnitTests | ${SECRETS_OUTCOME:-not-run} |"
             echo "| Explore.Infrastructure.Tests | ${INFRASTRUCTURE_OUTCOME:-not-run} |"
             echo "| Explore.Blazor.Client.Tests | ${BLAZOR_CLIENT_OUTCOME:-not-run} |"
             echo "| Explore.Blazor.IntegrationTests | ${BLAZOR_INTEGRATION_OUTCOME:-not-run} |"

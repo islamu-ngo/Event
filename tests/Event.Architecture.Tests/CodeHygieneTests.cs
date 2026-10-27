@@ -20,7 +20,7 @@ public class CodeHygieneTests
         "Event.Architecture.Tests",
         "Explore.Blazor.Client.Tests",
         "Explore.Blazor.IntegrationTests",
-        "Explore.Secrets.UnitTests"
+        "Explore.Infrastructure.Tests"
     ];
 
     #region Controller Base Class Conventions

@@ -84,6 +84,8 @@ public static class QuartzSchedulerKeys
 
     public static readonly JobKey InventoryHoldExpiryReconciliation =
         new(ScheduledJobNames.InventoryHoldExpiryReconciliation, RecurringGroup);
+    public static readonly JobKey ModerationReconciliation =
+        new(ScheduledJobNames.ModerationReconciliation, RecurringGroup);
 
     public static readonly JobKey RegistrationFinalizationDrain =
         new(ScheduledJobNames.RegistrationFinalizationDrain, RecurringGroup);
@@ -132,6 +134,7 @@ public static class QuartzSchedulerKeys
         OrganizerPaymentReadinessReconciliation,
         ConfigurationPortabilityRetentionCleanup,
         InventoryHoldExpiryReconciliation,
+        ModerationReconciliation,
         RegistrationFinalizationDrain,
         PaymentReconciliationDrain,
         FairReturnOrchestration,

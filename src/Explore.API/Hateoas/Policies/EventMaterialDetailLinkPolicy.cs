@@ -22,6 +22,7 @@ public sealed class EventMaterialDetailLinkPolicy(ITenantContext tenantContext)
                 ResourceKinds.EventResource, dto.EventId.ToString("D"),
                 new AuthorizationScope(TenantId: tenantContext.TenantId.ToString("D")),
                 new EventResourceCollectionAuthorizationFacts(tenantContext.TenantId, dto.EventId));
+        if (dto.Status == "quarantined" || dto.Draft is null) yield break;
         yield return Resource(LinkDefinition.Action(LinkRelations.ViewAudit, RouteNames.GetEventResourceAudit,
             HttpMethods.Get, new { id = dto.Id }), dto, AuthorizationActions.EventResources.ViewAudit);
         yield return Resource(LinkDefinition.Delete(RouteNames.DeleteEventResource, new { id = dto.Id }),

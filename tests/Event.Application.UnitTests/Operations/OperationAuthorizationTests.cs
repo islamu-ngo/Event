@@ -235,7 +235,7 @@ public sealed class OperationAuthorizationTests
         public Task<bool> Exists(Guid organizationId, Guid userId) => throw new NotSupportedException();
         public Task<List<OrganizationMember>> GetOrganizationMembersWithDetails() => throw new NotSupportedException();
         public Task<List<OrganizationMember>> GetMembersByOrganizationId(Guid organizationId) => throw new NotSupportedException();
-        public Task<List<OrganizationMember>> GetInvitesByEmail(string email) => throw new NotSupportedException();
+        public Task<List<OrganizationMember>> GetInvitesByUserId(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<OrganizationMember?> GetByOrganizationAndUser(Guid organizationId, Guid userId) => throw new NotSupportedException();
         public Task<bool> HasPermissionInOrganization(Guid organizationId, Guid userId, string permissionMasterCode) => throw new NotSupportedException();
         public Task<List<Guid>> GetOrganizationIdsWhereUserHasPermission(Guid userId, string permissionMasterCode, CancellationToken cancellationToken = default) => throw new NotSupportedException();

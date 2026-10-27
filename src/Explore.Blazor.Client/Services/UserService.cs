@@ -29,11 +29,6 @@ public interface IUserService
     Task<AdminAuthorityDto?> GetAdminAuthorityAsync();
 
     /// <summary>
-    /// Updates the current user's profile.
-    /// </summary>
-    Task<BaseCommandResponseOfGuid?> UpdateUserAsync(Guid userId, Guid expectedConcurrencyStamp, UpdateUserDto userDto);
-
-    /// <summary>
     /// Deletes the current user's account.
     /// </summary>
     Task<PrivacyErasureStartDto?> DeleteUserAsync();
@@ -182,26 +177,6 @@ public class UserService : IUserService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching admin authority");
-            return null;
-        }
-    }
-
-    /// <inheritdoc />
-    public async Task<BaseCommandResponseOfGuid?> UpdateUserAsync(Guid userId, Guid expectedConcurrencyStamp, UpdateUserDto userDto)
-    {
-        try
-        {
-            _logger.LogInformation("Updating user");
-            return await _apiClient.UpdateCurrentUserAsync(userId, userDto, $"\"{expectedConcurrencyStamp:D}\"");
-        }
-        catch (ApiException ex)
-        {
-            _logger.LogError(ex, "API error updating user: {StatusCode}", ex.StatusCode);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating user");
             return null;
         }
     }

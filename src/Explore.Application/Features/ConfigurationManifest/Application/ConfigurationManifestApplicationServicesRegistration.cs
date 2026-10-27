@@ -2,12 +2,12 @@ namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
 using Explore.Application.Features.ConfigurationManifest.LegalDocuments;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Managed;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Explore.Application.Services;
 using Explore.Application.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,6 +46,8 @@ public static class ConfigurationManifestApplicationServicesRegistration
         services.TryAddScoped<
             IConfigurationManifestPreflight,
             ConfigurationManifestPreflight>();
+        services.TryAddScoped<ModerationConfigurationImportAdapter>();
+        services.TryAddScoped<ModerationConfigurationExportService>();
         services.TryAddScoped<ConfigurationManifestCurrentStateReader>();
         services.TryAddSingleton<ConfigurationImportArtifactParser>();
         services.TryAddSingleton<ConfigurationImportPreviewComposer>();

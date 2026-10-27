@@ -1,6 +1,6 @@
 using System.Linq;
 using System.Globalization;
-using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Organization.Validators;
@@ -22,11 +22,10 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
     private readonly IActorRepository _actorRepository;
     private readonly IStorageObjectRepository _storageObjectRepository;
-    private readonly IAdminContext _adminContext;
     private readonly ITenantContext _tenantContext;
     private readonly HybridCache _cache;
     private readonly BusinessMetrics _metrics;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IOrganizationCreationMutationBoundary _creation;
 
     public CreateOrganizationCommandHandler(
         IOrganizationRepository organizationRepository,
@@ -34,25 +33,38 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
         IOrganizationMemberRepository organizationMemberRepository,
         IActorRepository actorRepository,
         IStorageObjectRepository storageObjectRepository,
-        IAdminContext adminContext,
         ITenantContext tenantContext,
         HybridCache cache,
         BusinessMetrics metrics,
-        IUnitOfWork unitOfWork)
+        IOrganizationCreationMutationBoundary creation)
     {
         _organizationRepository = organizationRepository;
         _organizationTenantRepository = organizationTenantRepository;
         _organizationMemberRepository = organizationMemberRepository;
         _actorRepository = actorRepository;
         _storageObjectRepository = storageObjectRepository;
-        _adminContext = adminContext;
         _tenantContext = tenantContext;
         _cache = cache;
         _metrics = metrics;
-        _unitOfWork = unitOfWork;
+        _creation = creation;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateOrganizationCommand request, CancellationToken cancellationToken)
+    {
+        var ids = new OrganizationCreationIds(Guid.CreateVersion7(), Guid.CreateVersion7(),
+            Guid.CreateVersion7(), Guid.CreateVersion7());
+        var result = await _creation.ExecuteCreationAsync(_tenantContext.TenantId, ids,
+            (creator, approved, token) => CreateAsync(request, ids, creator, approved, token), cancellationToken);
+        if (result.IsSuccess)
+        {
+            _metrics.RecordOrganizationCreated(_tenantContext.TenantId.ToString());
+            await _cache.RemoveAsync($"organization:detail:{result.Id}", cancellationToken);
+        }
+        return result;
+    }
+
+    private async Task<BaseCommandResponse<Guid>> CreateAsync(CreateOrganizationCommand request,
+        OrganizationCreationIds ids, Guid currentUserId, bool isTenantAdmin, CancellationToken cancellationToken)
     {
         var validator = new CreateOrganizationDtoValidator();
         var validationResult = await validator.ValidateAsync(request.OrganizationDto, cancellationToken);
@@ -73,13 +85,13 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
                 "Organization creation failed due to validation errors.");
         }
 
-        var currentUserId = request.CreatorUserId;
-
         var organization = new Organization
         {
+            Id = ids.OrganizationId,
             WebsiteUrl = request.OrganizationDto.WebsiteUrl,
             Pii = new OrganizationPii
             {
+                OrganizationId = ids.OrganizationId,
                 FullName = request.OrganizationDto.FullName,
                 Email = request.OrganizationDto.Email,
                 Country = request.OrganizationDto.Country,
@@ -90,20 +102,21 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
         };
         var tenantId = _tenantContext.TenantId;
         var createdAt = DateTime.UtcNow;
-        var isTenantAdmin = await _adminContext.IsTenantAdminAsync(tenantId, cancellationToken);
 
         organization.CreatedAt = createdAt;
         var organizationActor = new Actor
         {
+            Id = ids.ActorId,
             ActorTypeId = (int)ActorTypeEnum.Organization,
             ActorType = null!,
-            Pii = new ActorPii { DisplayName = organization.FullName },
+            Pii = new ActorPii { ActorId = ids.ActorId, DisplayName = organization.FullName },
             Description = null,
             Organization = organization
         };
 
         var participation = new OrganizationTenant
         {
+            Id = ids.ParticipationId,
             TenantId = tenantId,
             Tenant = null!,
             Organization = organization,
@@ -119,6 +132,7 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
 
         var organizationMember = new OrganizationMember
         {
+            Id = ids.MemberId,
             OrganizationTenant = participation,
             UserId = currentUserId,
             User = null!,
@@ -129,20 +143,13 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
             Tenant = null!
         };
 
-        await _unitOfWork.ExecuteInTransactionAsync(async transactionToken =>
-        {
-            organization = await _organizationRepository.Create(organization);
-            organizationActor.OrganizationId = organization.Id;
-            await _actorRepository.Create(organizationActor);
-            participation.OrganizationId = organization.Id;
-            participation = await _organizationTenantRepository.Create(participation);
-            organizationMember.OrganizationTenantId = participation.Id;
-            await _organizationMemberRepository.Create(organizationMember);
-        }, cancellationToken);
-
-        _metrics.RecordOrganizationCreated(_tenantContext.TenantId.ToString());
-
-        await _cache.RemoveAsync($"organization:detail:{organization.Id}", cancellationToken);
+        organization = await _organizationRepository.Create(organization);
+        organizationActor.OrganizationId = organization.Id;
+        await _actorRepository.Create(organizationActor);
+        participation.OrganizationId = organization.Id;
+        participation = await _organizationTenantRepository.Create(participation);
+        organizationMember.OrganizationTenantId = participation.Id;
+        await _organizationMemberRepository.Create(organizationMember);
 
         return BaseCommandResponse.Success(
             organization.Id,

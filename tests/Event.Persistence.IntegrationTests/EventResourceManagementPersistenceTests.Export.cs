@@ -19,9 +19,12 @@ public sealed partial class EventResourceManagementPersistenceTests
     {
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext(new ExportReadFailure());
-        var result = await Workflow(context, scope.TenantAId, actor).ExportAsync(scope.EventAId, 1, 20, default);
+        await using var request = Workflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow.ExportAsync(scope.EventAId, 1, 20, default);
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Unavailable);
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
     }
 
     [Test]
@@ -29,7 +32,10 @@ public sealed partial class EventResourceManagementPersistenceTests
     {
         var (scope, actor) = await SeedAsync();
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, actor);
+        await using var request = Workflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var workflow = request.Workflow;
         var id = Guid.CreateVersion7();
         var draft = Draft() with
         {
@@ -45,12 +51,13 @@ public sealed partial class EventResourceManagementPersistenceTests
         await context.SaveChangesAsync();
         var result = await new ExportEventResourceMetadataQueryHandler(workflow).QueryAsync(new(scope.EventAId));
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
-        var item = result.Value!.Items.Single();
+        var item = (await DiscloseAsync(result)).Items.Single();
         await Assert.That(item.Id).IsEqualTo(id);
         await Assert.That(item.Title).IsEqualTo(draft.Title);
         await Assert.That(item.SensitiveNotes).IsEqualTo(draft.SensitiveNotes);
         await Assert.That(item.Availability).IsEqualTo(draft.Availability);
-        await Assert.That(item.AudienceRules.Select(rule => rule.Kind).SequenceEqual(draft.AudienceRules.Select(rule => rule.Kind))).IsTrue();
+        await Assert.That(item.AudienceRules).IsNotNull();
+        await Assert.That(item.AudienceRules!.Value.Select(rule => rule.Kind).SequenceEqual(draft.AudienceRules.Select(rule => rule.Kind))).IsTrue();
         var json = JsonSerializer.SerializeToElement(item, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         await Assert.That(json.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal)
             .SetEquals(["id", "eventSessionId", "publicationState", "title", "publicTitle", "description", "sensitiveNotes",
@@ -66,8 +73,13 @@ public sealed partial class EventResourceManagementPersistenceTests
         var (scope, actor) = await SeedAsync();
         var id = Guid.CreateVersion7();
         await using var context = database.CreateContext();
-        await Assert.That((await Workflow(context, scope.TenantAId, actor)
-            .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
+        await using (var creation = Workflow(context, scope.TenantAId, actor))
+        {
+            await creation.InitializeAsync();
+            await creation.PrepareAsync();
+            await Assert.That((await creation.Workflow
+                .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
+        }
         var provider = Substitute.For<IEventResourceAuthorizationProvider>();
         provider.CheckBatchAsync(Arg.Any<IReadOnlyList<EventResourceProviderInput>>(), Arg.Any<CancellationToken>())
             .Returns(call =>
@@ -77,10 +89,13 @@ public sealed partial class EventResourceManagementPersistenceTests
                 return inputs.Select(input => input.Action == "export" && input.Resource.Id == id
                     ? EventResourceProviderDecision.Deny : EventResourceProviderDecision.Allow).ToArray();
             });
-        var result = await Workflow(context, scope.TenantAId, actor, provider: provider)
+        await using var request = Workflow(context, scope.TenantAId, actor, provider: provider);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow
             .ExportAsync(scope.EventAId, 1, 20, default);
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
     }
 
     [Test]
@@ -90,7 +105,10 @@ public sealed partial class EventResourceManagementPersistenceTests
         var id = Guid.CreateVersion7();
         await using (var seed = database.CreateContext())
         {
-            await Assert.That((await Workflow(seed, scope.TenantAId, actor)
+            await using var creation = Workflow(seed, scope.TenantAId, actor);
+            await creation.InitializeAsync();
+            await creation.PrepareAsync();
+            await Assert.That((await creation.Workflow
                 .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
             var resource = await seed.EventResources.SingleAsync(row => row.Id == id);
             var storage = await seed.StorageObjects.SingleAsync(row => row.Id == scope.StorageAId);
@@ -120,10 +138,13 @@ public sealed partial class EventResourceManagementPersistenceTests
                     .Select(_ => EventResourceProviderDecision.Allow).ToArray();
             });
         await using var context = database.CreateIndependentContext();
-        var result = await Workflow(context, scope.TenantAId, actor, provider: provider)
+        await using var request = Workflow(context, scope.TenantAId, actor, provider: provider);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow
             .ExportAsync(scope.EventAId, 1, 20, default);
         await Assert.That(changed).IsTrue();
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
         await Assert.That(result.Outcome).IsNotEqualTo(EventResourceAuthorityOutcome.Allowed);
     }
 
@@ -133,7 +154,10 @@ public sealed partial class EventResourceManagementPersistenceTests
         var (scope, actor) = await SeedAsync();
         var id = Guid.CreateVersion7();
         await using var context = database.CreateContext();
-        await Assert.That((await Workflow(context, scope.TenantAId, actor)
+        await using var request = Workflow(context, scope.TenantAId, actor);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        await Assert.That((await request.Workflow
             .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
         var resource = await context.EventResources.SingleAsync(row => row.Id == id);
         var storage = await context.StorageObjects.SingleAsync(row => row.Id == scope.StorageAId);
@@ -144,9 +168,9 @@ public sealed partial class EventResourceManagementPersistenceTests
         storage.SafeDisplayName = "foreign-secret.pdf";
         resource.SetStoredFile(storage.Id, resource.ConcurrencyStamp, actor, Now);
         await context.SaveChangesAsync();
-        var result = await Workflow(context, scope.TenantAId, actor).ExportAsync(scope.EventAId, 1, 20, default);
+        var result = await request.Workflow.ExportAsync(scope.EventAId, 1, 20, default);
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
-        var json = JsonSerializer.Serialize(result.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var json = JsonSerializer.Serialize(await DiscloseAsync(result), new JsonSerializerOptions(JsonSerializerDefaults.Web));
         await Assert.That(json.Contains("foreign-secret.pdf", StringComparison.Ordinal)).IsFalse();
         using var document = JsonDocument.Parse(json);
         await Assert.That(document.RootElement.GetProperty("items")[0].GetProperty("file").ValueKind)
@@ -159,8 +183,13 @@ public sealed partial class EventResourceManagementPersistenceTests
         var (scope, actor) = await SeedAsync();
         var id = Guid.CreateVersion7();
         await using (var seed = database.CreateContext())
-            await Assert.That((await Workflow(seed, scope.TenantAId, actor)
+        {
+            await using var creation = Workflow(seed, scope.TenantAId, actor);
+            await creation.InitializeAsync();
+            await creation.PrepareAsync();
+            await Assert.That((await creation.Workflow
                 .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
+        }
         var provider = Substitute.For<IEventResourceAuthorizationProvider>();
         bool changed = false;
         provider.CheckBatchAsync(Arg.Any<IReadOnlyList<EventResourceProviderInput>>(), Arg.Any<CancellationToken>())
@@ -184,11 +213,14 @@ public sealed partial class EventResourceManagementPersistenceTests
                 return (IReadOnlyList<EventResourceProviderDecision>)inputs.Select(_ => EventResourceProviderDecision.Allow).ToArray();
             });
         await using var context = database.CreateIndependentContext();
-        var result = await Workflow(context, scope.TenantAId, actor, provider: provider)
+        await using var request = Workflow(context, scope.TenantAId, actor, provider: provider);
+        await request.InitializeAsync();
+        await request.PrepareAsync();
+        var result = await request.Workflow
             .ExportAsync(scope.EventAId, 1, 20, default);
         await Assert.That(changed).IsTrue();
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
-        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Projection).IsNull();
     }
 
     private sealed class ExportReadFailure : DbCommandInterceptor

@@ -1,0 +1,76 @@
+@page "/moderation/pre-finding/notices/{NoticeId:guid}"
+@using Microsoft.AspNetCore.Authorization
+@using Explore.Blazor.Client.Services.Moderation
+@attribute [Authorize]
+@rendermode InteractiveAuto
+
+<PageTitle>Protected pre-finding notice</PageTitle>
+<HeadContent>
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+</HeadContent>
+
+<section class="pre-finding-notice" aria-busy="@(_busy ? "true" : "false")">
+    <h1>Protected pre-finding notice</h1>
+    <p>This is a notice before a finding. Opening it does not acknowledge receipt.</p>
+    @if (_busy)
+    {
+        <p role="status">Contacting the protected notice owner...</p>
+    }
+    @if (_failure != PreFindingNoticeFailure.None)
+    {
+        <p role="alert">@FailureMessage</p>
+    }
+    @if (_view is { } view)
+    {
+        <AppCard>
+            <div class="pre-finding-notice__content">
+                <h2>Allegation</h2>
+                <p class="pre-finding-notice__text">@view.Allegation</p>
+                <h2>Applicable rule</h2>
+                <p class="pre-finding-notice__text">@view.ApplicableRule</p>
+                <h2>Response instructions</h2>
+                <p class="pre-finding-notice__text">@view.ResponseInstructions</p>
+                <h2>Notice status</h2>
+                <dl>
+                    <dt>Receipt</dt>
+                    <dd>@(view.AcknowledgedAt is null ? "Not acknowledged" : "Acknowledged")</dd>
+                    <dt>Response</dt>
+                    <dd>@(view.RespondedAt is null ? "Not submitted" : "Submitted")</dd>
+                    <dt>Available until</dt>
+                    <dd><time datetime="@view.RetainUntil.ToString("O")">@view.RetainUntil.ToString("u")</time></dd>
+                </dl>
+                @if (view.Response is not null)
+                {
+                    <h2>Permitted response</h2>
+                    <p class="pre-finding-notice__text">@view.Response</p>
+                }
+                @if (view.HasAcknowledgeLink)
+                {
+                    <AppButton OnClick="AcknowledgeAsync" Disabled="@_busy" data-action="acknowledge">
+                        Acknowledge receipt
+                    </AppButton>
+                }
+                @if (view.HasSubmitResponseLink)
+                {
+                    <form @onsubmit="RespondAsync" @onsubmit:preventDefault class="pre-finding-notice__form">
+                        <label for="pre-finding-response">Your response</label>
+                        <p id="pre-finding-response-help">Required. Maximum 65,536 UTF-8 bytes. Submission records your response, not agreement with the allegation.</p>
+                        <textarea id="pre-finding-response" @bind="_statement" @bind:event="oninput"
+                                  required maxlength="65536" rows="8" autocomplete="off"
+                                  aria-describedby="pre-finding-response-help pre-finding-response-error"
+                                  aria-invalid="@(_inputError ? "true" : "false")"></textarea>
+                        <p id="pre-finding-response-error">@(_inputError ? "Enter a substantive response within the UTF-8 byte limit." : "")</p>
+                        <AppButton ButtonType="ButtonType.Submit" Disabled="@_busy" data-action="submit-response">
+                            Submit response
+                        </AppButton>
+                    </form>
+                }
+            </div>
+        </AppCard>
+    }
+    @if (!_busy && _failure != PreFindingNoticeFailure.Expired)
+    {
+        <AppButton OnClick="ReloadAsync" Variant="Variant.Outlined" data-action="reload">Reload notice</AppButton>
+    }
+</section>

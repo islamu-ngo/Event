@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4Z82Q7J2JEWZVKNT52Y5D0T
+Title: Model finite account-bound allegation receipts
+Type: feat
+Scope: access
+Summary: Define payload-free allegation target and evidence coordinates with digest-only account-bound receipts. Consumption requires the exact recorded native provenance, and retries preserve the original deadline. Native authentication, storage and adjudication remain separate.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

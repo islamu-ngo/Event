@@ -20,6 +20,32 @@ public sealed class EventReportSignalConfiguration : IEntityTypeConfiguration<Ev
         builder.Property(e => e.SafeSummary).HasMaxLength(500);
         builder.Property(e => e.ExternalSignalId).HasMaxLength(200);
         builder.Property(e => e.CorrelationId).HasMaxLength(100).IsRequired();
+        builder.Property(e => e.AdvisoryIdentity).HasMaxLength(200);
+        builder.Property(e => e.AdvisoryMaterialSha256).HasMaxLength(71);
+        builder.Property(e => e.SourceCaseConcurrencyStamp);
+
+        builder.HasOne<EventReportCase>()
+            .WithMany()
+            .HasForeignKey(e => new { e.TenantId, e.ReportId, e.CaseId })
+            .HasPrincipalKey(e => new { e.TenantId, e.ReportId, e.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<EventReportExternalLink>()
+            .WithMany()
+            .HasForeignKey(e => new { e.TenantId, e.ReportId, e.ProviderLinkId })
+            .HasPrincipalKey(e => new { e.TenantId, e.ReportId, e.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<IncomingWebhookMessage>()
+            .WithMany()
+            .HasForeignKey(e => new { e.TenantId, e.IncomingWebhookMessageId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(e => new { e.TenantId, e.Provider, e.AdvisoryIdentity, e.AdvisoryOrdinal })
+            .IsUnique()
+            .HasFilter("advisory_identity IS NOT NULL")
+            .HasDatabaseName("ux_event_report_signals_advisory_identity_ordinal");
 
         builder.HasOne(e => e.Tenant)
             .WithMany()
@@ -49,15 +75,19 @@ public sealed class EventReportSignalConfiguration : IEntityTypeConfiguration<Ev
 
         builder.HasIndex(e => new { e.TenantId, e.Provider, e.ProviderTargetScope, e.ProviderTargetId, e.ExternalSignalId })
             .IsUnique()
-            .HasFilter("external_signal_id IS NOT NULL")
+            .HasFilter("external_signal_id IS NOT NULL AND advisory_identity IS NULL")
             .HasDatabaseName("ux_event_report_signals_tenant_provider_target_external_signal");
 
         builder.HasIndex(e => new { e.TenantId, e.Provider, e.ProviderTargetScope, e.ProviderTargetId, e.CorrelationId })
             .IsUnique()
+            .HasFilter("advisory_identity IS NULL")
             .HasDatabaseName("ux_event_report_signals_tenant_provider_target_correlation");
 
         builder.ToTable(t =>
         {
+            t.HasCheckConstraint("ck_event_report_signals_advisory_source",
+                "(advisory_identity IS NULL AND advisory_ordinal IS NULL AND advisory_material_sha256 IS NULL AND case_id IS NULL AND source_case_concurrency_stamp IS NULL AND provider_link_id IS NULL AND incoming_webhook_message_id IS NULL) OR " +
+                "(advisory_identity IS NOT NULL AND length(btrim(advisory_identity)) > 0 AND advisory_ordinal IS NOT NULL AND advisory_ordinal >= 0 AND advisory_material_sha256 IS NOT NULL AND length(advisory_material_sha256) = 71 AND report_id IS NOT NULL AND case_id IS NOT NULL AND source_case_concurrency_stamp IS NOT NULL AND source_case_concurrency_stamp <> '00000000-0000-0000-0000-000000000000' AND provider_link_id IS NOT NULL AND ((provider = 3 AND incoming_webhook_message_id IS NOT NULL) OR (provider = 2 AND incoming_webhook_message_id IS NULL)))");
             t.HasCheckConstraint("ck_event_report_signals_provider", "provider BETWEEN 1 AND 5");
             t.HasCheckConstraint("ck_event_report_signals_provider_target_scope", "provider_target_scope BETWEEN 1 AND 3");
             t.HasCheckConstraint("ck_event_report_signals_provider_target_id_not_blank", "length(btrim(provider_target_id)) > 0");

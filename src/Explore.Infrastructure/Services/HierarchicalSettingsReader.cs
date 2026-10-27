@@ -107,6 +107,10 @@ public class HierarchicalSettingsReader : IHierarchicalSettingsReader
         // Current policy boundaries cannot depend on another replica invalidating this process's cache.
         var requiresAuthoritativePolicy = context.RequireAuthoritativeReads || keyList.Any(key => IsSmtpSetting(key)
             || key == GovernanceSettingKeys.TenantDelegation.LockSmtp
+            || key is GovernanceSettingKeys.Events.UserSubmissionEnabled
+                or GovernanceSettingKeys.Events.OrganizationSubmissionEnabled
+                or GovernanceSettingKeys.Events.GroupSubmissionEnabled
+                or GovernanceSettingKeys.Events.RequireApproval
             || key.StartsWith("public_experience.", StringComparison.Ordinal)
             || key.StartsWith("event_discovery.", StringComparison.Ordinal)
             || key.StartsWith("federation.", StringComparison.Ordinal));

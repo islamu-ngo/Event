@@ -6,6 +6,7 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
+using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventResource;
@@ -47,7 +48,6 @@ public sealed class EventResourceManagementController(
     IQueryHandler<GetEventResourceManagementDetailQuery, EventResourceManagementReadResult<EventResourceManagementDto>> detail,
     IQueryHandler<ListEventResourceManagementQuery, EventResourceManagementReadResult<EventResourceManagementPageDto>> list,
     IQueryHandler<GetEventResourceAuditQuery, EventResourceManagementReadResult<EventResourceAuditPageDto>> audit,
-    IQueryHandler<AuthorizeEventResourceManagementDisclosureQuery, EventResourceAuthorityOutcome> disclosure,
     IResourceAssembler<EventResourceManagementDto, EventResourceManagementDto> assembler,
     ITenantContext tenant) : ControllerBase
 {
@@ -71,10 +71,9 @@ public sealed class EventResourceManagementController(
     public async Task<ActionResult<HalResource<EventResourceManagementDto>>> Get(Guid id, CancellationToken cancellationToken)
     {
         var result = await detail.QueryAsync(new(id), cancellationToken);
-        if (result.Value is not { } value) return ReadFailure(result.Outcome);
-        var representation = await assembler.ToResource(value, HttpContext);
-        var outcome = await disclosure.QueryAsync(new(null, [value]), cancellationToken);
-        return outcome == EventResourceAuthorityOutcome.Allowed ? Ok(representation) : ReadFailure(outcome);
+        if (result.Projection is not { } projection) return ReadFailure(result.Outcome);
+        return new EventResourceProjectionResult<EventResourceManagementDto>(projection,
+            async (value, _) => Ok(await assembler.ToResource(value, HttpContext)), ReadFailure);
     }
 
     [HttpGet("event/{eventId:guid}/resources/management", Name = RouteNames.ListEventResourceManagement)]
@@ -85,16 +84,14 @@ public sealed class EventResourceManagementController(
         Guid eventId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
         var result = await list.QueryAsync(new(eventId, page, pageSize), cancellationToken);
-        if (result.Value is not { } value) return ReadFailure(result.Outcome);
-        var representation = await assembler.ToCollectionResource(
-            value.Items,
-            RouteNames.ListEventResourceManagement,
-            new EventMaterialCollectionAuthorizationContext(tenant.TenantId, eventId, value.Page, value.PageSize), HttpContext);
-        var outcome = await disclosure.QueryAsync(new(eventId, value.Items), cancellationToken);
-        return outcome == EventResourceAuthorityOutcome.Allowed
-            ? Ok(new EventResourceManagementCollectionDto(value.Page, value.PageSize,
-                representation.Links.ToImmutableDictionary(), representation.Embedded))
-            : ReadFailure(outcome);
+        if (result.Projection is not { } projection) return ReadFailure(result.Outcome);
+        return new EventResourceProjectionResult<EventResourceManagementPageDto>(projection, async (value, _) =>
+        {
+            var representation = await assembler.ToCollectionResource(value.Items, RouteNames.ListEventResourceManagement,
+                new EventMaterialCollectionAuthorizationContext(tenant.TenantId, eventId, value.Page, value.PageSize), HttpContext);
+            return Ok(new EventResourceManagementCollectionDto(value.Page, value.PageSize,
+                representation.Links.ToImmutableDictionary(), representation.Embedded));
+        }, ReadFailure);
     }
 
     [HttpGet("eventresource/{id:guid}/audit", Name = RouteNames.GetEventResourceAudit)]
@@ -104,7 +101,10 @@ public sealed class EventResourceManagementController(
         Guid id, [FromQuery] int limit = 100, CancellationToken cancellationToken = default)
     {
         var result = await audit.QueryAsync(new(id, limit), cancellationToken);
-        return result.Value is { } value ? Ok(value) : ReadFailure(result.Outcome);
+        return result.Projection is { } projection
+            ? new EventResourceProjectionResult<EventResourceAuditPageDto>(projection,
+                (value, _) => Task.FromResult<ActionResult>(Ok(value)), ReadFailure)
+            : ReadFailure(result.Outcome);
     }
 
     [HttpPost("event/{eventId:guid}/resources", Name = RouteNames.CreateEventResource)]

@@ -19,6 +19,7 @@ public sealed class EventReportExternalLinkConfiguration : IEntityTypeConfigurat
         builder.Property(e => e.SyncState).HasConversion<int>().IsRequired();
         builder.Property(e => e.LastErrorCategory).HasMaxLength(100);
         builder.Property(e => e.CorrelationId).HasMaxLength(100).IsRequired();
+        builder.Property(e => e.CaseConcurrencyStamp);
 
         builder.HasOne(e => e.Tenant)
             .WithMany()
@@ -58,6 +59,9 @@ public sealed class EventReportExternalLinkConfiguration : IEntityTypeConfigurat
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_event_report_external_links_provider", "provider BETWEEN 1 AND 2");
+            t.HasCheckConstraint("ck_event_report_external_links_case_generation",
+                "(case_id IS NULL AND case_concurrency_stamp IS NULL) OR " +
+                "(case_id IS NOT NULL AND case_concurrency_stamp IS NOT NULL AND case_concurrency_stamp <> '00000000-0000-0000-0000-000000000000')");
             t.HasCheckConstraint("ck_event_report_external_links_provider_target_scope", "provider_target_scope BETWEEN 1 AND 3");
             t.HasCheckConstraint("ck_event_report_external_links_provider_target_id_not_blank", "length(btrim(provider_target_id)) > 0");
             t.HasCheckConstraint("ck_event_report_external_links_sync_state", "sync_state BETWEEN 1 AND 5");

@@ -1,0 +1,29 @@
+Change-Id: CHG-01M502NVMF004QXK6BRM7PJ1TP
+Title: "Catalogue selected moderation secret authorities"
+Type: feat
+Scope: privacy
+Summary: "Declare instance-only recognition, native reconciliation and isolated measurement secret metadata through the existing catalogue without embedding material or activating a runtime consumer."
+Group: moderation-selected-secret-authorities
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Recognition material permits only explicit Infisical or environment authority and requires acknowledged overlap; bootstrap maintenance and isolated measurement credentials remain instance-only and do not supply native permission."
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: planned
+    Detail: "Complete the programme configuration examples and paired internal/public operator guides before PR; this prerequisite adds catalogue metadata, not secret values or selected runtime configuration."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: planned
+    Detail: "Publish selected-authority and isolated launcher responsibilities with the complete programme guides before PR; no activation or deployment support is certified here."

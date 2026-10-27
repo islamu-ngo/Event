@@ -62,6 +62,24 @@ public partial class ExploreDbContext
         modelBuilder.Entity<EventResourceAuditEntry>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
 
+        modelBuilder.Entity<EventResourceModerationQuarantine>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
+
+        modelBuilder.Entity<EventResourceModerationQuarantineReview>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
+
+        modelBuilder.Entity<EventResourceModerationQuarantineRelease>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
+
+        modelBuilder.Entity<EventResourceModerationReviewDuty>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
+
+        modelBuilder.Entity<EventResourceModerationReviewCompletion>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
+
+        modelBuilder.Entity<EventResourceModerationReviewEscalation>()
+            .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId);
+
         modelBuilder.Entity<EventParticipationConfiguration>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId)
             .HasQueryFilter(QueryFilterNames.SoftDelete, e => !e.IsDeleted);
@@ -290,6 +308,9 @@ public partial class ExploreDbContext
         modelBuilder.Entity<RegistrationProviderApprovedOrigin>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId)
             .HasQueryFilter(QueryFilterNames.SoftDelete, e => !e.IsDeleted && e.Connection != null && !e.Connection.IsDeleted);
+
+        modelBuilder.Entity<RegistrationProviderBindingPublication>()
+            .HasQueryFilter(QueryFilterNames.Tenant, publication => IsTenantFilterBypassed || publication.TenantId == TenantFilterTenantId);
 
         modelBuilder.Entity<RegistrationProviderBinding>()
             .HasQueryFilter(QueryFilterNames.Tenant, e => IsTenantFilterBypassed || e.TenantId == TenantFilterTenantId)

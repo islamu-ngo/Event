@@ -184,7 +184,9 @@ public class UserExternalLoginIntegrationTests
             .Returns(BaseCommandResponse.Failure<Guid>("claim_rejected", "Claim rejected."));
         var logins = Substitute.For<IUserExternalLoginRepository>();
         var tokenIssuer = Substitute.For<IAtprotoSessionTokenIssuer>();
+        using var scope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
+            scope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -318,7 +320,10 @@ public class UserExternalLoginIntegrationTests
                 new string('b', 64),
                 DateTime.UtcNow));
 
+        using var firstScope = _fixture.Factory.Services.CreateScope();
+        using var secondScope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler first = CreateAtprotoHandler(
+            firstScope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -326,6 +331,7 @@ public class UserExternalLoginIntegrationTests
             out _,
             bootstrapRepository);
         BootstrapAtprotoSessionCommandHandler second = CreateAtprotoHandler(
+            secondScope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -435,7 +441,9 @@ public class UserExternalLoginIntegrationTests
         var tokenIssuer = Substitute.For<IAtprotoSessionTokenIssuer>();
         tokenIssuer.IssueAsync(userId, Arg.Any<Guid>(), did, Arg.Any<CancellationToken>())
             .Returns(new AtprotoIssuedSessionToken("platform-token", DateTimeOffset.UtcNow.AddMinutes(5)));
+        using var scope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
+            scope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -502,7 +510,9 @@ public class UserExternalLoginIntegrationTests
         var tokenIssuer = Substitute.For<IAtprotoSessionTokenIssuer>();
         tokenIssuer.IssueAsync(userId, Arg.Any<Guid>(), did, Arg.Any<CancellationToken>())
             .Returns(new AtprotoIssuedSessionToken("platform-token", DateTimeOffset.UtcNow.AddMinutes(5)));
+        using var scope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
+            scope.ServiceProvider,
             gateway,
             tokenIssuer,
             claimAdministratorHandler,
@@ -559,7 +569,9 @@ public class UserExternalLoginIntegrationTests
             {
                 AtprotoLoginEnabled = false
             });
+        using var scope = _fixture.Factory.Services.CreateScope();
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
+            scope.ServiceProvider,
             gateway,
             Substitute.For<IAtprotoSessionTokenIssuer>(),
             Substitute.For<ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>>>(),
@@ -587,6 +599,7 @@ public class UserExternalLoginIntegrationTests
             new byte[] { 1 });
 
     private static BootstrapAtprotoSessionCommandHandler CreateAtprotoHandler(
+        IServiceProvider services,
         IAtprotoOAuthSecurityGateway gateway,
         IAtprotoSessionTokenIssuer tokenIssuer,
         ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>> claimAdministratorHandler,
@@ -677,10 +690,27 @@ public class UserExternalLoginIntegrationTests
         }
 
         var fenceAuthority = Substitute.For<Explore.Application.Contracts.PrivacyErasure.IPrivacyIdentityFenceAuthority>();
-        fenceAuthority.ExecuteSerializedAsync(
+        fenceAuthority.ExecuteEnrollmentSerializedAsync(
+                Arg.Any<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>(),
+                Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>()(
+                call.Arg<CancellationToken>()));
+        var recognition = Substitute.For<Explore.Application.Contracts.Moderation.IModerationRecognitionContinuity>();
+        recognition.ExecuteWithRecognitionLockAsync(
                 Arg.Any<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<Func<CancellationToken, Task<AtprotoSessionBootstrapResult>>>()(
                 call.Arg<CancellationToken>()));
+        recognition.MatchAndBindAsync(
+                Arg.Any<Explore.Application.Contracts.Moderation.ModerationRecognitionContinuityRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new Explore.Application.Contracts.Moderation.ModerationRecognitionContinuityResult
+            {
+                ActionFailure = ModerationRecognitionContinuityFailure.None,
+                AdmissionFailure = ModerationRecognitionContinuityFailure.None,
+                AdmissionExcluded = false,
+                ActionRecoveryStaged = false,
+                Actions = []
+            });
         return new BootstrapAtprotoSessionCommandHandler(
             gateway,
             tokenIssuer,
@@ -701,7 +731,9 @@ public class UserExternalLoginIntegrationTests
             tenantContext,
             configuration,
             TimeProvider.System,
-            new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority));
+            new Explore.Application.Services.PrivacyIdentityFenceOperation(fenceAuthority, recognition,
+                TimeProvider.System, logins, services.GetRequiredService<IHumanActionCommitFinalizer>),
+            null!); // These legacy scenarios exercise Person login; membership participants have native-store coverage.
     }
 
     private async Task EnsureUserExistsAsync(Guid userId, string? email = null)
@@ -757,8 +789,16 @@ public class UserExternalLoginIntegrationTests
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
     }
 
-    private sealed class InlineUnitOfWork : IUnitOfWork
+    private sealed class InlineUnitOfWork : IUnitOfWork, IPrivacyIdentityEnrollmentTransaction
     {
+        public async Task<T> ExecuteRecognitionEnrollmentAsync<T>(Func<CancellationToken, Task<T>> operation,
+            Func<CancellationToken, Task> beforeCommit, CancellationToken ct = default)
+        {
+            T result = await operation(ct);
+            await beforeCommit(ct);
+            return result;
+        }
+
         public Task ExecuteInTransactionAsync(
             Func<CancellationToken, Task> operation, CancellationToken ct = default) => operation(ct);
 

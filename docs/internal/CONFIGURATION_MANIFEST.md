@@ -75,6 +75,131 @@ The most important rule is:
 > atomically. A bootstrap rerun never restores historical values over current
 > Day 2 state.
 
+## Moderation Definition Portability Foundation
+
+`ModerationConfigurationDocumentProjection` exports complete non-chat semantic
+definitions and thirteen-dimension recipes without source jurisdiction, native
+profile IDs, cases, people or publication/approval authority. Strict JSON and
+explicit destination mappings feed the existing complete policy compiler.
+`CanImport` requires valid definitions, matching recipes and supported selected
+support; conversion always proposes a draft, never activation.
+
+`ModerationConfigurationDocumentDiff.Compare` compares a retained preset baseline,
+local definitions and incoming definitions. Local-only edits survive; identical
+edits need no action; divergent edits to one semantic definition are conflicts,
+including recipe changes and removals. Catalogue ordering is not a change.
+Profile scope/subject/effect/strategy sets are canonicalized for comparison;
+reordering them cannot manufacture a conflict with an independent local edit.
+Recipe values and their required base/additive sequence remain exact.
+The immutable result names the section and code/revision, not source authority;
+comparison does not merge, write or authorize application.
+
+`Merge` uses that complete comparison to preserve local definitions and apply only
+nonconflicting incoming additions, replacements and removals to a new immutable
+document. One conflict withholds the whole document; unrelated incoming changes
+cannot be partially returned. Local-only definitions and original recipe values
+survive. The merged document is still authority-neutral: native preview must
+recompile the complete result and independently qualify baseline ownership,
+destination mappings and current revisions before any coordinated publication.
+
+The scoped `ModerationConfigurationImportAdapter` now has a native-only preview/
+validate/export/apply path. Export acquires the same authorized current adopted
+graph and strips native coordinates through the complete neutral projection.
+Unsupported retained definitions remain exportable for review; export does not
+claim destination import eligibility or operational readiness. An authorized
+destination with no selected policy returns no document, not a default policy.
+Preview acquires current native administrator, tenant, host,
+epoch and selected policy entities in a serializable transaction. Its baseline
+must be adopted predecessor history, not a supplied document or prepared
+candidate. The binding covers caller/target, current heads, inventory, incoming
+and merged content, and retained/reserved profile identities. Apply reacquires
+that destination and recompiles the complete bound result.
+
+The publication participant requires the coordinator's original serializable
+transaction and a clean tracker: earlier sections must flush their own changes
+first. It saves its draft graph and qualification head without committing, and
+rejecting it rolls back the original transaction, including earlier flushed
+sections. Standalone publication keeps its clean-unit ownership contract. An
+imported draft does not move the independently active pointer or create
+activation evidence.
+
+The source wire contracts now carry an optional typed `moderation` document in
+the instance, manifest tenant and tenant-package shapes. The source schema
+generator describes the same complete definitions, named vocabularies and
+required-nullable recipe members. Wire remains independent of Domain and
+Application; its strict codec rejects unknown/private members, duplicate keys,
+numeric enums and over-budget input. Both shipped manifest and tenant-package
+schema artifacts are now regenerated natively from these complete source shapes.
+
+`ModerationConfigurationExportService` restores independently acquired retained
+history without exporting source readiness or native identities. Full-instance
+export qualifies native platform administration and explicitly owned tenant
+graphs; tenant export reads only the actual authorized request tenant. No tenant
+impersonation or provider-session mutation is used. An absent installation or
+selection omits optional meaning; malformed selected history fails closed.
+`ConfigurationManifestCurrentStateReader` holds one serializable read through
+artifact serialization. Import preview and fidelity use its original-transaction
+participant methods when the coordinator already owns that transaction. Tenant
+previews read a tenant package directly, never a global manifest trimmed afterward.
+
+The artifact/session bridge persists a bounded
+`ModerationConfigurationImportReservationSet`: the complete selected instance/
+tenant destination set, exact mapped native tenant identities, distinct UUIDv7
+operation identities and each destination's adopted baseline, reserved policy/
+publication/profile identities and native binding. It stores neither EF entities
+nor acquired permission. The approved preview also binds the
+reservation digest to artifact, target, selection, mapping, approvals, mode and
+expiry. Apply reloads that reservation, independently reacquires native authority
+and history, recompiles and compares bindings in the original serializable unit.
+Only exact coordinator-owned legal aggregates may flush before native publication;
+foreign pending work or stale inputs reject and roll back the whole transaction.
+Before the first moderation write, the native owner verifies every original
+destination. Shared qualification epochs may advance only by the exact writes
+already performed by this fanout; unrelated progress still conflicts. Its
+transaction-bound completion rechecks the complete resulting set after operation
+and outbox persistence, before the coordinator returns to the owning unit of work.
+Existing native fences remain held through commit; this completion is not an EF
+commit interceptor. Fidelity compares the actual post-apply artifact's instance
+and mapped tenant neutral meanings with their merged proposals. Reservations are
+limited to 256 tenants plus one instance definition and 1,100,000 characters.
+
+Current-state artifacts now also include exact-scoped legal authoring definitions
+through `LegalConfigurationSnapshotProjection`. Instance export reads only its
+independently authorized active-tenant set; tenant export reads only the actual
+request tenant. Projection preserves current-version locales, template provenance,
+audience and fresh-acceptance meaning as portable Draft intent. It never exports
+accountable/reviewer identities, source origin, approval or scheduling permission.
+Publication authority remains native-owned. The import coordinator captures the
+actual original serializable transaction coordinate through the legal repository,
+then flushes only the exact legal graphs returned by the section applier before
+moderation acquires its clean-tracker native owner. The flush never commits;
+rejected ownership rolls back earlier sections. Wire enum-name legal keys now
+resolve directly to the native enum rather than a catalog slug. Legal section
+digests use native text/language/template normalization, sort locales ordinally
+and compare Draft intent without accountable identity or effective-time proposals.
+Nonempty jurisdiction assumptions and nonnull change summaries have no native
+storage: their section receives
+`configuration_import_legal_metadata_not_supported` in preview, and selected apply
+rejects them before legal mutation rather than losing their meaning. Supported
+round-trip source is integrated; execution and whole mixed-section assurance
+remain deferred.
+
+`ConfigurationPortabilityRegistry` now declares `instance.moderation` and
+`tenant.moderation` as portable definition sections with export, preview, diff,
+apply and verification source support. The instance descriptor admits only the
+manifest; the tenant descriptor also admits a tenant package. Neither descriptor
+grants deletion or unconditional rollback. Apply selection uses the same registry
+gate as other sections; the complete native reservation and current authority
+checks remain independently mandatory. These descriptors do not confer activation.
+Whole-instance tenant moderation fanout source is integrated with qualified
+per-tenant native ownership; runtime/provider assurance is unrun.
+Rollback to an absent native policy is unsupported.
+Existing-policy rollback snapshots retain neutral
+prior meaning, not reservations or acquired authority. Provider migrations for
+the nullable session reservation and complete runtime/rollback assurance remain
+open. Schema behavior tests are unrun. All new witnesses remain unrun under the
+programme's implementation-first override.
+
 ## Contract Identity
 
 The public identity is exact and case-sensitive:

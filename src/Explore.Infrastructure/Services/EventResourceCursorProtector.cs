@@ -9,9 +9,9 @@ namespace Explore.Infrastructure.Services;
 public sealed class EventResourceCursorProtector(IDataProtectionProvider provider, TimeProvider clock)
     : IEventResourceCursorProtector
 {
-    private const int QueryVersion = 1;
+    private const int QueryVersion = 2;
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);
-    private readonly IDataProtector _protector = provider.CreateProtector("EventResource.AudienceCursor.v1");
+    private readonly IDataProtector _protector = provider.CreateProtector("EventResource.AudienceCursor.v2");
 
     public string Protect(EventResourceCursorScope scope, EventResourceCursorPosition position) =>
         _protector.Protect(JsonSerializer.Serialize(new Payload(QueryVersion, scope, position,

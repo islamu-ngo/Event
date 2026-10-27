@@ -17,6 +17,7 @@ public class EventReportExternalLink : ITenantEntity, IAuditableEntity
     public Guid ReportId { get; private set; }
     public EventReport Report { get; private set; } = null!;
     public Guid? CaseId { get; private set; }
+    public Guid? CaseConcurrencyStamp { get; private set; }
     public EventReportCase? Case { get; private set; }
     public EventReportExternalProvider Provider { get; private set; }
     public EventReportProviderTargetScope ProviderTargetScope { get; private set; }
@@ -38,6 +39,7 @@ public class EventReportExternalLink : ITenantEntity, IAuditableEntity
         Guid tenantId,
         Guid reportId,
         Guid? caseId,
+        Guid? caseConcurrencyStamp,
         EventReportExternalProvider provider,
         string correlationId,
         DateTime? createdAt = null,
@@ -49,9 +51,10 @@ public class EventReportExternalLink : ITenantEntity, IAuditableEntity
         EventReportGuards.RequireDefined(provider, nameof(provider));
         EventReportGuards.RequireDefined(providerTargetScope, nameof(providerTargetScope));
 
-        if (caseId == Guid.Empty)
+        if (caseId == Guid.Empty || caseConcurrencyStamp == Guid.Empty
+            || (caseId is null) != (caseConcurrencyStamp is null))
         {
-            throw new ArgumentException("Case id cannot be empty.", nameof(caseId));
+            throw new ArgumentException("A case binding requires its exact nonempty native generation.", nameof(caseId));
         }
 
         return new EventReportExternalLink
@@ -60,6 +63,7 @@ public class EventReportExternalLink : ITenantEntity, IAuditableEntity
             TenantId = tenantId,
             ReportId = reportId,
             CaseId = caseId,
+            CaseConcurrencyStamp = caseConcurrencyStamp,
             Provider = provider,
             ProviderTargetScope = providerTargetScope,
             ProviderTargetId = EventReportGuards.NormalizeRequired(providerTargetId, MaxProviderTargetIdLength, nameof(providerTargetId)),

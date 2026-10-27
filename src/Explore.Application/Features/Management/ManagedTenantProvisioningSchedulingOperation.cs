@@ -20,7 +20,7 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
     ISettingMutationLock mutationLock,
     IEventDiscoveryEnrollmentGate enrollmentGate)
 {
-    public async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>> ExecuteAsync(
+    public async Task<BaseCommandResponse<ManagedTenantProvisioningOperation>> ExecuteAsync(
         ScheduleManagedTenantProvisioningCommand request,
         CancellationToken cancellationToken = default)
     {
@@ -33,7 +33,7 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
             normalized.Administrator.LocalIdentity?.LocalSubjectId, cancellationToken);
         await using var enrollment = await enrollmentGate.AcquireAsync(cancellationToken);
 
-        BaseCommandResponse<ManagementTenantProvisioningOperationDto>? authorityFailure =
+        BaseCommandResponse<ManagedTenantProvisioningOperation>? authorityFailure =
             await EvaluateInstanceSchedulingPolicyAsync(request.ManagedInstanceId, cancellationToken);
         if (authorityFailure is not null)
             return authorityFailure;
@@ -49,7 +49,7 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
             return replay.ImmediateResponse;
         }
 
-        BaseCommandResponse<ManagementTenantProvisioningOperationDto>? instancePolicyFailure =
+        BaseCommandResponse<ManagedTenantProvisioningOperation>? instancePolicyFailure =
             await EvaluateInstanceSchedulingPolicyAsync(
                 request.ManagedInstanceId,
                 cancellationToken);
@@ -69,7 +69,7 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
 
         if (retryRecovery != CommittedRecoveryResolution.Owned)
         {
-            BaseCommandResponse<ManagementTenantProvisioningOperationDto>? tenantPolicyFailure =
+            BaseCommandResponse<ManagedTenantProvisioningOperation>? tenantPolicyFailure =
                 await EvaluateTenantCreationPolicyAsync(
                     normalized,
                     includeCapacity: false,
@@ -104,7 +104,7 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
                     return RecoveryConflict();
                 }
 
-                BaseCommandResponse<ManagementTenantProvisioningOperationDto>? concurrentInstancePolicyFailure =
+                BaseCommandResponse<ManagedTenantProvisioningOperation>? concurrentInstancePolicyFailure =
                     await EvaluateInstanceSchedulingPolicyAsync(
                         request.ManagedInstanceId,
                         token);
@@ -115,7 +115,7 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
 
                 if (concurrentRecovery != CommittedRecoveryResolution.Owned)
                 {
-                    BaseCommandResponse<ManagementTenantProvisioningOperationDto>? concurrentTenantPolicyFailure =
+                    BaseCommandResponse<ManagedTenantProvisioningOperation>? concurrentTenantPolicyFailure =
                         await EvaluateTenantCreationPolicyAsync(
                             normalized,
                             includeCapacity: true,
@@ -189,7 +189,7 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
             cancellationToken);
     }
 
-    private async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>?>
+    private async Task<BaseCommandResponse<ManagedTenantProvisioningOperation>?>
         EvaluateInstanceSchedulingPolicyAsync(
             Guid managedInstanceId,
             CancellationToken cancellationToken)
@@ -214,7 +214,7 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
             : Failure(registrationBlocker.Code, registrationBlocker.Message);
     }
 
-    private async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>?>
+    private async Task<BaseCommandResponse<ManagedTenantProvisioningOperation>?>
         EvaluateTenantCreationPolicyAsync(
             ManagementTenantProvisioningRequestDto request,
             bool includeCapacity,
@@ -351,7 +351,7 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
         });
 
     private sealed record ReplayResolution(
-        BaseCommandResponse<ManagementTenantProvisioningOperationDto>? ImmediateResponse,
+        BaseCommandResponse<ManagedTenantProvisioningOperation>? ImmediateResponse,
         ManagedTenantProvisioningOperation? RetryCandidate);
 
     private enum CommittedRecoveryResolution
@@ -361,20 +361,20 @@ public sealed class ManagedTenantProvisioningSchedulingOperation(
         Conflict
     }
 
-    private static BaseCommandResponse<ManagementTenantProvisioningOperationDto> Success(
+    private static BaseCommandResponse<ManagedTenantProvisioningOperation> Success(
         ManagedTenantProvisioningOperation operation,
         string message) => BaseCommandResponse.Success(
-            ManagedTenantProvisioningRequestCodec.ToDto(operation),
+            operation,
             message);
 
-    private static BaseCommandResponse<ManagementTenantProvisioningOperationDto> Failure(
+    private static BaseCommandResponse<ManagedTenantProvisioningOperation> Failure(
         string failureCode,
-        string message) => BaseCommandResponse.Failure<ManagementTenantProvisioningOperationDto>(
+        string message) => BaseCommandResponse.Failure<ManagedTenantProvisioningOperation>(
             failureCode,
             message,
             [message]);
 
-    private static BaseCommandResponse<ManagementTenantProvisioningOperationDto> RecoveryConflict() =>
+    private static BaseCommandResponse<ManagedTenantProvisioningOperation> RecoveryConflict() =>
         Failure(
             "tenant_provisioning_operation_provenance_conflict",
             "The customer reference is bound to a tenant that is not owned by this provisioning operation.");

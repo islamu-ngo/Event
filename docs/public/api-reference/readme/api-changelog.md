@@ -31,6 +31,61 @@ for the explicit pre-release provenance cutover procedure.
 
 ## Recent externally visible themes
 
+### Independent participant investigation (2026-10-13)
+
+`POST /api/moderation/participant-investigations/sources` captures a confidential,
+incident-specific assessment under current independent native investigator/read
+authority and separately adopted investigation custody. Supply exact incident,
+material, Human, Session/window, revision and finite UTC deadline coordinates,
+plus four bounded grounds fields. Unknown JSON members are rejected. The route
+uses a 32 KiB body limit, write-rate limiting and private/no-store responses;
+success returns only accepted source identity and revisions. Never log grounds.
+
+The separate attribution/renewal intent may name `ParticipantInvestigation`
+basis 5 with `investigationSourceId` and `investigationSourceRevision: 1` for the
+identified Human. This opens responsibility under review, not guilt, a strike,
+sanction or admission. Those fields are forbidden for other responsibility bases.
+Current native custody, incident generations and authenticated original capture
+remain required; changing authorization or deadlines alone cannot renew a live
+proceeding. Confidential disposal preserves history but ends current qualification.
+EventSubmission still names only the actual EventVersion submitter. Native schema
+and Client SDK generation/compilation passed; use the named responsibility,
+incident-kind and custody-purpose wire values. Hosted/provider/race assurance
+remains a programme-exit requirement.
+
+### Moderation policy authoring (2026-10-13)
+
+`GET /api/moderation/policies/current?scope=tenant|instance` returns latest retained
+authoring state and separately qualified next-write coordinates for the actual
+request context. An installed empty slot is unreserved. Optional UUIDv7
+`prospectivePolicyId` keeps the same local creation intent across reads of that
+empty slot; it cannot replace an adopted identity, reserve state or grant a write.
+Follow current draft/preparation HAL links and reconcile changed displayed heads
+deliberately. Candidate preparation never means adoption or activation.
+
+The guided Client page retains original and disabled definitions, appends semantic
+revisions and makes inventory/native-mode/declaration edits explicit.
+Simple/Advanced changes presentation only. Hosted/provider, browser and
+accessibility assurance remain programme-exit requirements.
+
+### Finite moderation material read purposes (2026-10-12)
+
+`POST /api/moderation/case-read-grants/{caseId}` grants a separately qualified
+account one finite case/material read purpose. Supply an exact case revision,
+source, grantee, UUIDv7 operation ID and finite UTC deadline with at most six
+fractional-second digits. The URL controls the case lookup; naming a grantee
+does not supply current administrative authority. Success returns only the
+committed grant ID. Repeat only the unchanged original intent when recovering a
+lost acknowledgement; replay cannot renew an expired or revoked grant.
+
+`POST /api/moderation/case-read-grants/{grantId}/revoke` withdraws the original
+revision-1 grant using a separate operation ID. A different operation cannot
+borrow an earlier revocation. Both actions use private/no-store responses,
+write-rate limits and 16 KiB body bounds. Obtain the opaque read token separately
+through the existing read-receipt route; neither granting nor revoking returns
+protected material. Generated client and provider/runtime assurance remain
+programme-exit requirements.
+
 ### Unified instance administration (2026-10-02)
 
 Internal administrator endpoints now use `/api/admin/instance/*` instead of

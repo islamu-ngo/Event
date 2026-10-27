@@ -76,7 +76,7 @@ static void ValidateDeployWorkflow(string path, string environmentName, string i
     }
 
     var text = File.ReadAllText(path);
-    RequireContains(text, "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1", path, "must download retained container build evidence with pinned download-artifact", failures);
+    RequireContains(text, "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2", path, "must download retained container build evidence with pinned download-artifact", failures);
     RequireContains(text, "pattern: container-build-*", path, "must download all container-build evidence artifacts", failures);
     RequireContains(text, $"resolve-deploy-image-evidence.cs -- artifacts/container-build islamu-event-api {immutablePrefix}", path, "must resolve API immutable tag/digest evidence", failures);
     RequireContains(text, $"resolve-deploy-image-evidence.cs -- artifacts/container-build islamu-event-ui {immutablePrefix}", path, "must resolve UI immutable tag/digest evidence", failures);

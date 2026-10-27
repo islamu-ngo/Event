@@ -183,20 +183,14 @@ public sealed partial class UserProfileSnapshotHttpTests
         await using (AsyncServiceScope edit = factory.Services.CreateAsyncScope())
         {
             edit.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(owner.TenantId);
-            // Exercise the real transactional handler and its real repositories, not the authorization decorator.
-            var handler = ActivatorUtilities.CreateInstance<UpdateUserCommandHandler>(edit.ServiceProvider);
-            var response = await handler.ExecuteAsync(new UpdateUserCommand
-            {
-                UserId = owner.UserId,
-                ExpectedConcurrencyStamp = profileStamp,
-                UpdateUserDto = new UpdateUserDto
-                {
-                    Names = new UpdateUserNamesDto { FirstName = "Edited", LastName = "Profile" },
-                    ProfileImage = new UpdateUserProfileImageDto { ProfilePictureId = null }
-                }
-            });
-            await Assert.That(response.IsSuccess).IsTrue();
+            // Fixture-only profile correction isolates historical booking ownership; admission is covered by native owner tests.
+            var users = edit.ServiceProvider.GetRequiredService<IUserRepository>();
+            var user = (await users.GetById(owner.UserId))!;
+            user.FirstName = "Edited";
+            user.LastName = "Profile";
+            await users.Update(user);
         }
+        await Assert.That((await SetProfileImageAsync(factory, owner, new() { ProfilePictureId = null })).IsSuccess).IsTrue();
 
         await using (AsyncServiceScope retire = factory.Services.CreateAsyncScope())
         {

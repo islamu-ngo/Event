@@ -1,3 +1,4 @@
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Responses;
 using Explore.Domain;
@@ -12,6 +13,7 @@ internal sealed partial class LocalIdentityCredentialStateStore
         LocalCredentialProvisioningSnapshot snapshot, CancellationToken token)
     {
         var receipt = snapshot.Receipt;
+        await identityFence.EnsureSubjectMayEnrollAsync(receipt.LocalSubjectId, token);
         string providerKey = receipt.LocalSubjectId.ToString("D");
         var user = await applicationDbContext.Users.AsNoTracking()
             .SingleOrDefaultAsync(row => row.Id == receipt.ApplicationUserId, token);
@@ -23,7 +25,13 @@ internal sealed partial class LocalIdentityCredentialStateStore
         if (user is { IsDeleted: false } && actor is { IsDeleted: false, IsSuspended: false }
             && actor.ActorTypeId == (int)ActorTypeEnum.User && actor.UserId == receipt.ApplicationUserId
             && login is not null && login.Id == receipt.ExternalLoginId && login.UserId == receipt.ApplicationUserId)
+        {
+            await identityFence.MatchAndBindAsync(
+                new ProviderAccountKey(AuthenticationProviderKind.Local, providerKey),
+                receipt.ApplicationUserId, receipt.ExternalLoginId, applicationDbContext.TenantFilterTenantId,
+                replacementProvisioning: false, token);
             return BaseCommandResponse.Success(id: receipt.OperationId);
+        }
         if (user is not null || actor is not null || login is not null
             || await applicationDbContext.Actors.AnyAsync(row => row.UserId == receipt.ApplicationUserId, token)
             || await applicationDbContext.UserExternalLogins.AnyAsync(row => row.Id == receipt.ExternalLoginId
@@ -67,6 +75,10 @@ internal sealed partial class LocalIdentityCredentialStateStore
             CreatedBy = receipt.InitiatingApplicationUserId
         });
         await applicationDbContext.SaveChangesAsync(token);
+        await identityFence.MatchAndBindAsync(
+            new ProviderAccountKey(AuthenticationProviderKind.Local, providerKey),
+            receipt.ApplicationUserId, receipt.ExternalLoginId, applicationDbContext.TenantFilterTenantId,
+            replacementProvisioning: true, token);
         return BaseCommandResponse.Success(id: receipt.OperationId);
     }
 }

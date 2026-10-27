@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M6D45M3RXF4K54GXMGZZCK
+Title: "Accept native conformance only from bound consumer measurements"
+Type: feat
+Scope: access
+Summary: "Bind consumer installations, challenges, issuers and accepted assertions to exact capability and runtime artifacts without claiming executed conformance; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Runtime inventory, installation/challenge/issuer/assertion verification and original measured-operations/budget acceptance bind conformance to exact native artifacts. Catalogue membership is not executed proof. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires separately owned consumer/measurement/issuer and operational-budget models plus generated schema history; no migration, conformance catalogue or provider execution is certified."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: planned
+    Detail: "Deploy the embedded capability schema and runtime identity wiring with the separately reviewed isolated launcher and selected measurement credential/database authority; measured activation remains unverified."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "The operational-budget endpoint source is introduced here; cumulative API/schema/client shapes are included once at final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete paired measurement enrollment, nonce-bound acceptance, staffing and isolated execution guidance. Source witnesses are UNRUN and neither a published catalogue nor passing native conformance is asserted."

@@ -12,7 +12,8 @@ public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository(
     CoLocatedPrivacyErasureAuthorityDbContext dbContext,
     TimeProvider timeProvider,
     IOptions<PrivacyErasureOptions> options)
-    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance, IPrivacyIdentityFenceAuthority
+    : IPrivacyErasureAuthority, IPrivacyErasureAuthorityMaintenance, IPrivacyIdentityFenceAuthority,
+        IPrivacyErasureRecoveryAuthority
 {
     public const int MaximumReadBatchSize = 500;
 
@@ -148,6 +149,7 @@ public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository(
             dbContext,
             "privacy-erasure-authority-counter",
             cancellationToken);
+        dbContext.ChangeTracker.Clear();
         PrivacyErasureCounter? counter = await dbContext.AuthorityCounters
             .SingleOrDefaultAsync(cancellationToken);
         if (counter is null)
@@ -166,6 +168,7 @@ public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository(
         var deleted = 0;
         var pseudonymized = 0;
         long expectedSequence = counter.RetainedFloorSequence;
+        long retainedFloor = counter.RetainedFloorSequence;
         foreach (PrivacyErasureIntent candidate in candidates)
         {
             EnsureContiguous(candidate, ref expectedSequence);
@@ -184,20 +187,14 @@ public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository(
                     pseudonymized++;
                 }
 
-                if (candidate.AuthoritySequence > counter.RetainedFloorSequence)
-                {
-                    counter.AdvanceRetainedFloorTo(candidate.AuthoritySequence);
-                }
+                retainedFloor = Math.Max(retainedFloor, candidate.AuthoritySequence);
 
                 break;
             }
 
             dbContext.ErasureIntents.Remove(candidate);
             deleted++;
-            if (candidate.AuthoritySequence > counter.RetainedFloorSequence)
-            {
-                counter.AdvanceRetainedFloorTo(candidate.AuthoritySequence);
-            }
+            retainedFloor = Math.Max(retainedFloor, candidate.AuthoritySequence);
         }
 
         await EnsureNextSequenceExistsAsync(
@@ -205,6 +202,8 @@ public sealed partial class CoLocatedPostgresPrivacyErasureAuthorityRepository(
             counter.LastSequence,
             cancellationToken);
 
+        if (deleted != 0 || pseudonymized != 0)
+            counter.RecordCompaction(retainedFloor);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new PrivacyErasureCompactionResult(deleted, pseudonymized, counter.GetState());

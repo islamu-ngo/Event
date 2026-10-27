@@ -89,7 +89,8 @@ public sealed class ConfigurationImportSectionApplier(
         DateTime occurredAt,
         string artifactDigest,
         ConfigurationImportArtifactParser parser,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        List<LegalDocument>? ownedLegalDocuments = null)
     {
         if (target.Scope != ConfigurationImportScope.Tenant
             || target.GetSessionStorageKey() == target.AuthorityKey)
@@ -189,15 +190,22 @@ public sealed class ConfigurationImportSectionApplier(
         return new(frozenEffects, publicationStore, async (publications, token) =>
         {
             var notifications = ImmutableArray.CreateBuilder<SettingChangedNotification>();
+            var ownedLegalDocuments = new List<LegalDocument>();
+            Guid transactionId = legalDocuments.CaptureConfigurationImportTransaction();
             if (instance is not null)
                 await ApplyInstanceAsync(instance, selected, subject!, operation, actorUserId,
-                    occurredAt, artifactDigest, notifications, token,
+                    occurredAt, artifactDigest, notifications, ownedLegalDocuments, token,
                     publications.SingleOrDefault(publication => publication.TenantId is null));
             foreach (var tenant in resolvedTenants)
                 await ApplyTenantAsync(tenant.TenantId, tenant.Spec.DisplayName, tenant.Spec.Settings,
                     tenant.Spec.Documents, tenant.Spec.LegalDocuments, selected, subject, operation,
-                    actorUserId, occurredAt, artifactDigest, notifications, token,
+                    actorUserId, occurredAt, artifactDigest, notifications, ownedLegalDocuments, token,
                     publications.SingleOrDefault(publication => publication.TenantId == tenant.TenantId));
+            if (ownedLegalDocuments.Count > 0)
+                await legalDocuments.FlushConfigurationImportInCurrentTransactionAsync(transactionId, target,
+                    target.Scope == ConfigurationImportScope.Instance
+                        ? resolvedTenants.Select(tenant => tenant.TenantId).Distinct().ToArray() : [],
+                    ownedLegalDocuments, token);
             return notifications.ToImmutable();
         });
 
@@ -340,6 +348,7 @@ public sealed class ConfigurationImportSectionApplier(
         DateTime occurredAt,
         string artifactDigest,
         ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
+        List<LegalDocument>? ownedLegalDocuments,
         CancellationToken cancellationToken,
         HumanConfigurationImportPublication? publication = null)
     {
@@ -423,6 +432,7 @@ public sealed class ConfigurationImportSectionApplier(
                 artifactDigest,
                 actorUserId,
                 occurredAt,
+                ownedLegalDocuments,
                 cancellationToken);
         }
     }
@@ -440,6 +450,7 @@ public sealed class ConfigurationImportSectionApplier(
         DateTime occurredAt,
         string artifactDigest,
         ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
+        List<LegalDocument>? ownedLegalDocuments,
         CancellationToken cancellationToken,
         HumanConfigurationImportPublication? publication = null)
     {
@@ -533,6 +544,7 @@ public sealed class ConfigurationImportSectionApplier(
                 artifactDigest,
                 actorUserId,
                 occurredAt,
+                ownedLegalDocuments,
                 cancellationToken);
         }
     }
@@ -588,16 +600,19 @@ public sealed class ConfigurationImportSectionApplier(
         string artifactDigest,
         Guid actorUserId,
         DateTime occurredAt,
+        List<LegalDocument>? ownedLegalDocuments,
         CancellationToken cancellationToken)
     {
+        if (source.Values.Any(document => document.JurisdictionAssumptions.Count != 0
+                || document.ChangeSummary is not null))
+            throw Blocked("configuration_import_legal_metadata_not_supported");
+
         foreach ((string code, ConfigurationManifestLegalDocumentV1Alpha2 portable)
                  in source.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
-            if (!Enum.TryParse<LegalDocumentKind>(
-                    code,
-                    ignoreCase: false,
-                    out LegalDocumentKind kind)
+            if (!Enum.TryParse<LegalDocumentKind>(portable.Kind, ignoreCase: false, out var kind)
                 || !Enum.IsDefined(kind)
+                || code != kind.ToString()
                 || LegalDocumentKindCatalog.Get(kind).Scope != scope
                 || !Enum.TryParse(
                     portable.Audience,
@@ -657,7 +672,7 @@ public sealed class ConfigurationImportSectionApplier(
                     occurredAt);
                 current.UpdatedBy = actorUserId;
             }
-            await legalDocuments.SaveImportedAsync(current, cancellationToken);
+            ownedLegalDocuments?.Add(current);
         }
     }
 

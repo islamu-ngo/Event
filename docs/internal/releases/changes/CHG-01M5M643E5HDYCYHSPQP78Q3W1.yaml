@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M643E5HDYCYHSPQP78Q3W1
+Title: "Retain published policy qualification generations"
+Type: feat
+Scope: access
+Summary: "Checkpoint policy publication, source adoption, classification inventory, measured acceptance and import-reservation models without activating native policy writers."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Model generations separate publication, source adoption, material inventory and independent measured acceptance. These source records cannot activate policy or replace native qualification; verification is unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Publication/source/selection tables and import-reservation storage require the cumulative schema checkpoint; migrations remain unapplied and provider behavior unverified."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/MODERATION.md
+    Disposition: planned
+    Detail: "Complete native publication/import owners and shared filters before deployment. The protected-complaint floor does not extend finite private custody."

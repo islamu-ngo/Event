@@ -255,6 +255,38 @@ reuse of a Local-owned account requires that link to remain present when the
 claim transaction checks it. A link removed before that transaction starts is
 not accepted from an earlier lookup.
 
+Tenant creation through both `/api/tenant` and the multi-tenant instance-admin
+route `/api/admin/instance/tenants` uses the platform user linked to the authenticated
+provider account, not the provider's token subject GUID. Creator attribution and optional
+administrator membership use that linked identity. An unlinked provider account
+cannot substitute a matching-looking GUID or email address. This correction adds
+no permissions, account links, configuration settings or database migration.
+
+Tenant creation retains the original caller's security-source protection before
+discovery enrollment and through transaction completion. Failed enrollment
+acquisition releases that protection without creating a tenant. This fixes
+missing-custody failures; it does not bypass authorization or require a new
+permission, configuration setting or database migration. Remote verification is
+still required before treating the correction as deployment-ready.
+
+Creating a managed-tenant or Local account does not collect a birth date. Its new
+private PII row starts without a birth date or collection receipt, at revision
+zero. The account-creation storage permissions include the existing mapped fields
+needed to insert that row, but do not grant birth-date reads or updates. This
+manifest correction adds no configuration setting or database migration; provider
+runtime acceptance still requires the separately tracked verification gates.
+
+Human managed-provider provisioning also recognizes the complete PII model
+without expanding its existing user-ID/name/email storage permissions. The
+private birth-date fields remain defaulted rather than collected by that flow.
+
+Local account administration likewise validates the complete PII storage shape
+without acquiring birth-date read or write permissions. Newly linked rows retain
+the private defaults, and a changed revision default or unexpected private-field
+grant is rejected rather than silently repaired. This correction needs no new
+setting or database migration; source and product checks alone do not certify
+provider runtime behavior.
+
 Instance administrators can use the administrative API to create Local accounts,
 issue supervised reset credentials and inspect or reconcile interrupted operations.
 The Local accounts section provides the same server-authorized operations.

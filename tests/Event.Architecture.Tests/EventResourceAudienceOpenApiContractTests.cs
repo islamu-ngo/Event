@@ -15,7 +15,7 @@ public sealed class EventResourceAudienceOpenApiContractTests
             .Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
         await Assert.That(fields.SetEquals(["id", "eventId", "title", "kind", "isTeaser", "availability", "requirements",
             "description", "languageCode", "accessibilityNote", "accessibleAlternativeEventResourceId",
-            "file", "externalDestinationSafeOrigin"])).IsTrue();
+            "file", "externalDestinationSafeOrigin", "materialVersionId"])).IsTrue();
         var page = schemas.GetProperty("EventResourceAudiencePageResource").GetProperty("properties");
         await Assert.That(page.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal)
             .SetEquals(["nextCursor", "_links", "_embedded"])).IsTrue();

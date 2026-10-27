@@ -285,8 +285,7 @@ public class GroupController : EventControllerBase
 
         var response = await _createGroup.ExecuteAsync(new CreateGroupCommand
         {
-            GroupDto = group,
-            CreatorUserId = userId.Value
+            GroupDto = group
         }, cancellationToken);
 
         if (!response.IsSuccess)

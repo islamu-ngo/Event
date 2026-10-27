@@ -41,7 +41,7 @@ public sealed partial class HumanEventTeamCustodyTests
             permissionId = await original.RolePermissions.Where(row => row.RoleId == (int)RoleEnum.CheckInStaff)
                 .Select(row => row.PermissionId).FirstAsync();
         }
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), async token =>
+        request.Admission.AfterNativeSources = async token =>
         {
             await Assert.That(await context.EventRoleAssignments.AsNoTracking().AnyAsync(row =>
                 row.EventId == target.Event && row.RoleId == (int)RoleEnum.CheckInStaff, token)).IsTrue();
@@ -81,12 +81,13 @@ public sealed partial class HumanEventTeamCustodyTests
                             fixture.Clock.GetUtcNow().AddDays(2).UtcDateTime), token);
                     break;
             }
-        });
-        var handler = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services, owner);
+        };
+        var handler = ActivatorUtilities.CreateInstance<AssignEventRoleCommandHandler>(request.Services);
         if (change == "unchanged")
             await Assert.That((await handler.ExecuteAsync(Assignment(fixture, target.Event))).IsSuccess).IsTrue();
         else
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => handler.ExecuteAsync(Assignment(fixture, target.Event)));
+        await Assert.That(request.Admission.NativeSourcesReached).IsTrue();
         await using var observer = fixture.Native.CreateDatabase();
         await Assert.That(await observer.EventRoleAssignments.AsNoTracking().CountAsync(row => row.EventId == target.Event))
             .IsEqualTo(change == "unchanged" ? 2 : 1);
@@ -114,7 +115,7 @@ public sealed partial class HumanEventTeamCustodyTests
         await using var request = new Request(fixture.Host.Services);
         await request.Authenticate(await fixture.SignInAsync());
         var context = request.Services.GetRequiredService<ExploreDbContext>();
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), async token =>
+        request.Admission.AfterNativeSources = async token =>
         {
             await Assert.That(await context.EventRoleAssignments.AsNoTracking().Where(row => row.Id == target.Assignment)
                 .Select(row => row.Status).SingleAsync(token)).IsEqualTo(EventRoleAssignmentStatus.Revoked);
@@ -126,17 +127,17 @@ public sealed partial class HumanEventTeamCustodyTests
                     fixture.Binding.LocalSubjectId));
                 await context.SaveChangesAsync(token);
             }
-        });
-        var handler = ActivatorUtilities.CreateInstance<RevokeEventRoleAssignmentCommandHandler>(request.Services, owner);
+        };
+        var handler = ActivatorUtilities.CreateInstance<RevokeEventRoleAssignmentCommandHandler>(request.Services);
         var command = new RevokeEventRoleAssignmentCommand
         {
             TenantId = PlatformDefaults.DefaultTenantId,
             EventId = target.Event,
-            AssignmentId = target.Assignment,
-            ActorUserId = fixture.Binding.LocalSubjectId
+            AssignmentId = target.Assignment
         };
         if (unrelatedGrant) await Assert.ThrowsAsync<UnauthorizedAccessException>(() => handler.ExecuteAsync(command));
         else await Assert.That((await handler.ExecuteAsync(command)).IsSuccess).IsTrue();
+        await Assert.That(request.Admission.NativeSourcesReached).IsTrue();
         await using var observer = fixture.Native.CreateDatabase();
         var persisted = await observer.EventRoleAssignments.AsNoTracking().SingleAsync(row => row.Id == target.Assignment);
         await Assert.That(persisted.Status).IsEqualTo(unrelatedGrant ? EventRoleAssignmentStatus.Active : EventRoleAssignmentStatus.Revoked);
@@ -168,7 +169,6 @@ public sealed partial class HumanEventTeamCustodyTests
         {
             TenantId = PlatformDefaults.DefaultTenantId,
             EventId = target.Event,
-            ActorUserId = fixture.Binding.LocalSubjectId,
             TargetUserEmail = " " + fixture.Login.Identifier + " ",
             RoleId = (int)RoleEnum.CheckInStaff,
             StartsAtUtc = fixture.Clock.GetUtcNow().AddMinutes(-1).UtcDateTime

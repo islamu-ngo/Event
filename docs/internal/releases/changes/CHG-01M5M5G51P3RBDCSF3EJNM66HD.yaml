@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M5G51P3RBDCSF3EJNM66HD
+Title: "Publish sessions and parent summaries under one authority boundary"
+Type: fix
+Scope: events
+Summary: "Freeze the original session parent and tenant, including already-published retries, while committing the session and parent summary atomically."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Details: "Session publication uses the original parent and current human publication boundary, including the already-published path. Ordinary authorization and readiness remain independent; regression source is unrun."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

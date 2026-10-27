@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5M50CF42TS5DCM5JR2GWBJ4
+Title: "Requalify group membership at the native commit boundary"
+Type: fix
+Scope: access
+Summary: "Keep group creation and membership authority current under the owning privacy transaction and source fences."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Native group writers requalify current issuer, membership and privacy authority through actual commit. Regression source remains unrun; this is not provider conformance."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable

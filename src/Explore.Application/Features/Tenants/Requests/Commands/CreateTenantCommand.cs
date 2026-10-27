@@ -19,7 +19,7 @@ public sealed record CreateTenantCommand : ICommand<BaseCommandResponse<Guid>>, 
     public CreateTenantDto TenantDto { get; init; } = null!;
 
     /// <summary>
-    /// The authenticated user making the request. Set by the controller from the JWT claims.
+    /// The authenticated application user making the request, resolved from the persisted provider binding by the HTTP adapter.
     /// Required when <see cref="CreateTenantDto.AssignCurrentUserAsTenantAdmin"/> is true.
     /// </summary>
     public Guid? RequestingUserId { get; init; }

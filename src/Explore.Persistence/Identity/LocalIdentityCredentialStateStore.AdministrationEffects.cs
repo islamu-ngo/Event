@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Domain.Enums;
 using Native = Explore.Persistence.Security.PostgresLocalAdministrationContract;
 
 namespace Explore.Persistence.Identity;
@@ -24,6 +26,7 @@ internal sealed partial class LocalIdentityCredentialStateStore
                 || Text(user, "NormalizedEmail") != request.NormalizedEmail
                 || Text(user, "FirstName") != request.FirstName || Text(user, "LastName") != request.LastName)
                 return LocalCredentialCreateResult.Rejected(LocalCredentialCreateOutcome.Conflict);
+            await identityFence.EnsureSubjectMayEnrollAsync(receipt.LocalSubjectId, token);
             await native.ReadOnlyAsync(token);
             return LocalCredentialCreateResult.Replayed(receipt);
         }
@@ -40,6 +43,7 @@ internal sealed partial class LocalIdentityCredentialStateStore
             LockoutEnabled = true,
             CreatedAt = NativeInstant()
         };
+        await identityFence.EnsureSubjectMayEnrollAsync(candidate.Id, token);
         string password = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
         using var manager = PrivateManager(native, candidate, services, token);
         var result = await manager.CreateAsync(candidate, password);
@@ -60,6 +64,7 @@ internal sealed partial class LocalIdentityCredentialStateStore
         NativeAdministrationAttempt native, IServiceProvider services, CancellationToken token)
     {
         var request = native.Request;
+        await identityFence.EnsureSubjectMayEnrollAsync(request.LocalSubjectId!.Value, token);
         var replay = Row(native.Before, nameof(LocalIdentityCredentialOperation), request.OperationId!.Value);
         if (replay is { } existing)
         {
@@ -124,6 +129,7 @@ internal sealed partial class LocalIdentityCredentialStateStore
         if (snapshot.Receipt.OperationId != operationId || snapshot != NativeProvisioning(native.Before, operationId)
             || snapshot.Receipt.Kind != LocalCredentialOperationKind.Create)
             return BaseCommandResponse.Conflict(id: operationId);
+        await identityFence.EnsureSubjectMayEnrollAsync(snapshot.Receipt.LocalSubjectId, token);
         var op = Row(native.Before, nameof(LocalIdentityCredentialOperation), operationId)!.Value;
         bool bound = NativeBinding(native.Before, op);
         if (bound)
@@ -139,6 +145,10 @@ internal sealed partial class LocalIdentityCredentialStateStore
         await native.CompileAsync(bound ? new() : new Native.Accepted(
             UserConcurrencyStamp: Guid.CreateVersion7(), ActorConcurrencyStamp: Guid.CreateVersion7()), token);
         await native.ApplyAsync(token);
+        await identityFence.MatchAndBindAsync(
+            new ProviderAccountKey(AuthenticationProviderKind.Local, snapshot.Receipt.LocalSubjectId.ToString("D")),
+            snapshot.Receipt.ApplicationUserId, snapshot.Receipt.ExternalLoginId,
+            applicationDbContext.TenantFilterTenantId, replacementProvisioning: !bound, token);
         AdvanceIssuedImage(native);
         return BaseCommandResponse.Success(id: operationId);
     }
@@ -152,6 +162,7 @@ internal sealed partial class LocalIdentityCredentialStateStore
         if (snapshot.Receipt.OperationId != operationId || snapshot != NativeProvisioning(native.Before, operationId)
             || snapshot.Receipt.Kind != LocalCredentialOperationKind.Create)
             return LocalCredentialActivationOutcome.Conflict;
+        await identityFence.EnsureSubjectMayEnrollAsync(snapshot.Receipt.LocalSubjectId, token);
         var state = NativeMetadata(native.Before, snapshot.Receipt.LocalSubjectId);
         if (!NativeCurrent(operation.Value, state)
             || state!.State is not (LocalCredentialState.ProvisioningPending or LocalCredentialState.ChangeRequired))

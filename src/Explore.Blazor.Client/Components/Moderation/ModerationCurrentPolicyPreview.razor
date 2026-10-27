@@ -1,0 +1,114 @@
+@using Explore.Blazor.Client.Clients
+
+@if (Policy is { } policy)
+{
+    <section class="moderation-policy-preview" data-policy-state="@policy.State">
+        <header>
+            <h2>Latest adopted policy authoring</h2>
+            <p>Retained declarations and selected profiles do not prove current enforcement, deployment readiness or permission.</p>
+        </header>
+        <dl class="moderation-policy-preview__facts">
+            <dt>Policy scope</dt><dd>@policy.Scope</dd>
+            <dt>Authoring state</dt><dd>@policy.State</dd>
+            <dt>Current write revision</dt><dd data-current-revision="@policy.ExpectedRevision">@policy.ExpectedRevision</dd>
+            <dt>Installed inventory revision</dt><dd data-installed-inventory="@policy.InstalledInventoryRevision">@policy.InstalledInventoryRevision</dd>
+        </dl>
+        @if (policy.Authoring is not { } authoring)
+        {
+            <p>No policy is adopted in this installed slot. Its prospective identity is not a reservation.</p>
+        }
+        else
+        {
+            <dl class="moderation-policy-preview__facts">
+                <dt>Historical input revision</dt><dd data-historical-revision="@authoring.HistoricalExpectedRevision">@authoring.HistoricalExpectedRevision</dd>
+                <dt>Historical inventory revision</dt><dd data-historical-inventory="@authoring.InventoryRevision">@authoring.InventoryRevision</dd>
+                <dt>Declared native modes</dt><dd>@string.Join(", ", authoring.Modes.Select(value => ModerationValueLabel.Format(value)))</dd>
+            </dl>
+            <section>
+                <h3>Retained classes</h3>
+                @foreach (var definition in authoring.Classes)
+                {
+                    <section data-policy-class="@definition.Reference.Code">
+                        <h4>@definition.Reference.Code</h4>
+                        <p class="moderation-policy-preview__meaning">@definition.Meaning</p>
+                        <dl class="moderation-policy-preview__facts">
+                            <dt>Ground</dt><dd>@ModerationValueLabel.Format(definition.Ground)</dd>
+                            <dt>Required basis</dt><dd>@ModerationValueLabel.Format(definition.Basis)</dd>
+                            <dt>Meaning revision</dt><dd>@definition.Reference.Revision</dd>
+                        </dl>
+                    </section>
+                }
+            </section>
+            <section>
+                <h3>Retained reasons</h3>
+                @foreach (var definition in authoring.Reasons)
+                {
+                    <section data-policy-reason="@definition.Reference.Code">
+                        <h4>@definition.Reference.Code</h4>
+                        <p class="moderation-policy-preview__meaning">@definition.Meaning</p>
+                        <dl class="moderation-policy-preview__facts">
+                            <dt>Meaning revision</dt><dd>@definition.Reference.Revision</dd>
+                            <dt>Class reference</dt><dd>@definition.Class.Code, revision @definition.Class.Revision</dd>
+                        </dl>
+                    </section>
+                }
+            </section>
+            <section>
+                <h3>All retained profiles</h3>
+                @foreach (var retained in authoring.Profiles)
+                {
+                    var definition = retained.Definition;
+                    bool selected = authoring.SelectedProfiles.Any(rule => SameRule(rule, definition.Rule));
+                    <section class="moderation-policy-preview__profile" data-policy-profile="@definition.Id" data-selected="@selected.ToString()">
+                        <h4>@definition.Rule.Code</h4>
+                        <dl class="moderation-policy-preview__facts">
+                            <dt>Selected declaration</dt><dd>@selected</dd>
+                            <dt>Meaning revision</dt><dd>@definition.Rule.Revision</dd>
+                            <dt>Reason reference</dt><dd>@definition.Reason.Code, revision @definition.Reason.Revision</dd>
+                            <dt>Reference profile</dt><dd>@definition.ReferenceProfile, revision @definition.ReferenceRevision</dd>
+                            <dt>Response grade</dt><dd>@definition.Grade</dd>
+                            <dt>Scope kinds</dt><dd>@string.Join(", ", definition.ScopeKinds.Select(value => ModerationValueLabel.Format(value)))</dd>
+                            <dt>Subject kinds</dt><dd>@string.Join(", ", definition.SubjectKinds.Select(value => ModerationValueLabel.Format(value)))</dd>
+                            <dt>Base recipe</dt><dd>@ModerationValueLabel.Format(definition.Bundle)</dd>
+                            <dt>Protection purpose</dt><dd>@ModerationValueLabel.Format(definition.ProtectionPurpose)</dd>
+                            <dt>Additive strategies</dt><dd>@string.Join(", ", definition.Strategies.Select(value => ModerationValueLabel.Format(value)))</dd>
+                            <dt>Timing</dt><dd>@ModerationValueLabel.Format(definition.Timing.Kind), duration @definition.Timing.Duration</dd>
+                            <dt>Required independent approvals</dt><dd>@definition.RequiredApprovals</dd>
+                            <dt>Contestation calendar months</dt><dd>@definition.ContestationCalendarMonths</dd>
+                            <dt>Recognition</dt><dd>@ModerationValueLabel.Format(definition.Recognition)</dd>
+                        </dl>
+                        <ul>
+                            @foreach (var effect in definition.Effects)
+                            {
+                                <li>@ModerationValueLabel.Format(effect.Kind): @ModerationValueLabel.Format(effect.Mode),
+                                    @ModerationValueLabel.Format(effect.Target), @ModerationValueLabel.Format(effect.Execution)</li>
+                            }
+                        </ul>
+                        @{ var planIndex = 0; }
+                        @foreach (var plan in retained.Consequences)
+                        {
+                            <ModerationConsequencePlanPreview Plan="@plan" PlanIndex="@planIndex" NestedUnderProfile="true" />
+                            planIndex++;
+                        }
+                    </section>
+                }
+            </section>
+        }
+        @if (ShowAdvanced)
+        {
+            <section>
+                <h3>Native write coordinates</h3>
+                <dl class="moderation-policy-preview__facts">
+                    <dt>Policy identity</dt><dd>@policy.PolicyId</dd>
+                    <dt>Expected publication</dt><dd>@policy.ExpectedPublicationId</dd>
+                    <dt>Host binding</dt><dd>@policy.ExpectedHostBindingId</dd>
+                    <dt>Current authority source</dt><dd>@policy.ExpectedAuthoritySourceId</dd>
+                    <dt>Qualification revision</dt><dd>@policy.ExpectedQualificationRevision</dd>
+                    <dt>Writer generation</dt><dd>@policy.ExpectedWriterGeneration</dd>
+                    <dt>Installed catalogue revision</dt><dd>@policy.InstalledCatalogueRevision</dd>
+                    <dt>Installed inventory fingerprint</dt><dd>@policy.InstalledInventoryFingerprint</dd>
+                </dl>
+            </section>
+        }
+    </section>
+}

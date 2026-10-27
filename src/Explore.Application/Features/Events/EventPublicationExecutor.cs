@@ -26,7 +26,7 @@ public sealed class EventPublicationExecutor(
     IEventRepository eventRepository,
     IEventLocationRepository eventLocationRepository,
     IOutboxRepository outboxRepository,
-    IUnitOfWork unitOfWork,
+    IEventPublicationMutationBoundary publicationBoundary,
     HybridCache cache,
     IEventLifecyclePolicyProvider policyProvider,
     IEventLifecycleReadinessEvaluator readinessEvaluator,
@@ -64,8 +64,8 @@ public sealed class EventPublicationExecutor(
         bool mutationAttempted = false;
 
         BaseCommandResponse<Guid> response = await mutationLock.ExecuteOrderedGroupsAsync(
-            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
-            outerToken => unitOfWork.ExecuteSerializableAsync(async token =>
+            [VisitorAccessCapabilityResolver.AuthoritySettingKeys, [Explore.Domain.Constants.GovernanceSettingKeys.Events.RequireApproval]],
+            outerToken => publicationBoundary.ExecuteAsync(eventId, async token =>
         {
             tenantIdToInvalidate = null;
             var attemptEvent = await eventRepository.GetById(eventId);

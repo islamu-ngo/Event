@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZT4DX1EJHWF7QGYMA21W50
+Title: "Model independently adopted Event rights and bounded continuity deadlines"
+Type: feat
+Scope: access
+Summary: "Retain exact Event rights, consenting-steward, jurisdiction, settlement and companion-rights obligations with independent finite acceptance and bounded continuity escalation timing, without granting permission or settlement authority."
+Group: moderation-event-rights-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

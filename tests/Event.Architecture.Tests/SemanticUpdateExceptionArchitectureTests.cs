@@ -1,4 +1,11 @@
 using System.Text.Json;
+using Asp.Versioning;
+using Explore.API.Controllers;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Architecture.Tests;
 
@@ -37,6 +44,7 @@ public sealed class SemanticUpdateExceptionArchitectureTests
         new("SetEventCustomPropertyValue", "/api/eventcustomproperty/value", "put", "Complete scalar custom-property value replacement."),
         new("SetEventCustomPropertyMultiValues", "/api/eventcustomproperty/values", "put", "Complete custom-property value-set replacement."),
         new("UpdateUserLastActiveTenant", "/api/user/active-tenant/{tenantId}", "post", "Authenticated tenant-context selection action."),
+        new("UpdateCurrentUserProfileImage", "/api/user/{id}/profile-image", "patch", "Ownership-checked, revision-checked avatar replacement independent of private profile collection."),
         new("ConfigureEventParticipation", "/api/events/{eventId}/participation", "patch", "Atomic coupled participation-configuration replacement."),
         new("UpdateEventPublicAction", "/api/events/{eventId}/public-actions/{actionId}", "put", "Atomic reviewed public-action replacement."),
         new("UpdateEventTicketType", "/api/events/{eventId}/ticketing/ticket-types/{ticketTypeId}", "put", "Atomic ticket-type replacement within one draft catalog."),
@@ -64,19 +72,43 @@ public sealed class SemanticUpdateExceptionArchitectureTests
     }
 
     [Test]
+    public async Task ProfileImageReplacementPreservesItsDedicatedBodyAndConcurrencyHeader()
+    {
+        await using Stream stream = GeneratedContractInputs.OpenSchema();
+        using JsonDocument document = await JsonDocument.ParseAsync(stream);
+        JsonElement operation = document.RootElement.GetProperty("paths")
+            .GetProperty("/api/user/{id}/profile-image").GetProperty("patch");
+        await Assert.That(operation.GetProperty("requestBody").GetProperty("required").GetBoolean()).IsTrue();
+        await Assert.That(operation.GetProperty("requestBody").GetProperty("content").EnumerateObject()
+            .Select(media => media.Value.GetProperty("schema").GetProperty("$ref").GetString())
+            .Distinct().ToArray()).IsEquivalentTo(new[] { "#/components/schemas/UpdateUserProfileImageDto" });
+        await Assert.That(operation.GetProperty("parameters").EnumerateArray().Any(parameter =>
+            parameter.GetProperty("name").GetString() == "If-Match"
+            && parameter.GetProperty("in").GetString() == "header")).IsTrue();
+    }
+
+    [Test]
     public async Task NestedAndApplicationOnlyUpdatesMustNotHaveDirectControllerOperations()
     {
-        string root = ResolveRepositoryRoot();
-        string controllers = string.Join('\n', Directory.GetFiles(
-                Path.Combine(root, "src", "Explore.API", "Controllers"),
-                "*.cs",
-                SearchOption.AllDirectories)
-            .Select(File.ReadAllText));
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddControllers().AddApplicationPart(typeof(UserProfileImageController).Assembly);
+        builder.Services.AddApiVersioning().AddMvc();
+        await using var app = builder.Build();
+        app.MapControllers();
+        string[] bodyTypes = ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.Metadata.GetMetadata<ControllerActionDescriptor>())
+            .OfType<ControllerActionDescriptor>()
+            .SelectMany(action => action.Parameters)
+            .Where(parameter => parameter.BindingInfo?.BindingSource?.Id == BindingSource.Body.Id)
+            .SelectMany(parameter => BodyContractTypes(parameter.ParameterType))
+            .Select(type => type.Name)
+            .Distinct().ToArray();
+        await Assert.That(bodyTypes).Contains(nameof(Explore.Application.DTOs.User.UpdateUserProfileImageDto));
 
         string[] internalTypes =
         [
             "UpdateActorAppearanceDto",
-            "UpdateUserProfileImageDto",
             "UpdateUserNamesDto",
             "UpdateEventDraftRequestDto",
             "UpdateEventTemplateDefinitionDto",
@@ -87,20 +119,22 @@ public sealed class SemanticUpdateExceptionArchitectureTests
 
         foreach (string internalType in internalTypes)
         {
-            await Assert.That(controllers).DoesNotContain(internalType);
+            await Assert.That(bodyTypes).DoesNotContain(internalType);
         }
     }
 
-    private static string ResolveRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Explore.slnx")))
-        {
-            directory = directory.Parent;
-        }
+    private static IEnumerable<Type> BodyContractTypes(Type type) => type.HasElementType
+        ? BodyContractTypes(type.GetElementType()!)
+        : new[] { type }.Concat(type.GetGenericArguments().SelectMany(BodyContractTypes));
 
-        return directory?.FullName
-            ?? throw new DirectoryNotFoundException("Could not locate repository root containing Explore.slnx.");
+    [Test]
+    [Arguments(typeof(Explore.Application.DTOs.User.UpdateUserProfileImageDto[]))]
+    [Arguments(typeof(IReadOnlyList<Explore.Application.DTOs.User.UpdateUserProfileImageDto>))]
+    [Arguments(typeof(Dictionary<string, Explore.Application.DTOs.User.UpdateUserProfileImageDto[]>))]
+    public async Task BodyContractDiscoveryIncludesArrayAndGenericArguments(Type bodyType)
+    {
+        await Assert.That(BodyContractTypes(bodyType).Select(type => type.Name).ToArray())
+            .Contains(nameof(Explore.Application.DTOs.User.UpdateUserProfileImageDto));
     }
 
     private sealed record SemanticException(string OperationId, string Path, string Method, string Rationale);

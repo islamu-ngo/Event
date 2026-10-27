@@ -1,6 +1,7 @@
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.GroupMembers.Handlers.Commands;
 using Explore.Application.Features.GroupMembers.Handlers.Queries;
@@ -23,7 +24,7 @@ public sealed partial class HumanAccountMembershipCustodyTests
     [Arguments(false, true)]
     [Arguments(true, false)]
     [Arguments(false, false)]
-    public async Task UnannotatedGroupOwnerKeepsPermissionOrAdminWithoutACerbosDecision(bool administrator, bool permission)
+    public async Task NativeGroupOwnerRequiresPermissionOrAdminWithLocalAuthorization(bool administrator, bool permission)
     {
         await using var fixture = await CreateFixture();
         var target = await SeedMembers(fixture, group: true, secondAdmin: false);
@@ -63,18 +64,21 @@ public sealed partial class HumanAccountMembershipCustodyTests
             if (!permission && mapping is not null) seed.Remove(mapping);
             var provider = await seed.SystemSettings.SingleAsync(row =>
                 row.SettingKey == GovernanceSettingKeys.Security.AuthorizationProvider);
-            provider.Value = "\"cerbos\"";
+            provider.Value = "\"local\"";
             await seed.SaveChangesAsync();
         }
         await using var request = new Request(fixture.Host.Services);
         await request.Authenticate(await fixture.SignInAsync());
-        var result = await ActivatorUtilities.CreateInstance<AddGroupMemberCommandHandler>(request.Services)
-            .ExecuteAsync(new()
-            {
-                RequesterUserId = fixture.Binding.LocalSubjectId.ToString("D"),
-                AddGroupMemberDto = new() { GroupId = target.Owner, Email = target.OtherEmail, Role = RoleEnum.GroupMember }
-            }, default);
-        await Assert.That(result.IsSuccess).IsEqualTo(administrator || permission);
+        async Task<BaseCommandResponse<Guid>> Invoke() =>
+            await ActivatorUtilities.CreateInstance<AddGroupMemberCommandHandler>(request.Services)
+                .ExecuteAsync(new()
+                {
+                    AddGroupMemberDto = new() { GroupId = target.Owner, Email = target.OtherEmail, Role = RoleEnum.GroupMember }
+                }, default);
+        if (administrator || permission)
+            await Assert.That((await Invoke()).IsSuccess).IsTrue();
+        else
+            await Assert.ThrowsAsync<AuthorizationException>(async () => { await Invoke(); });
         await using var observer = fixture.Native.CreateDatabase();
         await Assert.That(await observer.GroupMembers.AsNoTracking().AnyAsync(row =>
             row.GroupTenant.GroupId == target.Owner && row.UserId == target.OtherUser)).IsEqualTo(administrator || permission);
@@ -97,7 +101,7 @@ public sealed partial class HumanAccountMembershipCustodyTests
         await using var request = new Request(fixture.Host.Services);
         await request.Authenticate(await fixture.SignInAsync());
         var context = request.Services.GetRequiredService<ExploreDbContext>();
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), async token =>
+        request.Admission.AfterNativeSources = async token =>
         {
             if (group)
                 await context.GroupMembers.Where(row => row.Id == target)
@@ -105,25 +109,24 @@ public sealed partial class HumanAccountMembershipCustodyTests
             else
                 await context.OrganizationMembers.Where(row => row.Id == target)
                     .ExecuteUpdateAsync(update => update.SetProperty(row => row.RoleId, (int)RoleEnum.OrgModerator), token);
-        });
+        };
         async Task Invoke()
         {
             if (group)
-                await ActivatorUtilities.CreateInstance<UpdateGroupMemberRoleCommandHandler>(request.Services, owner)
+                await ActivatorUtilities.CreateInstance<UpdateGroupMemberRoleCommandHandler>(request.Services)
                     .ExecuteAsync(new()
                     {
-                        RequesterUserId = fixture.Binding.LocalSubjectId.ToString("D"),
                         UpdateGroupMemberRoleDto = new() { Id = target, Role = RoleEnum.GroupMember }
                     }, default);
             else
-                await ActivatorUtilities.CreateInstance<UpdateOrganizationMemberRoleCommandHandler>(request.Services, owner)
+                await ActivatorUtilities.CreateInstance<UpdateOrganizationMemberRoleCommandHandler>(request.Services)
                     .ExecuteAsync(new()
                     {
-                        RequesterUserId = fixture.Binding.LocalSubjectId.ToString("D"),
                         UpdateOrganizationMemberRoleDto = new() { Id = target, Role = RoleEnum.OrgMember }
                     }, default);
         }
         await Assert.ThrowsAsync<UnauthorizedAccessException>(Invoke);
+        await Assert.That(request.Admission.NativeSourcesReached).IsTrue();
         await using var persisted = fixture.Native.CreateDatabase();
         int role = group
             ? await persisted.GroupMembers.AsNoTracking().Where(row => row.Id == target).Select(row => row.RoleId).SingleAsync()
@@ -146,18 +149,16 @@ public sealed partial class HumanAccountMembershipCustodyTests
         var seed = await SeedMembers(fixture, group, secondAdmin: !last);
         await using var request = new Request(fixture.Host.Services);
         await request.Authenticate(await fixture.SignInAsync());
-        string actor = fixture.Binding.LocalSubjectId.ToString("D");
         BaseCommandResponse<Guid> response;
         if (group)
         {
             if (delete)
                 response = await ActivatorUtilities.CreateInstance<DeleteGroupMemberCommandHandler>(request.Services)
-                    .ExecuteAsync(new() { MemberId = seed.Self, RequesterUserId = actor }, default);
+                    .ExecuteAsync(new() { MemberId = seed.Self }, default);
             else
                 response = await ActivatorUtilities.CreateInstance<UpdateGroupMemberRoleCommandHandler>(request.Services)
                     .ExecuteAsync(new()
                     {
-                        RequesterUserId = actor,
                         UpdateGroupMemberRoleDto = new() { Id = seed.Self, Role = RoleEnum.GroupMember }
                     }, default);
         }
@@ -165,12 +166,11 @@ public sealed partial class HumanAccountMembershipCustodyTests
         {
             if (delete)
                 response = await ActivatorUtilities.CreateInstance<DeleteOrganizationMemberCommandHandler>(request.Services)
-                    .ExecuteAsync(new() { MemberId = seed.Self, RequesterUserId = actor }, default);
+                    .ExecuteAsync(new() { MemberId = seed.Self }, default);
             else
                 response = await ActivatorUtilities.CreateInstance<UpdateOrganizationMemberRoleCommandHandler>(request.Services)
                     .ExecuteAsync(new()
                     {
-                        RequesterUserId = actor,
                         UpdateOrganizationMemberRoleDto = new() { Id = seed.Self, Role = RoleEnum.OrgMember }
                     }, default);
         }
@@ -201,29 +201,28 @@ public sealed partial class HumanAccountMembershipCustodyTests
         var context = request.Services.GetRequiredService<ExploreDbContext>();
         int oldRole = group ? (int)RoleEnum.GroupAdmin : (int)RoleEnum.OrgAdmin;
         string originalCode = await context.Roles.Where(row => row.Id == oldRole).Select(row => row.MasterCode).SingleAsync();
-        var owner = new AfterBody((ISerializableAttemptOwner)new EfCoreUnitOfWork(context), token =>
+        request.Admission.AfterNativeSources = token =>
             context.Roles.Where(row => row.Id == oldRole)
-                .ExecuteUpdateAsync(update => update.SetProperty(row => row.MasterCode, "drift.original.definition"), token));
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.MasterCode, "drift.original.definition"), token);
         async Task Invoke()
         {
             BaseCommandResponse<Guid> result;
             if (group)
-                result = await ActivatorUtilities.CreateInstance<UpdateGroupMemberRoleCommandHandler>(request.Services, owner)
+                result = await ActivatorUtilities.CreateInstance<UpdateGroupMemberRoleCommandHandler>(request.Services)
                     .ExecuteAsync(new()
                     {
-                        RequesterUserId = fixture.Binding.LocalSubjectId.ToString("D"),
                         UpdateGroupMemberRoleDto = new() { Id = seed.Self, Role = RoleEnum.GroupMember }
                     }, default);
             else
-                result = await ActivatorUtilities.CreateInstance<UpdateOrganizationMemberRoleCommandHandler>(request.Services, owner)
+                result = await ActivatorUtilities.CreateInstance<UpdateOrganizationMemberRoleCommandHandler>(request.Services)
                     .ExecuteAsync(new()
                     {
-                        RequesterUserId = fixture.Binding.LocalSubjectId.ToString("D"),
                         UpdateOrganizationMemberRoleDto = new() { Id = seed.Self, Role = RoleEnum.OrgMember }
                     }, default);
             await Assert.That(result.IsSuccess).IsTrue();
         }
         await Assert.ThrowsAsync<UnauthorizedAccessException>(Invoke);
+        await Assert.That(request.Admission.NativeSourcesReached).IsTrue();
         await using var observer = fixture.Native.CreateDatabase();
         int role = group
             ? await observer.GroupMembers.AsNoTracking().Where(row => row.Id == seed.Self).Select(row => row.RoleId).SingleAsync()
@@ -248,13 +247,11 @@ public sealed partial class HumanAccountMembershipCustodyTests
                 return await ActivatorUtilities.CreateInstance<AddGroupMemberCommandHandler>(request.Services)
                     .ExecuteAsync(new()
                     {
-                        RequesterUserId = fixture.Binding.LocalSubjectId.ToString("D"),
                         AddGroupMemberDto = new() { GroupId = seed.Owner, Email = seed.OtherEmail, Role = RoleEnum.GroupMember }
                     }, default);
             return await ActivatorUtilities.CreateInstance<AddOrganizationMemberCommandHandler>(request.Services)
                 .ExecuteAsync(new()
                 {
-                    RequesterUserId = fixture.Binding.LocalSubjectId.ToString("D"),
                     TenantId = PlatformDefaults.DefaultTenantId,
                     AddOrganizationMemberDto = new() { OrganizationId = seed.Owner, Email = seed.OtherEmail, Role = RoleEnum.OrgMember }
                 }, default);

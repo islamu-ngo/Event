@@ -11,7 +11,6 @@ public sealed record RevokeEventRoleAssignmentCommand : ICommand<BaseCommandResp
     public Guid TenantId { get; init; }
     public Guid EventId { get; init; }
     public Guid AssignmentId { get; init; }
-    public Guid ActorUserId { get; init; }
 
     string? ISecureRequest.ResourceId => EventId == Guid.Empty ? null : EventId.ToString("D");
 

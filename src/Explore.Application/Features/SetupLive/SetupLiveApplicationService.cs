@@ -8,7 +8,6 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.SetupLive;
 using Explore.Domain.Enums;
-using Explore.Domain.Secrets;
 using Explore.Domain.SetupLive;
 using ISLAMU.Wire.Contracts.SetupLive;
 using Microsoft.Extensions.Logging;
@@ -47,7 +46,7 @@ public sealed record SetupLiveSecretBindingResult(
 
 public sealed partial class SetupLiveApplicationService(
     ISetupLiveRepository setupLiveRepository,
-    ISetupSecretBindingIdentityReader bindingIdentities,
+    ISetupSecretBindingCatalog secretBindingCatalog,
     IUnitOfWork unitOfWork,
     IActorOwnershipReader actorOwnership,
     IAuthorizationProvider authorization,
@@ -91,8 +90,8 @@ public sealed partial class SetupLiveApplicationService(
         if (authorized is null)
             return new(SetupLiveApplicationStatus.Unavailable);
 
-        Guid? bindingId = await bindingIdentities.ReadAsync(bindingKey, cancellationToken);
-        if (bindingId is null || !IsVersion7(bindingId.Value))
+        Guid? configuredBindingId = await secretBindingCatalog.FindInstanceIdAsync(bindingKey, cancellationToken);
+        if (configuredBindingId is not { } bindingId || !IsVersion7(bindingId))
             return new(SetupLiveApplicationStatus.Unavailable);
 
         SetupSecretBindingCommitment commitment;
@@ -115,7 +114,7 @@ public sealed partial class SetupLiveApplicationService(
         }
 
         string requestFingerprint = Digest(
-            $"setup-live-secret-binding-v1\n{tenantId:D}\n{authorized.Enrollment.ActorId:D}\n{enrollmentId:D}\n{authorized.Enrollment.Generation}\n{operationKey:D}\n{bindingId.Value:D}\n{bindingKey}");
+            $"setup-live-secret-binding-v1\n{tenantId:D}\n{authorized.Enrollment.ActorId:D}\n{enrollmentId:D}\n{authorized.Enrollment.Generation}\n{operationKey:D}\n{bindingId:D}\n{bindingKey}");
         Guid operationId = Guid.CreateVersion7();
         DateTime createdAt = UtcNow();
         var coordination = new SetupSecretBindingCoordinationRequest(
@@ -242,7 +241,7 @@ public sealed partial class SetupLiveApplicationService(
                         enrollmentId,
                         authorized.Enrollment.Generation,
                         admission.Operation!.Id,
-                        bindingId.Value,
+                        bindingId,
                         bindingKey,
                         secretValue),
                     cancellationToken);
@@ -784,8 +783,8 @@ public sealed partial class SetupLiveApplicationService(
         if (authorized is null)
             return new(SetupLiveApplicationStatus.Unavailable);
 
-        Guid? signing = await bindingIdentities.ReadAsync("setup.signing", cancellationToken);
-        Guid? encryption = await bindingIdentities.ReadAsync("setup.encryption", cancellationToken);
+        Guid? signing = await secretBindingCatalog.FindInstanceIdAsync("setup.signing", cancellationToken);
+        Guid? encryption = await secretBindingCatalog.FindInstanceIdAsync("setup.encryption", cancellationToken);
         SetupSecretBindingReadinessState signingState =
             await ReadinessStateAsync(signing, "setup.signing", cancellationToken);
         SetupSecretBindingReadinessState encryptionState =

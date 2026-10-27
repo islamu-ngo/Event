@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5WH2JFCGNFEPNX001RCA567
+Title: "Keep published event programs independent of caller collections"
+Type: fix
+Scope: events
+Summary: "Copy sessions, groups, days and agenda items when a managed event program is constructed or replaced, retaining the existing JSON contract."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Existing array shapes, routes and operation identifiers remain unchanged; native API generation produced no schema, client or inventory diff."
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/publication-and-sessions.md
+    Disposition: documented
+    Detail: "Constructor and replacement inputs are copied without a configuration or migration step. Regression sources remain locally unbuilt and unrun; product compilation does not certify runtime behavior."

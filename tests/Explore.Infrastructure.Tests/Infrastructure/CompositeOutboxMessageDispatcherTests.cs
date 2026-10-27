@@ -43,6 +43,30 @@ public sealed class CompositeOutboxMessageDispatcherTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
+    public async Task Unfinished_moderation_effect_propagates_through_dispatch_and_dead_letter_reconciliation(bool deadLetter)
+    {
+        var handler = Substitute.For<IModerationEffectDispatcher>();
+        var id = Guid.CreateVersion7();
+        var message = new OutboxMessage
+        {
+            Id = id,
+            AggregateId = id,
+            AggregateType = ModerationEffectOutboxMessageFactory.AggregateType,
+            EventType = ModerationEffectOutboxMessageFactory.EventType
+        };
+        handler.DispatchAsync(message, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new ApplicationException()));
+        var dispatcher = CreateDispatcher(
+            Substitute.For<IEventPublishedNotificationFanoutService>(),
+            Substitute.For<IEventModerationNotificationFanoutService>(),
+            moderationEffectDispatcher: handler);
+        await Assert.That(() => deadLetter ? dispatcher.ReconcileDeadLetterAsync(message) : dispatcher.DispatchAsync(message))
+            .Throws<ApplicationException>();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
     public async Task MissingNativeRefundCannotBeAcknowledgedAsCompleted(bool reconciliation)
     {
         Guid refundId = Guid.CreateVersion7();
@@ -845,7 +869,8 @@ public sealed class CompositeOutboxMessageDispatcherTests
         IConfigurationManifestEffectDispatcher? manifestEffectDispatcher = null,
         IConfigurationImportEffectDelivery? importEffectDelivery = null,
         IEventDiscoveryIdentityCorrectionNotificationService? correctionNotificationService = null,
-        ILogger<CompositeOutboxMessageDispatcher>? logger = null)
+        ILogger<CompositeOutboxMessageDispatcher>? logger = null,
+        IModerationEffectDispatcher? moderationEffectDispatcher = null)
     {
         HybridCache selectedCache = cache ?? new RecordingHybridCache();
         var correctionPlanner = Substitute.For<IAtprotoLocationPrivacyCorrectionPlanner>();
@@ -901,8 +926,9 @@ public sealed class CompositeOutboxMessageDispatcherTests
                 ?? Substitute.For<IConfigurationManifestEffectDispatcher>(),
             importEffectDelivery
                 ?? Substitute.For<IConfigurationImportEffectDelivery>(),
-            Substitute.For<INotificationOutboxExecutionAuthority>(),
-            Substitute.For<IGenericOutboxExecutionAuthority>());
+            moderationEffectDispatcher: moderationEffectDispatcher ?? Substitute.For<IModerationEffectDispatcher>(),
+            notificationOutboxExecutionAuthority: Substitute.For<INotificationOutboxExecutionAuthority>(),
+            genericOutboxExecutionAuthority: Substitute.For<IGenericOutboxExecutionAuthority>());
     }
 
     private static PaidOrderAcceptanceSnapshot RefundAcceptance(Guid tenantId) =>

@@ -1,5 +1,6 @@
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.GroupMembers.Handlers.Commands;
 using Explore.Application.Features.GroupMembers.Requests.Commands;
 using Explore.Application.Responses;
@@ -19,26 +20,27 @@ public sealed partial class HumanAccountMembershipCustodyTests
         await using var fixture = await CreateFixture();
         var seed = await SeedMembers(fixture, group: true, secondAdmin: false);
         string originalToken = await fixture.SignInAsync();
-        string actor = fixture.Binding.LocalSubjectId.ToString("D");
         var demotion = new UpdateGroupMemberRoleCommand
         {
-            RequesterUserId = actor,
             UpdateGroupMemberRoleDto = new() { Id = seed.Self, Role = RoleEnum.GroupMember }
         };
-        var removal = new DeleteGroupMemberCommand { RequesterUserId = actor, MemberId = seed.Self };
+        var removal = new DeleteGroupMemberCommand { MemberId = seed.Self };
 
-        async Task<BaseCommandResponse<Guid>> Update(UpdateGroupMemberRoleCommand command)
+        async Task<BaseCommandResponse<Guid>> Update(UpdateGroupMemberRoleCommand command, string? substitutedSubject = null)
         {
             await using var request = new Request(fixture.Host.Services);
             await request.Authenticate(originalToken);
+            if (substitutedSubject is not null) request.SubstituteSubject(substitutedSubject);
             return await ActivatorUtilities.CreateInstance<UpdateGroupMemberRoleCommandHandler>(request.Services)
                 .ExecuteAsync(command, default);
         }
 
-        async Task<BaseCommandResponse<Guid>> Delete(DeleteGroupMemberCommand command, string token)
+        async Task<BaseCommandResponse<Guid>> Delete(DeleteGroupMemberCommand command, string token,
+            string? substitutedSubject = null)
         {
             await using var request = new Request(fixture.Host.Services);
             await request.Authenticate(token);
+            if (substitutedSubject is not null) request.SubstituteSubject(substitutedSubject);
             return await ActivatorUtilities.CreateInstance<DeleteGroupMemberCommandHandler>(request.Services)
                 .ExecuteAsync(command, default);
         }
@@ -58,7 +60,6 @@ public sealed partial class HumanAccountMembershipCustodyTests
             added = await ActivatorUtilities.CreateInstance<AddGroupMemberCommandHandler>(request.Services)
                 .ExecuteAsync(new()
                 {
-                    RequesterUserId = actor,
                     AddGroupMemberDto = new()
                     {
                         GroupId = seed.Owner,
@@ -79,10 +80,11 @@ public sealed partial class HumanAccountMembershipCustodyTests
         string successorToken = await fixture.SignInAsync(seed.OtherLogin);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            Update(demotion with { RequesterUserId = seed.OtherUser.ToString("D") }));
+            Update(demotion, seed.OtherUser.ToString("D")));
         await Assert.That(await ReadGroupMemberships(fixture)).IsEquivalentTo(withSuccessor);
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            Delete(removal with { RequesterUserId = "not-a-user-id" }, originalToken));
+        var invalidRequester = await Delete(removal, originalToken, "not-a-user-id");
+        await Assert.That(invalidRequester.IsSuccess).IsFalse();
+        await Assert.That(invalidRequester.Errors).IsEquivalentTo(new[] { "Invalid requester User ID." });
         await Assert.That(await ReadGroupMemberships(fixture)).IsEquivalentTo(withSuccessor);
 
         var demoted = await Update(demotion);
@@ -95,15 +97,14 @@ public sealed partial class HumanAccountMembershipCustodyTests
 
         var removeSuccessor = new DeleteGroupMemberCommand
         {
-            RequesterUserId = seed.OtherUser.ToString("D"),
             MemberId = successor.Id
         };
         await Assert.That((await Delete(removeSuccessor, successorToken)).IsSuccess).IsFalse();
         await Assert.That(await ReadGroupMemberships(fixture)).IsEquivalentTo(afterDemotion);
-        await Assert.That((await Delete(removal, originalToken)).IsSuccess).IsFalse();
+        await Assert.ThrowsAsync<AuthorizationException>(() => Delete(removal, originalToken));
         await Assert.That(await ReadGroupMemberships(fixture)).IsEquivalentTo(afterDemotion);
 
-        var removed = await Delete(removal with { RequesterUserId = seed.OtherUser.ToString("D") }, successorToken);
+        var removed = await Delete(removal, successorToken);
         await Assert.That(removed.IsSuccess).IsTrue();
         await Assert.That(removed.Id).IsEqualTo(seed.Self);
         var final = await ReadGroupMemberships(fixture);
@@ -124,7 +125,6 @@ public sealed partial class HumanAccountMembershipCustodyTests
         string token = await fixture.SignInAsync();
         var command = new AddGroupMemberCommand
         {
-            RequesterUserId = fixture.Binding.LocalSubjectId.ToString("D"),
             AddGroupMemberDto = new()
             {
                 GroupId = seed.Owner,
@@ -133,10 +133,11 @@ public sealed partial class HumanAccountMembershipCustodyTests
                 GroupPositionId = 4
             }
         };
-        async Task<BaseCommandResponse<Guid>> Add(AddGroupMemberCommand input)
+        async Task<BaseCommandResponse<Guid>> Add(AddGroupMemberCommand input, string? substitutedSubject = null)
         {
             await using var request = new Request(fixture.Host.Services);
             await request.Authenticate(token);
+            if (substitutedSubject is not null) request.SubstituteSubject(substitutedSubject);
             return await ActivatorUtilities.CreateInstance<AddGroupMemberCommandHandler>(request.Services)
                 .ExecuteAsync(input, default);
         }
@@ -155,19 +156,19 @@ public sealed partial class HumanAccountMembershipCustodyTests
             await Assert.That(await request.Services.GetRequiredService<IGroupTenantRepository>()
                 .GetByGroupAndTenant(seed.Owner, PlatformDefaults.DefaultTenantId, default)).IsNull();
         }
-        await Assert.That((await Add(command)).IsSuccess).IsFalse();
+        await Assert.ThrowsAsync<AuthorizationException>(() => Add(command));
         await Assert.That(await ReadGroupMemberships(fixture)).IsEquivalentTo(original);
         await using (var database = fixture.Native.CreateDatabase())
             await database.GroupTenants.IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
                 .Where(row => row.Id == placement && row.TenantId == PlatformDefaults.DefaultTenantId)
                 .ExecuteUpdateAsync(update => update.SetProperty(row => row.IsDeleted, false));
 
-        foreach (string requester in new[] { "invalid", seed.OtherUser.ToString("D") })
-        {
-            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-                Add(command with { RequesterUserId = requester }));
-            await Assert.That(await ReadGroupMemberships(fixture)).IsEquivalentTo(original);
-        }
+        var invalidRequester = await Add(command, "invalid");
+        await Assert.That(invalidRequester.IsSuccess).IsFalse();
+        await Assert.That(invalidRequester.Errors).IsEquivalentTo(new[] { "Invalid requester User ID." });
+        await Assert.That(await ReadGroupMemberships(fixture)).IsEquivalentTo(original);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => Add(command, seed.OtherUser.ToString("D")));
+        await Assert.That(await ReadGroupMemberships(fixture)).IsEquivalentTo(original);
         await Assert.That((await Add(command with
         {
             AddGroupMemberDto = command.AddGroupMemberDto with { Email = "missing@example.test" }

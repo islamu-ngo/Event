@@ -1,4 +1,4 @@
-# Group members are org-scoped: org admins manage membership, all authenticated can view and join.
+# Group membership mutation scopes are projected from current tenant-bound group authority.
 
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
@@ -24,14 +24,34 @@ resourcePolicy:
       derivedRoles:
         - islamuevent_tenant_admin
 
-    # Org admins can manage group members for their organization
-    - actions: ["view", "create", "update", "delete"]
+    - actions: ["create"]
       effect: EFFECT_ALLOW
-      derivedRoles:
-        - islamuevent_org_admin
+      roles: ["islamuevent_authenticated_user"]
+      condition:
+        match:
+          expr: >
+            has(request.principal.attr.groupMemberCreateScopes) &&
+            (request.resource.attr.tenantId + "/" + request.resource.attr.groupId) in request.principal.attr.groupMemberCreateScopes
 
-    # All authenticated users can view and create (join) group memberships
-    - actions: ["view", "create"]
+    - actions: ["update"]
+      effect: EFFECT_ALLOW
+      roles: ["islamuevent_authenticated_user"]
+      condition:
+        match:
+          expr: >
+            has(request.principal.attr.groupMemberUpdateScopes) &&
+            (request.resource.attr.tenantId + "/" + request.resource.attr.groupId) in request.principal.attr.groupMemberUpdateScopes
+
+    - actions: ["delete"]
+      effect: EFFECT_ALLOW
+      roles: ["islamuevent_authenticated_user"]
+      condition:
+        match:
+          expr: >
+            has(request.principal.attr.groupMemberDeleteScopes) &&
+            (request.resource.attr.tenantId + "/" + request.resource.attr.groupId) in request.principal.attr.groupMemberDeleteScopes
+
+    - actions: ["view"]
       effect: EFFECT_ALLOW
       roles:
         - islamuevent_authenticated_user

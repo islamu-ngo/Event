@@ -33,23 +33,26 @@ public sealed class EventResourceAudienceWorkflow(
 
     private async Task<EventResourceAudienceDetailResult> ReadDetailAsync(Guid resourceId, CancellationToken cancellationToken)
     {
+        var principal = Scope(Guid.Empty);
         var prepared = await unitOfWork.ExecuteSerializableAsync(async ct =>
         {
             var row = await resources.GetAuthorityResourceAsync(tenant.TenantId, resourceId, ct);
             var storage = row?.StorageObjectId is { } storageId
                 ? await resources.GetStorageObjectAsync(tenant.TenantId, storageId, ct) : null;
-            return (Resource: row, File: row is null ? null : EventResourceFileSafety.Describe(row, storage));
+            EventResource? alternativeRow = null;
+            if (row?.AccessibleAlternativeEventResourceId is { } alternativeId && alternativeId != row.Id)
+            {
+                var candidate = await resources.GetAuthorityResourceAsync(tenant.TenantId, alternativeId, ct);
+                if (candidate?.EventId == row.EventId) alternativeRow = candidate;
+            }
+            return (Resource: row, Alternative: alternativeRow,
+                File: row is null ? null : EventResourceFileSafety.Describe(row, storage));
         }, cancellationToken);
         var resource = prepared.Resource;
         if (resource is null) return new(EventResourceAudienceFailure.NotFound);
         var rows = new List<EventResource> { resource };
-        if (resource.AccessibleAlternativeEventResourceId is { } alternativeId && alternativeId != resource.Id)
-        {
-            var alternative = await unitOfWork.ExecuteSerializableAsync(
-                ct => resources.GetAuthorityResourceAsync(tenant.TenantId, alternativeId, ct), cancellationToken);
-            if (alternative?.EventId == resource.EventId) rows.Add(alternative);
-        }
-        var checks = rows.Select(BindVersion).ToArray();
+        if (prepared.Alternative is { } alternative) rows.Add(alternative);
+        var checks = rows.Select(row => BindVersion(row, principal)).ToArray();
         checks[0] = checks[0] with { ExpectedAttachmentGeneration = prepared.File?.AttachmentGeneration };
         var decisions = await authority.AuthorizeAudienceAsync(checks, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -58,8 +61,11 @@ public sealed class EventResourceAudienceWorkflow(
         var accepted = Accepted(rows, checks, decisions);
         var proofChecks = new List<EventResourceAuthorityRequest>();
         var dto = Project(resource, accepted, proofChecks, prepared.File);
-        return new(EventResourceAudienceFailure.None, dto,
-            new(Scope(resource.EventId), null, proofChecks));
+        var actions = await PrepareActionsAsync([dto], accepted, cancellationToken);
+        dto = actions.Items[0];
+        var proof = new EventResourceAudienceDisclosureProof(principal with { EventId = resource.EventId },
+            null, proofChecks, actions.Checks, actions.Outcomes);
+        return new(EventResourceAudienceFailure.None, Projection(dto, proof, cancellationToken), proof);
     }
 
     private async Task<EventResourceAudiencePageResult> ReadPageAsync(Guid eventId, int pageSize,
@@ -71,7 +77,7 @@ public sealed class EventResourceAudienceWorkflow(
         EventResourceCursorPosition? position = null;
         if (cursor is not null && (cursor.Length > 2048 || !cursors.TryUnprotect(cursor, scope, out position)))
             return new(EventResourceAudienceFailure.InvalidRequest);
-        var parentRequest = Request(eventId) with { IsEventCollection = true };
+        var parentRequest = Request(eventId, scope) with { IsEventCollection = true };
         var parent = (await authority.AuthorizeAudienceAsync([parentRequest], cancellationToken))[0];
         cancellationToken.ThrowIfCancellationRequested();
         if (parent.Outcome is not (EventResourceAuthorityOutcome.Allowed or EventResourceAuthorityOutcome.NotFound))
@@ -101,7 +107,7 @@ public sealed class EventResourceAudienceWorkflow(
         if (prepared is null) return new(parentBinding is null
             ? EventResourceAudienceFailure.NotFound : EventResourceAudienceFailure.Unavailable);
         var rows = prepared.Rows;
-        var checks = rows.Select(row => BindVersion(row) with
+        var checks = rows.Select(row => BindVersion(row, scope) with
         { ExpectedAttachmentGeneration = prepared.Files[row.Id]?.AttachmentGeneration }).ToArray();
         var decisions = await authority.AuthorizeAudienceAsync(checks, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -128,6 +134,8 @@ public sealed class EventResourceAudienceWorkflow(
         var proofChecks = new List<EventResourceAuthorityRequest>();
         if (parentBinding is null) proofChecks.Add(accepted.Values.First());
         var items = visible.Take(pageSize).Select(row => Project(row, accepted, proofChecks, prepared.Files[row.Id])).ToImmutableArray();
+        var actions = await PrepareActionsAsync(items, accepted, cancellationToken);
+        items = actions.Items;
         string? next = null;
         if (visible.Length > pageSize)
         {
@@ -135,33 +143,91 @@ public sealed class EventResourceAudienceWorkflow(
             var last = visible[pageSize - 1];
             next = cursors.Protect(scope, new(last.SortOrder, last.Id));
         }
-        var proof = new EventResourceAudienceDisclosureProof(scope, parentBinding, proofChecks);
-        var final = await AuthorizeDisclosureAsync(proof, cancellationToken);
-        return final == EventResourceAudienceFailure.None
-            ? new(final, new(items, next), proof) : new(final);
+        var proof = new EventResourceAudienceDisclosureProof(scope, parentBinding, proofChecks,
+            actions.Checks, actions.Outcomes);
+        return new(EventResourceAudienceFailure.None,
+            Projection(new EventResourcePageDto(items, next), proof, cancellationToken), proof);
     }
+
+    private EventResourceReadProjection<T> Projection<T>(T value,
+        EventResourceAudienceDisclosureProof proof, CancellationToken cancellationToken) where T : class =>
+        new(value, async token => (await AuthorizeDisclosureAsync(proof, token)) switch
+        {
+            EventResourceAudienceFailure.None => EventResourceAuthorityOutcome.Allowed,
+            EventResourceAudienceFailure.AuthenticationRequired => EventResourceAuthorityOutcome.AuthenticationRequired,
+            EventResourceAudienceFailure.Forbidden => EventResourceAuthorityOutcome.Forbidden,
+            EventResourceAudienceFailure.NotFound => EventResourceAuthorityOutcome.NotFound,
+            _ => EventResourceAuthorityOutcome.Unavailable
+        }, cancellationToken);
 
     public async Task<EventResourceAudienceFailure> AuthorizeDisclosureAsync(
         EventResourceAudienceDisclosureProof proof, CancellationToken cancellationToken)
     {
         if (proof.Scope != Scope(proof.Scope.EventId)) return EventResourceAudienceFailure.NotFound;
-        if (proof.Parent is { } parent)
-        {
-            var result = (await authority.AuthorizeCapabilitiesAsync([parent], cancellationToken))[0];
-            cancellationToken.ThrowIfCancellationRequested();
-            if (result != EventResourceAuthorityOutcome.Allowed) return Failure(result);
-        }
-        var outcomes = await authority.AuthorizeCapabilitiesAsync(proof.Checks, cancellationToken);
+        EventResourceAuthorityRequest[] checks = proof.Parent is { } parent
+            ? [parent, .. proof.Checks, .. proof.ActionChecks]
+            : [.. proof.Checks, .. proof.ActionChecks];
+        var outcomes = await authority.AuthorizeCapabilitiesAsync(checks, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return Failure(outcomes.FirstOrDefault(outcome => outcome != EventResourceAuthorityOutcome.Allowed,
-            EventResourceAuthorityOutcome.Allowed));
+        int viewCount = checks.Length - proof.ActionChecks.Length;
+        var failure = outcomes.Take(viewCount).FirstOrDefault(
+            outcome => outcome != EventResourceAuthorityOutcome.Allowed, EventResourceAuthorityOutcome.Allowed);
+        if (failure != EventResourceAuthorityOutcome.Allowed) return Failure(failure);
+        // The representation has already been assembled privately. Neither a gained nor a lost
+        // action decision may change its affordances between preparation and terminal delivery.
+        return outcomes.Skip(viewCount).SequenceEqual(proof.ActionOutcomes)
+            ? EventResourceAudienceFailure.None : EventResourceAudienceFailure.NotFound;
     }
 
-    private EventResourceCursorScope Scope(Guid eventId) => new(tenant.TenantId, eventId,
-        user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller);
-    private EventResourceAuthorityRequest Request(Guid id) => new(tenant.TenantId, id,
-        user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, "view");
-    private EventResourceAuthorityRequest BindVersion(EventResource row) => Request(row.Id) with
+    private async Task<(ImmutableArray<EventResourceAudienceDetailDto> Items,
+        ImmutableArray<EventResourceAuthorityRequest> Checks,
+        ImmutableArray<EventResourceAuthorityOutcome> Outcomes)> PrepareActionsAsync(
+        IReadOnlyList<EventResourceAudienceDetailDto> items,
+        IReadOnlyDictionary<Guid, EventResourceAuthorityRequest> accepted, CancellationToken cancellationToken)
+    {
+        var checks = new List<EventResourceAuthorityRequest>();
+        foreach (var item in items)
+        {
+            if (item.Availability == "quarantined") continue;
+            var binding = accepted[item.Id] with { ExpectedDisclosure = null };
+            if (!item.IsTeaser && item.Availability == "available")
+            {
+                if (item.File is not null) checks.Add(binding with { Action = "download" });
+                if (item.ExternalDestinationSafeOrigin is not null) checks.Add(binding with { Action = "access" });
+            }
+            checks.Add(binding with { Action = "view-management" });
+        }
+        var outcomes = await authority.AuthorizeCapabilitiesAsync(checks, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var allowed = checks.Select((check, index) => (check.ResourceId, check.Action, Outcome: outcomes[index]))
+            .Where(result => result.Outcome == EventResourceAuthorityOutcome.Allowed)
+            .Select(result => (result.ResourceId, result.Action)).ToHashSet();
+        return (items.Select(item => item with
+        {
+            DownloadAuthorized = allowed.Contains((item.Id, "download")),
+            AccessAuthorized = allowed.Contains((item.Id, "access")),
+            ManagementAuthorized = allowed.Contains((item.Id, "view-management"))
+        }).ToImmutableArray(), checks.ToImmutableArray(), outcomes.ToImmutableArray());
+    }
+
+    private EventResourceCursorScope Scope(Guid eventId)
+    {
+        var principal = machine.Current;
+        return new(tenant.TenantId, eventId,
+            principal is null && !machine.IsMachineCaller && user.IsAuthenticated ? user.UserId : null,
+            machine.IsMachineCaller)
+        {
+            MachinePrincipal = principal is null ? null : EventResourceMachinePrincipal.Capture(principal)
+        };
+    }
+
+    private static EventResourceAuthorityRequest Request(Guid id, EventResourceCursorScope scope) =>
+        new(scope.TenantId, id, scope.SubjectUserId, scope.IsMachineCaller, "view")
+        {
+            MachinePrincipal = scope.MachinePrincipal
+        };
+
+    private static EventResourceAuthorityRequest BindVersion(EventResource row, EventResourceCursorScope scope) => Request(row.Id, scope) with
     { ExpectedResourceVersion = row.ConcurrencyStamp };
 
     private static Dictionary<Guid, EventResourceAuthorityRequest> Accepted(IReadOnlyList<EventResource> rows,
@@ -178,6 +244,9 @@ public sealed class EventResourceAudienceWorkflow(
         var check = accepted[row.Id];
         proof.Add(check);
         var disclosure = check.ExpectedDisclosure!;
+        if (row.HasModerationQuarantine)
+            return new(row.Id, row.EventId, null, null, false, "quarantined", null)
+            { MaterialVersionId = row.MaterialVersionId };
         bool privateMetadata = disclosure.DisclosePrivateMetadata;
         Guid? alternative = null;
         if (privateMetadata && row.AccessibleAlternativeEventResourceId is { } id

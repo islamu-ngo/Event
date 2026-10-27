@@ -1,6 +1,8 @@
 using System.Data.Common;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -103,22 +105,58 @@ public sealed partial class EventResourceDiscoveryQueryTests
         await context.SaveChangesAsync();
     }
 
+    private static async Task<T> DiscloseAsync<T>(EventResourceReadProjection<T>? projection) where T : class
+    {
+        await Assert.That(projection).IsNotNull();
+        T? released = null;
+        var outcome = await projection!.DiscloseAsync((value, _) => Task.FromResult(value), (value, _) =>
+        {
+            released = value;
+            return Task.CompletedTask;
+        });
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        return released!;
+    }
+
     private EventResourceAudienceWorkflow Workflow(ExploreDbContext context, Guid tenantId, Guid? subject,
-        Provider? provider = null, bool isMachine = false, string[]? origins = null)
+        Provider? provider = null, bool isMachine = false, string[]? origins = null,
+        IMachinePrincipalAccessor? machinePrincipal = null, bool allowUnscanned = false)
     {
         var repository = new EventResourceRepository(context);
         var unit = new EfCoreUnitOfWork(context);
         var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
         governance.ReadAsync(tenantId, Arg.Any<CancellationToken>()).Returns(EventResourceGovernancePolicy.Create(
             Enum.GetValues<EventResourceDeliveryTypeEnum>(), Enum.GetValues<EventResourceAudienceKindEnum>(),
-            [EventResourceGovernancePolicy.PdfMediaType], 10_485_760, false, origins ?? [], 30, 500, long.MaxValue));
+            [EventResourceGovernancePolicy.PdfMediaType], 10_485_760, allowUnscanned, origins ?? [], 30, 500, long.MaxValue));
         var routes = Substitute.For<IEventResourceProviderSnapshotReader>();
         routes.ReadAsync(tenantId, Arg.Any<CancellationToken>()).Returns(new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default"));
         var tenant = Substitute.For<ITenantContext>(); tenant.TenantId.Returns(tenantId);
         var user = Substitute.For<ICurrentUserService>(); user.IsAuthenticated.Returns(subject.HasValue); user.UserId.Returns(subject);
-        var machine = Substitute.For<IMachinePrincipalAccessor>(); machine.IsMachineCaller.Returns(isMachine);
+        var machine = machinePrincipal ?? Substitute.For<IMachinePrincipalAccessor>();
+        if (machinePrincipal is null)
+        {
+            machine.IsMachineCaller.Returns(isMachine);
+            if (isMachine)
+            {
+                var key = MachineKey(tenantId,
+                    subject.HasValue ? ExternalApiKeyOwnerType.User : ExternalApiKeyOwnerType.Tenant,
+                    subject ?? tenantId);
+                context.ExternalApiKeys.Add(key);
+                context.SaveChanges();
+                machine.Current.Returns(new ApiKeyPrincipalContext(
+                    key.KeyId, key.TenantId, key.OwnerType, key.OwnerId, [])
+                {
+                    CredentialSource = ApiKeyCredentialSource.Persisted
+                });
+            }
+        }
         return new(repository, unit, new(unit, new EventResourceAuthoritySnapshotReader(repository,
-            new EventAuthoritySnapshotService(context), governance), routes, provider ?? new Provider(), new Clock()),
+            new EventAuthoritySnapshotService(context), governance,
+            new ExternalApiKeyAuthenticationRepository(new SecurityTestSupport.AdministrativeAuthorityTestFactory(context)),
+            Substitute.For<IConfiguredApiKeyResourceAuthorityReader>(),
+            new Explore.Persistence.Services.EventResourceModerationSnapshotReader(context,
+                Substitute.For<IModerationMachineSubjectBindingRepository>(),
+                global::Event.Persistence.IntegrationTests.Moderation.ModerationRecognitionResourceFixture.Reader(context))), routes, provider ?? new Provider(), new Clock()),
             tenant, user, machine, _cursors);
     }
 

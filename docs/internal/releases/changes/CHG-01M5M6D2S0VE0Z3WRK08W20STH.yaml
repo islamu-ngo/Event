@@ -1,0 +1,29 @@
+Change-Id: CHG-01M5M6D2S0VE0Z3WRK08W20STH
+Title: "Expose bounded classification inventory and material review"
+Type: feat
+Scope: access
+Summary: "Bind taxonomy controls and material review reads to qualified native material generations and current disclosure authority; included tests are unrun and provider assurance remains pending."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Qualified taxonomy/control/material generations bound inventory and review reads; strict unions and terminal HAL disclosure prevent unqualified private material exposure. Included tests are UNRUN; runtime/provider assurance is pending."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Requires the separately owned classification and material-inventory models plus cumulative generated schema history; no migration or provider execution occurred."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: planned
+    Detail: "Taxonomy, control, material, inventory and review endpoint sources and union converter ship here; cumulative generated API artifacts are reserved once for final host composition."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Complete paired private material-review administration guidance and provider assurance with publication, measurement and final composition before deployment."

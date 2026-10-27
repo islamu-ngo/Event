@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5Q2079D843Z2V6504VZC604
+Title: "Honor declared provider hash collations without accepting drift"
+Type: fix
+Scope: access
+Summary: "Require the model-declared ordinal collation for provider publication hashes while preserving ordinary column, ownership and permission checks."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Marked ordinal properties require the exact PostgreSQL C collation; ordinary columns retain their existing rule. Native type, ownership, privilege and workflow-source checks remain unchanged. Opposite drift regressions are authored but locally unbuilt and unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: "The source guard follows existing model and generated migration comparison semantics without a new setting, grant or migration. It never silently repairs drift; provider runtime acceptance remains a verification gate."

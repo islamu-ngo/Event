@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M63NJ0Y9YRWQ6EFNZ0WNAM
+Title: "Resolve moderation maintenance credentials through the selected authority"
+Type: feat
+Scope: self-hosting
+Summary: "Acquire maintenance credentials only from the explicitly selected secret authority, without appsettings overrides or fallback; ordinary startup remains optional and native qualification is still required."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: mitigated
+    Detail: "The scoped maintenance resolver acquires only the explicitly selected authority, without appsettings credential overrides or fallback. Native persisted-key and installed-service qualification remain independently mandatory; regression sources are unrun."
+  Migration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: not-applicable
+    Detail: "This packet changes credential acquisition and service registration, not persisted database shape."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: "The maintenance credential uses the exact Infisical API mapping or selected documented environment authority; shared User Secrets remain Development/Testing-only. Provider selection does not supply a credential."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: "No HTTP route or response contract is introduced by the scoped secret resolver."
+  Operator:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Selected-authority credential responsibilities are documented. The optional reconciliation service still needs a live persisted key and current native binding; successful secret resolution is not moderation permission or activation assurance."

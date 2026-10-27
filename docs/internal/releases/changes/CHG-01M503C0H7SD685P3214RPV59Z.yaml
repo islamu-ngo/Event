@@ -1,0 +1,29 @@
+Change-Id: CHG-01M503C0H7SD685P3214RPV59Z
+Title: "Qualify selected recognition key rings against original lifecycle state"
+Type: feat
+Scope: privacy
+Summary: "Parse exact finite version-one selected-secret rings into disposable material, join their immutable metadata to durable lifecycle state, and orchestrate maintenance under the native setting lease with independent final source observations."
+Group: moderation-recognition-key-lifecycle
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Reject ambiguous, stale, foreign or mismatched key material; keep raw bytes ephemeral and require independently refreshed selected-source observations at the original native commit boundaries. Contracts alone grant no native permission."
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: planned
+    Detail: "Complete selected-authority ring schema and configuration examples in the paired programme guides before PR; this contract packet does not register or activate a runtime consumer."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: planned
+    Detail: "Publish maintenance, overlap and selected-secret responsibilities with the complete programme guides before PR; native storage, runtime ownership and provider assurance remain separate."

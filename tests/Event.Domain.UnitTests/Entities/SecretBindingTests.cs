@@ -205,6 +205,30 @@ public class SecretBindingTests
     }
 
     [Test]
+    public async Task RecognitionRing_RequiresInstanceExternalAuthorityAndAcknowledgedOverlap()
+    {
+        var key = SecretDefinitionRegistry.Keys.ModerationRecognitionKeyRing;
+        var definition = SecretDefinitionRegistry.GetRequired(key);
+        await Assert.That(definition.IsBootstrapSecret).IsFalse();
+        await Assert.That(definition.Requirement).IsEqualTo(SecretRequirement.OptionalCapability);
+        await Assert.That(definition.AllowedScopes).IsEquivalentTo([SecretScope.Instance]);
+        await Assert.That(definition.AllowedSources).IsEquivalentTo([
+            SecretSourceType.Infisical, SecretSourceType.EnvironmentVariable]);
+        await Assert.That(definition.DefaultInfisicalPath).IsEqualTo("/api");
+        await Assert.That(definition.DefaultInfisicalKey).IsEqualTo("MODERATION_RECOGNITION_KEYRING");
+        await Assert.That(definition.DefaultEnvironmentVariableName).IsEqualTo("MODERATION_RECOGNITION_KEYRING");
+        var rotation = SecretDefinitionRegistry.GetRotationProfile(key);
+        await Assert.That(rotation.Mode).IsEqualTo(SecretRotationMode.OverlapRollout);
+        await Assert.That(rotation.CandidateValidationRequired).IsTrue();
+        await Assert.That(rotation.EveryReplicaAcknowledgementRequired).IsTrue();
+        var binding = SecretBinding.CreateEnvironmentVariable(key, SecretScope.Instance, null,
+            definition.DefaultEnvironmentVariableName);
+        await Assert.That(binding.Scope).IsEqualTo(SecretScope.Instance);
+        await Assert.That(() => SecretBinding.CreateEnvironmentVariable(key, SecretScope.Tenant,
+            Guid.CreateVersion7(), definition.DefaultEnvironmentVariableName)).Throws<ArgumentException>();
+    }
+
+    [Test]
     public async Task Registry_ControlPlaneRegistrationCredentials_UsesDedicatedSubfolder()
     {
         var definition = SecretDefinitionRegistry.GetRequired(SecretDefinitionRegistry.Keys.Management.ControlPlaneRegistrationCredentials);

@@ -50,6 +50,7 @@ public static class SecretResolutionServiceCollectionExtensions
         // ---- Resolver --------------------------------------------------------
         services.TryAddScoped<ISecretResolver, SecretResolver>();
         services.TryAddScoped<IPrivacyIdentityFenceKeyProvider, PrivacyIdentityFenceKeyProvider>();
+        services.TryAddScoped<IModerationReconciliationSecretProvider, ModerationReconciliationSecretProvider>();
         services.TryAddScoped<IRetainedSecretResolver>(provider =>
             (IRetainedSecretResolver)provider.GetRequiredService<ISecretResolver>());
         services.TryAddScoped<ISetupSecretBindingWriter, SetupSecretBindingWriter>();

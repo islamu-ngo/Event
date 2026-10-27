@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.DTOs.EventAddOns;
 using Explore.Application.DTOs.InstanceAdmin;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.DTOs.ExternalApiKey;
@@ -23,7 +24,7 @@ using Explore.Application.Serialization;
 
 namespace ApplicationUnitTests.Responses;
 
-public sealed class BaseCommandResponseContractTests
+public sealed partial class BaseCommandResponseContractTests
 {
     private const string SyntheticReveal = "fixture.reveal.not-a-credential";
     private const string SyntheticKeyId = "fixture-key-id";
@@ -113,7 +114,8 @@ public sealed class BaseCommandResponseContractTests
     [Test]
     public async Task EveryDiscoveredDescendantHasExecutableFactoryAndApplicableWireScenarios()
     {
-        await Assert.That(CreateDerivedFactoryScenarios().Select(scenario => scenario.ResponseType))
+        await Assert.That(CreateDerivedFactoryScenarios().Select(scenario => scenario.ResponseType)
+            .Concat(CreateModerationFactoryScenarios().Select(scenario => scenario.ResponseType)))
             .IsEquivalentTo(ConcreteDescendantTypes)
             .Because("Every concrete response needs executable success, failure, payload and invalid-state coverage.");
         await Assert.That(CreateDerivedWireScenarios().Select(scenario => scenario.ResponseType).Distinct())
@@ -874,7 +876,7 @@ public sealed class BaseCommandResponseContractTests
         ];
     }
 
-    /// <summary>Supplies real payload values for exhaustive native factory validation across concrete response families.</summary>
+    /// <summary>Supplies real payload values for public factories; native outcome callbacks cover the other response families.</summary>
     private static DerivedFactoryScenario[] CreateDerivedFactoryScenarios()
     {
         RegistrationOrderDto order = CreateOrder();
@@ -889,9 +891,11 @@ public sealed class BaseCommandResponseContractTests
         AtprotoTransientValue transient = CreateTransientValue();
         LocalCredentialIssueDto issue = LocalCredentialIssueDto.Issued(CreateCredentialOperation(), SyntheticReveal);
         AnonymousRegistrationChallengeDto challenge = CreateAnonymousChallenge();
+        EventAddOnCatalogDto catalog = CreateAddOnCatalog();
 
         return
         [
+            Factory(typeof(EventAddOnPublicationResponse), Facts(("catalog", catalog)), ("Catalog", catalog)),
             Factory(typeof(AnonymousRegistrationChallengeIssueResult),
                 Facts(("eventId", RelatedId), ("challenge", challenge)), ("Challenge", challenge)),
             Factory(typeof(LocalCredentialIssueCommandResponse), Facts(("issue", issue)), ("Issue", issue)),
@@ -1222,6 +1226,52 @@ public sealed class BaseCommandResponseContractTests
         Token = null,
         ExpiresAt = FixtureOffset,
     };
+
+    private static EventAddOnCatalogDto CreateAddOnCatalog() => new()
+    {
+        Id = ResultId,
+        EventId = RelatedId,
+        VersionNumber = 1,
+        CurrencyCode = "EUR",
+        Items =
+        [
+            new EventAddOnCatalogItemDto
+            {
+                Id = ChoiceId,
+                Name = "Fixture add-on",
+                UnitPriceMinor = 125,
+                CurrencyCode = "EUR",
+                IsAvailable = true,
+                MaximumSelectableQuantity = 2,
+                FulfillmentDisclosure = "Collected at the event.",
+                RefundDisclosure = "Refunded with the order.",
+            },
+        ],
+    };
+
+    [Test]
+    public async Task AddOnPublicationRequiresCatalogIdentityAndClearsCatalogOnFailure()
+    {
+        EventAddOnPublicationResponse success = EventAddOnPublicationResponse.Success(CreateAddOnCatalog());
+        await Assert.That(success.Id).IsEqualTo(ResultId);
+        await Assert.That(() => EventAddOnPublicationResponse.Success(null!)).Throws<ArgumentNullException>();
+        await Assert.That(() => EventAddOnPublicationResponse.Success(CreateAddOnCatalog() with { Id = null }))
+            .Throws<ArgumentException>();
+        await Assert.That(() => EventAddOnPublicationResponse.Failure(success)).Throws<ArgumentException>();
+        await Assert.That(() => EventAddOnPublicationResponse.Failure(null!)).Throws<ArgumentNullException>();
+
+        foreach (BaseCommandResponse<Guid> failure in CreateEnvelopeFailures())
+        {
+            EventAddOnPublicationResponse response = EventAddOnPublicationResponse.Failure(failure);
+            await Assert.That(response.Id).IsEqualTo(failure.Id);
+            await Assert.That(response.Message).IsEqualTo(failure.Message);
+            await Assert.That(response.FailureCode).IsEqualTo(failure.FailureCode);
+            await Assert.That(response.Errors ?? []).IsEquivalentTo(failure.Errors ?? []);
+            await Assert.That(response.QuotaExceeded).IsEqualTo(failure.QuotaExceeded);
+            await Assert.That(response.IsSuccess).IsFalse();
+            await Assert.That(response.Catalog).IsNull();
+        }
+    }
 
     private static QuotaExceededDetails CreateQuota() => new(
         "fixture.quota",

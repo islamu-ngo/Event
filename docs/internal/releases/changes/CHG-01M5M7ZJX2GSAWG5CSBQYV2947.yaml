@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5M7ZJX2GSAWG5CSBQYV2947
+Title: "connect protected moderation screens to authenticated UI services"
+Type: feat
+Scope: access
+Summary: "Register completed moderation and private-profile transports, add authenticated noncached policy and notice routes and include private-completion JSON contracts. This shared wiring is not an intermediate deployment or verification claim."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Final UI wiring uses the registered authenticated transports and noncached protected routes; navigation guards do not replace native HAL action authority. No build, browser, runtime or provider verification was executed here."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Record this narrow mixed UI composition root after its introducing screens/transports and before the main-owned cumulative generated checkpoint. Source-series ordering is not independent build or deployment proof; full hooks and verification remain with main."

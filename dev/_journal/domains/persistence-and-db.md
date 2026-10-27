@@ -124,7 +124,7 @@ dotnet tests/Event.Persistence.IntegrationTests/bin/Release/net10.0/Event.Persis
 **Why This Matters for Future Work**: Cleanup must discharge the operation's actual EF ownership without treating a closed or replacement physical connection as proof of the same thing. Verify recovery on the same context, not only the first rejected invocation. Do not generalize these PostgreSQL receipts into unexecuted provider evidence.
 
 **References**:
-- `src/Explore.Persistence/Repositories/ActorOwnershipReader.cs`
+- `src/Explore.Persistence/Services/ActorOwnershipReader.cs`
 - `src/Explore.Persistence/Database/ProviderPrimitives/RelationalConnectionIdentity.cs`
 - `tests/Event.Persistence.IntegrationTests/TenantIsolation/ActorOwnershipReaderTests.cs`
 - PR: https://github.com/islamu-ngo/Event/pull/75

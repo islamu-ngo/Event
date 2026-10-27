@@ -8,8 +8,13 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.API.IntegrationTests.Features;
 
@@ -19,7 +24,9 @@ public sealed class EventResourceMetadataExportTests
     private static CancellationToken Token => TestContext.Current?.Execution.CancellationToken ?? CancellationToken.None;
 
     [Test]
-    public async Task ExportIsPrivateBoundedSemanticDataAndCannotSurviveRevocation()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExportIsPrivateBoundedSemanticDataAndCannotSurviveRevocation(bool revokeBeforeResult)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
@@ -142,7 +149,19 @@ public sealed class EventResourceMetadataExportTests
             }
             await database.SaveChangesAsync(Token);
         }
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        bool revokedAtResult = false;
+        async Task RevokeAsync()
+        {
+            await using var revoke = factory.CreateDatabase();
+            revoke.EnableTenantFilterBypass("Export test revokes one exact tenant subject.");
+            await revoke.TenantUsers.Where(row => row.TenantId == PlatformDefaults.DefaultTenantId && row.UserId == userId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.StatusId, (int)TenantUserStatusEnum.Suspended), Token);
+            revokedAtResult = true;
+        }
+        using var intercepted = revokeBeforeResult ? factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.Configure<MvcOptions>(options => options.Filters.Add(
+                new BeforeExportRepresentation($"/api/event/{eventId:D}/resources/export", RevokeAsync))))) : null;
+        using var client = (intercepted ?? factory).CreateClient(new WebApplicationFactoryClientOptions
         {
             BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false
@@ -156,6 +175,16 @@ public sealed class EventResourceMetadataExportTests
         string path = $"/api/event/{eventId:D}/resources/export";
         using (var exported = await client.GetAsync(path, Token))
         {
+            if (revokeBeforeResult)
+            {
+                await Assert.That(revokedAtResult).IsTrue();
+                await Assert.That(exported.IsSuccessStatusCode).IsFalse().Because(await exported.Content.ReadAsStringAsync(Token));
+                await Assert.That(exported.Headers.CacheControl?.NoStore).IsTrue();
+                var deniedBody = await exported.Content.ReadAsStringAsync(Token);
+                await Assert.That(deniedBody).DoesNotContain("Authorized private note");
+                await Assert.That(deniedBody).DoesNotContain("downloadable.pdf");
+                return;
+            }
             await Assert.That(exported.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(await exported.Content.ReadAsStringAsync(Token));
             await Assert.That(exported.Headers.CacheControl?.Private).IsTrue();
             await Assert.That(exported.Headers.CacheControl?.NoStore).IsTrue();
@@ -198,15 +227,21 @@ public sealed class EventResourceMetadataExportTests
             await Assert.That(body.RootElement.GetProperty("items").GetArrayLength()).IsEqualTo(0);
             await Assert.That(body.RootElement.TryGetProperty("totalCount", out _)).IsFalse();
         }
-        await using (var revoke = factory.CreateDatabase())
-        {
-            revoke.EnableTenantFilterBypass("Export test revokes one exact tenant subject.");
-            await revoke.TenantUsers.Where(row => row.TenantId == PlatformDefaults.DefaultTenantId && row.UserId == userId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.StatusId, (int)TenantUserStatusEnum.Suspended), Token);
-        }
+        await RevokeAsync();
         client.DefaultRequestHeaders.IfNoneMatch.Add(EntityTagHeaderValue.Any);
         using var denied = await client.GetAsync(path, Token);
         await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.NotFound).Because(await denied.Content.ReadAsStringAsync(Token));
         await Assert.That(denied.Headers.CacheControl?.NoStore).IsTrue();
+    }
+
+    private sealed class BeforeExportRepresentation(string path, Func<Task> revoke) : IAsyncResultFilter
+    {
+        public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
+        {
+            if (context.HttpContext.Request.Path == path
+                && context.Result is not ObjectResult { StatusCode: not StatusCodes.Status200OK })
+                await revoke();
+            await next();
+        }
     }
 }

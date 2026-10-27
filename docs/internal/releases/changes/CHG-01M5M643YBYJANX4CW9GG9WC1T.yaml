@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M643YBYJANX4CW9GG9WC1T
+Title: "Retain private birthdate collection provenance"
+Type: feat
+Scope: privacy
+Summary: "Checkpoint private declarations, exact collection metadata and isolated PII-owned provenance without projecting birthdates into general profile contracts or certifying age."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Method-only declaration access and exact current Human/purpose/collection metadata guard the source model; provenance remains an isolated PII-owned leaf. Host collection authorization remains separate; model/tests are unbuilt and unrun."
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: planned
+    Detail: "Private fields, collection provenance and profile metadata need the shared provider model policy and cumulative migration checkpoint; SQL Server cascade/rollback behavior has not been verified."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/MODERATION.md
+    Disposition: planned
+    Detail: "Pair with protected native profile ingress and erasure owners before deployment. A private declaration is not age assurance and must not enter general profile projections."

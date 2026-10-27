@@ -3,6 +3,7 @@ namespace Event.Application.UnitTests.Features.SetupLive;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.SetupLive;
+using Explore.Application.Contracts.Persistence;
 
 public sealed class SetupLiveApplyContractTests
 {

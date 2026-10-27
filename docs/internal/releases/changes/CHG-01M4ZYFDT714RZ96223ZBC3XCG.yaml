@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZYFDT714RZ96223ZBC3XCG
+Title: "Bind finite collection receipts to every native individual prerequisite"
+Type: feat
+Scope: privacy
+Summary: "Retain immutable purpose-bound applicability and prerequisite coordinates for one individual, require every assessed native record exactly once, narrow validity to all source ceilings, and irreversibly retire collection metadata without accepting sensitive data or treating it as a native permission."
+Group: moderation-individual-collection-receipt
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

@@ -602,6 +602,29 @@ remain refused. This limit concerns the new human administrative path, not
 bootstrap/worker or restricted replacement ownership. Twenty-six authentic
 controls are authored but unrun; installation/runtime acceptance remains open.
 
+### Account-creation PII writer manifests
+
+Managed-tenant worker creation and the Local identity writer explicitly include
+the mapped `_dateOfBirth`, `_birthDateCollectionReceiptId` and `_birthDateRevision`
+fields in their `UserPii` INSERT inventories. Fresh account graphs leave those
+fields null, null and zero; account creation does not collect a birth date.
+The worker still has no PII SELECT or UPDATE permission. The Local writer retains
+only its existing user-ID/name/email SELECT and name/email UPDATE columns, not
+birth-date SELECT or UPDATE authority. Exact model-shape validation remains
+fail-closed: an undeclared mapped field is not silently ignored.
+
+Human managed-provider provisioning separately declares all seven mapped PII
+properties for that same strict model check, while its operational `Columns`
+inventory remains the original user-ID/name/email set. SQL row reads, inserts
+and privilege attestation continue to use only those four operational columns;
+the private fields remain database-defaulted and acquire no new SELECT, INSERT
+or UPDATE grant from this correction.
+
+This aligns the reviewed manifests with the existing merged model; it changes no
+entity, schema or migration. Model-manifest, fresh-account and native permission
+regressions were authored but not locally built or executed. Product compilation
+does not establish provider permission or account-creation runtime acceptance.
+
 The separate PostgreSQL DATA contract is now authored in
 `PostgresLocalAdministrationContract`. Its reviewed inventory covers 90 scalars
 across eight lifecycle/binding relations, including PII. Fixed execute-only
@@ -610,6 +633,19 @@ the complete expected transition, apply it once and compare the full persisted
 postimage. The writer epoch protects absent rows, uniqueness and page ranges;
 completion erases sensitive retained state but keeps a transaction/backend
 tombstone. Deferred settlement checks only that completion seal.
+
+Its complete mapped inventory now recognizes 93 scalars while its operational
+inventory remains the same 90 scalars. For `UserPii`, the three private birth-date
+fields participate in exact model and physical-catalog checks but not column
+grants, row projections or INSERT payloads. The physical revision column must
+retain the source-owner migration's literal zero default; a changed default or
+an added private-field SELECT/UPDATE grant fails readiness and reinstall checks.
+The PII read CTE explicitly selects the four operational columns, rather than
+using `SELECT *`, so observing name/email data requires no birth-date permission.
+New Local rows therefore retain null birth date, null collection receipt and
+revision zero without collecting or disclosing those fields. These changes add
+no permission, schema migration or runtime repair. The new model, default and
+privilege-drift regressions are authored but remain locally unbuilt and unrun.
 
 The migrator installs this contract after S/P/route/H for co-located Identity;
 the PostgreSQL fixture preserves its epoch through reset. These are source

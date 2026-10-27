@@ -1,4 +1,5 @@
 using Explore.Application.Authorization;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -9,6 +10,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.Services;
 using Explore.Domain.ValueObjects;
 using NSubstitute;
+using ISLAMU.Moderation.Domain;
 
 namespace Event.Application.UnitTests.Authorization;
 
@@ -20,6 +22,187 @@ public class EventResourceAuthorityOrchestratorTests
     private static readonly Guid ResourceId = Guid.Parse("018f0000-0000-7000-8000-000000000103");
     private static readonly Guid Subject = Guid.Parse("018f0000-0000-7000-8000-000000000104");
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
+
+    [Test]
+    public async Task Qualified_nonadoption_retains_source_generation_without_creating_subject_authority()
+    {
+        var before = EventResourceModerationFacts.QualifiedNonadoption("publication-epoch-1");
+        var changed = EventResourceModerationFacts.QualifiedNonadoption("publication-epoch-2");
+        await Assert.That(before.IsAdopted).IsFalse();
+        await Assert.That(before.Subject).IsNull();
+        await Assert.That(before.PermitsNativeEvaluationAt(Now)).IsTrue();
+        await Assert.That(before == changed).IsFalse();
+        await Assert.That(() => EventResourceModerationFacts.QualifiedNonadoption(""))
+            .Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task UnadoptedResourceModerationPreservesNativeAuthorization()
+    {
+        var f = new Fixture();
+        f.Facts = f.Capture(moderation: EventResourceModerationFacts.NotAdopted);
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation("generation-1")));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+    }
+
+    [Test]
+    public async Task AdoptedResourceModerationWithoutCanonicalQualificationCannotPrepareContent()
+    {
+        var f = new Fixture();
+        f.Facts = f.Capture(moderation: EventResourceModerationFacts.Unavailable("qualification-unavailable"));
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => throw new InvalidOperationException("Unknown qualification cannot prepare content."));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(result.Lease).IsNull();
+    }
+
+    [Test]
+    public async Task CanonicalQualificationChangeAfterPreparationInvalidatesResourceDisclosure()
+    {
+        var f = new Fixture();
+        var origin = AuthorityScope.Instance(
+            AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()),
+            Guid.CreateVersion7());
+        var subject = SubjectReference.Create(ModerationSubjectKind.Human, Subject, origin);
+        f.Facts = f.Capture(moderation: EventResourceModerationFacts.Qualified(
+            subject, ModerationRestrictionOutcome.Unrestricted, "qualification-1"));
+        await using var preparation = new Preparation("generation-1");
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        f.Facts = f.Capture(moderation: EventResourceModerationFacts.Qualified(
+            subject, ModerationRestrictionOutcome.Unrestricted, "qualification-2"));
+        var released = await f.Service.CompleteHeadersAsync(result.Lease!);
+        await Assert.That(released.Outcome).IsNotEqualTo(EventResourceAuthorityOutcome.Allowed);
+        await Assert.That(released.Preparation).IsNull();
+        await Assert.That(preparation.Disposed).IsTrue();
+    }
+
+    [Test]
+    [Arguments(-1)]
+    [Arguments(0)]
+    [Arguments(1)]
+    public async Task RecognitionCurrentUntilBoundsTheActualHeaderHandoff(int ticksFromBoundary)
+    {
+        var f = new Fixture();
+        var origin = AuthorityScope.Instance(
+            AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()),
+            Guid.CreateVersion7());
+        var subject = SubjectReference.Create(ModerationSubjectKind.Human, Subject, origin);
+        var boundary = Now.AddSeconds(1);
+        f.Facts = f.Capture(moderation: EventResourceModerationFacts.Qualified(
+            subject, ModerationRestrictionOutcome.Unrestricted, "qualification-1", currentUntil: boundary));
+        await using var preparation = new Preparation("generation-1");
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        f.Clock.UtcNow = boundary.AddTicks(ticksFromBoundary);
+        var released = await f.Service.CompleteHeadersAsync(result.Lease!);
+        await Assert.That(released.Outcome).IsEqualTo(ticksFromBoundary < 0
+            ? EventResourceAuthorityOutcome.Allowed : EventResourceAuthorityOutcome.Forbidden);
+        await Assert.That(released.Preparation is not null).IsEqualTo(ticksFromBoundary < 0);
+        await Assert.That(preparation.Disposed).IsEqualTo(ticksFromBoundary >= 0);
+    }
+
+    [Test]
+    public async Task RecognitionLifetimeChangeInvalidatesPreparedAuthorityEvenWithTheSameGeneration()
+    {
+        var f = new Fixture();
+        var origin = AuthorityScope.Instance(
+            AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()),
+            Guid.CreateVersion7());
+        var subject = SubjectReference.Create(ModerationSubjectKind.Human, Subject, origin);
+        f.Facts = f.Capture(moderation: EventResourceModerationFacts.Qualified(
+            subject, ModerationRestrictionOutcome.Unrestricted, "qualification-1", currentUntil: Now.AddSeconds(1)));
+        await using var preparation = new Preparation("generation-1");
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        f.Facts = f.Capture(moderation: EventResourceModerationFacts.Qualified(
+            subject, ModerationRestrictionOutcome.Unrestricted, "qualification-1", currentUntil: Now.AddSeconds(2)));
+        var released = await f.Service.CompleteHeadersAsync(result.Lease!);
+        await Assert.That(released.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+        await Assert.That(released.Preparation).IsNull();
+        await Assert.That(preparation.Disposed).IsTrue();
+    }
+
+    [Test]
+    public async Task RecognitionLifetimeExpiryDuringPrivatePreparationCannotProduceADeliveryLease()
+    {
+        var f = new Fixture();
+        var origin = AuthorityScope.Instance(
+            AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()),
+            Guid.CreateVersion7());
+        var subject = SubjectReference.Create(ModerationSubjectKind.Human, Subject, origin);
+        var boundary = Now.AddSeconds(1);
+        f.Facts = f.Capture(moderation: EventResourceModerationFacts.Qualified(
+            subject, ModerationRestrictionOutcome.Unrestricted, "qualification-1", currentUntil: boundary));
+        await using var preparation = new Preparation("generation-1");
+        await using var result = await f.Service.AuthorizeAsync(f.Request, (_, _) =>
+        {
+            f.Clock.UtcNow = boundary;
+            return Task.FromResult<IEventResourcePrivatePreparation>(preparation);
+        });
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(result.Lease).IsNull();
+        await Assert.That(preparation.Disposed).IsTrue();
+    }
+
+    [Test]
+    public async Task UnrestrictedModerationDoesNotGrantMissingNativeResourcePermission()
+    {
+        var f = new Fixture(EventResourceAudienceKindEnum.AuthenticatedTenantMember);
+        var origin = AuthorityScope.Instance(
+            AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()),
+            Guid.CreateVersion7());
+        var subject = SubjectReference.Create(ModerationSubjectKind.Human, Subject, origin);
+        f.Facts = f.Capture(
+            access: new(Tenant, Subject, false, f.Access.Parent, [], true, f.Access.GovernancePolicy),
+            moderation: EventResourceModerationFacts.Qualified(
+                subject, ModerationRestrictionOutcome.Unrestricted, "qualification-1"));
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => throw new InvalidOperationException("Moderation cannot grant native audience permission."));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(result.Lease).IsNull();
+    }
+
+    [Test]
+    public async Task CanonicalServiceBindingRevisionChangeInvalidatesPreparedResourceDisclosure()
+    {
+        var f = new Fixture();
+        var origin = AuthorityScope.Instance(
+            AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()),
+            Guid.CreateVersion7());
+        var service = SubjectReference.Create(ModerationSubjectKind.Service, Guid.CreateVersion7(), origin);
+        var bindingId = Guid.CreateVersion7();
+        var principal = new EventResourceMachinePrincipal(
+            "proof-key", Tenant, ExternalApiKeyOwnerType.Tenant, Tenant, ApiKeyCredentialSource.Persisted);
+        f.Request = new(Tenant, ResourceId, null, true, "download", Now.AddMinutes(1))
+        {
+            MachinePrincipal = principal
+        };
+        var access = new EventResourceAccessFacts(Tenant, null, true, f.Access.Parent,
+            [new EventResourceAudienceFact
+            {
+                TenantId = Tenant, EventId = EventId, SubjectUserId = Guid.Empty,
+                Kind = EventResourceAudienceKindEnum.Public, IsCurrent = true
+            }], true, f.Access.GovernancePolicy);
+        f.Facts = f.Capture(access: access, machinePrincipal: principal,
+            moderation: EventResourceModerationFacts.Qualified(
+                service, ModerationRestrictionOutcome.Unrestricted, "qualification-1", bindingId, 1));
+        await using var preparation = new Preparation("generation-1");
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        f.Facts = f.Capture(access: access, machinePrincipal: principal,
+            moderation: EventResourceModerationFacts.Qualified(
+                service, ModerationRestrictionOutcome.Unrestricted, "qualification-1", bindingId, 2));
+        var released = await f.Service.CompleteHeadersAsync(result.Lease!);
+        await Assert.That(released.Outcome).IsNotEqualTo(EventResourceAuthorityOutcome.Allowed);
+        await Assert.That(released.Preparation).IsNull();
+        await Assert.That(preparation.Disposed).IsTrue();
+    }
 
     [Test]
     public async Task ParentPolicyInputsMustBeReauthorizedWhenAssignmentExpiresButModeratorEligibilityRemains()
@@ -360,7 +543,8 @@ public class EventResourceAuthorityOrchestratorTests
         var released = await f.Service.CompleteHeadersAsync(lease!);
         await Assert.That(released.Preparation).IsEqualTo(preparation);
         await Assert.That(released.Disclosure!.CanAccess).IsTrue();
-        await Assert.That(f.Clock.Samples - before).IsEqualTo(1);
+        await Assert.That(f.Clock.Samples - before).IsEqualTo(3);
+        await Assert.That(f.UnitOfWork.CommittedReads).IsEqualTo(3);
         await Assert.That((await f.Service.CompleteHeadersAsync(lease!)).Outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
     }
 
@@ -380,6 +564,80 @@ public class EventResourceAuthorityOrchestratorTests
         await Assert.That(f.Inputs.Single().Principal.HasEventUpdate).IsTrue();
         await Assert.That(f.Inputs.Single().Resource.PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Published);
         await Assert.That((await f.Service.CompleteHeadersAsync(lease!)).Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+    }
+
+    [Test]
+    [Arguments("resource")]
+    [Arguments("route")]
+    [Arguments("attachment")]
+    [Arguments("audience")]
+    public async Task Terminal_revocation_after_lease_creation_never_releases_private_preparation(string changedSource)
+    {
+        var f = new Fixture(EventResourceAudienceKindEnum.AuthenticatedTenantMember);
+        await using var preparation = new Preparation("generation-1");
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+
+        switch (changedSource)
+        {
+            case "resource":
+                f.Facts = null;
+                break;
+            case "route":
+                f.Route = null;
+                break;
+            case "attachment":
+                f.Facts = f.Capture(generation: "generation-2");
+                break;
+            case "audience":
+                f.Facts = f.Capture(access: new(Tenant, Subject, false,
+                    f.Access.Parent, [], true, f.Access.GovernancePolicy));
+                break;
+        }
+
+        var released = await f.Service.CompleteHeadersAsync(result.Lease!);
+        await Assert.That(released.Outcome).IsNotEqualTo(EventResourceAuthorityOutcome.Allowed);
+        await Assert.That(released.Preparation).IsNull();
+        await Assert.That(preparation.Disposed).IsTrue();
+        await Assert.That((await f.Service.CompleteHeadersAsync(result.Lease!)).Outcome)
+            .IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Terminal_requalification_retains_private_preparation_until_current_read_finishes(bool failure)
+    {
+        var f = new Fixture(EventResourceAudienceKindEnum.AuthenticatedTenantMember);
+        await using var preparation = new Preparation("generation-1");
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
+        var entered = Signal();
+        var resume = Signal();
+        f.OnRead = async (_, ct) =>
+        {
+            entered.SetResult();
+            await resume.Task.WaitAsync(Timeout, ct);
+            if (failure) throw new InvalidOperationException("private terminal persistence failure");
+        };
+
+        var pending = f.Service.CompleteHeadersAsync(result.Lease!);
+        var first = await Task.WhenAny(entered.Task, pending).WaitAsync(Timeout);
+        try
+        {
+            await Assert.That(first).IsEqualTo(entered.Task);
+            await Assert.That(preparation.Disposed).IsFalse();
+            f.Facts = null;
+        }
+        finally
+        {
+            resume.TrySetResult();
+        }
+        var released = await pending.WaitAsync(Timeout);
+        await Assert.That(released.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(released.Preparation).IsNull();
+        await Assert.That(preparation.Disposed).IsTrue();
     }
 
     [Test]
@@ -441,7 +699,7 @@ public class EventResourceAuthorityOrchestratorTests
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
         await Assert.That(first.Disposed).IsTrue();
         await Assert.That((await f.Service.CompleteHeadersAsync(lease!)).Preparation).IsEqualTo(second);
-        await Assert.That(f.UnitOfWork.CommittedReads).IsEqualTo(4);
+        await Assert.That(f.UnitOfWork.CommittedReads).IsEqualTo(5);
     }
 
     [Test]
@@ -513,9 +771,11 @@ public class EventResourceAuthorityOrchestratorTests
     public async Task Anonymous_and_machine_callers_share_only_the_public_path_without_PDP(bool machine, bool restricted)
     {
         var f = new Fixture(restricted ? EventResourceAudienceKindEnum.AuthenticatedTenantMember : EventResourceAudienceKindEnum.Public);
-        var user = machine ? Subject : (Guid?)null;
-        f.Request = f.Request with { IsMachineCaller = machine, SubjectUserId = user };
-        f.Facts = f.Capture(access: new(Tenant, user, machine, f.Access.Parent, f.Access.Audience, true, f.Access.GovernancePolicy));
+        var identity = machine ? new EventResourceMachinePrincipal("public-resource-key", Tenant,
+            ExternalApiKeyOwnerType.User, Subject, ApiKeyCredentialSource.Persisted) : null;
+        f.Request = f.Request with { IsMachineCaller = machine, SubjectUserId = null, MachinePrincipal = identity };
+        f.Facts = f.Capture(access: new(Tenant, null, machine, f.Access.Parent, f.Access.Audience, true, f.Access.GovernancePolicy),
+            machinePrincipal: identity);
         f.OnProvider = (_, _) => throw new InvalidOperationException("Public-only callers must not enter PDP");
         await using var preparation = new Preparation("generation-1");
         var result = await f.Service.AuthorizeAsync(f.Request,
@@ -523,6 +783,24 @@ public class EventResourceAuthorityOrchestratorTests
         await using var lease = result.Lease;
         await Assert.That(result.Outcome == EventResourceAuthorityOutcome.Allowed).IsEqualTo(!restricted);
         await Assert.That(f.Inputs.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task BatchCannotCombineDistinctMachineAuthoritiesWithTheSameOwner(bool changeSource)
+    {
+        var f = new Fixture(EventResourceAudienceKindEnum.Public);
+        var identity = new EventResourceMachinePrincipal("resource-key-one", Tenant,
+            ExternalApiKeyOwnerType.User, Subject, ApiKeyCredentialSource.Persisted);
+        var request = f.Request with { SubjectUserId = null, IsMachineCaller = true, MachinePrincipal = identity };
+        var changed = changeSource
+            ? identity with { CredentialSource = ApiKeyCredentialSource.Configured }
+            : identity with { KeyId = "resource-key-two" };
+        var outcomes = await f.Service.AuthorizeCapabilitiesAsync(
+            [request, request with { MachinePrincipal = changed }], default);
+        await Assert.That(outcomes.Count).IsEqualTo(2);
+        await Assert.That(outcomes.All(outcome => outcome == EventResourceAuthorityOutcome.Forbidden)).IsTrue();
     }
 
     [Test]
@@ -980,8 +1258,13 @@ public class EventResourceAuthorityOrchestratorTests
         }
 
         public EventResourceAuthorizationFacts Capture(string generation = "generation-1", EventResourceManagementFacts? management = null,
-            EventResourceAccessFacts? access = null) => new(Resource, access ?? Access, management ?? new(
-                new(false), new(true), new(false), [], true, true), generation);
+            EventResourceAccessFacts? access = null, EventResourceMachinePrincipal? machinePrincipal = null,
+            EventResourceModerationFacts? moderation = null) =>
+            new(Resource, access ?? Access, management ?? new(
+                new(false), new(true), new(false), [], true, true), generation, machinePrincipal: machinePrincipal)
+            {
+                Moderation = moderation ?? EventResourceModerationFacts.NotAdopted
+            };
 
         public EventResourceCapabilityAuthorizer NativeAuthorizer()
         {

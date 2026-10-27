@@ -236,6 +236,9 @@ public sealed partial class LocalAdministrationNativeContractTests
     [Arguments("extra-column")]
     [Arguments("ambient-select")]
     [Arguments("executor-global")]
+    [Arguments("private-pii-default")]
+    [Arguments("private-pii-select")]
+    [Arguments("private-pii-update")]
     public async Task CatalogAndAuthorityDriftFailReadinessAndNeverRepairOnReinstall(string drift)
     {
         var source = await SeedAsync();
@@ -246,6 +249,8 @@ public sealed partial class LocalAdministrationNativeContractTests
         string pii = names.Table(typeof(UserPii));
         string runtime = names.Quote(fixture.NativeQueueEnrollment.RuntimeLogin);
         string global = names.Quote(fixture.NativeQueueEnrollment.GlobalLogin);
+        string revision = names.Column(typeof(UserPii), "_birthDateRevision");
+        string birthDate = names.Column(typeof(UserPii), "_dateOfBirth");
         (string Change, string Restore) statements = drift switch
         {
             "owner-login" => ($"ALTER ROLE {Native.OwnerRole} LOGIN", $"ALTER ROLE {Native.OwnerRole} NOLOGIN"),
@@ -254,14 +259,21 @@ public sealed partial class LocalAdministrationNativeContractTests
                 $"ALTER TABLE {pii} ENABLE ALWAYS TRIGGER local_administration_changed"),
             "extra-column" => ($"ALTER TABLE {user} ADD COLUMN native_unreviewed text", $"ALTER TABLE {user} DROP COLUMN native_unreviewed"),
             "ambient-select" => ($"GRANT SELECT ON {user} TO {runtime}", $"REVOKE SELECT ON {user} FROM {runtime}"),
+            "private-pii-default" => ($"ALTER TABLE {pii} ALTER COLUMN {revision} SET DEFAULT 1",
+                $"ALTER TABLE {pii} ALTER COLUMN {revision} SET DEFAULT 0"),
+            "private-pii-select" => ($"GRANT SELECT ({birthDate}) ON {pii} TO {Native.OwnerRole}",
+                $"REVOKE SELECT ({birthDate}) ON {pii} FROM {Native.OwnerRole}"),
+            "private-pii-update" => ($"GRANT UPDATE ({birthDate}) ON {pii} TO {Native.OwnerRole}",
+                $"REVOKE UPDATE ({birthDate}) ON {pii} FROM {Native.OwnerRole}"),
             _ => ($"GRANT {Native.RuntimeRole} TO {global} WITH INHERIT TRUE, SET FALSE, ADMIN FALSE",
                 $"REVOKE {Native.RuntimeRole} FROM {global}")
         };
+        await using var caller = Open(PrimaryDatabaseRole.Runtime, source.Tenant);
+        await caller.Database.OpenConnectionAsync();
+        await Native.RequireReadyAsync(caller, fixture.NativeQueueEnrollment);
         await migration.Database.ExecuteSqlRawAsync(statements.Change);
         try
         {
-            await using var caller = Open(PrimaryDatabaseRole.Runtime, source.Tenant);
-            await caller.Database.OpenConnectionAsync();
             await Assert.ThrowsAsync<PostgresException>(() => Native.RequireReadyAsync(caller, fixture.NativeQueueEnrollment));
             await Assert.ThrowsAsync<PostgresException>(() => Native.ApplyAsync(migration, fixture.NativeQueueEnrollment));
         }

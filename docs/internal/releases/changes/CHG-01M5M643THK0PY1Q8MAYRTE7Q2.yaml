@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M643THK0PY1Q8MAYRTE7Q2
+Title: "Carry strict moderation definitions in configuration artifacts"
+Type: feat
+Scope: self-hosting
+Summary: "Extend manifest and tenant-package contracts with optional typed moderation definitions and matching generated schemas, rejecting invalid or private shapes without transferring activation authority."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: mitigated
+    Detail: "The strict codec rejects unknown/private members, duplicate keys, numeric enums, explicit null moderation sections and over-budget input. Portable definitions carry no native authority or activation rights; contract and schema witnesses remain unrun."
+  Migration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+    Detail: "The generated artifacts describe portable JSON documents, not persisted database changes."
+  Configuration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: documented
+    Detail: "Optional typed moderation definitions extend instance/tenant manifests and tenant packages. Complete named vocabularies and recipe shapes are reflected in both generated schemas, committed with their exact wire/generator sources; this does not change an HTTP endpoint."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: "These are configuration-manifest and tenant-package JSON schemas, not HTTP OpenAPI schemas; endpoint-generated contracts remain with their introducing source."
+  Operator:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: planned
+    Detail: "Paired manifest guidance travels with the coupled native-import source packet. Operators must supply complete valid definitions; schema availability does not imply draft application, rollback support or policy activation readiness."

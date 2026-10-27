@@ -1,0 +1,25 @@
+Change-Id: CHG-01M4EQH267P9HR0T8ZSZ9TKEA9
+Title: "Qualify native moderation sources with exact atomic receipts"
+Type: feat
+Scope: access
+Summary: "Qualify case, reviewer, evidence, finding and inactive policy writes against current native human authority. Commit each source change, qualification advancement and exact actor-bound receipt together; preserve subject-authored responses, independent review and accountable reversal without activating enforcement."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented

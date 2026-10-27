@@ -1,0 +1,26 @@
+Change-Id: CHG-01M5015XGB1PZ1WK6NQGAHA69X
+Title: "Retain original recognition key obligations and replica epochs"
+Type: feat
+Scope: privacy
+Summary: "Persist material-free recognition ring lifecycle, exact ordered runtime acknowledgements, immutable original capture and backup-horizon obligations, and finite purge/cleanup metadata; close stale or exhausted transitions without rehashing erased identifiers or granting native key authority."
+Group: moderation-recognition-key-lifecycle
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

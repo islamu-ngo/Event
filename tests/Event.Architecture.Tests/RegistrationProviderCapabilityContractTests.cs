@@ -130,7 +130,7 @@ public sealed class RegistrationProviderCapabilityContractTests
             new(connections, nameof(RegistrationProviderConnectionsController.ReplaceApprovedOrigins), "PUT", "connections/{connectionId:guid}/approved-origins",
                 RouteNames.ReplaceRegistrationProviderApprovedOrigins),
             new(bindings, nameof(RegistrationProviderBindingsController.ImportExternalFormVersion), "POST", "connections/{connectionId:guid}/external-imports",
-                RouteNames.ImportExternalRegistrationProviderFormVersion),
+                RouteNames.ImportExternalRegistrationProviderFormVersion, ServiceUnavailable: true),
             new(bindings, nameof(RegistrationProviderBindingsController.GetBindings), "GET", "bindings",
                 RouteNames.GetRegistrationProviderBindings, typeof(HalCollectionResource<RegistrationProviderBindingDto>)),
             new(bindings, nameof(RegistrationProviderBindingsController.GetBinding), "GET", "bindings/{bindingId:guid}",
@@ -142,7 +142,7 @@ public sealed class RegistrationProviderCapabilityContractTests
             new(bindings, nameof(RegistrationProviderBindingsController.DeleteBinding), "DELETE", "bindings/{bindingId:guid}",
                 RouteNames.DeleteRegistrationProviderBinding),
             new(bindings, nameof(RegistrationProviderBindingsController.PublishBinding), "POST", "bindings/{bindingId:guid}/publish",
-                RouteNames.PublishRegistrationProviderBinding),
+                RouteNames.PublishRegistrationProviderBinding, ServiceUnavailable: true),
             new(bindings, nameof(RegistrationProviderBindingsController.ReplaceMappings), "PUT", "bindings/{bindingId:guid}/mappings",
                 RouteNames.ReplaceRegistrationProviderMappings),
             new(channels, nameof(RegistrationProviderChannelsController.GetLaunchDescriptor), "GET", "workflows/{workflowId:guid}/requirements/{requirementId:guid}/channels/{channelId:guid}/bindings/{bindingId:guid}/launch-descriptor",
@@ -231,7 +231,8 @@ public sealed class RegistrationProviderCapabilityContractTests
                 (400, route.Verb == "GET" ? typeof(ProblemDetails) : typeof(ValidationProblemDetails)),
                 (401, typeof(ProblemDetails)),
                 (403, typeof(ProblemDetails)),
-                .. Enumerable.Repeat((404, typeof(ProblemDetails)), route.NotFoundCount)
+                .. Enumerable.Repeat((404, typeof(ProblemDetails)), route.NotFoundCount),
+                .. Enumerable.Repeat((503, typeof(ProblemDetails)), route.ServiceUnavailable ? 1 : 0)
             ];
             var actualResponses = action.MethodInfo.GetCustomAttributes<ProducesResponseTypeAttribute>()
                 .Select(response => (response.StatusCode, response.Type)).ToArray();
@@ -275,5 +276,6 @@ public sealed class RegistrationProviderCapabilityContractTests
         string Template,
         string Name,
         Type? ReadPayload = null,
-        int NotFoundCount = 0);
+        int NotFoundCount = 0,
+        bool ServiceUnavailable = false);
 }

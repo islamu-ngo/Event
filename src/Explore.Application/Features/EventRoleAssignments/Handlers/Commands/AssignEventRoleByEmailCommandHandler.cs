@@ -1,3 +1,6 @@
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
@@ -8,14 +11,20 @@ namespace Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 public sealed class AssignEventRoleByEmailCommandHandler(
     IUserRepository userRepository,
     IHumanEventTeamAssignmentOwner assignRoleHandler,
+    IAdminContext identity,
+    IMachinePrincipalAccessor machine,
+    ITenantContext tenant,
+    IAuthorizationProvider authorization,
     IHumanEventTeamActionPreparation preparation,
     ISerializableAttemptOwner owner)
-    : ICommandHandler<AssignEventRoleByEmailCommand, BaseCommandResponse<Guid>>
+    : EventRoleAssignmentCommandHandlerBase(identity, machine, tenant, authorization),
+      ICommandHandler<AssignEventRoleByEmailCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         AssignEventRoleByEmailCommand command,
         CancellationToken cancellationToken = default)
     {
+        await RequireActorAsync(command.TenantId, command.EventId, AuthorizationActions.Events.ManageTeam, cancellationToken);
         var prepared = await preparation.PrepareAsync(command, cancellationToken);
         return await owner.ExecuteAsync(async token =>
         {
@@ -24,8 +33,8 @@ public sealed class AssignEventRoleByEmailCommandHandler(
         }, cancellationToken);
     }
 
-    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(
-        AssignEventRoleByEmailCommand command, IPreparedHumanEventTeamAction prepared, CancellationToken cancellationToken)
+    private async Task<BaseCommandResponse<Guid>> ExecuteBodyAsync(AssignEventRoleByEmailCommand command,
+        IPreparedHumanEventTeamAction prepared, CancellationToken cancellationToken)
     {
         var targetUserEmail = command.TargetUserEmail.Trim();
         if (string.IsNullOrWhiteSpace(targetUserEmail))
@@ -39,6 +48,4 @@ public sealed class AssignEventRoleByEmailCommandHandler(
         return await assignRoleHandler.ExecuteHandoffAsync(inner, prepared, cancellationToken);
     }
 
-    private static BaseCommandResponse<Guid> Failure(string message, string failureCode) =>
-        BaseCommandResponse.Failure<Guid>(failureCode, message);
 }

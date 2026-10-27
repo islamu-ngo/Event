@@ -1,0 +1,30 @@
+Change-Id: CHG-01M5M643N6A64W85RSN1RW2RJ1
+Title: "Bind moderation measurements to isolated native test runs"
+Type: feat
+Scope: self-hosting
+Summary: "Issue nonce-bound assertions only after owned execution and evidence reconciliation against enrolled native sources; isolate the test database and signer while keeping unpublished catalogue and assurance limitations explicit."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Launcher source isolates child configuration and the test database, withholds signer material, reconciles owned native evidence and requalifies enrolled source before signing. The approved host is trusted, not hostile-host attestation; builds and complete provider/runtime assurance remain unrun."
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+    Detail: "The engineering launcher consumes separately supplied native receipt/enrollment persistence; this packet introduces no migration or schema-provisioning command."
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Measurement requires separately selected primary/test database coordinates and an independently enrolled P-256 signer from the approved authority. Public database identity excludes credentials; neither ordinary startup nor catalogue metadata selects this purpose."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: "The fixed engineering executable adds no HTTP endpoint and does not own aggregate API schema/client generation."
+  Operator:
+    Reference: docs/internal/MODERATION.md
+    Disposition: planned
+    Detail: "The engineering guide documents fixed bundles, evidence joins, source checks and failure behavior. No actual catalogue is published; complete native case instrumentation, provider evidence and operator activation assurance remain outstanding. This is coupled source, not an executed conformance pack."

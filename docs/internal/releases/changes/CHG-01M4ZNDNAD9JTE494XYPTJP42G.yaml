@@ -1,0 +1,26 @@
+Change-Id: CHG-01M4ZNDNAD9JTE494XYPTJP42G
+Title: "Model finite subject attribution qualification from retained material"
+Type: feat
+Scope: access
+Summary: "Retain exact material and separately qualified subject provenance with finite read and policy bounds, independent incident assessment linkage and closed withdrawal state; storage does not establish guilt or native permission."
+Group: moderation-attribution-source-model
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/MODERATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: not-applicable

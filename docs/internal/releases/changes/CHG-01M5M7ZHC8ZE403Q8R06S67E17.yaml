@@ -1,0 +1,28 @@
+Change-Id: CHG-01M5M7ZHC8ZE403Q8R06S67E17
+Title: "derive membership actors from authenticated operation context"
+Type: fix
+Scope: access
+Summary: "Stop copying requester and creator identities into group, organization and event-team requests; invitation lookup uses authenticated user identity. Runtime and provider verification are not claimed."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Membership controller requests no longer duplicate acting identities; authenticated operation context and native handlers retain authorization ownership. Runtime and provider verification were not run."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "The affected membership and invitation controller requests use authenticated user context rather than controller-populated actor or email fields; the final cumulative generated contract remains with the main session."
+  Operator:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: planned
+    Detail: "Coordinate controller changes with the existing identity-owning handlers and authorization policies. Paired public and internal guidance and final verification remain with the main session; this is not an intermediate deployment checkpoint."

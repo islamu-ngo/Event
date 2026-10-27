@@ -1,0 +1,27 @@
+Change-Id: CHG-01M5ZG7ABGMFPRYR24EYG34HX7
+Title: "Preserve qualified read observations during grant settlement"
+Type: fix
+Scope: access
+Summary: "Bind the original unchanged qualification epoch alongside the adjudicated grant, rejecting epoch mutation or replacement without permitting unrelated tracked writes."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/MODERATION.md
+    Disposition: mitigated
+    Detail: "Freeze the exact original qualification epoch as an unchanged observation across grant saves and final admission; mutation, detachment or replacement aborts settlement. New adversarial cases require remote execution before runtime assurance."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/moderation-and-banning.md
+    Disposition: documented
+    Detail: "No schema, database permission, configuration or wire change; successful remote grant and provider verification remains required."

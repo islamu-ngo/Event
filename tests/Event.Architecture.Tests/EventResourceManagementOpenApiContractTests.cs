@@ -14,7 +14,12 @@ public sealed class EventResourceManagementOpenApiContractTests
         var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
         var detail = schemas.GetProperty("HalResourceOfEventResourceManagementDto").GetProperty("properties");
         await Assert.That(detail.GetProperty("version").GetProperty("format").GetString()).IsEqualTo("uuid");
-        await Assert.That(detail.GetProperty("draft").GetProperty("$ref").GetString()).IsEqualTo("#/components/schemas/EventResourceDraftDto");
+        var draftAlternatives = detail.GetProperty("draft").GetProperty("oneOf").EnumerateArray().ToArray();
+        await Assert.That(draftAlternatives.Length).IsEqualTo(2);
+        await Assert.That(draftAlternatives.Single(value => value.TryGetProperty("$ref", out _))
+            .GetProperty("$ref").GetString()).IsEqualTo("#/components/schemas/EventResourceDraftDto");
+        await Assert.That(draftAlternatives.Single(value => value.TryGetProperty("type", out _))
+            .GetProperty("type").GetString()).IsEqualTo("null");
         await Assert.That(detail.TryGetProperty("_links", out _)).IsTrue();
         var item = schemas.GetProperty("HalCollectionEmbeddedOfEventResourceManagementDto")
             .GetProperty("properties").GetProperty("items").GetProperty("items");
@@ -69,8 +74,9 @@ public sealed class EventResourceManagementOpenApiContractTests
             ("EventResourceDestinationWriteDto", ["expectedVersion", "destination"]),
             ("EventResourceVersionRequestDto", ["expectedVersion"]),
             ("EventResourceManagementDto", ["id", "eventId", "version", "publicationState", "draft",
-                "createdAt", "updatedAt", "file", "externalDestinationSafeOrigin"]),
+                "createdAt", "updatedAt", "file", "externalDestinationSafeOrigin", "status", "materialVersionId"]),
             ("EventResourceAuditDto", ["id", "action", "outcome", "reason", "timestamp", "responsibleManagerUserId"]),
+            ("EventResourceAuditPageDto", ["items", "status", "materialVersionId"]),
             ("EventResourceDraftDto", ["title", "publicTitle", "description", "sensitiveNotes", "kind", "disclosureMode",
                 "deliveryType", "eventSessionId", "languageCode", "accessibilityNote", "sortOrder",
                 "accessibleAlternativeEventResourceId", "availability", "audienceRules"])

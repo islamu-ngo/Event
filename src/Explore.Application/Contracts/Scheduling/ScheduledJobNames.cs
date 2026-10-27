@@ -33,6 +33,7 @@ public static class ScheduledJobNames
     // job for why the sweep cannot be dropped once deadlines exist.
     public const string InventoryHoldExpiry = "inventory-hold-expiry";
     public const string InventoryHoldExpiryReconciliation = "inventory-hold-expiry-reconciliation";
+    public const string ModerationReconciliation = "moderation-reconciliation";
 
     /// <summary>Bounded drain migration: the timer moved to the scheduler, the claim semantics did not.</summary>
     public const string RegistrationFinalizationDrain = "registration-finalization-drain";
@@ -75,6 +76,7 @@ public static class ScheduledJobNames
         ConfigurationPortabilityRetentionCleanup,
         InventoryHoldExpiry,
         InventoryHoldExpiryReconciliation,
+        ModerationReconciliation,
         RegistrationFinalizationDrain,
         PaymentReconciliationDrain,
         FairReturnOrchestration,

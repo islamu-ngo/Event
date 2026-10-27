@@ -19,6 +19,27 @@ public sealed class EventReportRepository : GenericRepository<EventReport, Guid>
         _dbContext = dbContext;
     }
 
+    public async Task<IReadOnlyList<EventReportSignal>> GetProviderAdviceAsync(
+        Guid tenantId,
+        EventReportSignalProvider provider,
+        string advisoryIdentity,
+        CancellationToken cancellationToken) =>
+        await _dbContext.EventReportSignals
+            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+            .AsNoTracking()
+            .Where(signal => signal.TenantId == tenantId && signal.Provider == provider &&
+                signal.AdvisoryIdentity == advisoryIdentity)
+            .OrderBy(signal => signal.AdvisoryOrdinal)
+            .ToListAsync(cancellationToken);
+
+    public async Task PersistProviderAdviceAsync(
+        IReadOnlyList<EventReportSignal> signals,
+        CancellationToken cancellationToken)
+    {
+        await _dbContext.EventReportSignals.AddRangeAsync(signals, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<EventReport?> GetByIdForProviderSyncAsync(
         Guid tenantId,
         Guid reportId,

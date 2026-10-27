@@ -3356,3 +3356,51 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 - [x] Stays in journal only; concrete admission/retirement integration lesson. The ownership decision lives in the ADR.
 
 ---
+
+[2026-10-26 Europe/Brussels] — Skipping secret projection does not remove existing authority
+
+**Context**: During `secrets-authority` retirement, AppHost retained explicit resource settings while applying the selected consumer's secret catalogue. The BFF must receive only frontend purposes even when a caller has already populated the target environment.
+
+**Symptom / Observation**: `BffProcessProjectionMasksInheritedAndExplicitBackendCredentials` failed because a backend canary survived in the BFF target. Parsed Compose policy checks passed; correct declared service wiring did not prove exclusion of previously assigned values.
+
+**Root Cause**: `RuntimeSecretEnvironment.Apply` skipped catalogue entries outside the consumer's admitted roots but left matching target keys untouched. Its initial inherited-variable pass intentionally preserved explicit resource values. Together, those two reasonable local behaviors retained explicit credentials from a forbidden purpose.
+
+**Resolution**: Mask every purpose-disallowed or forbidden catalogue key with an empty value before continuing. Removing the key would expose inherited process environment again. Preserve public frontend intent through its separate existing mapping path. The nine-case admission slice passed after its intended failure; the complete 414-case native Secrets slice then passed. Commands: `dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet --no-restore -p:BuildInParallel=false -p:UseSharedCompilation=false -- --treenode-filter "/*/*/*SecretAuthorityLeastPrivilegeArchitectureTests/*" --minimum-expected-tests 9` and `dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet --no-restore -p:BuildInParallel=false -p:UseSharedCompilation=false -- --treenode-filter "/*/Explore.Infrastructure.Tests.Secrets/*/*" --minimum-expected-tests 414`.
+
+**Why This Matters for Future Work**: Projection admission and target-state exclusion are different obligations. Test both inherited and explicitly assigned secret inputs through the final process projection, not only the list of values the projector adds.
+
+**References**:
+- `src/Explore.ServiceDefaults/Secrets/RuntimeSecretEnvironment.cs`
+- `tests/Event.Architecture.Tests/SecretAuthorityLeastPrivilegeArchitectureTests.cs`
+- `docs/internal/SECRETS.md`
+
+**Promotion Consideration**:
+- [x] Stays in journal only; the consumer ownership contract remains in the SecretKit ADR.
+
+---
+
+[2026-10-27 Europe/Brussels] — Locked restore includes evaluated build inputs
+
+**Context**: Actual SecretKit container qualification exercised the API, BFF, migration service and self-contained Standalone recipes with locked NuGet restore.
+
+**Symptom / Observation**: A moving SDK tag failed the repository SDK selection. Matching SDK manifests still produced `NU1004` when the restore context omitted Razor content or enabled the single-file profile. The nested contract generator also failed with `CS8012` when it inherited the application's deployment properties.
+
+**Root Cause**: Project evaluation is part of the dependency contract. The SDK infers `Microsoft.AspNetCore.App.Internal.Assets` from Razor items, while single-file publication adds `Microsoft.NET.ILLink.Tasks`. Ordinary and container publication therefore do not have identical graphs. A build-time compiler tool belongs to the SDK host, not the application's target architecture or output directory.
+
+**Resolution**: Align all four SDK pins with `global.json`, copy complete restore inputs including real Razor files, generate Linux runtime locks through NuGet, and give Standalone its own `container/packages.lock.json`. The standard basename keeps that graph visible to dependency-submission tooling. Remove inherited deployment and output properties from the nested tool build while preserving the selected artifacts root. All four final Linux x64 image recipes completed. The final Standalone command was `podman build --pull=never --layers --cpu-period=100000 --cpu-quota=200000 --memory=4g --build-arg TARGETARCH=amd64 --build-arg BUILDPLATFORM=linux/amd64 -f src/Event.Standalone/Dockerfile -t localhost/islamu-secretkit-standalone:qualification-20261027 .`. The 469-pair license gate passed after the additional lock was generated.
+
+**Why This Matters for Future Work**: Copying project and lock files alone does not prove equivalent restore evaluation. Qualify each actual publish profile with locked restore; do not disable the lock, pin an incidental implicit package, or let target-specific application properties leak into host tooling. Image construction does not certify credentialed startup, another architecture or trim/AOT.
+
+**References**:
+- `src/Event.Standalone/Event.Standalone.csproj:12`
+- `src/Event.Standalone/container/packages.lock.json`
+- `src/Explore.Blazor/Dockerfile`
+- `src/Directory.Build.props`
+- `eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets:10`
+- `eng/dependency-submission/src/ISLAMU.DependencySubmission/RepositoryLocks.cs:11`
+- `docs/internal/SECRETKIT_LOCAL_PACKAGES.md`
+
+**Promotion Consideration**:
+- [x] Keep the build lesson in the journal; the current operator and engineering procedures are in the paired package guides.
+
+---

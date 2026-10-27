@@ -69,8 +69,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Explore.Application.Contracts.Deployment;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Validation;
 
 namespace Explore.Infrastructure;
 

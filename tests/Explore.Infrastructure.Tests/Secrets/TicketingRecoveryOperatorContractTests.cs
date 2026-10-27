@@ -1,12 +1,10 @@
 using Explore.Domain;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Recovery;
-using Explore.Secrets.Configuration;
-using Explore.Secrets.Validation;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
-namespace Explore.Secrets.UnitTests;
+namespace Explore.Infrastructure.Tests.Secrets;
 
 public sealed class TicketingRecoveryOperatorContractTests
 {

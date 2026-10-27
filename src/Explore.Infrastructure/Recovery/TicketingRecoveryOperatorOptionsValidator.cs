@@ -1,8 +1,7 @@
 using Explore.Domain.Secrets;
-using Explore.Secrets.Configuration;
 using Microsoft.Extensions.Options;
 
-namespace Explore.Secrets.Validation;
+namespace Explore.Infrastructure.Recovery;
 
 public sealed class TicketingRecoveryOperatorOptionsValidator :
     IValidateOptions<TicketingRecoveryOperatorOptions>

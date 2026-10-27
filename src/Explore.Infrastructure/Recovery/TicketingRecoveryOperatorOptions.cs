@@ -1,4 +1,4 @@
-namespace Explore.Secrets.Configuration;
+namespace Explore.Infrastructure.Recovery;
 
 public sealed class TicketingRecoveryOperatorOptions
 {

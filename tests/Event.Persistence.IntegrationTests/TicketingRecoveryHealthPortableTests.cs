@@ -73,14 +73,14 @@ public sealed class TicketingRecoveryHealthPortableTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(TimeProvider.System);
-        services.Configure<Explore.Secrets.Configuration.TicketingRecoveryOperatorOptions>(options => options.Enabled = true);
+        services.Configure<Explore.Infrastructure.Recovery.TicketingRecoveryOperatorOptions>(options => options.Enabled = true);
         services.AddHealthChecks().AddCheck<TicketingRecoveryHealthCheck>(TicketingRecoveryHealthCheck.Name);
         await using var provider = services.BuildServiceProvider();
         var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync();
         await Assert.That(report.Status).IsEqualTo(HealthStatus.Unhealthy);
         await Assert.That(report.Entries[TicketingRecoveryHealthCheck.Name].Data.Count).IsEqualTo(0);
         var disabled = new TicketingRecoveryHealthCheck(null!,
-            Microsoft.Extensions.Options.Options.Create(new Explore.Secrets.Configuration.TicketingRecoveryOperatorOptions()),
+            Microsoft.Extensions.Options.Options.Create(new Explore.Infrastructure.Recovery.TicketingRecoveryOperatorOptions()),
             TimeProvider.System);
         await Assert.That((await disabled.CheckHealthAsync(new HealthCheckContext())).Status).IsEqualTo(HealthStatus.Healthy);
     }

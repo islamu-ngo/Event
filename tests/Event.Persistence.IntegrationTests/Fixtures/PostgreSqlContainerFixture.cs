@@ -312,6 +312,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresDiscoveryMetadataPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresTenantMembershipMutationPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresActorOwnershipReadPermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
+            await PostgresSetupLiveStoragePermissions.ApplyAsync(migratorContext, NativeQueueEnrollment);
         }
 
         // Retain source custody metadata; ordinary DELETE must invalidate the original rows.

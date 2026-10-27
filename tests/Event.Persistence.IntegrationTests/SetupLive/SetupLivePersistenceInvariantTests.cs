@@ -14,6 +14,7 @@ using Explore.Domain.Secrets;
 using Explore.Domain.SetupLive;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
 using ISLAMU.Wire.Contracts.SetupLive;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -37,6 +38,40 @@ public sealed class SetupLivePersistenceInvariantTests(
         new(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
 
     [Test]
+    public async Task RuntimeCannotInstallItsOwnSetupLiveStoragePrivileges()
+    {
+        await using ExploreDbContext runtime =
+            fixture.CreateEnrolledTenantDbContext(new TenantContext(Guid.CreateVersion7()));
+        runtime.BindTenantLease();
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            PostgresSetupLiveStoragePermissions.ApplyAsync(runtime, fixture.NativeQueueEnrollment));
+    }
+
+    [Test]
+    public async Task RuntimeReadsSetupBindingIdentityWithoutAccessToProviderCoordinates()
+    {
+        await fixture.ResetAsync();
+        SecretBinding binding = SetupBinding("setup.signing", "ISLAMU_SETUP_SIGNING");
+        await using (ExploreDbContext seed = fixture.CreateDbContext())
+        {
+            seed.BindTenantLease();
+            seed.SecretBindings.Add(binding);
+            await seed.SaveChangesAsync();
+        }
+        await using ExploreDbContext runtime = fixture.CreateEnrolledTenantlessDbContext();
+        runtime.BindTenantLease();
+
+        Guid? identity = await new SetupSecretBindingIdentityReader(runtime)
+            .ReadAsync("setup.signing", CancellationToken.None);
+        await Assert.That(identity).IsEqualTo(binding.Id);
+        PostgresException failure = await Assert.ThrowsAsync<PostgresException>(() =>
+            new SecretBindingRepository(runtime).GetByKeyAndScopeAsync(
+                "setup.signing", SecretScope.Instance, null));
+        await Assert.That(failure.SqlState).IsEqualTo(PostgresErrorCodes.InsufficientPrivilege);
+    }
+
+    [Test]
     public async Task TenantFilterFailsClosedForEverySetupLiveEntity()
     {
         await fixture.ResetAsync();
@@ -46,6 +81,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         SetupTargetEnrollment enrollmentB = Enrollment(tenantB);
         await using (ExploreDbContext seed = fixture.CreateDbContext())
         {
+            seed.BindTenantLease();
             seed.Tenants.AddRange(Tenant(tenantA, "setup-a"), Tenant(tenantB, "setup-b"));
             seed.Set<SetupTargetEnrollment>().AddRange(enrollmentA, enrollmentB);
             seed.Set<SetupEnrollmentIssuanceClaim>().AddRange(
@@ -58,9 +94,11 @@ public sealed class SetupLivePersistenceInvariantTests(
         }
 
         await using ExploreDbContext tenantContext =
-            fixture.CreateTenantFilteredDbContext(new TenantContext(tenantA));
+            fixture.CreateEnrolledTenantDbContext(new TenantContext(tenantA));
         await using ExploreDbContext missingContext =
-            fixture.CreateTenantFilteredDbContext();
+            fixture.CreateEnrolledTenantlessDbContext();
+        tenantContext.BindTenantLease();
+        missingContext.BindTenantLease();
 
         SetupTargetEnrollment[] visibleEnrollments = await tenantContext
             .Set<SetupTargetEnrollment>().AsNoTracking().ToArrayAsync();
@@ -93,7 +131,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         SetupTargetEnrollment enrollmentA = Enrollment(tenantA);
         SetupTargetEnrollment secondEnrollmentA = Enrollment(tenantA);
         SetupTargetEnrollment enrollmentB = Enrollment(tenantB);
-        await using (ExploreDbContext seed = fixture.CreateDbContext())
+        await using (ExploreDbContext seed = CreateStorageContext())
         {
             seed.Tenants.AddRange(Tenant(tenantA, "replay-a"), Tenant(tenantB, "replay-b"));
             seed.Set<SetupTargetEnrollment>().AddRange(
@@ -117,7 +155,7 @@ public sealed class SetupLivePersistenceInvariantTests(
                 Operation(secondEnrollmentA, operationKey)),
             OperationReplayConstraint);
 
-        await using ExploreDbContext otherTenant = fixture.CreateDbContext();
+        await using ExploreDbContext otherTenant = CreateStorageContext();
         otherTenant.Set<SetupEnrollmentIssuanceClaim>().Add(
             Claim(enrollmentB, operationKey));
         otherTenant.Set<SetupSecretBindingOperation>().Add(
@@ -176,7 +214,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         await Assert.That(results.Select(result => result.Data!.EnrollmentId).Distinct())
             .HasSingleItem();
 
-        await using ExploreDbContext verify = fixture.CreateDbContext();
+        await using ExploreDbContext verify = CreateStorageContext();
         await Assert.That(await verify.Set<SetupTargetEnrollment>().CountAsync())
             .IsEqualTo(1);
         await Assert.That(await verify.Set<SetupEnrollmentIssuanceClaim>().CountAsync())
@@ -212,8 +250,9 @@ public sealed class SetupLivePersistenceInvariantTests(
                 EnvironmentVariableName = "ISLAMU_SETUP_SIGNING",
                 CreatedAt = Now
             };
-            enrollmentContext.SecretBindings.Add(binding);
-            await enrollmentContext.SaveChangesAsync();
+            await using ExploreDbContext seed = CreateStorageContext();
+            seed.SecretBindings.Add(binding);
+            await seed.SaveChangesAsync();
         }
 
         using var writer = new BlockingAtomicSetupSecretBindingWriter();
@@ -278,7 +317,7 @@ public sealed class SetupLivePersistenceInvariantTests(
                 .HasSingleItem();
             await Assert.That(writer.CallCount).IsEqualTo(1);
 
-            await using ExploreDbContext verify = fixture.CreateDbContext();
+            await using ExploreDbContext verify = CreateStorageContext();
             SetupSecretBindingOperation operation = await verify
                 .Set<SetupSecretBindingOperation>()
                 .AsNoTracking()
@@ -315,10 +354,11 @@ public sealed class SetupLivePersistenceInvariantTests(
                         RequestedScopes = [SetupEnrollmentScope.SecretBindingWrite]
                     },
                     CancellationToken.None);
-            enrollmentContext.SecretBindings.AddRange(
+            await using ExploreDbContext seed = CreateStorageContext();
+            seed.SecretBindings.AddRange(
                 SetupBinding("setup.signing", "ISLAMU_SETUP_SIGNING"),
                 SetupBinding("setup.encryption", "ISLAMU_SETUP_ENCRYPTION"));
-            await enrollmentContext.SaveChangesAsync();
+            await seed.SaveChangesAsync();
         }
 
         using var writer = new BlockingAtomicSetupSecretBindingWriter();
@@ -379,7 +419,7 @@ public sealed class SetupLivePersistenceInvariantTests(
                     SetupLiveApplicationStatus.Conflict
                 ]);
             await Assert.That(writer.CallCount).IsEqualTo(1);
-            await using ExploreDbContext verify = fixture.CreateDbContext();
+            await using ExploreDbContext verify = CreateStorageContext();
             SetupSecretBindingOperation operation = await verify
                 .Set<SetupSecretBindingOperation>()
                 .AsNoTracking()
@@ -413,9 +453,10 @@ public sealed class SetupLivePersistenceInvariantTests(
                     RequestedScopes = [SetupEnrollmentScope.SecretBindingWrite]
                 },
                 CancellationToken.None);
-            setup.SecretBindings.Add(SetupBinding(
+            await using ExploreDbContext seed = CreateStorageContext();
+            seed.SecretBindings.Add(SetupBinding(
                 "setup.signing", "ISLAMU_SETUP_SIGNING"));
-            await setup.SaveChangesAsync();
+            await seed.SaveChangesAsync();
         }
 
         using var writer = new BlockingAtomicSetupSecretBindingWriter();
@@ -495,9 +536,10 @@ public sealed class SetupLivePersistenceInvariantTests(
                     ]
                 },
                 CancellationToken.None);
-            setup.SecretBindings.Add(SetupBinding(
+            await using ExploreDbContext seed = CreateStorageContext();
+            seed.SecretBindings.Add(SetupBinding(
                 "setup.signing", "ISLAMU_SETUP_SIGNING"));
-            await setup.SaveChangesAsync();
+            await seed.SaveChangesAsync();
         }
 
         using var writer = new BlockingAtomicSetupSecretBindingWriter();
@@ -570,9 +612,10 @@ public sealed class SetupLivePersistenceInvariantTests(
                     ]
                 },
                 CancellationToken.None);
-            setup.SecretBindings.Add(SetupBinding(
+            await using ExploreDbContext seed = CreateStorageContext();
+            seed.SecretBindings.Add(SetupBinding(
                 "setup.signing", "ISLAMU_SETUP_SIGNING"));
-            await setup.SaveChangesAsync();
+            await seed.SaveChangesAsync();
         }
 
         using var writer = new BlockingAtomicSetupSecretBindingWriter();
@@ -631,7 +674,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         await fixture.ResetAsync();
         Guid owningTenant = Guid.CreateVersion7();
         SetupTargetEnrollment enrollment = Enrollment(owningTenant);
-        await using (ExploreDbContext seed = fixture.CreateDbContext())
+        await using (ExploreDbContext seed = CreateStorageContext())
         {
             seed.Tenants.Add(Tenant(owningTenant, "lineage-owner"));
             seed.Set<SetupTargetEnrollment>().Add(enrollment);
@@ -640,7 +683,7 @@ public sealed class SetupLivePersistenceInvariantTests(
 
         Guid foreignTenant = Guid.CreateVersion7();
         Guid foreignActor = Guid.CreateVersion7();
-        await using (ExploreDbContext foreignTenantSeed = fixture.CreateDbContext())
+        await using (ExploreDbContext foreignTenantSeed = CreateStorageContext())
         {
             foreignTenantSeed.Tenants.Add(Tenant(foreignTenant, "lineage-foreign"));
             await foreignTenantSeed.SaveChangesAsync();
@@ -662,7 +705,7 @@ public sealed class SetupLivePersistenceInvariantTests(
                 Operation(enrollment, Guid.CreateVersion7(), actorId: foreignActor)),
             OperationEnrollmentConstraint);
 
-        await using ExploreDbContext verify = fixture.CreateDbContext();
+        await using ExploreDbContext verify = CreateStorageContext();
         await Assert.That(await verify.Set<SetupEnrollmentIssuanceClaim>().CountAsync())
             .IsEqualTo(0);
         await Assert.That(await verify.Set<SetupSecretBindingOperation>().CountAsync())
@@ -681,7 +724,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         SetupSecretBindingOperation operation = Operation(
             enrollment,
             Guid.CreateVersion7());
-        await using (ExploreDbContext seed = fixture.CreateDbContext())
+        await using (ExploreDbContext seed = CreateStorageContext())
         {
             seed.Tenants.Add(Tenant(tenantId, "versions"));
             seed.Set<SetupTargetEnrollment>().Add(enrollment);
@@ -717,7 +760,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         SetupTargetEnrollment otherEnrollment = Enrollment(otherTenantId);
         Guid persistedOperation = Guid.CreateVersion7();
         Guid otherPersistedOperation = Guid.CreateVersion7();
-        await using (ExploreDbContext seed = fixture.CreateDbContext())
+        await using (ExploreDbContext seed = CreateStorageContext())
         {
             seed.Tenants.AddRange(
                 Tenant(tenantId, "repository-a"),
@@ -740,7 +783,7 @@ public sealed class SetupLivePersistenceInvariantTests(
             await repository.SaveChangesAsync(CancellationToken.None);
         }
 
-        await using (ExploreDbContext systemContext = fixture.CreateDbContext())
+        await using (ExploreDbContext systemContext = CreateStorageContext())
         {
             var systemRepository = new SetupLiveRepository(systemContext);
             SetupTargetEnrollment? foundEnrollment =
@@ -787,6 +830,8 @@ public sealed class SetupLivePersistenceInvariantTests(
             fixture.CreateTenantFilteredDbContext(new TenantContext(tenantId));
         await using ExploreDbContext staleContext =
             fixture.CreateTenantFilteredDbContext(new TenantContext(tenantId));
+        firstContext.BindTenantLease();
+        staleContext.BindTenantLease();
         var firstRepository = new SetupLiveRepository(firstContext);
         var staleRepository = new SetupLiveRepository(staleContext);
         SetupTargetEnrollment first = (await firstRepository.FindEnrollmentAsync(
@@ -808,6 +853,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         Guid rollbackOperation = Guid.CreateVersion7();
         await using ExploreDbContext rollbackContext =
             fixture.CreateTenantFilteredDbContext(new TenantContext(tenantId));
+        rollbackContext.BindTenantLease();
         var rollbackRepository = new SetupLiveRepository(rollbackContext);
         var unitOfWork = new EfCoreUnitOfWork(rollbackContext);
         await Assert.That(() => unitOfWork.ExecuteInTransactionAsync(
@@ -824,7 +870,7 @@ public sealed class SetupLivePersistenceInvariantTests(
                 }))
             .Throws<SetupRollbackSentinelException>();
 
-        await using ExploreDbContext verify = fixture.CreateDbContext();
+        await using ExploreDbContext verify = CreateStorageContext();
         await Assert.That(await verify.Set<SetupEnrollmentIssuanceClaim>().CountAsync(
             claim => claim.OperationKey == rollbackOperation)).IsEqualTo(0);
         await Assert.That(await verify.Set<SetupSecretBindingOperation>().CountAsync(
@@ -834,9 +880,9 @@ public sealed class SetupLivePersistenceInvariantTests(
     [Test]
     public async Task CoordinatorSerializesOnlyTheExactEnrollmentGeneration()
     {
-        await using ExploreDbContext firstContext = fixture.CreateDbContext();
-        await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        await using ExploreDbContext otherContext = fixture.CreateDbContext();
+        await using ExploreDbContext firstContext = CreateStorageContext();
+        await using ExploreDbContext secondContext = CreateStorageContext();
+        await using ExploreDbContext otherContext = CreateStorageContext();
         await secondContext.Database.OpenConnectionAsync();
         int secondBackend = await secondContext.Database
             .SqlQueryRaw<int>("SELECT pg_backend_pid() AS \"Value\"")
@@ -898,8 +944,8 @@ public sealed class SetupLivePersistenceInvariantTests(
         string expectedConstraint)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using ExploreDbContext winner = fixture.CreateDbContext();
-        await using ExploreDbContext contender = fixture.CreateDbContext();
+        await using ExploreDbContext winner = CreateStorageContext();
+        await using ExploreDbContext contender = CreateStorageContext();
         await contender.Database.OpenConnectionAsync(timeout.Token);
         int contenderBackend = await contender.Database
             .SqlQueryRaw<int>("SELECT pg_backend_pid() AS \"Value\"")
@@ -931,7 +977,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         Action<ExploreDbContext> addAttack,
         string expectedConstraint)
     {
-        await using ExploreDbContext attack = fixture.CreateDbContext();
+        await using ExploreDbContext attack = CreateStorageContext();
         addAttack(attack);
         Exception failure = (await Assert.That(() => attack.SaveChangesAsync())
             .Throws<Exception>())!;
@@ -946,7 +992,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         FormattableString command,
         string expectedConstraint)
     {
-        await using ExploreDbContext attack = fixture.CreateDbContext();
+        await using ExploreDbContext attack = CreateStorageContext();
         Exception failure = (await Assert.That(() =>
                 attack.Database.ExecuteSqlInterpolatedAsync(command))
             .Throws<Exception>())!;
@@ -974,7 +1020,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         CancellationToken cancellationToken,
         string? lockType = null)
     {
-        await using ExploreDbContext observer = fixture.CreateDbContext();
+        await using ExploreDbContext observer = CreateStorageContext();
         while (!cancellationToken.IsCancellationRequested)
         {
             if (competing.IsCompleted)
@@ -995,7 +1041,6 @@ public sealed class SetupLivePersistenceInvariantTests(
                     """).SingleAsync(cancellationToken);
             if (waiting > 0)
                 return true;
-            await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
         }
 
         return false;
@@ -1032,6 +1077,13 @@ public sealed class SetupLivePersistenceInvariantTests(
             CreatedAt = Now
         };
 
+    private ExploreDbContext CreateStorageContext()
+    {
+        var context = fixture.CreateDbContext();
+        context.BindTenantLease();
+        return context;
+    }
+
     private ExploreDbContext CreateApplicationContext(Guid tenantId, params IInterceptor[] interceptors)
     {
         var context = fixture.CreateEnrolledTenantDbContext(new TenantContext(tenantId), interceptors);
@@ -1047,7 +1099,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         IUnitOfWork? unitOfWork = null,
         ISetupSecretBindingOperationCoordinator? coordinator = null) => new(
         new SetupLiveRepository(context),
-        new SecretBindingRepository(context),
+        new SetupSecretBindingIdentityReader(context),
         unitOfWork ?? new EfCoreUnitOfWork(context),
         new ActorOwnershipReader(context, fixture.NativeQueueEnrollment),
         new AllowAuthorizationProvider(),
@@ -1066,7 +1118,7 @@ public sealed class SetupLivePersistenceInvariantTests(
         Guid tenantId = Guid.CreateVersion7();
         Guid userId = Guid.CreateVersion7();
         Guid actorId = Guid.CreateVersion7();
-        await using ExploreDbContext context = fixture.CreateDbContext();
+        await using ExploreDbContext context = CreateStorageContext();
         var tenant = Tenant(tenantId, "application-race");
         var user = new User
         {

@@ -1944,6 +1944,24 @@ secret-free configuration artifact, never a database or secret backup.
 
 ## Setup Live Secret-Binding Boundary
 
+`PostgresSetupLiveStoragePermissions` installs Runtime SELECT and INSERT rights
+on the EF-mapped enrollment, issuance-claim and secret-binding-operation tables.
+Only enrollment capability/lifecycle/expiry and operation settlement fields,
+their concurrency stamps and update audit columns receive UPDATE rights.
+Issuance claims remain immutable; no DELETE, Global-role membership, workflow
+routine or tenant-policy bypass is granted. Production migration and native test
+bootstrap invoke the same migrator-only installer on its original transaction.
+Setup Live uses `ISetupSecretBindingIdentityReader` to project only the ID of
+an unqualified instance `setup.signing` or `setup.encryption` binding. Runtime
+receives SELECT only on binding ID, key, qualifier and scope identity columns;
+provider coordinates and source references remain unreadable. Readiness and
+write ports continue to consume that ID and the canonical key, not a partially
+populated binding entity or a copied provider reference.
+The actual Runtime isolation regression checks both selected and absent tenant
+contexts; Runtime cannot invoke the installer to grant itself privileges.
+Application admission, replay, dispatch and settlement retain their existing
+serializable owner and authorization boundaries.
+
 Setup Live can submit a value only after the target reports the exact binding
 as `Ready`. The target writes through its already-selected authority; the
 current live-write authority is Infisical. Environment and User Secrets are not

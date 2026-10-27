@@ -6,6 +6,14 @@ description: Practical troubleshooting guide, symptom matrix, and step-by-step r
 
 # Troubleshooting & Operational Health
 
+Setup Live enrollment and write receipts require the Runtime storage permissions
+installed by the current database migration process. If an enrollment request
+fails with PostgreSQL permission error `42501`, apply the updated migration
+process using the configured migrator account. Keep Runtime and migrator
+credentials separate: do not run the API as migrator or give Runtime Global
+membership. Setup Live's fixed table and column permissions retain tenant
+isolation and do not authorize a provider write by themselves.
+
 Cross-tenant membership discovery requires the enrolled Global database login,
 not Runtime inheritance of a discovery executor. Reconcile unexpected role grants
 through the approved database process before reinstalling. This does not change

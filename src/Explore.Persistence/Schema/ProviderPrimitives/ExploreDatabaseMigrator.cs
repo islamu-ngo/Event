@@ -300,6 +300,8 @@ public static class ExploreDatabaseMigrator
                 executionDatabase, queueEnrollment, cancellationToken);
             await PostgresActorOwnershipReadPermissions.ApplyAsync(
                 executionDatabase, queueEnrollment, cancellationToken);
+            await PostgresSetupLiveStoragePermissions.ApplyAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
             await PostgresTenantCreationPermissions.ApplyAsync(executionDatabase, queueEnrollment,
                 IdentityDatabaseConfiguration.GetTopology(configuration), cancellationToken);
             await PostgresProvisioningPolicyPermissions.ApplyAsync(

@@ -47,7 +47,7 @@ public sealed record SetupLiveSecretBindingResult(
 
 public sealed partial class SetupLiveApplicationService(
     ISetupLiveRepository setupLiveRepository,
-    ISecretBindingRepository secretBindingRepository,
+    ISetupSecretBindingIdentityReader bindingIdentities,
     IUnitOfWork unitOfWork,
     IActorOwnershipReader actorOwnership,
     IAuthorizationProvider authorization,
@@ -91,12 +91,8 @@ public sealed partial class SetupLiveApplicationService(
         if (authorized is null)
             return new(SetupLiveApplicationStatus.Unavailable);
 
-        SecretBinding? binding = await secretBindingRepository.GetByKeyAndScopeAsync(
-            bindingKey,
-            SecretScope.Instance,
-            scopeId: null,
-            cancellationToken);
-        if (binding is null || !IsVersion7(binding.Id))
+        Guid? bindingId = await bindingIdentities.ReadAsync(bindingKey, cancellationToken);
+        if (bindingId is null || !IsVersion7(bindingId.Value))
             return new(SetupLiveApplicationStatus.Unavailable);
 
         SetupSecretBindingCommitment commitment;
@@ -119,7 +115,7 @@ public sealed partial class SetupLiveApplicationService(
         }
 
         string requestFingerprint = Digest(
-            $"setup-live-secret-binding-v1\n{tenantId:D}\n{authorized.Enrollment.ActorId:D}\n{enrollmentId:D}\n{authorized.Enrollment.Generation}\n{operationKey:D}\n{binding.Id:D}\n{bindingKey}");
+            $"setup-live-secret-binding-v1\n{tenantId:D}\n{authorized.Enrollment.ActorId:D}\n{enrollmentId:D}\n{authorized.Enrollment.Generation}\n{operationKey:D}\n{bindingId.Value:D}\n{bindingKey}");
         Guid operationId = Guid.CreateVersion7();
         DateTime createdAt = UtcNow();
         var coordination = new SetupSecretBindingCoordinationRequest(
@@ -246,7 +242,7 @@ public sealed partial class SetupLiveApplicationService(
                         enrollmentId,
                         authorized.Enrollment.Generation,
                         admission.Operation!.Id,
-                        binding.Id,
+                        bindingId.Value,
                         bindingKey,
                         secretValue),
                     cancellationToken);
@@ -788,20 +784,12 @@ public sealed partial class SetupLiveApplicationService(
         if (authorized is null)
             return new(SetupLiveApplicationStatus.Unavailable);
 
-        SecretBinding? signing = await secretBindingRepository.GetByKeyAndScopeAsync(
-            "setup.signing",
-            SecretScope.Instance,
-            scopeId: null,
-            cancellationToken);
-        SecretBinding? encryption = await secretBindingRepository.GetByKeyAndScopeAsync(
-            "setup.encryption",
-            SecretScope.Instance,
-            scopeId: null,
-            cancellationToken);
+        Guid? signing = await bindingIdentities.ReadAsync("setup.signing", cancellationToken);
+        Guid? encryption = await bindingIdentities.ReadAsync("setup.encryption", cancellationToken);
         SetupSecretBindingReadinessState signingState =
-            await ReadinessStateAsync(signing, cancellationToken);
+            await ReadinessStateAsync(signing, "setup.signing", cancellationToken);
         SetupSecretBindingReadinessState encryptionState =
-            await ReadinessStateAsync(encryption, cancellationToken);
+            await ReadinessStateAsync(encryption, "setup.encryption", cancellationToken);
         bool anyConfigured = signing is not null || encryption is not null;
         bool canWrite = authorized.Scopes.Contains(
                 SetupEnrollmentScope.SecretBindingWrite)
@@ -1057,15 +1045,16 @@ public sealed partial class SetupLiveApplicationService(
         };
 
     private async Task<SetupSecretBindingReadinessState> ReadinessStateAsync(
-        SecretBinding? binding,
+        Guid? bindingId,
+        string bindingKey,
         CancellationToken cancellationToken)
     {
-        if (binding is null)
+        if (bindingId is null)
             return SetupSecretBindingReadinessState.Unavailable;
         SetupSecretBindingWriteOutcome outcome =
             await secretBindingReadiness.GetReadinessAsync(
-                binding.Id,
-                binding.SettingKey,
+                bindingId.Value,
+                bindingKey,
                 cancellationToken);
         return outcome switch
         {

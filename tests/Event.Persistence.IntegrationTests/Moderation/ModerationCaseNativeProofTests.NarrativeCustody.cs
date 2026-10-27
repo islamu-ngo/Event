@@ -219,7 +219,13 @@ public sealed partial class ModerationCaseNativeProofTests
 
     private static async Task QualifyNarrativeCustodyAsync(NativeDatabase database, ModerationCaseTargetKind kind)
     {
+        using var progress = new StreamWriter(Environment.GetEnvironmentVariable("GRANT_TEST_PROGRESS_PATH") is { Length: > 0 } progressFile
+            ? new FileStream(progressFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)
+            : Console.OpenStandardError())
+        { AutoFlush = true };
+        progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-qualification-privacy:start");
         await using var privacy = await ModerationNoticePrivacyFixture.CreateAsync();
+        progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-qualification-privacy:complete");
         var privacyOwnerId = Guid.CreateVersion7();
         var governanceControllerId = Guid.CreateVersion7();
         AuthorityScope scope;
@@ -246,7 +252,9 @@ public sealed partial class ModerationCaseNativeProofTests
                 Role = null!,
                 GrantedAt = database.Clock.Now.UtcDateTime
             });
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-qualification-controller-save:start");
             await context.SaveChangesAsync();
+            progress.WriteLine("[DEBUG-GRANT-SETTLEMENT] native-qualification-controller-save:complete");
             var host = await context.ModerationHostBindings.SingleAsync();
             scope = AuthorityScope.Tenant(AuthorityScope.Instance(
                 AuthorityScope.Solution(AuthorityScope.TrustDomain(host.TrustDomainId), host.SolutionId),
@@ -307,7 +315,8 @@ public sealed partial class ModerationCaseNativeProofTests
             await using var context = database.Context();
             context.CurrentUserService = caller;
             var sources = NativeNarrativePolicyWriter(context, database, caller, privacy.Authority(context, database.Clock));
-            return command switch
+            progress.WriteLine($"[DEBUG-GRANT-SETTLEMENT] native-qualification-command:{command.GetType().Name}:start");
+            var response = command switch
             {
                 RecordModerationCaseNarrativePolicyCommand recording =>
                     await new RecordModerationCaseNarrativePolicyCommandHandler(sources).ExecuteAsync(recording),
@@ -319,6 +328,8 @@ public sealed partial class ModerationCaseNativeProofTests
                     await new AdoptModerationOperationalBudgetCommandHandler(sources).ExecuteAsync(adopting),
                 _ => throw new ArgumentOutOfRangeException(nameof(command))
             };
+            progress.WriteLine($"[DEBUG-GRANT-SETTLEMENT] native-qualification-command:{command.GetType().Name}:complete");
+            return response;
         }
     }
 

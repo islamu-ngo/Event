@@ -3,7 +3,7 @@ using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Event.Architecture.Tests;
 

@@ -16,6 +16,20 @@ public partial class ExploreDbContext
     private (Guid Id, long Revision, long Generation, long Position)? _stagedModerationRecoveryCoordinates;
     private Guid? _moderationRecoveryMutationTransactionId;
 
+    private bool HasLostModerationRecoveryAdvancement(Guid transactionId) =>
+        _moderationRecoveryMutationTransactionId == transactionId
+        && (_stagedModerationRecovery is null
+            || !IsOwnedModerationRecoveryAdvancement(Entry(_stagedModerationRecovery)));
+
+    private bool IsOwnedModerationRecoveryAdvancement(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry) =>
+        entry.Entity is ModerationRecoveryStoreState state
+        && entry.State is EntityState.Added or EntityState.Modified or EntityState.Unchanged
+        && ReferenceEquals(state, _stagedModerationRecovery)
+        && _stagedModerationRecoveryCoordinates == Coordinates(state)
+        && Database.CurrentTransaction is { } transaction
+        && _moderationRecoveryMutationTransactionId == transaction.TransactionId
+        && Equals(entry.Property("InstallationSlot").CurrentValue, 1);
+
     private async Task PrepareModerationRecoveryAsync(bool bulkMutation, CancellationToken token)
     {
         ChangeTracker.DetectChanges();

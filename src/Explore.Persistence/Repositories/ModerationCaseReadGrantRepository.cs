@@ -66,6 +66,8 @@ public sealed class ModerationCaseReadGrantRepository(
                 if (!CallerMatches()) return null;
                 var result = await stage(token);
                 if (result is null || context.ChangeTracker.Entries().Any(row => !owned(result, row.Entity))) return null;
+                using var settlement = context.BindModerationReadGrantSettlement(result,
+                    context.ChangeTracker.Entries<ModerationCaseReadGrantRevocationReceipt>().SingleOrDefault()?.Entity);
                 var expected = (result.Id, result.TenantId, result.TrustDomainId, result.CaseId, result.CaseRevision,
                     result.SourceId, result.CallerUserId, result.IssuerUserId, result.IssuerRoleGrantId,
                     result.IssuerPlatformGrant, result.IssuedAt, result.ExpiresAt, result.RevokedAt, result.Revision);
@@ -74,13 +76,15 @@ public sealed class ModerationCaseReadGrantRepository(
                     || expected != (result.Id, result.TenantId, result.TrustDomainId, result.CaseId, result.CaseRevision,
                         result.SourceId, result.CallerUserId, result.IssuerUserId, result.IssuerRoleGrantId,
                         result.IssuerPlatformGrant, result.IssuedAt, result.ExpiresAt, result.RevokedAt, result.Revision)
-                    || context.ChangeTracker.HasChanges() || context.ChangeTracker.Entries().Any(row => !owned(result, row.Entity))
+                    || context.ChangeTracker.HasChanges()
                     || System.Transactions.Transaction.Current is not null)
                     return null;
+                context.ValidateModerationReadGrantSettlement();
                 await transaction.CommitAsync(token);
                 return result;
             });
         }
+        catch (ExploreDbContext.ModerationReadGrantSettlementException) { return null; }
         catch (DbUpdateConcurrencyException) { return null; }
         catch (DbException) { return null; }
         catch (DbUpdateException exception) when (exception.InnerException is DbException or TimeoutException) { return null; }

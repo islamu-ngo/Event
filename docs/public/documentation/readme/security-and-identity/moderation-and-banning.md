@@ -1093,7 +1093,11 @@ grant remains recorded, but it must no longer authorize current access or replay
 
 The grant/revoke routes return identifiers only, not case bodies or delivery
 tokens. Independently approved correction text and delivery still need their
-own qualification. Source integration is in progress: Domain and Application
+own qualification. The settlement repair keeps the originally qualified recipient
+and deadline fixed before saving and rejects additional tracked grants, including
+changes introduced between the enrollment owner's saves. The added regression
+cases remain **UNRUN/unbuilt**; this is not provider/runtime certification.
+Source integration is in progress: Domain and Application
 compiled, and the custody-scope correction compiled in Persistence with 62 warnings
 and no errors. The subsequent construction-time expiry correction also compiled
 with 62 warnings and no errors; bounded source review found no additional
@@ -3310,6 +3314,10 @@ committed grant identity, not material or a read token. Reuse the same operation
 and original intent when retrying; do not change the deadline to renew it.
 An expired or revoked grant, changed material/case, or lost original
 administrator role grant cannot be repaired by replaying its creation.
+The grant and its native recovery advancement commit together; only the original
+transaction's exact recovery row is accepted. Changed grant coordinates or
+unrelated tracked writes make the operation unavailable rather than returning a
+grant identity. This does not change the request, response or retry contract.
 Use `POST /api/moderation/case-read-grants/{grantId}/revoke` with its own UUIDv7
 `operationId` and `expectedGrantRevision` of 1 to withdraw that original live
 grant. The grant in the URL controls the lookup. Both routes require current

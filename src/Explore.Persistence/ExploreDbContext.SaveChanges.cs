@@ -25,12 +25,16 @@ public partial class ExploreDbContext
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        return await SaveWithStorageReferencesAsync(async acceptChanges =>
+        ValidateModerationReadGrantSettlement();
+        var saved = await SaveWithStorageReferencesAsync(async acceptChanges =>
         {
             PrepareTrackedEntities();
             await PrepareModerationRecoveryAsync(bulkMutation: false, cancellationToken);
+            ValidateModerationReadGrantSettlement();
             return await SaveWithProvisioningPolicyAsync(acceptChanges, cancellationToken);
         }, acceptAllChangesOnSuccess, cancellationToken);
+        ValidateModerationReadGrantSettlement();
+        return saved;
     }
 
     internal async Task<int> SavePrivacyErasureChangesAsync(CancellationToken cancellationToken)

@@ -541,7 +541,29 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
 
 `Explore.Infrastructure.Tests` intentionally has both fast no-infrastructure tests and Docker-backed runtime tests. Docker-backed classes are `[Explicit]`, so an unfiltered developer run stays fast; a positive `Runtime`, `Email`, or `RabbitMQ` category filter opts into the matching container lane. Use `Category!=Runtime` for the fast local/PR lane. Use the `Email` category when changing SMTP or EmailDispatch behavior; it includes no-container configuration failure tests, Mailpit-backed SMTP/drain tests, and RabbitMQ consumer tests that deliver to Mailpit. Use the `RabbitMQ` category when changing optional broker transport, topology, publish-confirm, consumer settlement, DLQ replay, or parking behavior.
 
-Credential rotation coverage is restart-based today: the owning service reloads on restart or redeploy, not through live in-process refresh.
+### Native Secret Authority Coverage
+
+Secret authority tests run in the projects that own the behavior:
+
+| Native suite | Coverage |
+|---|---|
+| `Explore.Infrastructure.Tests/Secrets/` | Selected authority acquisition, borrowed operation lifetime, session-local token maintenance, runtime sources, resolver/shared cache and revision evidence, writers, commitments/status, and prepared Data Protection |
+| `Event.Domain.UnitTests/Secrets/` | Secret definition registry and consumer-specific rotation policy invariants |
+| `Event.Persistence.IntegrationTests/Database/` | Database binding, bootstrap, migration acquisition, and provider contracts |
+| `Event.API.IntegrationTests/`, `Explore.Blazor.IntegrationTests/`, `Event.Standalone.IntegrationTests/` | API, isolated BFF, and Combined serving-host composition/admission |
+
+Use the corresponding project commands in this guide, selecting the affected
+classes for bounded work. `SecretKitAuthenticationLifetimeTests` and
+`SecretKitBorrowedOperationTests` cover the selected owner's lifetime;
+`SharedSecretResolverCacheTests` covers shared cache behavior across scopes;
+`SecretKitDataProtectionAdmissionTests` covers asynchronous exact two-value
+preparation and fresh-authority readiness. Synchronous Data Protection consumers
+read prepared memory, not the network.
+
+Infisical authentication maintenance renews only the selected session's token.
+It does not poll application secrets, relogin, or replay operations. Credential
+activation follows consumer-specific rollout/restart policy, not generic
+rotation factories or compatibility shims.
 
 ### Disabled Test Governance
 

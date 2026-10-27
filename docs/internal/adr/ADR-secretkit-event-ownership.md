@@ -1,17 +1,18 @@
 # SecretKit Event Ownership And Preparation Boundary
 
 > **Audience:** Contributors | Architects | Maintainers
-> **Status:** Planned
+> **Status:** Accepted; integration assurance in progress
 > **Owner:** Security
-> **Last Verified:** 2026-10-25
+> **Last Verified:** 2026-10-27
 > **Source Anchors:** `dev/active/secretkit-adoption/secretkit-adoption-plan.md` Sections 5.1-5.3, `dev/active/secretkit-adoption/secretkit-adoption-tasks.md` task 1.5, `docs/internal/SECRETKIT_LOCAL_PACKAGES.md`
 
 ## Decision status
 
-The foundation architecture is approved for implementation. This ADR remains
-proposed pending implementation qualification and acceptance; approval of the
-design is not evidence of a completed serving-host cutover. Foundation checks
-are pending in this documentation task.
+The architecture is accepted and the serving composition uses the selected
+native owners described below. Source and dependency retirement are implemented
+in the task workspace; final integration assurance and delivery remain open.
+Dated verification receipts qualify their recorded snapshots, not every later
+source change or a deployed provider.
 
 ## Context and alternatives
 
@@ -19,8 +20,9 @@ API, BFF and tooling need a shared acquisition boundary without importing
 backend business layers into the BFF. Use the existing
 `Explore.ServiceDefaults/Secrets/` boundary instead of creating a replacement
 project, retaining a slim provider-mirroring project, or duplicating acquisition
-in each host. This selects the eventual ownership model without asserting that
-`Explore.Secrets` or its tests have already been removed.
+in each host. The October 27, 2026 native cutover removes `Explore.Secrets` and its
+test project after rehoming retained invariants; final runtime/provider/image
+qualification remains separate from that source and dependency retirement.
 
 ## Responsibility and dependency direction
 
@@ -32,15 +34,15 @@ authority identity once before authentication; provider content cannot replace
 them.
 
 Domain retains registry/binding scope and canonical-reference policy.
-Infrastructure must apply that policy before tenant cache/provider access in
-the successor adapter. Do not move the current Domain-dependent mixed
+Infrastructure applies that policy before tenant cache/provider access in
+its native adapter. Do not move the Domain-dependent
 acquisition policy wholesale into shared hosting.
 
 SecretKit belongs only at outer implementation boundaries, never in Domain,
 Application, wire DTOs or WASM. The BFF reaches shared acquisition through
-ServiceDefaults, not a backend project link. Infrastructure's future typed
-read/write adapter may directly reference Core/Infisical when implemented.
-Persistence may later reference ServiceDefaults only for design-time bootstrap:
+ServiceDefaults, not a backend project link. Infrastructure's typed native
+read/write adapters directly reference Core/Infisical.
+Persistence references ServiceDefaults for explicit migration/tooling acquisition:
 the ASP.NET-capable assembly dependency is acknowledged, but ordinary queries
 must not depend on HTTP hosting. Database construction and provider semantics
 remain Persistence responsibilities.

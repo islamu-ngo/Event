@@ -117,7 +117,7 @@ Event.sln
 ├── Event.Domain.UnitTests/
 ├── Event.Application.UnitTests/
 ├── Event.Architecture.Tests/
-├── Explore.Secrets.UnitTests/
+├── Explore.Infrastructure.Tests/   (native Secrets tests)
 ├── Event.Persistence.IntegrationTests/
 ├── Event.API.IntegrationTests/
 ├── Explore.Blazor.IntegrationTests/
@@ -127,6 +127,13 @@ Event.sln
 ```
 
 See [CODEBASE_STRUCTURE.md](CODEBASE_STRUCTURE.md) for the full directory map and notable subfolders.
+
+Secret authority coverage follows native ownership: Infrastructure/Secrets owns
+acquisition, lifetime, resolver/cache, and prepared Data Protection tests;
+Domain/Secrets owns registry invariants; Persistence/Database owns database
+binding and acquisition tests. API, BFF, and Standalone integration projects
+cover host composition. Do not introduce a separate compatibility secrets layer
+or generic polling/rotation factory.
 
 ### Application Layer Organization
 

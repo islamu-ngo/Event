@@ -56,6 +56,15 @@ INFISICAL_MIGRATION_CLIENT_SECRET=<migration credential>
 INFISICAL_ENV=prod
 ```
 
+Also set `INFISICAL_API_TOKEN_LIFETIME`, `INFISICAL_BFF_TOKEN_LIFETIME`, and
+`INFISICAL_MIGRATION_TOKEN_LIFETIME` to each identity's actual `Finite` or
+`Periodic` policy. Standalone uses `INFISICAL_COMBINED_TOKEN_LIFETIME` instead
+of the API/BFF pair. For periodic identities, supply the matching
+`INFISICAL_<CONSUMER>_TOKEN_PERIOD_SECONDS`; for finite identities, leave it
+unset or blank. Optional per-consumer renewal and request bounds are described
+in [secret lifecycle and recovery](secrets.md#fail-closed-authority-status).
+There is no implicit lifetime selection or shared deployment-policy fallback.
+
 When `SECRET_PROVIDER=Infisical`, only Infisical results are authoritative. The platform never silently falls back to environment variables or User Secrets for a value the authority failed to supply; startup fails closed instead.
 
 Aspire Standalone uses `INFISICAL_COMBINED_CLIENT_ID/CLIENT_SECRET` instead of

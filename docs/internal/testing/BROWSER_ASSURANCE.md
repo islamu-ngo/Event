@@ -24,6 +24,8 @@ Captured-cookie replay adds a server-side logout guard within the existing journ
 
 Event setup selects MultiTenant mode and creates an active tenant with current-user administrator membership through the ordinary Tenant API. The configured bootstrap's provisioning tenant is not silently treated as active or changed through a private store. Studio's real navigation panel is `shell.workspace-nav` in the Shell dock scope; a synthetic Workspace-scope descriptor does not prove its behavior. Native input validation allows a whitespace-only value through `required`, after which Event's own title validation supplies the associated visible error. Responsive assertions wait for rendered projection changes rather than sleeping for the viewport observer.
 
+RTL navigation checks document language and direction, mirrored panel geometry, visible named links, keyboard containment and focus restoration. They do not require Arabic glyphs in Studio's currently English navigation labels; translating those labels is a separate product change.
+
 ## Artifact boundary
 
 `BrowserArtifactPolicy` admits only fixed journey/outcome codes. Browser traces, HAR, storage state, videos, screenshots, console output, arbitrary filenames, response bodies and raw exceptions are not admitted. The owner configures no recording or storage export, and the journey boundary replaces exceptions with a code that has no inner exception, data payload or raw message. The Harness tests include a generated sensitive canary and prove it cannot survive exception sanitization. No screenshot is currently admitted, so there is no unmasked screenshot path.

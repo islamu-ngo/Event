@@ -27,8 +27,10 @@ public sealed class BrowserJourneyTests
             DateTimeOffset start = DateTimeOffset.UtcNow.AddDays(7);
             using JsonDocument created = await PostAsync(api, "/api/Event", new
             {
-                title = "Browser session assurance event", description = "Owned peer circuit assurance.",
-                eventFormatId = 2, eventTimeZoneId = "UTC",
+                title = "Browser session assurance event",
+                description = "Owned peer circuit assurance.",
+                eventFormatId = 2,
+                eventTimeZoneId = "UTC",
                 participationConfiguration = new { participationHandlingModeId = 4, advanceRegistrationObligationId = 3, identityAccessModeId = 1 },
                 sessions = new[] { new { tempKey = "session", title = "Browser session assurance", startTime = start, endTime = start.AddHours(1), endTimeType = 0 } }
             }, cancellationToken);
@@ -48,8 +50,14 @@ public sealed class BrowserJourneyTests
             await Assert.That((await peer.Context.CookiesAsync()).Count == 0).IsTrue();
             await peer.Context.AddCookiesAsync(cookies.Select(cookie => new Microsoft.Playwright.Cookie
             {
-                Name = cookie.Name, Value = cookie.Value, Domain = cookie.Domain, Path = cookie.Path,
-                HttpOnly = cookie.HttpOnly, Secure = cookie.Secure, SameSite = cookie.SameSite, Expires = cookie.Expires
+                Name = cookie.Name,
+                Value = cookie.Value,
+                Domain = cookie.Domain,
+                Path = cookie.Path,
+                HttpOnly = cookie.HttpOnly,
+                Secure = cookie.Secure,
+                SameSite = cookie.SameSite,
+                Expires = cookie.Expires
             }));
             await AssertAuthenticatedAsync(peer, true);
             IAPIResponse before = await peer.Context.APIRequest.GetAsync($"/{slug}{exportPath}");
@@ -331,7 +339,10 @@ public sealed class BrowserJourneyTests
             string identifier = "assurance-reader-" + host.RunId + "@example.invalid";
             using JsonDocument issued = await PostAsync(admin, "/api/instance/local-identities", new
             {
-                operationId = Guid.CreateVersion7(), email = identifier, firstName = "Assurance", lastName = "Reader"
+                operationId = Guid.CreateVersion7(),
+                email = identifier,
+                firstName = "Assurance",
+                lastName = "Reader"
             }, cancellationToken);
             string temporaryPassword = issued.RootElement.GetProperty("temporaryPassword").GetString()!;
             using HttpClient endpoint = host.CreateHttpClient("explore-blazor");
@@ -346,7 +357,8 @@ public sealed class BrowserJourneyTests
             using HttpClient api = host.CreateHttpClient("explore-api");
             using JsonDocument login = await PostAsync(api, "/api/auth/local/login", new
             {
-                identifier, password = host.BootstrapReplacementPassword
+                identifier,
+                password = host.BootstrapReplacementPassword
             }, cancellationToken);
             api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.RootElement.GetProperty("token").GetString());
             api.DefaultRequestHeaders.Add("X-Tenant-Slug", slug);
@@ -398,8 +410,6 @@ public sealed class BrowserJourneyTests
                 && !string.IsNullOrWhiteSpace(await link.InnerTextAsync())).IsTrue();
             previousBottom = item!.Y + item.Height;
         }
-        if (rtl)
-            await Assert.That((await navigation.InnerTextAsync()).Any(character => character is >= '\u0600' and <= '\u06ff')).IsTrue();
         await page.Keyboard.PressAsync("Escape");
         await Expect(dialog).ToHaveCountAsync(0);
         await Expect(toggle).ToBeFocusedAsync();

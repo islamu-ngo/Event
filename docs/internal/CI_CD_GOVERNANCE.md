@@ -514,7 +514,7 @@ runtime suites skipped by fail-fast ordering are not passing evidence.
 `Focused Grant Settlement` (`grant-settlement-tests.yml`) is a supplementary PR
 and manual workflow, independent of the required `Build & Test` job. It builds
 the Persistence test project and executes only the ordinary and adjudicated
-grant-settlement methods, with minimum counts of 8 and 10 respectively and one
+grant-settlement methods, with minimum counts of 8 and 14 respectively and one
 test at a time. Both selections are attempted after a successful build even if
 the first fails; either failure still fails the job. Each test process has a
 five-minute TERM deadline followed by a fifteen-second forced-stop grace period;

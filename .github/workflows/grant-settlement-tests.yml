@@ -60,7 +60,7 @@ jobs:
           timeout --signal=TERM --kill-after=15s 5m dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
             --configuration Release --no-build --verbosity minimal -- \
             --treenode-filter "/*/*/ModerationNoticeReadTests/Adjudicated_grant_settlement*" \
-            --minimum-expected-tests 10 --maximum-parallel-tests 1 --no-progress \
+            --minimum-expected-tests 14 --maximum-parallel-tests 1 --no-progress \
             --report-trx --report-trx-filename adjudicated-grant-settlement.trx
 
       - name: Retain Grant Settlement Results
@@ -91,7 +91,7 @@ jobs:
             echo "|---|---|"
             echo "| Build | ${BUILD_OUTCOME:-not-run} |"
             echo "| Ordinary grants (minimum 8 cases) | ${ORDINARY_OUTCOME:-not-run} |"
-            echo "| Adjudicated grants (minimum 10 cases) | ${ADJUDICATED_OUTCOME:-not-run} |"
+            echo "| Adjudicated grants (minimum 14 cases) | ${ADJUDICATED_OUTCOME:-not-run} |"
             echo
             echo 'TRX artifact: grant-settlement-results. Skipped tests are not passing evidence.'
             echo 'SQLite fixture coverage includes separate and colocated privacy authority; this is not multi-provider assurance.'

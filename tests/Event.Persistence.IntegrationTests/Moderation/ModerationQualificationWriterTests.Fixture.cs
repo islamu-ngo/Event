@@ -45,7 +45,8 @@ public sealed partial class ModerationQualificationWriterTests
                 Provider = Explore.Secrets.Database.PrimaryDatabaseProvider.Sqlite
             });
             _options = builder.UseSqlite(connection)
-                .UseSnakeCaseNamingConvention().AddInterceptors(new ExpireGovernanceOnSave(this)).Options;
+                .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance,
+                    new ExpireGovernanceOnSave(this)).Options;
             Instance = AuthorityScope.Instance(
                 AuthorityScope.Solution(AuthorityScope.TrustDomain(Guid.CreateVersion7()), Guid.CreateVersion7()),
                 Guid.CreateVersion7());

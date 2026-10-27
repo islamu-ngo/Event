@@ -9,6 +9,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Moderation;
 using Explore.Persistence.Repositories;
 using ISLAMU.Moderation.Domain;
@@ -963,7 +964,7 @@ public sealed partial class ModerationCaseNativeProofTests
         {
             var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
-            .AddInterceptors(interceptors)
+            .AddInterceptors([SqliteNamedLockTransactionInterceptor.Instance, .. interceptors])
             .UseSnakeCaseNamingConvention().Options)
             {
                 TenantContext = new SelectedTenant(TenantId),
@@ -980,7 +981,7 @@ public sealed partial class ModerationCaseNativeProofTests
             TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
                 .ReplaceService<IExecutionStrategyFactory, ReceiptRetryingStrategyFactory>()
-                .AddInterceptors(interceptors)
+                .AddInterceptors([SqliteNamedLockTransactionInterceptor.Instance, .. interceptors])
                 .UseSnakeCaseNamingConvention().Options)
             {
                 TenantContext = new SelectedTenant(TenantId),

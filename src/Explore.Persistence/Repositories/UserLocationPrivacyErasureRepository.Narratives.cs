@@ -1,6 +1,7 @@
 using System.Data;
 using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -33,10 +34,7 @@ public sealed partial class UserLocationPrivacyErasureRepository
 
         const int batchSize = 100;
         string reason = TenantFilterBypassReasons.UserPrivacyErasure;
-        bool postgres = dbContext.Database.ProviderName == RelationalNamedLock.PostgreSqlProvider;
-        string? previousTenant = postgres ? await dbContext.Database.SqlQueryRaw<string>(
-            "SELECT COALESCE(current_setting('app.current_tenant_id', true), '') AS \"Value\"")
-            .SingleAsync(cancellationToken) : null;
+        string? previousTenant = await PostgresTransactionTenantSetting.ReadAsync(dbContext, cancellationToken);
 
         // Tenants are the complete global inventory, including inactive tenants and
         // former memberships. Narrative rows cannot be discovered across PostgreSQL RLS
@@ -50,9 +48,7 @@ public sealed partial class UserLocationPrivacyErasureRepository
             if (tenants.Length == 0) break;
             foreach (Guid tenant in tenants)
             {
-                if (postgres)
-                    await dbContext.Database.ExecuteSqlRawAsync(
-                        "SELECT set_config('app.current_tenant_id', {0}, true)", [tenant.ToString("D")], cancellationToken);
+                await PostgresTransactionTenantSetting.SetAsync(dbContext, tenant.ToString("D"), cancellationToken);
                 // Global user erasure is independent of the current host, policy, trust
                 // selection, deadline and decryptor. Every read/delete retains both exact
                 // reporter and tenant predicates; no accusation or ciphertext is selected.
@@ -100,8 +96,6 @@ public sealed partial class UserLocationPrivacyErasureRepository
 
         // Preserve the caller's pooled-session identity. On failure the owning settlement
         // rolls back SET LOCAL with all deletes; never command an aborted transaction.
-        if (postgres)
-            await dbContext.Database.ExecuteSqlRawAsync(
-                "SELECT set_config('app.current_tenant_id', {0}, true)", [previousTenant!], cancellationToken);
+        await PostgresTransactionTenantSetting.SetAsync(dbContext, previousTenant!, cancellationToken);
     }
 }

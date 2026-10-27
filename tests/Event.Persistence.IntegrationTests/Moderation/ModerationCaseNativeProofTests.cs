@@ -959,27 +959,37 @@ public sealed partial class ModerationCaseNativeProofTests
         public IDataProtectionProvider NarrativeProtection { get; } = new EphemeralDataProtectionProvider();
         public NativeCaller Caller => new(CallerId);
 
-        public ExploreDbContext Context(params IInterceptor[] interceptors) => new(TestDbContextOptions.Create<ExploreDbContext>()
+        public ExploreDbContext Context(params IInterceptor[] interceptors)
+        {
+            var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
             .AddInterceptors(interceptors)
             .UseSnakeCaseNamingConvention().Options)
-        {
-            TenantContext = new SelectedTenant(TenantId),
-            CurrentUserService = Caller,
-            ModerationTrustDomainId = TrustId
-        };
+            {
+                TenantContext = new SelectedTenant(TenantId),
+                CurrentUserService = Caller,
+                ModerationTrustDomainId = TrustId
+            };
+            context.BindTenantLease();
+            return context;
+        }
 
-        public ExploreDbContext RetryingContext(params IInterceptor[] interceptors) => new(
+        public ExploreDbContext RetryingContext(params IInterceptor[] interceptors)
+        {
+            var context = new ExploreDbContext(
             TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
                 .ReplaceService<IExecutionStrategyFactory, ReceiptRetryingStrategyFactory>()
                 .AddInterceptors(interceptors)
                 .UseSnakeCaseNamingConvention().Options)
-        {
-            TenantContext = new SelectedTenant(TenantId),
-            CurrentUserService = Caller,
-            ModerationTrustDomainId = TrustId
-        };
+            {
+                TenantContext = new SelectedTenant(TenantId),
+                CurrentUserService = Caller,
+                ModerationTrustDomainId = TrustId
+            };
+            context.BindTenantLease();
+            return context;
+        }
 
         public ModerationCaseTargetProofOwner Owner(ExploreDbContext context) => new(context, Caller, Machine, Clock);
 

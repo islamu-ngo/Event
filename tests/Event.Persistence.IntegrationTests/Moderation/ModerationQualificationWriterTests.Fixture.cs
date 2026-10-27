@@ -81,9 +81,14 @@ public sealed partial class ModerationQualificationWriterTests
         public IEnumerable<IModerationConsumerRuntimeSource> ConsumerRuntimeSources { get; set; } = [];
         public Action? QualificationSaved { get; set; }
         public Guid PartialEvidenceId { get; } = Guid.CreateVersion7();
-        public ExploreDbContext Context(IInterceptor? interceptor = null) => new(interceptor is null ? _options
-            : new DbContextOptionsBuilder<ExploreDbContext>(_options).AddInterceptors(interceptor).Options)
-        { TenantContext = this };
+        public ExploreDbContext Context(IInterceptor? interceptor = null)
+        {
+            var context = new ExploreDbContext(interceptor is null ? _options
+                : new DbContextOptionsBuilder<ExploreDbContext>(_options).AddInterceptors(interceptor).Options)
+            { TenantContext = this };
+            context.BindTenantLease();
+            return context;
+        }
 
         public static async Task<SourceDatabase> CreateAsync()
         {

@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Moderation;
 using Explore.Domain;
 using Explore.Persistence;
+using ISLAMU.Moderation.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 

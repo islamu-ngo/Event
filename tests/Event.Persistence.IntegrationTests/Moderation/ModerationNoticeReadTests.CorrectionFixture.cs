@@ -174,9 +174,13 @@ public sealed partial class ModerationNoticeReadTests
                 1, database.ReviewerId, null, ModerationNoticeDeliveryDisposition.NativeRoutingUnavailable);
             fixture.SubjectNoticeId = representativeNotice?.Id ?? subjectNotice.Id;
             fixture.ReviewerNoticeId = reviewerNotice.Id;
+            var operationReceipt = ModerationOperationReceipt.Complete(effect.OperationId, new string('b', 64),
+                effect.TrustDomainId, effect.ScopeKind, effect.ScopeId, effect.SubjectKind, effect.SubjectId,
+                database.AdministratorId, new string('c', 64), decision.Id, sanction.Id,
+                decision.Revision, 1, 2, Now);
             await using var context = database.Context();
             context.ModerationTrustDomainId = database.Scope.TrustDomainId;
-            context.AddRange(allegation, finding, decision, sanction, effect, fixture.Approval,
+            context.AddRange(allegation, finding, decision, sanction, operationReceipt, effect, fixture.Approval,
                 policy, adoption, reviewer, identity, conflict, source, subjectNotice, reviewerNotice,
                 ModerationQualificationMutationReceipt.Complete(Guid.CreateVersion7(), new string('A', 64),
                     database.HostId, database.Scope.TrustDomainId, database.TenantId,

@@ -28,6 +28,14 @@ owners and host teardown real and bounded. A killed process or missing test
 summary is not a passing receipt. Diagnose partial-initialization leaks and
 provider lifecycle wiring rather than reducing coverage or extending a hang.
 
+The job budget is 120 minutes. The repaired full serial selection completed
+284 cases with no failures or skips in 73 minutes 29 seconds locally; the
+previous 45-minute job limit could not accommodate that measured execution.
+The budget also covers restore/build, policy contracts and evidence generation.
+This is a finite passing-run baseline, not permission to accept a missing
+summary or conceal a stalled fixture. Reassess the budget against retained
+complete-run receipts when the selection or execution arrangement changes.
+
 ## Complete PR file metadata
 
 The release-impact job checks out only its trusted base and fetches the immutable

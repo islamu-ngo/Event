@@ -22,7 +22,8 @@ jobs:
   security-tests:
     name: Security Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The full serial Security selection measured 73m29s; include build and policy-contract headroom.
+    timeout-minutes: 120
 
     steps:
       - name: Checkout

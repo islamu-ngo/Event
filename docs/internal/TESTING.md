@@ -775,6 +775,14 @@ Nightly/manual runtime lanes are intentionally advisory until reliability data p
 
 Required vs advisory gate policy, branch-protection guidance, and artifact retention expectations are maintained in [CI_CD_GOVERNANCE.md](CI_CD_GOVERNANCE.md).
 
+The supplementary `Focused Grant Settlement` workflow executes the 18 grant
+settlement regressions even when an unrelated Architecture failure prevents the
+main lane from reaching persistence tests. It selects `ReadGrantSettlement*`
+in `ModerationCaseNativeProofTests` (minimum 8) and
+`Adjudicated_grant_settlement*` in `ModerationNoticeReadTests` (minimum 10),
+retaining separate TRX files. This SQLite evidence does not replace any required
+check, execute the full provider matrix, or make skipped suites passing evidence.
+
 Rate limiting is automatically disabled in the `Testing` environment — all rate limit policies are replaced with `NoLimiter`.
 
 ## Related

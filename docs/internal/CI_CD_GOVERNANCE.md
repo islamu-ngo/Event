@@ -511,6 +511,18 @@ replace SetupLive or any later selected suite: all retained gates must pass.
 An early Architecture failure still fails `Build & Test` and retains its TRX;
 runtime suites skipped by fail-fast ordering are not passing evidence.
 
+`Focused Grant Settlement` (`grant-settlement-tests.yml`) is a supplementary PR
+and manual workflow, independent of the required `Build & Test` job. It builds
+the Persistence test project and executes only the ordinary and adjudicated
+grant-settlement methods, with minimum counts of 8 and 10 respectively and one
+test at a time. Both selections are attempted after a successful build even if
+the first fails; either failure still fails the job. Thirty-day TRX artifacts
+and the summary identify the tested Git object and actual step outcomes.
+The fixtures use SQLite, including separate and colocated privacy authorities;
+this lane does not attest the full provider matrix. It uses read-only checkout
+permissions without repository secrets. No existing workflow, required check,
+Architecture assertion or runtime/security gate is replaced or weakened.
+
 These read-only checks retain nonpersistent checkout credentials and no signing,
 publication or deployment authority. Bundled CI jobs, fourteen product/test
 solution registrations, two generator registrations, eight exclusive package

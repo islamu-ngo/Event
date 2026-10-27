@@ -7,6 +7,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Moderation.Notices;
+using Explore.Application.Features.Moderation.Notices.Commands;
 using Explore.Application.Services.Moderation;
 using Explore.Domain;
 using Explore.Domain.Enums;

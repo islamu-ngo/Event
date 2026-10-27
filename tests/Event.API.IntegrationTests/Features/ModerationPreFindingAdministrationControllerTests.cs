@@ -2,6 +2,7 @@ using Explore.API.Controllers;
 using Explore.Application.Contracts.Moderation;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Moderation.Responses;
+using Explore.Application.Features.Moderation.Responses.Commands;
 using Explore.Application.Responses;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

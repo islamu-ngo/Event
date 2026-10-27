@@ -14,29 +14,6 @@ public sealed record GetRecognitionRecoveryEscalationQuery(Guid Id)
 public sealed record GetRecognitionRecoveryContextQuery(Guid EscalationId)
     : IQuery<RecognitionRecoveryReadResponse<RecognitionRecoveryContextDto>>;
 
-public sealed record AssessRecognitionRecoveryCommand : ICommand<BaseCommandResponse<Guid>>
-{
-    [JsonIgnore] public Guid IntentId { get; init; }
-    [JsonIgnore] public Guid SourceId { get; init; }
-    public required Guid OperationId { get; init; }
-    public required long ExpectedPendingRevision { get; init; }
-    public required long ExpectedSourceRevision { get; init; }
-    public required long ExpectedSourceGeneration { get; init; }
-    public required Guid AdoptionId { get; init; }
-    public required long ExpectedAdoptionRevision { get; init; }
-    public required long ExpectedAdoptionGeneration { get; init; }
-    public required ModerationRecognitionDispositionGrounds Grounds { get; init; }
-    public required DateTimeOffset ValidUntil { get; init; }
-}
-
-public sealed record AuthorizeRecognitionRecoveryCommand : ICommand<BaseCommandResponse<Guid>>
-{
-    [JsonIgnore] public Guid Id { get; init; }
-    public required long ExpectedRevision { get; init; }
-}
-
-public sealed record AcknowledgeRecognitionRecoveryCommand(Guid Id) : ICommand<BaseCommandResponse<Guid>>;
-
 /// <summary>The receipt is supplied only by a purpose-authenticated adapter, never by a JSON body.</summary>
 public sealed record GetRecognitionCorrectionProofsQuery : IQuery<RecognitionRecoveryReadResponse<IReadOnlyList<RecognitionCorrectionProofDto>>>
 {

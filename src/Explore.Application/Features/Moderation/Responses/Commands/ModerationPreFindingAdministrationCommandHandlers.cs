@@ -4,7 +4,7 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using FluentValidation;
 
-namespace Explore.Application.Features.Moderation.Responses;
+namespace Explore.Application.Features.Moderation.Responses.Commands;
 
 public sealed class ProposeModerationPreFindingCustodyCommandHandler(IModerationPreFindingRepository repository)
     : ICommandHandler<ProposeModerationPreFindingCustodyCommand, BaseCommandResponse<Guid>>

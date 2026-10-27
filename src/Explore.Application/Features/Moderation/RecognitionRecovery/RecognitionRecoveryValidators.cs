@@ -1,4 +1,5 @@
 using FluentValidation;
+using Explore.Application.Features.Moderation.RecognitionRecovery.Commands;
 
 namespace Explore.Application.Features.Moderation.RecognitionRecovery;
 

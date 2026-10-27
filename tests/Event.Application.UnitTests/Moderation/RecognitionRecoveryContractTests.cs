@@ -2,6 +2,7 @@ using System.Text.Json;
 using Explore.Application;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Moderation.RecognitionRecovery;
+using Explore.Application.Features.Moderation.RecognitionRecovery.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Microsoft.Extensions.DependencyInjection;

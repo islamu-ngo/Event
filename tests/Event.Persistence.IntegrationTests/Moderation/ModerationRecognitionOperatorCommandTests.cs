@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Explore.Application.Features.Moderation.RecognitionRecovery;
+using Explore.Application.Features.Moderation.RecognitionRecovery.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Services.Moderation;
 using Explore.Domain;

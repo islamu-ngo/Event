@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Application.Services.Moderation;
 
-namespace Explore.Application.Features.Moderation.RecognitionRecovery;
+namespace Explore.Application.Features.Moderation.RecognitionRecovery.Commands;
 
 public sealed class AssessRecognitionRecoveryCommandHandler(ModerationRecognitionRecovery recovery, IUserContext user)
     : ICommandHandler<AssessRecognitionRecoveryCommand, BaseCommandResponse<Guid>>

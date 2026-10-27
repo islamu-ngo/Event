@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Domain;
 
-namespace Explore.Application.Features.Moderation.Responses;
+namespace Explore.Application.Features.Moderation.Responses.Commands;
 
 /// <summary>Explicit custody intent; current proposer, privacy owner and reviewer authority remain native facts.</summary>
 public sealed record ProposeModerationPreFindingCustodyCommand : ICommand<BaseCommandResponse<Guid>>

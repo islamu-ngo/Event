@@ -1,5 +1,6 @@
 using System.Text;
 using Explore.Application.Features.Moderation.Responses;
+using Explore.Application.Features.Moderation.Responses.Commands;
 
 namespace Event.Application.UnitTests.Moderation;
 

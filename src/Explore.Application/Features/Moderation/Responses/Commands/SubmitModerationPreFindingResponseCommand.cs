@@ -5,7 +5,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Responses;
 using FluentValidation;
 
-namespace Explore.Application.Features.Moderation.Responses;
+namespace Explore.Application.Features.Moderation.Responses.Commands;
 
 /// <summary>Recipient intent for one attributed subject case, never confidential occurrence identity.</summary>
 public sealed record SubmitModerationPreFindingResponseCommand : ICommand<BaseCommandResponse<Guid>>

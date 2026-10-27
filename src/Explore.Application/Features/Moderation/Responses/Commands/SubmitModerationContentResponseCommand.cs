@@ -6,7 +6,7 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using FluentValidation;
 
-namespace Explore.Application.Features.Moderation.Responses;
+namespace Explore.Application.Features.Moderation.Responses.Commands;
 
 public sealed record SubmitModerationContentResponseCommand(
     Guid NoticeId, Guid OperationId, string SnapshotHash,

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Features.Moderation.Responses;
+using Explore.Application.Features.Moderation.Responses.Commands;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Identity;

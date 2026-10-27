@@ -4,6 +4,7 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Moderation.Responses;
+using Explore.Application.Features.Moderation.Responses.Commands;
 using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

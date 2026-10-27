@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Moderation;
 using Explore.Application.Features.Moderation.Responses;
+using Explore.Application.Features.Moderation.Responses.Commands;
 using Explore.Domain;
 
 namespace Event.Application.UnitTests.Moderation;

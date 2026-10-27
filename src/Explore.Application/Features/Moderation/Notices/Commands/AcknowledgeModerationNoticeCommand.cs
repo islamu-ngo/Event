@@ -5,7 +5,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using FluentValidation;
 
-namespace Explore.Application.Features.Moderation.Notices;
+namespace Explore.Application.Features.Moderation.Notices.Commands;
 
 public sealed record AcknowledgeModerationNoticeCommand(Guid Id, Guid OperationId, string SnapshotHash)
     : ICommand<BaseCommandResponse<Guid>>;

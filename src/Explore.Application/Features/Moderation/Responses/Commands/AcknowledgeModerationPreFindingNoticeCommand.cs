@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using FluentValidation;
 
-namespace Explore.Application.Features.Moderation.Responses;
+namespace Explore.Application.Features.Moderation.Responses.Commands;
 
 /// <summary>Explicit recipient acknowledgement only; a GET or elapsed time cannot create response evidence.</summary>
 public sealed record AcknowledgeModerationPreFindingNoticeCommand : ICommand<BaseCommandResponse<Guid>>
